@@ -12,7 +12,7 @@ test_that("smooth-coefficient formula transactions prepare expressions once", {
     expect_false(grepl("getFromNamespace", paste(deparse(attr(bw$terms, "predvars")), collapse = "")))
     counts$n <- 0L
     ref <- npscoef(bw, se = TRUE, betas = TRUE)
-    expect_identical(counts$n, 1L)
+    expect_identical(counts$n, 0L)
     for (args in list(list(f, data = d, bws = .5),
         list(formula = f, data = d, bws = .5),
         list(data = d, bws = .5, formula = f))) {
@@ -26,10 +26,10 @@ test_that("smooth-coefficient formula transactions prepare expressions once", {
     }
     counts$n <- 0L
     evaluated <- npscoef(bw, newdata = d[1:7, ], se = TRUE)
-    expect_identical(counts$n, 2L)
+    expect_identical(counts$n, 1L)
     counts$n <- 0L
     prediction <- predict(ref, newdata = d[1:7, ], se.fit = TRUE)
-    expect_identical(counts$n, 2L)
+    expect_identical(counts$n, 1L)
     expect_identical(prediction$fit, fitted(evaluated))
     expect_identical(prediction$se.fit, se(evaluated))
     expect_error(predict(ref, newdata = data.frame(wrong = 1:7)), "columns.*x")
@@ -66,10 +66,8 @@ test_that("smooth-coefficient formulas retain the indexed sample and trained ter
   f <- y ~ poly(x, degree = 1) | z
   bw <- npscoefbw(f, data = d, bws = .5, bandwidth.compute = FALSE)
   mf <- model.frame(y ~ poly(x, degree = 1) + z, data = d)
-  # This is an independent refit, so both routes replay the trained transform.
-  # R's initial poly QR values and its subsequent coefficient recurrence may
-  # differ by an ulp; do not compare different input constructions as bitwise.
-  mf <- model.frame(attr(mf, "terms"), data = d)
+  # Retained training uses the initial poly QR values; only newdata uses the
+  # trained recurrence. The native oracle must describe those same two samples.
   new <- transform(d[1:8, ], x = x + .1)
   em <- model.frame(delete.response(attr(mf, "terms")), data = new)
   value <- npscoef(bw, newdata = new, se = FALSE)

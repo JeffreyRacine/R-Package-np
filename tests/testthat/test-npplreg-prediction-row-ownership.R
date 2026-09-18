@@ -134,7 +134,7 @@ test_that("plreg prediction SE consumes each prepared formula role once", {
   fit <- npplreg(bw)
   hits <- 0L
   ans <- predict(fit, se.fit = TRUE)
-  expect_identical(hits, 1L)
+  expect_identical(hits, 0L)
   expect_true(all(is.finite(ans$se.fit)))
 })
 

@@ -247,6 +247,7 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
   qenv$progress <- integer()
 
   local_mocked_bindings(
+    .npRmpi_fanout_native = function(action, ...) if (action == "poll") 1L else NULL,
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
     .npRmpi_master_only_mode = function(comm = 1L) FALSE,
     .npRmpi_bootstrap_worker_count = function(comm = 1L) 1L,
@@ -291,6 +292,8 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
       }
       qenv$queue[[length(qenv$queue) + 1L]] <- list(src = as.integer(dest),
         tag = qenv$header$control, payload = envelope(qenv$header, "terminal"))
+      qenv$queue[[length(qenv$queue) + 1L]] <- list(src = as.integer(dest),
+        tag = qenv$header$control, payload = envelope(qenv$header, "closed"))
       invisible(NULL)
     },
     mpi.iprobe = function(source, tag, comm = 1L) length(qenv$queue) > 0L,
@@ -347,6 +350,7 @@ test_that("wild fanout timeout drains healthy replies before returning its condi
   quit.state$queue <- list()
 
   local_mocked_bindings(
+    .npRmpi_fanout_native = function(action, ...) if (action == "poll") 1L else NULL,
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
     .npRmpi_master_only_mode = function(comm = 1L) FALSE,
     .npRmpi_bootstrap_worker_count = function(comm = 1L) 1L,
@@ -370,6 +374,8 @@ test_that("wild fanout timeout drains healthy replies before returning its condi
           obj$task_indices, lapply(obj$tasks, function(task) matrix(1, task$bsz, 1L))))
       quit.state$queue[[length(quit.state$queue) + 1L]] <- list(tag = 18432L,
         payload = envelope(quit.state$header, "terminal"))
+      quit.state$queue[[length(quit.state$queue) + 1L]] <- list(tag = 18432L,
+        payload = envelope(quit.state$header, "closed"))
       invisible(NULL)
     },
     mpi.iprobe = function(source, tag, comm = 1L)

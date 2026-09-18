@@ -213,9 +213,11 @@ result is returned, and the original condition is signalled. Once cleanup
 completes, the existing pool can be reused.
 
 A second interrupt during cleanup returns control with the pool explicitly
-quarantined. The existing \code{npRmpi.session.recv.timeout} option (or
-\code{NP_RMPI_SESSION_RECV_TIMEOUT_SEC} environment setting) also limits each
-cleanup attempt when positive. The unchanged zero default specifies no
+quarantined. The existing \code{npRmpi.session.recv.timeout} R option also
+limits each cleanup attempt when positive. Use this R option for a cleanup
+budget, not \code{NP_RMPI_SESSION_RECV_TIMEOUT_SEC}: that environment setting
+also arms the worker-side receive watchdog and can end an otherwise idle
+session. The unchanged zero default specifies no
 automatic deadline, not uninterruptible cleanup. The cleanup clock starts
 afresh for each explicit attempt and is not reset by incoming replies.
 

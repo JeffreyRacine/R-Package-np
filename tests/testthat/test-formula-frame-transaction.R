@@ -47,7 +47,7 @@ test_that("canonical frames evaluate expressions once and preserve prediction me
                    quote(list(y, lag(x, -1), lag(y, -1))))
 })
 
-test_that("one regression transaction reuses its sample and independent refits do not", {
+test_that("regression transactions and saved refits reuse their training sample", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
   set.seed(843L)
@@ -64,7 +64,7 @@ test_that("one regression transaction reuses its sample and independent refits d
   expect_identical(one$mean, two$mean)
   calls[] <- 0L
   separate <- npreg(bws = one$bws)
-  expect_identical(unname(calls), c(1L, 1L))
+  expect_identical(unname(calls), c(0L, 0L))
   expect_identical(one$mean, separate$mean)
   calls[] <- 0L
   auto <- npreg(f, data = d, nmulti = 1L)

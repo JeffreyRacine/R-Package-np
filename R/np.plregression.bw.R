@@ -22,7 +22,10 @@ npplregbw.formula <-
                                         eval_env = parent.frame())
     spec <- .np_plreg_formula_spec(formula.obj)
     mf[["formula"]] <- spec$joint
-    frame <- do.call(.np_formula_model_frame, as.list(mf[-1L]),
+    capture <- new.env(parent = emptyenv())
+    frame.args <- as.list(mf[-1L])
+    frame.args$.np.capture <- capture
+    frame <- do.call(.np_formula_model_frame, frame.args,
                      envir = parent.frame())
     roles <- .np_plreg_formula_split(frame, spec$terms, spec$xterms)
     dots <- list(...)
@@ -40,6 +43,7 @@ npplregbw.formula <-
     tbw$nobs.omit <- length(tbw$rows.omit)
     tbw$terms <- attr(roles$yz, "terms")
     tbw$xterms <- attr(roles$x, "terms")
+    tbw[[".np.formula.training"]] <- list(frame = frame, na.action = capture$na.action)
     tbw$chromoly <- spec$chromoly
     updateBwNameMetadata(nameList = list(ynames =
       names(roles$yz)[attr(tbw$terms, "response")]), bws = tbw)

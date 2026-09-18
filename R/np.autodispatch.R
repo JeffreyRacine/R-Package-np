@@ -2179,6 +2179,15 @@
       !exists(argname, envir = caller_env, inherits = FALSE))
     return(list(found = FALSE, value = NULL))
 
+  # A local variable with the same spelling is not an argument owner. Locate
+  # the activation of this exact environment, never a same-named binding in
+  # another dynamic frame. Later eval frames can reuse this environment.
+  frames <- sys.frames()
+  owner <- which(vapply(frames, identical, logical(1L), caller_env))
+  if (!length(owner) ||
+      !(argname %in% names(formals(sys.function(owner[[1L]])))))
+    return(list(found = FALSE, value = NULL))
+
   list(
     found = TRUE,
     value = get(argname, envir = caller_env, inherits = FALSE)

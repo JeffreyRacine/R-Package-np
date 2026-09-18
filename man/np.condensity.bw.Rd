@@ -758,6 +758,17 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+Formula bandwidth objects retain the prepared training sample (after alignment,
+subsetting and missing-value handling) and the resolved missing-value policy.
+Later refits use that sample even if constructor variables are rebound.
+Supplying explicit training data to the estimator replaces the training data;
+evaluation via \code{newdata} does not. Retention requires storage proportional
+to the sample size times the number of variables, not a pairwise weight matrix.
+Older saved objects without this retained state still rely on their original
+data bindings; rebuild their bandwidth object from the intended data before
+changing those bindings. User-defined transformation and missing-value
+functions should not rely on subsequently modified closure state.
+
 
   Beta associated kernels may be selected independently with
   \code{cxkertype="beta"} and \code{cykertype="beta"}. Orders 2, 4, 6,

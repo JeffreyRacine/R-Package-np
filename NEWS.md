@@ -1,5 +1,16 @@
 # npRmpi 0.80-1
 
+* Native arguments forwarded positionally through wrappers now retain their
+  actual promise owner. An unrelated same-named wrapper local can no longer
+  silently replace the supplied training data.
+
+* Formula bandwidth objects now retain their prepared training sample and NA
+  policy. Rebinding constructor variables (for example in a model-building
+  loop) no longer silently changes later refits, predictions, plots or tests.
+  Explicit training-data overrides remain available. Objects created by older
+  versions without retained samples still require their original data bindings.
+  Single-index bandwidth plotting uses the same saved-data owner.
+
 * Arguments forwarded through `...` wrappers are honored as in direct calls:
   an explicit `bws` is no longer ignored in favor of bandwidth search.
   Saved formula objects also retain forwarded or caller-local `na.action`
@@ -93,7 +104,8 @@
 
 * Quantile and conditional-mode one-call formula fits also reuse their prepared
   training sample. Conditional-mode response validation still occurs before
-  bandwidth selection, and independent refits evaluate their formulas afresh.
+  bandwidth selection. Saved-object refits now reuse the retained training
+  sample; explicit evaluation data still use the trained formula terms.
   Positional quantile formula calls with supplied numeric bandwidths no longer
   start an unintended bandwidth search; an explicit positional
   `bandwidth.compute = TRUE` request retains its existing search behavior.

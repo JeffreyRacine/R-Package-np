@@ -168,7 +168,7 @@ test_that("partially linear formula transactions prepare every expression once",
   expect_identical(unname(counts), rep(1L, 3L))
   counts[] <- 0L
   ref <- npplreg(bw, se = TRUE, residuals = TRUE)
-  expect_identical(unname(counts), rep(1L, 3L))
+  expect_identical(unname(counts), rep(0L, 3L))
   for (args in list(list(f, data = d, bws = h),
                    list(formula = f, data = d, bws = h),
                    list(data = d, bws = h, formula = f))) {
@@ -183,19 +183,19 @@ test_that("partially linear formula transactions prepare every expression once",
   }
   counts[] <- 0L
   evaluated <- npplreg(bw, newdata = d[1:7, ], se = TRUE)
-  expect_identical(unname(counts), c(1L, 2L, 2L))
+  expect_identical(unname(counts), c(0L, 1L, 1L))
   counts[] <- 0L
   expect_identical(predict(ref, newdata = d[1:7, ]), fitted(evaluated))
-  expect_identical(unname(counts), c(1L, 2L, 2L))
+  expect_identical(unname(counts), c(0L, 1L, 1L))
   expect_error(predict(ref, newdata = data.frame(wrong = 1:7)), "columns.*x")
   for (helper in c(".np_plreg_predict_train_data", ".np_plot_plreg_training_data")) {
     counts[] <- 0L
     plreg_preparation_internal(helper)(bw)
-    expect_identical(unname(counts), rep(1L, 3L), info = helper)
+    expect_identical(unname(counts), rep(0L, 3L), info = helper)
   }
   counts[] <- 0L
   npplreg(bw, newdata = d[1:7, ], y.eval = TRUE)
-  expect_identical(unname(counts), rep(2L, 3L))
+  expect_identical(unname(counts), rep(1L, 3L))
 })
 
 test_that("partially linear time alignment agrees with integer observation oracles", {
@@ -301,7 +301,7 @@ test_that("partially linear one-call stochastic and repeated-role expressions ar
   expect_identical(counts, 1L)
   counts <- 0L
   npplreg(bw)
-  expect_identical(counts, 1L)
+  expect_identical(counts, 0L)
   bad <- bw
   attr(bad$xterms, "predvars")[[2L]] <- quote(x + 100)
   expect_error(plreg_preparation_internal(".np_plreg_formula_terms")(bad),

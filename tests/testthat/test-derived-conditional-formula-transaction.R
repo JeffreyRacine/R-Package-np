@@ -37,7 +37,7 @@ test_that("derived conditional formulas share one constructor and fit sample", {
       expect_equal(fitted(fit), fitted(native), tolerance = 1e-12)
       counter$n <- 0L
       refit <- fun(bws = fit$bws)
-      expect_identical(counter$n, 1L)
+      expect_identical(counter$n, 0L)
       expect_identical(fitted(refit), fitted(fit))
       expect_false(".np.formula.state" %in% names(fit$bws$call$...))
     }

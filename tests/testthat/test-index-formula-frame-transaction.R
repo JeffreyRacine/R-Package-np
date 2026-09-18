@@ -11,10 +11,10 @@ test_that("single-index formulas prepare one sample independently of argument or
   expect_false(grepl("getFromNamespace", paste(deparse(attr(bw$terms, "predvars")), collapse = "")))
   counter$n <- 0L
   fit <- npindex(bw, se = FALSE)
-  expect_identical(counter$n, 1L)
+  expect_identical(counter$n, 0L)
   counter$n <- 0L
   evaluated <- npindex(bw, newdata = d[1:5, ], se = FALSE)
-  expect_identical(counter$n, 2L)
+  expect_identical(counter$n, 1L)
   expect_equal(predict(fit, newdata = d[1:5, ]), fitted(evaluated), tolerance = 0)
   for (args in list(list(f, data = d, bws = h),
       list(formula = f, data = d, bws = h),
