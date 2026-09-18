@@ -4,16 +4,18 @@
     where = "conditional hat"
   )
 
-  xbw.args <- list(
-    xdat = txdat,
-    ydat = rep.int(0.0, nrow(txdat)),
-    bws = bws$xbw,
+  # Keep the canonical metadata builder and finalizer, without re-entering the
+  # public search/argument/progress setup for every conditional bootstrap fit.
+  # Rebuild from this draw's actual X data; NN geometry is not cached or frozen.
+  if (identical(bws$cxkertype, "uniform"))
+    .np_warning("ignoring kernel order specified with uniform kernel type")
+  ydat <- rep.int(0.0, nrow(txdat))
+  reg.args <- list(
     regtype = spec$reg.engine,
     basis = spec$basis.engine,
     degree = spec$degree.engine,
     bernstein.basis = spec$bernstein.engine,
     bwtype = bws$type,
-    bandwidth.compute = FALSE,
     ckertype = bws$cxkertype,
     ckerorder = bws$cxkerorder,
     ckerbound = bws$cxkerbound,
@@ -23,7 +25,13 @@
     okertype = bws$oxkertype
   )
 
-  do.call(npregbw, xbw.args)
+  xbw <- .npregbw_build_rbandwidth(
+    xdat = txdat, ydat = ydat, bws = bws$xbw,
+    bandwidth.compute = FALSE, reg.args = reg.args, yname = "ydat"
+  )
+  npregbw.rbandwidth(
+    xdat = txdat, ydat = ydat, bws = xbw, bandwidth.compute = FALSE
+  )
 }
 
 .npcdhat_make_xkbw <- function(bws, txdat) {
