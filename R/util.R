@@ -4877,6 +4877,10 @@ int.kernels <- c(0.28209479177387814348, 0.47603496111841936711, 0.6239694368826
 QFAC <- qnorm(.25,lower.tail=FALSE)*2
 
 .np_eval_bws_call_arg <- function(bws, arg) {
+  training <- bws[[".np.native.training", exact = TRUE]]
+  if (!is.null(training) && arg %in% names(training))
+    return(training[[arg, exact = TRUE]])
+
   if (is.null(bws$call))
     stop("bandwidth object does not contain a call component")
 
