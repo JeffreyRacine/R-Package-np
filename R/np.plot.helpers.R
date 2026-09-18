@@ -11105,7 +11105,7 @@ draw.error.bands = function(ex, ely, ehy, lty = .np_plot_lty("interval"), col = 
   lines(ex,ehy,lty=lty,col=col)
 }
 
-draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = .np_plot_lty("interval"), col = par("col")){
+draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = .np_plot_lty("interval"), col = par("col"), lwd = par("lwd")){
   yy = double(3*length(ex))
   jj = seq_along(ex)*3
 
@@ -11118,33 +11118,34 @@ draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = .np
   xx[jj-1] = ex
   xx[jj] = NA
 
-  lines(xx,yy,lty=lty,col=col)
+  lines(xx,yy,lty=lty,col=col,lwd=lwd)
 
   if (hbar){
-    ## Compare lengths in display units, not unrelated x and y data units.
-    ## This keeps cap proportions invariant to response scaling and log axes.
-    golden = (1+sqrt(5))/2
+    ## Horizontal spacing, not interval height or the response-axis range,
+    ## determines cap width. Repeated locations do not shrink the caps.
     xp <- graphics::grconvertX(ex, from = "user", to = "inches")
-    finite.x <- xp[is.finite(xp)]
+    finite.x <- sort(unique(xp[is.finite(xp)]))
     if (!length(finite.x)) return(invisible(NULL))
     span <- diff(range(finite.x))
     if (span == 0) span <- par("pin")[[1L]]
     hbardist <- span / max(2L, length(finite.x)) * hbarscale
-    yg <- abs(graphics::grconvertY(ely, from = "user", to = "inches") -
-              graphics::grconvertY(ehy, from = "user", to = "inches")) / golden
-    hdelta <- pmin(yg, hbardist) / 2
+    if (length(finite.x) > 1L)
+      hbardist <- min(hbardist, min(diff(finite.x)) * hbarscale)
+    hdelta <- rep(hbardist / 2, length(xp))
+    ## A reference-category zero has no uncertainty bar to cap.
+    hdelta[is.finite(ely) & is.finite(ehy) & ely == ehy] <- 0
     xx[jj-2] <- graphics::grconvertX(xp - hdelta, from = "inches", to = "user")
     xx[jj-1] <- graphics::grconvertX(xp + hdelta, from = "inches", to = "user")
     
     ty = yy[jj-1]
     yy[jj-1] = yy[jj-2]
 
-    lines(xx,yy,col=col)
+    lines(xx,yy,col=col,lwd=lwd)
 
     yy[jj-2] = ty
     yy[jj-1] = ty
 
-    lines(xx,yy,col=col)
+    lines(xx,yy,col=col,lwd=lwd)
   }
 }
 
