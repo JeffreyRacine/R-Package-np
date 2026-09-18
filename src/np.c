@@ -22008,6 +22008,30 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
 
   int npks_err = 0;
 
+  /* OCG needs an index in the retained ordered-category table. Ordinary
+     numeric ordered evaluation may extrapolate and must remain unrestricted.
+     Check before native allocations (and before any MPI work is entered). */
+  if(myopti[KWS_POCGI] && myopti[KWS_NORDI] > 0){
+    const int rows = myopti[KWS_TISEI] ? myopti[KWS_TNOBSI] : myopti[KWS_ENOBSI];
+    const int levels = myopti[KWS_MLEVI];
+    const double *eval = myopti[KWS_TISEI] ? tord : eord;
+    if(levels <= 0 || rows < 0)
+      error("npksum: invalid ordered contrast metadata");
+    for(int coordinate = 0; coordinate < myopti[KWS_NORDI]; ++coordinate){
+      const double *categories = mcv +
+        (size_t)(myopti[KWS_NUNOI] + coordinate)*(size_t)levels;
+      int count = 0;
+      while(count < levels && categories[count] != *padnum) ++count;
+      for(int row = 0; row < rows; ++row){
+        const double value = eval[(size_t)coordinate*(size_t)rows + (size_t)row];
+        int index = 0;
+        while(index < count && categories[index] != value) ++index;
+        if(index == count)
+          error("npksum: compute.ocg requires ordered evaluation values in the bandwidth category table");
+      }
+    }
+  }
+
   /* match integer options with their globals */
 
   num_reg_continuous_extern = myopti[KWS_NCONI];
@@ -22369,7 +22393,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
 
       ret = &te;
       for(i = 0; i < num_obs_eval_extern; i++){
-        if(ret->key.dkey != matrix_X_ordered_eval_extern[k][i]){
+        if(i == 0 || ret->key.dkey != matrix_X_ordered_eval_extern[k][i]){
           te.key.dkey = matrix_X_ordered_eval_extern[k][i];
           if(thsearch_r(&te, TH_SEARCH, &ret, otabs+k) == TH_FAILURE)
             error("hash table lookup failed (which should be impossible)");
