@@ -68,6 +68,17 @@
   a number of dummy variables for a factor.  Every function in npRmpi
   supports both interfaces, where appropriate.
 
+  Bandwidth objects for regression, unconditional and conditional
+  density/distribution, single-index, partially linear and smooth-coefficient
+  methods retain their training values. Formula objects retain the prepared
+  model frame and NA policy; native objects retain the supplied training
+  values. Fitting with replacement training data records that sample in the
+  returned fit's bandwidth object, without modifying the original bandwidth
+  object. Evaluation or prediction grids do not replace training data.
+  Objects created without retained samples still require their original data
+  bindings or explicit training inputs. New evaluation data involving custom
+  formula transformations still require those transformation functions.
+
   Estimator formulas do not support right-hand-side \code{offset()} special
   terms; these are rejected rather than silently omitted. A variable named
   \code{offset} is not an offset special. This restriction does not change
