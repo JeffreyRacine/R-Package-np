@@ -35856,7 +35856,31 @@ static int np_conditional_kernel_row_core(const int *kernel_c,
                                                  const int bandwidth_divide_weights,
                                                  double *kw_out,
                                                  double *mean_out){
-  return kernel_weighted_sum_np_ctx((int *)kernel_c,
+  /* ANN swaps training/evaluation roles in the kernel traversal. This adapter
+     supplies exactly one evaluation point, so a training-indexed tree cannot
+     describe its vector operand. Retain tree traversal with the matching
+     one-point geometry. R scratch is bounded per call and unwinds on errors. */
+  KDN eval_node = {0};
+  KDT eval_tree = {0};
+  const void *scratch = NULL;
+  if(BANDWIDTH_den == BW_ADAP_NN && int_tree == NP_TREE_TRUE &&
+     num_continuous > 0){
+    scratch = vmaxget();
+    double *bounds = (double *)R_alloc((size_t)num_continuous, 2*sizeof(double));
+    for(int coordinate = 0; coordinate < num_continuous; ++coordinate)
+      bounds[2*coordinate] = bounds[2*coordinate+1] =
+        matrix_eval_continuous_one[coordinate][0];
+    eval_node.bb = bounds;
+    eval_node.childl = eval_node.childu = KD_NOCHILD;
+    eval_node.nlev = 1;
+    eval_node.istart = 0;
+    eval_tree.kdn = &eval_node;
+    eval_tree.bb = bounds;
+    eval_tree.ndim = num_continuous;
+    eval_tree.nbucket = eval_tree.numnode = 1;
+    kdt = &eval_tree;
+  }
+  const int status = kernel_weighted_sum_np_ctx((int *)kernel_c,
                                     (int *)kernel_u,
                                     (int *)kernel_o,
                                     BANDWIDTH_den,
@@ -35910,6 +35934,8 @@ static int np_conditional_kernel_row_core(const int *kernel_c,
                                     kw_out,
                                     NULL,
                                     NULL);
+  if(scratch != NULL) vmaxset(scratch);
+  return status;
 }
 
 static int np_conditional_kernel_row(const int *kernel_c,
