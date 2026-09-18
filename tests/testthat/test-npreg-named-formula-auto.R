@@ -25,6 +25,6 @@ test_that("named automatic regression shares the positional training transaction
     expect_identical(named$bws[[field]], positional$bws[[field]])
   state$n <- 0L
   refit <- npreg(bws = named$bws, se = TRUE, gradients = TRUE)
-  expect_identical(state$n, 1L)
+  expect_identical(state$n, 0L)
   expect_identical(refit$mean, named$mean)
 })

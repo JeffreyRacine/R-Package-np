@@ -26,7 +26,7 @@ test_that("default route partitions every single and paired test control", {
   captured <- new.env(parent = emptyenv())
 
   local_mocked_bindings(
-    .np_eval_bw_call = function(call, caller_env) {
+    .np_eval_bw_call = function(call, caller_env, formula.value = NULL) {
       captured$bw.names <- names(call)
       structure(list(marker = "bw"), class = "rbandwidth")
     },
@@ -75,7 +75,7 @@ test_that("default route evaluates bandwidth work before deferred test controls"
   events <- character()
 
   local_mocked_bindings(
-    .np_eval_bw_call = function(call, caller_env) {
+    .np_eval_bw_call = function(call, caller_env, formula.value = NULL) {
       eval(call$bws, envir = caller_env)
       structure(list(marker = "bw"), class = "rbandwidth")
     },
@@ -155,7 +155,7 @@ test_that("default route preserves regression bandwidth arguments", {
   captured <- NULL
 
   local_mocked_bindings(
-    .np_eval_bw_call = function(call, caller_env) {
+    .np_eval_bw_call = function(call, caller_env, formula.value = NULL) {
       captured <<- names(call)
       structure(list(marker = "bw"), class = "rbandwidth")
     },

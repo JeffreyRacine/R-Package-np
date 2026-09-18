@@ -19,10 +19,10 @@ test_that("unconditional replay resolves data in its retained call owner", {
                      predict(reference, newdata = fixture[1:3, ]))
     changed <- transform(fixture, x = x * 2)
     assign("private.data", changed, envir = environment(bw$call))
-    expect_identical(fitted(fit.fun(bw)), fitted(fit.fun(bw, data = changed)))
+    expect_identical(fitted(fit.fun(bw)), fitted(reference))
     expect_identical(fitted(fit.fun(bw, data = fixture)), fitted(reference))
     rm("private.data", envir = environment(bw$call))
-    expect_error(fit.fun(bw), "private.data.*not found")
+    expect_identical(fitted(fit.fun(bw)), fitted(reference))
     expect_identical(fitted(fit.fun(bw, data = fixture)), fitted(reference))
   }
 })
@@ -45,7 +45,7 @@ test_that("unconditional formula fits share one prepared training sample", {
     expect_identical(fitted(fit), fitted(named))
     count <- 0L
     refit <- fit.fun(bws = fit$bws)
-    expect_identical(count, 1L)
+    expect_identical(count, 0L)
     expect_identical(fitted(fit), fitted(refit))
     count <- 0L
     auto <- fit.fun(f, data = d, bwmethod = "normal-reference", se = TRUE)
@@ -63,7 +63,7 @@ test_that("unconditional formula fits share one prepared training sample", {
     expect_identical(fitted(recovered), fitted(fit))
     count <- 0L
     new <- fit.fun(bws = fit$bws, newdata = d[1:4, , drop = FALSE], se = TRUE)
-    expect_identical(count, 2L)
+    expect_identical(count, 1L)
     control <- fit.fun(bws = fit$bws, tdat = d, edat = d[1:4, , drop = FALSE], se = TRUE)
     expect_equal(fitted(new), fitted(control), tolerance = 1e-14)
     expect_equal(se(new), se(control), tolerance = 1e-14)

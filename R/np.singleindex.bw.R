@@ -22,6 +22,8 @@ npindexbw.formula <-
 
     mf.args <- as.list(mf[-1L])
     mf.args[["formula"]] <- substitute(quote(VALUE), list(VALUE = formula))
+    capture <- new.env(parent = emptyenv())
+    mf.args$.np.capture <- capture
     mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
 
     ydat <- model.response(mf)
@@ -36,6 +38,7 @@ npindexbw.formula <-
     tbw$rows.omit <- as.vector(attr(mf,"na.action"))
     tbw$nobs.omit <- length(tbw$rows.omit)
     tbw$terms <- attr(mf,"terms")
+    tbw[[".np.formula.training"]] <- list(frame = mf, na.action = capture$na.action)
 
     tbw <-
       updateBwNameMetadata(nameList =

@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Formula bandwidth objects now retain their prepared training sample and NA
+  policy. Rebinding constructor variables (for example in a model-building
+  loop) no longer silently changes later refits, predictions, plots or tests.
+  Explicit training-data overrides remain available. Objects created by older
+  versions without retained samples still require their original data bindings.
+  Single-index bandwidth plotting uses the same saved-data owner.
+
 * Arguments forwarded through `...` wrappers are honored as in direct calls:
   an explicit `bws` is no longer ignored in favor of bandwidth search.
   Saved formula objects also retain forwarded or caller-local `na.action`
@@ -65,7 +72,8 @@
 
 * Quantile and conditional-mode one-call formula fits also reuse their prepared
   training sample. Conditional-mode response validation still occurs before
-  bandwidth selection, and independent refits evaluate their formulas afresh.
+  bandwidth selection. Saved-object refits now reuse the retained training
+  sample; explicit evaluation data still use the trained formula terms.
 
 * Conditional density/distribution formula fitting now reuses its prepared
   training sample, avoiding repeated evaluation of predictor expressions.

@@ -54,7 +54,7 @@ test_that("conditional fitting reuses one prepared training frame", {
     expect_identical(fitted(named), fitted(fit))
     counter$n <- 0L
     refit <- fit.fun(bws = fit$bws)
-    expect_identical(counter$n, 1L)
+    expect_identical(counter$n, 0L)
     expect_identical(fitted(refit), fitted(fit))
     counter$n <- 0L
     auto <- fit.fun(formula = f, data = d, bandwidth.compute = FALSE)
@@ -64,7 +64,7 @@ test_that("conditional fitting reuses one prepared training frame", {
       paste(deparse(attr(terms(bw), "predvars")), collapse = ""), fixed = TRUE))
     counter$n <- 0L
     evaluated <- fit.fun(bws = bw, newdata = d[1:5, ], se = TRUE, gradients = TRUE)
-    expect_identical(counter$n, 2L)
+    expect_identical(counter$n, 1L)
     native <- fit.fun(bws = bw, txdat = d[c("x", "z")], tydat = d["y"],
       exdat = d[1:5, c("x", "z")], eydat = d[1:5, "y", drop = FALSE],
       se = TRUE, gradients = TRUE)

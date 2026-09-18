@@ -82,7 +82,8 @@
 }
 
 # Evaluate expression values once, align them transiently, and retain portable
-# prediction expressions (including makepredictcall metadata), never the data.
+# prediction expressions (including makepredictcall metadata), never data in
+# those prediction expressions. Bandwidth owners separately retain the frame.
 .np_formula_unwrap_prediction <- function(tt) {
   prediction <- attr(tt, "predvars")
   variables <- attr(tt, "variables")
@@ -130,7 +131,8 @@
 }
 
 .np_formula_model_frame <- function(formula, data = NULL, subset, na.action,
-                                    drop.unused.levels = FALSE, xlev = NULL, ...) {
+                                    drop.unused.levels = FALSE, xlev = NULL, ...,
+                                    .np.capture = NULL) {
   if (!is.data.frame(data) && !is.environment(data) && !is.null(attr(data, "class")))
     data <- as.data.frame(data)
   tt <- if (inherits(formula, "terms")) formula else terms(formula, data = data)
@@ -148,6 +150,20 @@
   frame.call[[1L]] <- quote(stats::model.frame)
   frame.call[["formula"]] <- tt
   frame.call["data"] <- list(data)
+  frame.call$.np.capture <- NULL
+  if (!is.null(.np.capture)) {
+    # Freeze the resolved policy, not its caller-side expression. Force the
+    # promise once, and let model.frame invoke the policy exactly once.
+    policy <- if (!missing(na.action)) na.action else {
+      action <- attr(data, "na.action")
+      if (!is.null(action) && mode(action) != "numeric") action else
+        getOption("na.action", stats::na.fail)
+    }
+    if (is.character(policy))
+      policy <- get(policy, envir = parent.frame(), mode = "function")
+    .np.capture$na.action <- policy
+    frame.call["na.action"] <- list(policy)
+  }
   frame <- eval(frame.call, parent.frame())
   retained <- attr(frame, "terms")
   attr(retained, "predvars") <- prediction
@@ -200,6 +216,19 @@
 .np_bws_formula_model_frame <- function(bws, mf.args, data.override = FALSE) {
   if (inherits(bws, c("conbandwidth", "condbandwidth")))
     .np_formula_validate_syntax(bws$formula, conditional.response = TRUE)
+  training <- bws[[".np.formula.training", exact = TRUE]]
+  if (!is.null(training)) {
+    if (!is.list(training) || !is.data.frame(training[["frame", exact = TRUE]]) ||
+        !("na.action" %in% names(training)))
+      stop("invalid retained formula training state", call. = FALSE)
+    if (!data.override)
+      return(training[["frame", exact = TRUE]])
+    mf.args["na.action"] <- training["na.action"]
+    return(do.call(.np_formula_model_frame, mf.args,
+                   envir = environment(mf.args[["formula"]])))
+  }
+  # Compatibility for objects saved before training frames were retained.
+  # Their original values cannot be reconstructed after caller rebinding.
   call.env <- environment(bws$call)
   if (is.environment(call.env)) {
     # These are the value arguments extracted from the saved model-frame call.
