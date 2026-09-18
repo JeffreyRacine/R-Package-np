@@ -160,7 +160,7 @@
         getOption("na.action", stats::na.fail)
     }
     if (is.character(policy))
-      policy <- get(policy, envir = parent.frame(), mode = "function")
+      policy <- get(policy, envir = asNamespace("stats"), mode = "function")
     .np.capture$na.action <- policy
     frame.call["na.action"] <- list(policy)
   }
@@ -168,7 +168,28 @@
   retained <- attr(frame, "terms")
   attr(retained, "predvars") <- prediction
   attr(frame, "terms") <- retained
+  if (!is.null(.np.capture)) frame <- .np_formula_complete_training_frame(frame)
   frame
+}
+
+# Native training owners use complete cases even when a model-frame policy
+# leaves missing values. Record that existing exclusion before formula owners
+# freeze the sample, rather than overwriting native omission bookkeeping later.
+.np_formula_complete_training_frame <- function(frame) {
+  missing.rows <- which(!stats::complete.cases(frame))
+  if (!length(missing.rows)) return(frame)
+  previous <- attr(frame, "na.action")
+  kept <- seq_len(nrow(frame) + length(previous))
+  if (length(previous)) kept <- kept[-as.integer(previous)]
+  omitted <- c(as.integer(previous), kept[missing.rows])
+  labels <- c(names(previous), row.names(frame)[missing.rows])
+  order <- order(omitted)
+  action <- structure(omitted[order], names = labels[order],
+    class = if (inherits(previous, "exclude")) "exclude" else "omit")
+  result <- frame[-missing.rows, , drop = FALSE]
+  attr(result, "terms") <- attr(frame, "terms")
+  attr(result, "na.action") <- action
+  result
 }
 
 # An automatic constructor/fit transaction may hand off its frame exactly once.
@@ -214,6 +235,7 @@
 }
 
 .np_bws_retain_formula_training <- function(bws, frame, na.action) {
+  attr(frame, ".np.na.policy") <- NULL
   bws[[".np.formula.training"]] <- list(frame = frame, na.action = na.action)
   bws[[".np.native.training"]] <- NULL
   call.env <- environment(bws$call)
@@ -292,7 +314,8 @@
 
 .np_bws_retain_fit_frame <- function(bws, frame) {
   retained <- bws[[".np.formula.training", exact = TRUE]]
-  policy <- if (is.null(retained)) getOption("na.action", stats::na.omit) else
+  effective <- attr(frame, ".np.na.policy", exact = TRUE)
+  policy <- if (!is.null(effective)) effective[[1L]] else if (is.null(retained)) getOption("na.action", stats::na.omit) else
     retained[["na.action", exact = TRUE]]
   .np_bws_retain_formula_training(bws, frame, policy)
 }
@@ -314,7 +337,8 @@
   call
 }
 
-.np_bws_formula_model_frame <- function(bws, mf.args, data.override = FALSE) {
+.np_bws_formula_model_frame <- function(bws, mf.args, data.override = FALSE,
+                                        overrides = list()) {
   if (inherits(bws, c("conbandwidth", "condbandwidth")))
     .np_formula_validate_syntax(bws$formula, conditional.response = TRUE)
   training <- bws[[".np.formula.training", exact = TRUE]]
@@ -323,15 +347,13 @@
         !("na.action" %in% names(training)))
       stop("invalid retained formula training state", call. = FALSE)
     if (!data.override)
-      return(training[["frame", exact = TRUE]])
+      return(.np_formula_complete_training_frame(training[["frame", exact = TRUE]]))
     mf.args["na.action"] <- training["na.action"]
-    return(do.call(.np_formula_model_frame, mf.args,
-                   envir = environment(mf.args[["formula"]])))
   }
   # Compatibility for objects saved before training frames were retained.
   # Their original values cannot be reconstructed after caller rebinding.
   call.env <- environment(bws$call)
-  if (is.environment(call.env)) {
+  if (is.null(training) && is.environment(call.env)) {
     # These are the value arguments extracted from the saved model-frame call.
     # Resolve them lazily in their original owner, including forwarded ..n
     # promises. Formula variables and subset still use the formula/data mask.
@@ -344,8 +366,16 @@
                                      list(EXPR = mf.args[[name]], OWNER = call.env))
     }
   }
-  do.call(.np_formula_model_frame, mf.args,
-          envir = environment(mf.args[["formula"]]))
+  if (data.override && "na.action" %in% names(overrides))
+    mf.args["na.action"] <- overrides["na.action"]
+  capture <- new.env(parent = emptyenv())
+  mf.args$.np.capture <- capture
+  frame <- do.call(.np_formula_model_frame, mf.args,
+                  envir = environment(mf.args[["formula"]]))
+  # Invocation-local metadata carries even an explicit NULL policy. The
+  # retention owner strips this attribute from the stored model frame.
+  attr(frame, ".np.na.policy") <- list(capture$na.action)
+  frame
 }
 
 # Partially linear formulas have two retained role terms but one observation
@@ -451,13 +481,13 @@
   list(yz = split.role(terms), x = split.role(xterms))
 }
 
-.np_plreg_formula_frame <- function(bws, data = NULL) {
+.np_plreg_formula_frame <- function(bws, data = NULL, overrides = list()) {
   m <- match(c("formula", "data", "subset", "na.action"),
              names(bws$call), nomatch = 0L)
   args <- as.list(bws$call[c(1L, m)])[-1L]
   args$formula <- .np_plreg_formula_terms(bws)
   if (!is.null(data)) args$data <- data
-  .np_bws_formula_model_frame(bws, args, data.override = !is.null(data))
+  .np_bws_formula_model_frame(bws, args, data.override = !is.null(data), overrides = overrides)
 }
 
 .np_plreg_formula_training <- function(bws, data = NULL) {
