@@ -6,6 +6,9 @@
   package constructor frames as their call environments; their user formula
   environments are preserved. Newly saved objects therefore avoid these
   unnecessary references to the originating package's namespace.
+  The same ownership cleanup covers scalar/vector-tau local-smoothing quantile
+  fits and their mean/scale pilots. Each native child retains its own response;
+  generated internal calls no longer serialize method closures.
 
 * Formula bandwidth objects now retain their prepared training sample and NA
   policy. Rebinding constructor variables (for example in a model-building

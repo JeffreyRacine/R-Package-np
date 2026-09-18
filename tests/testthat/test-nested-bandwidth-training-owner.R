@@ -41,6 +41,36 @@ test_that("partially linear child bandwidths own their native samples", {
                        output = "data", neval = 3L), a)
 })
 
+test_that("local-smoothing quantile children retain distinct pilot responses", {
+  withr::local_options(np.messages = FALSE)
+  set.seed(17653)
+  x <- data.frame(x = seq(-1, 1, length.out = 24))
+  y <- sin(x$x) + rnorm(24)
+  model <- nplsqreg(txdat = x, tydat = y, bws = .7, delta = .5,
+    tau = c(.25, .75), bandwidth.compute = FALSE, nomad = FALSE,
+    regtype = "ll", se = TRUE)
+  for (one in model$tau.fits) {
+    expect_true(is.symbol(one$call[[1L]]))
+    expect_null(environment(one$call))
+    expect_true(is.symbol(one$bws$call[[1L]]))
+    expect_null(environment(one$bws$call))
+    expect_identical(one$fit$bws[[".np.native.training"]]$ydat, one$bws$qdat)
+    children <- list(one$fit)
+    if (!is.null(one$bws$mean.fit)) {
+      expect_identical(one$bws$mean.fit$bws[[".np.native.training"]]$ydat, y)
+      expect_identical(one$bws$scale.fit$bws[[".np.native.training"]]$ydat,
+                       (y - as.numeric(fitted(one$bws$mean.fit)))^2)
+      children <- c(children, list(one$bws$mean.fit, one$bws$scale.fit))
+    }
+    for (child in children) {
+      expect_null(environment(child$call))
+      expect_null(environment(child$bws$call))
+      restored <- unserialize(serialize(child$bws, NULL))
+      expect_equal(fitted(npreg(restored)), fitted(child), tolerance = 1e-14)
+    }
+  }
+})
+
 test_that("child sample retention does not strip user formula environments", {
   withr::local_options(np.messages = FALSE)
   owner <- new.env(parent = globalenv())

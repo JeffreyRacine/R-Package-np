@@ -182,11 +182,9 @@ npplregbw.plbandwidth =
   # Keep the native samples needed by an extracted child without serializing
   # an enclosing namespace and the constructor's transient search state.
   for (i in seq_along(children)) {
-    children[[i]][[".np.native.training"]] <- list(
-      xdat = zdat, ydat = if (i == 1L) ydat else xdat[, i - 1L])
-    if (is.null(children[[i]]$call))
-      children[[i]]$call <- quote(npregbw(xdat = xdat, ydat = ydat))
-    environment(children[[i]]$call) <- NULL
+    children[[i]] <- .np_bws_retain_native_training(
+      children[[i]], xdat = zdat,
+      ydat = if (i == 1L) ydat else xdat[, i - 1L])
   }
   children
 }

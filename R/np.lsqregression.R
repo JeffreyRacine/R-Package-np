@@ -274,6 +274,27 @@ nplsqregbw <-
   scale
 }
 
+.nplsqreg_describe_call <- function(call, owner) {
+  # do.call on these internal methods can store the closure as the call head.
+  # Keep a portable descriptive public call, not the package function itself.
+  if (identical(call[[1L]], nplsqregbw.default))
+    call[[1L]] <- as.name("nplsqregbw")
+  else if (identical(call[[1L]], nplsqreg.default))
+    call[[1L]] <- as.name("nplsqreg")
+  environment(call) <- .np_call_owner_environment(owner)
+  call
+}
+
+.nplsqreg_retain_native_fit <- function(fit, xdat, ydat) {
+  fit$bws <- .np_bws_retain_native_training(fit$bws, xdat, ydat)
+  # These fits are produced internally with explicit native samples. A literal
+  # bandwidth embedded by do.call must describe the same retained child.
+  if (inherits(fit$call[["bws"]], "rbandwidth"))
+    fit$call[["bws"]] <- fit$bws
+  environment(fit$call) <- NULL
+  fit
+}
+
 .nplsqreg_scale_pilot <- function(xdat, ydat, dots,
                                   regtype.pilot = c("auto", "ll", "lc", "lp"),
                                   nomad.pilot = FALSE,
@@ -306,6 +327,8 @@ nplsqregbw <-
   scale.fit <- npreg(bws = mean.fit$bws, txdat = xdat, tydat = res^2)
   variance.hat <- as.numeric(fitted(scale.fit))
   scale <- .nplsqreg_finalize_scale_pilot(variance.hat, res)
+  mean.fit <- .nplsqreg_retain_native_fit(mean.fit, xdat, ydat)
+  scale.fit <- .nplsqreg_retain_native_fit(scale.fit, xdat, res^2)
   list(scale = scale, mean.fit = mean.fit, scale.fit = scale.fit,
        regtype.pilot = regtype.pilot, nomad.pilot = nomad.pilot)
 }
@@ -320,7 +343,7 @@ nplsqregbw <-
                               bandwidth.compute = FALSE)
     out$fval <- fval
     out$num.feval <- num.feval
-    out
+    .np_bws_retain_native_training(out, xdat, ydat)
   } else {
   out <- rbandwidth(
     bw = as.numeric(bw),
@@ -1135,7 +1158,7 @@ nplsqregbw.formula <-
     out <- .nplsqreg_set_response_name(
       out, .nplsqreg_formula_response_name(bws))
     out$call <- match.call(expand.dots = FALSE)
-    environment(out$call) <- parent.frame()
+    out$call <- .nplsqreg_describe_call(out$call, parent.frame())
     out
   }
 
@@ -1284,7 +1307,7 @@ nplsqregbw.default <-
         warm.start.degree = warm.start.degree,
         tau.search.controls = tau.search.controls,
         call = match.call(expand.dots = FALSE))
-      environment(out$call) <- parent.frame()
+      out$call <- .nplsqreg_describe_call(out$call, parent.frame())
       return(out)
     }
     tau <- .nplsqreg_validate_tau(tau.raw)
@@ -1584,7 +1607,7 @@ nplsqregbw.default <-
       out,
       .nplsqreg_native_diagnostics_from_search(search.result)
     )
-    environment(out$call) <- parent.frame()
+    out$call <- .nplsqreg_describe_call(out$call, parent.frame())
     out
   }
 
@@ -1645,7 +1668,7 @@ nplsqreg.formula <-
       fit.args$exdat <- exdat
     out <- do.call(nplsqreg, fit.args)
     out$call <- match.call(expand.dots = FALSE)
-    environment(out$call) <- parent.frame()
+    out$call <- .nplsqreg_describe_call(out$call, parent.frame())
     out$bws$formula <- bws
     out <- .nplsqreg_set_response_name(out, response.name)
     out <- .nplsqreg_record_omit(out, train.omit)
@@ -1698,6 +1721,8 @@ nplsqreg.lsqregressionbandwidth <-
         flags <- attr(fit, ".np.empty.rows", exact = TRUE)
         empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows, flags)
         if(!is.null(flags)) attr(fit, ".np.empty.rows") <- NULL
+        # This per-tau call belongs to the internal lapply activation.
+        environment(fit$call) <- NULL
         fit
       })
       out <- .nplsqreg_combine_fits(
@@ -1706,7 +1731,7 @@ nplsqreg.lsqregressionbandwidth <-
         bws = bws,
         tau.search = if (is.null(bws$tau.search)) "full" else bws$tau.search,
         call = match.call(expand.dots = FALSE))
-      environment(out$call) <- parent.frame()
+      out$call <- .nplsqreg_describe_call(out$call, parent.frame())
       return(.npreg_finish_empty_rows(out, empty.state$rows, defer = defer.empty,
         owner = "nplsqreg", row.labels = row.names(out$xeval)))
     }
@@ -1805,6 +1830,7 @@ nplsqreg.default <-
     fit <- do.call(npreg, c(fit.args, dots))
     empty.rows <- attr(fit, ".np.empty.rows", exact = TRUE)
     if(!is.null(empty.rows)) attr(fit, ".np.empty.rows") <- NULL
+    fit <- .nplsqreg_retain_native_fit(fit, txdat, bws$qdat)
 
     quant <- fitted(fit)
     qerr <- if (se) se(fit) else NA
@@ -1854,7 +1880,7 @@ nplsqreg.default <-
       out$eval.nobs.omit <- length(eval.omit)
       out <- .nplsqreg_pad_fit_outputs(out, eval.omit)
     }
-    environment(out$call) <- parent.frame()
+    out$call <- .nplsqreg_describe_call(out$call, parent.frame())
     .npreg_finish_empty_rows(out, empty.rows, omitted = eval.omit,
       defer = defer.empty, owner = "nplsqreg", row.labels = row.names(fit$eval))
   }
