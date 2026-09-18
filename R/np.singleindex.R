@@ -635,6 +635,13 @@ npindex.sibandwidth <-
     B <- as.integer(B)
     .npRmpi_require_active_slave_pool(where = "npindex()")
     spec <- .npindex_resolve_spec(bws, where = "npindex")
+    native.newdata <- dots[["newdata", exact = TRUE]]
+    if (missing(exdat) && !is.null(native.newdata)) {
+      native.eval <- .np_native_newdata_parts(
+        native.newdata, list(exdat = NULL), "npindex")
+      exdat <- native.eval$exdat
+    }
+
     no.ex = missing(exdat)
     no.ey = missing(eydat)
 

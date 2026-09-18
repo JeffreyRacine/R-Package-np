@@ -581,6 +581,13 @@ npreg.rbandwidth <-
         defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])))
     }
 
+    native.newdata <- dots[["newdata", exact = TRUE]]
+    if (missing(exdat) && !is.null(native.newdata)) {
+      native.eval <- .np_native_newdata_parts(
+        native.newdata, list(exdat = NULL), "npreg")
+      exdat <- native.eval$exdat
+    }
+
     no.ex = missing(exdat)
     no.ey = missing(eydat)
     npRejectLegacyLpArgs(names(dots), where = "npreg")

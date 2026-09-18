@@ -93,6 +93,13 @@ npudist.dbandwidth <-
     dots <- list(...)
     fit.start <- proc.time()[3]
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
+    native.newdata <- dots[["newdata", exact = TRUE]]
+    if (missing(edat) && !is.null(native.newdata)) {
+      native.eval <- .np_native_newdata_parts(
+        native.newdata, list(edat = NULL), "npudist")
+      edat <- native.eval$edat
+    }
+
     no.e = missing(edat)
     .npRmpi_require_active_slave_pool(where = "npudist()")
     if (.npRmpi_autodispatch_active()) {
