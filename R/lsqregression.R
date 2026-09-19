@@ -114,7 +114,7 @@ lsqregression <-
            ntrain,
            trainiseval = FALSE,
            gradients = FALSE,
-           se = !(length(quanterr) == 1L && is.na(quanterr)),
+           se = !.np_se_output_missing(quanterr),
            residuals = FALSE,
            resid = NA,
            call = NULL,
@@ -516,10 +516,8 @@ quantile.lsqregression <- function(x, ...) {
 }
 
 se.lsqregression <- function(x) {
-  if (!isTRUE(x$se) || is.null(x$quanterr) || !length(x$quanterr) ||
-      (length(x$quanterr) == 1L && is.na(x$quanterr)))
-    .np_stop_missing_output(substitute(x), "nplsqreg")
-  x$quanterr
+  .np_require_stored_se(x, x[["quanterr", exact = TRUE]], "nplsqreg",
+                       expr = substitute(x))
 }
 
 .nplsqreg_residuals_unavailable <- function(x) {

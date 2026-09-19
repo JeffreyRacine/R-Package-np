@@ -22,11 +22,17 @@
        call. = FALSE)
 }
 
+# Numeric NA is a computed undefined row, not the legacy logical NA placeholder.
+.np_se_output_missing <- function(value) {
+  is.null(value) || length(value) == 0L ||
+    (is.logical(value) && length(value) == 1L && is.na(value))
+}
+
 .np_require_stored_se <- function(x, value, family, what = "standard errors",
                                    expr = substitute(x), switches = "se = TRUE",
                                    bws.field = "bws", data.hint = NULL) {
   if (identical(x[["se", exact = TRUE]], FALSE) ||
-      is.null(value) || length(value) == 0L)
+      .np_se_output_missing(value))
     .np_stop_missing_output(expr, family, paste0(what, " were not computed."),
                             switches, bws.field, data.hint)
   value
