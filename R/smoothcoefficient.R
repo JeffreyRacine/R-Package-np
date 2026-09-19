@@ -99,10 +99,8 @@ residuals.smoothcoefficient <- function(object, ...) {
   dots
 }
 se.smoothcoefficient <- function(x){
-  if (!isTRUE(x$se) || is.null(x$merr) ||
-      (length(x$merr) == 1L && is.na(x$merr)))
-    .np_stop_missing_output(substitute(x), "npscoef")
-  x$merr
+  .np_require_stored_se(x, x[["merr", exact = TRUE]], "npscoef",
+                       expr = substitute(x))
 }
 predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")

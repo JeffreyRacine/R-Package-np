@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Smooth-coefficient prediction and location-scale quantile SE extraction now
+  preserve a computed NA standard error for a single unsupported evaluation
+  row, as they already did for larger grids. Unrequested uncertainty still
+  gives a no-search refit message.
+
 * Location-scale quantile prediction and retained-bandwidth refits now restore
   omitted rows consistently, including standard errors and multi-quantile
   residuals. Explicit replacement samples keep their own row positions.
