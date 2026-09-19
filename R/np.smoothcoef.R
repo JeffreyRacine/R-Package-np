@@ -1331,6 +1331,9 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (!(miss.ey && !miss.ex))
       sc.obj.args$xtra <- c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
     ev <- do.call(smoothcoefficient, sc.obj.args)
+    # Replay only fitting controls, never calls, caller frames or training data.
+    ev$fit.controls <- list(iterate = iterate, maxiter = maxiter, tol = tol,
+                            leave.one.out = leave.one.out)
     fit.elapsed <- proc.time()[3] - fit.start
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
     total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)
