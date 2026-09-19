@@ -108,18 +108,19 @@ test_that("explicit replacement responses override only retained defaults", {
     fun <- get(family,mode="function")
     bandwidth <- if (conditional) rep(.5,3) else switch(family,
       npindex=c(.5,1,.5),npplreg=matrix(.5,3,1),npscoef=.5,c(.5,.5))
-    for (formula in c(FALSE,TRUE)) {
-      args <- if (formula) list(formula=if(semi)y~x+w|z else y~x+w,data=d) else
-        c(list(xdat=d[c("x","w")],ydat=if(conditional)d["y"]else d$y),
-          if(semi)list(zdat=d["z"])else list())
+    for (missing.response in c(FALSE, TRUE)) {
+      args <- c(list(xdat=d[c("x","w")],ydat=if(conditional)d["y"]else d$y),
+                if(semi)list(zdat=d["z"])else list())
       b <- do.call(ctor,c(args,list(bws=bandwidth,bandwidth.compute=FALSE)))
-      user <- if (family=="npreghat")list(y=2*d$y+1,output="apply") else
-        list(tydat=if(conditional)data.frame(y=2*d$y+1)else 2*d$y+1,se=FALSE)
+      replacement <- 2*d$y+1
+      if (missing.response) replacement[3] <- NA_real_
+      user <- if (family=="npreghat")list(y=replacement,output="apply") else
+        list(tydat=if(conditional)data.frame(y=replacement)else replacement,se=FALSE)
       a <- do.call(fun,c(list(bws=b),user))
       ref <- do.call(fun,c(list(bws=b,txdat=d[c("x","w")]),
         if(semi)list(tzdat=d["z"])else list(),user))
       value <- function(v) if(is.numeric(v))as.numeric(v)else as.numeric(fitted(v))
-      expect_equal(value(a),value(ref),tolerance=1e-10,info=paste(family,formula))
+      expect_equal(value(a),value(ref),tolerance=1e-10,info=paste(family,missing.response))
     }
   }
 })

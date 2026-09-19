@@ -305,7 +305,7 @@ npreg.formula <-
       if (y.eval)
         reg.args$eydat <- eydat
     }
-    ev <- do.call(npreg, .np_args_with_defaults(c(reg.args, list(se = se)), dots))
+    ev <- do.call(npreg, c(reg.args, list(se = se), dots))
     if (!is.null(ev$bws)) {
       preserve.bws.call <- inherits(bws, "rbandwidth") && !is.null(bws$call)
       bw.call <- mc[c(1, match(c("bws", "data", "subset", "na.action"),

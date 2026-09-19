@@ -156,8 +156,7 @@ npindex.formula <-
         # formula again through the explicit-native formula reentry interface.
         if (!inherits(si.bws, "formula"))
           si.args$bws <- si.bws
-        ev <- do.call(npindex, .np_args_with_defaults(
-          c(si.args, list(se = se, se.type = se.type)), dots))
+        ev <- do.call(npindex, c(si.args, list(se = se, se.type = se.type), dots))
         ev$call <- mc
         environment(ev$call) <- parent.frame()
 
