@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Local-polynomial fitting, operator and bootstrap rank certificates now count
+  exact repeated design rows once, rather than treating duplicate observations
+  as independent directions. Sparse supported designs use the existing ridge
+  policy consistently across fits, hats, inference and counted bootstrap draws.
+  Identity preparation is shared within each fitting invocation; bandwidth
+  search and numerical ridge thresholds are unchanged.
+
 * Significance-test progress now shows the active predictor's position and
   completed bootstrap replications, with call-wide elapsed time and ETA.
   Analytic non-rejection is labelled as skipped bootstrap work.

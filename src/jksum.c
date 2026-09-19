@@ -11202,6 +11202,7 @@ cleanup:
 typedef struct {
   int count;
   int cap;
+  NPLPDesignSupport *design;
 } NPLPSupportRankContext;
 
 typedef struct {
@@ -11255,6 +11256,7 @@ typedef struct {
   /* Optional exact donor-count certificate for a single LP moment row. */
   int *support_rank;
   int support_cap;
+  NPLPDesignSupport *support_design;
 } NPBetaAbsoluteRouteCall;
 
 typedef struct {
@@ -11738,8 +11740,8 @@ static int np_beta_absolute_route_body(
       goto cleanup;
     if(call->support_rank != NULL) {
       /* Only the one-row common-scaled LP owner supplies this request. */
-      *call->support_rank = np_lp_rank_upper_bound_from_weights(
-        row_result.row, num_obs_train, call->support_cap);
+      *call->support_rank = np_lp_rank_upper_bound_from_design(
+        row_result.row, num_obs_train, call->support_cap, call->support_design);
     }
     status = 0;
     goto cleanup;
@@ -13231,6 +13233,7 @@ NPPermutationWeightOutput * const pkw_output,
        kernel_pow != 1)
       return KWSNP_ERR_BADINVOC;
     support_rank->count = 0;
+    np_lp_design_support_begin(support_rank->design);
   }
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
@@ -13401,6 +13404,7 @@ NPPermutationWeightOutput * const pkw_output,
         .retain_common_scale = beta_retain_common_scale,
         .support_rank = support_rank != NULL ? &support_rank->count : NULL,
         .support_cap = support_rank != NULL ? support_rank->cap : 0,
+        .support_design = support_rank != NULL ? support_rank->design : NULL,
         .centered_m2 = beta_centered_moment ?
           centered_moment_ctx->centered_m2 : NULL,
         .kw = kw,
@@ -15430,7 +15434,9 @@ NPPermutationWeightOutput * const pkw_output,
             begin + pxl->nlev[range];
           for(int donor = begin; donor < end &&
               support_rank->count < support_rank->cap; ++donor)
-            support_rank->count += tprod[donor] != 0.0;
+            if(tprod[donor] != 0.0)
+              support_rank->count += np_lp_design_support_add(
+                support_rank->design, is_adaptive ? j : donor);
         }
       }
       if(!nws){
@@ -32187,6 +32193,7 @@ typedef struct {
   NPRegressionLPEmptyRows *empty_rows;
   const NPConditionalLPFirstSERequest *first_se_request;
   double *conditional_variance;
+  NPLPDesignSupport *prepared_design;
   NPRegressionGradientRange continuous_range;
   NPRegressionGradientRange unordered_range;
   NPRegressionGradientRange ordered_range;
@@ -32217,6 +32224,8 @@ typedef struct {
   double *categorical_base_kernel_row;
   double *categorical_alternate_kernel_row;
   NPLPSolveWorkspace solve_workspace;
+  NPLPDesignSupport design_support;
+  NPLPDesignSupport *active_design;
   NPInferenceReuse inference_reuse;
 #ifdef MPI2
   NPRegMpiOwnerChunk mpi_owner_chunk;
@@ -32256,6 +32265,8 @@ static void np_regression_general_lp_fit_owner_init(
   owner->categorical_base_kernel_row = NULL;
   owner->categorical_alternate_kernel_row = NULL;
   np_lp_solve_workspace_init(&owner->solve_workspace);
+  memset(&owner->design_support, 0, sizeof(owner->design_support));
+  owner->active_design = &owner->design_support;
   memset(&owner->inference_reuse, 0, sizeof(owner->inference_reuse));
 #ifdef MPI2
   owner->mpi_owner_chunk.recvcounts = NULL;
@@ -32405,7 +32416,7 @@ static int np_regression_general_lp_point_at_frame(
   double *projection)
 {
   NPLPSolvePolicyDiagnostics solve_diagnostics = {0, 0.0};
-  NPLPSupportRankContext support_rank = {0, owner->nterms};
+  NPLPSupportRankContext support_rank = {0, owner->nterms, owner->active_design};
   double pristine_anchor;
   int i, term;
 
@@ -32972,6 +32983,15 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                                 owner->basis);
   }
 
+  if(call->prepared_design != NULL)
+    owner->active_design = call->prepared_design;
+  if(owner->active_design->n == 0)
+    np_lp_design_support_prepare(owner->active_design, owner->basis,
+                                  num_obs_train, owner->nterms);
+  else if(owner->active_design->n != num_obs_train ||
+          owner->active_design->p != owner->nterms)
+    error("LP fitting design identity shape changed within an invocation");
+
 #ifdef MPI2
 	    const int use_mpi_owner_reduce_lp =
 	      (iNum_Processors > 1) &&
@@ -32992,7 +33012,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 #endif
 
   for(j = 0; j < num_obs_eval; ++j) {
-    NPLPSupportRankContext support_rank = {0, owner->nterms};
+    NPLPSupportRankContext support_rank = {0, owner->nterms, owner->active_design};
     double sk, ey, ey2, sigma2hat;
     double pristine_anchor = 0.0;
     NPLPSolvePolicyDiagnostics solve_diagnostics = {0, 0.0};
@@ -34381,7 +34401,8 @@ const NPRegressionHC0Context *hc0_context,
 NPRegressionLPEmptyRows *empty_rows,
 const NPConditionalLPFirstSERequest *first_se_request,
 double *conditional_variance,
-NPRegressionFailure *failure){
+NPRegressionFailure *failure,
+NPLPDesignSupport *prepared_design){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -35737,6 +35758,7 @@ NPRegressionFailure *failure){
       .empty_rows = empty_rows,
       .first_se_request = first_se_request,
       .conditional_variance = conditional_variance,
+      .prepared_design = prepared_design,
       .continuous_range = np_regression_gradient_range(
         hc0_context != NULL ? hc0_context->gradient_request : NULL,
         0, num_reg_continuous),
@@ -36188,6 +36210,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   NPLPSolveWorkspace solve_workspace;
+  NPLPDesignSupport design_support = {0};
   NPReghatLPWorkspace reghat_workspace;
   NPBetaScaledRowContext beta_row_context;
   double *eval_basis = NULL;
@@ -36496,6 +36519,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
      (np_glp_cv_cache.terms == NULL))
     goto cleanup_lp_hat;
 
+  np_lp_design_support_prepare(&design_support, np_glp_cv_cache.basis,
+                                num_train, np_glp_cv_cache.nterms);
   if(kernel_route != NULL) {
     if(np_reghat_lp_workspace_prepare_columns(
          &reghat_workspace, np_glp_cv_cache.basis, num_train,
@@ -36581,8 +36606,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
          np_reghat_lp_workspace_influence_row_ranked(
            &reghat_workspace, kw, eval_basis, weights_out + i,
            (size_t)num_eval,
-           np_lp_rank_upper_bound_from_weights(
-             kw, num_train, np_glp_cv_cache.nterms)) != NP_REGHAT_LP_ROW_OK)
+           np_lp_rank_upper_bound_from_design(
+             kw, num_train, np_glp_cv_cache.nterms, &design_support)) != NP_REGHAT_LP_ROW_OK)
         goto cleanup_lp_hat;
       continue;
     } else {
@@ -36691,7 +36716,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
          np_glp_cv_cache.nterms,
          1,
          ridge_fraction,
-         np_lp_rank_upper_bound_from_weights(kw, num_train, np_glp_cv_cache.nterms),
+         np_lp_rank_upper_bound_from_design(kw, num_train, np_glp_cv_cache.nterms, &design_support),
          &solve_diagnostics) !=
        NP_LP_SOLVE_POLICY_OK) {
       if(empty_rows != NULL &&
@@ -36799,6 +36824,7 @@ typedef struct {
   double **eval_xord_one;
   double **eval_xcon_one;
   NPLPSolveWorkspace regression_solve_workspace;
+  NPLPDesignSupport design_support;
   int adaptive_fold;
   int adaptive_fold_selected;
 } NPConditionalXRowCtx;
@@ -37151,6 +37177,8 @@ static int np_conditional_xrow_ctx_prepare_canonical_influence(
       ctx->regression_outer_pack_ctx.symmetric = 1;
     }
   }
+  np_lp_design_support_prepare(&ctx->design_support, ctx->basis,
+                                ctx->num_train, k);
   return 0;
 }
 
@@ -37433,7 +37461,7 @@ static int np_regression_xrow_canonical_influence(
        k,
        1,
        ridge_fraction,
-       np_lp_rank_upper_bound_from_weights(ctx->kw, num_train, k),
+       np_lp_rank_upper_bound_from_design(ctx->kw, num_train, k, &ctx->design_support),
        &row_diagnostics) != NP_LP_SOLVE_POLICY_OK)
     return 1;
 
@@ -37983,8 +38011,8 @@ static int np_npsigtest_fixed_influence_row(
   }
   return np_reghat_lp_workspace_influence_row_ranked(
            lp_workspace, ctx->kw, eval_basis, row_out, 1U,
-           np_lp_rank_upper_bound_from_weights(
-             ctx->kw, num_train, np_glp_cv_cache.nterms)) ==
+           np_lp_rank_upper_bound_from_design(
+             ctx->kw, num_train, np_glp_cv_cache.nterms, &ctx->design_support)) ==
          NP_REGHAT_LP_ROW_OK ? 0 : 1;
 }
 
@@ -38113,6 +38141,8 @@ int np_regression_lp_sigtest_iid(
          &lp_workspace, np_glp_cv_cache.basis, num_train,
          np_glp_cv_cache.nterms) != NP_REGHAT_LP_ROW_OK)
       goto cleanup_sigtest_iid;
+    np_lp_design_support_prepare(&xctx.design_support, np_glp_cv_cache.basis,
+                                  num_train, np_glp_cv_cache.nterms);
     eval_basis = alloc_vecd(np_glp_cv_cache.nterms);
     if(eval_basis == NULL)
       goto cleanup_sigtest_iid;
@@ -38497,7 +38527,8 @@ static int np_conditional_x_weight_block_full_stream_core_suppress(double *vecto
                                                                    int eval_start,
                                                                    int block_rows,
                                                                    int suppress_nn_parallel,
-                                                                   double **rows_out);
+                                                                   double **rows_out,
+                                                                   NPLPDesignSupport *design_support);
 
 static int np_regression_lp_apply_train_coordinates_match_eval(void){
   const int num_train = num_obs_train_extern;
@@ -38552,6 +38583,7 @@ static int np_regression_lp_apply_hatblock_matrix(double *vector_scale_factor,
   double **rows_out = NULL;
   int start, i;
   int status = 1;
+  NPLPDesignSupport design_support = {0};
 
   if((vector_scale_factor == NULL) || (rhs_cols == NULL) ||
      (rhs_cols[0] == NULL) || (fitted_out == NULL))
@@ -38586,7 +38618,7 @@ static int np_regression_lp_apply_hatblock_matrix(double *vector_scale_factor,
                                                                start,
                                                                block_rows,
                                                                0,
-                                                               rows_out) != 0)
+                                                               rows_out, &design_support) != 0)
       goto cleanup_hatblock_apply;
 
     F77_CALL(dgemm)(&transa,
@@ -38635,6 +38667,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
   NPLPSolveWorkspace solve_workspace;
+  NPLPDesignSupport design_support = {0};
   NPReghatLPWorkspace reghat_workspace;
   NPBetaScaledRowContext beta_row_context;
   double **Ycols = NULL, **Wcols = NULL;
@@ -38874,6 +38907,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
          &reghat_workspace, np_glp_cv_cache.basis, num_train,
          np_glp_cv_cache.nterms) != NP_REGHAT_LP_ROW_OK)
       goto cleanup_lp_apply;
+    np_lp_design_support_prepare(&design_support, np_glp_cv_cache.basis,
+                                  num_train, np_glp_cv_cache.nterms);
     for(i = 1; i < n_rhs; ++i) {
       const size_t element_offset = (size_t)i*(size_t)num_train;
       const uintptr_t base_address =
@@ -38915,8 +38950,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
          np_reghat_lp_workspace_influence_row_ranked(
            &reghat_workspace, kw, eval_basis, hat_block + block_count,
            (size_t)block_rows,
-           np_lp_rank_upper_bound_from_weights(
-             kw, num_train, np_glp_cv_cache.nterms)) != NP_REGHAT_LP_ROW_OK)
+           np_lp_rank_upper_bound_from_design(
+             kw, num_train, np_glp_cv_cache.nterms, &design_support)) != NP_REGHAT_LP_ROW_OK)
         goto cleanup_lp_apply;
       ++block_count;
 
@@ -38984,8 +39019,10 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     Wcols[l] = np_glp_cv_cache.source_basis[l];
   }
 
+  np_lp_design_support_prepare(&design_support, np_glp_cv_cache.source_basis,
+                                num_train, np_glp_cv_cache.nterms);
   for(j = 0; j < num_eval; j++){
-    NPLPSupportRankContext support_rank = {0, np_glp_cv_cache.nterms};
+    NPLPSupportRankContext support_rank = {0, np_glp_cv_cache.nterms, &design_support};
 
     for(l = 0; l < num_reg_continuous_extern; l++){
       TCON[l][0] = matrix_X_continuous_eval_extern[l][j];
@@ -40893,7 +40930,8 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                                           int suppress_nn_parallel,
                                                           const NPConditionalXBlockBwCtx *bwctx,
                                                           const NPNNGeometryContext *nn_geometry_context,
-                                                          double **rows_out){
+                                                          double **rows_out,
+                                                          NPLPDesignSupport *design_support){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int ll_mode = np_lp_engine_extern;
@@ -41048,6 +41086,17 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL) ||
        !np_glp_cv_cache_prepare_influence_basis())
       goto cleanup_xweight_block;
+
+    /* Only the regression full-block fitting caller opts in. Objective
+     * consumers pass NULL and retain their existing rank policy and cost. */
+    if(design_support != NULL) {
+      if(design_support->n == 0)
+        np_lp_design_support_prepare(design_support, np_glp_cv_cache.basis,
+                                      num_train, np_glp_cv_cache.nterms);
+      else if(design_support->n != num_train ||
+              design_support->p != np_glp_cv_cache.nterms)
+        error("LP block design identity shape changed within an invocation");
+    }
 
     if(!np_lp_solve_workspace_reserve(&solve_workspace,
                                       np_glp_cv_cache.nterms,
@@ -41204,7 +41253,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
            k,
            1,
            1.0/(double)MAX(1, num_train),
-           np_lp_rank_upper_bound_from_weights(kw, num_train, k),
+           np_lp_rank_upper_bound_from_design(kw, num_train, k, design_support),
            NULL) != NP_LP_SOLVE_POLICY_OK)
         goto cleanup_xweight_block;
 
@@ -41288,7 +41337,7 @@ static int np_conditional_x_weight_block_stream_core_ctx(
   double **rows_out){
   return np_conditional_x_weight_block_stream_core_impl(
     vector_scale_factor, eval_start, block_rows, 1, suppress_nn_parallel,
-    NULL, nn_geometry_context, rows_out);
+    NULL, nn_geometry_context, rows_out, NULL);
 }
 
 static int np_conditional_x_weight_block_stream_core_suppress(double *vector_scale_factor,
@@ -41303,14 +41352,15 @@ static int np_conditional_x_weight_block_stream_core_suppress(double *vector_sca
                                                         suppress_nn_parallel,
                                                         NULL,
                                                         NULL,
-                                                        rows_out);
+                                                        rows_out, NULL);
 }
 
 static int np_conditional_x_weight_block_full_stream_core_suppress(double *vector_scale_factor,
                                                                    int eval_start,
                                                                    int block_rows,
                                                                    int suppress_nn_parallel,
-                                                                   double **rows_out){
+                                                                   double **rows_out,
+                                                                   NPLPDesignSupport *design_support){
   return np_conditional_x_weight_block_stream_core_impl(vector_scale_factor,
                                                         eval_start,
                                                         block_rows,
@@ -41318,7 +41368,7 @@ static int np_conditional_x_weight_block_full_stream_core_suppress(double *vecto
                                                         suppress_nn_parallel,
                                                         NULL,
                                                         NULL,
-                                                        rows_out);
+                                                        rows_out, design_support);
 }
 
 static int np_conditional_y_block_stream_op_core_ctx(
@@ -46732,7 +46782,7 @@ np_conditional_density_cvls_lp_supertile2_stream(
              use_parallel_blocks,
              &xbwctx,
              NULL,
-             xblocks[g]) != 0){
+             xblocks[g], NULL) != 0){
           local_fail = 1;
           break;
         }
@@ -47063,7 +47113,7 @@ static int np_conditional_density_cvls_lp_stream_impl(
            use_parallel_blocks,
            &xbwctx,
            NULL,
-           xblock) != 0){
+           xblock, NULL) != 0){
         local_fail = 1;
         break;
       }

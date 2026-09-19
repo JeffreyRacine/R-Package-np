@@ -428,6 +428,11 @@ static SEXP np_reghat_matrix_execution_run(void *data)
   PROTECT_INDEX empty_index;
   PROTECT_WITH_INDEX(empty_flags, &empty_index);
 
+  NPLPDesignSupport design_support = {0};
+  double **columns = (double **)R_alloc((size_t)nterms, sizeof(double *));
+  for(int term = 0; term < nterms; ++term)
+    columns[term] = workspace->design + (size_t)ntrain * term;
+  np_lp_design_support_prepare(&design_support, columns, ntrain, nterms);
 
   for(int j = 0; j < neval; j++){
     const double * const weights =
@@ -443,7 +448,7 @@ static SEXP np_reghat_matrix_execution_run(void *data)
       ntrain, nterms, workspace->design, weights,
       workspace->solve_workspace.rhs_work, workspace->weighted_design,
       &workspace->solve_workspace, workspace->prediction, 0,
-      np_lp_rank_upper_bound_from_weights(weights, ntrain, nterms));
+      np_lp_rank_upper_bound_from_design(weights, ntrain, nterms, &design_support));
     if(execution->allow_empty && row_status != NP_REGHAT_LP_ROW_OK &&
        row_status != NP_REGHAT_LP_ROW_NONFINITE &&
        np_lp_complete_weights_are_zero(weights, ntrain)) {

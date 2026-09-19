@@ -19625,6 +19625,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     double RS = 0.0, MSE = 0.0, MAE = 0.0, MAPE = 0.0, CORR = 0.0, SIGN = 0.0;
     int num_y_vars = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
     int num_x_vars = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+    /* The X design/order is fixed across kernel-response rows. Borrow one
+     * invocation-local identity map instead of allocating one per response. */
+    NPLPDesignSupport conditional_design = {0};
     int lp_loop_start = 0;
     int lp_loop_stop = num_obs_eval_extern;
 #ifdef MPI2
@@ -20055,7 +20058,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                  row_nn_geometry_context_ptr,
                                                                  NULL, empty_rows != NULL ? &row_empty : NULL, first_se_request,
                                                                  variance_metadata != NULL ? &variance_one : NULL,
-                                                                 &row_failure);
+                                                                 &row_failure, &conditional_design);
         if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
           lp_zero_radius_side = 1;
           lp_error = "conditional density/distribution fit encountered a zero literal explanatory radius after occurrence exclusion";
@@ -22533,7 +22536,7 @@ static SEXP np_regression_fitted_execute(void *data)
       1,
       NULL,
       &training_geometry_context,
-      &residual_preparation_context, NULL, NULL, NULL, NULL);
+      &residual_preparation_context, NULL, NULL, NULL, NULL, NULL);
 
     if(regression_fit_status != NP_REGRESSION_FIT_OK) {
       if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
@@ -22733,7 +22736,7 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
                                                      &ordinary_hc0_context : NULL,
-                                                   call->empty_rows, NULL, NULL, NULL);
+                                                   call->empty_rows, NULL, NULL, NULL, NULL);
   if(regression_fit_status != NP_REGRESSION_FIT_OK) {
     if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
       zero_radius_info = np_nn_zero_radius_info(

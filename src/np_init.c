@@ -56,6 +56,8 @@ extern SEXP C_np_lp_batch_project(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lp_batch_project_ranked(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lp_adjoint_prepared(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lp_support_rank(SEXP, SEXP, SEXP);
+extern SEXP C_np_lp_design_identity(SEXP);
+extern SEXP C_np_lp_design_support_rank(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_reghat_lp_matrix_fast(SEXP, SEXP, SEXP);
 extern SEXP C_np_conditional_lp_pair_se(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_reghat_lp_matrix_norm(SEXP, SEXP, SEXP);
@@ -223,6 +225,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_lp_batch_project_ranked", (DL_FUNC) &C_np_lp_batch_project_ranked, 6},
     {"C_np_lp_adjoint_prepared", (DL_FUNC) &C_np_lp_adjoint_prepared, 4},
     {"C_np_lp_support_rank", (DL_FUNC) &C_np_lp_support_rank, 3},
+    {"C_np_lp_design_identity", (DL_FUNC) &C_np_lp_design_identity, 1},
+    {"C_np_lp_design_support_rank", (DL_FUNC) &C_np_lp_design_support_rank, 4},
     {"C_np_reghat_lp_matrix_fast",       (DL_FUNC) &C_np_reghat_lp_matrix_fast,        3},
     {"C_np_conditional_lp_pair_se",      (DL_FUNC) &C_np_conditional_lp_pair_se,       5},
     {"C_np_reghat_lp_matrix_norm",       (DL_FUNC) &C_np_reghat_lp_matrix_norm,        3},
