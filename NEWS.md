@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* `npreghat` rejects explicit nonzero `ridge` requests on computational
+  owners that cannot honor them. Default automatic numerical ridging and
+  supported generic mixed-derivative ridge requests are unchanged.
+
 * Density/distribution hat and bootstrap adapters now preserve normalized
   Li--Racine ordered kernels, including conditional response kernels.
   This corrects affected ordered-factor operators, bootstrap intervals and
