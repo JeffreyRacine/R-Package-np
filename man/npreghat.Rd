@@ -84,7 +84,10 @@ These arguments control local-polynomial basis, degree, derivatives, leave-one-o
   \item{deriv}{Convenience alias for \code{s}.}
 
 
-  \item{leave.one.out}{Logical; if \code{TRUE}, compute in-sample leave-one-out hat weights. This cannot be combined with explicit \code{exdat}/\code{newdata}.}
+  \item{leave.one.out}{Logical; if \code{TRUE}, compute in-sample leave-one-out hat weights. This cannot be combined with explicit \code{exdat}/\code{newdata}.
+  Local-constant first-derivative weights with \code{leave.one.out = TRUE}
+  are not currently supported; local-constant level weights and the supported
+  local-polynomial leave-one-out derivatives remain available.}
 
 
   \item{ridge}{A finite nonnegative scalar. The default \code{0} retains the

@@ -195,6 +195,9 @@ These arguments control returned coefficient estimates, errors, residuals, and i
   \item{iterate}{
     a logical value indicating whether or not backfitted estimates
     should be iterated for self-consistency. Defaults to \code{TRUE}.
+    Fitted objects retain this control, \code{maxiter}, \code{tol}, and
+    \code{leave.one.out} for prediction and lazy residual extraction.
+    Explicit controls supplied to \code{predict} override retained values.
   }
 
 
@@ -215,7 +218,8 @@ These arguments control returned coefficient estimates, errors, residuals, and i
   \item{residuals}{
     a logical value indicating that you want residuals computed and
     returned in the resulting \code{smoothcoefficient} object. Defaults to
-    \code{FALSE}.
+    \code{FALSE}. Residuals refer to the training sample, including when
+    evaluation data are supplied, and do not require \code{se = TRUE}.
   }
 
 
@@ -298,8 +302,10 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
     non-intercept smooth coefficient estimates at each evaluation point}
   \item{gerr}{ if \code{se = TRUE}, asymptotic standard errors for
     \code{grad} }
-  \item{resid}{ if \code{residuals = TRUE}, in-sample or out-of-sample
-    residuals where appropriate (or possible) }
+  \item{resid}{ if \code{residuals = TRUE}, training responses minus their
+    fitted training values, restored to training rows under \code{na.exclude}.
+    Evaluation responses, when supplied, are used for evaluation goodness-of-fit
+    summaries, not to redefine these residuals. }
   \item{R2}{ coefficient of determination (Doksum and Samarov (1995))}
   \item{MSE}{ mean squared error }
   \item{MAE}{ mean absolute error }
