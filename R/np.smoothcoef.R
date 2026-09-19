@@ -1136,8 +1136,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       se <- FALSE
     }
 
-    if (se || (residuals && miss.ex)) {
-      if (se) {
+    # Training residuals have the same owner with or without uncertainty.
+    # External residual-only requests need the training solve, not its sandwich.
+    if (se || residuals) {
+      if (se || !miss.ex) {
         if (fast.largeh.lc) {
           if (miss.ex) {
             train.solve <- fast.solve
@@ -1151,20 +1153,22 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
             mean.fit <- as.vector(W.train %*% train.solve$coef)
           }
           resid <- tydat - mean.fit
-          u2.W <- resid^2
-          s.fast <- lc_fast_global_moments(
-            z.eval.one = if (miss.ex) tzdat[1L, , drop = FALSE] else ezdat[1L, , drop = FALSE],
-            u2 = u2.W
-          )$s
-          if (!is.null(fit.progress.step))
-            fit.progress.step("estimating standard errors")
-          vcv.beta.fast <- if (length(invalid.rows)) NULL else
-            accepted_moment_covariance(fast.eval$tww, fast.solve$ridge, s.fast)
-          merr <- rep(NA_real_, enrow)
-          beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
-          if (!is.null(vcv.beta.fast)) {
-            merr <- sqrt(pmax(rowSums((W %*% vcv.beta.fast) * W), 0.0))
-            beta.se[] <- rep(sqrt(pmax(diag(vcv.beta.fast), 0.0)), each = enrow)
+          if (se) {
+            u2.W <- resid^2
+            s.fast <- lc_fast_global_moments(
+              z.eval.one = if (miss.ex) tzdat[1L, , drop = FALSE] else ezdat[1L, , drop = FALSE],
+              u2 = u2.W
+            )$s
+            if (!is.null(fit.progress.step))
+              fit.progress.step("estimating standard errors")
+            vcv.beta.fast <- if (length(invalid.rows)) NULL else
+              accepted_moment_covariance(fast.eval$tww, fast.solve$ridge, s.fast)
+            merr <- rep(NA_real_, enrow)
+            beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
+            if (!is.null(vcv.beta.fast)) {
+              merr <- sqrt(pmax(rowSums((W %*% vcv.beta.fast) * W), 0.0))
+              beta.se[] <- rep(sqrt(pmax(diag(vcv.beta.fast), 0.0)), each = enrow)
+            }
           }
         } else if (fast.largeh.lp1) {
           if (miss.ex) {
@@ -1185,32 +1189,34 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
             mean.fit <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop = FALSE] %*% train.fast$coef[,i] })
           }
           resid <- tydat - mean.fit
-          u2.W <- resid^2
-          s.fast <- .npscoef_lp1_largeh_global_fit(
-            bws = bws,
-            tzdat = tzdat,
-            ezdat = if (miss.ex) tzdat else ezdat,
-            W.train = W.train,
-            tydat = tydat,
-            u2 = u2.W,
-            leave.one.out = leave.one.out,
-            where = "npscoef",
-            solver = solve_single_moment_system,
-            ksum_fun = lp1_moment_npksum
-          )$s
-          if (!is.null(fit.progress.step))
-            fit.progress.step("estimating standard errors")
-          vcv.theta.fast <- if (length(invalid.rows)) NULL else
-            accepted_moment_covariance(fast.eval$tww, fast.eval$ridge, s.fast)
-          merr <- rep(NA_real_, enrow)
-          beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
-          if (!is.null(vcv.theta.fast)) {
-            for (i in seq_len(enrow)) {
-              trans.i <- kronecker(diag(ncol(W)), matrix(fast.eval$lp_state$W.eval[i,], nrow = 1L))
-              vcv.beta.fast <- trans.i %*% vcv.theta.fast %*% t(trans.i)
-              w.i <- W[i,, drop = FALSE]
-              merr[i] <- sqrt(max(drop(w.i %*% vcv.beta.fast %*% t(w.i)), 0.0))
-              beta.se[i,] <- sqrt(pmax(diag(vcv.beta.fast), 0.0))
+          if (se) {
+            u2.W <- resid^2
+            s.fast <- .npscoef_lp1_largeh_global_fit(
+              bws = bws,
+              tzdat = tzdat,
+              ezdat = if (miss.ex) tzdat else ezdat,
+              W.train = W.train,
+              tydat = tydat,
+              u2 = u2.W,
+              leave.one.out = leave.one.out,
+              where = "npscoef",
+              solver = solve_single_moment_system,
+              ksum_fun = lp1_moment_npksum
+            )$s
+            if (!is.null(fit.progress.step))
+              fit.progress.step("estimating standard errors")
+            vcv.theta.fast <- if (length(invalid.rows)) NULL else
+              accepted_moment_covariance(fast.eval$tww, fast.eval$ridge, s.fast)
+            merr <- rep(NA_real_, enrow)
+            beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
+            if (!is.null(vcv.theta.fast)) {
+              for (i in seq_len(enrow)) {
+                trans.i <- kronecker(diag(ncol(W)), matrix(fast.eval$lp_state$W.eval[i,], nrow = 1L))
+                vcv.beta.fast <- trans.i %*% vcv.theta.fast %*% t(trans.i)
+                w.i <- W[i,, drop = FALSE]
+                merr[i] <- sqrt(max(drop(w.i %*% vcv.beta.fast %*% t(w.i)), 0.0))
+                beta.se[i,] <- sqrt(pmax(diag(vcv.beta.fast), 0.0))
+              }
             }
           }
         } else if (miss.ex && !do.iterate) {
@@ -1234,12 +1240,15 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
             W.eval.design = W.train
           )
           mean.fit <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop = FALSE] %*% train.solve$coef[,i] })
-          u2.W <- (resid <- tydat - mean.fit)^2
+          resid <- tydat - mean.fit
+          if (se) {
+          u2.W <- resid^2
           moments$s <- lc_moments(
             z.eval = if (miss.ex) NULL else ezdat,
             leave.one.out.eval = leave.one.out,
             u2 = u2.W
           )$s
+          }
         } else {
           lp_state.err <- .npscoef_lp_state(
             bws = bws,
@@ -1256,8 +1265,11 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
             Wz.eval = lp_state.err$W.eval
           )
           mean.fit <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop = FALSE] %*% train.solve$coef[,i] })
-          u2.W <- (resid <- tydat - mean.fit)^2
-          moments$s <- lp_tensor_moments(lp_state, u2 = u2.W)$s
+          resid <- tydat - mean.fit
+          if (se) {
+            u2.W <- resid^2
+            moments$s <- lp_tensor_moments(lp_state, u2 = u2.W)$s
+          }
         }
       } else if (residuals && miss.ex) {
         resid <- tydat - mean
