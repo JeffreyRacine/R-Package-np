@@ -810,9 +810,7 @@ npqreg.formula <-
     if (has.eval)
       q.args$exdat <- exdat
     q.args$bws <- bws
-    training <- names(dots) %in% c("txdat", "tydat")
-    q.args <- .np_args_with_defaults(q.args, dots[training])
-    tbw <- do.call(npqreg, .np_args_with_defaults(q.args, .npqreg_fit_dots(dots[!training])))
+    tbw <- do.call(npqreg, c(q.args, .npqreg_fit_dots(dots)))
 
     tbw$omit <- attr(umf,"na.action")
     tbw$rows.omit <- as.vector(tbw$omit)

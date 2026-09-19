@@ -288,7 +288,7 @@ npreg.formula <-
       if (y.eval)
         reg.args$eydat <- eydat
     }
-    ev <- do.call(npreg, .np_args_with_defaults(c(reg.args, list(se = se)), dots))
+    ev <- do.call(npreg, c(reg.args, list(se = se), dots))
     ev$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
     environment(ev$call) <- parent.frame()
 

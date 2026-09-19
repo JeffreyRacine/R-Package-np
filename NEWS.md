@@ -11,7 +11,7 @@
   accept matrix responses consistently and retain singleton matrix dimensions.
   Supported explicit hat ridges are retained when rebuilding an operator.
 
-* Fits reusing retained bandwidth data now give explicit replacement responses
+* Fits reusing retained native bandwidth data now give explicit replacement responses
   precedence over retained defaults. Copula predictions preserve inversion
   settings; conditional-mode predictions preserve the requested probability
   projection. Copula joint and marginal calculations use a common named column

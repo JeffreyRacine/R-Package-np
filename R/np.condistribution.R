@@ -65,7 +65,7 @@ npcdist.formula <-
       cd.args$eydat <- eydat
     }
     cd.args$bws <- bws
-    ev <- do.call(npcdist, .np_args_with_defaults(cd.args, dots))
+    ev <- do.call(npcdist, c(cd.args, dots))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)

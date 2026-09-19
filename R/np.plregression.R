@@ -58,7 +58,7 @@ npplreg.formula <-
         pl.args$eydat <- model.response(evaluation$yz)
     }
     pl.args$bws <- bws
-    ev <- do.call(npplreg, .np_args_with_defaults(pl.args, dots))
+    ev <- do.call(npplreg, c(pl.args, dots))
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
       if (!is.null(ev$bws))

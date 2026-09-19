@@ -66,7 +66,7 @@ npcdens.formula <-
       cd.args$eydat <- eydat
     }
     cd.args$bws <- bws
-    ev <- do.call(npcdens, .np_args_with_defaults(cd.args, dots))
+    ev <- do.call(npcdens, c(cd.args, dots))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
