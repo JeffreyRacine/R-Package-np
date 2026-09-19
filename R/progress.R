@@ -564,7 +564,7 @@
 }
 
 .np_progress_compact_bandwidth_line <- function(line, max_width) {
-  match <- regexec("^(.+(?:Bandwidth selection|Plot bootstrap)) \\((.+)\\)$", line)
+  match <- regexec("^(.+(?:Bandwidth selection|Plot bootstrap|Testing .+)) \\((.+)\\)$", line)
   parts <- regmatches(line, match)[[1L]]
   if (length(parts) != 3L) return(line)
   fields <- strsplit(parts[[3L]], ", ", fixed = TRUE)[[1L]]
