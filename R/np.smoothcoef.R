@@ -1242,12 +1242,12 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
           mean.fit <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop = FALSE] %*% train.solve$coef[,i] })
           resid <- tydat - mean.fit
           if (se) {
-          u2.W <- resid^2
-          moments$s <- lc_moments(
-            z.eval = if (miss.ex) NULL else ezdat,
-            leave.one.out.eval = leave.one.out,
-            u2 = u2.W
-          )$s
+            u2.W <- resid^2
+            moments$s <- lc_moments(
+              z.eval = if (miss.ex) NULL else ezdat,
+              leave.one.out.eval = leave.one.out,
+              u2 = u2.W
+            )$s
           }
         } else {
           lp_state.err <- .npscoef_lp_state(
