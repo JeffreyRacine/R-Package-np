@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Smooth-coefficient wild-bootstrap coefficient intervals now reuse the same
+  categorical kernel normalization as their fitted moment equations. Density
+  profile bootstrap intervals also retain the estimator's normalized
+  Li--Racine kernels for both unordered and ordered factors. Bootstrap draws,
+  ordinary fitted coefficients and bandwidth selection are unchanged.
+
 * Local-polynomial fitting, operator and bootstrap rank certificates now count
   exact repeated design rows once, rather than treating duplicate observations
   as independent directions. Sparse supported designs use the existing ridge

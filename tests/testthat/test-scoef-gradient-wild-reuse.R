@@ -80,3 +80,66 @@ test_that("coefficient projection retains normalized positive ridge and empty ro
     "local fit is undefined")
   expect_equal(as.vector(H%*%y),ref,tolerance=1e-10)
 })
+
+test_that("categorical coefficient projections retain their moment kernel units", {
+  skip_if_not(spawn_mpi_slaves(), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add=TRUE)
+  pkg <- getNamespaceName(environment(npscoef))
+  internal <- function(name) getFromNamespace(name, pkg)
+  withr::local_options(np.messages=FALSE, np.plot.wild.hat.block.bytes=8*60*2)
+  withr::local_preserve_seed()
+  set.seed(6019)
+  n <- 60L
+  x <- data.frame(x=runif(n,-1,1),v=rnorm(n))
+  y <- x$x + x$v + rnorm(n,sd=.3)
+  for (compress in c(TRUE,FALSE)) for (uk in c("liracine","aitchisonaitken"))
+    for (ok in c("liracine","wangvanryzin","racineliyan")) {
+      withr::local_options(np.categorical.compress=compress)
+      z <- data.frame(u=factor(rep(1:3,20)),o=ordered(rep(0:3,15)))
+      e <- c(2L,5L,8L,14L)
+      bw <- npscoefbw(xdat=x,ydat=y,zdat=z,bws=c(.3,.2),
+        bandwidth.compute=FALSE,ukertype=uk,okertype=ok)
+      state <- internal(".np_scoef_fit_internal")(bw,txdat=x,tydat=y,tzdat=z,
+        exdat=x[e,,drop=FALSE],ezdat=z[e,,drop=FALSE],iterate=FALSE,
+        .np_coefficient_projection=1L)
+      expect_identical(state$profile.weights,compress)
+      if (compress) {
+        expect_length(state$profile$train.id,n)
+        expect_identical(nrow(state$profile$train.profile.codes),12L)
+      } else expect_null(state$profile)
+      H <- internal(".npscoef_coefficient_projection_block")(state,1L,length(e))
+      for (response in list(y, 2*y+3)) {
+        ref <- npscoef(bw,txdat=x,tydat=response,tzdat=z,exdat=x[e,,drop=FALSE],
+                       ezdat=z[e,,drop=FALSE],iterate=FALSE)$grad[,1L]
+        expect_equal(drop(H%*%response),ref,tolerance=1e-11)
+      }
+      # Independent fixed-design weighted normal equations, with no hat/helper.
+      codes <- data.frame(u=as.integer(z$u),o=as.integer(z$o)-1L)
+      D <- cbind(1,as.matrix(x))
+      for (i in seq_along(e)) {
+        wu <- if(uk=="liracine") ifelse(codes$u==codes$u[e[i]],1,.3) else
+          ifelse(codes$u==codes$u[e[i]],.7,.15)
+        d <- abs(codes$o-codes$o[e[i]])
+        wo <- switch(ok,liracine=.2^d,
+          wangvanryzin=ifelse(d==0,.8,.4*.2^d),
+          racineliyan=.2^d/vapply(codes$o,function(a)sum(.2^abs(a-0:3)),numeric(1)))
+        w <- wu*wo
+        ref <- solve(crossprod(D,D*w),crossprod(D,w*y))[2L]
+        expect_equal(drop(H[i,,drop=FALSE]%*%y),as.double(ref),tolerance=1e-11)
+      }
+      pilot <- fitted(npscoef(bw,txdat=x,tydat=y,tzdat=z,
+                               exdat=x,ezdat=z,iterate=FALSE))
+      set.seed(414)
+      draws <- matrix(ifelse(runif(n*5L)<=.5,-1,1),n,5L)
+      rng <- .Random.seed
+      expected <- t(vapply(seq_len(5L),function(b)
+        npscoef(bw,txdat=x,tydat=pilot+(y-pilot)*draws[,b],tzdat=z,
+          exdat=x[e,,drop=FALSE],ezdat=z[e,,drop=FALSE],iterate=FALSE)$grad[,1L],
+        numeric(length(e))))
+      set.seed(414)
+      got <- internal(".np_wild_boot_from_scoef_exact")(x,y,z,x[e,,drop=FALSE],
+        z[e,,drop=FALSE],bw,B=5L,target="grad",gradient.index=1L)
+      expect_equal(got$t,expected,tolerance=1e-11)
+      expect_identical(.Random.seed,rng)
+    }
+})

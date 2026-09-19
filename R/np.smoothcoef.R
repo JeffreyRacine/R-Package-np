@@ -1049,6 +1049,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         tww = if (fast.largeh) array(fast.eval$tww,
           c(nrow(fast.eval$tww), ncol(fast.eval$tww), 1L)) else moments$tww,
         ridge = ridge, invalid = invalid.rows, global = fast.largeh,
+        profile.weights = !fast.largeh && use.cat.profile.lc,
+        profile = if (!fast.largeh && use.cat.profile.lc)
+          get_cat_profile_moments_cache()[c("train.id", "train.profile.codes",
+                                            "train.profile.dat")] else NULL,
         index = as.integer(j), t0 = as.double(coef.mat[j + 1L, ])
       ))
     }

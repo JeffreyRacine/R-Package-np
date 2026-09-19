@@ -917,7 +917,15 @@
   # units for fixed, generalized-NN and adaptive-NN bandwidths. This matters
   # whenever the accepted solve has a positive ridge.
   eval.rows <- if (state$global) 1L else rows
-  kw <- .npscoef_npksum(bws = state$bws, txdat = state$z.train,
+  # Borrow the actual moment producer's units, including compressed categorical
+  # moments. Reconstructing via native kernel sums can normalize LR differently.
+  kw <- if (isTRUE(state$profile.weights)) {
+    profile.kw <- .np_regression_cat_profile_kernel_matrix(
+      .np_cat_profile_code_matrix(state$z.eval[eval.rows, , drop = FALSE]),
+      state$profile$train.profile.codes, state$profile$train.profile.dat,
+      state$bws)
+    t(profile.kw[, state$profile$train.id, drop = FALSE])
+  } else .npscoef_npksum(bws = state$bws, txdat = state$z.train,
     exdat = state$z.eval[eval.rows, , drop = FALSE],
     bandwidth.divide = TRUE, return.kernel.weights = TRUE,
     .np.internal.bandwidth.divide.weights = TRUE)$kw
