@@ -382,7 +382,8 @@ npreg.formula <-
     }
 
     if(ev$residuals){
-        ev$resid <- naresid(ev$omit, ev$resid)
+        # Residuals always belong to training rows, not the evaluation grid.
+        ev$resid <- naresid(attr(tmf, "na.action"), ev$resid)
     }    
     return(ev)
   }

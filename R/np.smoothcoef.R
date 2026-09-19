@@ -110,8 +110,17 @@ npscoef.formula <-
     ev$mean <- napredict(ev$omit, ev$mean)
     ev$merr <- napredict(ev$omit, ev$merr)
 
+    # Coefficients and their effects share the fitted/evaluation row owner.
+    # Unrequested outputs retain their NULL/scalar sentinel representation.
+    if (isTRUE(ev$betas))
+      ev$beta <- napredict(ev$omit, ev$beta)
+    if (is.matrix(ev$grad))
+      ev$grad <- napredict(ev$omit, ev$grad)
+    if (is.matrix(ev$gerr))
+      ev$gerr <- napredict(ev$omit, ev$gerr)
+
     if(ev$residuals){
-        ev$resid <- naresid(ev$omit, ev$resid)
+        ev$resid <- naresid(attr(tmf, "na.action"), ev$resid)
     }    
     return(ev)
   }
