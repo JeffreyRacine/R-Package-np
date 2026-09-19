@@ -129,6 +129,18 @@ Further arguments are passed to methods.
 
 }
 \details{
+  With a formula-derived bandwidth object, supplying only \code{y}
+  replaces the evaluated response in retained-training-sample order: one row
+  per observation retained after the original subset and missing-value selection.
+  Original excluded rows are not restored; row names or equal lengths do not
+  imply original-data order. The effective \code{na.action} is then applied
+  jointly to the retained predictors and replacement response; any new omission
+  indices refer to this retained sample. The selected bandwidths remain fixed,
+  and the returned object retains the replacement sample for subsequent refits.
+  Use \code{data} for full formula-data replacement, not together with a partial
+  response replacement. Explicit native training arguments retain their separate
+  positional contract.
+
   Formula variables of class \code{ts}, including lagged variables, are
   aligned on their common time support before fitting. Other variables
   must already have the length of that intersection. Supply explicitly

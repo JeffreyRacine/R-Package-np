@@ -1684,6 +1684,7 @@ npreghat <-
 npreghat.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
+    dots <- list(...)
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
@@ -1694,7 +1695,15 @@ npreghat.formula <-
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
     mf <- .np_bws_formula_model_frame(bws, mf.args,
-      data.override = !missing(data) && !is.null(data), overrides = list(...))
+      data.override = !missing(data) && !is.null(data), overrides = dots)
+    if ("y" %in% names(dots)) {
+      mf <- .np_formula_replace_response(mf, bws, dots[["y"]], dots,
+                                         data.override = !is.null(data),
+                                         matrix.response = TRUE)
+      dots$y <- NULL
+      dots$na.action <- NULL
+      bws <- .np_bws_retain_fit_frame(bws, mf)
+    }
     tt <- attr(mf, "terms")
 
     y <- model.response(mf)
@@ -1715,7 +1724,7 @@ npreghat.formula <-
     if (has.eval)
       hat.args$exdat <- exdat
 
-    ev <- do.call(npreghat, c(hat.args, list(...)))
+    ev <- do.call(npreghat, c(hat.args, dots))
     attr(ev, "call") <- match.call(expand.dots = FALSE)
     ev
   }

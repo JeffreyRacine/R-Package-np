@@ -55,6 +55,12 @@ npconmode.formula <-
     umf <- tmf <- if (is.null(frame.state))
       .np_bws_formula_model_frame(bws, mf.args, data.override = !is.null(data), overrides = dots) else
         .np_formula_frame_take(frame.state)
+    if ("tydat" %in% names(dots)) {
+      umf <- tmf <- .np_formula_replace_response(tmf, bws, dots[["tydat"]],
+                                                 dots, data.override = !is.null(data))
+      dots$tydat <- NULL
+      dots$na.action <- NULL
+    }
     tt <- attr(tmf, "terms")
     bws <- .np_bws_retain_fit_frame(bws, tmf)
     train.omit <- attr(tmf, "na.action")

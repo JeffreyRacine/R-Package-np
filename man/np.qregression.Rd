@@ -223,6 +223,18 @@ prediction/evaluation route, or plot route as appropriate.
   }
 }
 \details{
+  With a formula-derived bandwidth object, supplying only \code{tydat}
+  replaces the evaluated response in retained-training-sample order: one row
+  per observation retained after the original subset and missing-value selection.
+  Original excluded rows are not restored; row names or equal lengths do not
+  imply original-data order. The effective \code{na.action} is then applied
+  jointly to the retained predictors and replacement response; any new omission
+  indices refer to this retained sample. The selected bandwidths remain fixed,
+  and the returned object retains the replacement sample for subsequent refits.
+  Use \code{data} for full formula-data replacement, not together with a partial
+  response replacement. Explicit native training arguments retain their separate
+  positional contract.
+
   For native (non-formula) objects, named \code{newdata} columns are matched
   to the retained variable names and reordered as needed. Extra columns are
   ignored; missing, duplicate or ambiguous names are errors. An unnamed
