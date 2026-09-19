@@ -2754,7 +2754,8 @@
       Mvals = M0,
       Zvals = Z0,
       rhs = rhs[i, ],
-      represented.mass = n
+      represented.mass = n,
+      rank.bounds = .np_inid_lp_rank_bounds(k, p)
     )[1L]
   }
 
@@ -2776,7 +2777,8 @@
         Mvals = Mvals,
         Zvals = Zvals,
         rhs = rhs[i, ],
-        represented.mass = represented.mass
+        represented.mass = represented.mass,
+        rank.bounds = .np_inid_lp_rank_bounds(kw[, i], p, counts.chunk)
       )
     }
     out
@@ -3805,11 +3807,17 @@
   as.double(colSums(counts.chunk))
 }
 
+.np_inid_lp_rank_bounds <- function(weights, p, counts = NULL) {
+  .Call("C_np_lp_support_rank", as.double(weights), counts, as.integer(p),
+        PACKAGE = "npRmpi")
+}
+
 .np_inid_lp_batch_project <- function(Mvals,
                                        Zvals,
                                        rhs,
                                        represented.mass,
-                                       diagnostics = FALSE) {
+                                       diagnostics = FALSE,
+                                       rank.bounds = NULL) {
   Mvals <- as.matrix(Mvals)
   if (!is.double(Mvals))
     storage.mode(Mvals) <- "double"
@@ -3827,12 +3835,13 @@
   }
 
   native <- .Call(
-    "C_np_lp_batch_project",
+    "C_np_lp_batch_project_ranked",
     Mvals,
     Zvals,
     as.double(rhs),
     as.double(represented.mass),
     isTRUE(diagnostics),
+    if (is.null(rank.bounds)) NULL else as.integer(rank.bounds),
     PACKAGE = "npRmpi"
   )
   status <- native[["status"]]
@@ -4492,7 +4501,8 @@
       Mvals = M0,
       Zvals = Z0,
       rhs = rhs[i, ],
-      represented.mass = n
+      represented.mass = n,
+      rank.bounds = .np_inid_lp_rank_bounds(k, p)
     )[1L]
   }
 
@@ -4507,7 +4517,8 @@
         Mvals = Mvals,
         Zvals = Zvals,
         rhs = rhs[i, ],
-        represented.mass = represented.mass
+        represented.mass = represented.mass,
+        rank.bounds = .np_inid_lp_rank_bounds(kw[, i], p, counts.chunk)
       )
     }
     out
@@ -9574,6 +9585,7 @@
     rows = rows,
     Mfeat = Mfeat,
     Zops = Zops,
+    kernel.row = k,
     rhs = state$W.eval[i, ]
   )
 }
@@ -9585,7 +9597,8 @@
     Mvals = M0,
     Zvals = Z0,
     rhs = feat$rhs,
-    represented.mass = state$n
+    represented.mass = state$n,
+    rank.bounds = .np_inid_lp_rank_bounds(feat$kernel.row, state$p)
   )[1L, ])
 }
 
@@ -9600,7 +9613,8 @@
     Mvals = Mvals,
     Zvals = Zmats,
     rhs = feat$rhs,
-    represented.mass = represented.mass
+    represented.mass = represented.mass,
+    rank.bounds = .np_inid_lp_rank_bounds(feat$kernel.row, state$p, counts.chunk)
   )
 }
 

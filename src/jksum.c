@@ -11197,6 +11197,13 @@ cleanup:
   return status;
 }
 
+/* A capped donor count is an upper bound on rank, not a full-rank claim.
+ * The optional request belongs to one complete fitting evaluation row. */
+typedef struct {
+  int count;
+  int cap;
+} NPLPSupportRankContext;
+
 typedef struct {
   const NPContinuousKernelRoute *route;
   int bandwidth_mode;
@@ -11245,6 +11252,9 @@ typedef struct {
   const NPBetaRegressionMomentCtx *regression_moment_context;
   NPContinuousKernelDerivativeDiagnostics *route_diagnostics;
   NPContinuousKernelProgressFunction progress;
+  /* Optional exact donor-count certificate for a single LP moment row. */
+  int *support_rank;
+  int support_cap;
 } NPBetaAbsoluteRouteCall;
 
 typedef struct {
@@ -11726,6 +11736,11 @@ static int np_beta_absolute_route_body(
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
+    if(call->support_rank != NULL) {
+      /* Only the one-row common-scaled LP owner supplies this request. */
+      *call->support_rank = np_lp_rank_upper_bound_from_weights(
+        row_result.row, num_obs_train, call->support_cap);
+    }
     status = 0;
     goto cleanup;
   }
@@ -13207,7 +13222,16 @@ const NP_OuterPackCtx * const outer_pack_ctx,
 const NPContinuousKernelExecutionContext * const kernel_execution_context,
 const NPCenteredMomentCtx * const centered_moment_ctx,
 const int keep_kw_owner_local,
-NPPermutationWeightOutput * const pkw_output){
+NPPermutationWeightOutput * const pkw_output,
+  NPLPSupportRankContext * const support_rank){
+  if(support_rank != NULL) {
+    if(num_obs_eval != 1 || !suppress_parallel || support_rank->cap <= 0 ||
+       leave_one_out || drop_one_train || symmetric || gather_scatter ||
+       do_score || do_ocg || permutation_operator != OP_NOOP ||
+       kernel_pow != 1)
+      return KWSNP_ERR_BADINVOC;
+    support_rank->count = 0;
+  }
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
   const NP_GateOverrideCtx gate_ctx_empty = {0};
@@ -13375,6 +13399,8 @@ NPPermutationWeightOutput * const pkw_output){
         .power2_observation_scale = beta_dual_power ?
           dual_power_ctx->observation_scale : NULL,
         .retain_common_scale = beta_retain_common_scale,
+        .support_rank = support_rank != NULL ? &support_rank->count : NULL,
+        .support_cap = support_rank != NULL ? support_rank->cap : 0,
         .centered_m2 = beta_centered_moment ?
           centered_moment_ctx->centered_m2 : NULL,
         .kw = kw,
@@ -15392,6 +15418,21 @@ NPPermutationWeightOutput * const pkw_output){
     /* expand matrix outer product, multiply by kernel weights, etc, do sum */
 
     if (!(drop_one_train && do_psum && (j == drop_which_train))){
+      if(support_rank != NULL && support_rank->count < support_rank->cap) {
+        /* Fixed/GNN: the product is the complete donor row. ANN: the
+         * outer loop visits donors and its one inner entry is this query.
+         * Tree scratch outside pxl is not part of the accumulated row. */
+        const int ranges = pxl == NULL ? 1 : pxl->n;
+        for(int range = 0; range < ranges &&
+            support_rank->count < support_rank->cap; ++range) {
+          const int begin = pxl == NULL ? 0 : pxl->istart[range];
+          const int end = pxl == NULL ? num_xt :
+            begin + pxl->nlev[range];
+          for(int donor = begin; donor < end &&
+              support_rank->count < support_rank->cap; ++donor)
+            support_rank->count += tprod[donor] != 0.0;
+        }
+      }
       if(!nws){
         np_outer_weighted_sum(matrix_W, sgn, ncol_W,
                               matrix_Y, ncol_Y,
@@ -15959,7 +16000,8 @@ static int np_regression_profile_residual_kernel_sum(
     response_columns, NULL, NULL, call->vector_scale_factor, 1,
     NULL, NULL, call->lambda, call->num_categories,
     call->matrix_categorical_vals, NULL, weighted_sum, NULL, NULL,
-    NULL, &preparation, NULL, NULL, NULL, 0, NULL);
+    NULL, &preparation, NULL, NULL, NULL, 0, NULL,
+    NULL);
 }
 
 /*
@@ -16200,7 +16242,8 @@ NPPermutationWeightOutput * const pkw_output){
     NULL,
     NULL,
     0,
-    pkw_output);
+    pkw_output,
+    NULL);
 }
 
 int kernel_weighted_sum_np_power12(
@@ -16328,7 +16371,8 @@ double * const pkw){
     NULL,
     NULL,
     0,
-    pkw_output);
+    pkw_output,
+    NULL);
   return status;
 }
 
@@ -16399,6 +16443,7 @@ NPContinuousKernelProgressFunction progress)
     kernel_route == NULL ? NULL : &kernel_execution_context,
     NULL,
     0,
+    NULL,
     NULL);
 }
 
@@ -16465,6 +16510,7 @@ NPContinuousKernelProgressFunction progress)
     kernel_route == NULL ? NULL : &kernel_execution_context,
     &centered_moment_ctx,
     0,
+    NULL,
     NULL);
 }
 
@@ -16603,7 +16649,8 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
                                       &kernel_execution_context,
                                     NULL,
                                     0,
-                                    pkw_output);
+                                    pkw_output,
+                                    NULL);
   return status;
 }
 
@@ -16707,7 +16754,8 @@ static int np_density_categorical_profile_sum(
     counts, NULL, NULL, call->vector_scale_factor,
     1, NULL, NULL, call->lambda, call->num_categories,
     call->matrix_categorical_vals, NULL, sum, NULL, NULL,
-    NULL, NULL, &execution, NULL, NULL, 0, NULL);
+    NULL, NULL, &execution, NULL, NULL, 0, NULL,
+    NULL);
 }
 
 static int np_glp_max_degree(const int ncon, const int *deg){
@@ -19776,6 +19824,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   NULL,
                                   0,
+                                  NULL,
                                   NULL) != 0){
       int_LARGE_SF = tsf;
       NP_LP_CV_FAIL();
@@ -19941,6 +19990,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   NULL,
                                   0,
+                                  NULL,
                                   NULL) != 0)
       NP_LP_CV_FAIL();
 
@@ -20531,6 +20581,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                      NULL,
                                      NULL,
                                      0,
+                                     NULL,
                                      NULL) != 0){
       local_fail = 1;
       goto adaptive_blas_collective_gate;
@@ -22039,6 +22090,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    NULL,
                                    NULL,
                                    0,
+                                   NULL,
                                    NULL);
         int_LARGE_SF = tsf;
       }
@@ -22161,6 +22213,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                          NULL,
                                          NULL,
                                          0,
+                                         NULL,
                                          NULL);
             }
             MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);
@@ -22338,7 +22391,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                      &objective_pack_ctx,
                                      NULL,
                                      NULL,
-                                     0);
+                                     0,
+                                     NULL);
         } else {
           if(j < (num_obs-1)){
             for(l = 0; l < nrc2; l++)
@@ -25894,6 +25948,7 @@ preflight_profile_cdf:
                                          NULL,
                                          NULL,
                                          1,
+                                         NULL,
                                          NULL);
   if((engine_status != 0) || (row_tile_sink.count_rows != 0))
     goto cleanup_profile_cdf;
@@ -26962,6 +27017,7 @@ double * cv){
                               /* ANN owns training rows; each CDF loss row
                                * needs every donor's retained weight. */
                               BANDWIDTH_den != BW_ADAP_NN,
+                              NULL,
                               NULL);
     
 #ifdef MPI2
@@ -29439,7 +29495,8 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
   const double *power2_observation_scale,
   double *scaled_kernel_weights,
   const NPContinuousKernelRoute *kernel_route,
-  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics)
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+  NPLPSupportRankContext * const support_rank)
 {
   NP_DualPowerCtx dual_power_context = {
     weighted_sum_power2, 2, basis, basis, nterms, nterms, NULL, 1, NULL,
@@ -29468,7 +29525,8 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
     lambda, num_categories, matrix_categorical_vals, NULL,
     weighted_sum, NULL, scaled_kernel_weights, NULL,
     &dual_power_context,
-    NULL, &execution_context, NULL, 0, NULL);
+    NULL, &execution_context, NULL, 0, NULL,
+    support_rank);
 }
 
 void np_beta_scaled_row_context_init(NPBetaScaledRowContext *context)
@@ -30512,6 +30570,7 @@ static int np_empty_x_row_mark(const NPEmptyXRowContext *ctx, int row,
 #ifdef MPI2
     0,
 #endif
+    NULL,
     NULL);
   if(status == 0 && np_lp_complete_weights_are_zero(weights, ctx->n)) {
     np_regression_empty_row_mark(rows, row, contrast >= 0);
@@ -30949,7 +31008,8 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       NULL, NULL, NULL,
       0,
       owner->conditional_permutation_weights != NULL ?
-        &conditional_pkw_output : NULL);
+        &conditional_pkw_output : NULL,
+        NULL);
 
     if(weighted_sum_status != 0) {
       execution->status = NP_REGRESSION_SCALAR_FIT_ERR_TRAVERSAL;
@@ -32293,7 +32353,8 @@ static int np_regression_general_lp_empty_row(
         call->lambda, call->num_categories, call->matrix_categorical_vals,
         call->categorical_compress, owner->moments, NULL, NULL,
         owner->retained_kernel_row, call->kernel_route,
-        call->kernel_route_diagnostics);
+        call->kernel_route_diagnostics,
+        NULL);
     } else {
       status = kernel_weighted_sum_np_ctx_ex(
         call->kernel_c, call->kernel_u, call->kernel_o, call->bandwidth_mode,
@@ -32313,6 +32374,7 @@ static int np_regression_general_lp_empty_row(
 #ifdef MPI2
         0,
 #endif
+        NULL,
         NULL);
     }
     if(status != 0)
@@ -32343,6 +32405,7 @@ static int np_regression_general_lp_point_at_frame(
   double *projection)
 {
   NPLPSolvePolicyDiagnostics solve_diagnostics = {0, 0.0};
+  NPLPSupportRankContext support_rank = {0, owner->nterms};
   double pristine_anchor;
   int i, term;
 
@@ -32385,7 +32448,8 @@ static int np_regression_general_lp_point_at_frame(
          NULL,
          kernel_row,
          call->kernel_route,
-         call->kernel_route_diagnostics) != 0)
+         call->kernel_route_diagnostics,
+         &support_rank) != 0)
       return 0;
   } else {
     if(kernel_weighted_sum_np_ctx_ex(
@@ -32437,7 +32501,8 @@ static int np_regression_general_lp_point_at_frame(
 #ifdef MPI2
          0,
 #endif
-         NULL) != 0)
+         NULL,
+         &support_rank) != 0)
       return 0;
   }
 
@@ -32456,7 +32521,7 @@ static int np_regression_general_lp_point_at_frame(
        owner->nterms,
        1,
        epsilon,
-       NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+       support_rank.count,
        &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK) {
     if(np_regression_general_lp_empty_row(call, owner, row, 1,
          moment_stride, kernel_row != NULL, kernel_row)) {
@@ -32927,6 +32992,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 #endif
 
   for(j = 0; j < num_obs_eval; ++j) {
+    NPLPSupportRankContext support_rank = {0, owner->nterms};
     double sk, ey, ey2, sigma2hat;
     double pristine_anchor = 0.0;
     NPLPSolvePolicyDiagnostics solve_diagnostics = {0, 0.0};
@@ -33007,7 +33073,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          }
 
 	          if(call->kernel_route == NULL)
-	            kernel_weighted_sum_np_ctx(call->kernel_c,
+	            kernel_weighted_sum_np_ctx_ex(call->kernel_c,
 	                                   call->kernel_u,
 	                                   call->kernel_o,
 	                                   BANDWIDTH_reg,
@@ -33060,7 +33126,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                   NULL,
 	                                   owner_kernel_row,
 	                                   call->gate_context,
-	                                   NULL);
+	                                   NULL, NULL, NULL, NULL, 0, NULL, &support_rank);
 	          else {
 	            /*
 	             * Rank ownership changes only who computes this row.  It must
@@ -33102,7 +33168,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                   call->hc0_context->scaled_residual : NULL,
 	                 owner_kernel_row,
 	                 call->kernel_route,
-	                 call->kernel_route_diagnostics) != 0) {
+	                 call->kernel_route_diagnostics,
+	                 &support_rank) != 0) {
 	              owner_solve_failed = 1;
 	              break;
 	            }
@@ -33122,7 +33189,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	               owner->nterms,
 	               1,
 	               epsilon,
-	               NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+	               support_rank.count,
 	               &solve_diagnostics_owner) != NP_LP_SOLVE_POLICY_OK){
 	            if(np_regression_general_lp_empty_row(call, owner, jj, 0,
 	                 moment_stride, 1,
@@ -33593,7 +33660,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
            ordinary_hc0 ? call->hc0_context->scaled_residual : NULL,
            hc0_kernel_row,
            call->kernel_route,
-           call->kernel_route_diagnostics) != 0) {
+           call->kernel_route_diagnostics,
+           &support_rank) != 0) {
         execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE;
         return R_NilValue;
       }
@@ -33647,7 +33715,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 #ifdef MPI2
                          0,
 #endif
-                         NULL);
+                         NULL,
+                         &support_rank);
       if((ordinary_hc0 || hc0_residual_preparing) && moment_status != 0) {
         execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
         return R_NilValue;
@@ -33669,7 +33738,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
          owner->nterms,
          1,
          epsilon,
-         NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+         support_rank.count,
          &solve_diagnostics) !=
        NP_LP_SOLVE_POLICY_OK) {
       if(np_regression_general_lp_empty_row(call, owner, j, 0,
@@ -36509,9 +36578,11 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     if(kernel_route != NULL) {
       if(np_beta_scaled_row_context_fill(
            &beta_row_context, i, NULL, NULL) != NP_CONTINUOUS_ROW_OK ||
-         np_reghat_lp_workspace_influence_row(
+         np_reghat_lp_workspace_influence_row_ranked(
            &reghat_workspace, kw, eval_basis, weights_out + i,
-           (size_t)num_eval) != NP_REGHAT_LP_ROW_OK)
+           (size_t)num_eval,
+           np_lp_rank_upper_bound_from_weights(
+             kw, num_train, np_glp_cv_cache.nterms)) != NP_REGHAT_LP_ROW_OK)
         goto cleanup_lp_hat;
       continue;
     } else {
@@ -36620,7 +36691,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
          np_glp_cv_cache.nterms,
          1,
          ridge_fraction,
-         NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+         np_lp_rank_upper_bound_from_weights(kw, num_train, np_glp_cv_cache.nterms),
          &solve_diagnostics) !=
        NP_LP_SOLVE_POLICY_OK) {
       if(empty_rows != NULL &&
@@ -37910,8 +37981,10 @@ static int np_npsigtest_fixed_influence_row(
         num_continuous, np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
         matrix_X_continuous_train_extern, eval_idx, eval_basis);
   }
-  return np_reghat_lp_workspace_influence_row(
-           lp_workspace, ctx->kw, eval_basis, row_out, 1U) ==
+  return np_reghat_lp_workspace_influence_row_ranked(
+           lp_workspace, ctx->kw, eval_basis, row_out, 1U,
+           np_lp_rank_upper_bound_from_weights(
+             ctx->kw, num_train, np_glp_cv_cache.nterms)) ==
          NP_REGHAT_LP_ROW_OK ? 0 : 1;
 }
 
@@ -38839,9 +38912,11 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
 
       if(np_beta_scaled_row_context_fill(
            &beta_row_context, j, NULL, NULL) != NP_CONTINUOUS_ROW_OK ||
-         np_reghat_lp_workspace_influence_row(
+         np_reghat_lp_workspace_influence_row_ranked(
            &reghat_workspace, kw, eval_basis, hat_block + block_count,
-           (size_t)block_rows) != NP_REGHAT_LP_ROW_OK)
+           (size_t)block_rows,
+           np_lp_rank_upper_bound_from_weights(
+             kw, num_train, np_glp_cv_cache.nterms)) != NP_REGHAT_LP_ROW_OK)
         goto cleanup_lp_apply;
       ++block_count;
 
@@ -38910,6 +38985,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   }
 
   for(j = 0; j < num_eval; j++){
+    NPLPSupportRankContext support_rank = {0, np_glp_cv_cache.nterms};
 
     for(l = 0; l < num_reg_continuous_extern; l++){
       TCON[l][0] = matrix_X_continuous_eval_extern[l][j];
@@ -38922,7 +38998,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     for(l = 0; l < num_reg_ordered_extern; l++)
       TORD[l][0] = matrix_X_ordered_eval_extern[l][j];
 
-    if(kernel_weighted_sum_np_ctx(kernel_cx,
+    if(kernel_weighted_sum_np_ctx_ex(kernel_cx,
                                   kernel_ux,
                                   kernel_ox,
                                   BANDWIDTH_den_extern,
@@ -38973,7 +39049,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                                   NULL,
                                   NULL,
                                   NULL,
-                                  NULL) != 0)
+                                  NULL, NULL, NULL, NULL, 0, NULL, &support_rank) != 0)
       goto cleanup_lp_apply;
 
     for(i = 0; i < np_glp_cv_cache.nterms; i++){
@@ -38993,7 +39069,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
          np_glp_cv_cache.nterms,
          n_rhs,
          ridge_fraction,
-         NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+         support_rank.count,
          NULL) !=
        NP_LP_SOLVE_POLICY_OK) {
       if(empty_rows != NULL &&
@@ -53495,6 +53571,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                (compute_categorical_moments || compute_leading_moments) ?
                                  &categorical_execution : NULL,
                                NULL, NULL, 0,
+                               NULL,
                                NULL); // no permutation kernel weights
 
     if((compute_categorical_moments || compute_leading_moments) &&
@@ -55198,7 +55275,8 @@ static SEXP np_conditional_category_se_body(void *data)
              call->sum, call->psum, call->weights[2*side], &call->gate[side],
              NULL, NULL, NULL, NULL,
              1,
-             &permutation) != 0) {
+             &permutation,
+             NULL) != 0) {
           call->status = 2;
           break;
         }
@@ -55795,6 +55873,7 @@ NPRegressionLPEmptyRows *empty_rows
                            &xy_execution : NULL,
                          NULL, NULL,
                          0, // preserve the wrapper's kernel-weight ownership
+                         NULL,
                          NULL);
 
   //x - we assume x is in xy tree order
@@ -55870,6 +55949,7 @@ NPRegressionLPEmptyRows *empty_rows
                            &x_execution : NULL,
                          NULL, NULL,
                          0, // preserve the wrapper's kernel-weight ownership
+                         NULL,
                          NULL);
 #ifdef NP_ANN_DIRECT_DIAGNOSTIC
   if(ann_uncertainty) ann_radius_equal=np_ann_direct_radius_equal;
@@ -56189,6 +56269,7 @@ NPRegressionLPEmptyRows *empty_rows
 #ifdef MPI2
       0,
 #endif
+      NULL,
       NULL);
     if(replay_status != 0) {
       np_progress_conditional_se_end(&cat_se_call.progress);

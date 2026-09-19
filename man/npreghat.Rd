@@ -126,6 +126,9 @@ Local-polynomial operators retain the fitted solve's numerical ridge
 adjustment; see Numerical Ridging in \code{\link{npreg}} and its
 Seifert--Gasser reference. A hat operator alone does not estimate residual
 variance or apply the residual normalization used by regression inference.
+Fewer nonzero-weight donor rows than basis coefficients trigger the same
+existing ridge policy as fitting, for levels and derivative operators.
+This is a structural rank bound, not a new numerical conditioning threshold.
 
 For \code{output = "matrix"}, the return value is a matrix with class
 \code{c("npreghat", "matrix")} so it can be used directly in matrix products,
