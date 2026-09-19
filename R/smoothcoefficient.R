@@ -86,7 +86,17 @@ fitted.smoothcoefficient <- function(object, ...){
  object$mean 
 }
 residuals.smoothcoefficient <- function(object, ...) {
- if(object$residuals) { return(object$resid) } else { return(npscoef(bws = object$bws, residuals =TRUE)$resid) } 
+  if (object$residuals) return(object$resid)
+  do.call(npscoef, c(list(bws = object$bws, residuals = TRUE),
+                    .np_scoef_replay_controls(object, list())))$resid
+}
+
+.np_scoef_replay_controls <- function(object, dots) {
+  controls <- object[["fit.controls", exact = TRUE]]
+  allowed <- c("iterate", "maxiter", "tol", "leave.one.out")
+  for (name in intersect(names(controls), allowed))
+    if (!(name %in% names(dots))) dots[[name]] <- controls[[name]]
+  dots
 }
 se.smoothcoefficient <- function(x){
   if (!isTRUE(x$se) || is.null(x$merr) ||
@@ -113,6 +123,7 @@ predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
+  dots <- .np_scoef_replay_controls(object, dots)
   tr <- do.call(npscoef, c(list(bws = object$bws, se = se.fit), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
