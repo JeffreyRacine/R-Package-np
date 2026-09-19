@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Partial response replacement with formula-derived bandwidth objects now uses
+  retained-sample row order, before jointly applying the effective NA policy.
+  Refits retain the replacement sample without changing the original bandwidth
+  object. Original-data replacement belongs in `data`; it cannot be combined
+  with a partial response. Bandwidth selection is not repeated.
+
 * Native-object standard `newdata` now matches named columns to the retained
   variable names in fitting and prediction. Reordered or extra columns are
   handled consistently; missing, duplicate or ambiguous names are rejected.

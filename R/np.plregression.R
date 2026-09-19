@@ -31,6 +31,12 @@ npplreg.formula <-
     dots$.np.formula.state <- NULL
     frame <- if (is.null(frame.state)) .np_plreg_formula_frame(bws, data, overrides = dots)
              else .np_formula_frame_take(frame.state)
+    if ("tydat" %in% names(dots)) {
+      frame <- .np_formula_replace_response(frame, bws, dots[["tydat"]],
+                                             dots, data.override = !is.null(data))
+      dots$tydat <- NULL
+      dots$na.action <- NULL
+    }
     bws <- .np_bws_retain_fit_frame(bws, frame)
     roles <- .np_plreg_formula_split(frame, bws$terms, bws$xterms)
     response.name <- names(roles$yz)[attr(bws$terms, "response")]

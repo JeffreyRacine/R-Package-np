@@ -98,7 +98,8 @@ npindex.formula <-
         mf.args <- as.list(tmf)[-1L]
         if (inherits(bws, "sibandwidth") &&
             (missing(data) || is.null(data)) &&
-            all(c("xdat", "ydat") %in% names(bws[["call"]]))) {
+            all(c("xdat", "ydat") %in% names(bws[["call"]])) &&
+            !("tydat" %in% names(dots))) {
           # Automatic formula fits retain already-prepared native training
           # inputs. Recover them as plot does; do not apply the formula twice.
           txdat <- toFrame(.np_eval_bws_call_arg(bws, "xdat"))
@@ -109,6 +110,12 @@ npindex.formula <-
         } else {
           umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args,
             data.override = !missing(data) && !is.null(data), overrides = dots)
+          if ("tydat" %in% names(dots)) {
+            umf <- tmf <- .np_formula_replace_response(tmf, bws, dots[["tydat"]],
+                                                       dots, data.override = !is.null(data))
+            dots$tydat <- NULL
+            dots$na.action <- NULL
+          }
           tt <- attr(tmf, "terms")
           if (!raw.formula) bws <- .np_bws_retain_fit_frame(bws, tmf)
           response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]

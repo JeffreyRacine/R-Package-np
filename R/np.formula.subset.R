@@ -330,6 +330,49 @@
   .np_bws_retain_formula_training(bws, frame, policy)
 }
 
+# A partial response replacement conditions on the already-selected design.
+# Its rows therefore index the retained frame, never the original data before
+# subset/NA selection. Do not replay expressions or infer ownership from length.
+.np_formula_replace_response <- function(frame, bws, response, overrides,
+                                         data.override = FALSE,
+                                         matrix.response = FALSE) {
+  if (data.override)
+    stop("partial response replacement cannot be combined with 'data'; put the replacement response in 'data' instead",
+         call. = FALSE)
+  roles <- .np_bws_formula_roles(bws)
+  columns <- roles[["ydat"]]
+  if (!length(columns) || !all(columns %in% names(frame)))
+    stop("partial response replacement requires retained response columns", call. = FALSE)
+  if (length(intersect(columns, unlist(roles[names(roles) != "ydat"], use.names = FALSE))))
+    stop("a response used as a predictor requires full 'data' replacement", call. = FALSE)
+  if (NROW(response) != nrow(frame))
+    stop("replacement response must have one row per retained training observation, in retained-sample order; use 'data' to replace the original sample",
+         call. = FALSE)
+  if (isTRUE(matrix.response) && length(columns) == 1L && is.matrix(response)) {
+    frame[[columns]] <- I(response)
+  } else {
+    values <- toFrame(response)
+    if (ncol(values) != length(columns))
+      stop("replacement response has an incompatible number of columns", call. = FALSE)
+    for (j in seq_along(columns)) frame[[columns[[j]]]] <- values[[j]]
+  }
+  retained <- bws[[".np.formula.training", exact = TRUE]]
+  policy <- if ("na.action" %in% names(overrides)) overrides[["na.action"]] else
+    if (!is.null(retained)) retained[["na.action", exact = TRUE]] else {
+      effective <- attr(frame, ".np.na.policy", exact = TRUE)
+      if (!is.null(effective)) effective[[1L]] else getOption("na.action", stats::na.omit)
+    }
+  if (is.character(policy))
+    policy <- get(policy, envir = asNamespace("stats"), mode = "function")
+  tt <- attr(frame, "terms")
+  attr(frame, "na.action") <- NULL
+  if (!is.null(policy)) frame <- policy(frame)
+  attr(frame, "terms") <- tt
+  frame <- .np_formula_complete_training_frame(frame)
+  attr(frame, ".np.na.policy") <- list(policy)
+  frame
+}
+
 .np_bws_retain_fit_frame <- function(bws, frame) {
   retained <- bws[[".np.formula.training", exact = TRUE]]
   effective <- attr(frame, ".np.na.policy", exact = TRUE)
