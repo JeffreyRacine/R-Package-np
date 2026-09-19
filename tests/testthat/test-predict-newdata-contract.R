@@ -144,7 +144,7 @@ test_that("predict aliases newdata to exdat for default npqreg", {
   )
   expect_error(
     predict(fit, newdata = data.frame(z = c(0.2, 0.5, 0.8))),
-    "newdata must contain columns"
+    "'newdata' must include columns 'x'"
   )
 })
 

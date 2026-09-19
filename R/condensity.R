@@ -230,15 +230,10 @@ predict.condensity <- function(object, se.fit = FALSE, ...) {
       is.null(dots$exdat) &&
       is.null(dots$eydat) &&
       !is.null(dots$newdata)) {
-    nd <- toFrame(dots$newdata)
-    req <- c(object$ynames, object$xnames)
-    miss <- setdiff(req, names(nd))
-    if (length(miss) > 0L) {
-      stop(sprintf("'newdata' must include columns %s, or supply both 'exdat' and 'eydat'.",
-                   paste(shQuote(req), collapse = ", ")))
-    }
-    dots$eydat <- nd[, object$ynames, drop = FALSE]
-    dots$exdat <- nd[, object$xnames, drop = FALSE]
+    parts <- .np_native_newdata_parts(dots$newdata,
+      list(exdat = object$xnames, eydat = object$ynames), "predict")
+    dots$eydat <- parts$eydat
+    dots$exdat <- parts$exdat
     dots$newdata <- NULL
   }
 

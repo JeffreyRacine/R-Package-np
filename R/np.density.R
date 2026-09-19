@@ -105,7 +105,7 @@ npudens.bandwidth <-
   native.newdata <- dots[["newdata", exact = TRUE]]
   if (missing(edat) && !is.null(native.newdata)) {
     native.eval <- .np_native_newdata_parts(
-      native.newdata, list(edat = NULL), "npudens")
+      native.newdata, list(edat = bws$xnames), "npudens")
     edat <- native.eval$edat
   }
 

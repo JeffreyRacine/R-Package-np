@@ -639,7 +639,7 @@ npindex.sibandwidth <-
     native.newdata <- dots[["newdata", exact = TRUE]]
     if (missing(exdat) && !is.null(native.newdata)) {
       native.eval <- .np_native_newdata_parts(
-        native.newdata, list(exdat = NULL), "npindex")
+        native.newdata, list(exdat = bws$xnames), "npindex")
       exdat <- native.eval$exdat
     }
 

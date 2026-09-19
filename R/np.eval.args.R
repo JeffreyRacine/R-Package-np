@@ -11,12 +11,17 @@
 }
 
 .np_native_newdata_parts <- function(newdata, groups, where) {
+  # Preserve the established positional input for an unnamed single-role
+  # matrix/vector. Once names are supplied, they identify variables, not rows.
+  named <- is.data.frame(newdata) ||
+    (!is.null(dim(newdata)) && !is.null(colnames(newdata)))
   nd <- toFrame(newdata)
-  if (length(groups) == 1L)
+  if (length(groups) == 1L && !named)
     return(setNames(list(nd), names(groups)))
   required <- unlist(groups, use.names = FALSE)
   if (any(lengths(groups) == 0L) || anyNA(required) || any(!nzchar(required)) ||
-      anyDuplicated(required) || anyDuplicated(names(nd)))
+      anyDuplicated(required) || is.null(names(nd)) || anyNA(names(nd)) ||
+      any(!nzchar(names(nd))) || anyDuplicated(names(nd)))
     stop(sprintf("%s: native 'newdata' roles are ambiguous; supply %s explicitly",
                  where, paste(shQuote(names(groups)), collapse = " and ")),
          call. = FALSE)

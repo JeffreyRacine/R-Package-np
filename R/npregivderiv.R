@@ -232,12 +232,12 @@ npregivderiv.default <- function(y,
 
   bw <- .np_progress_with_legacy_suppressed(npudensbw(dat=z, bwmethod="normal-reference"))
   model.fz <- .np_progress_with_legacy_suppressed(npudens(tdat=z, bws=bw$bw))
-  f.z <- predict(model.fz, newdata=z)
+  f.z <- predict(model.fz, edat=z)
   model.Sz <- .np_progress_with_legacy_suppressed(npudist(tdat=z, bws=bw$bw))
-  S.z <- 1-predict(model.Sz, newdata=z)
-  f.z.eval <- if(evaluation.requested) predict(model.fz, newdata=zeval) else NULL
+  S.z <- 1-predict(model.Sz, edat=z)
+  f.z.eval <- if(evaluation.requested) predict(model.fz, edat=zeval) else NULL
   S.z.eval <- if(evaluation.requested) {
-    1-predict(model.Sz, newdata=zeval)
+    1-predict(model.Sz, edat=zeval)
   } else {
     NULL
   }

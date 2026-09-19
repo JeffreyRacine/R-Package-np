@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Native-object standard `newdata` now matches named columns to the retained
+  variable names in fitting and prediction. Reordered or extra columns are
+  handled consistently; missing, duplicate or ambiguous names are rejected.
+  Explicit native evaluation arguments remain positional and take precedence.
+  Unnamed single-role matrix/vector inputs remain positional. Copula
+  `newdata` uses the documented probability-coordinate names.
+
 * `npreghat` rejects explicit nonzero `ridge` requests on computational
   owners that cannot honor them. Default automatic numerical ridging and
   supported generic mixed-derivative ridge requests are unchanged.
