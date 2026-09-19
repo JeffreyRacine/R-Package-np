@@ -265,7 +265,9 @@ npdeneqtest <- function(x = NULL,
 
   ## Compute the test statistic
   
-  output <- teststat(x,y,bw.x,bw.y)
+  output <- .np_progress_activity_run("Computing test statistic",
+    .np_with_compiled_fit_progress("Computing test statistic",
+      max(nrow(x), nrow(y)), expr = teststat(x, y, bw.x, bw.y)))
   
   ## Compute empirical P-values - the number of resampled statistics
   ## more extreme than the original statistic

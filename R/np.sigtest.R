@@ -393,7 +393,10 @@ npsigtest.npregression <-
     return(result)
   }
 
-  as.numeric(.npreghat_exact_lp_apply_from_regression_core(
+  # Tiles can run much longer than the console heartbeat interval. Forward
+  # native activity to the existing test owner, without advancing rep counts.
+  .np_with_compiled_fit_progress("Computing bootstrap statistic", nrow(xdat),
+    expr = as.numeric(.npreghat_exact_lp_apply_from_regression_core(
     bws = bws,
     txdat = xdat,
     y = if (response.ready) response.matrix else donor.index,
@@ -409,7 +412,7 @@ npsigtest.npregression <-
       null.mean = null.mean,
       residual.pool = residual.pool
     )
-  ))
+  )))
 }
 
 .np_npsig_streamed_response_statistic <- function(bws,
@@ -686,8 +689,12 @@ npsigtest.rbandwidth <- function(bws,
 
       progress <- .np_progress_step(progress)
       nn.stage <- "unrestricted residual fit"
-      ei.unres <- scale(.npreg_complete(bws = bws, txdat = xdat,
-                                        tydat = ydat, residuals = TRUE)$resid)
+      ei.unres <- if (streamed.iid) {
+        scale(as.double(ydat) - npreg.out$mean)
+      } else {
+        scale(.npreg_complete(bws = bws, txdat = xdat,
+                             tydat = ydat, residuals = TRUE)$resid)
+      }
       ei.unres.scale <- attr(ei.unres,"scaled:scale")
       ei.unres.center <- attr(ei.unres,"scaled:center")      
       progress <- .np_progress_step(progress)
@@ -987,8 +994,9 @@ npsigtest.rbandwidth <- function(bws,
           if (!streamed.residual.ready) {
             progress <- .np_progress_step(progress)
             nn.stage <- "unrestricted residual fit"
-            streamed.ei.unres <- scale(.npreg_complete(
-              bws = bws, txdat = xdat, tydat = ydat, residuals = TRUE)$resid)
+            # Same training response and smoother as the observed statistic.
+            # Match npreg's residual arithmetic without repeating its fit.
+            streamed.ei.unres <- scale(as.double(ydat) - streamed.unrestricted$mean)
             streamed.ei.unres.scale <- attr(streamed.ei.unres, "scaled:scale")
             streamed.ei.unres.center <- attr(streamed.ei.unres, "scaled:center")
             streamed.ei.unres <- NULL

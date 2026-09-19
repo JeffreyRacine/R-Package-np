@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Significance tests keep their progress heartbeat active during long native
+  bootstrap tiles and reuse an already-computed unrestricted fit when preparing
+  streamed residuals. Bootstrap draws and test definitions are unchanged.
+
+* Density-equality tests display activity while computing the observed statistic
+  after the bootstrap replications finish.
+
 * Reusing a single-index bandwidth object created by a one-call formula fit
   now preserves its training omission map. With na.exclude, fitted values,
   standard errors, gradients and residuals retain their original row positions,
