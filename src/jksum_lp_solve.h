@@ -172,6 +172,34 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_ranked(
  */
 int np_lp_rank_upper_bound_from_weights(const double *weights, int n, int p);
 
+/* Invocation-local exact complete-design identities. Preparation is explicit
+ * at fitting owners: shared search workspaces must not opt in implicitly.
+ * Storage belongs to the enclosing R call; no per-query allocation or cache. */
+typedef struct NPLPDesignSupport {
+  int n;
+  int p;
+  int *identity;
+  unsigned int *seen;
+  unsigned int epoch;
+} NPLPDesignSupport;
+
+void np_lp_design_support_prepare(NPLPDesignSupport *support,
+                                  double *const *basis, int n, int p);
+void np_lp_design_support_begin(NPLPDesignSupport *support);
+int np_lp_rank_upper_bound_from_design(const double *weights, int n, int p,
+                                       NPLPDesignSupport *support);
+
+static inline int np_lp_design_support_add(NPLPDesignSupport *support, int row)
+{
+  if(support == NULL || support->identity == NULL)
+    return 1;
+  const int id = support->identity[row];
+  if(support->seen[id] == support->epoch)
+    return 0;
+  support->seen[id] = support->epoch;
+  return 1;
+}
+
 /*
  * Exact basis-general influence row for a one-column signed weighted design:
  * w_i z_i z_eval / sum_j(w_j z_j^2).  output_stride permits both contiguous

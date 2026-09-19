@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <R.h>
+#include <R_ext/Utils.h>
 #include <R_ext/Arith.h>
 #include <R_ext/Lapack.h>
 
@@ -835,6 +837,84 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_ranked(
 
   return np_lp_solve_workspace_solve_adjoint_factored(
     workspace, p, nrhs, pristine_anchor, policy_diagnostics);
+}
+
+void np_lp_design_support_prepare(NPLPDesignSupport *support,
+                                  double *const *basis, int n, int p)
+{
+  size_t capacity = 1;
+  int duplicates = 0;
+  if(support == NULL || basis == NULL || n < 0 || p <= 0)
+    error("invalid LP design identity request");
+  memset(support, 0, sizeof(*support));
+  support->n = n;
+  support->p = p;
+  if(n < 2 || p == 1)
+    return;
+  while(capacity < (size_t)n * 2U) {
+    if(capacity > SIZE_MAX / 2U)
+      error("LP design identity capacity overflow");
+    capacity *= 2U;
+  }
+  if(capacity > SIZE_MAX / sizeof(int))
+    error("LP design identity capacity overflow");
+  int *table = (int *)R_alloc(capacity, sizeof(int));
+  int *identity = (int *)R_alloc((size_t)n, sizeof(int));
+  memset(table, 0, capacity * sizeof(int));
+  for(int row = 0; row < n; ++row) {
+    uint64_t hash = UINT64_C(14695981039346656037);
+    if((row & 4095) == 0)
+      R_CheckUserInterrupt();
+    for(int term = 0; term < p; ++term) {
+      const double value = basis[term][row] == 0.0 ? 0.0 : basis[term][row];
+      uint64_t bits;
+      memcpy(&bits, &value, sizeof(bits));
+      hash = (hash ^ bits) * UINT64_C(1099511628211);
+    }
+    size_t slot = (size_t)(hash ^ (hash >> 32)) & (capacity - 1U);
+    while(table[slot] != 0) {
+      const int other = table[slot] - 1;
+      int equal = 1;
+      for(int term = 0; term < p && equal; ++term)
+        equal = basis[term][row] == basis[term][other];
+      if(equal)
+        break;
+      slot = (slot + 1U) & (capacity - 1U);
+    }
+    if(table[slot] == 0)
+      table[slot] = row + 1;
+    else
+      duplicates = 1;
+    identity[row] = table[slot] - 1;
+  }
+  if(duplicates) {
+    support->identity = identity;
+    support->seen = (unsigned int *)R_alloc((size_t)n, sizeof(unsigned int));
+    memset(support->seen, 0, (size_t)n * sizeof(unsigned int));
+  }
+}
+
+void np_lp_design_support_begin(NPLPDesignSupport *support)
+{
+  if(support != NULL && support->identity != NULL && ++support->epoch == 0U) {
+    memset(support->seen, 0, (size_t)support->n * sizeof(unsigned int));
+    support->epoch = 1U;
+  }
+}
+
+int np_lp_rank_upper_bound_from_design(const double *weights, int n, int p,
+                                       NPLPDesignSupport *support)
+{
+  if(support == NULL || support->identity == NULL)
+    return np_lp_rank_upper_bound_from_weights(weights, n, p);
+  if(weights == NULL || n != support->n || p <= 0)
+    return NP_LP_RANK_UPPER_BOUND_UNKNOWN;
+  np_lp_design_support_begin(support);
+  int count = 0;
+  for(int row = 0; row < n && count < p; ++row)
+    if(weights[row] != 0.0)
+      count += np_lp_design_support_add(support, row);
+  return count;
 }
 
 int np_lp_rank_upper_bound_from_weights(const double *weights, int n, int p)

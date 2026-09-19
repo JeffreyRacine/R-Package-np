@@ -96,3 +96,82 @@ test_that("higher-degree sparse rows use the same response and adjoint policy", 
     }
   }
 })
+test_that("duplicate complete designs cannot inflate the structural rank", {
+  pkg <- environmentName(environment(npreg))
+  identity <- getFromNamespace(".np_inid_lp_design_identity", pkg)
+  count <- getFromNamespace(".np_inid_lp_rank_bounds", pkg)
+  W <- rbind(c(1, -0, 0), c(1, 0, -0), c(1, 2, 3), c(1, 2, 3),
+             c(1, 4, 9), c(1, 5, 10))
+  ids <- identity(W)
+  expect_identical(ids[, 1L], c(0L, 0L, 2L, 2L, 4L, 5L))
+  weights <- c(0, -1, 1, 1, 0, 0)
+  counts <- cbind(rep(1L, 6), c(0L, 3L, 0L, 7L, 0L, 0L), rep(0L, 6))
+  for (p in 1:5)
+    expect_identical(count(weights, p, counts, ids),
+                     as.integer(c(min(p, 2), min(p, 2), 0)))
+  expect_null(identity(W[c(1, 3, 5, 6), , drop = FALSE]))
+  bad <- ids; bad[1, 2] <- 0L
+  expect_error(count(rep(0, 6), 3L, identity = bad), "identity chain")
+})
+
+test_that("expanded duplicate rows retain the basis-general ridge oracle", {
+  pkg <- environmentName(environment(npreg))
+  old <- options(np.messages = FALSE, np.tree = getOption("np.tree"))
+  on.exit(options(old), add = TRUE)
+  base <- data.frame(x=c(-.1,.1,seq(1,2,length.out=8)),
+                     z=c(.15,-.15,2.3,1.1,2.7,1.4,3,1.8,2.1,1.3))
+  x <- base[c(rep(1:2,each=6),3:10), ]
+  y <- sin(x$x) + cos(x$z)
+  ex <- data.frame(x=0,z=0)
+  basis <- getFromNamespace("W.lp",pkg)
+  for (degree in 1:2) for (bernstein in c(FALSE,TRUE))
+  for (tree in c(FALSE,TRUE)) {
+    options(np.tree=tree)
+    b <- suppressWarnings(npregbw(xdat=x,ydat=y,bws=c(.3,.3),
+      bandwidth.compute=FALSE,ckertype="uniform",regtype="lp",
+      degree=rep(degree,2),degree.select="manual",bernstein.basis=bernstein))
+    W <- basis(x,degree=rep(degree,2),basis="glp",bernstein.basis=bernstein)
+    E <- basis(x,exdat=ex,degree=rep(degree,2),basis="glp",bernstein.basis=bernstein)
+    k <- getFromNamespace(".np_kernel_weights_direct",pkg)(
+      bws=b,txdat=x,exdat=ex,bandwidth.divide=TRUE)[,1]
+    expect_gt(sum(k != 0),ncol(W))
+    expect_equal(nrow(unique(W[k != 0,,drop=FALSE])),2)
+    A <- crossprod(W,W*k); delta <- max(abs(diag(A)))/nrow(W)
+    rhs <- drop(crossprod(W,y*k)); rhs[1] <- rhs[1]*(1+delta/A[1,1])
+    oracle <- drop(E %*% solve(A+diag(delta,ncol(W)),rhs))
+    fit <- suppressWarnings(npreg(b,exdat=ex))
+    hat <- suppressWarnings(npreghat(b,exdat=ex))
+    expect_equal(as.numeric(fitted(fit)),oracle,tolerance=1e-10)
+    expect_equal(drop(hat %*% y),oracle,tolerance=1e-10)
+  }
+})
+
+test_that("conditional rows and large RHS blocks share duplicate-design support", {
+  old <- options(np.messages = FALSE, np.tree = TRUE)
+  on.exit(options(old), add = TRUE)
+  base <- data.frame(x=c(-.1,.1,seq(1,2,length.out=8)),
+    z=c(.15,-.15,2.3,1.1,2.7,1.4,3,1.8,2.1,1.3))
+  x <- base[c(rep(1:2,each=6),3:10), ]
+  y <- sin(x$x) + cos(x$z)
+  b <- suppressWarnings(npregbw(x,y,bws=c(.3,.3),regtype="ll",
+    ckertype="uniform",bandwidth.compute=FALSE))
+  Y <- outer(y,seq_len(19),function(a,b) sin(a*b))
+  H <- suppressWarnings(npreghat(b))
+  A <- suppressWarnings(npreghat(b,y=Y,output="apply"))
+  expect_equal(as.numeric(A),as.numeric(H%*%Y),tolerance=1e-10)
+  ex <- data.frame(x=rep(0,3),z=rep(0,3)); ey <- c(.1,.3,.5)
+  for(family in c("npcdens","npcdist")) {
+    bwfun <- get(paste0(family,"bw"),asNamespace("np"))
+    fitfun <- get(family,asNamespace("np"))
+    cb <- suppressWarnings(bwfun(xdat=x,ydat=y,bws=c(.4,.3,.3),
+      regtype="ll",cxkertype="uniform",bandwidth.compute=FALSE))
+    fit <- suppressWarnings(fitfun(cb,exdat=ex,eydat=ey))
+    target <- if(family=="npcdens")
+      outer(y,ey,function(a,b) dnorm((b-a)/.4)/.4) else
+      outer(y,ey,function(a,b) pnorm((b-a)/.4))
+    expected <- vapply(seq_along(ey),function(j)
+      as.numeric(fitted(suppressWarnings(npreg(b,tydat=target[,j],
+        exdat=ex[j,,drop=FALSE])))),numeric(1))
+    expect_lt(max(abs(as.numeric(fitted(fit))-expected)),1e-10)
+  }
+})

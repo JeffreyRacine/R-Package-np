@@ -43,9 +43,39 @@ static int np_lp_batch_matrix_dims(SEXP x, int *nrow, int *ncol)
   return XLENGTH(x) == expected;
 }
 
-/* Count independent donor rows, not resampling mass. Saturate at p; this
- * proves deficiency only when fewer than p contributors remain. */
-SEXP C_np_lp_support_rank(SEXP weights, SEXP counts, SEXP cap_arg)
+/* Exact complete-row groups, prepared once with the bootstrap design.
+ * The forward chains permit counted support without per-row scratch. */
+SEXP C_np_lp_design_identity(SEXP basis)
+{
+  int n = 0, p = 0;
+  if(TYPEOF(basis) != REALSXP || !np_lp_batch_matrix_dims(basis, &n, &p) ||
+     p <= 0)
+    error("LP design must be a double matrix");
+  double **columns = (double **)R_alloc((size_t)p, sizeof(double *));
+  for(int term = 0; term < p; ++term)
+    columns[term] = REAL(basis) + (size_t)n * term;
+  NPLPDesignSupport support = {0};
+  np_lp_design_support_prepare(&support, columns, n, p);
+  if(support.identity == NULL)
+    return R_NilValue;
+  SEXP out = PROTECT(allocMatrix(INTSXP, n, 2));
+  int *ids = INTEGER(out), *next = ids + n;
+  int *tail = (int *)R_alloc((size_t)n, sizeof(int));
+  for(int row = 0; row < n; ++row) {
+    ids[row] = support.identity[row];
+    next[row] = -1;
+    if(ids[row] != row)
+      next[tail[ids[row]]] = row;
+    tail[ids[row]] = row;
+  }
+  UNPROTECT(1);
+  return out;
+}
+
+/* Count distinct supported designs, never resampling mass. Saturate at p;
+ * reaching p is not a claim of full numerical column rank. */
+SEXP C_np_lp_design_support_rank(SEXP weights, SEXP counts, SEXP cap_arg,
+                               SEXP identity)
 {
   const int cap = asInteger(cap_arg);
   int n = 0, systems = 1;
@@ -59,21 +89,48 @@ SEXP C_np_lp_support_rank(SEXP weights, SEXP counts, SEXP cap_arg)
        !np_lp_batch_matrix_dims(counts, &nr, &systems) || nr != n)
       error("LP donor counts must match the kernel row");
   }
+  const int *ids = NULL, *next = NULL;
+  if(identity != R_NilValue) {
+    int nr = 0, nc = 0;
+    if(TYPEOF(identity) != INTSXP ||
+       !np_lp_batch_matrix_dims(identity, &nr, &nc) || nr != n || nc != 2)
+      error("LP design identities must match the kernel row");
+    ids = INTEGER(identity);
+    next = ids + n;
+  }
   SEXP out = PROTECT(allocVector(INTSXP, systems));
   for(int s = 0; s < systems; ++s) {
     int count = 0;
     for(int i = 0; i < n && count < cap; ++i) {
-      const size_t offset = i + (size_t)n*s;
-      const int present = counts == R_NilValue ||
-        (TYPEOF(counts) == INTSXP ? INTEGER(counts)[offset] != 0 :
-                                  REAL(counts)[offset] != 0.0);
-      if(REAL(weights)[i] != 0.0 && present)
-        ++count;
+      if(ids != NULL && ids[i] != i) {
+        if(ids[i] < 0 || ids[i] > i)
+          error("invalid LP design identity");
+        continue;
+      }
+      int row = i;
+      do {
+        const size_t offset = row + (size_t)n*s;
+        const int present = counts == R_NilValue ||
+          (TYPEOF(counts) == INTSXP ? INTEGER(counts)[offset] != 0 :
+                                    REAL(counts)[offset] != 0.0);
+        if(REAL(weights)[row] != 0.0 && present) { ++count; break; }
+        const int following = next == NULL ? -1 : next[row];
+        if(following != -1 && (following <= row || following >= n ||
+                              ids[following] != i))
+          error("invalid LP design identity chain");
+        row = following;
+      } while(row != -1);
     }
     INTEGER(out)[s] = count;
   }
   UNPROTECT(1);
   return out;
+}
+
+/* Retain the previous private ABI; all arithmetic has one canonical owner. */
+SEXP C_np_lp_support_rank(SEXP weights, SEXP counts, SEXP cap_arg)
+{
+  return C_np_lp_design_support_rank(weights, counts, cap_arg, R_NilValue);
 }
 
 static SEXP np_lp_batch_result(SEXP values,

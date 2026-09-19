@@ -2484,8 +2484,13 @@
   as.double(colSums(counts.chunk))
 }
 
-.np_inid_lp_rank_bounds <- function(weights, p, counts = NULL) {
-  .Call("C_np_lp_support_rank", as.double(weights), counts, as.integer(p),
+.np_inid_lp_design_identity <- function(W) {
+  if (!is.double(W)) storage.mode(W) <- "double"
+  .Call("C_np_lp_design_identity", W, PACKAGE = "np")
+}
+
+.np_inid_lp_rank_bounds <- function(weights, p, counts = NULL, identity = NULL) {
+  .Call("C_np_lp_design_support_rank", as.double(weights), counts, as.integer(p), identity,
         PACKAGE = "np")
 }
 
@@ -2649,6 +2654,7 @@
     stop("regression moment design matrix shape mismatch")
 
   p <- ncol(W)
+  design.identity <- .np_inid_lp_design_identity(W)
   mcols <- p * (p + 1L) / 2L
   rhs <- W.eval
   ones <- matrix(1.0, nrow = n, ncol = 1L)
@@ -2698,7 +2704,7 @@
       Zvals = Z0,
       rhs = rhs[i, ],
       represented.mass = n,
-      rank.bounds = .np_inid_lp_rank_bounds(k, p)
+      rank.bounds = .np_inid_lp_rank_bounds(k, p, identity = design.identity)
     )[1L]
     prep.progress <- .np_plot_progress_tick(state = prep.progress, done = i)
   }
@@ -2725,7 +2731,7 @@
         Zvals = Zvals,
         rhs = rhs[i, ],
         represented.mass = represented.mass,
-        rank.bounds = .np_inid_lp_rank_bounds(kw[, i], p, counts.chunk)
+        rank.bounds = .np_inid_lp_rank_bounds(kw[, i], p, counts.chunk, design.identity)
       )
     }
   }
@@ -3459,6 +3465,7 @@
   W.eval <- as.matrix(W.eval)
 
   p <- ncol(W)
+  design.identity <- .np_inid_lp_design_identity(W)
   mcols <- p * (p + 1L) / 2L
   rhs <- W.eval
   ones <- matrix(1.0, nrow = n, ncol = 1L)
@@ -3489,7 +3496,7 @@
       Zvals = Z0,
       rhs = rhs[i, ],
       represented.mass = n,
-      rank.bounds = .np_inid_lp_rank_bounds(k, p)
+      rank.bounds = .np_inid_lp_rank_bounds(k, p, identity = design.identity)
     )[1L]
   }
 
@@ -3513,7 +3520,7 @@
         Zvals = Zvals,
         rhs = rhs[i, ],
         represented.mass = represented.mass,
-        rank.bounds = .np_inid_lp_rank_bounds(kw[, i], p, counts.chunk)
+        rank.bounds = .np_inid_lp_rank_bounds(kw[, i], p, counts.chunk, design.identity)
       )
     }
   }
@@ -6019,6 +6026,7 @@
     W = W,
     W.eval = W.eval,
     p = p,
+    design.identity = .np_inid_lp_design_identity(W),
     mcols = mcols
   )
 }
@@ -6059,7 +6067,7 @@
     Zvals = Z0,
     rhs = feat$rhs,
     represented.mass = state$n,
-    rank.bounds = .np_inid_lp_rank_bounds(feat$kernel.row, state$p)
+    rank.bounds = .np_inid_lp_rank_bounds(feat$kernel.row, state$p, identity = state$design.identity)
   )[1L, ])
 }
 
@@ -6075,7 +6083,7 @@
     Zvals = Zmats,
     rhs = feat$rhs,
     represented.mass = represented.mass,
-    rank.bounds = .np_inid_lp_rank_bounds(feat$kernel.row, state$p, counts.chunk)
+    rank.bounds = .np_inid_lp_rank_bounds(feat$kernel.row, state$p, counts.chunk, state$design.identity)
   )
 }
 
