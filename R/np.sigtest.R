@@ -78,6 +78,12 @@ if (getRversion() >= "2.15.1")
   .npRmpi_npsig_do_leaf(npreg, extra.args = extra.args, ...)
 }
 
+# Preparation is coordinated by the caller, but its fit uses the established
+# collective regression owner. Independent bootstrap tasks remain local.
+.npRmpi_npsig_npreg_prepare <- function(extra.args = NULL, ...) {
+  .npRmpi_npsig_do_leaf(.npreg_complete, extra.args = extra.args, ...)
+}
+
 .npRmpi_npsig_collective_context <- function() {
   isTRUE(.npRmpi_autodispatch_called_from_bcast())
 }
@@ -226,6 +232,10 @@ if (getRversion() >= "2.15.1")
     matrix(vals, nrow = task$bsz, ncol = 1L)
   }
 
+  if (!is.null(progress.context)) {
+    progress.context$fanout.active <- TRUE
+    on.exit(progress.context$fanout.active <- FALSE, add = TRUE)
+  }
   out <- .npRmpi_bootstrap_run_fanout(
     tasks = tasks,
     worker = worker.chunk,
@@ -660,7 +670,9 @@ npsigtest.npregression <-
     return(result)
   }
 
-  as.numeric(.npreghat_exact_lp_apply_from_regression_core(
+  # Activate only this rank's native activity; worker renderers remain silent.
+  .np_with_compiled_fit_progress("Computing bootstrap statistic", nrow(xdat),
+    expr = as.numeric(.npreghat_exact_lp_apply_from_regression_core(
     bws = bws,
     txdat = xdat,
     y = if (response.ready) response.matrix else donor.index,
@@ -676,7 +688,7 @@ npsigtest.npregression <-
       null.mean = null.mean,
       residual.pool = residual.pool
     )
-  ))
+  )))
 }
 
 # Streamed statistics retain training-row identity for generalized-NN radii.
@@ -886,7 +898,12 @@ npsigtest.rbandwidth <- function(bws,
   progress <- .np_progress_show_now(progress)
   previous.fit.forward <- .np_progress_runtime$fit_forward
   .np_progress_runtime$fit_forward <- function() {
-    progress <<- .np_progress_step(progress, done = progress$last_done)
+    # During fan-out, receipts update the shared context, not this local copy.
+    # Native master-task heartbeats must retain those completed replications.
+    active <- isTRUE(progress.context$fanout.active)
+    current <- if (active) progress.context$state else progress
+    progress <<- .np_progress_step(current, done = current$last_done)
+    if (active) progress.context$state <- progress
   }
   on.exit(.np_progress_runtime$fit_forward <- previous.fit.forward, add = TRUE)
   progress.active <- TRUE
@@ -912,7 +929,7 @@ npsigtest.rbandwidth <- function(bws,
     bws.original <- bws
 
   num.obs <- nrow(xdat)
-  npreg.eval.fun <- if (boot.type == "II") .npRmpi_npsig_npreg_leaf else .npRmpi_npsig_do_local
+  npreg.eval.fun <- if (boot.type == "II") .npRmpi_npsig_npreg_leaf else .npRmpi_npsig_npreg_prepare
 
   nn.stage <- "unrestricted gradient evaluation"
   .np_with_nn_radius_context({
@@ -999,12 +1016,16 @@ npsigtest.rbandwidth <- function(bws,
 
       progress <- .np_progress_step(progress)
       nn.stage <- "unrestricted residual fit"
-      npreg.unres <- npreg.eval.fun(extra.args,
-                                    txdat = xdat,
-                                    tydat = ydat,
-                                    bws = bws,
-                                    residuals = TRUE)
-      ei.unres <- scale(npreg.unres$resid)
+      ei.unres <- if (streamed.iid) {
+        scale(as.double(ydat) - npreg.out$mean)
+      } else {
+        npreg.unres <- npreg.eval.fun(extra.args,
+                                      txdat = xdat,
+                                      tydat = ydat,
+                                      bws = bws,
+                                      residuals = TRUE)
+        scale(npreg.unres$resid)
+      }
       ei.unres.scale <- attr(ei.unres,"scaled:scale")
       ei.unres.center <- attr(ei.unres,"scaled:center")      
       progress <- .np_progress_step(progress)
@@ -1352,17 +1373,11 @@ npsigtest.rbandwidth <- function(bws,
           if (!streamed.residual.ready) {
             progress <- .np_progress_step(progress)
             nn.stage <- "unrestricted residual fit"
-            streamed.unres <- npreg.eval.fun(
-              extra.args,
-              txdat = xdat,
-              tydat = ydat,
-              bws = bws,
-              residuals = TRUE
-            )
-            streamed.ei.unres <- scale(streamed.unres$resid)
+            # Same training response and smoother as the observed statistic.
+            # Match npreg's residual arithmetic without repeating its fit.
+            streamed.ei.unres <- scale(as.double(ydat) - streamed.unrestricted$mean)
             streamed.ei.unres.scale <- attr(streamed.ei.unres, "scaled:scale")
             streamed.ei.unres.center <- attr(streamed.ei.unres, "scaled:center")
-            streamed.unres <- NULL
             streamed.ei.unres <- NULL
             streamed.residual.ready <- TRUE
             progress <- .np_progress_step(progress)

@@ -38023,6 +38023,39 @@ static int np_npsigtest_fixed_influence_row(
  * pivotal statistics use a mean/residual pass followed by the derivative/HC0
  * pass.
  */
+/* The tile owns malloc-backed workspaces. A progress callback may signal an
+ * R condition just like an interrupt, so checkpoint unwinds release these
+ * invocation-local buffers before the R wrapper resets native global state. */
+typedef struct {
+  NPConditionalXRowCtx *xctx;
+  NPReghatLPWorkspace *lp_workspace;
+  double **double_buffers[7];
+  int **int_buffers[2];
+  long double **statistic_sum;
+} NPSigtestProgressCleanup;
+
+static void np_npsig_progress_cleanup(void *data, Rboolean jump)
+{
+  NPSigtestProgressCleanup *scope = (NPSigtestProgressCleanup *)data;
+  if(!jump)
+    return;
+  np_conditional_xrow_ctx_clear(scope->xctx);
+  np_reghat_lp_workspace_clear(scope->lp_workspace);
+  for(int i = 0; i < 7; ++i)
+    free(*scope->double_buffers[i]);
+  for(int i = 0; i < 2; ++i)
+    free(*scope->int_buffers[i]);
+  free(*scope->statistic_sum);
+}
+
+static SEXP np_npsig_progress_checkpoint(void *unused)
+{
+  (void)unused;
+  R_CheckUserInterrupt();
+  np_progress_fit_heartbeat();
+  return R_NilValue;
+}
+
 int np_regression_lp_sigtest_iid(
   double *vector_scale_factor,
   const double *donor_index,
@@ -38053,6 +38086,13 @@ int np_regression_lp_sigtest_iid(
   int status = NP_REGRESSION_LP_MATRIX_ERROR;
   int eval_idx;
   int rhs;
+  NPSigtestProgressCleanup progress_cleanup = {
+    &xctx, &lp_workspace,
+    {&row, &scalar_derivative_weight, &residual_tile, &eval_basis,
+     &base_fit, &residual_scale, &owned_response_tile},
+    {&residual_information, &scalar_derivative_mask},
+    &statistic_sum
+  };
 
   memset(&xctx, 0, sizeof(xctx));
   np_reghat_lp_workspace_init(&lp_workspace);
@@ -38218,7 +38258,8 @@ int np_regression_lp_sigtest_iid(
         statistic_sum[rhs] += (long double)effect*(long double)effect;
       }
       if((eval_idx & 31) == 0)
-        R_CheckUserInterrupt();
+        R_UnwindProtect(np_npsig_progress_checkpoint, NULL,
+                        np_npsig_progress_cleanup, &progress_cleanup, NULL);
     }
   } else if(!pivotal) {
     for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
@@ -38239,7 +38280,8 @@ int np_regression_lp_sigtest_iid(
         statistic_sum[rhs] += (long double)gradient*(long double)gradient;
       }
       if((eval_idx & 31) == 0)
-        R_CheckUserInterrupt();
+        R_UnwindProtect(np_npsig_progress_checkpoint, NULL,
+                        np_npsig_progress_cleanup, &progress_cleanup, NULL);
     }
   } else {
     size_t residual_count;
@@ -38307,7 +38349,8 @@ int np_regression_lp_sigtest_iid(
           residual_scale[rhs] = fabs(residual);
       }
       if((eval_idx & 31) == 0)
-        R_CheckUserInterrupt();
+        R_UnwindProtect(np_npsig_progress_checkpoint, NULL,
+                        np_npsig_progress_cleanup, &progress_cleanup, NULL);
     }
 
     for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
@@ -38323,7 +38366,8 @@ int np_regression_lp_sigtest_iid(
        * its share of the original num_train statistic denominator. */
       if(has_unidentified_information && scalar_proof.structural_zero) {
         if((eval_idx & 31) == 0)
-          R_CheckUserInterrupt();
+          R_UnwindProtect(np_npsig_progress_checkpoint, NULL,
+                          np_npsig_progress_cleanup, &progress_cleanup, NULL);
         continue;
       }
       for(rhs = 0; rhs < n_rhs; ++rhs) {
@@ -38395,7 +38439,8 @@ int np_regression_lp_sigtest_iid(
         statistic_sum[rhs] += (long double)ratio*(long double)ratio;
       }
       if((eval_idx & 31) == 0)
-        R_CheckUserInterrupt();
+        R_UnwindProtect(np_npsig_progress_checkpoint, NULL,
+                        np_npsig_progress_cleanup, &progress_cleanup, NULL);
     }
     /* Only a complete finite zero gradient column can forgive undefined
        standard errors. An isolated 0/0 in a nonzero column remains an error. */

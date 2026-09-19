@@ -446,11 +446,11 @@ npdeneqtest <- function(x = NULL,
 
   ## Compute the test statistic
   
-  output <- if (.npRmpi_deneq_collective_context()) {
-    .npRmpi_with_local_regression(teststat(x, y, bw.x, bw.y))
-  } else {
-    teststat(x,y,bw.x,bw.y)
-  }
+  # All ranks enter this observed stage together. Let the existing kernel-sum
+  # owner share its rows; independently assigned bootstrap work stays local.
+  output <- .np_progress_activity_run("Computing test statistic",
+    .np_with_compiled_fit_progress("Computing test statistic",
+      max(nrow(x), nrow(y)), expr = teststat(x, y, bw.x, bw.y)))
   
   ## Compute empirical P-values - the number of resampled statistics
   ## more extreme than the original statistic
