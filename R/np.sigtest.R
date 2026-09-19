@@ -208,21 +208,48 @@ npsigtest.npregression <-
   statistic
 }
 
-.np_npsig_progress_promote <- function(state, total, done) {
-  if (!isTRUE(state$known_total)) {
-    state$known_total <- TRUE
-    state$total <- total
-    state$throttle_sec <- .np_progress_interval_sec(
-      known_total = TRUE,
-      domain = state$domain
-    )
-  }
-  .np_progress_step_at(
-    state,
-    now = .np_progress_now(),
-    done = done,
-    force = TRUE
-  )
+.np_npsig_progress_fields <- function(state, done, detail, now) {
+  reps <- if (is.null(done)) 0 else done
+  elapsed <- max(0, now - state$started)
+  work <- state$npsig.completed + if (state$npsig.completed < state$npsig.target)
+    min(1, reps / state$npsig.B) else 0
+  eta <- if (work <= 0) "estimating" else if (work >= state$npsig.total)
+    "0s" else paste0(.np_progress_fmt_num(elapsed *
+      (state$npsig.total - work) / work), "s")
+  c(if (!state$npsig.joint)
+      sprintf("target %d/%d", state$npsig.target, state$npsig.total),
+    if (state$npsig.skipped) "rep skipped" else
+      sprintf("rep %d/%d", reps, state$npsig.B),
+    paste0("elapsed ", .np_progress_fmt_num(elapsed), "s"), paste("eta", eta))
+}
+
+.np_npsig_progress_begin <- function(tested.names, B, joint) {
+  state <- .np_progress_begin(if (joint) "Testing joint significance" else
+    paste("Testing", tested.names[[1L]]), surface = "bootstrap")
+  state$npsig.target <- 1L
+  state$npsig.total <- if (joint) 1L else length(tested.names)
+  state$npsig.completed <- 0L
+  state$npsig.B <- B
+  state$npsig.joint <- joint
+  state$npsig.skipped <- FALSE
+  state$last_done <- 0L
+  state$unknown_total_fields <- .np_npsig_progress_fields
+  state
+}
+
+.np_npsig_progress_target <- function(state, name, target) {
+  state$label <- paste("Testing", name)
+  state$npsig.target <- target
+  state$npsig.completed <- target - 1L
+  state$npsig.skipped <- FALSE
+  .np_progress_step_at(state, .np_progress_now(), done = 0L, force = TRUE)
+}
+
+.np_npsig_progress_complete <- function(state, skipped = state$npsig.skipped) {
+  state$npsig.completed <- state$npsig.target
+  state$npsig.skipped <- skipped
+  .np_progress_step_at(state, .np_progress_now(),
+                       done = if (skipped) 0L else state$last_done, force = TRUE)
 }
 
 .np_npsig_upper_tail_p <- function(bootstrap, observed) {
@@ -549,11 +576,13 @@ npsigtest.rbandwidth <- function(bws,
   tested.names <- names(xdat)[index]
   missing.names <- is.na(tested.names) | !nzchar(tested.names)
   tested.names[missing.names] <- paste("variable", index[missing.names])
-  progress <- .np_progress_begin(
-    if (joint) "Testing joint significance" else paste("Testing", tested.names[[1L]]),
-    surface = "bootstrap"
-  )
+  progress <- .np_npsig_progress_begin(tested.names, B, joint)
   progress <- .np_progress_show_now(progress)
+  previous.fit.forward <- .np_progress_runtime$fit_forward
+  .np_progress_runtime$fit_forward <- function() {
+    progress <<- .np_progress_step(progress, done = progress$last_done)
+  }
+  on.exit(.np_progress_runtime$fit_forward <- previous.fit.forward, add = TRUE)
   progress.active <- TRUE
   on.exit({
     if (isTRUE(progress.active))
@@ -640,6 +669,7 @@ npsigtest.rbandwidth <- function(bws,
     if (all(.np_npsig_zero_effects(npreg.out, index,
           if (pivot.use) structural else NULL))) {
       .np_npsig_advance_bootstrap_rng(num.obs, B, boot.method)
+      progress <- .np_npsig_progress_complete(progress, skipped = TRUE)
       progress <- .np_progress_end(progress)
       progress.active <- FALSE
       return(sigtest(In = In, In.bootstrap = matrix(NA_real_, B, 1L),
@@ -746,14 +776,7 @@ npsigtest.rbandwidth <- function(bws,
         tile.rows <- tile.start:(tile.start + tile.count - 1L)
         In.vec[tile.rows] <- tile.statistic
         tile.done <- tile.rows[[length(tile.rows)]]
-        if (!isTRUE(progress$known_total)) {
-          progress <- .np_npsig_progress_promote(
-            progress, total = B, done = tile.start
-          )
-          progress <- .np_progress_step(progress, done = tile.done)
-        } else {
-          progress <- .np_progress_step(progress, done = tile.done)
-        }
+        progress <- .np_progress_step(progress, done = tile.done)
       }
     } else for (i.star in seq_len(B)) {
       if(boot.method == "iid") {
@@ -871,13 +894,7 @@ npsigtest.rbandwidth <- function(bws,
             if (identical(boot.method, "pairwise")) xdat.star else xdat, index) else NULL,
           context = sprintf("bootstrap replication %d", i.star)
         )
-      if (!isTRUE(progress$known_total)) {
-        progress <- .np_npsig_progress_promote(
-          progress, total = B, done = i.star
-        )
-      } else {
-        progress <- .np_progress_step(progress, done = i.star)
-      }
+      progress <- .np_progress_step(progress, done = i.star)
     }
 
     ## Compute the P-value
@@ -916,7 +933,7 @@ npsigtest.rbandwidth <- function(bws,
       ## Increment counter...
       
       ii <- ii + 1
-      progress$label <- paste("Testing", tested.names[[ii]])
+      progress <- .np_npsig_progress_target(progress, tested.names[[ii]], ii)
       pivot.use <- pivot.plan$effective[[ii]]
       
       if(boot.type=="II") {
@@ -958,8 +975,7 @@ npsigtest.rbandwidth <- function(bws,
         In.mat[, ii] <- NA_real_
         bootstrap.executed[[ii]] <- 0L
         bootstrap.reason[[ii]] <- "observed contrast identically zero"
-        progress <- .np_npsig_progress_promote(
-          progress, total = length(index), done = ii)
+        progress <- .np_npsig_progress_complete(progress, skipped = TRUE)
         next
       }
       
@@ -1073,15 +1089,7 @@ npsigtest.rbandwidth <- function(bws,
           tile.rows <- tile.start:(tile.start + tile.count - 1L)
           In.vec[tile.rows] <- tile.statistic
           tile.done <- tile.rows[[length(tile.rows)]]
-          if (length(index) == 1L && !isTRUE(progress$known_total)) {
-            progress <- .np_npsig_progress_promote(
-              progress, total = B, done = tile.done
-            )
-          } else if (length(index) == 1L) {
-            progress <- .np_progress_step(progress, done = tile.done)
-          } else {
-            progress <- .np_progress_step(progress)
-          }
+          progress <- .np_progress_step(progress, done = tile.done)
         }
       } else for (i.star in seq_len(B)) {
         if(boot.method == "iid") {
@@ -1199,15 +1207,7 @@ npsigtest.rbandwidth <- function(bws,
               if (identical(boot.method, "pairwise")) xdat.star else xdat, i) else NULL,
             context = sprintf("bootstrap replication %d", i.star)
           )
-        if (length(index) == 1L && !isTRUE(progress$known_total)) {
-          progress <- .np_npsig_progress_promote(
-            progress, total = B, done = i.star
-          )
-        } else if (length(index) == 1L) {
-          progress <- .np_progress_step(progress, done = i.star)
-        } else {
-          progress <- .np_progress_step(progress)
-        }
+        progress <- .np_progress_step(progress, done = i.star)
 
       }
 
@@ -1217,18 +1217,13 @@ npsigtest.rbandwidth <- function(bws,
       
       In.mat[,ii] = In.vec
 
-      if (length(index) > 1L) {
-        if (ii < length(index))
-          progress$label <- paste("Testing", tested.names[[ii + 1L]])
-        progress <- .np_npsig_progress_promote(
-          progress, total = length(index), done = ii
-        )
-      }
+      progress <- .np_npsig_progress_complete(progress)
       
     }
     
   } ## End invididual test
 
+  progress <- .np_npsig_progress_complete(progress)
   progress <- .np_progress_end(progress)
   progress.active <- FALSE
 

@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Significance-test progress now shows the active predictor's position and
+  completed bootstrap replications, with call-wide elapsed time and ETA.
+  Analytic non-rejection is labelled as skipped bootstrap work.
+
 * Partial response replacement with formula-derived bandwidth objects now uses
   retained-sample row order, before jointly applying the effective NA policy.
   Refits retain the replacement sample without changing the original bandwidth
