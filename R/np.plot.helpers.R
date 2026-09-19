@@ -1938,10 +1938,11 @@
     seq_len(nlevels(x))
 }
 
-.np_regression_cat_profile_kernel_matrix <- function(eval.codes,
+.np_cat_profile_kernel_matrix <- function(eval.codes,
                                                      train.codes,
                                                      xdat,
-                                                     bws) {
+                                                     bws,
+                                                     density = FALSE) {
   eval.codes <- as.matrix(eval.codes)
   train.codes <- as.matrix(train.codes)
   if (ncol(eval.codes) != ncol(train.codes))
@@ -1949,6 +1950,7 @@
 
   W <- matrix(1.0, nrow = nrow(eval.codes), ncol = nrow(train.codes))
   lambda <- as.double(bws$bw)
+  okertype <- if (density) .np_kbandwidth_okertype(bws) else bws$okertype
 
   for (j in seq_len(ncol(train.codes))) {
     if (is.factor(xdat[[j]]) && !is.ordered(xdat[[j]])) {
@@ -1960,19 +1962,21 @@
         Kj <- ifelse(same, 1.0 - lambda[j], lambda[j] / (ncat - 1.0))
       } else if (identical(bws$ukertype, "liracine")) {
         Kj <- ifelse(same, 1.0, lambda[j])
+        if (density)
+          Kj <- Kj / (1.0 + (ncat - 1.0) * lambda[j])
       } else {
         stop("unsupported unordered categorical kernel in profile bootstrap")
       }
     } else if (is.ordered(xdat[[j]])) {
       d <- abs(outer(eval.codes[, j], train.codes[, j], "-"))
-      if (identical(bws$okertype, "wangvanryzin")) {
+      if (identical(okertype, "wangvanryzin")) {
         Kj <- ifelse(d == 0, 1.0 - lambda[j],
                      (lambda[j]^d) * (1.0 - lambda[j]) * 0.5)
-      } else if (identical(bws$okertype, "liracine")) {
+      } else if (identical(okertype, "liracine")) {
         Kj <- lambda[j]^d
-      } else if (identical(bws$okertype, "nliracine")) {
+      } else if (identical(okertype, "nliracine")) {
         Kj <- (lambda[j]^d) * (1.0 - lambda[j]) / (1.0 + lambda[j])
-      } else if (identical(bws$okertype, "racineliyan")) {
+      } else if (identical(okertype, "racineliyan")) {
         support <- .np_cat_ordered_support_values(xdat[[j]])
         den <- vapply(train.codes[, j],
                       function(x) sum(lambda[j]^abs(x - support)),
@@ -1988,6 +1992,13 @@
   }
 
   W
+}
+
+# Family policy is explicit; the arithmetic above has one owner. Regression
+# profile moments retain their historical unnormalized Li-Racine units.
+.np_regression_cat_profile_kernel_matrix <- function(eval.codes, train.codes,
+                                                     xdat, bws) {
+  .np_cat_profile_kernel_matrix(eval.codes, train.codes, xdat, bws)
 }
 
 .np_regression_cat_profile_mean <- function(bws, txdat, tydat, exdat = NULL) {
@@ -2083,57 +2094,9 @@
   profile.mean[eval.id]
 }
 
-.np_density_cat_profile_kernel_matrix <- function(eval.codes,
-                                                  train.codes,
-                                                  xdat,
-                                                  bws) {
-  eval.codes <- as.matrix(eval.codes)
-  train.codes <- as.matrix(train.codes)
-  if (ncol(eval.codes) != ncol(train.codes))
-    stop("profile code matrices must have matching columns")
-
-  W <- matrix(1.0, nrow = nrow(eval.codes), ncol = nrow(train.codes))
-  lambda <- as.double(bws$bw)
-  okertype <- .np_kbandwidth_okertype(bws)
-
-  for (j in seq_len(ncol(train.codes))) {
-    if (is.factor(xdat[[j]]) && !is.ordered(xdat[[j]])) {
-      same <- outer(eval.codes[, j], train.codes[, j], "==")
-      ncat <- nlevels(xdat[[j]])
-      if (ncat < 2L) {
-        Kj <- ifelse(same, 1.0, 0.0)
-      } else if (identical(bws$ukertype, "aitchisonaitken")) {
-        Kj <- ifelse(same, 1.0 - lambda[j], lambda[j] / (ncat - 1.0))
-      } else if (identical(bws$ukertype, "liracine")) {
-        Kj <- ifelse(same, 1.0, lambda[j])
-      } else {
-        stop("unsupported unordered categorical kernel in density profile bootstrap")
-      }
-    } else if (is.ordered(xdat[[j]])) {
-      d <- abs(outer(eval.codes[, j], train.codes[, j], "-"))
-      if (identical(okertype, "wangvanryzin")) {
-        Kj <- ifelse(d == 0, 1.0 - lambda[j],
-                     (lambda[j]^d) * (1.0 - lambda[j]) * 0.5)
-      } else if (identical(okertype, "liracine")) {
-        Kj <- lambda[j]^d
-      } else if (identical(okertype, "nliracine")) {
-        Kj <- (lambda[j]^d) * (1.0 - lambda[j]) / (1.0 + lambda[j])
-      } else if (identical(okertype, "racineliyan")) {
-        support <- .np_cat_ordered_support_values(xdat[[j]])
-        den <- vapply(train.codes[, j],
-                      function(x) sum(lambda[j]^abs(x - support)),
-                      numeric(1))
-        Kj <- t(t(lambda[j]^d) / den)
-      } else {
-        stop("unsupported ordered categorical kernel in density profile bootstrap")
-      }
-    } else {
-      stop("density profile bootstrap requires categorical predictors")
-    }
-    W <- W * Kj
-  }
-
-  W
+.np_density_cat_profile_kernel_matrix <- function(eval.codes, train.codes,
+                                                  xdat, bws) {
+  .np_cat_profile_kernel_matrix(eval.codes, train.codes, xdat, bws, density = TRUE)
 }
 
 .np_regression_cat_profile_boot_setup <- function(xdat, exdat, ydat, bws) {
