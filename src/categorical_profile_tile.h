@@ -18,6 +18,13 @@ typedef enum {
   NP_PROFILE_TILE_ERR_CAPACITY = 8
 } NPCategoricalProfileTileStatus;
 
+/* Borrowed metadata/data view, not an owning workspace. The caller keeps all
+ * pointed-to arrays alive through validation and the last fill, and owns the
+ * output/scratch arrays passed separately. These helpers retain no pointers
+ * and neither allocate nor free the specification's storage. A failed fill
+ * (notably the signed-log row) may leave partial output; consume it only after
+ * NP_PROFILE_TILE_OK. Kernel/operator selection and normalization remain the
+ * invoking estimator's responsibility. */
 typedef struct {
   int ntrain;
   int neval;

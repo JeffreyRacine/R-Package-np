@@ -26,6 +26,14 @@ static inline int np_lp_delete_denominator(const double leverage,
   return isfinite(*denominator) && (*denominator != 0.0);
 }
 
+/* Borrowed view for one resident-row accumulation call. All pointed-to
+ * storage remains caller-owned and must outlive the call. Inputs (including
+ * basis, despite its historical non-const pointer type) are read-only here.
+ * moments/rhs and, when enabled, support_count are updated additively for
+ * both endpoints of each visited pair; the caller initializes these buffers.
+ * No pointer is retained and no heap storage is allocated by the row helpers.
+ * The enclosing jksum.c owner handles triangle completion, any rank reduction,
+ * solve policy and cleanup. See src/README.md for the surrounding route map. */
 typedef struct {
   int nterms;
   int row_j;
