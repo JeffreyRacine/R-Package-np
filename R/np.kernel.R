@@ -345,13 +345,13 @@ npksum.default <-
     ## catch and destroy NA's
 
     keep.rows <- rep_len(TRUE, nrow(txdat))
-    rows.omit <- attr(na.omit(txdat), "na.action")
+    rows.omit <- .np_current_rows_omit(txdat)
 
     if (!miss.ty)
-      rows.omit <- union(rows.omit, attr(na.omit(tydat), "na.action"))
+      rows.omit <- union(rows.omit, .np_current_rows_omit(tydat))
 
     if (!miss.weights)
-      rows.omit <- union(rows.omit, attr(na.omit(weights), "na.action"))
+      rows.omit <- union(rows.omit, .np_current_rows_omit(weights))
 
     
     if (length(rows.omit) > 0L)

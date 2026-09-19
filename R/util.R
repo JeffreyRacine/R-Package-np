@@ -3132,6 +3132,14 @@ coarseclass <- function(a) {
   return(class(a)[1])
 }
 
+# Return omissions in the current input, not historical indices left by an
+# earlier na.omit/na.exclude call. Do not alter the caller's restoration map.
+.np_current_rows_omit <- function(frame) {
+  if (!is.null(attr(frame, "na.action", exact = TRUE)))
+    attr(frame, "na.action") <- NULL
+  attr(stats::na.omit(frame), "na.action")
+}
+
 toFrame <- function(frame) {
   if(!is.data.frame(frame)){
     t.names <- NULL

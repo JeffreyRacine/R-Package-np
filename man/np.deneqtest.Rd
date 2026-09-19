@@ -23,7 +23,8 @@ These arguments identify the two samples and any supplied bandwidths.
 }
 
   \item{bw.x,bw.y}{
-    optional bandwidth objects for \code{x,y}
+    optional bandwidth objects for \code{x,y}. Each supplied bandwidth is
+    retained; only a missing bandwidth is selected.
   }
 
 
@@ -128,6 +129,12 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   type.
 
   It is crucial that both data frames have the same variable names.
+
+  Incomplete rows are omitted independently from each sample before bandwidth
+  selection, bootstrap resampling and computation of the statistic. Factor
+  levels are retained. Each sample must contain at least two complete
+  observations. Supplying one bandwidth does not cause it to be reselected when
+  the bandwidth for the other sample is missing.
 
 }
 

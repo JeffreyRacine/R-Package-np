@@ -1,5 +1,16 @@
 # npRmpi 0.80-1
 
+* Kernel sums, hat operators and quantile evaluation now distinguish current
+  missing rows from historical na.action attributes on already-clean data.
+  Supplying na.omit/na.exclude output no longer deletes unrelated rows a
+  second time. Formula-result omission restoration remains unchanged.
+
+* Density-equality tests retain an individually supplied bandwidth while
+  selecting only the missing counterpart. Incomplete rows are omitted once
+  per independent sample before bandwidth selection and bootstrap resampling,
+  avoiding inconsistent kernel-sum/count dimensions; at least two complete
+  observations are required in each sample.
+
 * Significance tests keep their progress heartbeat active during long native
   bootstrap tiles and reuse an already-computed unrestricted fit when preparing
   streamed residuals. Bootstrap draws and test definitions are unchanged.

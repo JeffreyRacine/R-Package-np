@@ -14664,7 +14664,7 @@ plotFactor <- function(f, y, ...){
       eval.omit <- NULL
       if (!no.ex) {
         keep.eval <- rep_len(TRUE, nrow(exdat))
-        eval.omit <- attr(na.omit(exdat), "na.action")
+        eval.omit <- .np_current_rows_omit(exdat)
         if (length(eval.omit) > 0L)
           keep.eval[as.integer(eval.omit)] <- FALSE
         exdat <- exdat[keep.eval, , drop = FALSE]

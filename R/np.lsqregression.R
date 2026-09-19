@@ -241,7 +241,7 @@ nplsqregbw <-
 
 .nplsqreg_prepare_eval_data <- function(exdat) {
   exdat <- toFrame(exdat)
-  rows.omit <- attr(na.omit(exdat), "na.action")
+  rows.omit <- .np_current_rows_omit(exdat)
   if (.nplsqreg_omit_length(rows.omit)) {
     keep.rows <- rep(TRUE, nrow(exdat))
     keep.rows[as.integer(rows.omit)] <- FALSE
