@@ -97,11 +97,13 @@ npindex.formula <-
           tmf[["data"]] <- data
         mf.args <- as.list(tmf)[-1L]
         if (inherits(bws, "sibandwidth") &&
+            is.null(bws[[".np.formula.training", exact = TRUE]]) &&
             (missing(data) || is.null(data)) &&
             all(c("xdat", "ydat") %in% names(bws[["call"]])) &&
             !("tydat" %in% names(dots))) {
-          # Automatic formula fits retain already-prepared native training
-          # inputs. Recover them as plot does; do not apply the formula twice.
+          # Historical formula fits without a retained frame may store only
+          # prepared native inputs. New snapshots use the canonical frame
+          # owner below so their omission map survives without re-evaluation.
           txdat <- toFrame(.np_eval_bws_call_arg(bws, "xdat"))
           tydat <- .np_eval_bws_call_arg(bws, "ydat")
           response.name <- bws[["ynames"]]

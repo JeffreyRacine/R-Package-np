@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Reusing a single-index bandwidth object created by a one-call formula fit
+  now preserves its training omission map. With na.exclude, fitted values,
+  standard errors, gradients and residuals retain their original row positions,
+  including residuals requested after fitting.
+
 * Smooth-coefficient prediction and location-scale quantile SE extraction now
   preserve a computed NA standard error for a single unsupported evaluation
   row, as they already did for larger grids. Unrequested uncertainty still
