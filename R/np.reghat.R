@@ -1821,7 +1821,7 @@ npreghat.rbandwidth <-
     }
 
     keep.rows <- rep_len(TRUE, nrow(txdat))
-    rows.omit <- attr(na.omit(txdat), "na.action")
+    rows.omit <- .np_current_rows_omit(txdat)
     if (!is.null(y))
       rows.omit <- union(rows.omit, attr(na.omit(as.data.frame(y)), "na.action"))
 
@@ -1837,7 +1837,7 @@ npreghat.rbandwidth <-
 
     if (!no.ex) {
       keep.eval <- rep_len(TRUE, nrow(exdat))
-      rows.omit.eval <- attr(na.omit(exdat), "na.action")
+      rows.omit.eval <- .np_current_rows_omit(exdat)
       if (length(rows.omit.eval) > 0L)
         keep.eval[as.integer(rows.omit.eval)] <- FALSE
       if (!any(keep.eval))

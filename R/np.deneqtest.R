@@ -47,10 +47,17 @@ npdeneqtest <- function(x = NULL,
   if(B < 9) stop(" number of bootstrap replications must be >= 9")
 
 
-  if(is.null(bw.x) || is.null(bw.y)) {
+  ## The two samples are independent. Establish their complete rows once,
+  ## before selection, pooled resampling and sample-size denominators.
+  if (anyNA(x)) x <- stats::na.omit(x)
+  if (anyNA(y)) y <- stats::na.omit(y)
+  if (nrow(x) < 2L || nrow(y) < 2L)
+    stop("x and y must each contain at least two complete observations")
+
+  if(is.null(bw.x))
     bw.x <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(dat=x,...))
+  if(is.null(bw.y))
     bw.y <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(dat=y,...))
-  }
 
   ## Save seed prior to setting
 
