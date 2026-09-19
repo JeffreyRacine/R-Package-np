@@ -1,5 +1,18 @@
 # np 0.80-1
 
+* Native one-call fits pass their already evaluated training data to the
+  bandwidth constructor. Side-effecting or random data expressions are no
+  longer evaluated again for that handoff; fitting and retained bandwidth
+  data use the same realization, including MPI dispatch.
+
+* Local-polynomial fitting, hats and related inference now consistently
+  apply the existing ridge rule when fewer nonzero-weight donor rows
+  contribute than there are basis coefficients. This corrects unstable
+  fit/hat disagreement at structurally underdetermined rows, including
+  mean-only fits. Bootstrap rank counts use independent donor rows rather
+  than resampling multiplicities. Bandwidth-search objectives and the ridge
+  magnitude and numerical thresholds are unchanged.
+
 * Conditional gradient bootstrap preparation reuses the canonical internal
   bandwidth builder and finalizer instead of repeating public constructor setup.
   Each resample still uses its own geometry and the same numerical fit.

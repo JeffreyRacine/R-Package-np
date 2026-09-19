@@ -418,6 +418,11 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   data-adaptive ridge selector. Ridging stabilizes the fit; it is distinct
   from the residual normalization above, which uses the actual accepted
   smoother, including any ridge adjustment.
+  A local system with fewer nonzero-weight donor rows than basis
+  coefficients is structurally rank deficient and uses this same ridge
+  policy for fitting and related hat operators. Bootstrap multiplicities
+  do not create additional independent donor rows. This check does not
+  assert full rank when the donor count reaches the basis dimension.
   }
 
   When bandwidths are obtained with \code{regtype="lp"}, C-level

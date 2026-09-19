@@ -76,6 +76,43 @@ SEXP C_np_lc_hat_normalize(SEXP kw, SEXP denominator)
   return out;
 }
 
+/* Preserve the caller's explicit R matrix-product arithmetic while sharing
+ * the response/adjoint rank and ridge policy with the compiled row owner. */
+SEXP C_np_lp_adjoint_prepared(SEXP gram, SEXP rhs, SEXP ntrain_arg,
+                              SEXP rank_arg)
+{
+  int nr = 0, p = 0;
+  const int ntrain = asInteger(ntrain_arg);
+  const int rank = asInteger(rank_arg);
+  NPLPSolveWorkspace workspace;
+  NPLPSolvePolicyDiagnostics diagnostics = {0, 0.0};
+  if(TYPEOF(gram) != REALSXP || !np_matrix_dims(gram, &nr, &p) ||
+     p <= 1 || nr != p || TYPEOF(rhs) != REALSXP ||
+     XLENGTH(rhs) != p || ntrain == NA_INTEGER || ntrain <= 0 ||
+     rank == NA_INTEGER || rank < 0 || rank > p)
+    error("invalid prepared LP adjoint input");
+  SEXP out = PROTECT(allocVector(REALSXP, p));
+  np_lp_solve_workspace_init(&workspace);
+  if(!np_lp_solve_workspace_reserve(&workspace, p, 1)) {
+    np_lp_solve_workspace_clear(&workspace);
+    UNPROTECT(1);
+    error("unable to allocate prepared LP adjoint workspace");
+  }
+  memcpy(workspace.gram_source, REAL(gram), (size_t)p*(size_t)p*sizeof(double));
+  memcpy(workspace.rhs_source, REAL(rhs), (size_t)p*sizeof(double));
+  const NPLPSolvePolicyStatus status = np_lp_solve_workspace_solve_adjoint_ranked(
+    &workspace, p, 1, 1.0/ntrain, rank, &diagnostics);
+  if(status == NP_LP_SOLVE_POLICY_OK)
+    memcpy(REAL(out), workspace.rhs_work, (size_t)p*sizeof(double));
+  np_lp_solve_workspace_clear(&workspace);
+  UNPROTECT(1);
+  if(status == NP_LP_SOLVE_POLICY_NONFINITE)
+    error("LP solve failed in R hat-matrix path: non-finite system");
+  if(status != NP_LP_SOLVE_POLICY_OK)
+    error("LP solve failed in R hat-matrix path after bounded ridging");
+  return out;
+}
+
 static SEXP np_reghat_width_one_matrix(SEXP kw,
                                        SEXP wtrain,
                                        SEXP weval,
@@ -122,7 +159,8 @@ static NPReghatLPRowStatus np_reghat_lp_prediction_raw(
   double * const weighted_design,
   NPLPSolveWorkspace * const solve_workspace,
   double * const prediction,
-  const int check_interrupt)
+  const int check_interrupt,
+  const int support_rank)
 {
   const double alpha = 1.0;
   const double beta = 0.0;
@@ -161,7 +199,8 @@ static NPReghatLPRowStatus np_reghat_lp_prediction_raw(
     R_CheckUserInterrupt();
   switch(np_lp_solve_workspace_solve_adjoint_ranked(
            solve_workspace, nterms, 1, ridge_fraction,
-           NP_LP_RANK_UPPER_BOUND_UNKNOWN, &diagnostics)) {
+           support_rank,
+           &diagnostics)) {
   case NP_LP_SOLVE_POLICY_OK:
     break;
   case NP_LP_SOLVE_POLICY_NONFINITE:
@@ -271,12 +310,13 @@ NPReghatLPRowStatus np_reghat_lp_workspace_prepare_columns(
   return NP_REGHAT_LP_ROW_OK;
 }
 
-NPReghatLPRowStatus np_reghat_lp_workspace_influence_row(
+NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked(
   NPReghatLPWorkspace *workspace,
   const double *weights,
   const double *basis_eval,
   double *row_out,
-  size_t output_stride)
+  size_t output_stride,
+  int support_rank)
 {
   NPReghatLPRowStatus status;
   int observation;
@@ -289,7 +329,7 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row(
   status = np_reghat_lp_prediction_raw(
     workspace->ntrain, workspace->nterms, workspace->design,
     weights, basis_eval, workspace->weighted_design,
-    &workspace->solve_workspace, workspace->prediction, 0);
+    &workspace->solve_workspace, workspace->prediction, 0, support_rank);
   if(status != NP_REGHAT_LP_ROW_OK)
     return status;
   for(observation = 0; observation < workspace->ntrain; ++observation) {
@@ -301,6 +341,17 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row(
     row_out[(size_t)observation*output_stride] = value;
   }
   return NP_REGHAT_LP_ROW_OK;
+}
+
+/* Search consumers deliberately retain their incumbent numerical admission.
+ * Fitting consumers furnish an explicit certificate through the ranked API. */
+NPReghatLPRowStatus np_reghat_lp_workspace_influence_row(
+  NPReghatLPWorkspace *workspace, const double *weights,
+  const double *basis_eval, double *row_out, size_t output_stride)
+{
+  return np_reghat_lp_workspace_influence_row_ranked(
+    workspace, weights, basis_eval, row_out, output_stride,
+    NP_LP_RANK_UPPER_BOUND_UNKNOWN);
 }
 
 typedef struct {
@@ -391,7 +442,8 @@ static SEXP np_reghat_matrix_execution_run(void *data)
     row_status = np_reghat_lp_prediction_raw(
       ntrain, nterms, workspace->design, weights,
       workspace->solve_workspace.rhs_work, workspace->weighted_design,
-      &workspace->solve_workspace, workspace->prediction, 0);
+      &workspace->solve_workspace, workspace->prediction, 0,
+      np_lp_rank_upper_bound_from_weights(weights, ntrain, nterms));
     if(execution->allow_empty && row_status != NP_REGHAT_LP_ROW_OK &&
        row_status != NP_REGHAT_LP_ROW_NONFINITE &&
        np_lp_complete_weights_are_zero(weights, ntrain)) {

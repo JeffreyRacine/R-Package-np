@@ -46,6 +46,14 @@ NPReghatLPRowStatus np_reghat_lp_workspace_prepare_columns(
  * from a nonsingular solve, so signed-log kernel owners may pass their
  * representable common-scaled row directly.
  */
+NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked(
+  NPReghatLPWorkspace *workspace,
+  const double *weights,
+  const double *basis_eval,
+  double *row_out,
+  size_t output_stride,
+  int support_rank);
+
 NPReghatLPRowStatus np_reghat_lp_workspace_influence_row(
   NPReghatLPWorkspace *workspace,
   const double *weights,

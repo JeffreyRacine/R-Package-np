@@ -86,7 +86,7 @@ static int np_lp_pair_endpoint(NPLPPairCall *call, int query,
       }
 
   if(np_lp_solve_workspace_solve_response_ranked(s, p, 1, 1.0/n,
-       NP_LP_RANK_UPPER_BOUND_UNKNOWN, &diagnostics) != NP_LP_SOLVE_POLICY_OK)
+       active < p ? active : p, &diagnostics) != NP_LP_SOLVE_POLICY_OK)
     error("conditional LP contrast covariance: accepted endpoint solve failed");
   memcpy(theta, s->rhs_work, (size_t)p*sizeof(double));
   *point = 0.0;

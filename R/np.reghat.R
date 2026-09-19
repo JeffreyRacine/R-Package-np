@@ -916,49 +916,21 @@ npreghat <-
   H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
   norms <- if (return.norm) matrix(NA_real_, neval, 3L) else NULL
   empty.rows <- NULL
-  eps <- 1.0 / max(1L, ntrain)
-
   for (j in seq_len(neval)) {
     w <- kw[, j]
     A.base <- crossprod(W.train, W.train * w)
     rhs <- W.eval[j, ]
-    solved <- tryCatch(solve(A.base, rhs), error = function(e) NULL)
-
-    if (is.null(solved) || !all(is.finite(solved))) {
-      if (any(!is.finite(A.base)) || any(!is.finite(rhs)))
-        stop("LP solve failed in R hat-matrix path: non-finite system")
-      if (allow.empty.rows && all(is.finite(w)) && all(w == 0.0)) {
-        if (is.null(empty.rows)) empty.rows <- integer(neval)
-        empty.rows[j] <- 1L
-        next
-      }
-      A.try <- A.base
-      nepsilon <- 0.0
-
-      for (ridge.step in seq_len(128L)) {
-        diag(A.try) <- diag(A.try) + eps
-        nepsilon <- nepsilon + eps
-        solved <- tryCatch(solve(A.try, rhs), error = function(e) NULL)
-        if (!is.null(solved) && all(is.finite(solved)))
-          break
-      }
-      if (is.null(solved) || !all(is.finite(solved)))
-        stop("LP solve failed in R hat-matrix path after bounded ridging")
-
-      pristine.anchor <- A.base[1L, 1L]
-      correction <- if (is.finite(pristine.anchor) &&
-                        pristine.anchor != 0.0) {
-        nepsilon * (solved[1L] / pristine.anchor)
-      } else {
-        NA_real_
-      }
-      if (!is.finite(correction))
-        correction <- (nepsilon / pristine.anchor) * solved[1L]
-      corrected <- solved[1L] + correction
-      if (!is.finite(correction) || !is.finite(corrected))
-        stop("LP solve failed in R hat-matrix path: invalid ridge intercept anchor")
-      solved[1L] <- corrected
+    if (any(!is.finite(A.base)) || any(!is.finite(rhs)) || any(!is.finite(w)))
+      stop("LP solve failed in R hat-matrix path: non-finite system")
+    if (allow.empty.rows && all(is.finite(w)) && all(w == 0.0)) {
+      if (is.null(empty.rows)) empty.rows <- integer(neval)
+      empty.rows[j] <- 1L
+      next
     }
+    solved <- .Call("C_np_lp_adjoint_prepared", A.base, as.double(rhs),
+                    as.integer(ntrain),
+                    as.integer(min(ncol(W.train), sum(w != 0.0))),
+                    PACKAGE = "np")
 
     if (return.norm) {
       row <- w * drop(W.train %*% solved)

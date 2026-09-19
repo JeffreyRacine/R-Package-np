@@ -43,6 +43,39 @@ static int np_lp_batch_matrix_dims(SEXP x, int *nrow, int *ncol)
   return XLENGTH(x) == expected;
 }
 
+/* Count independent donor rows, not resampling mass. Saturate at p; this
+ * proves deficiency only when fewer than p contributors remain. */
+SEXP C_np_lp_support_rank(SEXP weights, SEXP counts, SEXP cap_arg)
+{
+  const int cap = asInteger(cap_arg);
+  int n = 0, systems = 1;
+  if(TYPEOF(weights) != REALSXP || XLENGTH(weights) > INT_MAX ||
+     cap == NA_INTEGER || cap <= 0)
+    error("invalid LP donor-count request");
+  n = (int)XLENGTH(weights);
+  if(counts != R_NilValue) {
+    int nr = 0;
+    if((TYPEOF(counts) != REALSXP && TYPEOF(counts) != INTSXP) ||
+       !np_lp_batch_matrix_dims(counts, &nr, &systems) || nr != n)
+      error("LP donor counts must match the kernel row");
+  }
+  SEXP out = PROTECT(allocVector(INTSXP, systems));
+  for(int s = 0; s < systems; ++s) {
+    int count = 0;
+    for(int i = 0; i < n && count < cap; ++i) {
+      const size_t offset = i + (size_t)n*s;
+      const int present = counts == R_NilValue ||
+        (TYPEOF(counts) == INTSXP ? INTEGER(counts)[offset] != 0 :
+                                  REAL(counts)[offset] != 0.0);
+      if(REAL(weights)[i] != 0.0 && present)
+        ++count;
+    }
+    INTEGER(out)[s] = count;
+  }
+  UNPROTECT(1);
+  return out;
+}
+
 static SEXP np_lp_batch_result(SEXP values,
                                int status,
                                int failed_system,
@@ -68,11 +101,12 @@ static SEXP np_lp_batch_result(SEXP values,
   return out;
 }
 
-SEXP C_np_lp_batch_project(SEXP packed_gram,
+SEXP C_np_lp_batch_project_ranked(SEXP packed_gram,
                            SEXP moments,
                            SEXP projection,
                            SEXP represented_mass,
-                           SEXP diagnostics)
+                           SEXP diagnostics,
+                           SEXP rank_bounds)
 {
   int nsystem = 0;
   int packed_width = 0;
@@ -117,6 +151,13 @@ SEXP C_np_lp_batch_project(SEXP packed_gram,
      (LOGICAL(diagnostics)[0] == NA_LOGICAL))
     error("diagnostics must be TRUE or FALSE");
   want_diagnostics = LOGICAL(diagnostics)[0];
+  if(rank_bounds != R_NilValue) {
+    if(TYPEOF(rank_bounds) != INTSXP || XLENGTH(rank_bounds) != nsystem)
+      error("rank_bounds must have one integer per system");
+    for(int system = 0; system < nsystem; ++system)
+      if(INTEGER(rank_bounds)[system] < 0 || INTEGER(rank_bounds)[system] > p)
+        error("rank_bounds must be between zero and the basis width");
+  }
 
   if(TYPEOF(moments) == REALSXP) {
     if(!np_lp_batch_matrix_dims(moments, &moment_nrow, &moment_ncol) ||
@@ -222,7 +263,8 @@ SEXP C_np_lp_batch_project(SEXP packed_gram,
 
     status = np_lp_solve_workspace_solve_response_ranked(
       &workspace, p, nrhs, 1.0/mass_ptr[system],
-      NP_LP_RANK_UPPER_BOUND_UNKNOWN, &solve_diagnostics);
+      rank_bounds == R_NilValue ? NP_LP_RANK_UPPER_BOUND_UNKNOWN :
+        INTEGER(rank_bounds)[system], &solve_diagnostics);
     if(want_diagnostics) {
       INTEGER(ridge_steps)[system] = solve_diagnostics.ridge_steps;
       REAL(ridge_total)[system] = solve_diagnostics.ridge_total;
@@ -260,4 +302,13 @@ SEXP C_np_lp_batch_project(SEXP packed_gram,
   nprotect++;
   UNPROTECT(nprotect);
   return result;
+}
+
+/* Preserve the existing private ABI for moment-only callers. Both entries
+ * use the same solver; absence of a donor certificate is explicit. */
+SEXP C_np_lp_batch_project(SEXP gram, SEXP moments, SEXP projection,
+                           SEXP mass, SEXP diagnostics)
+{
+  return C_np_lp_batch_project_ranked(
+    gram, moments, projection, mass, diagnostics, R_NilValue);
 }
