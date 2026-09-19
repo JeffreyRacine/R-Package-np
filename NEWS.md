@@ -1,5 +1,18 @@
 # npRmpi 0.80-1
 
+* Formula regression, single-index and smooth-coefficient residuals now retain
+  training-row ownership when an external evaluation grid has different missing
+  rows. Smooth-coefficient coefficients and effects are restored alongside
+  fitted values under na.exclude. External smooth-coefficient residual requests
+  no longer depend on requesting standard errors.
+
+* Smooth-coefficient prediction and lazy residual extraction retain the fit's
+  iteration, tolerance, iteration limit and leave-one-out controls. Explicit
+  prediction controls still take precedence.
+
+* Scalar numeric I(...) formula terms now use the ordinary numeric predictor
+  type, without admitting matrix-valued terms or changing the stored formula.
+
 * Smooth-coefficient wild-bootstrap coefficient intervals now reuse the same
   categorical kernel normalization as their fitted moment equations. Density
   profile bootstrap intervals also retain the estimator's normalized
