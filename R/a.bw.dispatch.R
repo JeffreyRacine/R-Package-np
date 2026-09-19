@@ -132,8 +132,41 @@
   NULL
 }
 
+.np_bw_native_values <- function(call_obj, map, frame) {
+  if (is.null(map)) return(list(call = call_obj, expressions = list()))
+  if (!is.environment(frame) || is.null(names(map)) ||
+      anyDuplicated(names(map)) || any(!nzchar(names(map))))
+    stop("invalid native bandwidth handoff", call. = FALSE)
+  tagged <- call_obj
+  indices <- seq_along(tagged)[-1L]
+  for (i in indices) tagged[[i]] <- i
+  matcher <- function(...) NULL
+  formals(matcher) <- as.pairlist(c(
+    stats::setNames(rep(alist(value = ), length(map)), names(map)), alist(... = )))
+  matched <- match.call(matcher, tagged, expand.dots = TRUE)
+  expressions <- list()
+  for (name in intersect(names(map), names(matched))) {
+    index <- matched[[name]]
+    source <- as.name(map[[name]])
+    if (eval(call("missing", source), envir = frame)) {
+      # A selector-native spelling can live in the fitter's dots. Use its
+      # original promise, not the expression captured from the caller.
+      dots <- eval(quote(substitute(list(...))), envir = frame)[-1L]
+      dot.index <- match(name, names(dots), nomatch = 0L)
+      if (!dot.index) next
+      value <- eval(substitute(...elt(I), list(I = dot.index)), envir = frame)
+    } else {
+      value <- eval(source, envir = frame)
+    }
+    expressions[name] <- list(call_obj[[index]])
+    call_obj[[index]] <- substitute(quote(VALUE), list(VALUE = value))
+  }
+  list(call = call_obj, expressions = expressions)
+}
+
 .np_eval_bw_call <- function(call_obj, caller_env = parent.frame(),
-                             formula.value = NULL) {
+                             formula.value = NULL, native.map = NULL,
+                             native.frame = NULL) {
   if (!is.call(call_obj))
     stop("bandwidth selector call is malformed", call. = FALSE)
 
@@ -168,7 +201,13 @@
       call_obj[[index]] <- substitute(quote(VALUE), list(VALUE = formula.value$value))
     }
   }
-  result <- eval(call_obj, envir = caller_env)
+  native <- if (is.null(formula.value))
+    .np_bw_native_values(call_obj, native.map, native.frame) else
+    list(call = call_obj, expressions = list())
+  result <- eval(native$call, envir = caller_env)
+  if (is.call(result[["call"]]))
+    for (name in intersect(names(native$expressions), names(result[["call"]])))
+      result[["call"]][[name]] <- native$expressions[[name]]
   # Execute with the already-resolved value, but preserve the user's formula
   # expression in the existing call metadata. No handoff state is retained.
   if (!is.null(formula.expression) && !is.null(result[["formula"]]) &&
