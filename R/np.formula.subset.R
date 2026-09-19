@@ -148,6 +148,16 @@
   # Observation-level auxiliaries share the formula's time intersection,
   # subset and NA action. They are model-frame extras, never predictors.
   aligned <- .np_formula_align_values(c(values, .np.auxiliary))
+  # I(numeric_vector) protects formula syntax, not a distinct kernel data type.
+  # Keep matrices and all other explicit classes subject to existing policy.
+  for (i in seq_along(values)) {
+    value <- aligned[[i]]
+    if (identical(attr(value, "class"), "AsIs") &&
+        is.numeric(value) && is.null(dim(value))) {
+      class(value) <- NULL
+      aligned[[i]] <- value
+    }
+  }
   attr(tt, "predvars") <- aligned[seq_along(values)]
   auxiliary <- aligned[length(values) + seq_along(.np.auxiliary)]
   selected <- if (length(auxiliary))
