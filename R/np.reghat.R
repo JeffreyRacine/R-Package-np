@@ -1758,6 +1758,9 @@ npreghat.rbandwidth <-
            ...){
 
     output <- match.arg(output)
+    if (!is.numeric(ridge) || length(ridge) != 1L ||
+        !is.finite(ridge) || ridge < 0)
+      stop("'ridge' must be one finite nonnegative number", call. = FALSE)
     constraint.output <- identical(output, "constraint")
     matrix.output <- identical(output, "matrix") || constraint.output
     dots <- list(...)
@@ -1972,6 +1975,18 @@ npreghat.rbandwidth <-
         s = s,
         leave.one.out = leave.one.out
       )
+
+    # These canonical owners implement automatic numerical ridging, not a
+    # caller-specified ridge. Never silently discard that explicit request or
+    # reroute it to a different computational owner.
+    if (ridge != 0 && (native.loo.route || native.lp.mean.apply.route ||
+        direct.apply || exact.core.route ||
+        .npreghat_native_apply_candidate(
+          bws, output, y, reg.spec$regtype.engine, reg.spec$degree.engine,
+          reg.spec$basis.engine, reg.spec$bernstein.basis.engine, s,
+          leave.one.out)))
+      stop("npreghat: nonzero 'ridge' is not supported for this operator; use ridge = 0 for the existing automatic numerical ridging policy",
+           call. = FALSE)
 
     if (native.loo.route && identical(output, "apply")) {
       out <- .npreghat_exact_lp_apply_from_regression_core(
