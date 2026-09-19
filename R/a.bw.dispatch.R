@@ -205,12 +205,13 @@
     .np_bw_native_values(call_obj, native.map, native.frame) else
     list(call = call_obj, expressions = list())
   result <- eval(native$call, envir = caller_env)
-  if (is.call(result[["call"]]))
+  if (is.list(result) && is.call(result[["call"]]))
     for (name in intersect(names(native$expressions), names(result[["call"]])))
       result[["call"]][[name]] <- native$expressions[[name]]
   # Execute with the already-resolved value, but preserve the user's formula
   # expression in the existing call metadata. No handoff state is retained.
-  if (!is.null(formula.expression) && !is.null(result[["formula"]]) &&
+  if (!is.null(formula.expression) && is.list(result) &&
+      !is.null(result[["formula"]]) &&
       is.call(result[["call"]]))
     result[["call"]][["formula"]] <- formula.expression
   result
