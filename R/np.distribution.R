@@ -342,10 +342,12 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
     .np_progress_select_bandwidth_enhanced(
       "Selecting distribution bandwidth",
         .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        native.map = c(bws = "bws", dat = "tdat"), native.frame = environment(),
                         formula.value = .np_formula_value(formula.input, bws, tdat, "dat"))
     )
   } else {
         .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        native.map = c(bws = "bws", dat = "tdat"), native.frame = environment(),
                         formula.value = .np_formula_value(formula.input, bws, tdat, "dat"))
   }
 

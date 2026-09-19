@@ -414,10 +414,12 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
       .np_progress_select_bandwidth_enhanced(
         "Selecting single-index bandwidth",
         .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        native.map = c(bws = "bws", xdat = "txdat", ydat = "tydat"), native.frame = environment(),
                         formula.value = .np_formula_value(dots[["formula", exact = TRUE]], bws, txdat))
       )
     } else {
         .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        native.map = c(bws = "bws", xdat = "txdat", ydat = "tydat"), native.frame = environment(),
                         formula.value = .np_formula_value(dots[["formula", exact = TRUE]], bws, txdat))
     }
   } else {

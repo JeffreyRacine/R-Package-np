@@ -799,14 +799,17 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
       .np_progress_select_bandwidth_enhanced(
         "Selecting partially linear regression bandwidth",
         .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        native.map = c(bws = "bws", xdat = "txdat", ydat = "tydat", zdat = "tzdat"), native.frame = environment(),
                         formula.value = .np_formula_value(formula.input, bws, txdat))
       )
     } else {
         .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        native.map = c(bws = "bws", xdat = "txdat", ydat = "tydat", zdat = "tzdat"), native.frame = environment(),
                         formula.value = .np_formula_value(formula.input, bws, txdat))
     }
   } else {
         .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        native.map = c(bws = "bws", xdat = "txdat", ydat = "tydat", zdat = "tzdat"), native.frame = environment(),
                         formula.value = .np_formula_value(formula.input, bws, txdat))
   }
   

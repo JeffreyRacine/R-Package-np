@@ -1313,6 +1313,7 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
   }
 
   tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        native.map = c(bws = "bws", xdat = "xdat", ydat = "ydat"), native.frame = environment(),
                          formula.value = .np_formula_value(formula.input, bws, xdat))
   
   call.args <- list(bws = tbw)
