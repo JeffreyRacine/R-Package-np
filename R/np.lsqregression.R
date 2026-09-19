@@ -180,6 +180,7 @@ nplsqregbw <-
     obj$rows.omit <- as.vector(omit)
     obj$nobs.omit <- length(omit)
   } else {
+    obj$omit <- NULL
     obj$rows.omit <- NA_integer_
     obj$nobs.omit <- 0L
   }
@@ -197,6 +198,20 @@ nplsqregbw <-
   }
   out$xeval <- .nplsqreg_napredict_eval(omit, out$xeval)
   out$nobs <- nrow(out$xeval)
+  if (!is.null(out$tau.fits))
+    out$tau.fits <- lapply(out$tau.fits, .nplsqreg_pad_fit_outputs, omit = omit)
+  out
+}
+
+.nplsqreg_restore_training_rows <- function(out, omit) {
+  if (!.nplsqreg_omit_length(omit))
+    return(out)
+  out <- .nplsqreg_record_omit(out, omit)
+  out$bws <- .nplsqreg_record_omit(out$bws, omit)
+  if (isTRUE(out$residuals))
+    out$resid <- .nplsqreg_napredict_eval(omit, out$resid)
+  if (!is.null(out$tau.fits))
+    out$tau.fits <- lapply(out$tau.fits, .nplsqreg_restore_training_rows, omit = omit)
   out
 }
 
@@ -1072,7 +1087,9 @@ nplsqregbw <-
   first <- fit.list[[1L]]
   out <- first
   out$bw <- bws$bw
-  out$bws <- bws
+  # The scalar fits own the actual training row map; bws may describe an older
+  # original sample when the caller explicitly supplied compact replacements.
+  out$bws <- .nplsqreg_record_omit(bws, first[["omit", exact = TRUE]])
   out$reg.bws <- stats::setNames(lapply(fit.list, `[[`, "reg.bws"), labels)
   out$fit <- stats::setNames(lapply(fit.list, `[[`, "fit"), labels)
   out$tau <- tau
@@ -1646,7 +1663,7 @@ nplsqreg.formula <-
     if (!is.null(native.exdat)) {
       npValidateNewdataFormula(native.exdat, delete.response(tt),
                                include.response = FALSE)
-      emf <- do.call(stats::model.frame,
+      emf <- do.call(.np_formula_model_frame,
                      list(formula = .np_formula_aligned_terms(delete.response(tt)), data = native.exdat),
                      envir = parent.frame())
       eval.omit <- attr(emf, "na.action")
@@ -1654,7 +1671,7 @@ nplsqreg.formula <-
     } else if (has.eval) {
       npValidateNewdataFormula(newdata, delete.response(tt),
                                include.response = FALSE)
-      emf <- do.call(stats::model.frame,
+      emf <- do.call(.np_formula_model_frame,
                      list(formula = .np_formula_aligned_terms(delete.response(tt)), data = newdata),
                      envir = parent.frame())
       eval.omit <- attr(emf, "na.action")
@@ -1680,8 +1697,7 @@ nplsqreg.formula <-
     out$bws <- .nplsqreg_record_omit(out$bws, train.omit)
     if (!has.eval)
       out <- .nplsqreg_pad_fit_outputs(out, train.omit)
-    if (isTRUE(residuals) && .nplsqreg_omit_length(train.omit))
-      out$resid <- .nplsqreg_napredict_eval(train.omit, out$resid)
+    out <- .nplsqreg_restore_training_rows(out, train.omit)
     if (has.eval && .nplsqreg_omit_length(eval.omit)) {
       out$eval.omit <- eval.omit
       out$eval.rows.omit <- as.vector(eval.omit)
@@ -1700,6 +1716,15 @@ nplsqreg.formula <-
 nplsqreg.lsqregressionbandwidth <-
   function(bws, txdat = NULL, tydat = NULL, tau = bws$tau,
            se = FALSE, ...) {
+    retained.training <- is.null(txdat) && is.null(tydat)
+    restore <- function(out) {
+      # The retained arrays are complete cases; only the owning bandwidth
+      # object knows their original positions. Explicit data owns its own map.
+      omit <- if (retained.training) bws[["omit", exact = TRUE]] else NULL
+      if (isTRUE(out$trainiseval))
+        out <- .nplsqreg_pad_fit_outputs(out, omit)
+      .nplsqreg_restore_training_rows(out, omit)
+    }
     tau <- .nplsqreg_validate_tau_values(tau)
     if (length(tau) != length(bws$tau) || !isTRUE(all.equal(tau, bws$tau)))
       stop("cross-tau nplsqreg bandwidth-object reuse is not supported",
@@ -1737,11 +1762,12 @@ nplsqreg.lsqregressionbandwidth <-
         tau.search = if (is.null(bws$tau.search)) "full" else bws$tau.search,
         call = match.call(expand.dots = FALSE))
       out$call <- .nplsqreg_describe_call(out$call, parent.frame())
-      return(.npreg_finish_empty_rows(out, empty.state$rows, defer = defer.empty,
-        owner = "nplsqreg", row.labels = row.names(out$xeval)))
+      out <- .npreg_finish_empty_rows(out, empty.state$rows, defer = defer.empty,
+        owner = "nplsqreg", row.labels = row.names(out$xeval))
+      return(restore(out))
     }
-    nplsqreg.default(bws = bws, txdat = txdat, tydat = tydat, tau = tau,
-                     se = se, ...)
+    restore(nplsqreg.default(bws = bws, txdat = txdat, tydat = tydat, tau = tau,
+                             se = se, ...))
   }
 
 nplsqreg.NULL <- function(...) {
@@ -1879,8 +1905,8 @@ nplsqreg.default <-
     out <- .nplsqreg_record_omit(out, train.omit)
     if (!eval.present)
       out <- .nplsqreg_pad_fit_outputs(out, train.omit)
-    if (isTRUE(residuals) && .nplsqreg_omit_length(train.omit))
-      out$resid <- .nplsqreg_napredict_eval(train.omit, out$resid)
+    out$bws <- .nplsqreg_record_omit(out$bws, train.omit)
+    out <- .nplsqreg_restore_training_rows(out, train.omit)
     if (eval.present && .nplsqreg_omit_length(eval.omit)) {
       out$eval.omit <- eval.omit
       out$eval.rows.omit <- as.vector(eval.omit)
