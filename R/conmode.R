@@ -59,7 +59,8 @@ conmode =
            xtrain = NULL,
            ytrain = NULL,
            gradients = FALSE,
-           se = TRUE){
+           se = TRUE,
+           proper.control = list()){
 
     if (missing(bws) || missing(xeval) || missing(conmode) || missing(condens) || missing(ntrain))
       stop("improper invocation of conmode constructor")
@@ -95,6 +96,7 @@ conmode =
       proper.requested = proper.requested,
       proper.applied = proper.applied,
       proper.info = proper.info,
+      proper.control = proper.control,
       confusion.matrix = confusion.matrix,
       CCR.overall = CCR.overall,
       CCR.byoutcome = CCR.byoutcome,
@@ -258,6 +260,12 @@ predict.conmode <- function(object,
     dots$probabilities <- TRUE
   }
 
+  if (!"proper" %in% names(dots) &&
+      !is.null(object[["proper.requested", exact = TRUE]]))
+    dots$proper <- object[["proper.requested", exact = TRUE]]
+  if (!"proper.control" %in% names(dots) &&
+      !is.null(object[["proper.control", exact = TRUE]]))
+    dots$proper.control <- object[["proper.control", exact = TRUE]]
   ev <- do.call(npconmode, c(list(bws = object$bws), dots))
   if (identical(type, "class"))
     return(ev$conmode)

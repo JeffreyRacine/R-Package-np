@@ -6,6 +6,20 @@ kbandwidth <-
 kbandwidth.integer <-
   function(bw, ...) { kbandwidth.numeric(bw = bw, ...) }
 
+# Density/distribution families and raw kernel sums use different spellings
+# for the same ordered mass. Translate semantics at the object boundary, not
+# at the numerical kernel or by rescaling a finished estimate.
+.np_density_okertype <- function(okertype) {
+  if (identical(okertype, "liracine")) "nliracine" else okertype
+}
+
+.np_kbandwidth_okertype <- function(bw) {
+  if (inherits(bw, c("bandwidth", "dbandwidth")))
+    .np_density_okertype(bw[["okertype", exact = TRUE]])
+  else
+    bw[["okertype", exact = TRUE]]
+}
+
 kbandwidth.default <- function(bw, ...){
   kbandwidth.numeric(bw = unlist(bw$bandwidth),
                      bwscaling = FALSE,
@@ -16,7 +30,7 @@ kbandwidth.default <- function(bw, ...){
                      ckerlb = if (!is.null(bw$ckerlb)) bw$ckerlb else NULL,
                      ckerub = if (!is.null(bw$ckerub)) bw$ckerub else NULL,
                      ukertype = bw$ukertype,
-                     okertype = bw$okertype,
+                     okertype = .np_kbandwidth_okertype(bw),
                      nobs = bw$nobs,
                      xdati = if(is.null(bw$zdati)) bw$xdati else bw$zdati,
                      ydati = bw$ydati,

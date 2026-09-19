@@ -810,7 +810,9 @@ npqreg.formula <-
     if (has.eval)
       q.args$exdat <- exdat
     q.args$bws <- bws
-    tbw <- do.call(npqreg, c(q.args, .npqreg_fit_dots(dots)))
+    training <- names(dots) %in% c("txdat", "tydat")
+    q.args <- .np_args_with_defaults(q.args, dots[training])
+    tbw <- do.call(npqreg, .np_args_with_defaults(q.args, .npqreg_fit_dots(dots[!training])))
 
     tbw$omit <- attr(umf,"na.action")
     tbw$rows.omit <- as.vector(tbw$omit)
@@ -829,9 +831,8 @@ npqreg.formula <-
 
 npqreg.call <-
   function(bws, ...) {
-    npqreg(txdat = .np_eval_bws_call_arg(bws, "xdat"),
-           tydat = .np_eval_bws_call_arg(bws, "ydat"),
-           bws = bws, ...)
+    do.call(npqreg, .np_retained_training_args(
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
   }
 
 npqreg.conbandwidth <-

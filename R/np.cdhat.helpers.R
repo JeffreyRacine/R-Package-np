@@ -45,7 +45,7 @@
     ckerlb = bws$cxkerlb,
     ckerub = bws$cxkerub,
     ukertype = bws$uxkertype,
-    okertype = bws$oxkertype,
+    okertype = .np_density_okertype(bws$oxkertype),
     nobs = nrow(txdat),
     xdati = untangle(txdat),
     ydati = NULL,
@@ -65,7 +65,7 @@
     ckerlb = bws$cykerlb,
     ckerub = bws$cykerub,
     ukertype = bws$uykertype,
-    okertype = bws$oykertype,
+    okertype = .np_density_okertype(bws$oykertype),
     nobs = nrow(tydat),
     xdati = untangle(tydat),
     ydati = NULL,
@@ -81,14 +81,6 @@
   txdat <- toFrame(txdat)
   ncon <- sum(bws$ixcon)
   con.names <- names(txdat)[bws$ixcon]
-  if (!is.null(s) && !is.null(names(s))) {
-    sout <- integer(ncon)
-    names(sout) <- con.names
-    keep <- intersect(names(s), con.names)
-    if (length(keep))
-      sout[keep] <- as.integer(s[keep])
-    s <- sout
-  }
   .npreghat_resolve_s(s = s, deriv = deriv, ncon = ncon, con.names = con.names)
 }
 

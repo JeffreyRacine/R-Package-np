@@ -288,7 +288,7 @@ npreg.formula <-
       if (y.eval)
         reg.args$eydat <- eydat
     }
-    ev <- do.call(npreg, c(reg.args, list(se = se), dots))
+    ev <- do.call(npreg, .np_args_with_defaults(c(reg.args, list(se = se)), dots))
     ev$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
     environment(ev$call) <- parent.frame()
 
@@ -354,9 +354,8 @@ npreg.formula <-
 
 npreg.call <-
   function(bws, ...) {
-    ev <- npreg(txdat = .np_eval_bws_call_arg(bws, "xdat"),
-                tydat = .np_eval_bws_call_arg(bws, "ydat"),
-                bws = bws, ...)
+    ev <- do.call(npreg, .np_retained_training_args(
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
     return(ev)

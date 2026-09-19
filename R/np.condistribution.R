@@ -65,7 +65,7 @@ npcdist.formula <-
       cd.args$eydat <- eydat
     }
     cd.args$bws <- bws
-    ev <- do.call(npcdist, c(cd.args, dots))
+    ev <- do.call(npcdist, .np_args_with_defaults(cd.args, dots))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
@@ -94,9 +94,8 @@ npcdist.formula <-
 
 npcdist.call <-
   function(bws, ...) {
-    npcdist(txdat = .np_eval_bws_call_arg(bws, "xdat"),
-            tydat = .np_eval_bws_call_arg(bws, "ydat"),
-            bws = bws, ...)
+    do.call(npcdist, .np_retained_training_args(
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
   }
 
 

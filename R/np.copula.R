@@ -196,7 +196,7 @@ npcopula <- function(bws, ...) {
   d$data <- data
   d$target <- target
   d$density <- identical(target, "density")
-  d$ntrain <- bws$nobs
+  d$ntrain <- nrow(data)
   d$trainiseval <- identical(evaluation, "sample")
   d$u.provided <- isTRUE(u.provided)
   d$u.auto <- isTRUE(u.auto)
@@ -861,6 +861,10 @@ predict.npcopula <- function(object,
       data <- object$data
     if (is.null(data))
       stop("npcopula object does not retain the training data needed for prediction; refit with npcopula()")
+    for (control in c("n.quasi.inv", "er.quasi.inv")) {
+      if (!control %in% names(dots) && !is.null(object[[control, exact = TRUE]]))
+        dots[control] <- list(object[[control, exact = TRUE]])
+    }
     args <- c(list(bws = object$bws, data = data, se = se.fit),
               if (is.null(u)) list() else list(u = u),
               dots)
@@ -1410,6 +1414,12 @@ npcopula.default <- function(bws,
                            se = FALSE) {
   density <- identical(target, "density")
   num.var <- length(bws$xnames)
+  data <- toFrame(data)
+  if (anyDuplicated(names(data)) || anyDuplicated(bws$xnames) ||
+      !all(bws$xnames %in% names(data)) || ncol(data) != num.var)
+    stop("copula data columns must uniquely match the bandwidth variable names",
+         call. = FALSE)
+  data <- data[, bws$xnames, drop = FALSE]
   u <- .npcopula_validate_u(u, num.var)
   n.quasi.inv <- .npcopula_validate_n_quasi_inv(n.quasi.inv)
   er.quasi.inv <- .npcopula_validate_er_quasi_inv(er.quasi.inv)
@@ -1444,7 +1454,7 @@ npcopula.default <- function(bws,
       copula <- fitted(npudens(bws=bws,tdat=data))
     }
 
-    u <- matrix(NA,bws$nobs,num.var)
+    u <- matrix(NA,nrow(data),num.var)
     for (j in seq_len(num.var)) {
       stage <- stage + 1L
       progress <- .npcopula_progress_step(

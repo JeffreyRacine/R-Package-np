@@ -156,7 +156,8 @@ npindex.formula <-
         # formula again through the explicit-native formula reentry interface.
         if (!inherits(si.bws, "formula"))
           si.args$bws <- si.bws
-        ev <- do.call(npindex, c(si.args, list(se = se, se.type = se.type), dots))
+        ev <- do.call(npindex, .np_args_with_defaults(
+          c(si.args, list(se = se, se.type = se.type)), dots))
         ev$call <- mc
         environment(ev$call) <- parent.frame()
 
@@ -190,9 +191,8 @@ npindex.formula <-
 
 npindex.call <-
   function(bws, ...) {
-    npindex(txdat = .np_eval_bws_call_arg(bws, "xdat"),
-            tydat = .np_eval_bws_call_arg(bws, "ydat"),
-            bws = bws, ...)
+    do.call(npindex, .np_retained_training_args(
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
   }
 
 .np_index_kernel_args <- function(bws) {

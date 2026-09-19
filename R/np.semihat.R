@@ -671,9 +671,7 @@
         function(j) fit_one(y[, j]),
         numeric(nrow(idx.eval))
       )
-
-      if (is.null(dim(out)))
-        return(as.vector(out))
+      dim(out) <- c(nrow(idx.eval), ncol(y))
       if (ncol(out) == 1L)
         return(as.vector(out[, 1L]))
       return(out)
@@ -694,15 +692,15 @@
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
 
-    fit <- .np_regression_direct(
-      bws = rbw,
-      txdat = idx.train,
-      tydat = y,
-      exdat = idx.eval,
-      gradients = FALSE, allow.empty.rows = allow.empty.rows
-    )
-    out <- fit$mean
-    flags <- attr(fit, ".np.empty.rows", exact = TRUE)
+    y <- .np_indexhat_numeric_y(y)
+    if (nrow(y) != nrow(idx.train))
+      stop("number of rows in 'y' must equal number of training rows")
+    fits <- lapply(seq_len(ncol(y)), function(j) .np_regression_direct(
+      bws = rbw, txdat = idx.train, tydat = y[, j], exdat = idx.eval,
+      gradients = FALSE, allow.empty.rows = allow.empty.rows))
+    out <- if (ncol(y) == 1L) fits[[1L]]$mean else
+      do.call(cbind, lapply(fits, function(fit) fit$mean))
+    flags <- attr(fits[[1L]], ".np.empty.rows", exact = TRUE)
     if(!is.null(flags)) attr(out, ".np.empty.rows") <- flags
     return(out)
   }
@@ -1042,9 +1040,9 @@ npindexhat <-
     .np_semihat_require_class(bws, "sibandwidth", "npindexhat")
     if (is.null(y) && constraint.output)
       stop("argument 'y' is required when output='constraint'")
-    s <- as.integer(s)
-    if (length(s) != 1L || is.na(s) || !(s %in% c(0L, 1L)))
+    if (!is.numeric(s) || length(s) != 1L || is.na(s) || !(s %in% c(0L, 1L)))
       stop("argument 's' must be 0 (fit) or 1 (index derivative)")
+    s <- as.integer(s)
     if (!is.null(fd.step)) {
       fd.step <- as.double(fd.step)
       if (length(fd.step) != 1L || is.na(fd.step) || !is.finite(fd.step) || fd.step <= 0)

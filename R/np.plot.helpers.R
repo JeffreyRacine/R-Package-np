@@ -2094,6 +2094,7 @@
 
   W <- matrix(1.0, nrow = nrow(eval.codes), ncol = nrow(train.codes))
   lambda <- as.double(bws$bw)
+  okertype <- .np_kbandwidth_okertype(bws)
 
   for (j in seq_len(ncol(train.codes))) {
     if (is.factor(xdat[[j]]) && !is.ordered(xdat[[j]])) {
@@ -2110,14 +2111,14 @@
       }
     } else if (is.ordered(xdat[[j]])) {
       d <- abs(outer(eval.codes[, j], train.codes[, j], "-"))
-      if (identical(bws$okertype, "wangvanryzin")) {
+      if (identical(okertype, "wangvanryzin")) {
         Kj <- ifelse(d == 0, 1.0 - lambda[j],
                      (lambda[j]^d) * (1.0 - lambda[j]) * 0.5)
-      } else if (identical(bws$okertype, "liracine")) {
+      } else if (identical(okertype, "liracine")) {
         Kj <- lambda[j]^d
-      } else if (identical(bws$okertype, "nliracine")) {
+      } else if (identical(okertype, "nliracine")) {
         Kj <- (lambda[j]^d) * (1.0 - lambda[j]) / (1.0 + lambda[j])
-      } else if (identical(bws$okertype, "racineliyan")) {
+      } else if (identical(okertype, "racineliyan")) {
         support <- .np_cat_ordered_support_values(xdat[[j]])
         den <- vapply(train.codes[, j],
                       function(x) sum(lambda[j]^abs(x - support)),
@@ -5244,11 +5245,7 @@
     # normalized ordered kernel. kbandwidth/npksum reserve that spelling for
     # the unnormalized kernel and call the density-family kernel
     # "nliracine". Translate only at this private family adapter.
-    okertype = if (identical(bws$okertype, "liracine")) {
-      "nliracine"
-    } else {
-      bws$okertype
-    },
+    okertype = .np_density_okertype(bws$okertype),
     nobs = nrow(xdat),
     xdati = untangle(xdat),
     xnames = names(xdat)
@@ -5612,7 +5609,7 @@
     ckerlb = if (!is.null(bws$cxkerlb)) bws$cxkerlb else NULL,
     ckerub = if (!is.null(bws$cxkerub)) bws$cxkerub else NULL,
     ukertype = bws$uxkertype,
-    okertype = bws$oxkertype,
+    okertype = .np_density_okertype(bws$oxkertype),
     nobs = nrow(xdat),
     xdati = untangle(xdat),
     xnames = names(xdat)
@@ -5645,7 +5642,7 @@
     ckerlb = if (length(ckerlb)) ckerlb else NULL,
     ckerub = if (length(ckerub)) ckerub else NULL,
     ukertype = bws$uxkertype,
-    okertype = bws$oxkertype,
+    okertype = .np_density_okertype(bws$oxkertype),
     nobs = nrow(xydat),
     xdati = untangle(xydat),
     xnames = names(xydat)

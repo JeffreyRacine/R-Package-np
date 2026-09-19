@@ -58,7 +58,7 @@ npplreg.formula <-
         pl.args$eydat <- model.response(evaluation$yz)
     }
     pl.args$bws <- bws
-    ev <- do.call(npplreg, c(pl.args, dots))
+    ev <- do.call(npplreg, .np_args_with_defaults(pl.args, dots))
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
       if (!is.null(ev$bws))
@@ -81,10 +81,8 @@ npplreg.formula <-
 
 npplreg.call <-
   function(bws, ...) {
-    npplreg(txdat = .np_eval_bws_call_arg(bws, "xdat"),
-            tydat = .np_eval_bws_call_arg(bws, "ydat"),
-            tzdat = .np_eval_bws_call_arg(bws, "zdat"),
-            bws = bws, ...)
+    do.call(npplreg, .np_retained_training_args(
+      bws, c(txdat = "xdat", tydat = "ydat", tzdat = "zdat"), list(...)))
   }
 
 .np_plreg_fit_progress_targets <- function(xnames) {
