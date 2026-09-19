@@ -284,7 +284,8 @@ predict.npregression <- function(object, se.fit = FALSE, ...) {
   if (!is.null(dots$exdat) && !is.null(dots$newdata)) {
     dots$newdata <- NULL
   } else if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
-    dots$exdat <- dots$newdata
+    dots$exdat <- .np_native_newdata_parts(
+      dots$newdata, list(exdat = object$bws$xnames), "predict")$exdat
     dots$newdata <- NULL
   }
 

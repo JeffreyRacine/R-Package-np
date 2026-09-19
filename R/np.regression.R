@@ -386,7 +386,7 @@ npreg.rbandwidth <-
     native.newdata <- dots[["newdata", exact = TRUE]]
     if (missing(exdat) && !is.null(native.newdata)) {
       native.eval <- .np_native_newdata_parts(
-        native.newdata, list(exdat = NULL), "npreg")
+        native.newdata, list(exdat = bws$xnames), "npreg")
       exdat <- native.eval$exdat
     }
 

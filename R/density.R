@@ -100,7 +100,8 @@ predict.npdensity <- function(object, se.fit = FALSE, ...) {
   if (!is.null(dots$edat) && !is.null(dots$newdata)) {
     dots$newdata <- NULL
   } else if (!has.formula.route && is.null(dots$edat) && !is.null(dots$newdata)) {
-    dots$edat <- dots$newdata
+    dots$edat <- .np_native_newdata_parts(
+      dots$newdata, list(edat = object$bws$xnames), "predict")$edat
     dots$newdata <- NULL
   }
 

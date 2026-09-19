@@ -83,19 +83,8 @@ quantile.qregression <- function(x, ...){ x$quantile }
                             include.response = FALSE)
     return(newdata)
   }
-  if (is.data.frame(newdata) && !is.null(names(newdata))) {
-    xnames <- object$bws$xnames
-    if (length(xnames)) {
-      missing.names <- setdiff(xnames, names(newdata))
-      if (length(missing.names))
-        stop(sprintf(
-          "newdata must contain columns: %s",
-          paste(shQuote(xnames), collapse = ", ")
-        ), call. = FALSE)
-      return(newdata[, xnames, drop = FALSE])
-    }
-  }
-  newdata
+  .np_native_newdata_parts(
+    newdata, list(exdat = object$bws$xnames), "predict.npqreg")$exdat
 }
 
 predict.qregression <- function(object, se.fit = FALSE, ...) {

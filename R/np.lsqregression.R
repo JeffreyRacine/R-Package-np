@@ -1783,7 +1783,8 @@ nplsqreg.default <-
       if (!missing(exdat))
         fit.args$exdat <- exdat
       else if (!is.null(native.newdata))
-        fit.args$exdat <- native.newdata
+        fit.args$exdat <- .np_native_newdata_parts(
+          native.newdata, list(exdat = bw$xnames), "nplsqreg")$exdat
       fit.args$.np.defer.empty.rows <- defer.empty
       return(do.call(nplsqreg, fit.args))
     }
@@ -1827,7 +1828,8 @@ nplsqreg.default <-
       fit.args$exdat <- eval.prepared$exdat
       eval.omit <- eval.prepared$omit
     } else if (!is.null(native.newdata)) {
-      eval.prepared <- .nplsqreg_prepare_eval_data(native.newdata)
+      eval.prepared <- .nplsqreg_prepare_eval_data(.np_native_newdata_parts(
+        native.newdata, list(exdat = bws$xnames), "nplsqreg")$exdat)
       fit.args$exdat <- eval.prepared$exdat
       eval.omit <- eval.prepared$omit
     }

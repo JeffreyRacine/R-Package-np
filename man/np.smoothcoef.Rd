@@ -239,6 +239,13 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   }
 }
 \details{
+  For native (non-formula) objects, named \code{newdata} columns are matched
+  to the retained variable names and reordered as needed. Extra columns are
+  ignored; missing, duplicate or ambiguous names are errors. An unnamed
+  matrix or vector remains positional for a single evaluation role.
+  Explicit native evaluation arguments retain their positional contract and
+  take precedence over \code{newdata}.
+
   For a native bandwidth object, \code{newdata} is split into
   \code{exdat} and \code{ezdat} using the retained predictor and smoothing
   variable names. Names must identify both roles unambiguously;

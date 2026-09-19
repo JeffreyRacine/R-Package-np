@@ -854,7 +854,7 @@ npqreg.condbandwidth <-
     fit.dots <- list(...)
     if (missing(exdat) && !is.null(fit.dots[["newdata", exact = TRUE]]))
       exdat <- .np_native_newdata_parts(fit.dots[["newdata", exact = TRUE]],
-                                       list(exdat = NULL), "npqreg")$exdat
+                                       list(exdat = bws$xnames), "npqreg")$exdat
     fit.dots$newdata <- NULL
     cat.se.demand <- .np_conditional_cat_se_demand(
       fit.dots[[".np_conditional_cat_se_demand", exact = TRUE]],

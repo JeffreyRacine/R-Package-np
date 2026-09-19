@@ -239,12 +239,10 @@ predict.plregression <- function(object, se.fit = FALSE, ...) {
   if ((!is.null(dots$exdat) || !is.null(dots$ezdat)) && !is.null(dots$newdata)) {
     dots$newdata <- NULL
   } else if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
-    nd <- toFrame(dots$newdata)
-    need <- c(obj.bws$xnames, obj.bws$znames)
-    if (!all(need %in% names(nd)))
-      stop("'newdata' must include columns: ", paste(need, collapse = ", "))
-    dots$exdat <- nd[, obj.bws$xnames, drop = FALSE]
-    dots$ezdat <- nd[, obj.bws$znames, drop = FALSE]
+    parts <- .np_native_newdata_parts(dots$newdata,
+      list(exdat = obj.bws$xnames, ezdat = obj.bws$znames), "predict.npplreg")
+    dots$exdat <- parts$exdat
+    dots$ezdat <- parts$ezdat
     dots$newdata <- NULL
   }
 

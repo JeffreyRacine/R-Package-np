@@ -814,7 +814,8 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
     }
   } else {
     if (is.null(dots$exdat) && !is.null(dots$newdata)) {
-      dots$exdat <- dots$newdata
+      dots$exdat <- .np_native_newdata_parts(
+        dots$newdata, list(exdat = object$bws$xnames), "predict.nplsqreg")$exdat
       dots$newdata <- NULL
     }
   }

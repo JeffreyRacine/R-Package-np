@@ -149,6 +149,13 @@ selection, prediction, or plotting route.
   }
 }
 \details{
+  For native (non-formula) objects, named \code{newdata} columns are matched
+  to the retained variable names and reordered as needed. Extra columns are
+  ignored; missing, duplicate or ambiguous names are errors. An unnamed
+  matrix or vector remains positional for a single evaluation role.
+  Explicit native evaluation arguments retain their positional contract and
+  take precedence over \code{newdata}.
+
   Formula variables of class \code{ts}, including lagged variables, are
   aligned on their common time support before fitting. Other variables
   must already have the length of that intersection. Supply explicitly

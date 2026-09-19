@@ -105,18 +105,11 @@ predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
   if ((!is.null(dots$exdat) || !is.null(dots$ezdat)) && !is.null(dots$newdata)) {
     dots$newdata <- NULL
   } else if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
-    nd <- toFrame(dots$newdata)
-    if (!is.null(object$bws$znames)) {
-      need <- c(object$bws$xnames, object$bws$znames)
-      if (!all(need %in% names(nd)))
-        stop("'newdata' must include columns: ", paste(need, collapse = ", "))
-      dots$exdat <- nd[, object$bws$xnames, drop = FALSE]
-      dots$ezdat <- nd[, object$bws$znames, drop = FALSE]
-    } else {
-      if (!all(object$bws$xnames %in% names(nd)))
-        stop("'newdata' must include columns: ", paste(object$bws$xnames, collapse = ", "))
-      dots$exdat <- nd[, object$bws$xnames, drop = FALSE]
-    }
+    groups <- list(exdat = object$bws$xnames)
+    if (!is.null(object$bws$znames)) groups$ezdat <- object$bws$znames
+    parts <- .np_native_newdata_parts(dots$newdata, groups, "predict.npscoef")
+    dots$exdat <- parts$exdat
+    if (!is.null(parts$ezdat)) dots$ezdat <- parts$ezdat
     dots$newdata <- NULL
   }
 

@@ -814,6 +814,17 @@ fitted.npcopula <- function(object, ...) {
   nd <- as.data.frame(newdata)
   xnames <- object$xnames
   unames <- paste0("u", seq_along(xnames))
+  if (!isTRUE(allow.xnames) &&
+      (is.data.frame(newdata) || !is.null(colnames(newdata)))) {
+    if (length(xnames) && all(xnames %in% names(nd)) &&
+        !all(unames %in% names(nd)))
+      stop("newdata with original variable names is ambiguous for npcopula; supply probability coordinates via 'u' or use newdata columns named u1, u2, ...",
+           call. = FALSE)
+    out <- .np_native_newdata_parts(
+      newdata, list(u = unames), "predict.npcopula")$u
+    names(out) <- xnames
+    return(out)
+  }
   if (length(unames) && all(unames %in% names(nd))) {
     out <- nd[, unames, drop = FALSE]
     names(out) <- xnames

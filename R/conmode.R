@@ -187,13 +187,8 @@ fitted.conmode <- function(object, ...) {
   ynames <- object$ynames
 
   if (!is.null(xnames) && length(xnames)) {
-    missing.names <- setdiff(xnames, names(nd))
-    if (length(missing.names))
-      stop(sprintf(
-        "newdata must contain columns: %s",
-        paste(shQuote(xnames), collapse = ", ")
-      ), call. = FALSE)
-    dots$exdat <- nd[, xnames, drop = FALSE]
+    dots$exdat <- .np_native_newdata_parts(
+      newdata, list(exdat = xnames), "predict.npconmode")$exdat
     if (is.null(dots$eydat) &&
         !is.null(ynames) && length(ynames) && all(ynames %in% names(nd)))
       dots$eydat <- nd[, ynames, drop = FALSE]
