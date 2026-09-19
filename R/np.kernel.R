@@ -49,7 +49,7 @@ npksum.formula <-
       tt <- .np_formula_aligned_terms(delete.response(attr(mf,"terms")))
       npValidateNewdataFormula(newdata, tt, include.response = FALSE)
       umf.args <- list(formula = tt, data = newdata)
-      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
       exdat <- umf[, attr(attr(umf, "terms"),"term.labels"), drop = FALSE]
     }
 

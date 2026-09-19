@@ -149,6 +149,13 @@ selection, prediction, or plotting route.
   }
 }
 \details{
+  Omitted training rows are restored as \code{NA} in fitted values and
+  residuals, including fits obtained from a retained bandwidth object and
+  multiple quantile probabilities. Prediction restores omitted evaluation
+  rows in both estimates and standard errors. Explicit training inputs own
+  their row positions; a complete-case replacement is not padded using an
+  older bandwidth object's omissions.
+
   For native (non-formula) objects, named \code{newdata} columns are matched
   to the retained variable names and reordered as needed. Extra columns are
   ignored; missing, duplicate or ambiguous names are errors. An unnamed

@@ -92,5 +92,6 @@ test_that("vector prediction retains mixed time-indexed and native input semanti
   actual <- predict(model, newdata = ex)
   expected <- do.call(cbind, expected); colnames(expected) <- colnames(actual)
   expect_identical(actual, expected)
-  expect_identical(dim(actual), c(9L, 2L))
+  expect_identical(dim(actual), c(10L, 2L))
+  expect_true(all(is.na(actual[2L, ])))
 })

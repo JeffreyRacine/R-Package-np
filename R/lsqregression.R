@@ -761,9 +761,11 @@ gradients.lsqregression <- function(x, se = FALSE,
   tt <- stats::terms(object$bws$formula)
   rhs <- .np_formula_aligned_terms(stats::delete.response(tt))
   npValidateNewdataFormula(newdata, rhs, include.response = FALSE)
-  mf <- do.call(stats::model.frame, list(formula = rhs, data = newdata),
+  mf <- do.call(.np_formula_model_frame, list(formula = rhs, data = newdata),
                 envir = environment(tt))
-  mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
+  mf <- .np_formula_complete_training_frame(mf)
+  list(exdat = mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE],
+       omit = attr(mf, "na.action"))
 }
 
 predict.lsqregression <- function(object, se.fit = FALSE, ...) {
@@ -774,6 +776,38 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
   npRejectLegacyBooleanErrors(dots, "predict.lsqregression")
   if ("se" %in% names(dots))
     stop("predict.lsqregression() uses se.fit=, not se=", call. = FALSE)
+  # Prepare the evaluation sample once, before splitting vector tau. The row
+  # map belongs to this request, never to a previous external fit.
+  retained.evaluation <- is.null(dots$exdat) && is.null(dots$newdata)
+  eval.omit <- NULL
+  if (!is.null(dots$exdat)) {
+    prepared <- .nplsqreg_prepare_eval_data(dots$exdat)
+    dots$exdat <- prepared$exdat
+    eval.omit <- prepared$omit
+    dots$newdata <- NULL
+  } else if (!is.null(dots$newdata)) {
+    prepared <- if (!is.null(object$bws$formula)) {
+      .nplsqreg_predict_formula_newdata_to_exdat(object, dots$newdata)
+    } else {
+      .nplsqreg_prepare_eval_data(.np_native_newdata_parts(
+        dots$newdata, list(exdat = object$bws$xnames), "predict.nplsqreg")$exdat)
+    }
+    dots$exdat <- prepared$exdat
+    eval.omit <- prepared$omit
+    dots$newdata <- NULL
+  } else {
+    eval.omit <- object$bws[["omit", exact = TRUE]]
+  }
+  finish <- function(out, flags = NULL, row.labels = NULL) {
+    if (se.fit) {
+      out$fit <- .nplsqreg_napredict_eval(eval.omit, out$fit)
+      out$se.fit <- .nplsqreg_napredict_eval(eval.omit, out$se.fit)
+    } else {
+      out <- .nplsqreg_napredict_eval(eval.omit, out)
+    }
+    .npreg_finish_empty_rows(out, flags, omitted = eval.omit,
+      defer = defer.empty, owner = "predict.nplsqreg", row.labels = row.labels)
+  }
   if (length(object$tau) > 1L) {
     if (is.null(object$tau.fits) || length(object$tau.fits) != length(object$tau))
       stop("vector nplsqreg object lacks per-tau fit state", call. = FALSE)
@@ -781,13 +815,12 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
     empty.state <- new.env(hash = FALSE, parent = emptyenv())
     empty.state$rows <- NULL
     child.dots <- dots
-    if (is.null(child.dots$exdat) && !is.null(child.dots$newdata) &&
-        !is.null(object$bws$formula)) {
-      child.dots$exdat <- .nplsqreg_predict_formula_newdata_to_exdat(object, child.dots$newdata)
-      child.dots$newdata <- NULL
-    }
     child.dots$.np.defer.empty.rows <- TRUE
     pred <- lapply(object$tau.fits, function(one) {
+      # The parent owns restoration once, including legacy children that did
+      # not retain a training omission map of their own.
+      if (retained.evaluation)
+        one$bws <- .nplsqreg_record_omit(one$bws, NULL)
       value <- do.call(predict.lsqregression,
         c(list(object = one, se.fit = se.fit), child.dots))
       flags <- attr(value, ".np.empty.rows", exact = TRUE)
@@ -802,30 +835,11 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
       colnames(se.out) <- labels
       out <- list(fit = fit, se.fit = se.out, df = pred[[1L]]$df,
                   residual.scale = pred[[1L]]$residual.scale)
-      return(.npreg_finish_empty_rows(out, empty.state$rows, defer = defer.empty,
-        owner = "predict.nplsqreg"))
+      return(finish(out, empty.state$rows))
     }
     out <- do.call(cbind, pred)
     colnames(out) <- labels
-    return(.npreg_finish_empty_rows(out, empty.state$rows, defer = defer.empty,
-      owner = "predict.nplsqreg"))
-  }
-  has.formula.route <- !is.null(object$bws$formula)
-
-  if (!is.null(dots$exdat) && !is.null(dots$newdata))
-    dots$newdata <- NULL
-
-  if (has.formula.route) {
-    if (is.null(dots$exdat) && !is.null(dots$newdata)) {
-      dots$exdat <- .nplsqreg_predict_formula_newdata_to_exdat(object, dots$newdata)
-      dots$newdata <- NULL
-    }
-  } else {
-    if (is.null(dots$exdat) && !is.null(dots$newdata)) {
-      dots$exdat <- .np_native_newdata_parts(
-        dots$newdata, list(exdat = object$bws$xnames), "predict.nplsqreg")$exdat
-      dots$newdata <- NULL
-    }
+    return(finish(out, empty.state$rows))
   }
 
   fit.args <- list(bws = object$reg.bws,
@@ -844,8 +858,8 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
   } else {
     fitted(tr)
   }
-  .npreg_finish_empty_rows(out, attr(tr, ".np.empty.rows", exact = TRUE),
-    defer = defer.empty, owner = "predict.nplsqreg", row.labels = row.names(tr$eval))
+  finish(out, attr(tr, ".np.empty.rows", exact = TRUE),
+         row.labels = row.names(tr$eval))
 }
 
 plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,

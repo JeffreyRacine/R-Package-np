@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Location-scale quantile prediction and retained-bandwidth refits now restore
+  omitted rows consistently, including standard errors and multi-quantile
+  residuals. Explicit replacement samples keep their own row positions.
+  Scalar numeric I(...) terms also work in location-scale quantile evaluation
+  and kernel-sum formula evaluation, as they do when fitting.
+
 * Formula regression, single-index and smooth-coefficient residuals now retain
   training-row ownership when an external evaluation grid has different missing
   rows. Smooth-coefficient coefficients and effects are restored alongside
