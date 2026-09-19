@@ -126,7 +126,8 @@ test_that("all canonical LP solve retries are bounded", {
   expect_gt(fallback.start, 0L)
   expect_gt(fallback.stop, fallback.start)
   fallback <- substr(reghat.r, fallback.start, fallback.stop - 1L)
-  expect_true(grepl("seq_len(128L)", fallback, fixed = TRUE))
+  # The R matrix route now borrows the canonical bounded native adjoint solve.
+  expect_true(grepl("C_np_lp_adjoint_prepared", fallback, fixed = TRUE))
   expect_true(grepl("non-finite system", fallback, fixed = TRUE))
   expect_false(grepl("repeat\\s*\\{", fallback))
 })

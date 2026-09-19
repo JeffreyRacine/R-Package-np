@@ -703,7 +703,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
       "                                                   &nn_geometry_context,\n",
       "                                                   ordinary_hc0_active ?\n",
       "                                                     &ordinary_hc0_context : NULL,\n",
-      "                                                   call->empty_rows, NULL, NULL, NULL);"
+      "                                                   call->empty_rows, NULL, NULL, NULL, NULL);"
     ),
     fixed = TRUE
   )
@@ -1522,7 +1522,7 @@ test_that("every beta side enters the common conditional regression owner", {
       "                                                                 row_nn_geometry_context_ptr,\n",
       "                                                                 NULL, empty_rows != NULL ? &row_empty : NULL, first_se_request,\n",
       "                                                                 variance_metadata != NULL ? &variance_one : NULL,\n",
-      "                                                                 &row_failure);"
+      "                                                                 &row_failure, &conditional_design);"
     ),
     fixed = TRUE
   )
@@ -1848,7 +1848,7 @@ test_that("centered moments have one activated fail-closed route boundary", {
   )
   expect_match(
     engine,
-    "&centered_moment_ctx,\n    0,\n    NULL);",
+    "&centered_moment_ctx,\n    0,\n    NULL,\n    NULL);",
     fixed = TRUE
   )
   expect_match(engine, "beta_point_request", fixed = TRUE)
