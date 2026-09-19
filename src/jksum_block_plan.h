@@ -14,6 +14,10 @@ typedef enum {
   NP_JKSUM_BLOCK_PLAN_CAPACITY = 3
 } NPJksumBlockPlanStatus;
 
+/* Value-only result: no buffers, borrowed pointers or communicator ownership.
+ * The planners clear this record before validation and allocate no storage.
+ * Consume dimensions only after NP_JKSUM_BLOCK_PLAN_OK; the caller owns buffer
+ * allocation, traversal and (where applicable) rank-symmetric communication. */
 typedef struct {
   int64_t x_width;
   int64_t x_alloc;
