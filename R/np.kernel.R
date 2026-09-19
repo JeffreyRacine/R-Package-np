@@ -21,6 +21,7 @@ npksum <-
 
 npksum.formula <-
   function(formula, data, newdata, subset, na.action, ...){
+    dots <- list(...)
     .npRmpi_require_active_slave_pool(where = "npksum()")
     if (.npRmpi_npksum_should_localize(NULL, list(...)) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
@@ -36,7 +37,9 @@ npksum.formula <-
     if (!missing(subset))
       mf.args[c("data", "subset")] <- .np_formula_subset_inputs(
         if (missing(data)) NULL else data, substitute(subset), parent.frame())
-    mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
+    if (!is.null(dots$weights)) mf.args$.np.auxiliary <- list(weights = dots$weights)
+    mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
+    if (!is.null(dots$weights)) dots$weights <- model.weights(mf)
     
     tydat <- model.response(mf)
     txdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
@@ -56,7 +59,7 @@ npksum.formula <-
     if (!miss.new)
       call_args$exdat <- exdat
 
-    tobj <- do.call(npksum, c(call_args, list(...)))
+    tobj <- do.call(npksum, c(call_args, dots))
 
     tobj$formula <- formula
     tobj$na.action <- attr(mf, "na.action")

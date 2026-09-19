@@ -305,7 +305,7 @@ npreg.formula <-
       if (y.eval)
         reg.args$eydat <- eydat
     }
-    ev <- do.call(npreg, c(reg.args, list(se = se), dots))
+    ev <- do.call(npreg, .np_args_with_defaults(c(reg.args, list(se = se)), dots))
     if (!is.null(ev$bws)) {
       preserve.bws.call <- inherits(bws, "rbandwidth") && !is.null(bws$call)
       bw.call <- mc[c(1, match(c("bws", "data", "subset", "na.action"),
@@ -385,9 +385,8 @@ npreg.formula <-
 
 npreg.call <-
   function(bws, ...) {
-    ev <- npreg(txdat = .np_eval_bws_call_arg(bws, "xdat"),
-                tydat = .np_eval_bws_call_arg(bws, "ydat"),
-                bws = bws, ...)
+    ev <- do.call(npreg, .np_retained_training_args(
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
     return(ev)

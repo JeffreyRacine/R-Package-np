@@ -66,7 +66,7 @@ npcdens.formula <-
       cd.args$eydat <- eydat
     }
     cd.args$bws <- bws
-    ev <- do.call(npcdens, c(cd.args, dots))
+    ev <- do.call(npcdens, .np_args_with_defaults(cd.args, dots))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
@@ -95,9 +95,8 @@ npcdens.formula <-
 
 npcdens.call <-
   function(bws, ...) {
-    npcdens(txdat = .np_eval_bws_call_arg(bws, "xdat"),
-            tydat = .np_eval_bws_call_arg(bws, "ydat"),
-            bws = bws, ...)
+    do.call(npcdens, .np_retained_training_args(
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
   }
 
 

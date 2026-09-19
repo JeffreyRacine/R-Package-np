@@ -105,6 +105,10 @@ the location-scale transformation.
     an optional strictly positive scale vector interpreted as the
     conditional standard deviation at the training observations. If
     omitted, a pilot scale is computed automatically.
+    In formula calls, a full-length vector follows the formula's time
+    alignment, \code{subset} and missing-value selection. A vector already
+    having the selected sample length remains accepted when that length
+    differs from the original sample length.
   }
 
   \item{regtype.pilot}{

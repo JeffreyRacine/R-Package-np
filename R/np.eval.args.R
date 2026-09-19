@@ -1,5 +1,15 @@
 # Native bandwidth-object fits share the evaluation roles already supported by
 # fitted-object predict methods. Do not consult a call or an ambient frame.
+.np_args_with_defaults <- function(defaults, explicit) {
+  c(defaults[!names(defaults) %in% names(explicit)], explicit)
+}
+
+.np_retained_training_args <- function(bws, roles, explicit) {
+  for (arg in setdiff(names(roles), names(explicit)))
+    explicit[arg] <- list(.np_eval_bws_call_arg(bws, roles[[arg]]))
+  .np_args_with_defaults(list(bws = bws), explicit)
+}
+
 .np_native_newdata_parts <- function(newdata, groups, where) {
   nd <- toFrame(newdata)
   if (length(groups) == 1L)

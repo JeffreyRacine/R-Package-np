@@ -1,5 +1,27 @@
 # npRmpi 0.80-1
 
+* Density/distribution hat and bootstrap adapters now preserve normalized
+  Li--Racine ordered kernels, including conditional response kernels.
+  This corrects affected ordered-factor operators, bootstrap intervals and
+  conditional local-polynomial contrast/higher-derivative uncertainty.
+  Raw regression and kernel-sum ordered-kernel conventions are unchanged.
+
+* Hat derivative selectors now validate orders before integer conversion
+  and honor named coordinates and explicit prediction overrides. Index hats
+  accept matrix responses consistently and retain singleton matrix dimensions.
+  Supported explicit hat ridges are retained when rebuilding an operator.
+
+* Fits reusing retained bandwidth data now give explicit replacement responses
+  precedence over retained defaults. Copula predictions preserve inversion
+  settings; conditional-mode predictions preserve the requested probability
+  projection. Copula joint and marginal calculations use a common named column
+  order and the actual replacement sample size.
+
+* Formula kernel-sum weights and location-scale regression scales now follow
+  the response/predictor subset, time alignment and missing-value selection.
+  Full-length auxiliary inputs refer to the original sample; unambiguously
+  preselected shorter inputs remain supported.
+
 * Native one-call fits pass their already evaluated training data to the
   bandwidth constructor. Side-effecting or random data expressions are no
   longer evaluated again for that handoff; fitting and retained bandwidth

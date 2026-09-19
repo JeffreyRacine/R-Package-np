@@ -81,6 +81,10 @@ evaluation points for the generalized product kernel sum.
   \item{weights}{
     a \eqn{n} by \eqn{q}  matrix of weights which can optionally be
     applied to \code{tydat} in the sum. See details.
+    In formula calls, full-length weights follow the same time alignment,
+    \code{subset} and missing-value selection as the formula variables.
+    Weights already having the selected sample length are also accepted when
+    that length differs from the original sample length.
   }
   
 \subsection{Kernel-Sum Operators And Output}{

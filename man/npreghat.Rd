@@ -89,7 +89,12 @@ These arguments control local-polynomial basis, degree, derivatives, leave-one-o
   \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves. Wider systems restore the response intercept from the signed pristine Gram intercept.}
 
 
-  \item{s}{Derivative multi-index over continuous predictors.}
+  \item{s}{Derivative multi-index over continuous predictors, with finite
+  non-negative integer entries. A named vector selects predictors by their
+  continuous-variable names; omitted coordinates have order zero. An unnamed
+  scalar selects the first continuous predictor. Unknown or duplicated names
+  are errors. Explicit \code{s} takes precedence over the \code{deriv} alias;
+  an explicit \code{deriv} in prediction overrides the retained selector.}
 
 
 \subsection{Method Objects}{

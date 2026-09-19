@@ -1287,6 +1287,7 @@ nplsqregbw <-
 
 nplsqregbw.formula <-
   function(bws, data = NULL, tau = 0.5, subset, na.action, ...) {
+    dots <- list(...)
     .npRmpi_require_active_slave_pool(where = "nplsqregbw()")
 
     tt <- .np_formula_aligned_terms(terms(bws))
@@ -1301,11 +1302,13 @@ nplsqregbw.formula <-
     if (!missing(data) && !is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    mf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    if (!is.null(dots$scale)) mf.args$.np.auxiliary <- list(scale = dots$scale)
+    mf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
+    if (!is.null(dots$scale)) dots$scale <- mf[["(scale)"]]
     train.omit <- attr(mf, "na.action")
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
-    out <- nplsqregbw(xdat = xdat, ydat = ydat, tau = tau, ...)
+    out <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = tau), dots))
     out <- .nplsqreg_record_omit(out, attr(mf, "na.action"))
     out$formula <- bws
     out <- .nplsqreg_set_response_name(
@@ -1818,7 +1821,9 @@ nplsqreg.formula <-
     if (!missing(data) && !is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    mf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    if (!is.null(dots$scale)) mf.args$.np.auxiliary <- list(scale = dots$scale)
+    mf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
+    if (!is.null(dots$scale)) dots$scale <- mf[["(scale)"]]
     train.omit <- attr(mf, "na.action")
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]

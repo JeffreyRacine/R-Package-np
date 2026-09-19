@@ -90,7 +90,7 @@ npscoef.formula <-
         sc.args$ezdat <- ezdat
     }
     sc.args$bws <- bws
-    ev <- do.call(npscoef, c(sc.args, list(se = se), dots))
+    ev <- do.call(npscoef, .np_args_with_defaults(c(sc.args, list(se = se)), dots))
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
       if (!is.null(ev$bws))
@@ -112,14 +112,10 @@ npscoef.formula <-
 
 npscoef.call <-
   function(bws, ...) {
-    call.args <- list(
-      txdat = .np_eval_bws_call_arg(bws, "xdat"),
-      tydat = .np_eval_bws_call_arg(bws, "ydat")
-    )
+    roles <- c(txdat = "xdat", tydat = "ydat")
     if (!is.null(bws$zdati))
-      call.args$tzdat <- .np_eval_bws_call_arg(bws, "zdat")
-    call.args$bws <- bws
-    do.call(npscoef, c(call.args, list(...)))
+      roles <- c(roles, tzdat = "zdat")
+    do.call(npscoef, .np_retained_training_args(bws, roles, list(...)))
   }
 
 .np_scoef_fit_progress_begin <- function(handoff = FALSE, detail = NULL) {

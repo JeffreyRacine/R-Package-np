@@ -45,9 +45,6 @@ npreghat <-
 }
 
 .npreghat_resolve_s <- function(s, deriv, ncon, con.names) {
-  if (ncon == 0L)
-    return(integer(0))
-
   if (is.null(s)) {
     if (is.null(deriv)) {
       s <- integer(ncon)
@@ -56,23 +53,26 @@ npreghat <-
     }
   }
 
-  if (length(s) == 1L)
-    s <- c(as.integer(s), rep.int(0L, ncon - 1L))
+  if (!is.numeric(s) || anyNA(s) || any(!is.finite(s)) ||
+      any(s < 0 | s > .Machine$integer.max) || any(s != floor(s)))
+    stop("argument 's' must be a non-negative integer vector")
 
   if (!is.null(names(s))) {
+    if (anyNA(names(s)) || any(!nzchar(names(s))) || anyDuplicated(names(s)) ||
+        any(!names(s) %in% con.names))
+      stop("names of 's' must uniquely identify continuous predictors")
     sout <- integer(ncon)
     names(sout) <- con.names
-    keep <- intersect(names(s), con.names)
-    if (length(keep))
-      sout[keep] <- as.integer(s[keep])
+    sout[names(s)] <- s
     s <- sout
+  } else if (ncon == 0L && !any(s > 0L)) {
+    s <- integer(0)
+  } else if (length(s) == 1L && ncon > 0L) {
+    s <- c(s, rep.int(0L, ncon - 1L))
   }
 
   if (length(s) != ncon)
     stop("argument 's' must have length equal to the number of continuous predictors")
-
-  if (anyNA(s) || any(s < 0) || any(s != as.integer(s)))
-    stop("argument 's' must be a non-negative integer vector")
 
   as.integer(s)
 }
@@ -1948,19 +1948,15 @@ npreghat.formula <-
     if (has.eval)
       hat.args$exdat <- exdat
 
-    ev <- do.call(npreghat, c(hat.args, list(...)))
+    ev <- do.call(npreghat, .np_args_with_defaults(hat.args, list(...)))
     attr(ev, "call") <- match.call(expand.dots = FALSE)
     ev
   }
 
 npreghat.call <-
   function(bws, ...) {
-    ev <- npreghat(
-      txdat = .np_eval_bws_call_arg(bws, "xdat"),
-      y = .np_eval_bws_call_arg(bws, "ydat"),
-      bws = bws,
-      ...
-    )
+    ev <- do.call(npreghat, .np_retained_training_args(
+      bws, c(txdat = "xdat", y = "ydat"), list(...)))
     attr(ev, "call") <- match.call(expand.dots = FALSE)
     ev
   }
@@ -2506,6 +2502,7 @@ npreghat.rbandwidth <-
       attr(H, "s") <- s
       attr(H, "leave.one.out") <- leave.one.out
       attr(H, "ridge.used") <- ridge.used
+      attr(H, "ridge") <- ridge
       attr(H, "rows.omit") <- rows.omit
       attr(H, "call") <- match.call(expand.dots = FALSE)
 
@@ -2636,6 +2633,7 @@ npreghat.rbandwidth <-
     attr(H, "s") <- s
     attr(H, "leave.one.out") <- leave.one.out
     attr(H, "ridge.used") <- ridge.used
+    attr(H, "ridge") <- ridge
     attr(H, "rows.omit") <- rows.omit
     attr(H, "call") <- match.call(expand.dots = FALSE)
 
@@ -2701,6 +2699,8 @@ predict.npreghat <-
     }
 
     leave.one.out <- if (is.null(leave.one.out)) FALSE else leave.one.out
+    if (missing(s) && !is.null(deriv))
+      s <- NULL
     call.args <- list(
       bws = bws,
       txdat = txdat,
@@ -2711,11 +2711,12 @@ predict.npreghat <-
       degree = attr(object, "degree"),
       basis = attr(object, "basis"),
       bernstein.basis = attr(object, "bernstein.basis"),
+      ridge = if (is.null(attr(object, "ridge", exact = TRUE))) 0 else attr(object, "ridge", exact = TRUE),
       leave.one.out = leave.one.out
     )
     if (!is.null(newdata) || !isTRUE(leave.one.out))
       call.args$exdat <- if (is.null(newdata)) attr(object, "exdat") else newdata
-    do.call(npreghat, c(call.args, dots))
+    do.call(npreghat, .np_args_with_defaults(call.args, dots))
   }
 
 print.npreghat <- function(x, ...) {

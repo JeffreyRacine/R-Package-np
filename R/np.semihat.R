@@ -682,8 +682,7 @@
         numeric(nrow(idx.eval))
       )
 
-      if (is.null(dim(out)))
-        return(as.vector(out))
+      dim(out) <- c(nrow(idx.eval), ncol(y))
       if (ncol(out) == 1L)
         return(as.vector(out[, 1L]))
       return(out)
@@ -1045,9 +1044,9 @@ npindexhat <-
     .np_semihat_require_class(bws, "sibandwidth", "npindexhat")
     if (is.null(y) && constraint.output)
       stop("argument 'y' is required when output='constraint'")
-    s <- as.integer(s)
-    if (length(s) != 1L || is.na(s) || !(s %in% c(0L, 1L)))
+    if (!is.numeric(s) || length(s) != 1L || is.na(s) || !(s %in% c(0L, 1L)))
       stop("argument 's' must be 0 (fit) or 1 (index derivative)")
+    s <- as.integer(s)
     if (!is.null(fd.step)) {
       fd.step <- as.double(fd.step)
       if (length(fd.step) != 1L || is.na(fd.step) || !is.finite(fd.step) || fd.step <= 0)

@@ -132,7 +132,7 @@
 
 .np_formula_model_frame <- function(formula, data = NULL, subset, na.action,
                                     drop.unused.levels = FALSE, xlev = NULL, ...,
-                                    .np.capture = NULL) {
+                                    .np.capture = NULL, .np.auxiliary = list()) {
   if (!is.data.frame(data) && !is.environment(data) && !is.null(attr(data, "class")))
     data <- as.data.frame(data)
   tt <- if (inherits(formula, "terms")) formula else terms(formula, data = data)
@@ -145,12 +145,21 @@
     for (i in seq_along(values))
       prediction[[i + 1L]] <- stats::makepredictcall(values[[i]], variables[[i + 1L]])
   }
-  attr(tt, "predvars") <- .np_formula_align_values(values)
+  # Observation-level auxiliaries share the formula's time intersection,
+  # subset and NA action. They are model-frame extras, never predictors.
+  aligned <- .np_formula_align_values(c(values, .np.auxiliary))
+  attr(tt, "predvars") <- aligned[seq_along(values)]
+  auxiliary <- aligned[length(values) + seq_along(.np.auxiliary)]
+  selected <- if (length(auxiliary))
+    vapply(auxiliary, NROW, integer(1L)) != NROW(aligned[[1L]]) else logical()
   frame.call <- match.call()
   frame.call[[1L]] <- quote(stats::model.frame)
   frame.call[["formula"]] <- tt
   frame.call["data"] <- list(data)
   frame.call$.np.capture <- NULL
+  frame.call$.np.auxiliary <- NULL
+  if (length(auxiliary))
+    frame.call[names(auxiliary)[!selected]] <- auxiliary[!selected]
   if (!is.null(.np.capture)) {
     # Freeze the resolved policy, not its caller-side expression. Force the
     # promise once, and let model.frame invoke the policy exactly once.
@@ -165,6 +174,15 @@
     frame.call["na.action"] <- list(policy)
   }
   frame <- eval(frame.call, parent.frame())
+  # Preserve unambiguously preselected legacy auxiliaries. Full-length inputs
+  # always belong to the original sample, even when subset only reorders it.
+  for (name in names(auxiliary)[selected]) {
+    value <- auxiliary[[name]]
+    if (NROW(value) != nrow(frame))
+      stop(sprintf("'%s' must match the original or selected formula sample", name),
+           call. = FALSE)
+    frame[[paste0("(", name, ")")]] <- value
+  }
   retained <- attr(frame, "terms")
   attr(retained, "predvars") <- prediction
   attr(frame, "terms") <- retained

@@ -673,6 +673,7 @@ npconmode.conbandwidth <-
       proper.requested = proper.out$proper.requested,
       proper.applied = proper.out$proper.applied,
       proper.info = proper.out$proper.info,
+      proper.control = proper.control,
       se = se,
       gradients = gradients
     )
