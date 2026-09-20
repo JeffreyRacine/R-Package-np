@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Beta nearest-neighbour regression CVLS and density CVML use neighbourhoods
+  with the held-out occurrence excluded. Unconditional density CVLS applies
+  the same correction to its cross term while retaining the full-sample
+  integrated squared density. Fixed-bandwidth calculations are unchanged.
+
 * Conditional properization no longer treats LC/degree-zero fitting alone
   as a guarantee of a proper density or CDF. The shortcut also checks kernel
   positivity, response normalization and nearest-neighbour orientation.
