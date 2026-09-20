@@ -345,6 +345,14 @@ prediction/evaluation route, or plot route as appropriate.
          {\hat f(\hat q_\tau(x)|x)} .
   }
 
+  This is a plug-in estimate of the population implicit-CDF identity, using
+  the selected density in the denominator. It is not in general the exact
+  derivative of the fitted finite-smoothing quantile curve. In particular,
+  bounded and beta response kernels use observation-centred CDFs and
+  target-centred densities, so numerical differentiation of the fitted
+  quantiles need not reproduce the reported plug-in gradients. The same
+  selected-density convention is used for the delta-method standard errors.
+
   For categorical conditioning variables in positive-degree local-polynomial
   fits (including local-linear fits), first-difference standard errors retain
   the paired covariance between the two category endpoints. Each endpoint uses
