@@ -497,6 +497,8 @@ npplreg.plbandwidth <-
 
     txdat = toFrame(txdat)
     tzdat = toFrame(tzdat)
+    .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
+    .np_require_paired_rows(txdat, tzdat, "txdat", "tzdat")
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat, zdat = tzdat)
     
     ## catch and destroy NA's, part 1
@@ -526,6 +528,9 @@ npplreg.plbandwidth <-
     if (!no.exz){
       exdat = toFrame(exdat)
       ezdat = toFrame(ezdat)
+      .np_require_paired_rows(exdat, ezdat, "exdat", "ezdat")
+      if (!no.ey)
+        .np_require_paired_rows(exdat, eydat, "exdat", "eydat")
       exdat.full <- exdat
       ezdat.full <- ezdat
 

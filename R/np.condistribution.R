@@ -149,11 +149,13 @@ npcdist.condbandwidth <-
 
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
+    .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
     if (!no.exy){
       exdat = toFrame(exdat)
       eydat = toFrame(eydat)
+      .np_require_paired_rows(exdat, eydat, "exdat", "eydat")
 
       if (! txdat %~% exdat )
         stop("'txdat' and 'exdat' are not similar data frames!")

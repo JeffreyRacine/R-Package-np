@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Retained-bandwidth conditional, single-index, partially linear and
+  smooth-coefficient fits reject mismatched paired data rows before recycling
+  can alter the sample.
+
 * Uniform native quadrature grids retain the exact supplied support endpoints,
   preventing roundoff from dropping a bounded-kernel endpoint contribution in
   conditional and unconditional density cross-validation.

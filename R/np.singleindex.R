@@ -505,6 +505,8 @@ npindex.sibandwidth <-
     if (!(is.vector(tydat) || is.factor(tydat)))
       stop("'tydat' must be a vector or a factor")
 
+    .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
+
     tydat =
       if (is.factor(tydat))
         as.numeric(levels(tydat))[as.integer(tydat)]

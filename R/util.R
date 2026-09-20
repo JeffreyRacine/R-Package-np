@@ -3135,6 +3135,13 @@ coarseclass <- function(a) {
 
 # Return omissions in the current input, not historical indices left by an
 # earlier na.omit/na.exclude call. Do not alter the caller's restoration map.
+.np_require_paired_rows <- function(a, b, a.name, b.name) {
+  if (NROW(a) != NROW(b))
+    stop(sprintf("'%s' and '%s' must have the same number of rows", a.name, b.name),
+         call. = FALSE)
+  invisible(NULL)
+}
+
 .np_current_rows_omit <- function(frame) {
   if (!is.null(attr(frame, "na.action", exact = TRUE)))
     attr(frame, "na.action") <- NULL

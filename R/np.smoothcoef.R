@@ -369,6 +369,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (!miss.z)
       tzdat <- toFrame(tzdat)
 
+    .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
+    if (!miss.z)
+      .np_require_paired_rows(txdat, tzdat, "txdat", "tzdat")
+
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat,
       zdat = if (miss.z) NULL else tzdat)
 
@@ -377,6 +381,9 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
 
       if (!miss.z)
         ezdat <- toFrame(ezdat)
+
+      if (!miss.z)
+        .np_require_paired_rows(exdat, ezdat, "exdat", "ezdat")
 
       if (! txdat %~% exdat )
         stop("'txdat' and 'exdat' are not similar data frames!")
