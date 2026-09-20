@@ -3135,6 +3135,17 @@ coarseclass <- function(a) {
 
 # Return omissions in the current input, not historical indices left by an
 # earlier na.omit/na.exclude call. Do not alter the caller's restoration map.
+.np_formula_output_action <- function(object, frame, formula.eval) {
+  if (formula.eval || isTRUE(object[["trainiseval", exact = TRUE]]))
+    return(attr(frame, "na.action", exact = TRUE))
+  # External native rows belong to the native owner, never the training frame.
+  # Its established policy omits incomplete rows; do not inherit na.exclude.
+  omitted <- object[["eval.rows.omit", exact = TRUE]]
+  if (!length(omitted) || (length(omitted) == 1L && is.na(omitted)))
+    return(NULL)
+  structure(as.integer(omitted), class = "omit")
+}
+
 .np_require_paired_rows <- function(a, b, a.name, b.name) {
   if (NROW(a) != NROW(b))
     stop(sprintf("'%s' and '%s' must have the same number of rows", a.name, b.name),

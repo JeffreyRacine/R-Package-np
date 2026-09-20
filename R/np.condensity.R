@@ -55,7 +55,7 @@ npcdens.formula <-
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
 
-    has.eval <- !is.null(newdata)
+    has.eval <- !is.null(newdata) && !any(c("exdat", "eydat") %in% names(dots))
     if (has.eval) {
       npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
@@ -74,11 +74,11 @@ npcdens.formula <-
     cd.args$bws <- bws
     ev <- do.call(npcdens, c(cd.args, dots))
 
-    ev$omit <- attr(umf,"na.action")
+    ev$omit <- .np_formula_output_action(ev, umf, has.eval)
     ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
     train.omit <- as.vector(attr(tmf, "na.action"))
-    eval.omit <- if (has.eval) as.vector(attr(umf, "na.action")) else integer(0)
+    eval.omit <- if (isTRUE(ev$trainiseval)) integer(0) else as.vector(ev$omit)
     ev$train.rows.omit <- if (length(train.omit)) train.omit else NA
     ev$train.nobs.omit <- length(train.omit)
     ev$eval.rows.omit <- if (length(eval.omit)) eval.omit else NA

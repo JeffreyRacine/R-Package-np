@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Formula fits with native evaluation data no longer restore training
+  exclusions into an unrelated evaluation grid. Native evaluation arguments
+  consistently take precedence over formula newdata in these routes.
+
 * Smooth-coefficient and partially linear fits honor separately supplied
   evaluation Z data when evaluation X defaults to the training data, and
   validate the paired evaluation row counts.

@@ -62,7 +62,7 @@ npscoef.formula <-
     if (!miss.z)
       tzdat <- tmf[, .np_formula_term_names(bws$chromoly[[3]]), drop = FALSE]
 
-    has.eval <- !is.null(newdata)
+    has.eval <- !is.null(newdata) && !any(c("exdat", "ezdat") %in% names(dots))
     if (has.eval) {
       if (!y.eval){
         npValidateNewdataFormula(newdata, tt, include.response = FALSE)
@@ -103,7 +103,7 @@ npscoef.formula <-
         ev$bws$ynames <- response.name
     }
 
-    ev$omit <- attr(umf,"na.action")
+    ev$omit <- .np_formula_output_action(ev, umf, has.eval)
     ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
 
@@ -1314,6 +1314,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (!(miss.ey && !miss.ex))
       sc.obj.args$xtra <- c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
     ev <- do.call(smoothcoefficient, sc.obj.args)
+    ev$eval.rows.omit <- if (miss.ex) integer(0) else which(!keep.eval)
     # Replay only fitting controls, never calls, caller frames or training data.
     ev$fit.controls <- list(iterate = iterate, maxiter = maxiter, tol = tol,
                             leave.one.out = leave.one.out)
