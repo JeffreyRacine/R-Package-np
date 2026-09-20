@@ -150,6 +150,9 @@ These arguments control where the partially linear regression is evaluated and w
     a \eqn{q}-variate data frame of points on which the regression will
     be estimated (evaluation data).  By default,
     evaluation takes place on the data provided by \code{tzdat}.
+    Supplying only \code{ezdat} uses the original training \code{txdat}
+    for the linear evaluation role. The two evaluation roles must have the
+    same row count before omitting missing rows.
   }
 
 

@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Smooth-coefficient and partially linear fits honor separately supplied
+  evaluation Z data when evaluation X defaults to the training data, and
+  validate the paired evaluation row counts.
+
 * Explicit evaluation responses at training locations follow the training-row
   omission mask. Single-index fits no longer overwrite those supplied
   responses when calculating goodness-of-fit statistics.

@@ -352,6 +352,12 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       if (!is.null(native.eval$ezdat)) ezdat <- native.eval$ezdat
     }
 
+    explicit.ez <- !missing(ezdat)
+    if (missing(exdat) && explicit.ez)
+      exdat <- txdat
+    if (!missing(exdat) && missing(ezdat) && !miss.z)
+      ezdat <- tzdat
+    eval.z <- !miss.z || explicit.ez
     miss.ex = missing(exdat)
     miss.ey = missing(eydat)
 
@@ -379,10 +385,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (!miss.ex){
       exdat <- toFrame(exdat)
 
-      if (!miss.z)
+      if (eval.z)
         ezdat <- toFrame(ezdat)
 
-      if (!miss.z)
+      if (eval.z)
         .np_require_paired_rows(exdat, ezdat, "exdat", "ezdat")
 
       if (! txdat %~% exdat )
@@ -427,7 +433,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       eval.df <- data.frame(exdat)
       if (!miss.ey)
         eval.df <- data.frame(eval.df, eydat)
-      if (!miss.z)
+      if (eval.z)
         eval.df <- data.frame(eval.df, ezdat)
       rows.omit <- attr(na.omit(eval.df), "na.action")
       if (length(rows.omit) > 0L)
@@ -436,7 +442,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       exdat <- exdat[keep.eval,,drop = FALSE]
       if (!miss.ey)
         eydat <- eydat[keep.eval]
-      if (!miss.z)
+      if (eval.z)
         ezdat <- ezdat[keep.eval,, drop = FALSE]
 
       if (!any(keep.eval))
@@ -473,8 +479,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
 
     if (!miss.ex){
       exdat <- adjustLevels(exdat, bws$xdati)
-      if (!miss.z)
-        ezdat <- adjustLevels(ezdat, bws$zdati)
+      if (eval.z)
+        ezdat <- adjustLevels(ezdat, if (miss.z) bws$xdati else bws$zdati)
     }
 
     ## grab the evaluation data before it is converted to numeric
@@ -484,7 +490,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         teval <- list(exdat = txdat, ezdat = tzdat)
     } else {
       teval <- exdat
-      if (!miss.z)
+      if (eval.z)
         teval <- list(exdat = exdat, ezdat = ezdat)
     }
 
@@ -499,8 +505,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
 
     if (miss.z){
       tzdat <- txdat
-      if (!miss.ex)
+      if (!miss.ex && !explicit.ez)
         ezdat <- exdat
+      else if (!miss.ex)
+        ezdat <- toMatrix(ezdat)
     }
     ## from this point on txdat and exdat have been recast as matrices
     ## construct 'W' matrix
