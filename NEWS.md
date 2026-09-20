@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Uniform native quadrature grids retain the exact supplied support endpoints,
+  preventing roundoff from dropping a bounded-kernel endpoint contribution in
+  conditional and unconditional density cross-validation.
+
 * Mixed categorical/beta density and distribution operators now pass the
   categorical-compression option to their shared native kernel-sum owner.
 

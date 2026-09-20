@@ -37163,6 +37163,9 @@ static void np_fill_trapezoid_rule(double a,
     grid[i] = a + ((double)i)*step;
     weights[i] = step;
   }
+  /* Fused multiply-add may put the computed endpoint outside support. */
+  grid[0] = a;
+  grid[n - 1] = b;
   weights[0] *= 0.5;
   weights[n - 1] *= 0.5;
 }
