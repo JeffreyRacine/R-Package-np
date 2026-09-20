@@ -99,6 +99,9 @@ npuniden.sc <- function(X=NULL,
     if(h <= 0) stop("bandwidth h must be positive")
     if(num.grid < 0) stop("num.grid must be a non-negative integer")
     if(constraint=="density" && is.null(lb) && is.null(ub)) stop("you must provide lower and/or upper bounds when constraining the density")
+    if ((!is.null(lb) && (!is.numeric(lb) || length(lb) != 1L)) ||
+        (!is.null(ub) && (!is.numeric(ub) || length(ub) != 1L)))
+        stop("density bounds must be numeric scalars")
     if(!is.null(lb) && anyNA(lb)) stop("lower bound must not contain missing values")
     if(!is.null(lb) && any(lb<0, na.rm = TRUE)) stop("lower bound must be non-negative")
     if(!is.null(ub) && anyNA(ub)) stop("upper bound must not contain missing values")
@@ -194,8 +197,17 @@ npuniden.sc <- function(X=NULL,
             bvec <- c(0,-f,-sign.deriv*f.deriv)
         } else {
             ## Constrain the density
-            Amat <- cbind(rep(1,n.train),A,-A)
-            bvec <- c(0,lb-f,f-ub)
+            Amat <- matrix(1, n.train, 1L)
+            bvec <- 0
+            if (!is.null(lb)) {
+                Amat <- cbind(Amat, A)
+                bvec <- c(bvec, lb-f)
+            }
+            # An infinite upper bound is nonbinding, not an infinite QP RHS.
+            if (!is.null(ub) && is.finite(ub)) {
+                Amat <- cbind(Amat, -A)
+                bvec <- c(bvec, f-ub)
+            }
         }
         output.QP <- tryCatch(solve.QP(Dmat=Dmat,
                                        dvec=dvec,

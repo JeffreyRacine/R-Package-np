@@ -66,12 +66,13 @@ These arguments set optional lower and upper density bounds used with \code{cons
 }
 
 \item{lb}{
-  a scalar lower bound (\eqn{\ge 0}) to be used in conjunction with
+  an optional scalar lower bound (\eqn{\ge 0}) to be used in conjunction with
   \code{constraint="density"}
 }
 
 \item{ub}{
-  a scalar upper bound (\eqn{\ge 0} and \eqn{\ge} \code{lb}) to be used
+  an optional scalar upper bound (\eqn{\ge 0} and, when supplied,
+  \eqn{\ge} \code{lb}) to be used
   in conjunction with \code{constraint="density"}
 }
 

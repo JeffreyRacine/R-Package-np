@@ -29,3 +29,19 @@ test_that("univariate uncertainty uses training sample size", {
     expect_equal(some$sd.f,all$sd.f[c(2,15,30)],tolerance=0)
   }
 })
+
+test_that("one-sided density constraints build conformable quadratic programs", {
+  skip_on_cran()
+  owns.pool <- !.mpi_pool_active()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  if (owns.pool) on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  X <- seq(.05,.95,length.out=12)
+  for (bounds in list(list(lb=0),list(ub=10),list(lb=0,ub=10),list(lb=0,ub=Inf),
+                      list(lb=.9),list(ub=1.1))) {
+    fit <- do.call(npuniden.sc,c(list(X=X,Y=X,h=.25),bounds))
+    expect_true(fit$solve.QP)
+    if (!is.null(bounds$lb)) expect_gte(min(fit$f.sc)+1e-10,bounds$lb)
+    if (!is.null(bounds$ub)) expect_lte(max(fit$f.sc)-1e-10,bounds$ub)
+  }
+  expect_error(npuniden.sc(X,h=.25,lb=c(0,.1)),"numeric scalars")
+})
