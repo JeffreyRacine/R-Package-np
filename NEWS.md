@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Conditional density/distribution properization groups conditioning rows by
+  exact identity, avoiding merged slices after large coordinate translations
+  or numeric factor-label rounding.
+
 * Categorical recoding and declared-support reconstruction preserve valid
   factor levels labelled NA without converting them to missing observations.
   Actual missing factor codes remain missing.

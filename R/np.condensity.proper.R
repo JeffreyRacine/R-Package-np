@@ -197,11 +197,9 @@
 }
 
 .np_condens_numeric_equal <- function(a, b, tol) {
-  if (anyNA(c(a, b)))
-    return(isTRUE(all.equal(a, b, tolerance = 0, check.attributes = FALSE)))
-  if (!is.finite(a) || !is.finite(b))
-    return(identical(a, b))
-  abs(a - b) <= tol + tol * max(abs(a), abs(b), 1)
+  # Conditioning identity is exact, not a numerical convergence criterion.
+  # An arbitrary coordinate origin must not merge distinct model slices.
+  identical(a, b)
 }
 
 .np_condens_x_rows_match <- function(xeval, i, j, tol) {
