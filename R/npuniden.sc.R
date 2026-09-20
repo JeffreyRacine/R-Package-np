@@ -249,8 +249,8 @@ npuniden.sc <- function(X=NULL,
         index <- seq_along(Y)
     }
 
-    se.f <- sqrt(abs(f*int.kernel.squared(X.grid,h,a,b)/(h*length(f))))[index]
-    se.f.sc <- sqrt(abs(f.sc*int.kernel.squared(X.grid,h,a,b)/(h*length(f.sc))))[index]    
+    se.f <- sqrt(abs(f*int.kernel.squared(X.grid,h,a,b)/(h*n.train)))[index]
+    se.f.sc <- sqrt(abs(f.sc*int.kernel.squared(X.grid,h,a,b)/(h*n.train)))[index]
 
     F <- integrate.trapezoidal(X.grid[index],f[index])
     F.sc <- integrate.trapezoidal(X.grid[index],f.sc[index])
@@ -269,8 +269,8 @@ npuniden.sc <- function(X=NULL,
                 f.sc.deriv=f.sc.deriv,
                 F=F,
                 F.sc=F.sc,
-                se.F=sqrt(abs(F*(1-F)/length(F))),
-                se.F.sc=sqrt(abs(F.sc*(1-F.sc)/length(F.sc))),                
+                se.F=sqrt(abs(F*(1-F)/n.train)),
+                se.F.sc=sqrt(abs(F.sc*(1-F.sc)/n.train)),
                 f.integral=int.f,
                 f.sc.integral=int.f.sc,
                 solve.QP=solve.QP.flag,

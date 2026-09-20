@@ -322,8 +322,8 @@ npuniden.boundary <- function(X=NULL,
         F <- Fhat(Y,f,a,b,proper=proper)
         return(list(f=f,
                     F=F,
-                    sd.f=sqrt(abs(f*int.kernel.squared(Y,h,a,b)/(h*length(f)))),
-                    sd.F=sqrt(abs(F*(1-F)/length(F))),
+                    sd.f=sqrt(abs(f*int.kernel.squared(Y,h,a,b)/(h*length(X)))),
+                    sd.F=sqrt(abs(F*(1-F)/length(X))),
                     h=h))
     } else {
         ## Search bandwidth
@@ -332,8 +332,8 @@ npuniden.boundary <- function(X=NULL,
         F <- Fhat(Y,f,a,b,proper=proper)
         return(list(f=f,
                     F=F,
-                    sd.f=sqrt(abs(f*int.kernel.squared(Y,h.opt,a,b)/(h.opt*length(f)))),
-                    sd.F=sqrt(abs(F*(1-F)/length(F))),
+                    sd.f=sqrt(abs(f*int.kernel.squared(Y,h.opt,a,b)/(h.opt*length(X)))),
+                    sd.F=sqrt(abs(F*(1-F)/length(X))),
                     h=h.opt,
                     nmulti=nmulti,
                     cv.opt=cv.opt))

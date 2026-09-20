@@ -59,6 +59,9 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
 
 }
 \details{
+  Reported standard errors use the number of training observations in
+  \code{X}, not the number of requested evaluation points.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
   Typical usages are (see below for a complete list of options and also
