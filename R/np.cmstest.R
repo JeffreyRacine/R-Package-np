@@ -11,6 +11,14 @@
 # Model methods restore excluded rows for user display. Kernel statistics and
 # bootstrap refits instead share the model's compact design/response sample.
 .np_cms_compact_model <- function(model, xdat, ydat) {
+  # Weighted rq retains a weighted x/y pair, but raw residuals/fitted values.
+  # Its retained frame owns the raw sample (division by weights loses zero rows).
+  if (inherits(model, "rq") && length(model[["weights", exact = TRUE]])) {
+    frame <- model[["model", exact = TRUE]]
+    model[["y"]] <- model.response(frame)
+    model[["x"]] <- model.matrix(model[["terms", exact = TRUE]], frame,
+                                contrasts.arg = model[["contrasts", exact = TRUE]])
+  }
   n <- nrow(xdat)
   if (NROW(model[["x", exact = TRUE]]) != n ||
       length(model[["y", exact = TRUE]]) != n || length(ydat) != n ||
@@ -25,6 +33,22 @@
     stop("model residuals and fitted values must match its retained compact sample",
          call. = FALSE)
   model
+}
+
+# One refit owner for serial and collective bootstrap callers. GLM working
+# weights are not observation weights; only its retained prior weights apply.
+.np_cms_refit_residuals <- function(model, y.star, tau = NULL) {
+  if (!is.null(tau))
+    return(residuals(rq(y.star ~ model$x - 1, tau = tau,
+                        weights = model[["weights", exact = TRUE]]),
+                     type = "response"))
+  family <- model[["family", exact = TRUE]]
+  weights <- if (is.null(family)) model[["weights", exact = TRUE]] else
+    model[["prior.weights", exact = TRUE]]
+  residuals(glm(y.star ~ model$x - 1,
+                family = if (is.null(family)) gaussian() else family,
+                weights = weights, offset = model[["offset", exact = TRUE]]),
+            type = "response")
 }
 
 .np_cms_bootstrap_chunk_size <- function(n,
@@ -263,11 +287,7 @@ npcmstest <- function(formula,
 
     y.star <- yhat + model.resid * draw.wild.mult(length(model.resid), a, b, P.a)
     resid <-
-      if(is.null(model$family)) {
-        residuals(glm(y.star~ model$x - 1), type = "response")
-      } else {
-        residuals(glm(y.star~ model$x - 1,family=model$family), type = "response")
-      }
+      .np_cms_refit_residuals(model, y.star)
     
     resid
   }
@@ -285,11 +305,7 @@ npcmstest <- function(formula,
 
     y.star <- yhat + model.resid * draw.wild.mult(length(model.resid), a, b, P.a)
     resid <-
-      if(is.null(model$family)) {
-        residuals(glm(y.star~ model$x - 1), type = "response")
-      } else {
-        residuals(glm(y.star~ model$x - 1,family=model$family), type = "response")
-      }
+      .np_cms_refit_residuals(model, y.star)
     
     resid
   }
@@ -298,11 +314,7 @@ npcmstest <- function(formula,
 
     y.star <- yhat + model.resid[sample.int(length(model.resid), replace = TRUE)]
     resid <-
-      if(is.null(model$family)) {
-        residuals(glm(y.star~ model$x - 1), type = "response")
-      } else {
-        residuals(glm(y.star~ model$x - 1,family=model$family), type = "response")
-      }
+      .np_cms_refit_residuals(model, y.star)
     
     resid
   }

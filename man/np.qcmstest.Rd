@@ -26,6 +26,10 @@ with Mixed Data Types }
   and bootstrap statistics. Manual bandwidth inputs and selection controls are
   not forwarded a second time as kernel-sum arguments.
 
+  Bootstrap refits preserve the model's observation weights. Weighted quantile
+  models supply their raw design and response through the retained model frame;
+  zero observation weights need not be inverted.
+
   Model residuals, fitted values, response and design use the model's compact
   complete-observation sample, including when it was fitted with
   \code{na.exclude}. The supplied test data must represent those same complete
