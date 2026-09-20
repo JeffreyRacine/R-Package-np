@@ -19,7 +19,13 @@ npqcmstest <- function(formula,
 
   .np_cms_validate_model(model, quantile = TRUE)
 
-  if(tau <=0 || tau >=1) stop("tau must lie in (0,1)")
+  if (!is.numeric(tau) || length(tau) != 1L || !is.finite(tau) ||
+      tau <= 0 || tau >= 1)
+    stop("tau must be a finite scalar in (0,1)")
+  model.tau <- model[["tau", exact = TRUE]]
+  if (!is.numeric(model.tau) || length(model.tau) != 1L ||
+      !is.finite(model.tau) || tau != model.tau)
+    stop("tau must match the single quantile fitted by model")
 
   if(B < 9) stop("number of bootstrap replications must be >= 9")
 
@@ -40,7 +46,7 @@ npqcmstest <- function(formula,
     ydat <- model.response(mf)
     xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]
 
-    na.index <- unclass(attr(xdat,"na.action"))
+    na.index <- unclass(attr(mf,"na.action"))
   } else if(!miss.f){
     stop(paste("A formula was specified along with xdat and ydat.\n",
                "Please see the documentation on proper interface usage."))

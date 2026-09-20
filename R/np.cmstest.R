@@ -147,7 +147,7 @@ npcmstest <- function(formula,
     ydat <- model.response(mf)
     xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]
 
-    na.index <- unclass(attr(xdat,"na.action"))
+    na.index <- unclass(attr(mf,"na.action"))
   } else if(!miss.f){
     stop(paste("A formula was specified along with xdat and ydat.\n",
                "Please see the documentation on proper interface usage."))

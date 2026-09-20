@@ -157,7 +157,9 @@ These arguments control the quantile level, test statistic, bootstrap procedure,
 
 
   \item{tau}{
-    a numeric value specifying the \eqn{\tau}{tau}th quantile is desired
+    a finite scalar in (0,1) specifying the desired \eqn{\tau}{tau}th quantile.
+    It must equal the single quantile fitted by \code{model}; the default
+    remains 0.5, so pass \code{tau} explicitly for other fitted quantiles.
   }
 
 
