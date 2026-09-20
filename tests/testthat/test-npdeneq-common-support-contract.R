@@ -64,3 +64,34 @@ test_that("density equality freezes the union support for every contraction", {
   expect_identical(serialize(y, NULL), before.y)
   expect_identical(serialize(bx, NULL), before.bw)
 })
+
+test_that("common declared support retains unused levels and bandwidth-only domains", {
+  old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
+  x <- data.frame(u = factor(rep(c("a", "b"), c(8, 12)), levels = c("b", "a", "unused")))
+  y <- data.frame(u = factor(rep(c("a", "c"), c(11, 9)), levels = c("c", "a")))
+  domain <- c("b", "a", "unused", "c", "bw-only")
+  xd <- x; yd <- y
+  xd$u <- factor(x$u, levels = domain); yd$u <- factor(y$u, levels = domain)
+  bw <- npudensbw(dat = xd, bws = .2, bandwidth.compute = FALSE)
+  a <- npdeneqtest(x, y, bw.x = bw, B = 9)
+  b <- npdeneqtest(xd, yd, bw.x = bw, B = 9)
+  fields <- c("In", "Tn", "In.bootstrap", "Tn.bootstrap", "In.P", "Tn.P")
+  expect_identical(a[fields], b[fields])
+  ox <- data.frame(o = ordered(rep(c("low","high"), 10), levels = c("low","high")))
+  oy <- data.frame(o = ordered(rep(c("low","mid","high"), 7), levels = c("low","mid","high")))
+  full <- ox; full$o <- ordered(ox$o, levels = levels(oy$o))
+  for (k in c("liracine", "wangvanryzin")) {
+    bw <- npudensbw(dat = full, bws = .3, bandwidth.compute = FALSE, okertype = k)
+    expect_identical(npdeneqtest(ox, oy, bw.x = bw, B = 9)[fields],
+                     npdeneqtest(full, oy, bw.x = bw, B = 9)[fields])
+  }
+  bad <- oy; bad$o <- ordered(oy$o, levels = rev(levels(oy$o)))
+  expect_error(npdeneqtest(ox, bad, bw.x = .3, B = 9), "unambiguous common level order")
+  set.seed(963)
+  mx <- cbind(x, v = runif(nrow(x))); my <- cbind(y, v = runif(nrow(y)))
+  mx.full <- mx; my.full <- my
+  lev <- union(levels(x$u), levels(y$u))
+  mx.full$u <- factor(mx$u, levels = lev); my.full$u <- factor(my$u, levels = lev)
+  expect_identical(npdeneqtest(mx, my, bw.x = c(.2,.4), B = 9)[fields],
+                   npdeneqtest(mx.full, my.full, bw.x = c(.2,.4), B = 9)[fields])
+})
