@@ -1,3 +1,24 @@
+test_that("CMS validates retained components rather than call spelling", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  set.seed(527); d <- data.frame(x = rnorm(24)); d$y <- d$x + rnorm(24)
+  keep <- TRUE
+  models <- list(
+    cms = list(lm(y ~ x, d, x = TRUE, y = TRUE), lm(y ~ x, d, x = keep, y = keep)),
+    qcms = list(quantreg::rq(y ~ x, data = d, model = TRUE),
+                quantreg::rq(y ~ x, data = d, model = keep)))
+  for (kind in names(models)) {
+    fun <- get(paste0("np", kind, "test"), asNamespace("npRmpi"))
+    invoke <- function(model) do.call(fun, list(formula = y ~ x, data = d,
+      model = model, bws = .4, bandwidth.compute = FALSE, distribution = "asymptotic"))
+    a <- invoke(models[[kind]][[1L]]); b <- invoke(models[[kind]][[2L]])
+    fields <- setdiff(names(a), c("pcall", "bws"))
+    expect_identical(a[fields], b[fields])
+    broken <- models[[kind]][[1L]]; broken$x <- NULL
+    expect_error(invoke(broken), "must retain")
+  }
+})
+
 test_that("CMS manual bandwidths belong to selection, not duplicated kernel dots", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
