@@ -388,10 +388,12 @@ npcdist.condbandwidth <-
       gradients, glp.gradient.partial, glp.categorical.effects,
       bws, cat.se.demand)
 
+    native.xbw <- .npcdhat_physical_bandwidth(bws, "x")
+    native.ybw <- .npcdhat_physical_bandwidth(bws, "y")
     myopti <- list(
         num_obs_train = tnrow,
         num_obs_eval = enrow,
-        int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
+        int_LARGE_SF = SF_ARB,
         BANDWIDTH_den_extern = switch(bws$type,
             fixed = BW_FIXED,
             generalized_nn = BW_GEN_NN,
@@ -453,9 +455,9 @@ npcdist.condbandwidth <-
             as.double(txuno), as.double(txord), as.double(txcon),
             as.double(eyuno), as.double(eyord), as.double(eycon),
             as.double(exuno), as.double(exord), as.double(excon),
-            as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                        bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                        bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+            as.double(c(native.xbw[bws$ixcon], native.ybw[bws$iycon],
+                        native.ybw[bws$iyuno], native.ybw[bws$iyord],
+                        native.xbw[bws$ixuno], native.xbw[bws$ixord])),
             as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
             as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
             as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),

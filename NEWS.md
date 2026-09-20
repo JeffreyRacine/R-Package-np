@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Conditional fits, operators and bootstrap preparation consistently resolve
+  retained scale factors to physical bandwidths, including the separate X/Y
+  calculations used by local-polynomial fits. Resampling does not rescale the
+  selected smoothing parameters.
+
 * Fourth- and sixth-order Gaussian convolution calculations now preserve
   translation and bandwidth-unit invariance. This corrects affected kernel
   sums and density cross-validation calculations.

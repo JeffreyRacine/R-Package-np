@@ -1,3 +1,14 @@
+.npcdhat_physical_bandwidth <- function(bws, role) {
+  raw <- bws[[paste0(role, "bw"), exact = TRUE]]
+  if (!isTRUE(bws[["scaling", exact = TRUE]]))
+    return(raw)
+  physical <- bws[["bandwidth", exact = TRUE]][[role, exact = TRUE]]
+  if (!is.numeric(physical) || length(physical) != length(raw) ||
+      any(!is.finite(physical)))
+    stop("conditional operator requires retained physical bandwidths", call. = FALSE)
+  physical
+}
+
 .npcdhat_make_xbw <- function(bws, txdat) {
   spec <- npConditionalRegEngineSpec(
     bws,
@@ -26,7 +37,7 @@
   )
 
   xbw <- .npregbw_build_rbandwidth(
-    xdat = txdat, ydat = ydat, bws = bws$xbw,
+    xdat = txdat, ydat = ydat, bws = .npcdhat_physical_bandwidth(bws, "x"),
     bandwidth.compute = FALSE, reg.args = reg.args, yname = "ydat"
   )
   npregbw.rbandwidth(
@@ -36,7 +47,7 @@
 
 .npcdhat_make_xkbw <- function(bws, txdat) {
   kbandwidth.numeric(
-    bw = bws$xbw,
+    bw = .npcdhat_physical_bandwidth(bws, "x"),
     bwscaling = FALSE,
     bwtype = bws$type,
     ckertype = bws$cxkertype,
@@ -56,7 +67,7 @@
 
 .npcdhat_make_ybw <- function(bws, tydat) {
   kbandwidth.numeric(
-    bw = bws$ybw,
+    bw = .npcdhat_physical_bandwidth(bws, "y"),
     bwscaling = FALSE,
     bwtype = bws$type,
     ckertype = bws$cykertype,
