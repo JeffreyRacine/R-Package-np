@@ -111,6 +111,9 @@ npqcmstest <- function(formula,
     bw <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npregbw(xdat=xdat, ydat=varepsilon, ...))
   }
 
+  # Resolve the kernel once; selection-only dots do not belong to npksum.
+  kernel.bw <- kbandwidth(bw)
+
   ## Now define the Jn test statistic that takes arguments xdat, the
   ## residual vector, the bandwidth object, and the number of bootstrap
   ## replications
@@ -123,8 +126,8 @@ npqcmstest <- function(formula,
 
   if (!density.weighted)
     fhat <- npksum(txdat = xdat,
-                   bws = bw$bw, leave.one.out = TRUE,
-                   bandwidth.divide = FALSE,...)$ksum/(n*prodh)
+                   bws = kernel.bw, leave.one.out = TRUE,
+                   bandwidth.divide = FALSE)$ksum/(n*prodh)
 
   if(min(fhat) == 0)
   stop(paste(sep="","\nAttempt to divide by zero density.",
@@ -143,9 +146,9 @@ npqcmstest <- function(formula,
 
     return( sum(varepsilon*npksum(txdat=xdat,
                                   tydat=varepsilon,
-                                  bws=bw$bw,
+                                  bws=kernel.bw,
                                   leave.one.out=TRUE,
-                                  bandwidth.divide=TRUE,...)$ksum/fhat)/n^2 )
+                                  bandwidth.divide=TRUE)$ksum/fhat)/n^2 )
   }
 
   Omega.hat <- function(xdat, model.resid, bw) {
@@ -161,10 +164,10 @@ npqcmstest <- function(formula,
            sum(varepsilon^2*
                npksum(txdat=xdat,
                       tydat=varepsilon^2,
-                      bws=bw$bw,
+                      bws=kernel.bw,
                       leave.one.out=TRUE,
                       kernel.pow=2,
-                      bandwidth.divide=TRUE,...)$ksum/fhat^2)/n^2 )
+                      bandwidth.divide=TRUE)$ksum/fhat^2)/n^2 )
   }
 
   Jn <- function(xdat, model.resid, bw) {
@@ -269,11 +272,11 @@ npqcmstest <- function(formula,
       statistic <- .np_cms_statistics_batch(
         xdat = xdat,
         score = score,
-        bw = bw,
+        bw = kernel.bw,
         fhat = fhat,
         prodh = prodh,
         pivot = pivot,
-        kernel.args = list(...)
+        kernel.args = list()
       )
      Sn.bootstrap[idx] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
       progress <- .np_progress_step(progress, done = max(idx))
