@@ -23,8 +23,18 @@ These arguments identify the two samples and any supplied bandwidths.
 }
 
   \item{bw.x,bw.y}{
-    optional bandwidth objects for \code{x,y}. Each supplied bandwidth is
-    retained; only a missing bandwidth is selected.
+    optional common bandwidth specification. If neither is supplied, one
+    bandwidth is selected on \code{x} by least-squares cross-validation
+    (\code{bwmethod = "cv.ls"}, overridable through \code{\dots}).
+    If only one is supplied it is reused for both samples without a search.
+    If both are supplied their effective bandwidths, kernels and support
+    specifications must agree; incompatible specifications are rejected.
+    This test requires fixed bandwidths and symmetric kernels without
+    boundary normalization. Nearest-neighbour bandwidths, beta kernels and
+    finite continuous normalization bounds are rejected: the test's directed
+    cross sum and variance formula assume symmetry. Unnormalized Gaussian,
+    Epanechnikov and uniform kernels remain supported, including mixed
+    continuous/categorical data. Other estimators' kernel support is unchanged.
   }
 
 
@@ -56,8 +66,9 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 }
 
   \item{\dots}{ additional arguments supplied to specify the bandwidth
-    type, kernel types, and so on.  This is used if you do not pass in
-    bandwidth objects and you do not desire the default behaviours. To
+    type, kernel types, and so on. These selection arguments are used only
+    when both \code{bw.x} and \code{bw.y} are absent; they do not modify a
+    supplied bandwidth specification. To
     do this, you may specify any of \code{bwscaling}, \code{bwtype},
     \code{ckertype}, \code{ckerorder}, \code{ukertype},
     \code{okertype}.}
@@ -116,6 +127,15 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   identical variables/datatypes. See Li, Maasoumi, and Racine (2009) for
   details.
 
+  The same bandwidth is held fixed in both samples and every bootstrap
+  replication. Automatic selection follows the archived simulation drivers
+  used for the paper's tables: select on the first sample. The methodological
+  description in the paper instead discusses pooled-sample selection.
+  First-sample selection makes sample ordering relevant when a bandwidth is
+  selected automatically. To choose on the pool explicitly, construct a
+  bandwidth with \code{npudensbw(dat = rbind(x, y), bwmethod = "cv.ls")}
+  and supply it as \code{bw.x}.
+
   With fixed, unbounded bandwidths, pooled bootstrap samples are represented
   by multiplicities on their common support and processed in bounded groups.
   Multi-response kernel sums then reuse the fixed geometry for the first- and
@@ -139,8 +159,8 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   Incomplete rows are omitted independently from each sample before bandwidth
   selection, bootstrap resampling and computation of the statistic. Factor
   levels are retained. Each sample must contain at least two complete
-  observations. Supplying one bandwidth does not cause it to be reselected when
-  the bandwidth for the other sample is missing.
+  observations. Supplying one bandwidth reuses it for both samples; it is not
+  reselected when the other bandwidth argument is missing.
 
 }
 
