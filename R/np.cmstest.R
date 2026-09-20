@@ -301,10 +301,7 @@ npcmstest <- function(formula,
         } else {
           resid.wild.rademacher(model.resid)
         }
-        progress <- .np_progress_step(
-          progress,
-          done = ii
-        )
+        progress <- .np_progress_step(progress)
       }
 
       statistic <- .np_cms_statistics_batch(
@@ -316,7 +313,8 @@ npcmstest <- function(formula,
         pivot = pivot,
         kernel.args = list(...)
       )
-      Sn.bootstrap[idx] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
+     Sn.bootstrap[idx] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
+      progress <- .np_progress_step(progress, done = max(idx))
     }
     progress <- .np_progress_end(progress)
     Sn.bootstrap <- sort(Sn.bootstrap)

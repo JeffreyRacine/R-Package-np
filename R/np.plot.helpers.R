@@ -228,18 +228,27 @@
   invisible(NULL)
 }
 
-.np_plot_progress_notify <- function(stage = NULL, done = NULL, total = NULL,
-                                      force = FALSE) {
+.np_plot_progress_record <- function(stage = NULL, done = NULL, total = NULL,
+                                      unit = "rep") {
   context <- .np_plot_progress_runtime$context
   if (is.null(context))
     return(invisible(NULL))
   if (!is.null(stage)) context$stage <- stage
   if (!is.null(done) && !is.null(total) && total > 0) {
-    context$rep <- sprintf("rep %d/%d", done, total)
+    context$rep <- sprintf("%s %d/%d", unit, done, total)
     # A bias bootstrap can reset the local counter within the same target.
     # Do not claim completion of the outer call from a local B/B endpoint.
-    context$fraction <- max(context$fraction, done / total)
+    if (unit %in% c("rep", "block"))
+      context$fraction <- max(context$fraction, done / total)
   }
+  invisible(NULL)
+}
+
+.np_plot_progress_notify <- function(stage = NULL, done = NULL, total = NULL,
+                                      force = FALSE, unit = "rep") {
+  .np_plot_progress_record(stage, done, total, unit)
+  context <- .np_plot_progress_runtime$context
+  if (is.null(context)) return(invisible(NULL))
   context$state <- .np_progress_step_at(context$state, .np_progress_now(),
                                         force = force)
   invisible(NULL)
@@ -273,16 +282,18 @@
   state
 }
 
-.np_plot_bootstrap_progress_begin <- function(total, label) {
+.np_plot_bootstrap_progress_begin <- function(total, label, unit = "rep") {
   state <- .np_plot_progress_begin(total = total, label = label)
   if (is.null(state))
     return(NULL)
 
+  state$plot_unit <- unit
   if (!is.null(state$plot_context)) {
     state$start_note_pending <- FALSE
     state$last_emit <- state$started
     state$last_emitted_done <- 0L
-    .np_plot_progress_notify(stage = "resampling", done = 0L, total = total)
+    .np_plot_progress_notify(stage = if (unit == "rep") "resampling" else
+      paste("evaluating", unit), done = 0L, total = total, unit = unit)
     return(state)
   }
   .np_progress_show_now(state = state, done = 0L)
@@ -298,6 +309,12 @@
   done <- max(0L, min(state$total, done))
 
   state$last_done <- done
+  # Store completed work even when the local display is throttled. The outer
+  # native heartbeat must see the latest count without changing chunk timing.
+  if (!is.null(state$plot_context))
+    .np_plot_progress_record(stage = state$plot_stage, done =
+      if (is.null(state$plot_stage)) done else NULL, total = state$total,
+      unit = if (is.null(state$plot_unit)) "rep" else state$plot_unit)
   now <- .np_progress_now()
   state <- .np_progress_maybe_emit_start_note(state = state, now = now)
 
@@ -332,7 +349,7 @@
   if (!is.null(state$plot_context))
     .np_plot_progress_notify(stage = state$plot_stage, done =
       if (is.null(state$plot_stage)) done else NULL, total = state$total,
-      force = force)
+      force = force, unit = if (is.null(state$plot_unit)) "rep" else state$plot_unit)
   state
 }
 
@@ -1402,7 +1419,8 @@
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   block.rows <- .np_plot_wild_hat_block_rows(ntrain = ntrain, neval = neval)
   nblocks <- as.integer(ceiling(neval / block.rows))
-  progress <- .np_plot_bootstrap_progress_begin(total = nblocks, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = nblocks,
+    label = progress.label, unit = "block")
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)

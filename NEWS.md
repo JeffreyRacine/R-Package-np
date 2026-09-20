@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Bootstrap progress retains the latest completed work between heartbeats.
+  Operator rows and blocks are distinguished from completed replications;
+  conditional-moment tests credit evaluated statistics, not generated draws.
+
+* Serial-dependence tests reject missing time points rather than silently
+  joining observations across gaps. Supply a contiguous complete segment
+  explicitly when the original series contains missing values.
+
 * Kernel sums, hat operators and quantile evaluation now distinguish current
   missing rows from historical na.action attributes on already-clean data.
   Supplying na.omit/na.exclude output no longer deletes unrelated rows a
