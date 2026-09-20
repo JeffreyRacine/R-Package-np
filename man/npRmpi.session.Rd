@@ -213,13 +213,18 @@ result is returned, and the original condition is signalled. Once cleanup
 completes, the existing pool can be reused.
 
 A second interrupt during cleanup returns control with the pool explicitly
-quarantined. The existing \code{npRmpi.session.recv.timeout} R option also
-limits each cleanup attempt when positive. Use this R option for a cleanup
-budget, not \code{NP_RMPI_SESSION_RECV_TIMEOUT_SEC}: that environment setting
-also arms the worker-side receive watchdog and can end an otherwise idle
-session. The unchanged zero default specifies no
-automatic deadline, not uninterruptible cleanup. The cleanup clock starts
-afresh for each explicit attempt and is not reset by incoming replies.
+quarantined. The \code{npRmpi.fanout.cleanup.timeout} R option limits each
+cleanup attempt (default 30 seconds, a finite positive value). This replaces
+the former use of \code{npRmpi.session.recv.timeout} for fan-out cleanup.
+The separate \code{npRmpi.fanout.terminal.timeout} option (also default 30
+seconds, finite and positive) bounds the completion handshake only after all
+numerical result payloads, including the master's work, are accounted for.
+Neither limit sets a deadline for ongoing numerical computation. These are
+maximum waits, not mandatory delays, and do not arm the worker watchdog.
+The cleanup clock starts afresh for each explicit attempt and is not reset by
+incoming replies. An exhausted terminal deadline quarantines the pool without
+adding another cleanup grace to that same failed call. A missing numerical
+result still requires an interrupt or an explicitly configured dispatch timeout.
 
 A quarantined pool rejects new work. An explicit
 \code{npRmpi.quit(force=TRUE)} can resume cooperative cleanup and close the pool

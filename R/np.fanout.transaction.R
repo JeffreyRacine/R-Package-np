@@ -169,11 +169,43 @@
   tx$scheduled <- 0L
   tx$next.task <- integer(workers)
   tx$seen <- rep.int(FALSE, n)
+  tx$completed <- 0L
+  tx$terminal.started <- NA_real_
+  tx$terminal.budget <- .npRmpi_fanout_budget("terminal")
+  tx$terminal.expired <- FALSE
   tx$weights <- if (is.null(weights)) rep.int(1L, n) else weights
   tx$progress <- integer(workers)
   tx$raw.messages <- 0L
   tx$raw.bytes <- 0
   tx
+}
+
+.npRmpi_fanout_budget <- function(stage) {
+  name <- paste0("npRmpi.fanout.", stage, ".timeout")
+  value <- getOption(name, 30)
+  if (!is.numeric(value) || length(value) != 1L || !is.finite(value) || value <= 0)
+    stop(name, " must be a finite positive number of seconds", call. = FALSE)
+  as.double(value)
+}
+
+# Credit only validated result payloads, not progress beacons or assigned work.
+# No clock is read until every numerical task, including the master's, is done.
+.npRmpi_fanout_result_complete <- function(tx, count) {
+  tx$completed <- tx$completed + count
+  if (tx$completed == tx$n && is.na(tx$terminal.started))
+    tx$terminal.started <- unname(proc.time()[["elapsed"]])
+  invisible(NULL)
+}
+
+.npRmpi_fanout_terminal_boundary <- function(tx) {
+  if (is.finite(tx$terminal.started) &&
+      unname(proc.time()[["elapsed"]]) - tx$terminal.started >= tx$terminal.budget) {
+    tx$terminal.expired <- TRUE
+    stop(structure(list(message = "MPI numerical results are complete, but the terminal handshake budget was exhausted; the pool is quarantined",
+                        call = NULL),
+                   class = c("npRmpi_cleanup_pending", "error", "condition")))
+  }
+  invisible(NULL)
 }
 
 .npRmpi_fanout_header <- function(tx) {
@@ -251,6 +283,7 @@
       any(tx$seen[tasks]) || !is.list(message[["value"]]) ||
       length(message[["value"]]) != length(tasks)) .npRmpi_fanout_protocol_error()
   tx$seen[tasks] <- TRUE
+  .npRmpi_fanout_result_complete(tx, length(tasks))
   if (identical(tx$scheduler, "dynamic")) {
     # Preserve the incumbent result-arrival assignment order even when READY
     # control receipts from different ranks arrive in a different order.
@@ -265,9 +298,22 @@
 .npRmpi_fanout_receive <- function(tx, discard = FALSE, poll = TRUE, sleep = 0.0005,
                                   timeout = 0, started = 0, what = "fan-out",
                                   recovery = NULL) {
+  terminal.wait <- !discard && is.finite(tx$terminal.started)
+  # Blocking apply remains blocking during computation. Only its completed-
+  # result handshake uses bounded, interruptible polling.
+  if (terminal.wait) {
+    # A previously blocking receiver has no polling cadence to preserve.
+    # Use the existing native-completion cadence rather than the apply
+    # helper's slower numerical-work polling default. Explicit polling
+    # callers keep their chosen cadence.
+    if (!poll) sleep <- 0.0005
+    poll <- TRUE
+    .npRmpi_fanout_terminal_boundary(tx)
+  }
   if (poll) {
     while (!isTRUE(mpi.iprobe(mpi.any.source(), mpi.any.tag(), tx$comm))) {
       if (discard) .npRmpi_fanout_cleanup_boundary(tx)
+      if (terminal.wait) .npRmpi_fanout_terminal_boundary(tx)
       if (!discard && timeout > 0 &&
           unname(proc.time()[["elapsed"]]) - started > timeout)
         stop(sprintf("MPI %s dispatch timeout waiting on worker results (timeout=%.3fs)",
@@ -323,7 +369,7 @@
     stop("MPI fan-out activation did not complete; session is not reusable", call. = FALSE)
   tx$phase <- "draining"
   tx$cleanup.started <- unname(proc.time()[["elapsed"]])
-  tx$cleanup.budget <- .npRmpi_session_recv_timeout()
+  tx$cleanup.budget <- .npRmpi_fanout_budget("cleanup")
   .npRmpi_fanout_notice("Cancelling MPI work at task boundaries; draining replies. Interrupt again to return with this pool quarantined.")
   .npRmpi_fanout_recovery_step(recovery, first = TRUE)
   suspendInterrupts({
@@ -361,7 +407,12 @@
 }
 
 .npRmpi_fanout_cleanup_attempt <- function(tx, recovery = NULL) {
-  failure <- tryCatch({ .npRmpi_fanout_drain(tx, recovery); NULL },
+  # An exhausted terminal deadline must not stack a fresh cleanup grace in
+  # the same call. A later explicit quit may resume with its own budget.
+  failure <- if (isTRUE(tx$terminal.expired) && isTRUE(tx$owner.active))
+    structure(list(message = "MPI terminal handshake remains incomplete", call = NULL),
+              class = c("npRmpi_cleanup_pending", "error", "condition")) else
+    tryCatch({ .npRmpi_fanout_drain(tx, recovery); NULL },
                       error = identity, interrupt = identity)
   if (!is.null(failure)) {
     tx$phase <- if (inherits(failure, c("interrupt", "npRmpi_cleanup_pending")))
@@ -391,7 +442,21 @@
   }, add = TRUE)
   failure <- new.env(parent = emptyenv())
   failure$condition <- NULL
-  value <- tryCatch(force(code), error = function(e) {
+  value <- tryCatch({
+    value <- force(code)
+    if (any(tx$rank != "closed"))
+      stop("MPI fan-out returned before worker quiescence", call. = FALSE)
+    while (!identical(.npRmpi_fanout_native("poll", tx$comm), 1L)) {
+      .npRmpi_fanout_terminal_boundary(tx)
+      Sys.sleep(0.0005)
+    }
+    suspendInterrupts({
+      .npRmpi_fanout_native("finish", tx$comm)
+      tx$native <- FALSE
+      tx$phase <- "quiescent"
+    })
+    value
+  }, error = function(e) {
     failure$condition <- e
     NULL
   }, interrupt = function(e) {
@@ -405,14 +470,6 @@
       .npRmpi_fanout_rethrow(failure$condition)
     })
   }
-  if (any(tx$rank != "closed"))
-    stop("MPI fan-out returned before worker quiescence", call. = FALSE)
-  while (!identical(.npRmpi_fanout_native("poll", tx$comm), 1L)) Sys.sleep(0.0005)
-  suspendInterrupts({
-    .npRmpi_fanout_native("finish", tx$comm)
-    tx$native <- FALSE
-    tx$phase <- "quiescent"
-  })
   value
 }
 
@@ -609,6 +666,7 @@
       tx$phase <- "active"
     })
     sent <- 0L
+    if (n == 0L) .npRmpi_fanout_result_complete(tx, 0L)
     if (dynamic) {
       for (rank in seq_len(workers)) {
         sent <- sent + 1L
@@ -767,6 +825,7 @@
       if (!internal.progress)
         state$done <- state$done + weights[[task.local.idx]]
       tx$seen[[task.local.idx]] <- TRUE
+      .npRmpi_fanout_result_complete(tx, 1L)
       progress.step(state$done)
       .npRmpi_bootstrap_transport_trace(what, "fanout.master_local_chunk.done",
         list(task_idx = task.local.idx, bsz = weights[[task.local.idx]]))

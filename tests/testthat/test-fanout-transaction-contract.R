@@ -107,7 +107,7 @@ test_that("an abandoned cooperative cleanup is retained and explicitly closable"
     "  if (tx$phase == 'active') stop('collector witness')",
     "  receive(tx, ...)",
     "})",
-    "options(npRmpi.session.recv.timeout=.01, np.messages=FALSE)",
+    "options(npRmpi.fanout.cleanup.timeout=.01, np.messages=FALSE)",
     "e <- tryCatch(npRmpi:::mpi.iapplyLB(1:8, identity), error=identity)",
     "stopifnot(identical(conditionMessage(e), 'collector witness'))",
     "bind('.npRmpi_fanout_receive', receive)",
@@ -117,7 +117,7 @@ test_that("an abandoned cooperative cleanup is retained and explicitly closable"
     "stopifnot(identical(.Call('np_mpi_fanout_owner', 1L, PACKAGE='npRmpi'), tx))",
     "e <- tryCatch(npRmpi:::mpi.iapplyLB(1:8, identity), error=identity)",
     "stopifnot(inherits(e, 'error'))",
-    "options(npRmpi.session.recv.timeout=3)",
+    "options(npRmpi.fanout.cleanup.timeout=3)",
     "npRmpi.quit(force=TRUE)",
     "stopifnot(is.null(get('.npRmpi_fanout_retained', ns)(1L)))",
     "cat('COOPERATIVE_QUARANTINE_EXPLICIT_CLOSE_OK\\n')"
