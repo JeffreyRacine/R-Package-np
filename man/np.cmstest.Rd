@@ -19,7 +19,16 @@
   are evaluated as multi-response kernel sums. This reuses kernel geometry
   without forming a dense observation-by-observation weight matrix or
   changing residual order, pivoting, density weighting, or random draws.
-  The asymptotic route is unchanged.
+  The selected bandwidth's effective kernel metadata are shared by the observed
+  and bootstrap statistics. Manual bandwidth inputs and selection controls are
+  not forwarded a second time as kernel-sum arguments.
+
+  Model residuals, fitted values, response and design use the model's compact
+  complete-observation sample, including when it was fitted with
+  \code{na.exclude}. The supplied test data must represent those same complete
+  observations in the same order; incompatible samples are rejected rather
+  than re-paired. The original model and its missing-value restoration policy
+  are not modified.
 }
 \usage{
 npcmstest(formula,
@@ -60,9 +69,9 @@ These arguments identify the model formula/data interface and explicit data inpu
   \item{model}{
     a model object obtained from a call to \code{\link{lm}} (or
     \code{\link{glm}}). Important: the
-    call to either \code{\link{glm}} or \code{\link{lm}} must have the arguments
-    \code{x=TRUE} and
-    \code{y=TRUE} or \code{npcmstest} will not work. Also, the test is
+    model must retain its design and response components, normally requested
+    with \code{x=TRUE} and \code{y=TRUE}. The values, not the spelling of the
+    original call, determine availability. Also, the test is
     based on residual bootstrapping hence the outcome must be continuous
     (which rules out Logit, Probit, and Count models).
   }

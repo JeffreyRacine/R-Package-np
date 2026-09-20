@@ -34,7 +34,9 @@ These arguments identify the two samples and any supplied bandwidths.
     finite continuous normalization bounds are rejected: the test's directed
     cross sum and variance formula assume symmetry. Unnormalized Gaussian,
     Epanechnikov and uniform kernels remain supported, including mixed
-    continuous/categorical data. Other estimators' kernel support is unchanged.
+    continuous/categorical data. An active ordered Racine--Li--Yan kernel is
+    also rejected because it is asymmetric and has a nonconstant self-diagonal.
+    Other estimators' kernel support is unchanged.
   }
 
 
@@ -136,13 +138,23 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   bandwidth with \code{npudensbw(dat = rbind(x, y), bwmethod = "cv.ls")}
   and supply it as \code{bw.x}.
 
+  Categorical coordinates use the union of the declared levels in both samples
+  and supplied bandwidth objects, including unused levels. The same domain
+  and effective kernel metadata are retained in every contraction and bootstrap
+  draw. Ordered domains must have an unambiguous common order; otherwise declare
+  the same ordered levels in both samples. Automatic selection still uses only
+  the first sample's observations, with this common metadata.
+  A raw numeric bandwidth retains the default raw kernel-sum conventions;
+  a density bandwidth object retains its selected density-kernel conventions,
+  including normalized ordered Li--Racine masses. Selection arguments in
+  \code{\dots} do not override an explicitly supplied bandwidth specification.
+
   With fixed, unbounded bandwidths, pooled bootstrap samples are represented
   by multiplicities on their common support and processed in bounded groups.
   Multi-response kernel sums then reuse the fixed geometry for the first- and
   second-power contractions without constructing a dense kernel matrix.
-  Bounded-kernel and nearest-neighbour bandwidth routes retain literal
-  duplicate resampling because their boundary corrections or sample-owned
-  radii cannot in general be represented by fixed-support counts.
+  Boundary-normalized and nearest-neighbour specifications are not supported
+  by this density-equality statistic.
 
 }
 
