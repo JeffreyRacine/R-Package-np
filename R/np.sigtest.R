@@ -78,10 +78,14 @@ if (getRversion() >= "2.15.1")
   .npRmpi_npsig_do_leaf(npreg, extra.args = extra.args, ...)
 }
 
-# Preparation is coordinated by the caller, but its fit uses the established
-# collective regression owner. Independent bootstrap tasks remain local.
+# Preserve the dispatched fit at ordinary entry and the collective fit inside
+# a broadcast. Only an intentionally non-dispatched caller with idle workers
+# needs the local owner; it cannot enter a native collective by itself.
 .npRmpi_npsig_npreg_prepare <- function(extra.args = NULL, ...) {
-  .npRmpi_npsig_do_leaf(.npreg_complete, extra.args = extra.args, ...)
+  if (.npRmpi_autodispatch_active() || .npRmpi_npsig_collective_context())
+    .npRmpi_npsig_do_leaf(.npreg_complete, extra.args = extra.args, ...)
+  else
+    .npRmpi_npsig_do_local(extra.args = extra.args, ...)
 }
 
 .npRmpi_npsig_collective_context <- function() {
