@@ -89,7 +89,7 @@ These arguments control smooth-coefficient iteration, leave-one-out behavior, an
   \item{leave.one.out}{Logical; leave-one-out kernel weights for \code{npscoefhat}. This currently requires evaluation \code{z} data to match training \code{z} data.}
 
 
-  \item{ridge}{Base ridge term for local linear solves in \code{npscoefhat}; must be a non-negative finite scalar. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves.}
+  \item{ridge}{Base ridge term for local linear solves in \code{npscoefhat}; must be a non-negative finite scalar. The ridge sequence starts at the supplied base (zero by default) and then increments by \code{1/n.train} as needed for stable solves. The ridge is expressed in the normalized kernel-weight units of the matrix output; categorical profile application converts it to the equivalent profile-system scale.}
 
 
 \subsection{Additional Arguments}{

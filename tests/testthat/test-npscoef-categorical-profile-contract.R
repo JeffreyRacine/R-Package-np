@@ -198,6 +198,61 @@ test_that("npscoefhat apply uses categorical profile route", {
   expect_equal(got[, 1L], oracle$mean, tolerance = 1e-8)
 })
 
+test_that("npscoefhat categorical profile ridge uses the canonical weight scale", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = TRUE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20260917L)
+  n <- 48L
+  xdat <- data.frame(a = runif(n, -1, 1), b = runif(n, -1, 1))
+  zdat <- data.frame(
+    u = factor(rep(letters[1:3], length.out = n)),
+    v = factor(rep(LETTERS[1:2], length.out = n))
+  )
+  y <- xdat$a - 0.35 * xdat$b + rnorm(n, sd = 0.1)
+  exdat <- xdat[1:7, , drop = FALSE]
+  ezdat <- zdat[1:7, , drop = FALSE]
+  for (ukertype in c("liracine", "aitchisonaitken")) {
+    bw <- npscoefbw(
+      xdat = xdat, ydat = y, zdat = zdat, bws = c(0.4, 0.3),
+      bandwidth.compute = FALSE, ukertype = ukertype
+    )
+    args <- list(bws = bw, txdat = xdat, tzdat = zdat,
+                 exdat = exdat, ezdat = ezdat, ridge = 0.25)
+
+    H <- do.call(npscoefhat, c(args, list(output = "matrix")))
+    applied.profile <- do.call(npscoefhat, c(args, list(y = y, output = "apply")))
+    options(np.categorical.compress = FALSE)
+    applied.direct <- do.call(npscoefhat, c(args, list(y = y, output = "apply")))
+    options(np.categorical.compress = TRUE)
+
+    W <- cbind(1, as.matrix(xdat))
+    E <- cbind(1, as.matrix(exdat))
+    oracle <- vapply(seq_len(nrow(exdat)), function(i) {
+      weights <- rep(1, n)
+      for (j in seq_along(zdat)) {
+        same <- zdat[[j]] == ezdat[[j]][i]
+        lambda <- c(0.4, 0.3)[j]
+        nc <- nlevels(zdat[[j]])
+        weights <- weights * if (ukertype == "liracine")
+          ifelse(same, 1, lambda) / (1 + (nc - 1) * lambda) else
+          ifelse(same, 1 - lambda, lambda / (nc - 1))
+      }
+      drop(E[i, , drop = FALSE] %*%
+             solve(crossprod(W, W * weights) + diag(0.25, ncol(W)),
+                   crossprod(W, y * weights)))
+    }, numeric(1L))
+    expect_equal(as.vector(H %*% y), oracle, tolerance = 1e-11, info = ukertype)
+    expect_equal(as.vector(applied.profile), oracle, tolerance = 1e-11,
+                 info = ukertype)
+    expect_equal(as.vector(applied.direct), as.vector(H %*% y), tolerance = 1e-11,
+                 info = ukertype)
+  }
+})
+
 test_that("npscoef plot-bootstrap inid helper uses categorical profiles exactly", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   withr::local_options(npRmpi.autodispatch = FALSE)
