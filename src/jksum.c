@@ -21561,6 +21561,85 @@ static inline int np_regression_cv_scalar_accumulate_scaled_row(
   return !R_FINITE(*cv) || !R_FINITE(*traceH);
 }
 
+/* Explicit delete-one geometry for route-bearing beta row consumers.
+ * The row retains its kernel/response algebra. This owner only prepares the
+ * existing occurrence-aware radii once and selects adaptive fold radii into
+ * the row's borrowed bandwidth storage. Full fits and CVAIC do not enter. */
+typedef struct {
+  int num_obs;
+  int ncon;
+  double **train;
+  double **primary;
+  double **successor;
+  double **selected;
+  double *fold_scale;
+  void *allocation_marker;
+  int allocation_active;
+} NPBetaLooGeometry;
+
+static void np_beta_loo_geometry_clear(NPBetaLooGeometry *geometry, Rboolean jump)
+{
+  /* Clear after the beta row context, which was prepared later. R restores
+   * transient allocations itself during a longjmp. */
+  if(geometry->allocation_active && !jump)
+    vmaxset(geometry->allocation_marker);
+  memset(geometry, 0, sizeof(*geometry));
+}
+
+static int np_beta_loo_geometry_select(NPBetaLooGeometry *geometry, int row)
+{
+  return geometry->primary != NULL &&
+    np_nn_adaptive_fold_select_row(
+      geometry->num_obs, geometry->ncon, geometry->train,
+      geometry->primary, geometry->successor, geometry->fold_scale,
+      row, geometry->selected) != NP_NN_GEOMETRY_OK;
+}
+
+static int np_beta_loo_geometry_prepare(
+  NPBetaLooGeometry *geometry, int bandwidth_mode, int num_obs,
+  int ncon, int nuno, int nord, double **train, double *scale_factor,
+  double **bandwidth, double *lambda)
+{
+  NPNNGeometryContext context = {
+    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+    .eval_to_train = NULL,
+    .adaptive_successor = NULL
+  };
+  NPNNGeometryStatus status = NP_NN_GEOMETRY_OK;
+  double **target = bandwidth;
+
+  if(geometry == NULL || geometry->primary != NULL ||
+     (bandwidth_mode != BW_GEN_NN && bandwidth_mode != BW_ADAP_NN))
+    return 1;
+  geometry->num_obs = num_obs;
+  geometry->ncon = ncon;
+  geometry->train = train;
+  geometry->selected = bandwidth;
+  if(bandwidth_mode == BW_ADAP_NN) {
+    geometry->allocation_marker = vmaxget();
+    geometry->allocation_active = 1;
+    geometry->primary = (double **)R_alloc((size_t)ncon, sizeof(double *));
+    geometry->successor = (double **)R_alloc((size_t)ncon, sizeof(double *));
+    geometry->fold_scale = (double *)R_alloc((size_t)ncon, sizeof(double));
+    for(int coordinate = 0; coordinate < ncon; ++coordinate) {
+      geometry->primary[coordinate] =
+        (double *)R_alloc((size_t)num_obs, sizeof(double));
+      geometry->successor[coordinate] =
+        (double *)R_alloc((size_t)num_obs, sizeof(double));
+    }
+    target = geometry->primary;
+    context.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
+    context.adaptive_successor = geometry->successor;
+    context.adaptive_fold_scale = geometry->fold_scale;
+  }
+  if(kernel_bandwidth_mean_ctx(
+       0, bandwidth_mode, num_obs, num_obs, 0, 0, 0,
+       ncon, nuno, nord, 0, scale_factor, NULL, NULL, train, train,
+       NULL, target, lambda, &context, NULL, &status) != 0)
+    return 1;
+  return np_beta_loo_geometry_select(geometry, 0);
+}
+
 /*
  * Route-aware scalar regression objective.  This is an O(n) row consumer,
  * not a beta objective: the route owns continuous-kernel construction while
@@ -21591,6 +21670,7 @@ typedef struct {
 
 typedef struct {
   NPBetaScaledRowContext row_context;
+  NPBetaLooGeometry loo_geometry;
   int *operator;
   int *kernel_u;
   int *kernel_o;
@@ -21610,6 +21690,7 @@ static void np_regression_cv_scalar_route_owner_init(
   NPRegressionCvScalarRouteOwner *owner)
 {
   np_beta_scaled_row_context_init(&owner->row_context);
+  memset(&owner->loo_geometry, 0, sizeof(owner->loo_geometry));
   owner->operator = NULL;
   owner->kernel_u = NULL;
   owner->kernel_o = NULL;
@@ -21634,6 +21715,7 @@ static void np_regression_cv_scalar_route_owner_cleanup(
   if(!jump)
     np_continuous_kernel_beta_prepared_context_release(
       &owner->row_context.beta_prepared);
+  np_beta_loo_geometry_clear(&owner->loo_geometry, jump);
   if(owner->matrix_bandwidth != NULL)
     free_mat(owner->matrix_bandwidth,
              owner->matrix_bandwidth_columns);
@@ -21725,11 +21807,16 @@ static int np_regression_cv_scalar_continuous_route_body(
   for(evaluation = 0; evaluation < num_reg_ordered; ++evaluation)
     kernel_o[evaluation] = KERNEL_ordered_reg;
 
-  if(np_beta_continuous_bandwidth_prepare_canonical(
+  if(bwm == RBWM_CVLS && BANDWIDTH_reg != BW_FIXED ?
+     np_beta_loo_geometry_prepare(
+       &owner->loo_geometry, BANDWIDTH_reg, num_obs,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
+       matrix_X_continuous, vector_scale_factor, matrix_bandwidth, lambda) :
+     np_beta_continuous_bandwidth_prepare_canonical(
        BANDWIDTH_reg, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        matrix_X_continuous, matrix_X_continuous,
-       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL) != 0)
+       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL))
     goto cleanup_route;
 
   row_status = np_beta_scaled_row_context_prepare(
@@ -21751,6 +21838,8 @@ static int np_regression_cv_scalar_continuous_route_body(
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
+    if(np_beta_loo_geometry_select(&owner->loo_geometry, evaluation))
+      goto cleanup_route;
     row_status = np_beta_scaled_row_context_fill_omitting(
       row_context, evaluation, omitted, &row_sum, NULL);
     if(row_status != NP_CONTINUOUS_ROW_OK ||
@@ -21854,6 +21943,7 @@ static NP_NOINLINE int np_regression_cv_scalar_continuous_route(
 typedef struct {
   NPBetaScaledRowContext row_context;
   NPReghatLPWorkspace lp_workspace;
+  NPBetaLooGeometry loo_geometry;
   int *operator;
   int *kernel_u;
   int *kernel_o;
@@ -21876,6 +21966,7 @@ static void np_regression_cv_lp_route_owner_init(
 {
   np_beta_scaled_row_context_init(&owner->row_context);
   np_reghat_lp_workspace_init(&owner->lp_workspace);
+  memset(&owner->loo_geometry, 0, sizeof(owner->loo_geometry));
   owner->operator = NULL;
   owner->kernel_u = NULL;
   owner->kernel_o = NULL;
@@ -21903,6 +21994,7 @@ static void np_regression_cv_lp_route_owner_cleanup(
     np_continuous_kernel_beta_prepared_context_release(
       &owner->row_context.beta_prepared);
   np_reghat_lp_workspace_clear(&owner->lp_workspace);
+  np_beta_loo_geometry_clear(&owner->loo_geometry, jump);
   if(owner->matrix_bandwidth != NULL)
     free_mat(owner->matrix_bandwidth,
              owner->matrix_bandwidth_columns);
@@ -22033,11 +22125,16 @@ static int np_regression_cv_lp_continuous_route_body(
   for(evaluation = 0; evaluation < num_reg_ordered; ++evaluation)
     kernel_o[evaluation] = KERNEL_ordered_reg;
 
-  if(np_beta_continuous_bandwidth_prepare_canonical(
+  if(bwm == RBWM_CVLS && BANDWIDTH_reg != BW_FIXED ?
+     np_beta_loo_geometry_prepare(
+       &owner->loo_geometry, BANDWIDTH_reg, num_obs,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
+       matrix_X_continuous, vector_scale_factor, matrix_bandwidth, lambda) :
+     np_beta_continuous_bandwidth_prepare_canonical(
        BANDWIDTH_reg, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        matrix_X_continuous, matrix_X_continuous,
-       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL) != 0)
+       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL))
     goto cleanup_lp_route;
 
   row_status = np_beta_scaled_row_context_prepare(
@@ -22062,8 +22159,12 @@ static int np_regression_cv_lp_continuous_route_body(
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
-    row_status = np_beta_scaled_row_context_fill(
-      row_context, evaluation, NULL, NULL);
+    if(np_beta_loo_geometry_select(&owner->loo_geometry, evaluation))
+      goto cleanup_lp_route;
+    row_status = np_beta_scaled_row_context_fill_omitting(
+      row_context, evaluation,
+      bwm == RBWM_CVLS && BANDWIDTH_reg != BW_FIXED ? evaluation : -1,
+      NULL, NULL);
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup_lp_route;
 
@@ -22079,7 +22180,9 @@ static int np_regression_cv_lp_continuous_route_body(
     leverage = influence_row[evaluation];
     residual = vector_Y[evaluation] - fitted;
 
-    if(bwm == RBWM_CVLS) {
+    if(bwm == RBWM_CVLS && BANDWIDTH_reg != BW_FIXED) {
+      cv += residual*residual;
+    } else if(bwm == RBWM_CVLS) {
       double denominator;
 
       if(!np_lp_delete_denominator(leverage, &denominator))
