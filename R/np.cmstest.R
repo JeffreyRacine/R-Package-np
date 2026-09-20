@@ -25,7 +25,7 @@
     npksum,
     c(list(txdat = xdat,
            tydat = score,
-           bws = bw[["bw", exact = TRUE]],
+           bws = if (inherits(bw, "kbandwidth")) bw else bw[["bw", exact = TRUE]],
            leave.one.out = TRUE,
            bandwidth.divide = TRUE),
       kernel.args)
@@ -41,7 +41,7 @@
     npksum,
     c(list(txdat = xdat,
            tydat = score2,
-           bws = bw[["bw", exact = TRUE]],
+           bws = if (inherits(bw, "kbandwidth")) bw else bw[["bw", exact = TRUE]],
            leave.one.out = TRUE,
            kernel.pow = 2,
            bandwidth.divide = TRUE),
@@ -386,6 +386,10 @@ npcmstest <- function(formula,
     "Computing bandwidths",
     npregbw(xdat=xdat, ydat=model$y, ...))
   
+  # Selection owns its dots. Every contraction uses its resolved kernel,
+  # including manual bandwidths, scaling, nondefault kernels and bounds.
+  kernel.bw <- kbandwidth(bw)
+
   ## Now define the Jn test statistic that takes arguments xdat, the
   ## residual vector, the bandwidth object, and the number of bootstrap
   ## replications
@@ -398,8 +402,8 @@ npcmstest <- function(formula,
 
   if (!density.weighted)
     fhat <- npksum(txdat = xdat,
-                   bws = bw$bw, leave.one.out = TRUE,
-                   bandwidth.divide = TRUE, ...)$ksum/n
+                   bws = kernel.bw, leave.one.out = TRUE,
+                   bandwidth.divide = TRUE)$ksum/n
 
 
   if(min(fhat) == 0)
@@ -416,9 +420,9 @@ npcmstest <- function(formula,
 
     return( sum(model.resid*npksum(txdat=xdat,
                                    tydat=model.resid,
-                                   bws=bw$bw,
+                                   bws=kernel.bw,
                                    leave.one.out=TRUE,
-                                   bandwidth.divide=TRUE, ...)$ksum/fhat)/n^2 )
+                                   bandwidth.divide=TRUE)$ksum/fhat)/n^2 )
   }
 
   Omega.hat <- function(xdat, model.resid, bw) {
@@ -431,10 +435,10 @@ npcmstest <- function(formula,
            sum(model.resid^2*
                npksum(txdat=xdat,
                       tydat=model.resid^2,
-                      bws=bw$bw,
+                      bws=kernel.bw,
                       leave.one.out=TRUE,
                       kernel.pow=2,
-                      bandwidth.divide=TRUE, ...)$ksum/fhat^2)/n^2 )
+                      bandwidth.divide=TRUE)$ksum/fhat^2)/n^2 )
   }
 
   Jn <- function(xdat, model.resid, bw) {
@@ -447,11 +451,11 @@ npcmstest <- function(formula,
     .np_cms_statistics_batch(
       xdat = xdat,
       score = model.resid,
-      bw = bw,
+      bw = kernel.bw,
       fhat = fhat,
       prodh = prodh,
       pivot = pivot,
-      kernel.args = list(...)
+      kernel.args = list()
     )
   }
 
