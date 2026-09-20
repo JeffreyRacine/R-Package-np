@@ -1,5 +1,8 @@
 # np 0.80-1
 
+* Mixed categorical/beta density and distribution operators now pass the
+  categorical-compression option to their shared native kernel-sum owner.
+
 * Mixed local-polynomial derivatives correctly differentiate every coordinate,
   including constant factors and degree-zero axes. All-zero derivative orders
   return the value basis, including its intercept.
