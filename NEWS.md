@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Categorical recoding and declared-support reconstruction preserve valid
+  factor levels labelled NA without converting them to missing observations.
+  Actual missing factor codes remain missing.
+
 * Formula fits with native evaluation data no longer restore training
   exclusions into an unrelated evaluation grid. Native evaluation arguments
   consistently take precedence over formula newdata in these routes.

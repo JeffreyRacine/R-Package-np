@@ -1074,12 +1074,16 @@ npCategoricalFirstDifferenceFrames <- function(exdat, index, where) {
   }
 
   lower <- upper <- exdat
-  lower[[index]] <- factor(
+  lower[[index]] <- .np_factor_with_levels(
     lev[lower.code], levels = lev, ordered = is.ordered(x)
   )
-  upper[[index]] <- factor(
+  upper[[index]] <- .np_factor_with_levels(
     lev[upper.code], levels = lev, ordered = is.ordered(x)
   )
+  if (anyNA(lev)) {
+    is.na(lower[[index]]) <- is.na(code)
+    is.na(upper[[index]]) <- is.na(code)
+  }
 
   list(lower = lower, upper = upper)
 }
@@ -3179,16 +3183,28 @@ toFrame <- function(frame) {
 }
 
 
+.np_factor_with_levels <- function(x, levels, ordered = is.ordered(x)) {
+  if (!anyNA(levels))
+    return(factor(x, levels = levels, ordered = ordered))
+  # A missing label may name a valid category. A missing factor code remains
+  # a missing observation: converting through character would conflate them.
+  lev <- base::levels(factor(character(), levels = levels, exclude = NULL))
+  codes <- if (is.factor(x))
+    match(base::levels(x), lev)[as.integer(x)] else match(as.character(x), lev)
+  structure(codes, levels = lev, names = names(x),
+            class = if (ordered) c("ordered", "factor") else "factor")
+}
+
 cast <- function(a, b, same.levels = TRUE){
   if(is.ordered(b)){
     if(same.levels)
-      ordered(a, levels = levels(b))
+      .np_factor_with_levels(a, levels = levels(b), ordered = TRUE)
     else
       ordered(a)
   }   
   else if(is.factor(b)){
     if(same.levels)
-      factor(a, levels = levels(b))
+      .np_factor_with_levels(a, levels = levels(b), ordered = FALSE)
     else
       factor(a)
   }
@@ -3249,7 +3265,7 @@ adjustLevels <- function(data, dati, allowNewCells = FALSE){
             .np_warning(paste("more than one 'new' category is redundant when estimating on unordered data.\n",
                           "training data categories: ", paste(dati$all.lev[[i]], collapse=" "),"\n",
                           "redundant estimation data categories: ", paste(newCats, collapse=" "), "\n", sep=""))
-          data[,i] <- factor(data[,i], levels = c(dati$all.lev[[i]], newCats))
+          data[,i] <- .np_factor_with_levels(data[,i], levels = c(dati$all.lev[[i]], newCats))
         } else {
           if (dati$inumord[i]){
             if (!isNum(newCats))
@@ -3262,15 +3278,16 @@ adjustLevels <- function(data, dati, allowNewCells = FALSE){
                        "categorical, qualitative variable is not supported.\n"))
           }
 
-          data[,i] <- ordered(data[,i], levels = sort(as.numeric(c(dati$all.lev[[i]], newCats))))
+          data[,i] <- .np_factor_with_levels(data[,i],
+            levels = sort(as.numeric(c(dati$all.lev[[i]], newCats))), ordered = TRUE)
         }
       } else {
-        data[,i] <- factor(data[,i], levels = dati$all.lev[[i]])
+        data[,i] <- .np_factor_with_levels(data[,i], levels = dati$all.lev[[i]])
       }
     } else {
       if (!all(is.element(levels(data[,i]), dati$all.lev[[i]])))
         stop("data contains unknown factors (wrong dataset provided?)")
-      data[,i] <- factor(data[,i], levels = dati$all.lev[[i]])
+      data[,i] <- .np_factor_with_levels(data[,i], levels = dati$all.lev[[i]])
     }
   }
 

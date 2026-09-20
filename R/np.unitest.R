@@ -147,10 +147,10 @@ npunitest <- function(data.x = NULL,
         data.null <- c(data.x,data.y)
       } else {
         if(is.ordered(data.x)) {
-          data.null <- ordered(c(as.character(data.x),as.character(data.y)),
-                               levels = levels(data.x))
+          data.null <- .np_factor_with_levels(c(as.character(data.x),as.character(data.y)),
+                               levels = levels(data.x), ordered = TRUE)
         } else {
-          data.null <- factor(c(as.character(data.x),as.character(data.y)),
+          data.null <- .np_factor_with_levels(c(as.character(data.x),as.character(data.y)),
                               levels = levels(data.x))
         }
       }

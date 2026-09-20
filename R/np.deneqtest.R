@@ -106,7 +106,7 @@
           !identical(unname(dati[["iord"]][j]), ordered) ||
           !identical(unname(dati[["iuno"]][j]), !ordered))
         stop("density-equality bandwidth types must match the samples", call. = FALSE)
-      factor(character(), levels = dati[["all.lev"]][[j]], ordered = ordered)
+      .np_factor_with_levels(character(), levels = dati[["all.lev"]][[j]], ordered = ordered)
     }))
     common <- x[[j]]
     for (domain in domains) {
@@ -118,7 +118,7 @@
     levels <- levels(common)
     if (!identical(levels(x[[j]]), levels)) x[[j]] <- common
     if (!identical(levels(y[[j]]), levels))
-      y[[j]] <- factor(y[[j]], levels = levels, ordered = ordered)
+      y[[j]] <- .np_factor_with_levels(y[[j]], levels = levels, ordered = ordered)
   }
   list(x = x, y = y)
 }

@@ -937,7 +937,7 @@ np_render_control <- function(style = c("band", "bar"),
 
 .np_plot_conmode_cast_like <- function(x, template) {
   if (is.factor(template))
-    return(factor(as.character(x),
+    return(.np_factor_with_levels(x,
                   levels = levels(template),
                   ordered = is.ordered(template)))
   if (is.integer(template))
@@ -949,7 +949,7 @@ np_render_control <- function(style = c("band", "bar"),
 
 .np_plot_conmode_grid_values <- function(x, neval, xtrim) {
   if (is.factor(x)) {
-    return(factor(levels(x), levels = levels(x), ordered = is.ordered(x)))
+    return(.np_factor_with_levels(levels(x), levels = levels(x), ordered = is.ordered(x)))
   }
   rng <- stats::quantile(x, probs = xtrim, names = FALSE, na.rm = TRUE)
   seq(rng[1L], rng[2L], length.out = neval)
@@ -966,7 +966,7 @@ np_render_control <- function(style = c("band", "bar"),
 
 .np_plot_conmode_level_factor <- function(ytrain, level, n) {
   y <- ytrain[[1L]]
-  factor(rep(level, n),
+  .np_factor_with_levels(rep(level, n),
          levels = levels(y),
          ordered = is.ordered(y))
 }

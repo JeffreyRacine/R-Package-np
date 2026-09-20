@@ -32,7 +32,7 @@
            call. = FALSE)
     }
   }
-  cast <- function(z) factor(z, levels = lev, ordered = is.ordered(x))
+  cast <- function(z) .np_factor_with_levels(z, levels = lev, ordered = is.ordered(x))
   # Retain the historical evaluation order where X already spans the domain.
   grid <- union(as.character(unique(x)), lev)
   list(x = cast(x), y = cast(y), evaluation = cast(grid))

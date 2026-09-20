@@ -481,7 +481,7 @@
 
         if (xi.factor){
           ei = levels(xdat[,i])
-          ei = factor(ei, levels = ei)
+          ei = .np_factor_with_levels(ei, levels = ei)
           xi.neval = length(ei)
         } else {
           xi.neval = neval
