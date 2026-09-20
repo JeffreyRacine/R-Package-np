@@ -48,7 +48,7 @@ test_that("npunitest count reduction preserves the summation bootstrap", {
   )
   expect_identical(
     out$P,
-    mean(reference.bootstrap > reference.statistic(x, y))
+    mean(reference.bootstrap >= reference.statistic(x, y))
   )
 })
 

@@ -331,8 +331,8 @@ npsdeptest <- function(data = NULL,
     P.cumulant.vec <- numeric()
     
     for (k in seq_len(lag.num)) {
-      P.vec[k] <- mean(Srho.bootstrap.mat[,k] > Srho.vec[k])
-      P.cumulant.vec[k] <- mean(Srho.cumulant.bootstrap.mat[,k] > Srho.cumulant.vec[k])
+      P.vec[k] <- .np_bootstrap_upper_tail_pvalue(Srho.bootstrap.mat[,k], Srho.vec[k])
+      P.cumulant.vec[k] <- .np_bootstrap_upper_tail_pvalue(Srho.cumulant.bootstrap.mat[,k], Srho.cumulant.vec[k])
     }
 
   }

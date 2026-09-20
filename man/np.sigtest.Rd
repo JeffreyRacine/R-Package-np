@@ -293,6 +293,13 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 
 }
 
+\section{Bootstrap P-Values}{
+  The bootstrap upper-tail p-value is the proportion of bootstrap statistics
+  greater than or equal to the observed statistic. Ties count as at least as
+  extreme, giving the conservative tie convention for discrete statistics.
+  This is the ordinary bootstrap proportion, without an add-one correction;
+  a reported zero is possible with a finite number of replications.
+}
 \value{
   \code{npsigtest} returns an object of type
   \code{sigtest}. \code{\link{summary}} supports \code{sigtest} objects. It

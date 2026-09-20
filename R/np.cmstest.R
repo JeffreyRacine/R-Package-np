@@ -665,7 +665,7 @@ npcmstest <- function(formula,
 
     Sn = if (pivot) tJn$Jn else tIn
 
-    tJn$P <- mean(Sn.bootstrap > Sn)
+    tJn$P <- .np_bootstrap_upper_tail_pvalue(Sn.bootstrap, Sn)
 
     
   }

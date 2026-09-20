@@ -441,8 +441,8 @@ npdeneqtest <- function(x = NULL,
   ## Compute empirical P-values - the number of resampled statistics
   ## more extreme than the original statistic
   
-  Tn.P <- mean(Tn.vector > output$Tn)
-  In.P <- mean(In.vector > output$In)
+  Tn.P <- .np_bootstrap_upper_tail_pvalue(Tn.vector, output$Tn)
+  In.P <- .np_bootstrap_upper_tail_pvalue(In.vector, output$In)
   
   ## Restore seed
 

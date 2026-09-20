@@ -535,7 +535,7 @@ npsigtest.npregression <-
 }
 
 .np_npsig_upper_tail_p <- function(bootstrap, observed) {
-  mean(bootstrap >= observed)
+  .np_bootstrap_upper_tail_pvalue(bootstrap, observed)
 }
 
 .np_npsig_streamed_iid_eligible <- function(bws,
