@@ -246,10 +246,14 @@ npuniden.sc <- function(X=NULL,
     ## unconstrained estimate
 
     corr.factor <- 1
-    int.f.sc <- integrate.trapezoidal(X.grid,f.sc)[n.grid]
-    int.f <- integrate.trapezoidal(X.grid,f)[n.grid]
+    # The integration helper restores input order; total mass is at max(x).
+    right.endpoint <- which.max(X.grid)
+    int.f.sc <- integrate.trapezoidal(X.grid,f.sc)[right.endpoint]
+    int.f <- integrate.trapezoidal(X.grid,f)[right.endpoint]
     if(integral.equal) corr.factor <- int.f.sc/int.f
     f.sc <- f.sc/corr.factor
+    if (!(constraint %in% c("log-concave", "log-convex")))
+        f.sc.deriv <- f.sc.deriv/corr.factor
 
     ## The constraints are imposed on X.grid, but we only want the
     ## constrained estimate at the sample points X (or evaluation
