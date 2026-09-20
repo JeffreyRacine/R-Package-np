@@ -17,15 +17,7 @@ npqcmstest <- function(formula,
   if (...length())
     npRejectLegacyBootstrapCount(names(list(...)), "npqcmstest")
 
-  pcall = paste(deparse(model$call),collapse="")
-  if(length(grep("model = TRUE", pcall)) == 0)
-    stop(paste(sQuote("model")," is missing components ",
-               sQuote("model"),
-               ".\nTo fix this please invoke ",
-               sQuote("rq"),
-               " with ", sQuote("model=TRUE"),
-               ".\nSee help for further info.",
-               sep=""))
+  .np_cms_validate_model(model, quantile = TRUE)
 
   if(tau <=0 || tau >=1) stop("tau must lie in (0,1)")
 

@@ -1,3 +1,13 @@
+.np_cms_validate_model <- function(model, quantile = FALSE) {
+  if (is.null(model[["x", exact = TRUE]]) || is.null(model[["y", exact = TRUE]]) ||
+      (isTRUE(quantile) && is.null(model[["model", exact = TRUE]])))
+    stop(if (quantile)
+      "'model' must retain x, y and model components; fit rq with model = TRUE" else
+      "'model' must retain x and y components; fit lm or glm with x = TRUE and y = TRUE",
+      call. = FALSE)
+  invisible(NULL)
+}
+
 .np_cms_bootstrap_chunk_size <- function(n,
                                          boot.num,
                                          pivot,
@@ -72,13 +82,7 @@ npcmstest <- function(formula,
   if (...length())
     npRejectLegacyBootstrapCount(names(list(...)), "npcmstest")
   
-  pcall = paste(deparse(model$call),collapse="")
-  if(length(grep("x = (T|TRUE)[ ,)]", pcall)) == 0 || length(grep("y = (T|TRUE)[ ,)]", pcall)) == 0)
-    stop(paste(sQuote("model")," is missing components ", sQuote("x"), " and ",
-               sQuote("y"), ".\nTo fix this please invoke ", sQuote("lm"),
-               " or ", sQuote("glm"),
-               " with ", sQuote("x=TRUE"), " and ", sQuote("y=TRUE"),
-               ".\nSee help for further info.", sep=""))
+  .np_cms_validate_model(model, quantile = FALSE)
 
   if(B < 9) stop("number of bootstrap replications must be >= 9")
 
