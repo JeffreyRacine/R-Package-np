@@ -135,6 +135,20 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
    with replacement from the pooled \code{data.x} and \code{data.y}
    (\code{data.x} only for \code{summation}).
 
+   Missing observations are omitted independently from the two samples before
+   bandwidth selection and overlap checks. Each sample must retain at least
+   one observation; automatic bandwidth selection can require more.
+
+   For categorical data, the declared factor levels define the finite domain
+   of the probability comparison, including levels not observed in a sample.
+   The two samples share the union of their declared levels, retained in all
+   bootstrap samples. Plug-in bandwidths use that category count, and the
+   discrete statistic sums over the entire common domain, not only observed
+   categories. Existing kernel normalization is unchanged. Numeric ordered
+   levels retain their numeric scale. Qualitative ordered samples must specify
+   the same level order or an order-consistent subset; otherwise declare a
+   common ordered level set explicitly before calling the test.
+
    The summation version of this statistic can be numerically unstable
    when \code{data.x} and \code{data.y} lack common support or when the
    overlap is sparse (the summation version involves division of
