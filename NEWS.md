@@ -1,5 +1,24 @@
 # npRmpi 0.80-1
 
+* Density-equality tests freeze one common declared categorical support,
+  including unused levels and supplied bandwidth metadata, in every observed
+  and bootstrap contraction. Raw numeric bandwidths no longer acquire different
+  category normalizations in the two samples. Active ordered Racine-Li-Yan
+  kernels are rejected in this test only. Cross-sample normalization no longer
+  overflows when the product of integer sample sizes exceeds 2^31-1.
+
+* Conditional-mean and quantile specification tests accept manual bandwidths
+  without duplicate kernel arguments, retain selected kernel metadata in all
+  contractions, and keep na.exclude models on their compact estimation sample.
+  They validate actual model components rather than the spelling of the model
+  call; incompatible test/model response samples are rejected explicitly.
+
+* Formula column extraction and retained-role replay support quoted predictor
+  names without silently renaming the data. Pipe-formula splitting distinguishes
+  actual operators from punctuation inside quoted names or transformations.
+  Fitting, refitting, prediction, significance tests and plotting share the same
+  symbolic-name interpretation; formulas are not re-evaluated to decode names.
+
 * MPI apply and bootstrap collectors now limit the terminal handshake after
   all numerical results are complete, and each cooperative cleanup attempt,
   to 30 seconds by default. Separate `npRmpi.fanout.terminal.timeout` and

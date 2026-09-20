@@ -21,8 +21,18 @@ with Mixed Data Types }
   evaluated as multi-response kernel sums. This reuses kernel geometry
   without forming a dense observation-by-observation weight matrix or
   changing score order, \code{tau}, \code{bwydat}, pivoting, density
-  weighting, or random draws. Each MPI rank batches only its assigned
-  replications; the asymptotic route is unchanged.
+  weighting, or random draws. Each MPI rank batches only its assigned replications.
+
+  The selected bandwidth's effective kernel metadata are shared by the observed
+  and bootstrap statistics. Manual bandwidth inputs and selection controls are
+  not forwarded a second time as kernel-sum arguments.
+
+  Model residuals, fitted values, response and design use the model's compact
+  complete-observation sample, including when it was fitted with
+  \code{na.exclude}. The supplied test data must represent those same complete
+  observations in the same order; incompatible samples are rejected rather
+  than re-paired. The original model and its missing-value restoration policy
+  are not modified.
 }
 \usage{
 npqcmstest(formula,
@@ -64,8 +74,9 @@ These arguments identify the model formula/data interface and explicit data inpu
 
   \item{model}{
     a model object obtained from a call to \code{\link[quantreg]{rq}}. Important: the
-    call to \code{\link[quantreg]{rq}} must have the argument \code{model=TRUE} or
-    \code{npqcmstest} will not work.
+    model must retain its model, design and response components, normally
+    requested with \code{model=TRUE}. Availability is checked from those
+    components, not the spelling of the original call.
   }
 
 
