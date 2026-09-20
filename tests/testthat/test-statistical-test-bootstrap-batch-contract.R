@@ -101,7 +101,7 @@ test_that("density-equality count batches preserve literal resampling", {
                    levels = c("a", "b", "c"))
   )
   bw.x <- c(0.53, 0.22)
-  bw.y <- c(0.61, 0.28)
+  bw.y <- bw.x
   pool <- data.frame(rbind(x, y))
   power12 <- getFromNamespace(".npksum_power12", "npRmpi")
 
