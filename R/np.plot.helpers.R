@@ -2019,6 +2019,27 @@
   .np_cat_profile_kernel_matrix(eval.codes, train.codes, xdat, bws)
 }
 
+# Regression profile moments intentionally retain the unnormalised
+# Li--Racine unordered kernel.  The direct kernel-weight owner normalises that
+# kernel by this constant.  Ratio estimators cancel it, but an additive ridge
+# does not: callers that regularise a profile moment must express the ridge in
+# the profile moment's units.
+.np_regression_cat_profile_ridge_scale <- function(xdat, bws) {
+  xdat <- toFrame(xdat)
+  lambda <- as.double(bws$bw)
+  if (length(lambda) != ncol(xdat))
+    stop("categorical profile ridge scale requires one bandwidth per column")
+
+  scale <- 1.0
+  for (j in seq_along(xdat)) {
+    if (is.factor(xdat[[j]]) && !is.ordered(xdat[[j]]) &&
+        identical(bws$ukertype, "liracine")) {
+      scale <- scale * (1.0 + (nlevels(xdat[[j]]) - 1.0) * lambda[j])
+    }
+  }
+  scale
+}
+
 .np_regression_cat_profile_mean <- function(bws, txdat, tydat, exdat = NULL) {
   if (!npUseCategoricalCompress(ncon = bws$ncon,
                                 ncat = bws$nuno + bws$nord))

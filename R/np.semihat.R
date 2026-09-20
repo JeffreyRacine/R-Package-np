@@ -1481,6 +1481,10 @@ npscoefhat <-
         ridge.base = max(0.0, as.double(ridge)),
         cap = 1.0
       )
+      # Profile moments retain unnormalised Li--Racine unordered weights while
+      # the ordinary hat owner uses their normalised counterpart.  Convert the
+      # additive ridge, not the fitted result, so both solve the same system.
+      ridge.scale <- .np_regression_cat_profile_ridge_scale(tzdat, bws)
       for (ii in seq_len(m)) {
         XtWX <- matrix(sww.eval[ii, ], nrow = p, ncol = p, byrow = TRUE)
         rhs <- matrix(wy.eval[ii, ], nrow = p, ncol = q, byrow = TRUE)
@@ -1490,7 +1494,7 @@ npscoefhat <-
         for (ridge.try in ridge.grid) {
           A <- XtWX
           if (ridge.try > 0)
-            A[diag.loc] <- XtWX.diag + ridge.try
+            A[diag.loc] <- XtWX.diag + ridge.try * ridge.scale
           v <- tryCatch(
             solve(t(A), matrix(W.eval[ii, ], ncol = 1L)),
             error = function(e) NULL
