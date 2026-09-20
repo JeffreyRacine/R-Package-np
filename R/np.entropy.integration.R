@@ -2,6 +2,13 @@
 .np_entropy_tail_bandwidths <- 8
 .np_entropy_workspace_bytes <- 16 * 1024^2
 
+# Only symmetric observed-stage entry can use collective evaluation rows.
+# Bootstrap leaves run under local mode even inside an outer broadcast.
+.npRmpi_entropy_collective_rows <- function() {
+  !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+    .npindex_spmd_active(comm = 1L)
+}
+
 # Borrow the existing outer statistic/bootstrap owner. Native activity must
 # not be mistaken for completed statistical replications.
 .np_entropy_compute <- function(total = 1L, expr) {
@@ -410,7 +417,16 @@
                                                       bw.x,
                                                       bw.y,
                                                       bw.joint) {
-  value <- .np_entropy_compute(expr = .Call(
+  if (.npRmpi_entropy_collective_rows()) {
+    rows <- .npindex_spmd_eval_rows(
+      neval = length(x.dat), ncol.out = 1L,
+      what = "observed entropy summation",
+      worker = function(rows) .np_entropy_compute(expr = .Call(
+        "C_np_entropy_bivariate_summation_rows",
+        as.double(x.dat), as.double(y.dat),
+        as.double(c(bw.x, bw.y, bw.joint)), rows, PACKAGE = "npRmpi")))
+    value <- 0.5 * (sum(rows) / length(x.dat))
+  } else value <- .np_entropy_compute(expr = .Call(
     "C_np_entropy_bivariate_summation",
     as.double(x.dat),
     as.double(y.dat),
@@ -511,14 +527,16 @@
       weights <-
         rep(axis.x$weights[x.index], times = length(y.index)) *
         rep(axis.y$weights[y.index], each = length(x.index))
-      values <- .np_entropy_compute(expr = .Call(
-        "C_np_entropy_gaussian_integrand",
-        points,
-        x.dat,
-        y.dat,
-        bandwidths,
-        PACKAGE = "npRmpi"
-      ))
+      if (.npRmpi_entropy_collective_rows()) {
+        values <- as.numeric(.npindex_spmd_eval_rows(
+          neval = ncol(points), ncol.out = 1L,
+          what = "observed entropy integration",
+          worker = function(rows) as.numeric(.np_entropy_compute(expr = .Call(
+            "C_np_entropy_gaussian_integrand", points[, rows, drop = FALSE],
+            x.dat, y.dat, bandwidths, PACKAGE = "npRmpi")))))
+      } else values <- .np_entropy_compute(expr = .Call(
+          "C_np_entropy_gaussian_integrand", points, x.dat, y.dat,
+          bandwidths, PACKAGE = "npRmpi"))
       block.value <- sum(weights * values)
       adjusted <- block.value - compensation
       next.total <- total + adjusted

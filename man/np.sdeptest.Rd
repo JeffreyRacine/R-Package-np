@@ -154,6 +154,11 @@ These arguments control bootstrap execution and reproducibility settings.
   computationally demanding than \code{summation}, but avoids the density
   division that can make the summation statistic unstable.
 
+  Observed bivariate statistics share evaluation rows or quadrature points
+  across active MPI ranks, with the complete lag-pair sample on each rank.
+  Results are assembled in their original order using storage linear in the
+  number of evaluation points, not a sample-by-sample kernel matrix.
+
   The \code{summation} version fuses both marginal density sums and the
   joint density sum in one registered native pass with constant auxiliary
   storage. Bootstrap samples remain ordered index resamples: marginal

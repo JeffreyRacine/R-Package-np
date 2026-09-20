@@ -68,6 +68,7 @@ extern SEXP C_np_npscoef_batch_project(SEXP, SEXP);
 extern SEXP C_np_entropy_gaussian_integrand(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_entropy_symmetric_summation_counts(SEXP, SEXP, SEXP);
 extern SEXP C_np_entropy_bivariate_summation(SEXP, SEXP, SEXP);
+extern SEXP C_np_entropy_bivariate_summation_rows(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_entropy_bivariate_summation_xindex(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_entropy_univariate_summation_counts(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_categorical_profile_kernel_tile(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -237,6 +238,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_entropy_gaussian_integrand",  (DL_FUNC) &C_np_entropy_gaussian_integrand,   4},
     {"C_np_entropy_symmetric_summation_counts",(DL_FUNC) &C_np_entropy_symmetric_summation_counts,3},
     {"C_np_entropy_bivariate_summation",(DL_FUNC) &C_np_entropy_bivariate_summation,3},
+    {"C_np_entropy_bivariate_summation_rows",(DL_FUNC) &C_np_entropy_bivariate_summation_rows,4},
     {"C_np_entropy_bivariate_summation_xindex",(DL_FUNC) &C_np_entropy_bivariate_summation_xindex,4},
     {"C_np_entropy_univariate_summation_counts",(DL_FUNC) &C_np_entropy_univariate_summation_counts,4},
     {"C_np_categorical_profile_kernel_tile",(DL_FUNC) &C_np_categorical_profile_kernel_tile,12},
