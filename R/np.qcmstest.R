@@ -310,6 +310,8 @@ npqcmstest <- function(formula,
     na.index <- which(!keep.rows)
   }
 
+  model <- .np_cms_compact_model(model, xdat, ydat)
+
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)

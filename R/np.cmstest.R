@@ -8,6 +8,25 @@
   invisible(NULL)
 }
 
+# Model methods restore excluded rows for user display. Kernel statistics and
+# bootstrap refits instead share the model's compact design/response sample.
+.np_cms_compact_model <- function(model, xdat, ydat) {
+  n <- nrow(xdat)
+  if (NROW(model[["x", exact = TRUE]]) != n ||
+      length(model[["y", exact = TRUE]]) != n || length(ydat) != n ||
+      !isTRUE(all.equal(as.numeric(model[["y", exact = TRUE]]),
+                        as.numeric(ydat), tolerance = 0, check.attributes = FALSE)))
+    stop("model and test data must contain the same complete observations in the same order",
+         call. = FALSE)
+  # Copy-on-modify: never change the caller's object or independently omit
+  # elements from a residual vector. Keep the original na.action for reporting.
+  model[["na.action"]] <- NULL
+  if (length(residuals(model, type = "response")) != n || length(fitted(model)) != n)
+    stop("model residuals and fitted values must match its retained compact sample",
+         call. = FALSE)
+  model
+}
+
 .np_cms_bootstrap_chunk_size <- function(n,
                                          boot.num,
                                          pivot,
@@ -366,6 +385,8 @@ npcmstest <- function(formula,
 
     na.index <- which(!keep.rows)
   }
+
+  model <- .np_cms_compact_model(model, xdat, ydat)
 
   ## Save seed prior to setting
 
