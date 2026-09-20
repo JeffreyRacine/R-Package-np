@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Fixed categorical class-probability effect plots now apply the fitted
+  probability projection at both category endpoints before subtraction,
+  matching public class-probability predictions.
+
 * Conditional fitted objects retain their resolved properization controls for
   prediction and plotting. Explicit consumer controls take precedence; older
   objects without retained controls keep the historical default behavior.

@@ -1438,6 +1438,11 @@ np_render_control <- function(style = c("band", "bar"),
           where = "plot.conmode"
         )
         eval.level <- function(z) {
+          if (isTRUE(object$proper.requested)) {
+            probability <- .np_plot_conmode_probability_matrix(
+              object, xtrain, ytrain, z, lev)$probabilities
+            return(as.vector(probability[, match(level, lev)]))
+          }
           as.vector(npcdenshat(
             bws = object$bws,
             txdat = xtrain,
