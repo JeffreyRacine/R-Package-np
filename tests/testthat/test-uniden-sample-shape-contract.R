@@ -45,3 +45,36 @@ test_that("one-sided density constraints build conformable quadratic programs", 
   }
   expect_error(npuniden.sc(X,h=.25,lb=c(0,.1)),"numeric scalars")
 })
+
+test_that("shape mass and derivative normalization respect coordinate and scale", {
+  skip_on_cran()
+  owns.pool <- !.mpi_pool_active()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  if (owns.pool) on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  X <- seq(.05,.95,length.out=12)^2; Y <- seq(.1,.9,length.out=7)
+  raw <- npuniden.sc(X,Y,h=.3,constraint="mono.incr")
+  adjusted <- npuniden.sc(X,Y,h=.3,constraint="mono.incr",integral.equal=TRUE)
+  # The identity-distance QP isolates row ownership from inherited conditioning
+  # of A %*% t(A); default-distance normalization is tested separately below.
+  ordered <- npuniden.sc(X,Y,h=.3,constraint="mono.incr",integral.equal=TRUE,
+                         function.distance=FALSE)
+  reordered <- npuniden.sc(rev(X),rev(Y),h=.3,constraint="mono.incr",integral.equal=TRUE,
+                           function.distance=FALSE)
+  expect_true(raw$solve.QP && adjusted$solve.QP && reordered$solve.QP)
+  # Independently compute total integral of the unconstrained density.
+  xx <- sort(c(Y,X))
+  f <- vapply(xx,function(x) mean(dnorm((x-X)/.3)/(.3*(pnorm((1-x)/.3)-pnorm(-x/.3)))),0.)
+  correction <- (xx[2]-xx[1])^2/12 *
+    ((tail(f,1)-tail(f,2)[1])/(xx[2]-xx[1])-(f[2]-f[1])/(xx[2]-xx[1]))
+  total <- sum(diff(xx)*(head(f,-1)+tail(f,-1))/2)-correction
+  expect_equal(raw$f.integral,total,tolerance=1e-13)
+  expect_equal(ordered$f.sc,rev(reordered$f.sc),tolerance=1e-8)
+  expect_equal(ordered$f.sc.deriv,rev(reordered$f.sc.deriv),tolerance=1e-8)
+  factor <- raw$f.sc.integral/raw$f.integral
+  expect_equal(adjusted$f.sc,raw$f.sc/factor,tolerance=1e-13)
+  expect_equal(adjusted$f.sc.deriv,raw$f.sc.deriv/factor,tolerance=1e-13)
+  lograw <- npuniden.sc(X,Y,h=.3,constraint="log-concave")
+  logadjusted <- npuniden.sc(X,Y,h=.3,constraint="log-concave",integral.equal=TRUE)
+  expect_true(lograw$solve.QP && logadjusted$solve.QP)
+  expect_equal(lograw$f.sc.deriv,logadjusted$f.sc.deriv,tolerance=0)
+})

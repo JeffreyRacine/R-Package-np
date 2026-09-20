@@ -96,7 +96,10 @@ These arguments control grid construction, distance metric, and mass preservatio
 \item{integral.equal}{
   a logical value, that, if \code{TRUE}, adjusts the constrained estimate
   to have the same probability mass over the range \code{X}, \code{Y},
-  and the additional grid points
+  and the additional grid points, taking the integral at the rightmost
+  coordinate regardless of input order. Raw density derivatives receive the
+  same normalization; derivatives of the log-density do not change under
+  multiplication of the density by a constant.
 }
 
 
