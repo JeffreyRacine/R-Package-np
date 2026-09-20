@@ -80,7 +80,9 @@ npuniden.sc <- function(X=NULL,
         if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
         if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
         if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
-        sapply(seq_along(X), function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b,deriv=0)^2)[length(X.seq)]})
+        geometry <- .np_quadrature_prepare(X.seq)
+        sapply(seq_along(X), function(i){.np_quadrature_total(X.seq,
+            h*kernel(X[i],X.seq,h,a,b,deriv=0)^2, geometry)})
     }
 
     W.kernel <- function(x,X,h,a=0,b=1,deriv=0) {
@@ -241,10 +243,9 @@ npuniden.sc <- function(X=NULL,
     ## unconstrained estimate
 
     corr.factor <- 1
-    # The integration helper restores input order; total mass is at max(x).
-    right.endpoint <- which.max(X.grid)
-    int.f.sc <- integrate.trapezoidal(X.grid,f.sc)[right.endpoint]
-    int.f <- integrate.trapezoidal(X.grid,f)[right.endpoint]
+    geometry <- .np_quadrature_prepare(X.grid)
+    int.f.sc <- .np_quadrature_total(X.grid,f.sc,geometry)
+    int.f <- .np_quadrature_total(X.grid,f,geometry)
     if(integral.equal) corr.factor <- int.f.sc/int.f
     f.sc <- f.sc/corr.factor
     if (!(constraint %in% c("log-concave", "log-convex")))

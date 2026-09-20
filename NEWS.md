@@ -1,5 +1,16 @@
 # np 0.80-1
 
+* Auxiliary beta density kernels consistently use dimensionless bandwidths on
+  normalized support. Beta2 rejects h > 1/4 and inadmissible explicit grids;
+  automatic starts and optimizer bounds respect that same domain.
+
+* Sampled cumulative quadrature is anchored at zero and invariant to repeated
+  evaluation coordinates. Endpoint correction applies to uniform-grid totals
+  only; irregular-grid totals use the nonuniform trapezoidal rule. Training
+  multiplicities are retained, and the IV derivative iteration reuses prepared
+  shared integration geometry. Entropy's corrected-total arithmetic is unchanged.
+  Absolute auxiliary CDF integration on partial grids remains an open issue.
+
 * Conditional-mean and quantile specification bootstrap refits retain model
   observation weights and, for mean models, offsets. Weighted rq models use
   their retained raw model frame rather than weight-scaled x/y components.

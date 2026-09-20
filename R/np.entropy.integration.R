@@ -146,7 +146,7 @@
   weights[n] <- dx[n - 1L] / 2
   weights[2L:(n - 1L)] <- (dx[-length(dx)] + dx[-1L]) / 2
 
-  ## Match the endpoint correction used by integrate.trapezoidal().
+  ## Match the uniform-grid TOTAL correction in .np_quadrature_total().
   correction <- step / 12
   weights[1L] <- weights[1L] - correction
   weights[2L] <- weights[2L] + correction

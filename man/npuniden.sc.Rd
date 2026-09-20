@@ -130,6 +130,14 @@ This argument chooses the monotonicity, convexity, or log-shape constraint.
   Reported standard errors use the number of training observations in
   \code{X}, not the number of requested evaluation points.
 
+  Numerical integration collapses duplicate integration coordinates, not
+  training observations, and restores the evaluation order and multiplicity.
+  Sampled total integrals use a uniform-grid endpoint correction only when
+  the distinct coordinates are uniformly spaced; otherwise they use the
+  nonuniform trapezoidal rule. The \code{F} and \code{F.sc} calculations
+  currently integrate from the smallest evaluation coordinate, not from the
+  support lower bound when the requested grid covers only part of the support.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
   Typical usages are (see below for a complete list of options and also

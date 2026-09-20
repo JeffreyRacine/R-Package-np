@@ -32,13 +32,13 @@ test_that("entropy quadrature weights enforce their uniform-grid contract", {
 
 test_that("entropy trapezoid weights match the established helper", {
   weights <- getFromNamespace(".np_entropy_trapezoid_weights", "np")
-  established <- getFromNamespace("integrate.trapezoidal", "np")
+  established <- getFromNamespace(".np_quadrature_total", "np")
   grid <- seq(-4, 5, length.out = 257L)
   value <- exp(-grid^2 / 3) * (1 + cos(grid)^2)
 
   expect_equal(
     unname(crossprod(weights(grid), value)[1L]),
-    established(grid, value)[length(grid)],
+    established(grid, value),
     tolerance = 32 * .Machine$double.eps
   )
 })
