@@ -1,3 +1,26 @@
+test_that("density equality rejects only active asymmetric ordered kernels", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  x <- data.frame(o = ordered(rep(1:3, c(12, 4, 5)), levels = 1:3))
+  y <- data.frame(o = ordered(rep(1:3, c(3, 14, 5)), levels = 1:3))
+  bw <- npudensbw(dat = x, bws = .5, bandwidth.compute = FALSE, okertype = "racineliyan")
+  expect_true(all(is.finite(fitted(npudens(bws = bw, tdat = x)))))
+  set.seed(816); seed <- .Random.seed
+  expect_error(npdeneqtest(x, y, bw.x = bw, B = 9), "symmetric ordered kernel")
+  expect_error(npdeneqtest(x, y, bw.y = bw, B = 9), "symmetric ordered kernel")
+  expect_error(npdeneqtest(x, y, okertype = "r", B = 9), "symmetric ordered kernel")
+  expect_identical(.Random.seed, seed)
+  for (kernel in c("liracine", "wangvanryzin")) {
+    bw <- npudensbw(dat = x, bws = .5, bandwidth.compute = FALSE, okertype = kernel)
+    forward <- npdeneqtest(x, y, bw.x = bw, B = 9)
+    reverse <- npdeneqtest(y, x, bw.x = bw, B = 9)
+    expect_equal(forward$In, reverse$In, tolerance = 2e-12)
+  }
+  a <- data.frame(z = seq_len(20)/20)
+  expect_s3_class(npdeneqtest(a, a + .1, bws = .4, bandwidth.compute = FALSE,
+                             okertype = "racineliyan", B = 9), "deneqtest")
+})
+
 test_that("density equality freezes the union support for every contraction", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
