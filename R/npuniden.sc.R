@@ -197,17 +197,12 @@ npuniden.sc <- function(X=NULL,
             bvec <- c(0,-f,-sign.deriv*f.deriv)
         } else {
             ## Constrain the density
-            Amat <- matrix(1, n.train, 1L)
-            bvec <- 0
-            if (!is.null(lb)) {
-                Amat <- cbind(Amat, A)
-                bvec <- c(bvec, lb-f)
-            }
-            # An infinite upper bound is nonbinding, not an infinite QP RHS.
-            if (!is.null(ub) && is.finite(ub)) {
-                Amat <- cbind(Amat, -A)
-                bvec <- c(bvec, f-ub)
-            }
+            # Assemble once: repeated cbind would copy an additional n-by-grid
+            # matrix. An infinite upper bound is a nonbinding inequality.
+            has.upper <- !is.null(ub) && is.finite(ub)
+            Amat <- cbind(rep(1,n.train), if (!is.null(lb)) A,
+                          if (has.upper) -A)
+            bvec <- c(0, if (!is.null(lb)) lb-f, if (has.upper) f-ub)
         }
         output.QP <- tryCatch(solve.QP(Dmat=Dmat,
                                        dvec=dvec,
