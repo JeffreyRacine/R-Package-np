@@ -21481,6 +21481,12 @@ static SEXP np_regression_fitted_execute(void *data)
       for( i=0;i<num_obs_train_extern;i++ )
         vector_Y_extern[i] = ty[ipt[i]];
 
+      /* A separately supplied response at training locations owns the same
+       * evaluation occurrences, hence the same tree permutation. */
+      if(train_is_eval && !ey_is_ty)
+        for(i = 0; i < num_obs_eval_extern; ++i)
+          vector_Y_eval_extern[i] = ey[ipt[i]];
+
     } else {
       build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern,
                    4*num_reg_continuous_extern, ipe, &owner->outer_tree);

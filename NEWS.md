@@ -34,7 +34,7 @@
   validate the paired evaluation row counts.
 
 * Explicit evaluation responses at training locations follow the training-row
-  omission mask. Single-index fits no longer overwrite those supplied
+  omission mask and native tree ordering. Single-index fits no longer overwrite those supplied
   responses when calculating goodness-of-fit statistics.
 
 * Retained-bandwidth conditional, single-index, partially linear and
