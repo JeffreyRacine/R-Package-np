@@ -1324,7 +1324,7 @@ nplsqregbw.formula <-
     if (!is.null(dots$scale)) dots$scale <- mf[["(scale)"]]
     train.omit <- attr(mf, "na.action")
     ydat <- model.response(mf)
-    xdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
+    xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
     out <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = tau), dots))
     out <- .nplsqreg_record_omit(out, attr(mf, "na.action"))
     out$formula <- bws
@@ -1843,7 +1843,7 @@ nplsqreg.formula <-
     if (!is.null(dots$scale)) dots$scale <- mf[["(scale)"]]
     train.omit <- attr(mf, "na.action")
     ydat <- model.response(mf)
-    xdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
+    xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
 
     has.eval <- !is.null(native.exdat) || !is.null(newdata)
     if (!is.null(native.exdat)) {
@@ -1853,7 +1853,7 @@ nplsqreg.formula <-
                      list(formula = .np_formula_aligned_terms(delete.response(tt)), data = native.exdat),
                      envir = parent.frame())
       eval.omit <- attr(emf, "na.action")
-      exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]
+      exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"), "term.labels")), drop = FALSE]
     } else if (has.eval) {
       npValidateNewdataFormula(newdata, delete.response(tt),
                                include.response = FALSE)
@@ -1861,7 +1861,7 @@ nplsqreg.formula <-
                      list(formula = .np_formula_aligned_terms(delete.response(tt)), data = newdata),
                      envir = parent.frame())
       eval.omit <- attr(emf, "na.action")
-      exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]
+      exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"), "term.labels")), drop = FALSE]
     } else {
       eval.omit <- NULL
     }

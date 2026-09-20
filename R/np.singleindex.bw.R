@@ -27,7 +27,7 @@ npindexbw.formula <-
     mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
 
     ydat <- model.response(mf)
-    xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
+    xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]
 
     tbw <- do.call(npindexbw, c(list(xdat = xdat, ydat = ydat), list(...)))
 

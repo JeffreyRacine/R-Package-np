@@ -33,7 +33,7 @@ npplregbw.formula <-
     dots$.np.formula.state <- NULL
     tbw <- do.call(npplregbw,
                   c(list(xdat = roles$x, ydat = model.response(roles$yz),
-                         zdat = roles$yz[, spec$chromoly[[3L]], drop = FALSE]),
+                         zdat = roles$yz[, .np_formula_term_names(spec$chromoly[[3L]]), drop = FALSE]),
                     dots))
 
     tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))

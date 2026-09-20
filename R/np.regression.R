@@ -272,7 +272,7 @@ npreg.formula <-
 
     response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
-    txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+    txdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
     has.eval <- !is.null(newdata)
     if (has.eval) {
       if (!y.eval){
@@ -291,7 +291,7 @@ npreg.formula <-
       if (y.eval)
         eydat <- model.response(emf)
       
-      exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
+      exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"),"term.labels")), drop = FALSE]
     }
 
     reg.bws <- if (!is.null(dots$bws)) {

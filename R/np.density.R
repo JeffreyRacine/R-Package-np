@@ -49,7 +49,7 @@ npudens.formula <-
     bws <- .np_bws_retain_fit_frame(bws, tmf)
     train.omit <- attr(tmf, "na.action")
 
-    tdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+    tdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
@@ -59,7 +59,7 @@ npudens.formula <-
       emf <- umf
       eval.omit <- attr(umf, "na.action")
 
-      edat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
+      edat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"),"term.labels")), drop = FALSE]
     } else {
       eval.omit <- train.omit
     }

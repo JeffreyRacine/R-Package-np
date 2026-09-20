@@ -31,7 +31,7 @@ if (getRversion() >= "2.15.1")
     tmf <- .np_bws_formula_model_frame(obj, mf.args)
 
     ydat <- model.response(tmf)
-    xdat <- tmf[, attr(attr(tmf, "terms"), "term.labels"), drop = FALSE]
+    xdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"), "term.labels")), drop = FALSE]
     return(list(xdat = xdat, ydat = ydat))
   }
 
@@ -342,7 +342,7 @@ npsigtest.formula <-
     else .np_formula_frame_take(frame.state)
 
     ydat <- model.response(tmf)
-    xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+    xdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
 
     ev <- if (is.null(frame.state)) {
       npsigtest(xdat = xdat, ydat = ydat, bws = bws, ...)

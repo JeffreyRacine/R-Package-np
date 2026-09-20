@@ -444,6 +444,6 @@
   .np_formula_validate_syntax(bws$formula, conditional.response = TRUE)
   tt <- bws$terms
   attr(tt, "predvars") <- .np_formula_unwrap_prediction(tt)$prediction
-  response <- match(bws$variableNames[["response"]], attr(tt, "term.labels"))
+  response <- match(bws$variableNames[["response"]], .np_formula_term_names(attr(tt, "term.labels")))
   drop.terms(tt, response)
 }

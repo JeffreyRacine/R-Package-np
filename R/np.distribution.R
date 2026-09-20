@@ -47,7 +47,7 @@ npudist.formula <-
     tt <- attr(tmf, "terms")
     bws <- .np_bws_retain_fit_frame(bws, tmf)
 
-    tdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+    tdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
@@ -56,7 +56,7 @@ npudist.formula <-
       umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
       emf <- umf
 
-      edat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
+      edat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"),"term.labels")), drop = FALSE]
     }
     
     ud.args <- list(tdat = tdat)

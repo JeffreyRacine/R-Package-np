@@ -1940,7 +1940,7 @@ npreghat.formula <-
     tt <- attr(mf, "terms")
 
     y <- model.response(mf)
-    txdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
+    txdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
@@ -1948,7 +1948,7 @@ npreghat.formula <-
       et <- delete.response(tt)
       emf <- do.call(.np_formula_model_frame, list(formula = et, data = newdata),
                      envir = environment(tt))
-      exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]
+      exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"), "term.labels")), drop = FALSE]
     }
 
     hat.args <- list(bws = bws, txdat = txdat)

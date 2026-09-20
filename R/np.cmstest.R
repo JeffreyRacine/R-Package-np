@@ -362,7 +362,7 @@ npcmstest <- function(formula,
     mf <- do.call(model.frame, mf.args)
     
     ydat <- model.response(mf)
-    xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
+    xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]
 
     na.index <- unclass(attr(xdat,"na.action"))
   } else if(!miss.f){

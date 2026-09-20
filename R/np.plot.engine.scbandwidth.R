@@ -149,9 +149,9 @@
       umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args)
       
       ydat <- model.response(tmf)
-      xdat <- tmf[, bws$chromoly[[2]], drop = FALSE]
+      xdat <- tmf[, .np_formula_term_names(bws$chromoly[[2]]), drop = FALSE]
       if (!miss.z)
-        zdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
+        zdat <- tmf[, .np_formula_term_names(bws$chromoly[[3]]), drop = FALSE]
     } else {
       if(all(miss.xy) && !is.null(bws$call)){
         xdat <- data.frame(.np_eval_bws_call_arg(bws, "xdat"))

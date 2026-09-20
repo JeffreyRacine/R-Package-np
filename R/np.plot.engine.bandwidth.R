@@ -77,7 +77,7 @@
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args)
 
-      xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+      xdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
     } else {
       if(miss.x && !is.null(bws$call)){
         xdat <- data.frame(.np_eval_bws_call_arg(bws, "dat"))

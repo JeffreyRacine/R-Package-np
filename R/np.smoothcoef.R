@@ -57,10 +57,10 @@ npscoef.formula <-
 
     response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
-    txdat <- tmf[, bws$chromoly[[2]], drop = FALSE]
+    txdat <- tmf[, .np_formula_term_names(bws$chromoly[[2]]), drop = FALSE]
     miss.z <- !(length(bws$chromoly) == 3)
     if (!miss.z)
-      tzdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
+      tzdat <- tmf[, .np_formula_term_names(bws$chromoly[[3]]), drop = FALSE]
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
@@ -79,9 +79,9 @@ npscoef.formula <-
       if (y.eval)
         eydat <- model.response(emf)
       
-      exdat <- emf[, bws$chromoly[[2]], drop = FALSE]
+      exdat <- emf[, .np_formula_term_names(bws$chromoly[[2]]), drop = FALSE]
       if (!miss.z)
-        ezdat <- emf[, bws$chromoly[[3]], drop = FALSE]
+        ezdat <- emf[, .np_formula_term_names(bws$chromoly[[3]]), drop = FALSE]
     }
 
 
