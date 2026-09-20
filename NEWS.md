@@ -1,5 +1,27 @@
 # np 0.80-1
 
+* Density-equality tests now use one common bandwidth in both samples and
+  all bootstrap replications. Automatic selection uses first-sample LSCV,
+  following the archived table scripts; explicit CV-method choices remain
+  available. One supplied bandwidth is reused without a search; incompatible
+  two-bandwidth inputs are rejected. The paper's pooled-selection description
+  and this first-sample implementation are distinguished in the help page.
+  This test now explicitly rejects nearest-neighbour bandwidths and
+  boundary-normalized/beta kernels, whose directed cross sums need not be
+  symmetric as its statistic and studentizer require. Fixed unnormalized
+  Gaussian, Epanechnikov and uniform kernels remain supported. No other
+  estimator's kernel or nearest-neighbour capabilities change.
+
+* Bootstrap upper-tail p-values count ties as at least as extreme in all
+  inference routines, consistently with significance tests. They remain
+  ordinary bootstrap proportions (no add-one correction); zero p-values
+  remain possible. Discrete/categorical tied cases may now report larger
+  p-values.
+
+* Smooth-coefficient hat application with categorical profile compression
+  now expresses a positive ridge in the same kernel-weight units as the
+  matrix output. Bandwidth selection and zero-ridge arithmetic are unchanged.
+
 * Native data-first fitting calls such as `npudens(x)` again pass observations
   to bandwidth selection instead of interpreting them as bandwidths. Explicit
   manual-bandwidth and named training-data calls retain their interpretation.
