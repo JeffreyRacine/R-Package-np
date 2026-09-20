@@ -74,7 +74,7 @@ npudensbw.NULL <-
     )
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
-      t.names <- deparse(substitute(dat))
+      t.names <- paste(deparse(substitute(dat)), collapse = "")
 
     dat = toFrame(dat)
     
@@ -1153,7 +1153,7 @@ npudensbw.default <-
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudensbw")
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
-      t.names <- deparse(substitute(dat))
+      t.names <- paste(deparse(substitute(dat)), collapse = "")
 
     dat <- toFrame(dat)
     

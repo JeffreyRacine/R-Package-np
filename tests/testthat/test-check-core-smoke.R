@@ -22,6 +22,16 @@ test_that("npudist core smoke stays alive", {
   expect_true(all(predict(fit) >= 0 & predict(fit) <= 1))
 })
 
+test_that("unconditional data-first calls retain the training-data argument", {
+  x <- data.frame(x = seq(.1, .9, length.out = 12L))
+  for (fit in list(npudens, npudist)) {
+    a <- fit(x, bwmethod = "normal-reference")
+    b <- fit(tdat = x, bwmethod = "normal-reference")
+    expect_identical(fitted(a), fitted(b))
+    expect_identical(a$bws$bw, b$bws$bw)
+  }
+})
+
 test_that("npreg core smoke aligns lagged time series before fitting", {
   set.seed(20260915)
   y <- stats::ts(rnorm(28), start = c(2001, 1), frequency = 4)

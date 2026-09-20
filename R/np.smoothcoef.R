@@ -151,7 +151,8 @@ npscoef.call <-
 
 npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
                             se = FALSE, ...) {
-  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame(),
+                               required.training = c("txdat", "tydat"))
   sc.names <- names(sc)
   nomad <- npValidateNomadControl(nomad, "nomad")
   npRejectLegacyBooleanErrors(.np_formula_dispatch_args(

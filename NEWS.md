@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Native data-first fitting calls such as `npudens(x)` again pass observations
+  to bandwidth selection instead of interpreting them as bandwidths. Explicit
+  manual-bandwidth and named training-data calls retain their interpretation.
+  Long univariate input expressions no longer fail while constructing a
+  single variable label.
+
 * Univariate entropy equality and symmetry tests retain declared categorical
   support, including unused levels, throughout probability summation and
   bootstrap resampling. Equality tests use common category metadata; ambiguous
