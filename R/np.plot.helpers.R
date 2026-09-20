@@ -8715,7 +8715,7 @@ plotFactor <- function(f, y, ...){
     tmf <- .np_bws_formula_model_frame(bws, mf.args)
 
     ydat <- model.response(tmf)
-    xdat <- tmf[, attr(attr(tmf, "terms"), "term.labels"), drop = FALSE]
+    xdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"), "term.labels")), drop = FALSE]
     return(list(xdat = xdat, ydat = ydat))
   }
 

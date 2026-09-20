@@ -26,7 +26,7 @@ npksum.formula <-
     if (!is.null(dots$weights)) dots$weights <- model.weights(mf)
     
     tydat <- model.response(mf)
-    txdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
+    txdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]
 
     miss.new <- missing(newdata)
     if (!miss.new){
@@ -34,7 +34,7 @@ npksum.formula <-
       npValidateNewdataFormula(newdata, tt, include.response = FALSE)
       umf.args <- list(formula = tt, data = newdata)
       umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
-      exdat <- umf[, attr(attr(umf, "terms"),"term.labels"), drop = FALSE]
+      exdat <- umf[, .np_formula_term_names(attr(attr(umf, "terms"),"term.labels")), drop = FALSE]
     }
 
     call_args <- list(txdat = txdat)

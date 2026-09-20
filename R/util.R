@@ -2884,9 +2884,7 @@ explodeFormula <- function(formula, data=NULL){
   formula.terms <- if (is.null(data)) terms(formula) else terms(formula, data = data)
   response <- if (length(formula) == 3L) all.vars(formula[[2L]]) else character(0)
   term.labels.raw <- attr(formula.terms, "term.labels")
-  term.labels <- ifelse(grepl("^`[^`]+`$", term.labels.raw),
-                        substring(term.labels.raw, 2L, nchar(term.labels.raw) - 1L),
-                        term.labels.raw)
+  term.labels <- .np_formula_term_names(term.labels.raw)
   res <- list(response, term.labels)
   stopifnot(all(sapply(res,length) > 0))
   names(res) <- c("response","terms")
@@ -2933,14 +2931,20 @@ explodePipe <- function(formula, env = parent.frame()){
       stop(conditionMessage(formula), call. = FALSE)
   }
   .np_formula_validate_syntax(formula)
-  tf <- as.character(formula)  
-  tf <- tf[length(tf)]
-  lhs <- if (length(as.character(formula)) == 3) {
-    strsplit(as.character(formula)[2], " *[+] *")
-  } else {
-    list()
+  # Split actual formula operators, not punctuation inside quoted names or
+  # transformations. Keep parseable labels for the existing formula owners.
+  split.operator <- function(expr, operator) {
+    if (is.call(expr) && length(expr) == 3L &&
+        identical(expr[[1L]], as.name(operator)))
+      return(c(split.operator(expr[[2L]], operator),
+               split.operator(expr[[3L]], operator)))
+    list(expr)
   }
-  rhs <- strsplit(strsplit(tf, " *[|] *")[[1]], " *[+] *")
+  labels <- function(expr) vapply(split.operator(expr, "+"), function(term)
+    paste(deparse(term, backtick = TRUE, width.cutoff = 500L), collapse = ""),
+    character(1L))
+  lhs <- if (length(formula) == 3L) list(labels(formula[[2L]])) else list()
+  rhs <- lapply(split.operator(formula[[length(formula)]], "|"), labels)
   c(lhs, rhs)
 }
 

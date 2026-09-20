@@ -41,7 +41,7 @@ npplreg.formula <-
     roles <- .np_plreg_formula_split(frame, bws$terms, bws$xterms)
     response.name <- names(roles$yz)[attr(bws$terms, "response")]
     pl.args <- list(txdat = roles$x, tydat = model.response(roles$yz),
-                    tzdat = roles$yz[, bws$chromoly[[3L]], drop = FALSE],
+                    tzdat = roles$yz[, .np_formula_term_names(bws$chromoly[[3L]]), drop = FALSE],
                     se = se)
     umf <- frame
     native.eval <- !is.null(dots[["exdat", exact = TRUE]]) ||
@@ -59,7 +59,7 @@ npplreg.formula <-
       umf <- .np_formula_model_frame(tt, data = newdata)
       evaluation <- .np_plreg_formula_split(umf, yzterms, bws$xterms)
       pl.args$exdat <- evaluation$x
-      pl.args$ezdat <- evaluation$yz[, bws$chromoly[[3L]], drop = FALSE]
+      pl.args$ezdat <- evaluation$yz[, .np_formula_term_names(bws$chromoly[[3L]]), drop = FALSE]
       if (response.eval)
         pl.args$eydat <- model.response(evaluation$yz)
     }

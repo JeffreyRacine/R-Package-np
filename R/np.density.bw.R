@@ -46,7 +46,7 @@ npudensbw.formula <-
     if (attr(attr(mf, "terms"), "response") != 0)
       stop("invalid density formula")
     
-    dat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
+    dat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]
     
     dots <- list(...)
     .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], mf)

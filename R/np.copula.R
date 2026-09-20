@@ -1253,7 +1253,7 @@ plot.npcopula <- function(x,
           add = TRUE)
   u.auto <- is.null(u) && identical(evaluation, "grid")
   frame.state$validate.training <- function(frame) {
-    dat <- frame[, attr(attr(frame, "terms"), "term.labels"), drop = FALSE]
+    dat <- frame[, .np_formula_term_names(attr(attr(frame, "terms"), "term.labels")), drop = FALSE]
     if (u.auto && ncol(dat) != 2L)
       stop("automatic copula probability grids are supported only for two variables; supply 'u' or use evaluation='sample'")
   }
@@ -1264,7 +1264,7 @@ plot.npcopula <- function(x,
     .np_formula_dispatch_call(bw.fun, bw.args, expressions, envir)
   )
   mf <- .np_formula_frame_take(frame.state)
-  dat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
+  dat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
   if (u.auto) u <- .npcopula_make_auto_u(names(dat), neval)
   list(bws = bw, data = dat, u = u, u.auto = u.auto)
 }

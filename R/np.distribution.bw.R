@@ -88,7 +88,7 @@ npudistbw.formula <-
     if (attr(attr(mf, "terms"), "response") != 0)
       stop("invalid distribution formula")
     
-    dat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
+    dat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]
 
     has.gval <- !is.null(gdata)
     if (has.gval) {
@@ -102,7 +102,7 @@ npudistbw.formula <-
       gmf.args <- as.list(gmf[-1L])
       gmf <- do.call(.np_formula_model_frame, gmf.args, envir = parent.frame())
 
-      gdat <- gmf[, attr(attr(gmf, "terms"),"term.labels"), drop = FALSE]
+      gdat <- gmf[, .np_formula_term_names(attr(attr(gmf, "terms"),"term.labels")), drop = FALSE]
 
     }
 

@@ -754,7 +754,7 @@ gradients.lsqregression <- function(x, se = FALSE,
   mf <- do.call(.np_formula_model_frame, list(formula = rhs, data = newdata),
                 envir = environment(tt))
   mf <- .np_formula_complete_training_frame(mf)
-  list(exdat = mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE],
+  list(exdat = mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE],
        omit = attr(mf, "na.action"))
 }
 

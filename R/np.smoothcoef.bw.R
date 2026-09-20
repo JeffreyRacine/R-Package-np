@@ -43,10 +43,10 @@ npscoefbw.formula <-
     mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
     
     ydat <- model.response(mf)
-    xdat <- mf[, chromoly[[2]], drop = FALSE]
+    xdat <- mf[, .np_formula_term_names(chromoly[[2]]), drop = FALSE]
     miss.z <- !(length(chromoly) == 3)
     if (!miss.z)
-      zdat <- mf[, chromoly[[3]], drop = FALSE]
+      zdat <- mf[, .np_formula_term_names(chromoly[[3]]), drop = FALSE]
     
     bw.args <- list(xdat = xdat, ydat = ydat)
     if (!miss.z)

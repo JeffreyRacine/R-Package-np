@@ -1,3 +1,16 @@
+# terms() quotes non-syntactic symbols; model.frame() uses their actual names.
+# Resolve only a simple symbol. Never evaluate a term or rewrite a transform,
+# interaction, formula, predvars expression, or the user's data-frame names.
+.np_formula_term_names <- function(labels) {
+  quoted <- which(startsWith(labels, "`"))
+  if (!length(quoted)) return(labels)
+  for (i in quoted) {
+    term <- str2lang(labels[[i]])
+    if (is.symbol(term)) labels[[i]] <- as.character(term)
+  }
+  labels
+}
+
 # Inspect terms, not text: offset as a variable/response or inside an ordinary
 # transformation is not an offset special and retains its existing semantics.
 .np_formula_validate_terms <- function(tt) {
@@ -279,7 +292,7 @@
 .np_bws_formula_roles <- function(bws) {
   tt <- bws[["terms", exact = TRUE]]
   if (inherits(bws, c("bandwidth", "dbandwidth")))
-    return(list(dat = attr(tt, "term.labels")))
+    return(list(dat = .np_formula_term_names(attr(tt, "term.labels"))))
   if (inherits(bws, c("conbandwidth", "condbandwidth")))
     return(list(xdat = bws$variableNames[["terms"]],
                 ydat = bws$variableNames[["response"]]))
@@ -289,11 +302,11 @@
     paste(deparse(variable, width.cutoff = 500L), collapse = "")
   chromoly <- bws[["chromoly", exact = TRUE]]
   if (inherits(bws, c("plbandwidth", "scbandwidth"))) {
-    out <- list(xdat = chromoly[[2L]], ydat = response)
-    if (length(chromoly) == 3L) out$zdat <- chromoly[[3L]]
+    out <- list(xdat = .np_formula_term_names(chromoly[[2L]]), ydat = response)
+    if (length(chromoly) == 3L) out$zdat <- .np_formula_term_names(chromoly[[3L]])
     return(out)
   }
-  list(xdat = attr(tt, "term.labels"), ydat = response)
+  list(xdat = .np_formula_term_names(attr(tt, "term.labels")), ydat = response)
 }
 
 .np_bws_retain_formula_roles <- function(bws, training) {
@@ -581,5 +594,5 @@
   frame <- .np_plreg_formula_frame(bws, data)
   roles <- .np_plreg_formula_split(frame, bws$terms, bws$xterms)
   list(txdat = roles$x, tydat = model.response(roles$yz),
-       tzdat = roles$yz[, bws$chromoly[[3L]], drop = FALSE])
+       tzdat = roles$yz[, .np_formula_term_names(bws$chromoly[[3L]]), drop = FALSE])
 }

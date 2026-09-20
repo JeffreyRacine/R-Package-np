@@ -122,7 +122,7 @@ npindex.formula <-
           if (!raw.formula) bws <- .np_bws_retain_fit_frame(bws, tmf)
           response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
           tydat <- model.response(tmf)
-          txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+          txdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
         }
         has.eval <- !is.null(newdata)
         if (has.eval) {
@@ -140,7 +140,7 @@ npindex.formula <-
           if (y.eval)
             eydat <- model.response(emf)
           
-          exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
+          exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"),"term.labels")), drop = FALSE]
         }
 
         si.bws <- if (!is.null(dots$.np_index_explicit_bws)) {
@@ -258,7 +258,7 @@ npindex.call <-
 
 .np_index_formula_reentry_xdat <- function(mf) {
   terms.obj <- attr(mf, "terms")
-  mf[, attr(terms.obj, "term.labels"), drop = FALSE]
+  mf[, .np_formula_term_names(attr(terms.obj, "term.labels")), drop = FALSE]
 }
 
 .np_index_formula_reentry_rhs_terms <- function(formula, xdat) {
