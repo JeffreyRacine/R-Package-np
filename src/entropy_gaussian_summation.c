@@ -120,9 +120,8 @@ SEXP C_np_entropy_symmetric_summation_counts(SEXP support,
  * statistic.  This avoids three general npksum() setups and makes one streamed
  * pass over each training/evaluation pair with constant auxiliary storage.
  */
-SEXP C_np_entropy_bivariate_summation(SEXP x,
-                                      SEXP y,
-                                      SEXP bandwidths)
+static SEXP np_entropy_bivariate_summation(SEXP x, SEXP y,
+                                          SEXP bandwidths, SEXP rows)
 {
   const double *x_ptr;
   const double *y_ptr;
@@ -130,6 +129,9 @@ SEXP C_np_entropy_bivariate_summation(SEXP x,
   const R_xlen_t n = XLENGTH(x);
   long double statistic_sum = 0.0L;
   int interrupt_countdown = NP_ENTROPY_SUMMATION_INTERRUPT_INTERVAL;
+  const int selected = rows != R_NilValue;
+  const R_xlen_t n_eval = selected ? XLENGTH(rows) : n;
+  SEXP answer = R_NilValue;
 
   if (TYPEOF(x) != REALSXP || TYPEOF(y) != REALSXP ||
       TYPEOF(bandwidths) != REALSXP || n < 1 || XLENGTH(y) != n ||
@@ -146,7 +148,18 @@ SEXP C_np_entropy_bivariate_summation(SEXP x,
     if (!R_FINITE(x_ptr[i]) || !R_FINITE(y_ptr[i]))
       Rf_error("bivariate entropy data must be finite");
 
-  for (R_xlen_t evaluation = 0; evaluation < n; ++evaluation) {
+  if (selected) {
+    if (TYPEOF(rows) != INTSXP)
+      Rf_error("entropy evaluation rows must be integer indices");
+    for (R_xlen_t j = 0; j < n_eval; ++j)
+      if (INTEGER(rows)[j] == NA_INTEGER ||
+          INTEGER(rows)[j] < 1 || (R_xlen_t)INTEGER(rows)[j] > n)
+        Rf_error("entropy evaluation row is outside the training sample");
+    answer = PROTECT(Rf_allocVector(REALSXP, n_eval));
+  }
+
+  for (R_xlen_t j = 0; j < n_eval; ++j) {
+    const R_xlen_t evaluation = selected ? INTEGER(rows)[j] - 1 : j;
     long double sum_x = 0.0L;
     long double sum_y = 0.0L;
     long double sum_joint = 0.0L;
@@ -179,11 +192,29 @@ SEXP C_np_entropy_bivariate_summation(SEXP x,
         (sum_x * sum_y * bw[2] * bw[3]) /
         ((long double)n * sum_joint * bw[0] * bw[1]);
       const double term = 1.0 - sqrt((double)ratio);
-      statistic_sum += term * term;
+      if (selected) REAL(answer)[j] = term * term;
+      else statistic_sum += term * term;
     }
   }
 
+  if (selected) {
+    UNPROTECT(1);
+    return answer;
+  }
   return Rf_ScalarReal(0.5 * (double)(statistic_sum / n));
+}
+
+SEXP C_np_entropy_bivariate_summation(SEXP x, SEXP y, SEXP bandwidths)
+{
+  return np_entropy_bivariate_summation(x, y, bandwidths, R_NilValue);
+}
+
+SEXP C_np_entropy_bivariate_summation_rows(SEXP x, SEXP y,
+                                          SEXP bandwidths, SEXP rows)
+{
+  if (rows == R_NilValue)
+    Rf_error("entropy evaluation rows must be integer indices");
+  return np_entropy_bivariate_summation(x, y, bandwidths, rows);
 }
 
 /*
