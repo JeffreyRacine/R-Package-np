@@ -80,11 +80,66 @@
   out
 }
 
+# One declared domain belongs to the test, not to individual contractions.
+.npdeneq_common_support <- function(x, y, bandwidths = list()) {
+  for (j in seq_along(x)) {
+    ordered <- is.ordered(x[[j]])
+    categorical <- is.factor(x[[j]])
+    if (categorical != is.factor(y[[j]]) ||
+        ordered != is.ordered(y[[j]]))
+      stop("density-equality samples must have matching variable types", call. = FALSE)
+    if (!categorical) next
+    domains <- c(list(y[[j]]), lapply(bandwidths, function(bw) {
+      if (is.null(bw) || is.numeric(bw)) return(NULL)
+      dati <- bw[["xdati", exact = TRUE]]
+      if (length(dati[["all.lev"]]) != ncol(x) ||
+          !identical(unname(dati[["iord"]][j]), ordered) ||
+          !identical(unname(dati[["iuno"]][j]), !ordered))
+        stop("density-equality bandwidth types must match the samples", call. = FALSE)
+      factor(character(), levels = dati[["all.lev"]][[j]], ordered = ordered)
+    }))
+    common <- x[[j]]
+    for (domain in domains) {
+      if (is.null(domain) || identical(levels(common), levels(domain))) next
+      # Reuse the established declared-support policy, without changing its
+      # entropy consumers or inferring an order for qualitative categories.
+      common <- .np_entropy_factor_support(common, domain)$x
+    }
+    levels <- levels(common)
+    if (!identical(levels(x[[j]]), levels)) x[[j]] <- common
+    if (!identical(levels(y[[j]]), levels))
+      y[[j]] <- factor(y[[j]], levels = levels, ordered = ordered)
+  }
+  list(x = x, y = y)
+}
+
+.npdeneq_prepare_bandwidth <- function(bw, x) {
+  bw <- .npdeneq_validate_bandwidth(bw)
+  dati <- untangle(x)
+  if (is.numeric(bw))
+    return(kbandwidth.numeric(bw, xdati = dati, xnames = names(x), nobs = nrow(x)))
+  kbw <- if (inherits(bw, "kbandwidth")) bw else kbandwidth(bw)
+  for (kind in c("icon", "iuno", "iord"))
+    if (!identical(unname(kbw[[kind, exact = TRUE]]), unname(dati[[kind]])))
+      stop("density-equality bandwidth types must match the samples", call. = FALSE)
+  if (identical(kbw[["xdati"]][["all.lev"]], dati[["all.lev"]]))
+    return(kbw)
+  # Rebuild metadata through the canonical constructor, never by mutating
+  # bandwidth slots. Ordered density-to-kernel translation has already occurred.
+  args <- kbw[c("bw", "ckertype", "ckerorder", "ckerbound", "ckerlb",
+               "ckerub", "ukertype", "okertype")]
+  args$bwtype <- kbw[["type"]]
+  args$xdati <- dati
+  args$xnames <- names(x)
+  args$nobs <- nrow(x)
+  do.call(kbandwidth.numeric, args)
+}
+
 .npdeneq_common_bandwidth <- function(x, bw.x, bw.y, ...) {
   if (is.null(bw.x) && is.null(bw.y))
-    return(.npdeneq_validate_bandwidth(.npdeneq_select_bandwidth(x, ...)))
-  if (!is.null(bw.x)) bw.x <- .npdeneq_validate_bandwidth(bw.x)
-  if (!is.null(bw.y)) bw.y <- .npdeneq_validate_bandwidth(bw.y)
+    return(.npdeneq_prepare_bandwidth(.npdeneq_select_bandwidth(x, ...), x))
+  if (!is.null(bw.x)) bw.x <- .npdeneq_prepare_bandwidth(bw.x, x)
+  if (!is.null(bw.y)) bw.y <- .npdeneq_prepare_bandwidth(bw.y, x)
   if (is.null(bw.x)) return(bw.y)
   if (is.null(bw.y)) return(bw.x)
   if (!identical(.npdeneq_bandwidth_signature(bw.x, x),
@@ -120,6 +175,10 @@ npdeneqtest <- function(x = NULL,
   if (nrow(x) < 2L || nrow(y) < 2L)
     stop("x and y must each contain at least two complete observations")
 
+  support <- .npdeneq_common_support(x, y,
+    list(bw.x, bw.y, if (is.null(bw.x) && is.null(bw.y)) list(...)[["bws"]]))
+  x <- support$x
+  y <- support$y
   bw.x <- .npdeneq_common_bandwidth(x, bw.x, bw.y, ...)
   bw.y <- bw.x
 
