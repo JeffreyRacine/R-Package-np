@@ -4807,10 +4807,11 @@ W.lp <- function(xdat = NULL,
 
     ## Local constant OR no continuous variables
 
+    constant <- if (gradient.compute && any(gradient.vec > 0L)) 0 else 1
     if(is.null(exdat)) {
-      return(matrix(1,nrow=nrow(as.data.frame(xdat)),ncol=1))
+      return(matrix(constant,nrow=nrow(as.data.frame(xdat)),ncol=1))
     } else {
-      return(matrix(1,nrow=nrow(as.data.frame(exdat)),ncol=1))
+      return(matrix(constant,nrow=nrow(as.data.frame(exdat)),ncol=1))
     }
 
   } else {
@@ -4822,7 +4823,6 @@ W.lp <- function(xdat = NULL,
     } else {
       res <- rep.int(1,nrow(exdat.numeric))
     }
-    res.deriv <- 1
     if(degree[1] > 0) {
       res <- cbind(1, mypoly(x=xdat.numeric[,1],
                              ex=exdat.numeric[,1],
@@ -4832,8 +4832,6 @@ W.lp <- function(xdat = NULL,
                              Bernstein=Bernstein,
                              complete.glp=identical(basis, "glp")))[, 1 + z.noi[, 1]]
 
-      if(gradient.compute && gradient.vec[1] != 0) res.deriv <- cbind(1,matrix(NA,1,degree[1]))[, 1 + z.noi[, 1],drop=FALSE]
-      if(gradient.compute && gradient.vec[1] == 0) res.deriv <- cbind(1,matrix(0,1,degree[1]))[, 1 + z.noi[, 1],drop=FALSE]
     }
     if(k > 1) for (i in 2:k) if(degree[i] > 0) {
       res <- res * cbind(1, mypoly(x=xdat.numeric[,i],
@@ -4843,8 +4841,6 @@ W.lp <- function(xdat = NULL,
                                    r=gradient.vec[i],
                                    Bernstein=Bernstein,
                                    complete.glp=identical(basis, "glp")))[, 1 + z.noi[, i]]
-      if(gradient.compute && gradient.vec[i] != 0) res.deriv <- res.deriv * cbind(1,matrix(NA,1,degree[i]))[, 1 + z.noi[, i],drop=FALSE]
-      if(gradient.compute && gradient.vec[i] == 0) res.deriv <- res.deriv *cbind(1,matrix(0,1,degree[i]))[, 1 + z.noi[, i],drop=FALSE]
     }
 
     if(is.null(exdat)) {
@@ -4852,13 +4848,18 @@ W.lp <- function(xdat = NULL,
     } else {
       res <- matrix(res,nrow=NROW(exdat))
     }
-    if(gradient.compute) res.deriv <- matrix(res.deriv,nrow=1)
     colnames(res) <- apply(z.noi, 1L, function(x) paste(x, collapse = "."))
-    if(gradient.compute) colnames(res.deriv) <- apply(z.noi, 1L, function(x) paste(x, collapse = "."))
 
     if(gradient.compute) {
-      res[,!is.na(as.numeric(res.deriv))] <- 0
-      return(cbind(0,res))
+      # A constant factor on any differentiated axis annihilates the product.
+      # Nonconstant Bernstein column indices are not polynomial degrees;
+      # mypoly, not this mask, owns their within-axis derivatives.
+      axes <- which(gradient.vec > 0L)
+      if (length(axes)) {
+        zero <- rowSums(z.noi[, axes, drop = FALSE] == 0L) > 0L
+        res[, zero] <- 0
+      }
+      return(cbind(if (length(axes)) 0 else 1,res))
     } else {
       return(cbind(1,res))
     }

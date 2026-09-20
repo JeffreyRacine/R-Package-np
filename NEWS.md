@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Mixed local-polynomial derivatives correctly differentiate every coordinate,
+  including constant factors and degree-zero axes. All-zero derivative orders
+  return the value basis, including its intercept.
+
 * Conditional fits, operators and bootstrap preparation consistently resolve
   retained scale factors to physical bandwidths, including the separate X/Y
   calculations used by local-polynomial fits. Resampling does not rescale the
