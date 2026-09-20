@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Conditional properization no longer treats LC/degree-zero fitting alone
+  as a guarantee of a proper density or CDF. The shortcut also checks kernel
+  positivity, response normalization and nearest-neighbour orientation.
+
 * Fixed categorical class-probability effect plots now apply the fitted
   probability projection at both category endpoints before subtraction,
   matching public class-probability predictions.

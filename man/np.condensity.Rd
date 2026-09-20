@@ -172,6 +172,13 @@ These arguments control optional post-estimation properization of the fitted con
     a logical value specifying whether to apply post-estimation
     properization to the conditional density estimate. Defaults to
     \code{FALSE}.
+    Local-constant or degree-zero fits bypass correction only when their
+    kernels and bandwidth geometry guarantee nonnegative, unit-mass response
+    components and nonnegative predictor weights. Signed kernels,
+    generalized-nearest-neighbour response bandwidths and target-centred
+    bounded or beta response densities do not have this guarantee. Requested
+    correction then uses the existing supported grid or slice procedure,
+    with its additional evaluation cost and support requirements.
   }
 
 

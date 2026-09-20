@@ -173,6 +173,12 @@ These arguments control optional post-estimation properization of the fitted con
     a logical value specifying whether to apply post-estimation
     properization to the conditional distribution estimate. Defaults to
     \code{FALSE}.
+    Local-constant or degree-zero fits bypass correction only when their
+    kernels and bandwidth geometry guarantee a convex mixture of proper
+    response CDFs. Signed kernels and generalized-nearest-neighbour response
+    bandwidths do not have this guarantee. Requested correction then uses
+    the existing supported grid or slice procedure, with its additional
+    evaluation cost and support requirements.
   }
 
 
