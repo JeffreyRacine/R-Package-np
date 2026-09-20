@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Conditional fitted objects retain their resolved properization controls for
+  prediction and plotting. Explicit consumer controls take precedence; older
+  objects without retained controls keep the historical default behavior.
+
 * Conditional density/distribution properization groups conditioning rows by
   exact identity, avoiding merged slices after large coordinate translations
   or numeric factor-label rounding.

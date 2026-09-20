@@ -179,6 +179,11 @@ These arguments control optional post-estimation properization of the fitted con
     a list of controls for properization. Supported entries are
     \code{tol}, \code{grid.check}, \code{store.raw}, and
     \code{fail.on.unsupported}.
+    Resolved controls are retained in fitted objects and inherited by
+    \code{predict()} and \code{plot()} unless explicitly replaced. An
+    explicit control list replaces the retained list; unspecified entries
+    then use their defaults. Prediction still errors on unsupported
+    correction unless \code{fail.on.unsupported=FALSE} is explicitly supplied.
   }
 
 

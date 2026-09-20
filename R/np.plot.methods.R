@@ -729,8 +729,7 @@ np_render_control <- function(style = c("band", "bar"),
   )
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.condensity")
-  if (is.null(dots$proper) && isTRUE(object$proper.requested))
-    dots$proper <- TRUE
+  dots <- .np_conditional_replay_proper(object, dots)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_condistribution <- function(object, ..., .plot_dots_call = NULL) {
@@ -742,8 +741,7 @@ np_render_control <- function(style = c("band", "bar"),
   )
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.condistribution")
-  if (is.null(dots$proper) && isTRUE(object$proper.requested))
-    dots$proper <- TRUE
+  dots <- .np_conditional_replay_proper(object, dots)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_npdistribution <- function(object, ..., .plot_dots_call = NULL)

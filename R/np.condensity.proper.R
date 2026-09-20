@@ -1,3 +1,27 @@
+.np_conditional_replay_proper <- function(object, dots, prediction = FALSE) {
+  if (is.null(dots[["proper", exact = TRUE]]) &&
+      isTRUE(object[["proper.requested", exact = TRUE]]))
+    dots$proper <- TRUE
+  if (!isTRUE(dots[["proper", exact = TRUE]]))
+    return(dots)
+  supplied.control <- dots[["proper.control", exact = TRUE]]
+  if (is.null(supplied.control))
+    dots$proper.control <- object[["proper.control", exact = TRUE]]
+  if (is.null(dots[["proper.method", exact = TRUE]]))
+    dots$proper.method <- object[["proper.method", exact = TRUE]]
+  if (prediction) {
+    ctrl <- dots[["proper.control", exact = TRUE]]
+    if (is.null(ctrl)) ctrl <- list()
+    # Fitting may allow unsupported correction; prediction remains fail-closed
+    # unless this prediction explicitly chooses otherwise.
+    if (is.null(supplied.control) ||
+        (is.list(supplied.control) && is.null(supplied.control$fail.on.unsupported)))
+      ctrl$fail.on.unsupported <- TRUE
+    dots$proper.control <- ctrl
+  }
+  dots
+}
+
 .np_condens_proper_shadow_enabled <- function() {
   isTRUE(getOption("np.condens.proper.shadow", FALSE))
 }
@@ -634,6 +658,7 @@
   object$proper.requested <- args$proper.requested
   object$proper.applied <- FALSE
   object$proper.method <- if (isTRUE(args$proper.requested)) args$proper.method else NULL
+  object$proper.control <- if (isTRUE(args$proper.requested)) args$proper.control else NULL
   object$condens.raw <- NULL
   object$proper.info <- .np_condens_make_reason_info(
     reason = if (isTRUE(args$proper.requested)) "pending" else "not_requested",
