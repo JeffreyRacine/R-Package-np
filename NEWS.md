@@ -16,7 +16,11 @@
   are not refitted for integration. Boundary proper=TRUE uses positive-part
   whole-support normalization instead of a constant shift that could create
   infinite mass. Sparse-grid CDF queries can have additional integration cost;
-  search objectives and raw density fitting are unchanged.
+  CDF integration adds no cross-validation work or raw-density refitting.
+
+* The auxiliary Gaussian2 boundary kernel evaluates its removable moment-ratio
+  limit at and near the support midpoint, including narrow-kernel ordinate
+  underflow, instead of returning NaN. The mathematical kernel is unchanged.
 
 * Conditional-mean and quantile specification bootstrap refits retain model
   observation weights and, for mean models, offsets. Weighted rq models use

@@ -129,7 +129,13 @@ and distribution function estimates over the range \eqn{[a,b]}
   separately clipped or rescaled on the requested grid. This replaces the
   former constant upward shift, which could create infinite mass on unbounded
   support. Failed numerical convergence or invalid normalizing mass is reported
-  as an error. Raw \code{proper=FALSE} densities and CV objectives are unchanged.
+  as an error. This normalization does not alter the raw \code{proper=FALSE}
+  kernel definitions or cross-validation objectives.
+
+  The \code{"gaussian2"} kernel uses the continuous limit of its truncated-
+  moment ratios at the support midpoint. The same stable algebra also avoids
+  loss of these ratios when both boundary Gaussian ordinates underflow; no
+  different kernel is substituted.
 
   Sampled total integrals used elsewhere in this helper collapse duplicate
   integration coordinates, not training observations. Endpoint correction

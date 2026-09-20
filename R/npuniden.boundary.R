@@ -58,12 +58,23 @@ npuniden.boundary <- function(X=NULL,
             z.a <- (a-x)/h
             z.b <- (b-x)/h
             pnorm.zb.m.pnorm.za <- (pnorm(z.b)-pnorm(z.a))
-            mu.1 <- (dnorm(z.a)-dnorm(z.b))/(pnorm.zb.m.pnorm.za)
             mu.2 <- 1+(z.a*dnorm(z.a)-z.b*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            aa <- mu.3/(mu.3-mu.1*mu.2)
-            bb <- -mu.1/(mu.3-mu.1*mu.2)
             if((b-a)/h > 1e-04) {
+                # mu.3/mu.1 has a removable 0/0 at the support midpoint;
+                # the ordinates can also both underflow for narrow kernels.
+                # This algebraic ratio preserves the same kernel everywhere.
+                half.width <- (b-a)/(2*h)
+                delta <- (x-(a+(b-a)/2))/h
+                t <- abs(half.width*delta)
+                if(t < 1e-3) {
+                    t2 <- t*t
+                    ratio <- half.width^2+delta^2-
+                        2*t2*(1/3-t2*(1/45-2*t2/945))
+                } else {
+                    ratio <- 2+min(abs(z.a),abs(z.b))^2-4*t/expm1(2*t)
+                }
+                aa <- ratio/(ratio-mu.2)
+                bb <- -1/(ratio-mu.2)
                 (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
             } else {
                 rep(1/(b-a),length(X))
