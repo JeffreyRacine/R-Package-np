@@ -70,3 +70,31 @@ test_that("CMS refits retain weights, offsets and raw rq design", {
     }
   }
 })
+
+test_that("CMS omission metadata and quantile ownership are explicit", {
+  skip_on_cran()
+  owns.pool <- !.mpi_pool_active()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  if (owns.pool) on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old <- options(np.messages = FALSE); on.exit(options(old))
+  set.seed(911); d <- data.frame(x = rnorm(25), y = rnorm(25))
+  d$x[c(2,8)] <- NA
+  for (quantile in c(FALSE, TRUE)) {
+    m <- if (quantile) quantreg::rq(y ~ x, data = d, na.action = na.exclude) else
+      lm(y ~ x, d, x = TRUE, y = TRUE, na.action = na.exclude)
+    args <- list(formula = y ~ x, data = d, model = m, bws = .5,
+                 bandwidth.compute = FALSE, B = 9)
+    result <- if (quantile) do.call(npqcmstest, args) else do.call(npcmstest, args)
+    expect_identical(as.integer(result$na.index), c(2L,8L))
+  }
+  m <- quantreg::rq(y ~ x, data = d, tau = .8)
+  seed <- .Random.seed
+  expect_error(npqcmstest(y ~ x, d, model = m, B = 9), "tau must match")
+  expect_identical(.Random.seed, seed)
+  expect_error(npqcmstest(y ~ x, d, model = m, tau = c(.2,.8), B = 9),
+               "finite scalar")
+  expect_error(npqcmstest(y ~ x, d, model = m, tau = NA_real_, B = 9),
+               "finite scalar")
+  expect_silent(npqcmstest(y ~ x, d, model = m, tau = .8, B = 9,
+                           bws = .5, bandwidth.compute = FALSE))
+})
