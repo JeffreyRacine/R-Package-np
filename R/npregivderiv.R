@@ -309,25 +309,10 @@ npregivderiv.default <- function(y,
   ## NOTE - this presumes univariate z case... in general this would
   ## be a continuous variable's index
 
-  # Pre-calculate components for integrate.trapezoidal
-  z.val <- z[,1]
-  n.z <- length(z.val)
-  order.z <- order(z.val)
-  z.sorted <- z.val[order.z]
-  dz.sorted <- diff(z.sorted)
-  cz.z <- dz.sorted[1]
-  inv.order.z <- order(order.z)
-
+  # Prepare integration geometry once, not once per IV iteration.
+  quadrature.geometry <- .np_quadrature_prepare(z[,1])
   integrate.trapezoidal.internal <- function(y.val) {
-      y.sorted <- y.val[order.z]
-      dy.sorted <- diff(y.sorted)
-      ca.z <- dy.sorted[1] / cz.z
-      cb.z <- dy.sorted[n.z - 1] / cz.z
-      cf.z <- cz.z^2 / 12 * (cb.z - ca.z)
-      if (!is.finite(cf.z)) cf.z <- 0
-      int.vec <- c(0, cumsum(dz.sorted * (y.sorted[-n.z] + y.sorted[-1]) / 2))
-      int.vec <- int.vec - cf.z
-      int.vec[inv.order.z]
+      .np_quadrature_cumulative(y.val, quadrature.geometry)
   }
 
   phi <- integrate.trapezoidal.internal(phi.prime)

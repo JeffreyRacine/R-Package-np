@@ -51,7 +51,9 @@ an optional upper bound (defaults to upper bound of empirical support \eqn{\max(
 
 
   \item{h}{
-an optional bandwidth (>0)
+an optional positive bandwidth. For \code{"beta1"} and \code{"beta2"},
+\code{h} is dimensionless on the rescaled support \eqn{[0,1]}, not in
+the original data units. For \code{"beta2"}, \eqn{0<h\le 1/4} is required.
 }
 
   \item{X}{
@@ -77,7 +79,8 @@ presence of local maxima)
 }
 
   \item{grid}{
-an optional grid used for the initial grid search when \code{cv="grid-hybrid"}
+an optional grid used for the initial grid search when \code{cv="grid-hybrid"},
+in the same units and admissible domain as \code{h}
 }
 
   \item{kertype}{
@@ -103,6 +106,20 @@ and distribution function estimates over the range \eqn{[a,b]}
 \details{
   Reported standard errors use the number of training observations in
   \code{X}, not the number of requested evaluation points.
+
+  Beta kernels require finite support bounds. Their bandwidths and automatic
+  search starts refer to \eqn{(X-a)/(b-a)}; changing data units does not rescale
+  \code{h}. The \code{"beta2"} bound prevents its left and right boundary
+  regions from overlapping. Inadmissible explicit bandwidths or grid values
+  are rejected rather than clipped.
+
+  Sampled numerical integration uses distinct integration coordinates and
+  restores their original order and multiplicity; training observations are
+  not deduplicated. Cumulative integrals are anchored at the smallest supplied
+  evaluation coordinate. Consequently the current \code{F} calculation on a
+  partial evaluation grid is not an absolute CDF from the support lower bound.
+  Endpoint correction is used for sampled total integrals only on uniform
+  grids. These distinctions also apply to bandwidth cross-validation.
 
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
 

@@ -64,9 +64,9 @@ test_that("shape mass and derivative normalization respect coordinate and scale"
   # Independently compute total integral of the unconstrained density.
   xx <- sort(c(Y,X))
   f <- vapply(xx,function(x) mean(dnorm((x-X)/.3)/(.3*(pnorm((1-x)/.3)-pnorm(-x/.3)))),0.)
-  correction <- (xx[2]-xx[1])^2/12 *
-    ((tail(f,1)-tail(f,2)[1])/(xx[2]-xx[1])-(f[2]-f[1])/(xx[2]-xx[1]))
-  total <- sum(diff(xx)*(head(f,-1)+tail(f,-1))/2)-correction
+  # This irregular grid requires nonuniform trapezoidal quadrature, not
+  # the uniform-grid endpoint correction.
+  total <- sum(diff(xx)*(head(f,-1)+tail(f,-1))/2)
   expect_equal(raw$f.integral,total,tolerance=1e-13)
   expect_equal(ordered$f.sc,rev(reordered$f.sc),tolerance=1e-8)
   expect_equal(ordered$f.sc.deriv,rev(reordered$f.sc.deriv),tolerance=1e-8)

@@ -210,7 +210,9 @@ npuniden.boundary <- function(X=NULL,
         if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
         if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
         if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
-        sapply(seq_along(X), function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
+        geometry <- .np_quadrature_prepare(X.seq)
+        sapply(seq_along(X), function(i){.np_quadrature_total(X.seq,
+            h*kernel(X[i],X.seq,h,a,b)**2, geometry)})
     }
     fhat <- function(X,Y,h,a=0,b=1,proper=FALSE) {
         f <- sapply(seq_along(Y), function(i){mean(kernel(Y[i],X,h,a,b))})
@@ -224,7 +226,7 @@ npuniden.boundary <- function(X=NULL,
                 f <- f - min(f.seq)
                 f.seq <- f.seq - min(f.seq)
             }
-            int.f.seq <- integrate.trapezoidal(X.seq,f.seq)[length(X.seq)]
+            int.f.seq <- .np_quadrature_total(X.seq,f.seq)
             f <- f/int.f.seq
         }
         return(f)
@@ -267,8 +269,9 @@ npuniden.boundary <- function(X=NULL,
     } else {
         ## Least-squares cross-validation function (minimizing)
         fnscale <- list(fnscale = 1) 
+        cv.geometry <- if(is.null(h)) .np_quadrature_prepare(X) else NULL
         cv.function <- function(h,X,a=0,b=1) {
-            cv.ls <- (integrate.trapezoidal(X,fhat(X,X,h,a,b)**2)[order(X)])[length(X)]-2*mean(fhat.loo(X,h,a,b))
+            cv.ls <- .np_quadrature_total(X,fhat(X,X,h,a,b)**2,cv.geometry)-2*mean(fhat.loo(X,h,a,b))
             if (is.finite(cv.ls)) cv.ls else sqrt(sqrt(.Machine$double.xmax))
         }
     }

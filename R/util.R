@@ -1,43 +1,63 @@
-## This function will compute the cumulative integral at each sample
-## realization using the trapezoidal rule and the cumsum function as
-## we need to compute this in a computationally efficient manner.
+# Sampled quadrature has two distinct contracts: an anchored cumulative
+# integral, and a total with the historical uniform-grid endpoint correction.
+# Coordinates, not observations, are collapsed. Retain this geometry across
+# repeated integrations (notably the IV iteration).
+.np_quadrature_prepare <- function(x) {
+  if(!is.numeric(x) || any(!is.finite(x)))
+    stop("quadrature coordinates must be finite numeric values")
+  ord <- order(x)
+  xs <- x[ord]
+  keep <- !duplicated(xs)
+  unique.x <- xs[keep]
+  dx <- diff(unique.x)
+  uniform <- length(dx) > 0L &&
+    all(abs(dx-dx[1L]) <= 64*.Machine$double.eps*max(abs(dx), diff(range(unique.x))))
+  list(n=length(x), order=ord, inverse=order(ord), keep=keep,
+       map=cumsum(keep), dx=dx, uniform=uniform)
+}
 
-# integrate.trapezoidal <- function(x,y) {
-#   n <- length(x)
-#   rank.x <- rank(x)
-#   order.x <- order(x)
-#   y <- y[order.x]
-#   x <- x[order.x]
-#   int.vec <- numeric(length(x))
-#   ## Use a correction term at the boundary: -cx^2/12*(f'(b)-f'(a)),
-#   ## check for NaN case
-#   cx  <- x[2]-x[1]
-#   ca <- (y[2]-y[1])/cx
-#   cb <- (y[n]-y[n-1])/cx
-#   cf <- cx^2/12*(cb-ca)
-#   if(!is.finite(cf)) cf <- 0
-#   int.vec[1] <- 0
-#   int.vec[2:n] <- cumsum((x[2:n]-x[2:n-1])*(y[2:n]+y[2:n-1])/2)
-#   return(int.vec[rank.x]-cf)
-# }
+.np_quadrature_values <- function(y, geometry) {
+  if(!is.numeric(y) || length(y) != geometry$n)
+    stop("quadrature ordinates must be numeric and match the coordinates")
+  ys <- y[geometry$order]
+  if(any(!geometry$keep)) {
+    n <- length(ys)
+    left <- ys[-n]
+    right <- ys[-1L]
+    same <- (left == right) | (is.na(left) & is.na(right))
+    conflict <- same[!geometry$keep[-1L]]
+    if(anyNA(conflict) || any(!conflict))
+      stop("conflicting quadrature ordinates at duplicate coordinates")
+  }
+  ys[geometry$keep]
+}
 
-# Benches 1.3-1.7 times faster (mean/median) produces identical results
+.np_quadrature_cumulative <- function(y, geometry) {
+  ys <- .np_quadrature_values(y, geometry)
+  n <- length(ys)
+  if(n == 0L) return(numeric())
+  integral <- if(n == 1L) 0 else
+    c(0, cumsum(geometry$dx*(ys[-n]+ys[-1L])/2))
+  integral[geometry$map][geometry$inverse]
+}
+
+.np_quadrature_total <- function(x, y, geometry=.np_quadrature_prepare(x)) {
+  ys <- .np_quadrature_values(y, geometry)
+  n <- length(ys)
+  if(n < 2L) return(0)
+  total <- cumsum(geometry$dx*(ys[-n]+ys[-1L])/2)[n-1L]
+  if(geometry$uniform) {
+    # This corrects the TOTAL only, never every cumulative ordinate.
+    step <- geometry$dx[1L]
+    dy <- diff(ys)
+    correction <- step^2/12*(dy[n-1L]/step-dy[1L]/step)
+    if(is.finite(correction)) total <- total-correction
+  }
+  total
+}
 
 integrate.trapezoidal <- function(x, y) {
-  n <- length(x)
-  order.x <- order(x)
-  x <- x[order.x]
-  y <- y[order.x]
-  dx <- diff(x)
-  dy <- diff(y)
-  cx <- dx[1]
-  ca <- dy[1] / cx
-  cb <- dy[n - 1] / cx
-  cf <- cx^2 / 12 * (cb - ca)
-  if (!is.finite(cf)) cf <- 0
-  int.vec <- c(0, cumsum(dx * (y[-n] + y[-1]) / 2))
-  int.vec <- int.vec - cf
-  int.vec[order(order.x)]  # inverse permutation == rank(x) when no ties
+  .np_quadrature_cumulative(y, .np_quadrature_prepare(x))
 }
 
 ## No Zero Denominator, used in C code for kernel estimation...
