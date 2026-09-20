@@ -391,7 +391,7 @@
   .np_bws_retain_formula_training(bws, frame, policy)
 }
 
-.np_formula_default_call <- function(call, definition, caller) {
+.np_formula_default_call <- function(call, definition, caller, required.training = NULL) {
   # Name the bandwidth before changing the callee. Keep the remaining call
   # shape: an unnamed formula beside bws= belongs to the formula dispatcher,
   # not to an explicitly named native training argument.
@@ -402,6 +402,22 @@
   if (is.null(labels)) labels <- rep.int("", length(call))
   labels[is.na(labels)] <- ""
   partial <- which(nzchar(labels) & startsWith("bws", labels))
+  if (!length(partial)) {
+    # These defaults also accept data-first calls (e.g. npudens(x) or
+    # npreg(x, y)). Matching the fitter's first formal does not by itself
+    # establish bandwidth ownership: its selector has a data-first NULL
+    # method. Preserve that syntax unless the training slots establish bws.
+    training <- if (is.null(required.training))
+      grep("^t(x|y|z)?dat$", names(formals(definition)), value = TRUE) else required.training
+    first <- training[[1L]]
+    first.named <- any(nzchar(labels) &
+      (startsWith(first, labels) | labels == substring(first, 2L)))
+    complete <- all(training %in% names(matched))
+    formula.after <- !first.named && !complete && first %in% names(matched) &&
+      inherits(get(first, envir = parent.frame(), inherits = FALSE), "formula")
+    if (!first.named && !complete && !formula.after && !"formula" %in% labels)
+      return(call)
+  }
   index <- if (length(partial)) partial[[1L]] else which(labels[-1L] == "")[[1L]] + 1L
   labels[[index]] <- "bws"
   names(call) <- labels

@@ -764,7 +764,9 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
   } else {
     "manual"
   }
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   if (.npRmpi_autodispatch_active() &&
+      (missing(bws) || "bws" %in% names(sc)) &&
       !formula.forwarded && !formula.only &&
       (explicit.plbandwidth || identical(degree.select.value, "manual")) &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
@@ -773,7 +775,6 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
     return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
   }
 
-  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =

@@ -764,6 +764,7 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     return(.npRmpi_with_local_cdist_eval(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   }
   if (.npRmpi_autodispatch_active() &&
+      (missing(bws) || "bws" %in% names(sc)) &&
       !npNomadControlRequested(nomad) &&
       !uses.nomad.degree.search &&
       !keep_local_cvls_nn &&

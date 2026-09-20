@@ -770,6 +770,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     identical(regtype.request[1L], "ll")) &&
     identical(bwtype.request[1L] %in% c("generalized_nn", "adaptive_nn"), TRUE)
   if (.npRmpi_autodispatch_active() &&
+      (missing(bws) || "bws" %in% names(sc)) &&
       !npNomadControlRequested(nomad) &&
       !uses.nomad.degree.search &&
       !keep_local_prepared_nn &&

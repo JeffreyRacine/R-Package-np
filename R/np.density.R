@@ -319,12 +319,13 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
   tdat.formula.early <- (!missing(tdat)) && inherits(tdat, "formula")
   formula.input <- .np_formula_dispatch_args(
     NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   if (.npRmpi_autodispatch_active() &&
+      (missing(bws) || "bws" %in% names(sc)) &&
       !bws.formula.early &&
       !tdat.formula.early && !inherits(formula.input, "formula"))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
-  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =

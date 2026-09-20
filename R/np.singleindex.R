@@ -322,6 +322,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
     "manual"
   }
   if (.npRmpi_autodispatch_active() &&
+      (missing(bws) || "bws" %in% names(sc)) &&
       !bws.formula &&
       !bws.call &&
       (explicit.sibandwidth || identical(degree.select.value, "manual"))) {

@@ -32,6 +32,17 @@ test_that("check-minimal verifies deterministic bandwidth name metadata updates"
   expect_equal(bws$varnames$x, "oldx")
   expect_equal(bws$varnames$y, "oldy")
 })
+
+test_that("check-minimal preserves data-first versus bandwidth-first syntax", {
+  normalize <- getFromNamespace(".np_formula_default_call", "npRmpi")
+  definition <- function(bws, tdat, ...) NULL
+  expect_identical(normalize(quote(npudens(x)), definition, environment()),
+                   quote(npudens(x)))
+  expect_identical(normalize(quote(npudens(h, x)), definition, environment()),
+                   quote(npudens(bws = h, x)))
+  expect_identical(normalize(quote(npudens(h, tdat = x)), definition, environment()),
+                   quote(npudens(bws = h, tdat = x)))
+})
 test_that("copula grid coordinates cannot fall back to equal-length training data", {
   ns <- asNamespace(getNamespaceName(environment(npcopula)))
   coordinates <- get(".npcopula_eval_xgrid", ns)

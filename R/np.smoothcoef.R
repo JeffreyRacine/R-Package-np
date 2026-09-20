@@ -179,12 +179,14 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       .npRmpi_npscoef_should_localize(bws) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
     return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame(),
+                               required.training = c("txdat", "tydat"))
   if (.npRmpi_autodispatch_active() &&
+      (missing(bws) || "bws" %in% names(sc)) &&
       !formula.forwarded && !formula.only &&
       (explicit.scbandwidth || identical(degree.select.value, "manual")))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
-  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
