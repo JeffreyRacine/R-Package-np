@@ -166,7 +166,7 @@ npdeneqtest <- function(x = NULL,
 
     ## sum.4 and sum.3 are identical...
     
-    In <- sum.1/(n1*(n1-1))+sum.2/(n2*(n2-1))-2*sum.3/(n1*n2)
+    In <- sum.1/(n1*(n1-1))+sum.2/(n2*(n2-1))-2*sum.3/(as.double(n1)*n2)
 
     ## Next, compute sigma^2_n
 
@@ -237,7 +237,7 @@ npdeneqtest <- function(x = NULL,
 
     In <- sum.1 / (n1 * (n1 - 1)) +
       sum.2 / (n2 * (n2 - 1)) -
-      2 * sum.3 / (n1 * n2)
+      2 * sum.3 / (as.double(n1) * n2)
     sigma2.n <- 2 * (
       sum2.1 / (n1^2 * (n1 - 1)^2) +
       sum2.2 / (n2^2 * (n2 - 1)^2) +
