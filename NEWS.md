@@ -55,7 +55,9 @@
 * Conditional fits, operators and bootstrap preparation consistently resolve
   retained scale factors to physical bandwidths, including the separate X/Y
   calculations used by local-polynomial fits. Resampling does not rescale the
-  selected smoothing parameters.
+  selected smoothing parameters. Bias-corrected bootstrap pilots preserve
+  physical/scale-factor metadata in regression, conditional, smooth-coefficient
+  and partially linear bandwidth objects.
 
 * Fourth- and sixth-order Gaussian convolution calculations now preserve
   translation and bandwidth-unit invariance. This corrects affected kernel

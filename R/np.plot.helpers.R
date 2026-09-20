@@ -11109,8 +11109,14 @@ compute.default.error.range <- function(center, err) {
     new.values[j] <- .np_plot_cat_lambda_pilot(current[j], upper, factor)
   }
 
+  raw.values <- new.values[cat.idx]
+  if (isTRUE(bws$scaling)) {
+    if (length(bws$ncatfac) != 1L || !is.finite(bws$ncatfac) || bws$ncatfac <= 0)
+      stop("scaled bootstrap pilot requires a valid categorical scale", call. = FALSE)
+    raw.values <- raw.values / bws$ncatfac
+  }
   if (!is.null(bws[[raw.field]]) && length(bws[[raw.field]]) >= max(cat.idx))
-    bws[[raw.field]][cat.idx] <- new.values[cat.idx]
+    bws[[raw.field]][cat.idx] <- raw.values
   if (side == "x") {
     if (!is.null(bws$bandwidth$x) && length(bws$bandwidth$x) >= max(cat.idx))
       bws$bandwidth$x[cat.idx] <- new.values[cat.idx]
@@ -11267,7 +11273,7 @@ compute.default.error.range <- function(center, err) {
 
   out <- bws
   out$bw[icon] <- out$bw[icon] * pilot$factor
-  out$bandwidth$x <- out$bw
+  out$bandwidth$x[icon] <- out$bandwidth$x[icon] * pilot$factor
   if (!is.null(out$sfactor$x) && length(out$sfactor$x) == length(out$bw)) {
     out$sfactor$x[icon] <- out$sfactor$x[icon] * pilot$factor
   }
@@ -11753,7 +11759,7 @@ compute.default.error.range <- function(center, err) {
   bw.name <- names(out$bandwidth)[1L]
   if (is.null(bw.name) || !nzchar(bw.name))
     bw.name <- "x"
-  out$bandwidth[[bw.name]] <- out$bw
+  out$bandwidth[[bw.name]][icon] <- out$bandwidth[[bw.name]][icon] * pilot$factor
   if (!is.null(out$sfactor[[bw.name]]) && length(out$sfactor[[bw.name]]) == length(out$bw))
     out$sfactor[[bw.name]][icon] <- out$sfactor[[bw.name]][icon] * pilot$factor
   if (!is.null(out$sumNum[[bw.name]]) && length(out$sumNum[[bw.name]]) == length(out$bw))
@@ -11794,7 +11800,7 @@ compute.default.error.range <- function(center, err) {
     if (!is.numeric(child$bw) || length(child$bw) != length(icon))
       stop("invalid partially linear child bandwidth vector for oversmoothed bootstrap center", call. = FALSE)
     child$bw[icon] <- child$bw[icon] * pilot$factor
-    child$bandwidth$x <- child$bw
+    child$bandwidth$x[icon] <- child$bandwidth$x[icon] * pilot$factor
     if (!is.null(child$sfactor$x) && length(child$sfactor$x) == length(child$bw))
       child$sfactor$x[icon] <- child$sfactor$x[icon] * pilot$factor
     if (!is.null(child$sumNum$x) && length(child$sumNum$x) == length(child$bw))
