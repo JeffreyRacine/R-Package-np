@@ -166,13 +166,17 @@
 # The archived simulation drivers select on sample A by LSCV, then use the
 # same smoothing specification in both samples and all resamples.
 .npdeneq_check_kernel <- function(bwtype, ckertype, ckerbound = "none",
-                                  ckerlb = NULL, ckerub = NULL) {
+                                  ckerlb = NULL, ckerub = NULL,
+                                  okertype = NULL, ordered = FALSE) {
   # The directed cross sum and its studentizer require a symmetric kernel.
   # Compact symmetric kernels are allowed; domain normalization is not.
   if (!identical(bwtype, "fixed") || identical(ckertype, "beta") ||
       (!is.null(ckerbound) && !identical(ckerbound, "none")) ||
       any(is.finite(ckerlb)) || any(is.finite(ckerub)))
     stop('npdeneqtest requires fixed bandwidths and symmetric kernels without boundary normalization; use bwtype = "fixed", ckerbound = "none", and a Gaussian, Epanechnikov or uniform kernel',
+         call. = FALSE)
+  if (isTRUE(ordered) && identical(okertype, "racineliyan"))
+    stop("npdeneqtest requires a symmetric ordered kernel with constant self-diagonal; the Racine-Li-Yan ordered kernel is not supported by this test",
          call. = FALSE)
   invisible(NULL)
 }
@@ -183,21 +187,26 @@
   # Do not reconstruct an object (or reissue its constructor warnings).
   .npdeneq_check_kernel(bw[["type", exact = TRUE]],
     bw[["ckertype", exact = TRUE]], bw[["ckerbound", exact = TRUE]],
-    bw[["ckerlb", exact = TRUE]], bw[["ckerub", exact = TRUE]])
+    bw[["ckerlb", exact = TRUE]], bw[["ckerub", exact = TRUE]],
+    bw[["okertype", exact = TRUE]], any(bw[["iord", exact = TRUE]]))
   bw
 }
 
 .npdeneq_select_bandwidth <- function(x, bwmethod = "cv.ls",
     bwtype = c("fixed", "generalized_nn", "adaptive_nn"),
     ckertype = c("gaussian", "epanechnikov", "uniform", "beta"),
-    ckerbound = c("none", "range", "fixed"), ...) {
+    ckerbound = c("none", "range", "fixed"),
+    okertype = c("liracine", "wangvanryzin", "racineliyan"), ...) {
   bwtype <- match.arg(bwtype)
   ckertype <- match.arg(ckertype)
   ckerbound <- match.arg(ckerbound)
-  .npdeneq_check_kernel(bwtype, ckertype, ckerbound)
+  okertype <- match.arg(okertype)
+  .npdeneq_check_kernel(bwtype, ckertype, ckerbound,
+    okertype = okertype, ordered = any(vapply(x, is.ordered, logical(1L))))
   .np_progress_select_bandwidth_enhanced("Computing bandwidths",
     npudensbw(dat = x, bwmethod = bwmethod, bwtype = bwtype,
-              ckertype = ckertype, ckerbound = ckerbound, ...))
+              ckertype = ckertype, ckerbound = ckerbound,
+              okertype = okertype, ...))
 }
 
 .npdeneq_bandwidth_signature <- function(bw, x) {
