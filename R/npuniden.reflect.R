@@ -46,7 +46,7 @@ npuniden.reflect <- function(X = NULL,
         return(list(f=f,
                     F=cdf,
                     sd.f=std,
-                    sd.F=sqrt(abs(cdf*(1-cdf)/length(cdf))),
+                    sd.F=sqrt(abs(cdf*(1-cdf)/length(X))),
                     h=hh,
                     nmulti=length(bw$fval.history),
                     cv.opt=bw$fval))
@@ -54,7 +54,7 @@ npuniden.reflect <- function(X = NULL,
         return(list(f=f,
                     F=cdf,
                     sd.f=std,
-                    sd.F=sqrt(abs(cdf*(1-cdf)/length(cdf))),
+                    sd.F=sqrt(abs(cdf*(1-cdf)/length(X))),
                     h=hh))
     }
 }
