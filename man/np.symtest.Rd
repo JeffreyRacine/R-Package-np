@@ -132,6 +132,18 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
    plug-in variety (\code{\link{bw.SJ}} for continuous variables and
    direct plug-in for discrete variables).
 
+   Missing observations are omitted before computing the statistic. For
+   categorical data, declared levels, including unused levels, are retained
+   in the pooled null sample and every bootstrap draw. The discrete entropy
+   sum uses the full declared domain and the plug-in selector uses its
+   category count. Kernel normalization and the existing reflection rule are
+   unchanged; this does not define a new reflection for arbitrary nominal
+   labels.
+   If an observed or bootstrap reflection produces a category outside the
+   declared domain, the call stops rather than discarding that observation.
+   Numeric factor levels must therefore accommodate the existing reflection
+   rule. No p-value is returned from incomplete bootstrap statistics.
+
   For bootstrapping the null distribution of the statistic, \code{iid}
   conducts simple random resampling, while \code{geom} conducts Politis
   and Romano's (1994) stationary bootstrap using automatic block length

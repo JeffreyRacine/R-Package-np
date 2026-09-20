@@ -21,7 +21,6 @@ npunitest <- function(data.x = NULL,
   if(!identical(class(data.x), class(data.y))) stop(" data vectors must be of same data type")
   if((ncol(data.frame(data.x)) != 1) ||( ncol(data.frame(data.y)) != 1)) stop(" data vectors must have one dimension only")
   if(B < 9) stop(" number of bootstrap replications must be >= 9")
-  if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x))) .np_warning("non-overlapping empirical distributions (see `Details' in ?npunidist)")
 
   method <- match.arg(method)
   entropy.fast.gaussian <- .np_entropy_uses_default_fixed_gaussian(list(...))
@@ -38,8 +37,16 @@ npunitest <- function(data.x = NULL,
 
   ## Remove NAs
 
-  data.x <- na.omit(data.x)
-  data.y <- na.omit(data.y)
+  data.x <- .np_entropy_complete_sample(data.x)
+  data.y <- .np_entropy_complete_sample(data.y)
+  if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x)))
+    .np_warning("non-overlapping empirical distributions (see `Details' in ?npunitest)")
+  if (is.factor(data.x)) {
+    support <- .np_entropy_factor_support(data.x, data.y)
+    data.x <- support$x
+    data.y <- support$y
+    discrete.evaluation <- support$evaluation
+  }
 
   ## Note - this function accepts numeric and factors/ordered,
   ## however, factors must be integers.
@@ -50,30 +57,10 @@ npunitest <- function(data.x = NULL,
   } else {
     ## Optimal bandwidth for factor (unordered) used for both
     ## (plug-in).
-    if(is.null(bw.x)) {
-      n <- length(data.x)
-      c <- length(unique(data.x))
-      if(c <= 1) stop("data.x must contain at least two distinct factor levels")
-      xeval <- unique(data.x)
-      p <- .np_progress_activity_run("Computing bandwidths",
-        fitted(npudens(tdat=data.x,edat=xeval,bws=0,...)))
-      sum.Lambda3 <- c/(c-1)*sum(p*(1-p))
-      sum.Lambda2.minus.Lambda1.sq <- c^2/((c-1)^2)*sum(p*(1-p))
-      n.sum.Lambda1.sq <- n*sum(((1-c*p)/(c-1))^2)
-      bw.x <- sum.Lambda3/(sum.Lambda2.minus.Lambda1.sq+n.sum.Lambda1.sq)
-    }
-    if(is.null(bw.y)) {
-      n <- length(data.y)
-      c <- length(unique(data.y))
-      if(c <= 1) stop("data.y must contain at least two distinct factor levels")
-      yeval <- unique(data.y)
-      p <- .np_progress_activity_run("Computing bandwidths",
-        fitted(npudens(tdat=data.y,edat=xeval,bws=0,...)))
-      sum.Lambda3 <- c/(c-1)*sum(p*(1-p))
-      sum.Lambda2.minus.Lambda1.sq <- c^2/((c-1)^2)*sum(p*(1-p))
-      n.sum.Lambda1.sq <- n*sum(((1-c*p)/(c-1))^2)
-      bw.y <- sum.Lambda3/(sum.Lambda2.minus.Lambda1.sq+n.sum.Lambda1.sq)
-    }
+    if(is.null(bw.x))
+      bw.x <- .np_entropy_discrete_plugin_bw(data.x, "data.x", ...)
+    if(is.null(bw.y))
+      bw.y <- .np_entropy_discrete_plugin_bw(data.y, "data.y", ...)
   }
 	
   ## Hellinger distance (Srho) between the densities. This function
@@ -130,12 +117,8 @@ npunitest <- function(data.x = NULL,
         }
       }
     } else {
-      xeval <- unique(data.x)
-      p.data.x <- fitted(npudens(tdat=data.x,edat=xeval,bws=bw.x,...))
-      p.data.y <- fitted(npudens(tdat=data.y,edat=xeval,bws=bw.y,...))   
-      ## Sum the information function over the unique probabilities and
-      ## return.
-      return(sum(0.5*(sqrt(p.data.x)-sqrt(p.data.y))**2))
+      return(.np_entropy_discrete_distance(
+        data.x, data.y, bw.x, bw.y, discrete.evaluation, ...))
     }
   }
 
@@ -164,9 +147,11 @@ npunitest <- function(data.x = NULL,
         data.null <- c(data.x,data.y)
       } else {
         if(is.ordered(data.x)) {
-          data.null <- ordered(c(as.character(data.x),as.character(data.y)))
+          data.null <- ordered(c(as.character(data.x),as.character(data.y)),
+                               levels = levels(data.x))
         } else {
-          data.null <- factor(c(as.character(data.x),as.character(data.y)))
+          data.null <- factor(c(as.character(data.x),as.character(data.y)),
+                              levels = levels(data.x))
         }
       }
       

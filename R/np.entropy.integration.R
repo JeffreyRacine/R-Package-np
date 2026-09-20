@@ -2,6 +2,77 @@
 .np_entropy_tail_bandwidths <- 8
 .np_entropy_workspace_bytes <- 16 * 1024^2
 
+# Entropy statistics own compact independent samples, not row-restored fits.
+# na.omit's index is historical after compaction and is not estimator input.
+.np_entropy_complete_sample <- function(data) {
+  data <- na.omit(data)
+  attr(data, "na.action") <- NULL
+  if (!length(data))
+    stop("each entropy sample must contain a non-missing observation",
+         call. = FALSE)
+  data
+}
+
+# Discrete entropy compares probability functions on one declared domain.
+# Keep that domain through pooling and resampling, including unused levels.
+.np_entropy_factor_support <- function(x, y = x) {
+  lx <- levels(x)
+  ly <- levels(y)
+  lev <- union(lx, ly)
+  if (is.ordered(x) && !identical(lx, ly)) {
+    numeric.levels <- suppressWarnings(as.numeric(lev))
+    if (all(is.finite(numeric.levels)) && !anyDuplicated(numeric.levels)) {
+      lev <- lev[order(numeric.levels)]
+    } else if (all(ly %in% lx) && identical(lx[lx %in% ly], ly)) {
+      lev <- lx
+    } else if (all(lx %in% ly) && identical(ly[ly %in% lx], lx)) {
+      lev <- ly
+    } else {
+      stop("ordered entropy samples require an unambiguous common level order; declare the same ordered levels in both samples",
+           call. = FALSE)
+    }
+  }
+  cast <- function(z) factor(z, levels = lev, ordered = is.ordered(x))
+  # Retain the historical evaluation order where X already spans the domain.
+  grid <- union(as.character(unique(x)), lev)
+  list(x = cast(x), y = cast(y), evaluation = cast(grid))
+}
+
+.np_entropy_discrete_plugin_bw <- function(data, label, ...) {
+  n <- length(data)
+  categories <- nlevels(data)
+  if (length(unique(data)) <= 1L)
+    stop(paste(label, "must contain at least two distinct factor levels"),
+         call. = FALSE)
+  grid <- .np_entropy_factor_support(data)$evaluation
+  p <- .np_progress_activity_run("Computing bandwidths",
+    fitted(npudens(tdat = data, edat = grid, bws = 0, ...)))
+  sum.Lambda3 <- categories/(categories-1)*sum(p*(1-p))
+  sum.Lambda2.minus.Lambda1.sq <-
+    categories^2/((categories-1)^2)*sum(p*(1-p))
+  n.sum.Lambda1.sq <- n*sum(((1-categories*p)/(categories-1))^2)
+  sum.Lambda3/(sum.Lambda2.minus.Lambda1.sq+n.sum.Lambda1.sq)
+}
+
+.np_entropy_discrete_distance <- function(x, y, bw.x, bw.y, evaluation, ...) {
+  p.x <- fitted(npudens(tdat = x, edat = evaluation, bws = bw.x, ...))
+  p.y <- fitted(npudens(tdat = y, edat = evaluation, bws = bw.y, ...))
+  sum(0.5*(sqrt(p.x)-sqrt(p.y))^2)
+}
+
+# Keep the established numeric-label reflection, but never omit a reflected
+# observation merely because its category is outside the declared domain.
+.np_entropy_reflect_factor <- function(data) {
+  tmp <- as.numeric(data.matrix(data))
+  location <- median(sort(unique(tmp)))
+  reflected <- factor(-(tmp-location)+location, levels = levels(data),
+                      ordered = is.ordered(data))
+  if (anyNA(reflected))
+    stop("categorical symmetry reflection leaves the declared support; supply numeric factor levels closed under the existing reflection rule",
+         call. = FALSE)
+  reflected
+}
+
 # Borrow the existing outer statistic/bootstrap owner. Native activity must
 # not be mistaken for completed statistical replications.
 .np_entropy_compute <- function(total = 1L, expr) {

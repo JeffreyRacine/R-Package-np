@@ -35,7 +35,7 @@ npsymtest <- function(data = NULL,
 
   ## Remove NAs
 
-  data <- na.omit(data)
+  data <- .np_entropy_complete_sample(data)
 
   ## Note - this function accepts numeric and factors/ordered,
   ## however, factors must be integers.
@@ -47,33 +47,15 @@ npsymtest <- function(data = NULL,
     data.rotate <- -(data-mean(data))+mean(data)
     if(is.null(bw)) bw <- .np_progress_activity_run("Computing bandwidths", bw.SJ(data))
   } else {
-    if(is.ordered(data)) {
-      ## Rotate around the median, ordered case.
-      data.levels <- levels(data)
-      tmp <- as.numeric(data.matrix(data))
-      location <- median(sort(unique(tmp)))
-      data.rotate <- ordered(-(tmp-location)+location,levels=data.levels)
-    } else {
-      ## unordered case.
-      data.levels <- levels(data)
-      tmp <- as.numeric(data.matrix(data))
-      location <- median(sort(unique(tmp)))
-      data.rotate <- factor(-(tmp-location)+location,levels=data.levels)
-    }
+    data.rotate <- .np_entropy_reflect_factor(data)
     ## Optimal bandwidth for factor (unordered) used for both
     ## (plug-in).
-    if(is.null(bw)) {
-      n <- length(data)
-      c <- length(unique(data))
-      if(c <= 1) stop("data must contain at least two distinct factor levels")
-      xeval <- unique(data)
-      p <- .np_progress_activity_run("Computing bandwidths",
-        fitted(npudens(tdat=data,edat=xeval,bws=0,...)))
-      sum.Lambda3 <- c/(c-1)*sum(p*(1-p))
-      sum.Lambda2.minus.Lambda1.sq <- c^2/((c-1)^2)*sum(p*(1-p))
-      n.sum.Lambda1.sq <- n*sum(((1-c*p)/(c-1))^2)
-      bw <- sum.Lambda3/(sum.Lambda2.minus.Lambda1.sq+n.sum.Lambda1.sq)
-    }
+    support <- .np_entropy_factor_support(data, data.rotate)
+    data <- support$x
+    data.rotate <- support$y
+    discrete.evaluation <- support$evaluation
+    if(is.null(bw))
+      bw <- .np_entropy_discrete_plugin_bw(data, "data", ...)
   }
 	
   ##  Impose the null and generate a data of resampled statistics
@@ -82,9 +64,11 @@ npsymtest <- function(data = NULL,
     data.null <- c(data,data.rotate)
   } else {
     if(is.ordered(data)) {
-      data.null <- ordered(c(as.character(data),as.character(data.rotate)))
+      data.null <- ordered(c(as.character(data),as.character(data.rotate)),
+                           levels = levels(data))
     } else {
-      data.null <- factor(c(as.character(data),as.character(data.rotate)))
+      data.null <- factor(c(as.character(data),as.character(data.rotate)),
+                          levels = levels(data))
     }
   }
 
@@ -139,12 +123,8 @@ npsymtest <- function(data = NULL,
         }
       }
     } else {
-      xeval <- unique(data)
-      p.data <- fitted(npudens(tdat=data,edat=xeval,bws=bw,...))
-      p.data.rotate <- fitted(npudens(tdat=data.rotate,edat=xeval,bws=bw,...))   
-      ## Sum the information function over the unique probabilities and
-      ## return.
-      return(sum(0.5*(sqrt(p.data)-sqrt(p.data.rotate))**2))
+      return(.np_entropy_discrete_distance(
+        data, data.rotate, bw, bw, discrete.evaluation, ...))
     }
   }
   
@@ -173,19 +153,7 @@ npsymtest <- function(data = NULL,
     if(is.numeric(data.null)) {
       null.sample2 <- -(null.sample1-mean(null.sample1))+mean(null.sample1)
     } else {
-      if(is.ordered(data)) {
-        ## Rotate around the median, ordered case
-        null.sample1.levels <- levels(null.sample1)
-        tmp <- as.numeric(data.matrix(null.sample1))
-        location <- median(sort(unique(tmp)))
-        null.sample2 <- ordered(-(tmp-location)+location,levels=data.levels)
-      } else {
-        ## unordered case
-        null.sample1.levels <- levels(null.sample1)
-        tmp <- as.numeric(data.matrix(null.sample1))
-        location <- median(sort(unique(tmp)))
-        null.sample2 <- factor(-(tmp-location)+location,levels=data.levels)
-      }
+      null.sample2 <- .np_entropy_reflect_factor(null.sample1)
     }
     value <- Srho.sym(null.sample1,null.sample2,bw,method=method)
     .np_progress_activity_step(boot.state$progress, done = boot.state$counter)

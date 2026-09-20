@@ -1,5 +1,17 @@
 # np 0.80-1
 
+* Univariate entropy equality and symmetry tests retain declared categorical
+  support, including unused levels, throughout probability summation and
+  bootstrap resampling. Equality tests use common category metadata; ambiguous
+  qualitative ordered supports require an explicit common level declaration.
+  Corrected categorical statistics, selected bandwidths and p-values may differ.
+  A shared plug-in selector now evaluates each sample's own probabilities,
+  fixing equality tests that supply only the first bandwidth. Independent
+  missing-value omission is completed before overlap checks, and obsolete
+  omission attributes no longer break numeric entropy integration.
+  Categorical symmetry now rejects an observed or bootstrap reflection outside
+  its declared support instead of silently losing those observations.
+
 * Bootstrap progress retains the latest completed work between heartbeats.
   Operator rows and blocks are distinguished from completed replications;
   conditional-moment tests credit evaluated statistics, not generated draws.
