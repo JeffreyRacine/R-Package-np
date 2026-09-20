@@ -160,6 +160,7 @@
     save.seed = get0(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
   on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
   result <- .npRmpi_bootstrap_run_fanout(
+    progress.unit = "row",
     tasks = tasks, worker = worker, ncol.out = 1L,
     what = "ann-unconditional-se", progress.label = "Adaptive-NN standard errors",
     profile.where = "ann-unconditional-se", comm = 1L,

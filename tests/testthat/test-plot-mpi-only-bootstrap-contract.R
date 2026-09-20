@@ -251,7 +251,8 @@ test_that("wild fanout master-assist uses master chunk when workers are active",
     .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
     .npRmpi_master_only_mode = function(comm = 1L) FALSE,
     .npRmpi_bootstrap_worker_count = function(comm = 1L) 1L,
-    .np_plot_bootstrap_progress_begin = function(total, label) list(total = as.integer(total)),
+    .np_plot_bootstrap_progress_begin = function(total, label, unit = "rep")
+      list(total = as.integer(total), enabled = TRUE),
     .np_plot_progress_tick = function(state, done, force = FALSE) {
       qenv$progress <- c(qenv$progress, as.integer(done))
       state

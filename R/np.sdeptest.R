@@ -61,39 +61,32 @@
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
 
-  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  local.idx <- seq_len(boot.num)
+  local.idx <- local.idx[(local.idx - 1L) %% size == rank]
   .npRmpi_bootstrap_transport_trace(
     what = "npsdeptest",
     event = "fanout.collective.start",
     fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx))
   )
 
-  local.Srho <- matrix(NA_real_, nrow = length(local.idx), ncol = lag.num)
-  local.cumulant <- matrix(NA_real_, nrow = length(local.idx), ncol = lag.num)
-
-  for (jj in seq_along(local.idx)) {
-    b <- local.idx[[jj]]
-    resampled.ts <- as.ts(data[plan[b, ]])
-    Srho.vec.boot <- numeric(lag.num)
-
-    for (k in seq_len(lag.num)) {
-      tmp <- ts.intersect(resampled.ts, lag(resampled.ts, k))
-      y <- as.numeric(tmp[,1])
-      y.lag <- as.numeric(tmp[,2])
-      Srho.vec.boot[k] <- .npRmpi_with_local_regression(
-        Srho.bivar(
-          y,
-          y.lag,
-          bw.y[k],
-          bw.y.lag[k],
-          c(bw.joint.y[k], bw.joint.y.lag[k]),
-          method = method
-        )
-      )
-      local.Srho[jj, k] <- Srho.vec.boot[k]
-      local.cumulant[jj, k] <- sum(Srho.vec.boot[seq_len(k)])
-    }
-  }
+  parts <- .npRmpi_bootstrap_collective_apply(
+    boot.num, 1L, function(ids, pos) {
+      resampled.ts <- as.ts(data[plan[ids, ]])
+      values <- numeric(lag.num)
+      for (k in seq_len(lag.num)) {
+        tmp <- ts.intersect(resampled.ts, lag(resampled.ts, k))
+        values[k] <- .npRmpi_with_local_regression(Srho.bivar(
+          as.numeric(tmp[, 1]), as.numeric(tmp[, 2]),
+          bw.y[k], bw.y.lag[k], c(bw.joint.y[k], bw.joint.y.lag[k]),
+          method = method))
+      }
+      c(values, vapply(seq_len(lag.num),
+        function(k) sum(values[seq_len(k)]), numeric(1)))
+    }, progress = progress, comm = comm)
+  rows <- matrix(unlist(parts, use.names = FALSE), ncol = 2L * lag.num,
+                 byrow = TRUE)
+  local.Srho <- rows[, seq_len(lag.num), drop = FALSE]
+  local.cumulant <- rows[, lag.num + seq_len(lag.num), drop = FALSE]
 
   invisible(gc(FALSE))
 

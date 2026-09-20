@@ -835,6 +835,7 @@ npqreg <-
   }
 
   out <- .npRmpi_bootstrap_run_fanout(
+    progress.unit = "row",
     tasks = tasks,
     worker = worker,
     ncol.out = 1L,
@@ -1031,6 +1032,7 @@ npqreg <-
   }
 
   .npRmpi_bootstrap_run_fanout(
+    progress.unit = "row",
     tasks = tasks,
     worker = worker,
     ncol.out = length(tau) * cols.per.tau,

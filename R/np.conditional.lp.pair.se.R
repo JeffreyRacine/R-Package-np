@@ -61,6 +61,7 @@
     save.seed = get0(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
   on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
   .npRmpi_bootstrap_run_fanout(tasks = tasks, worker = worker, ncol.out = 6L,
+    progress.unit = "row",
     what = "conditional-lp-pair-se", progress.label = "Categorical contrast standard errors",
     profile.where = "conditional-lp-pair-se", comm = 1L,
     prefer.local.single_worker = FALSE, master_local_chunk = TRUE,

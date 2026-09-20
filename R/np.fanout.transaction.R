@@ -2,6 +2,47 @@
 # Cancellation is cooperative at existing rank-local task/chunk boundaries.
 # This protocol does not recover a lost rank or a failed native MPI primitive.
 .npRmpi_fanout_state <- new.env(parent = emptyenv())
+.npRmpi_bootstrap_task_progress <- new.env(parent = emptyenv())
+
+# Preserve the original condition class, including message-less interrupts.
+.npRmpi_fanout_rethrow <- function(condition) {
+  if (inherits(condition, "interrupt")) {
+    signalCondition(condition)
+    invokeRestart("abort")
+  }
+  stop(condition)
+}
+
+# Optional, call-scoped completion within one task. Consumers report a
+# cumulative count only after completing their numerical batch. The owner
+# converts it to deltas and credits any unreported tail exactly once.
+.npRmpi_bootstrap_task_checkpoint <- function(done) {
+  checkpoint <- .npRmpi_bootstrap_task_progress$checkpoint
+  if (is.function(checkpoint)) checkpoint(done)
+  invisible(NULL)
+}
+
+.npRmpi_bootstrap_task_evaluate <- function(expr, weight, report = NULL) {
+  if (is.null(report)) return(force(expr))
+  state <- new.env(parent = emptyenv())
+  state$done <- 0L
+  previous <- .npRmpi_bootstrap_task_progress$checkpoint
+  on.exit(.npRmpi_bootstrap_task_progress$checkpoint <- previous, add = TRUE)
+  checkpoint <- function(done) {
+    if (length(done) != 1L || is.na(done) || !is.finite(done) ||
+        done != as.integer(done) || done < state$done || done > weight)
+      stop("invalid internal bootstrap completion count", call. = FALSE)
+    delta <- as.integer(done - state$done)
+    if (delta > 0L) report(delta)
+    state$done <- as.integer(done)
+    invisible(NULL)
+  }
+  .npRmpi_bootstrap_task_progress$checkpoint <- checkpoint
+  value <- force(expr)
+  if (!inherits(value, "try-error") && !inherits(value, "npRmpi_local_failure"))
+    checkpoint(weight)
+  value
+}
 
 .npRmpi_fanout_native <- function(action, comm, arg1 = NULL, arg2 = NULL) {
   comm <- as.integer(comm)
@@ -361,13 +402,7 @@
     .npRmpi_fanout_cleanup_attempt(tx, recovery)
     suspendInterrupts({
       .npRmpi_fanout_forget(tx)
-      if (inherits(failure$condition, "interrupt")) {
-        # A real interrupt need not have a message. stop() would turn its
-        # unhandled default action into an ordinary, catchable error.
-        signalCondition(failure$condition)
-        invokeRestart("abort")
-      }
-      stop(failure$condition)
+      .npRmpi_fanout_rethrow(failure$condition)
     })
   }
   if (any(tx$rank != "closed"))
@@ -504,17 +539,25 @@
   completed <- 0L
   for (i in seq_along(tasks)) {
     if (.npRmpi_fanout_worker_cancelled(header)) break
-    value <- .npRmpi_fanout_worker_call(tmpfunarg$FUN,
-      c(list(request$tasks[[i]]), tmpfunarg$dot.arg))
+    value <- .npRmpi_bootstrap_task_evaluate(
+      .npRmpi_fanout_worker_call(tmpfunarg$FUN,
+        c(list(request$tasks[[i]]), tmpfunarg$dot.arg)),
+      weight = request$tasks[[i]]$bsz,
+      report = if (isTRUE(tmpfunarg$progress.enabled) &&
+                   isTRUE(request$tasks[[i]]$report.internal)) function(delta) {
+        mpi.send.Robj(.npRmpi_fanout_envelope(header, "progress", value = delta),
+                       0L, tag, comm)
+      })
     if (isTRUE(tmpfunarg$stream.results)) {
       .npRmpi_fanout_worker_result(header, tasks[[i]], list(value), tag)
     } else {
       parts[i] <- list(value)
-      if (isTRUE(tmpfunarg$progress.enabled)) {
+      if (isTRUE(tmpfunarg$progress.enabled) &&
+          !isTRUE(request$tasks[[i]]$report.internal)) {
         boot <- boot + request$tasks[[i]]$bsz
         if (i %% tmpfunarg$progress.stride == 0L || i == length(tasks)) {
-          mpi.send.Robj(.npRmpi_fanout_envelope(header, "progress", value = as.integer(boot)),
-                         0L, tag, comm)
+          mpi.send.Robj(.npRmpi_fanout_envelope(header, "progress",
+                         value = as.integer(boot)), 0L, tag, comm)
           boot <- 0L
         }
       }
@@ -600,7 +643,10 @@
   worker.idx <- if (master.local) lapply(seq_len(workers), function(rank)
     which((seq_len(n) - 1L) %% (workers + 1L) == rank)) else NULL
   stream <- master.local && .npRmpi_bootstrap_stream_bundle_results(worker.idx, tasks, ncol.out)
-  beacons <- master.local && !stream && progress.enabled
+  # Internal-reporting tasks can retain completion beacons even when their
+  # result payloads are streamed. Other consumers keep the incumbent policy.
+  beacons <- master.local && progress.enabled && (!stream ||
+    all(vapply(tasks, function(task) isTRUE(task$report.internal), logical(1L))))
   stride <- if (beacons) .npRmpi_bootstrap_bundle_progress_stride(worker.idx) else 0L
   shared <- serialize(list(FUN = worker, dot.arg = dot.arg,
     transaction = .npRmpi_fanout_header(tx), stream.results = stream,
@@ -636,6 +682,41 @@
     }
     invisible(NULL)
   }
+  drain.available <- function() {
+    if (!identical(tx$phase, "active") || isTRUE(state$polling))
+      return(invisible(NULL))
+    state$polling <- TRUE
+    on.exit(state$polling <- FALSE, add = TRUE)
+    # Rank-local native computation temporarily maps comm[1] to MPI_COMM_SELF.
+    # Receipt polling must use the saved pool, then restore the numerical
+    # owner's local mode even if collection or rendering signals a condition.
+    old.mode <- .Call("C_np_set_local_regression_mode", FALSE, PACKAGE = "npRmpi")
+    on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"),
+            add = TRUE)
+    while (any(tx$rank != "closed") &&
+           isTRUE(mpi.iprobe(mpi.any.source(), mpi.any.tag(), comm))) receive()
+    invisible(NULL)
+  }
+  if (master.local && progress.enabled &&
+      any(vapply(tasks, function(task) isTRUE(task$report.internal), logical(1L)))) {
+    previous.forward <- .np_progress_runtime$fit_forward
+    on.exit(.np_progress_runtime$fit_forward <- previous.forward, add = TRUE)
+    .np_progress_runtime$fit_forward <- function() {
+      # Existing native heartbeats service completed worker receipts while
+      # the master's numerical tile is still active. Otherwise blocking sends
+      # can stall workers until the master's next whole-tile boundary.
+      # The native progress bridge deliberately tolerates cosmetic R errors.
+      # Retain transport/interrupt conditions here and rethrow at the next
+      # ordinary R-owned task boundary, where the transaction can unwind.
+      if (is.null(state$pump.failure)) {
+        state$pump.failure <- tryCatch({ drain.available(); NULL },
+          error = identity, interrupt = identity)
+      }
+      if (is.function(previous.forward)) previous.forward()
+      else progress.step(state$done)
+      invisible(NULL)
+    }
+  }
   .npRmpi_fanout_run(tx, {
     suspendInterrupts({
       tx$phase <- "activating"
@@ -668,10 +749,24 @@
     for (task.local.idx in local.idx) {
       .npRmpi_bootstrap_transport_trace(what, "fanout.master_local_chunk.start",
         list(task_idx = task.local.idx))
-      state$out[task.local.idx] <- list(.npRmpi_fanout_worker_call(worker,
-        c(list(tasks[[task.local.idx]]), dot.arg)))
+      internal.progress <- progress.enabled &&
+        isTRUE(tasks[[task.local.idx]]$report.internal)
+      state$out[task.local.idx] <- list(.npRmpi_bootstrap_task_evaluate(
+        .npRmpi_fanout_worker_call(worker,
+          c(list(tasks[[task.local.idx]]), dot.arg)),
+        weight = weights[[task.local.idx]],
+        report = if (internal.progress) function(delta) {
+          if (!is.null(state$pump.failure))
+            .npRmpi_fanout_rethrow(state$pump.failure)
+          state$done <- state$done + delta
+          drain.available()
+          progress.step(state$done)
+        }))
+      if (!is.null(state$pump.failure))
+        .npRmpi_fanout_rethrow(state$pump.failure)
+      if (!internal.progress)
+        state$done <- state$done + weights[[task.local.idx]]
       tx$seen[[task.local.idx]] <- TRUE
-      state$done <- state$done + weights[[task.local.idx]]
       progress.step(state$done)
       .npRmpi_bootstrap_transport_trace(what, "fanout.master_local_chunk.done",
         list(task_idx = task.local.idx, bsz = weights[[task.local.idx]]))

@@ -65,52 +65,35 @@
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
 
-  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  local.idx <- seq_len(boot.num)
+  local.idx <- local.idx[(local.idx - 1L) %% size == rank]
   .npRmpi_bootstrap_transport_trace(
     what = "npunitest",
     event = "fanout.collective.start",
     fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx))
   )
 
-  if (isTRUE(fast.fixed.gaussian) && length(local.idx)) {
-    support.length <- length(data.null)
-    chunk.size <- .np_entropy_count_chunk_size(
-      support.length, bytes.per.support = 80, max.chunk = 16L
-    )
-    local.Srho <- numeric(length(local.idx))
-    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
-      chunk <- start:min(length(local.idx), start + chunk.size - 1L)
-      replications <- local.idx[chunk]
-      counts.x <- vapply(
-        replications,
-        function(b) tabulate(plan$x[b, ], nbins = support.length),
-        integer(support.length)
-      )
-      counts.y <- vapply(
-        replications,
-        function(b) tabulate(plan$y[b, ], nbins = support.length),
-        integer(support.length)
-      )
-      local.Srho[chunk] <- .np_entropy_compute(expr = .Call(
-        "C_np_entropy_univariate_summation_counts",
-        as.double(data.null),
-        matrix(as.double(counts.x), nrow = support.length),
-        matrix(as.double(counts.y), nrow = support.length),
-        as.double(c(bw.x, bw.y)),
-        PACKAGE = "npRmpi"
-      ))
-    }
-  } else {
-    local.Srho <- numeric(length(local.idx))
-    for (jj in seq_along(local.idx)) {
-      b <- local.idx[[jj]]
-      data.null.x <- data.null[plan$x[b, ]]
-      data.null.y <- data.null[plan$y[b, ]]
-      local.Srho[[jj]] <- .npRmpi_with_local_regression(
-        Srho.univar(data.null.x, data.null.y, bw.x, bw.y, method = method)
-      )
-    }
-  }
+  chunk.size <- if (isTRUE(fast.fixed.gaussian)) .np_entropy_count_chunk_size(
+    length(data.null), bytes.per.support = 80, max.chunk = 16L) else 1L
+  local.Srho <- as.numeric(unlist(.npRmpi_bootstrap_collective_apply(
+    boot.num, chunk.size, function(ids, pos) {
+      if (isTRUE(fast.fixed.gaussian)) {
+        support.length <- length(data.null)
+        counts.x <- vapply(ids,
+          function(b) tabulate(plan$x[b, ], nbins = support.length),
+          integer(support.length))
+        counts.y <- vapply(ids,
+          function(b) tabulate(plan$y[b, ], nbins = support.length),
+          integer(support.length))
+        .np_entropy_compute(expr = .Call(
+          "C_np_entropy_univariate_summation_counts", as.double(data.null),
+          matrix(as.double(counts.x), nrow = support.length),
+          matrix(as.double(counts.y), nrow = support.length),
+          as.double(c(bw.x, bw.y)), PACKAGE = "npRmpi"))
+      } else .npRmpi_with_local_regression(Srho.univar(
+        data.null[plan$x[ids, ]], data.null[plan$y[ids, ]],
+        bw.x, bw.y, method = method))
+    }, progress = progress, comm = comm), use.names = FALSE))
 
   invisible(gc(FALSE))
 

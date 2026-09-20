@@ -233,18 +233,27 @@
   invisible(NULL)
 }
 
-.np_plot_progress_notify <- function(stage = NULL, done = NULL, total = NULL,
-                                      force = FALSE) {
+.np_plot_progress_record <- function(stage = NULL, done = NULL, total = NULL,
+                                      unit = "rep") {
   context <- .np_plot_progress_runtime$context
   if (is.null(context))
     return(invisible(NULL))
   if (!is.null(stage)) context$stage <- stage
   if (!is.null(done) && !is.null(total) && total > 0) {
-    context$rep <- sprintf("rep %d/%d", done, total)
+    context$rep <- sprintf("%s %d/%d", unit, done, total)
     # A bias bootstrap can reset the local counter within the same target.
     # Do not claim completion of the outer call from a local B/B endpoint.
-    context$fraction <- max(context$fraction, done / total)
+    if (unit %in% c("rep", "block"))
+      context$fraction <- max(context$fraction, done / total)
   }
+  invisible(NULL)
+}
+
+.np_plot_progress_notify <- function(stage = NULL, done = NULL, total = NULL,
+                                      force = FALSE, unit = "rep") {
+  .np_plot_progress_record(stage, done, total, unit)
+  context <- .np_plot_progress_runtime$context
+  if (is.null(context)) return(invisible(NULL))
   context$state <- .np_progress_step_at(context$state, .np_progress_now(),
                                         force = force)
   invisible(NULL)
@@ -281,16 +290,18 @@
   state
 }
 
-.np_plot_bootstrap_progress_begin <- function(total, label) {
+.np_plot_bootstrap_progress_begin <- function(total, label, unit = "rep") {
   state <- .np_plot_progress_begin(total = total, label = label)
   if (is.null(state))
     return(NULL)
 
+  state$plot_unit <- unit
   if (!is.null(state$plot_context)) {
     state$start_note_pending <- FALSE
     state$last_emit <- state$started
     state$last_emitted_done <- 0L
-    .np_plot_progress_notify(stage = "resampling", done = 0L, total = total)
+    .np_plot_progress_notify(stage = if (unit == "rep") "resampling" else
+      paste("evaluating", unit), done = 0L, total = total, unit = unit)
     return(state)
   }
   .np_progress_show_now(state = state, done = 0L)
@@ -306,6 +317,12 @@
   done <- max(0L, min(state$total, done))
 
   state$last_done <- done
+  # Store completed work even when the local display is throttled. The outer
+  # native heartbeat must see the latest count without changing chunk timing.
+  if (!is.null(state$plot_context))
+    .np_plot_progress_record(stage = state$plot_stage, done =
+      if (is.null(state$plot_stage)) done else NULL, total = state$total,
+      unit = if (is.null(state$plot_unit)) "rep" else state$plot_unit)
   now <- .np_progress_now()
   state <- .np_progress_maybe_emit_start_note(state = state, now = now)
 
@@ -340,7 +357,7 @@
   if (!is.null(state$plot_context))
     .np_plot_progress_notify(stage = state$plot_stage, done =
       if (is.null(state$plot_stage)) done else NULL, total = state$total,
-      force = force)
+      force = force, unit = if (is.null(state$plot_unit)) "rep" else state$plot_unit)
   state
 }
 
@@ -1351,7 +1368,8 @@
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   block.rows <- .np_plot_wild_hat_block_rows(ntrain = ntrain, neval = neval)
   nblocks <- as.integer(ceiling(neval / block.rows))
-  progress <- .np_plot_bootstrap_progress_begin(total = nblocks, label = progress.label)
+  progress <- .np_plot_bootstrap_progress_begin(total = nblocks,
+    label = progress.label, unit = "block")
   on.exit({
     .np_plot_progress_end(progress)
   }, add = TRUE)
@@ -1552,6 +1570,56 @@
 # centralized without touching call sites.
 .npRmpi_plot_inid_ksum_fastpath_enabled <- function() {
   TRUE
+}
+
+# Collective bootstrap leaves own strided replication IDs. Keep their
+# arithmetic batches and confirm completion at the same batch boundary on all
+# ranks, including empty tails. Never infer remote completion from rank zero.
+.npRmpi_bootstrap_collective_apply <- function(B, chunk.size, worker,
+                                              progress = NULL, comm = 1L) {
+  size <- mpi.comm.size(comm)
+  rank <- mpi.comm.rank(comm)
+  ids <- seq_len(B)
+  ids <- ids[(ids - 1L) %% size == rank]
+  chunk.size <- max(1L, as.integer(chunk.size))
+  rounds <- ceiling(ceiling(B / size) / chunk.size)
+  values <- vector("list", rounds)
+  owner <- new.env(parent = emptyenv())
+  owner$progress <- progress
+  previous.forward <- .np_progress_runtime$fit_forward
+  if (rank == 0L && is.list(progress)) {
+    .np_progress_runtime$fit_forward <- function() {
+      owner$progress <- .np_progress_step(owner$progress,
+                                         done = owner$progress$last_done)
+    }
+    on.exit(.np_progress_runtime$fit_forward <- previous.forward, add = TRUE)
+  }
+  for (round in seq_len(rounds)) {
+    first <- (round - 1L) * chunk.size + 1L
+    pos <- if (first <= length(ids))
+      seq.int(first, min(length(ids), first + chunk.size - 1L)) else integer()
+    local <- .npRmpi_capture_local_work(
+      if (length(pos)) worker(ids[pos], pos) else NULL)
+    values[round] <- list(local)
+    failed <- mpi.allreduce(as.integer(inherits(local, "npRmpi_local_failure")), type = 1L,
+                            op = "max", comm = comm)
+    if (failed != 0L) {
+      if (!inherits(local, "npRmpi_local_failure"))
+        local <- structure(list(condition = simpleError(
+          "MPI bootstrap batch failed on another rank")),
+          class = "npRmpi_local_failure")
+      .npRmpi_raise_completed_failure(local)
+    }
+    # Every rank has completed its assigned prefix when allreduce returns.
+    done <- min(B, round * chunk.size * size)
+    if (rank == 0L && !is.null(owner$progress)) {
+      if (is.function(owner$progress)) owner$progress(done)
+      else if (is.environment(owner$progress))
+        .np_progress_activity_step(owner$progress, done)
+      else owner$progress <- .np_progress_step(owner$progress, done = done)
+    }
+  }
+  values
 }
 
 .npRmpi_bootstrap_worker_count <- function(comm = 1L) {
@@ -2029,7 +2097,8 @@
                                          required.bindings = NULL,
                                          ...,
                                          progress.context = NULL,
-                                         metadata.reducer = NULL) {
+                                         metadata.reducer = NULL,
+                                         progress.unit = "rep") {
   if (!is.null(metadata.reducer) && !is.function(metadata.reducer))
     stop("invalid internal fan-out metadata reducer", call. = FALSE)
   rng.final.state <- attr(tasks, "rng_final_state", exact = TRUE)
@@ -2071,7 +2140,8 @@
   } else {
     progress <- .np_plot_bootstrap_progress_begin(
       total = total.boot,
-      label = progress.label
+      label = progress.label,
+      unit = progress.unit
     )
     progress.tick <- .np_plot_progress_tick
     on.exit({
@@ -2159,7 +2229,7 @@
     tryCatch(.npRmpi_fanout_bootstrap(
       tasks = tasks, worker = worker.exec, dot.arg = list(...),
       workers = workers, comm = comm, master.local = master_local_chunk,
-      ncol.out = ncol.out, progress.enabled = !is.null(progress),
+      ncol.out = ncol.out, progress.enabled = isTRUE(progress$enabled),
       progress.step = function(done) {
         progress.state$value <- progress.tick(progress.state$value, done)
         invisible(NULL)

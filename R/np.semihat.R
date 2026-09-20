@@ -1301,6 +1301,7 @@ npindexhat <-
   }
 
   .npRmpi_bootstrap_run_fanout(
+    progress.unit = "row",
     tasks = tasks,
     worker = worker,
     ncol.out = ncol(yy),

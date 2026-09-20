@@ -124,7 +124,8 @@
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
 
-  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  local.idx <- seq_len(boot.num)
+  local.idx <- local.idx[(local.idx - 1L) %% size == rank]
   .npRmpi_bootstrap_transport_trace(
     what = "npcmstest",
     event = "fanout.collective.start",
@@ -134,14 +135,12 @@
   local.Sn <- numeric(length(local.idx))
   chunk.size <- .np_cms_bootstrap_chunk_size(
     n = length(model.resid),
-    boot.num = max(1L, length(local.idx)),
+    boot.num = max(1L, ceiling(boot.num / size)),
     pivot = pivot
   )
 
-  if (length(local.idx)) {
-    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
-      stopi <- min(length(local.idx), start + chunk.size - 1L)
-      pos <- seq.int(start, stopi)
+  local.Sn <- as.numeric(unlist(.npRmpi_bootstrap_collective_apply(
+    boot.num, chunk.size, function(ids, pos) {
       residuals.chunk <- matrix(NA_real_, nrow = length(model.resid),
                                 ncol = length(pos))
 
@@ -159,9 +158,8 @@
       statistic <- .npRmpi_with_local_regression(
         statistic.batch(residuals.chunk)
       )
-      local.Sn[pos] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
-    }
-  }
+      if (pivot) statistic[["Jn"]] else statistic[["In"]]
+    }, progress = progress, comm = comm), use.names = FALSE))
 
   invisible(gc(FALSE))
 
@@ -214,7 +212,8 @@
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
 
-  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  local.idx <- seq_len(boot.num)
+  local.idx <- local.idx[(local.idx - 1L) %% size == rank]
   .npRmpi_bootstrap_transport_trace(
     what = "npcmstest",
     event = "fanout.collective.start",
@@ -224,14 +223,12 @@
   local.Sn <- numeric(length(local.idx))
   chunk.size <- .np_cms_bootstrap_chunk_size(
     n = length(model.resid),
-    boot.num = max(1L, length(local.idx)),
+    boot.num = max(1L, ceiling(boot.num / size)),
     pivot = pivot
   )
 
-  if (length(local.idx)) {
-    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
-      stopi <- min(length(local.idx), start + chunk.size - 1L)
-      pos <- seq.int(start, stopi)
+  local.Sn <- as.numeric(unlist(.npRmpi_bootstrap_collective_apply(
+    boot.num, chunk.size, function(ids, pos) {
       residuals.chunk <- matrix(NA_real_, nrow = length(model.resid),
                                 ncol = length(pos))
 
@@ -249,9 +246,8 @@
       statistic <- .npRmpi_with_local_regression(
         statistic.batch(residuals.chunk)
       )
-      local.Sn[pos] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
-    }
-  }
+      if (pivot) statistic[["Jn"]] else statistic[["In"]]
+    }, progress = progress, comm = comm), use.names = FALSE))
 
   invisible(gc(FALSE))
 
@@ -612,11 +608,12 @@ npcmstest <- function(formula,
           } else {
             resid.wild.rademacher(model.resid)
           }
-          progress <- .np_progress_step(progress, done = ii)
+          progress <- .np_progress_step(progress)
         }
 
         statistic <- statistic.batch(residuals.chunk)
-        Sn.bootstrap[idx] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
+       Sn.bootstrap[idx] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
+        progress <- .np_progress_step(progress, done = max(idx))
       }
     }
     progress <- .np_progress_end(progress)

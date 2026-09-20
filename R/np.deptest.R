@@ -60,40 +60,26 @@
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
 
-  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  local.idx <- seq_len(boot.num)
+  local.idx <- local.idx[(local.idx - 1L) %% size == rank]
   .npRmpi_bootstrap_transport_trace(
     what = "npdeptest",
     event = "fanout.collective.start",
     fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx))
   )
 
-  local.Srho <- numeric(length(local.idx))
-
-  if (method == "summation" && length(local.idx)) {
-    chunk.size <- .np_entropy_count_chunk_size(
-      length(data.x), bytes.per.support = 4, max.chunk = 16L
-    )
-    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
-      position <- start:min(
-        length(local.idx), start + chunk.size - 1L
-      )
-      local.Srho[position] <- .npRmpi_with_local_regression(
+  chunk.size <- if (method == "summation") .np_entropy_count_chunk_size(
+    length(data.x), bytes.per.support = 4, max.chunk = 16L) else 1L
+  local.Srho <- as.numeric(unlist(.npRmpi_bootstrap_collective_apply(
+    boot.num, chunk.size, function(ids, pos) {
+      if (method == "summation") .npRmpi_with_local_regression(
         .np_entropy_bivariate_gaussian_summation_xindex(
-          data.x, data.y,
-          plan[local.idx[position], , drop = FALSE],
-          bw.data.x, bw.data.y, bw.joint
-        )
-      )
-    }
-  } else {
-    for (jj in seq_along(local.idx)) {
-      b <- local.idx[[jj]]
-      data.x.boot <- data.x[plan[b, ]]
-      local.Srho[[jj]] <- .npRmpi_with_local_regression(
-        Srho.bivar(data.x.boot, data.y, bw.data.x, bw.data.y, bw.joint, method = method)
-      )
-    }
-  }
+          data.x, data.y, plan[ids, , drop = FALSE],
+          bw.data.x, bw.data.y, bw.joint))
+      else .npRmpi_with_local_regression(
+        Srho.bivar(data.x[plan[ids, ]], data.y, bw.data.x, bw.data.y,
+                   bw.joint, method = method))
+    }, progress = progress, comm = comm), use.names = FALSE))
 
   invisible(gc(FALSE))
 

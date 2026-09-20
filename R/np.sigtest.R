@@ -143,6 +143,7 @@ if (getRversion() >= "2.15.1")
 
 .npRmpi_npsig_parallel_boot_values_collective <- function(boot.seeds,
                                                           worker,
+                                                          progress.context = NULL,
                                                           comm = 1L) {
   n.boot <- length(boot.seeds)
   if (n.boot < 1L)
@@ -155,19 +156,21 @@ if (getRversion() >= "2.15.1")
   }
 
   rank <- mpi.comm.rank(comm)
-  local.idx <- seq.int(rank + 1L, n.boot, by = size)
-  local.vals <- if (length(local.idx)) {
-    as.numeric(worker(local.idx, boot.seeds))
-  } else {
-    numeric(0)
-  }
+  local.idx <- seq_len(n.boot)
+  local.idx <- local.idx[(local.idx - 1L) %% size == rank]
+  local.vals <- as.numeric(unlist(.npRmpi_bootstrap_collective_apply(
+    n.boot, 8L, function(ids, pos) as.numeric(worker(ids, boot.seeds)),
+    progress = if (!is.null(progress.context)) function(done) {
+      progress.context$state <- .np_progress_step(progress.context$state, done = done)
+    }, comm = comm), use.names = FALSE))
 
   gathered <- mpi.gather.Robj(local.vals, root = 0L, comm = comm)
   if (rank == 0L) {
     out <- numeric(n.boot)
     gathered <- .npRmpi_npsig_gather_rank_chunks(gathered = gathered, size = size)
     for (r in seq_len(size)) {
-      idx.r <- seq.int(r, n.boot, by = size)
+      idx.r <- seq_len(n.boot)
+      idx.r <- idx.r[(idx.r - 1L) %% size == r - 1L]
       vals.r <- as.numeric(gathered[[r]])
       if (length(idx.r) != length(vals.r))
         stop("npsigtest MPI gather returned mismatched bootstrap chunk lengths", call. = FALSE)
@@ -186,7 +189,8 @@ if (getRversion() >= "2.15.1")
   lapply(starts, function(start) {
     list(
       start = as.integer(start),
-      bsz = as.integer(min(chunk.size, n.boot - start + 1L))
+      bsz = as.integer(min(chunk.size, n.boot - start + 1L)),
+      report.internal = TRUE
     )
   })
 }
@@ -202,10 +206,15 @@ if (getRversion() >= "2.15.1")
   if (n.boot < 1L)
     return(numeric(0))
 
+  if (!is.null(progress.context)) {
+    progress.context$fanout.active <- TRUE
+    on.exit(progress.context$fanout.active <- FALSE, add = TRUE)
+  }
   if (.npRmpi_npsig_collective_context()) {
     return(.npRmpi_npsig_parallel_boot_values_collective(
       boot.seeds = boot.seeds,
       worker = worker,
+      progress.context = progress.context,
       comm = comm
     ))
   }
@@ -232,10 +241,6 @@ if (getRversion() >= "2.15.1")
     matrix(vals, nrow = task$bsz, ncol = 1L)
   }
 
-  if (!is.null(progress.context)) {
-    progress.context$fanout.active <- TRUE
-    on.exit(progress.context$fanout.active <- FALSE, add = TRUE)
-  }
   out <- .npRmpi_bootstrap_run_fanout(
     tasks = tasks,
     worker = worker.chunk,
@@ -1188,6 +1193,7 @@ npsigtest.rbandwidth <- function(bws,
               context = sprintf("bootstrap replications %s",
                 paste(task.idx[tile.position], collapse = ", "))
             )
+            .npRmpi_bootstrap_task_checkpoint(max(tile.position))
           }
           return(out)
         }
@@ -1241,6 +1247,7 @@ npsigtest.rbandwidth <- function(bws,
               .np_npsig_structure(bws, xdat.star, index) else structural,
             context = sprintf("bootstrap replication %d", task.idx[kk])
           )
+          .npRmpi_bootstrap_task_checkpoint(kk)
         }
         out
       }
@@ -1565,6 +1572,7 @@ npsigtest.rbandwidth <- function(bws,
                 context = sprintf("bootstrap replications %s",
                   paste(task.idx[tile.position], collapse = ", "))
               )
+              .npRmpi_bootstrap_task_checkpoint(max(tile.position))
             }
             return(out)
           }
@@ -1631,6 +1639,7 @@ npsigtest.rbandwidth <- function(bws,
                   .np_npsig_structure(bws, xdat.star, i) else structural.test,
                 context = sprintf("bootstrap replication %d", task.idx[kk])
               )
+            .npRmpi_bootstrap_task_checkpoint(kk)
           }
           out
         }

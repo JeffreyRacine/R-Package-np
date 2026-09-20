@@ -67,44 +67,30 @@
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
 
-  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  local.idx <- seq_len(boot.num)
+  local.idx <- local.idx[(local.idx - 1L) %% size == rank]
   .npRmpi_bootstrap_transport_trace(
     what = "npsymtest",
     event = "fanout.collective.start",
     fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx), method = method)
   )
 
-  if (!is.null(fast.data.null) && length(local.idx)) {
-    support.length <- length(fast.data.null)
-    chunk.size <- .np_entropy_count_chunk_size(
-      support.length, bytes.per.support = 8, max.chunk = 64L
-    )
-    local.Srho <- numeric(length(local.idx))
-    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
-      chunk <- start:min(length(local.idx), start + chunk.size - 1L)
-      replications <- local.idx[chunk]
-      counts <- vapply(
-        replications,
-        function(ii) tabulate(plan[ii, ], nbins = support.length),
-        integer(support.length)
-      )
-      local.Srho[chunk] <- .np_entropy_compute(expr = .Call(
-        "C_np_entropy_symmetric_summation_counts",
-        as.double(fast.data.null),
-        matrix(as.double(counts), nrow = support.length),
-        as.double(fast.bandwidth),
-        PACKAGE = "npRmpi"
-      ))
-    }
-  } else {
-    local.Srho <- numeric(length(local.idx))
-    for (jj in seq_along(local.idx)) {
-      ii <- local.idx[[jj]]
-      local.Srho[[jj]] <- .npRmpi_with_local_regression(
-        boot.eval(plan[ii, ])
-      )
-    }
-  }
+  chunk.size <- if (!is.null(fast.data.null)) .np_entropy_count_chunk_size(
+    length(fast.data.null), bytes.per.support = 8, max.chunk = 64L) else 1L
+  local.Srho <- as.numeric(unlist(.npRmpi_bootstrap_collective_apply(
+    boot.num, chunk.size, function(ids, pos) {
+      if (!is.null(fast.data.null)) {
+        support.length <- length(fast.data.null)
+        counts <- vapply(ids,
+          function(ii) tabulate(plan[ii, ], nbins = support.length),
+          integer(support.length))
+        .np_entropy_compute(expr = .Call(
+          "C_np_entropy_symmetric_summation_counts",
+          as.double(fast.data.null),
+          matrix(as.double(counts), nrow = support.length),
+          as.double(fast.bandwidth), PACKAGE = "npRmpi"))
+      } else .npRmpi_with_local_regression(boot.eval(plan[ids, ]))
+    }, progress = progress, comm = comm), use.names = FALSE))
 
   invisible(gc(FALSE))
 

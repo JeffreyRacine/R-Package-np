@@ -90,59 +90,38 @@
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
 
-  local.idx <- seq.int(rank + 1L, boot.num, by = size)
+  local.idx <- seq_len(boot.num)
+  local.idx <- local.idx[(local.idx - 1L) %% size == rank]
   .npRmpi_bootstrap_transport_trace(
     what = "npdeneqtest",
     event = "fanout.collective.start",
     fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx))
   )
 
-  local.Tn <- numeric(length(local.idx))
-  local.In <- numeric(length(local.idx))
-
-  if (compress.bootstrap && length(local.idx)) {
-    chunk.size <- .npdeneq_count_chunk_size(
-      pool.n = nrow(z),
-      boot.num = length(local.idx)
-    )
-    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
-      stopi <- min(length(local.idx), start + chunk.size - 1L)
-      pos <- seq.int(start, stopi)
-      x.count <- matrix(0, nrow = nrow(z), ncol = length(pos))
-      y.count <- matrix(0, nrow = nrow(z), ncol = length(pos))
-
-      for (jj in seq_along(pos)) {
-        i <- local.idx[[pos[[jj]]]]
-        x.count[, jj] <- tabulate(plan$x[i, ], nbins = nrow(z))
-        y.count[, jj] <- tabulate(plan$y[i, ], nbins = nrow(z))
+  chunk.size <- if (compress.bootstrap) .npdeneq_count_chunk_size(
+    pool.n = nrow(z), boot.num = ceiling(boot.num / size)) else 1L
+  parts <- .npRmpi_bootstrap_collective_apply(
+    boot.num, chunk.size, function(ids, pos) {
+      if (compress.bootstrap) {
+        x.count <- matrix(0, nrow = nrow(z), ncol = length(ids))
+        y.count <- matrix(0, nrow = nrow(z), ncol = length(ids))
+        for (jj in seq_along(ids)) {
+          x.count[, jj] <- tabulate(plan$x[ids[[jj]], ], nbins = nrow(z))
+          y.count[, jj] <- tabulate(plan$y[ids[[jj]], ], nbins = nrow(z))
+        }
+        output.boot <- .npRmpi_with_local_regression(teststat.counted.batch(
+          z = z, x.count = x.count, y.count = y.count, bw.x = bw.x, bw.y = bw.y,
+          n1 = ncol(plan$x), n2 = ncol(plan$y)))
+      } else {
+        output.boot <- .npRmpi_with_local_regression(teststat(
+          data.frame(z[plan$x[ids, ], , drop = FALSE]),
+          data.frame(z[plan$y[ids, ], , drop = FALSE]), bw.x, bw.y))
       }
-
-      output.boot <- .npRmpi_with_local_regression(
-        teststat.counted.batch(
-          z = z,
-          x.count = x.count,
-          y.count = y.count,
-          bw.x = bw.x,
-          bw.y = bw.y,
-          n1 = ncol(plan$x),
-          n2 = ncol(plan$y)
-        )
-      )
-      local.Tn[pos] <- output.boot[["Tn"]]
-      local.In[pos] <- output.boot[["In"]]
-    }
-  } else {
-    for (jj in seq_along(local.idx)) {
-      i <- local.idx[[jj]]
-      x.bootstrap <- data.frame(z[plan$x[i, ], , drop = FALSE])
-      y.bootstrap <- data.frame(z[plan$y[i, ], , drop = FALSE])
-      output.boot <- .npRmpi_with_local_regression(
-        teststat(x.bootstrap, y.bootstrap, bw.x, bw.y)
-      )
-      local.Tn[[jj]] <- output.boot$Tn
-      local.In[[jj]] <- output.boot$In
-    }
-  }
+      cbind(Tn = output.boot[["Tn"]], In = output.boot[["In"]])
+    }, progress = progress, comm = comm)
+  rows <- do.call(rbind, parts)
+  local.Tn <- if (length(local.idx)) rows[, "Tn"] else numeric()
+  local.In <- if (length(local.idx)) rows[, "In"] else numeric()
 
   payload <- c(as.numeric(local.idx), local.Tn, local.In)
   gathered <- mpi.gather.Robj(payload, root = 0L, comm = comm)

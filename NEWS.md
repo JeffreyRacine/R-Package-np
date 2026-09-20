@@ -1,5 +1,19 @@
 # npRmpi 0.80-1
 
+* Bootstrap progress retains the latest completed work between heartbeats.
+  Significance tests report completed internal tiles without reducing their
+  numerical task sizes. Collective test consumers report completed batches,
+  while operator rows/blocks remain distinct from bootstrap replications.
+  Workers do not write to the console; quiet mode avoids completion beacons.
+
+* Bivariate entropy observed statistics share summation rows and quadrature
+  evaluations across active ranks. Each row retains the full training sample;
+  bootstrap draws, bandwidths and integration grids are unchanged.
+
+* Serial-dependence tests reject missing time points rather than silently
+  joining observations across gaps. Supply a contiguous complete segment
+  explicitly when the original series contains missing values.
+
 * Kernel sums, hat operators and quantile evaluation now distinguish current
   missing rows from historical na.action attributes on already-clean data.
   Supplying na.omit/na.exclude output no longer deletes unrelated rows a
