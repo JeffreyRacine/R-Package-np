@@ -4,6 +4,11 @@ beta_regression_objective_oracle <- function(training,
                                              bwtype,
                                              order,
                                              method) {
+  if (identical(method, "cv.ls") && !identical(bwtype, "fixed")) {
+    weights <- workhorse_nn_loo_weights(training,bandwidth,bwtype,order=order)
+    fitted <- colSums(weights*response)/colSums(weights)
+    return(mean((response-fitted)^2))
+  }
   weights <- npksum(
     bws = bandwidth,
     txdat = training,
@@ -63,6 +68,8 @@ beta_regression_lp_objective_oracle <- function(training,
     ckerub = rep(1, ncol(training))
   )$kw
   n <- nrow(training)
+  if (identical(method,"cv.ls") && !identical(bwtype,"fixed"))
+    weights <- workhorse_nn_loo_weights(training,bandwidth,bwtype,order=order)
   loss <- 0
   trace_hat <- 0
 
