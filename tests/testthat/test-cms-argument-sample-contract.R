@@ -9,7 +9,8 @@ test_that("CMS inference uses the compact model sample with na.exclude", {
       glm = glm(y ~ x, data = d, x = TRUE, y = TRUE, na.action = policy),
       qcms = quantreg::rq(y ~ x, data = d, model = TRUE, na.action = policy))
     omit <- make(na.omit); exclude <- make(na.exclude)
-    before <- serialize(exclude, NULL)
+    immutable <- c("x", "y", "residuals", "fitted.values", "na.action", "coefficients", "call")
+    before <- serialize(exclude[immutable], NULL)
     fun <- get(if (kind == "qcms") "npqcmstest" else "npcmstest", asNamespace("np"))
     for (distribution in c("asymptotic", "bootstrap")) {
       for (route in c("formula", "native")) {
@@ -19,11 +20,11 @@ test_that("CMS inference uses the compact model sample with na.exclude", {
           bws = .4, bandwidth.compute = FALSE))
         a <- do.call(fun, c(args, list(model = omit)))
         b <- do.call(fun, c(args, list(model = exclude)))
-        fields <- setdiff(names(a), c("pcall", "bws"))
+        fields <- setdiff(names(a), c("pcall", "bws", "timing.profile"))
         expect_identical(a[fields], b[fields])
       }
     }
-    expect_identical(serialize(exclude, NULL), before)
+    expect_identical(serialize(exclude[immutable], NULL), before)
     expect_error(do.call(fun, list(xdat = rev(d$x), ydat = rev(d$y), model = exclude,
       bws = .4, bandwidth.compute = FALSE)), "same complete observations")
   }
@@ -43,7 +44,7 @@ test_that("CMS validates retained components rather than call spelling", {
     invoke <- function(model) do.call(fun, list(formula = y ~ x, data = d,
       model = model, bws = .4, bandwidth.compute = FALSE, distribution = "asymptotic"))
     a <- invoke(models[[kind]][[1L]]); b <- invoke(models[[kind]][[2L]])
-    fields <- setdiff(names(a), c("pcall", "bws"))
+    fields <- setdiff(names(a), c("pcall", "bws", "timing.profile"))
     expect_identical(a[fields], b[fields])
     broken <- models[[kind]][[1L]]; broken$x <- NULL
     expect_error(invoke(broken), "must retain")
@@ -77,5 +78,27 @@ test_that("CMS manual bandwidths belong to selection, not duplicated kernel dots
         expect_true(is.finite(result$P))
       }
     }
+  }
+})
+
+test_that("CMS mixed-kernel contractions retain selected categorical metadata", {
+  old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
+  set.seed(645)
+  d <- data.frame(x = rnorm(30), u = factor(rep(c("a","b","c"),10)),
+                  o = ordered(rep(1:3,10)), y = rnorm(30))
+  model <- lm(y~x+u+o, data=d, x=TRUE, y=TRUE)
+  score <- residuals(model)
+  K <- dnorm(outer(d$x,d$x,"-")/.4)/.4 *
+    (ifelse(outer(as.character(d$u),as.character(d$u),"=="),1,.2)/(1+2*.2)) *
+    .5^abs(outer(as.integer(d$o),as.integer(d$o),"-"))
+  diag(K) <- 0
+  for (weighted in c(FALSE,TRUE)) for (pivot in c(FALSE,TRUE)) {
+    result <- npcmstest(y~x+u+o, data=d, model=model, bws=c(.4,.2,.5),
+      bandwidth.compute=FALSE, ukertype="liracine", okertype="liracine",
+      B=9, density.weighted=weighted, pivot=pivot)
+    fhat <- if(weighted) rep(1,30) else rowSums(K)/30
+    expect_equal(result$In,sum(score*(K%*%score)/fhat)/30^2,tolerance=2e-12)
+    if(pivot) expect_equal(result$Omega.hat,
+      2*.4*sum(score^2*((K^2)%*%(score^2))/fhat^2)/30^2,tolerance=2e-12)
   }
 })
