@@ -540,6 +540,8 @@ npindex.sibandwidth <-
 
     txdat <- txdat[keep.rows,,drop = FALSE]
     tydat <- tydat[keep.rows]
+    if (no.ex && !no.ey)
+      eydat <- eydat[keep.rows]
 
     if (!no.ex){
       keep.eval <- rep_len(TRUE, nrow(exdat))
@@ -611,7 +613,8 @@ npindex.sibandwidth <-
     if(no.ex) {
       index.eval <- index
       exdat <- txdat
-      eydat <- tydat
+      if (no.ey)
+        eydat <- tydat
     } else {
       index.eval <- as.vector(exdat %*% bws$beta)
     }

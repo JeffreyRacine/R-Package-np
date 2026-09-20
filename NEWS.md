@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Explicit evaluation responses at training locations follow the training-row
+  omission mask. Single-index fits no longer overwrite those supplied
+  responses when calculating goodness-of-fit statistics.
+
 * Retained-bandwidth conditional, single-index, partially linear and
   smooth-coefficient fits reject mismatched paired data rows before recycling
   can alter the sample.

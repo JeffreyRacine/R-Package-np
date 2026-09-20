@@ -417,6 +417,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
 
     txdat <- txdat[keep.rows,,drop = FALSE]
     tydat <- tydat[keep.rows]
+    if (miss.ex && !miss.ey)
+      eydat <- eydat[keep.rows]
     if (!miss.z)
       tzdat <- tzdat[keep.rows,, drop = FALSE]
 

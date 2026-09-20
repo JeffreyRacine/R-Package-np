@@ -593,6 +593,8 @@ npreg.rbandwidth <-
 
     txdat <- txdat[keep.rows,,drop = FALSE]
     tydat <- tydat[keep.rows]
+    if (no.ex && !no.ey)
+      eydat <- eydat[keep.rows]
     resid.response <- tydat
 
     ## no.ex = missing(exdat)

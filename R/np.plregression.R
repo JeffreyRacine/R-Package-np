@@ -525,6 +525,12 @@ npplreg.plbandwidth <-
     no.exz = missing(exdat)
     no.ey = missing(eydat)
 
+    if (no.exz && !no.ey) {
+      if (length(eydat) != length(keep.rows))
+        stop("'eydat' must have one value per original training row", call. = FALSE)
+      eydat <- eydat[keep.rows]
+    }
+
     if (!no.exz){
       exdat = toFrame(exdat)
       ezdat = toFrame(ezdat)
