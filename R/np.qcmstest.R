@@ -93,10 +93,7 @@
         ii <- local.idx[[pos[[jj]]]]
         y.star <- yhat + model.resid[plan[ii, ]]
         suppressWarnings(
-          residuals.chunk[, jj] <- residuals(
-            rq(y.star ~ model$x - 1, tau = tau),
-            type = "response"
-          )
+          residuals.chunk[, jj] <- .np_cms_refit_residuals(model, y.star, tau)
         )
       }
 
@@ -186,10 +183,7 @@
         ii <- local.idx[[pos[[jj]]]]
         y.star <- yhat + (model.resid - resid.mean) * plan[ii, ] + resid.mean
         suppressWarnings(
-          residuals.chunk[, jj] <- residuals(
-            rq(y.star ~ model$x - 1, tau = tau),
-            type = "response"
-          )
+          residuals.chunk[, jj] <- .np_cms_refit_residuals(model, y.star, tau)
         )
       }
 
@@ -462,7 +456,7 @@ npqcmstest <- function(formula,
       draw.wild.mult(length(model.resid), a, b, P.a) +
       resid.mean
 
-    suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
+    suppressWarnings(resid <- .np_cms_refit_residuals(model, y.star, tau))
 
     resid
   }
@@ -481,7 +475,7 @@ npqcmstest <- function(formula,
       draw.wild.mult(length(model.resid), a, b, P.a) +
       resid.mean
 
-    suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
+    suppressWarnings(resid <- .np_cms_refit_residuals(model, y.star, tau))
 
     resid
   }
@@ -492,7 +486,7 @@ npqcmstest <- function(formula,
 
     y.star <- yhat + model.resid[sample.int(length(model.resid), replace = TRUE)]
 
-    suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
+    suppressWarnings(resid <- .np_cms_refit_residuals(model, y.star, tau))
 
     resid
   }

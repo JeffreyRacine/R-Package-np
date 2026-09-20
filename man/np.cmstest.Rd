@@ -25,6 +25,9 @@
   and bootstrap statistics. Manual bandwidth inputs and selection controls are
   not forwarded a second time as kernel-sum arguments.
 
+  Bootstrap refits preserve the model's observation weights and offsets
+  (GLM prior weights, not iterative working weights).
+
   Model residuals, fitted values, response and design use the model's compact
   complete-observation sample, including when it was fitted with
   \code{na.exclude}. The supplied test data must represent those same complete
