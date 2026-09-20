@@ -166,6 +166,9 @@ npsdeptest <- function(data = NULL,
   if((lag.num < 1) || (lag.num > length(data))) stop(" lag.num must be a positive integer less than the number of observations")
   if(ncol(data.frame(data)) != 1) stop(" data must have one dimension only")
   if(B < 9) stop(" number of bootstrap replications must be >= 9")
+  if (anyNA(data))
+    stop("npsdeptest requires a complete time series: NA/NaN values cannot be omitted without changing the lags. Supply a contiguous complete segment explicitly.",
+         call. = FALSE)
 
   method <- match.arg(method)
 
@@ -179,9 +182,8 @@ npsdeptest <- function(data = NULL,
 
   if(is.ts(data)) data <- as.numeric(data)
 
-  ## Omit NAs
-
-  data <- na.omit(data)
+  ## Keep original time adjacency; missing values were rejected before seed
+  ## entry and bandwidth selection rather than silently compressing time.
 
   ## Define the metric entropy function
 

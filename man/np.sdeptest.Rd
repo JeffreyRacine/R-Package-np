@@ -25,7 +25,11 @@ These arguments identify the data series, lag count, and statistic variant.
 
   \item{data}{
     a vector containing the variable that can be of type
-    \code{\link{numeric}} or \code{\link{ts}}.
+    \code{\link{numeric}} or \code{\link{ts}}. The sequence must be
+    complete and regularly spaced. Missing values (including \code{NaN})
+    are rejected: omitting them would change the time lags. If necessary,
+    explicitly select a contiguous complete segment; do not delete interior
+    missing observations. For a numeric vector, its order defines time.
   }
 
 
