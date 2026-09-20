@@ -215,7 +215,7 @@ npsymtest <- function(data = NULL,
 
   .np_progress_activity_end(boot.state$progress, completed = TRUE)
 
-  p.value <- mean(resampled.stat > test.stat)
+  p.value <- .np_bootstrap_upper_tail_pvalue(resampled.stat, test.stat)
 
   ## Restore seed
 

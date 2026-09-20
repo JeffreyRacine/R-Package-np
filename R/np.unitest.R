@@ -205,7 +205,7 @@ npunitest <- function(data.x = NULL,
 
     .np_progress_activity_end(progress, completed = TRUE)
     
-    p.value <- mean(resampled.stat > test.stat)
+    p.value <- .np_bootstrap_upper_tail_pvalue(resampled.stat, test.stat)
     
   }
 

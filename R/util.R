@@ -4129,6 +4129,17 @@ genBwScaleStrs <- function(x){
   }))
 }
 
+.np_bootstrap_upper_tail_pvalue <- function(bootstrap, observed) {
+  # Ordinary bootstrap upper-tail p-value.  Ties are counted as at least as
+  # extreme so discrete/categorical tests remain conservative.
+  if (length(observed) != 1L)
+    stop("bootstrap p-value observed statistic must be scalar", call. = FALSE)
+  B <- length(bootstrap)
+  if (B < 1L)
+    stop("bootstrap p-value requires at least one replication", call. = FALSE)
+  mean(bootstrap >= observed)
+}
+
 npFormat <- function(x){
   format(sapply(x,format))
 }

@@ -142,6 +142,6 @@ test_that("density-equality count batches preserve literal resampling", {
   expect_equal(out[["In"]], unname(observed[["In"]]), tolerance = 2e-13)
   expect_equal(out[["Tn.bootstrap"]], reference["Tn", ], tolerance = 2e-13)
   expect_equal(out[["In.bootstrap"]], reference["In", ], tolerance = 2e-13)
-  expect_identical(out[["Tn.P"]], mean(reference["Tn", ] > observed[["Tn"]]))
-  expect_identical(out[["In.P"]], mean(reference["In", ] > observed[["In"]]))
+  expect_identical(out[["Tn.P"]], mean(reference["Tn", ] >= observed[["Tn"]]))
+  expect_identical(out[["In.P"]], mean(reference["In", ] >= observed[["In"]]))
 })

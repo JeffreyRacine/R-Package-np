@@ -142,7 +142,7 @@ npdeptest <- function(data.x = NULL,
 
     ## Compute P-values
 
-    P <- mean(Srho.vec.boot > Srho.vec)
+    P <- .np_bootstrap_upper_tail_pvalue(Srho.vec.boot, Srho.vec)
 
   }
 

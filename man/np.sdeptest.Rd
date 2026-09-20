@@ -71,6 +71,13 @@ These arguments control bootstrap execution and reproducibility settings.
 
 
 }
+\section{Bootstrap P-Values}{
+  The bootstrap upper-tail p-value is the proportion of bootstrap statistics
+  greater than or equal to the observed statistic. Ties count as at least as
+  extreme, giving the conservative tie convention for discrete statistics.
+  This is the ordinary bootstrap proportion, without an add-one correction;
+  a reported zero is possible with a finite number of replications.
+}
 \value{
   \code{npsdeptest} returns an object of type \code{deptest} with the
   following components
