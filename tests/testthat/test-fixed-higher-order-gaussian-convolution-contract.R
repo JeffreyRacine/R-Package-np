@@ -133,3 +133,29 @@ test_that("Gaussian convolution and CVLS obey independent kernel calculus", {
     }
   }
 })
+
+test_that("adaptive Gaussian CVLS integrates the unequal-width kernels", {
+  old <- options(np.messages=FALSE,np.largeh=FALSE,np.largelambda=FALSE)
+  on.exit(options(old),add=TRUE)
+  x <- c(-.8,-.45,-.2,.03,.22,.47,.68,.91,1.1)
+  n <- length(x); k <- 3L
+  h <- vapply(seq_len(n),function(i) sort(abs(x[-i]-x[i]))[k],numeric(1))
+  for(order in c(4L,6L)) {
+    convolution <- outer(seq_len(n),seq_len(n),Vectorize(function(i,j)
+      gaussian_convolution_moment_oracle(x[i],x[j],h[i],h[j],order)))
+    cross <- vapply(seq_len(n),function(i) {
+      donors <- setdiff(seq_len(n),i)
+      hh <- vapply(donors,function(j)
+        sort(abs(x[setdiff(donors,j)]-x[j]))[k],numeric(1))
+      z <- (x[i]-x[donors])/hh
+      polynomial <- if(order==4L) 1.5-.5*z^2 else 1.875-1.25*z^2+.125*z^4
+      mean(dnorm(z)*polynomial/hh)
+    },numeric(1))
+    oracle <- 2*mean(cross)-mean(convolution)
+    bw <- npudensbw(dat=data.frame(x=x),bws=k,bwtype="adaptive_nn",
+      ckerorder=order,bwmethod="cv.ls",bandwidth.compute=FALSE)
+    actual <- npudensbw.bandwidth(dat=data.frame(x=x),bws=bw,
+      bandwidth.compute=TRUE,eval.only=TRUE,nmulti=1L)$fval
+    expect_equal(actual,oracle,tolerance=2e-10)
+  }
+})
