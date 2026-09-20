@@ -29,9 +29,10 @@ with Mixed Data Types }
   Model residuals, fitted values, response and design use the model's compact
   complete-observation sample, including when it was fitted with
   \code{na.exclude}. The supplied test data must represent those same complete
-  observations in the same order; incompatible samples are rejected rather
-  than re-paired. The original model and its missing-value restoration policy
-  are not modified.
+  observations in the same order. Row counts and response values are checked;
+  when those agree, the caller remains responsible for supplying the matching
+  covariate rows. The test does not infer a new pairing or reorder observations.
+  The original model and its missing-value restoration policy are not modified.
 }
 \usage{
 npqcmstest(formula,
