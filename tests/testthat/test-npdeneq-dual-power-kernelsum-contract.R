@@ -157,11 +157,24 @@ test_that("weighted dual-power sums preserve expanded-sample semantics", {
   )
 })
 
-test_that("count compression accepts numeric fixed bandwidths only by default", {
+test_that("count compression is limited to fixed unbounded bandwidths", {
+  kbandwidth <- getFromNamespace("kbandwidth", "npRmpi")
   eligible <- getFromNamespace(
     ".npdeneq_count_compression_eligible",
     "npRmpi"
   )
   expect_true(eligible(0.2))
   expect_false(eligible(structure(list(), class = "not-a-bandwidth")))
+  x <- data.frame(x = seq(0.05, 0.95, length.out = 20))
+  fixed <- npudensbw(dat = x, bws = .2, bandwidth.compute = FALSE)
+  bounded <- npudensbw(dat = x, bws = .2, bandwidth.compute = FALSE,
+                      ckerbound = "fixed", ckerlb = 0, ckerub = 1)
+  nearest <- npudensbw(dat = x, bws = 6, bandwidth.compute = FALSE,
+                      bwtype = "generalized_nn")
+  expect_true(eligible(fixed))
+  expect_false(eligible(bounded))
+  expect_false(eligible(nearest))
+  expect_true(eligible(kbandwidth(fixed)))
+  expect_false(eligible(kbandwidth(bounded)))
+  expect_false(eligible(kbandwidth(nearest)))
 })

@@ -18,7 +18,8 @@
   if (is.numeric(bw) || is.integer(bw))
     return(TRUE)
 
-  kbw <- tryCatch(kbandwidth(bw), error = function(e) NULL)
+  kbw <- if (inherits(bw, "kbandwidth")) bw else
+    tryCatch(kbandwidth(bw), error = function(e) NULL)
   if (is.null(kbw) ||
       !identical(kbw[["type", exact = TRUE]], "fixed"))
     return(FALSE)
