@@ -1,5 +1,17 @@
 # npRmpi 0.80-1
 
+* Conditional-mean and quantile specification bootstrap refits retain model
+  observation weights and, for mean models, offsets. Weighted rq models use
+  their retained raw model frame rather than weight-scaled x/y components.
+  Quantile tests reject a tau inconsistent with the fitted model, and both
+  formula tests retain the correct omitted-row indices.
+
+* Auxiliary univariate density/CDF standard errors use the training sample
+  size rather than the number of evaluation points. Shape-constrained density
+  fits accept one-sided density bounds correctly; integral.equal uses the
+  rightmost coordinate regardless of input order and rescales raw derivatives
+  consistently with the density (log derivatives are unchanged).
+
 * Density-equality tests freeze one common declared categorical support,
   including unused levels and supplied bandwidth metadata, in every observed
   and bootstrap contraction. Raw numeric bandwidths no longer acquire different
