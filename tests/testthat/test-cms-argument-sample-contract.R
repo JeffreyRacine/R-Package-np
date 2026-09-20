@@ -1,3 +1,34 @@
+test_that("CMS inference uses the compact model sample with na.exclude", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  set.seed(319); d <- data.frame(x = rnorm(30)); d$y <- d$x^2 + rnorm(30)
+  d$x[c(4, 19)] <- NA
+  for (kind in c("cms", "qcms", "glm")) {
+    make <- function(policy) switch(kind,
+      cms = lm(y ~ x, data = d, x = TRUE, y = TRUE, na.action = policy),
+      glm = glm(y ~ x, data = d, x = TRUE, y = TRUE, na.action = policy),
+      qcms = quantreg::rq(y ~ x, data = d, model = TRUE, na.action = policy))
+    omit <- make(na.omit); exclude <- make(na.exclude)
+    before <- serialize(exclude, NULL)
+    fun <- get(if (kind == "qcms") "npqcmstest" else "npcmstest", asNamespace("np"))
+    for (distribution in c("asymptotic", "bootstrap")) {
+      for (route in c("formula", "native")) {
+        inputs <- if (route == "formula") list(formula = y ~ x, data = d) else
+          list(xdat = d$x, ydat = d$y)
+        args <- c(inputs, list(distribution = distribution, B = 9,
+          bws = .4, bandwidth.compute = FALSE))
+        a <- do.call(fun, c(args, list(model = omit)))
+        b <- do.call(fun, c(args, list(model = exclude)))
+        fields <- setdiff(names(a), c("pcall", "bws"))
+        expect_identical(a[fields], b[fields])
+      }
+    }
+    expect_identical(serialize(exclude, NULL), before)
+    expect_error(do.call(fun, list(xdat = rev(d$x), ydat = rev(d$y), model = exclude,
+      bws = .4, bandwidth.compute = FALSE)), "same complete observations")
+  }
+})
+
 test_that("CMS validates retained components rather than call spelling", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
