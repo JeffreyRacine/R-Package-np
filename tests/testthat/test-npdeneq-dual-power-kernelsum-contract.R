@@ -144,6 +144,7 @@ test_that("weighted dual-power sums preserve expanded-sample semantics", {
 })
 
 test_that("count compression is limited to fixed unbounded bandwidths", {
+  kbandwidth <- getFromNamespace("kbandwidth", "np")
   eligible <- getFromNamespace(
     ".npdeneq_count_compression_eligible",
     "np"
@@ -166,4 +167,7 @@ test_that("count compression is limited to fixed unbounded bandwidths", {
   expect_true(eligible(fixed))
   expect_false(eligible(bounded))
   expect_false(eligible(nearest))
+  expect_true(eligible(kbandwidth(fixed)))
+  expect_false(eligible(kbandwidth(bounded)))
+  expect_false(eligible(kbandwidth(nearest)))
 })
