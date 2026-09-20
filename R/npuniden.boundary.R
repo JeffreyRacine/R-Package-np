@@ -33,6 +33,15 @@ npuniden.boundary <- function(X=NULL,
     if(nmulti < 1) stop("number of multistarts nmulti must be positive")
     if(!is.logical(proper)) stop("proper must be either TRUE or FALSE")
     if(kertype=="gaussian2" && (!is.finite(a) || !is.finite(b))) stop("finite bounds are required for kertype gaussian2")
+    beta.kernel <- kertype %in% c("beta1", "beta2")
+    if(beta.kernel && (!is.finite(a) || !is.finite(b)))
+        stop("finite bounds are required for beta kernels")
+    if(kertype=="beta2") {
+        if(!is.null(h) && (!is.finite(h) || h > 1/4))
+            stop("beta2 bandwidth h must satisfy 0 < h <= 1/4 on normalized support")
+        if(!is.null(grid) && any(!is.finite(grid) | grid > 1/4))
+            stop("beta2 grid values must satisfy 0 < h <= 1/4 on normalized support")
+    }
     h.opt <- NULL
     if(kertype=="gaussian1") {
         ## Gaussian reweighted boundary kernel function (bias of O(h))
@@ -77,11 +86,11 @@ npuniden.boundary <- function(X=NULL,
         kernel <- function(x,X,h,a=0,b=1) {
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
-            if(x < 2*h && h < (b-a)) {
+            if(x < 2*h) {
                 dbeta(X,rho(x,h),(1-x)/h)/(b-a)
-            } else if((2*h <= x && x <= 1-2*h) || h >= (b-a)) {
+            } else if(2*h <= x && x <= 1-2*h) {
                 dbeta(X,x/h,(1-x)/h)/(b-a)
-            } else if(x > 1-2*h && h < (b-a)) {
+            } else if(x > 1-2*h) {
                 dbeta(X,x/h,rho(1-x,h))/(b-a)
             }
         }
@@ -280,13 +289,18 @@ npuniden.boundary <- function(X=NULL,
         ## First establish a sound starting value using grid search,
         ## then use that starting value for numeric search
         if(is.null(grid)) {
-            rob.spread <- c(sd(X),IQR(X)/1.349)
+            # Beta h is dimensionless, as are the kernel's shape parameters.
+            search.X <- if(beta.kernel) (X-a)/(b-a) else X
+            rob.spread <- c(sd(search.X),IQR(search.X)/1.349)
             rob.spread <- min(rob.spread[rob.spread>0])
             constant <- rob.spread*length(X)**(-0.2)
             h.vec <- c(seq(0.25,1.75,length=10),2^(1:25))*constant
+            if(kertype=="beta2")
+                h.vec <- unique(c(h.vec[is.finite(h.vec) &
+                    h.vec >= sqrt(.Machine$double.eps) & h.vec <= 1/4], 1/4))
             cv.vec <- sapply(seq_along(h.vec), function(i){cv.function(h.vec[i],X,a,b)})
             start.idx <- if (bwmethod=="cv.ml") which.max(cv.vec) else which.min(cv.vec)
-            upper.bound <- if (kertype=="beta2") (b-a)/4 else Inf
+            upper.bound <- if (kertype=="beta2") 1/4 else Inf
             foo <- optim(h.vec[start.idx],
                          cv.function,
                          method="L-BFGS-B",
@@ -301,7 +315,7 @@ npuniden.boundary <- function(X=NULL,
         } else {
             cv.vec <- sapply(seq_along(grid), function(i){cv.function(grid[i],X,a,b)})
             start.idx <- if (bwmethod=="cv.ml") which.max(cv.vec) else which.min(cv.vec)
-            upper.bound <- if (kertype=="beta2") (b-a)/4 else Inf
+            upper.bound <- if (kertype=="beta2") 1/4 else Inf
             foo <- optim(grid[start.idx],
                          cv.function,
                          method="L-BFGS-B",
