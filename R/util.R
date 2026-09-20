@@ -60,6 +60,161 @@ integrate.trapezoidal <- function(x, y) {
   .np_quadrature_cumulative(y, .np_quadrature_prepare(x))
 }
 
+# Continuous quadrature is deliberately separate from the sampled-data rule.
+# Legendre coefficients give a reusable primitive without resampling the fit
+# for each requested CDF point. All state is local to one fitted invocation.
+.np_quad_legendre <- function(x, degree) {
+  p <- matrix(1, length(x), degree+1L)
+  if(degree > 0L) p[,2L] <- x
+  if(degree > 1L) for(k in 2:degree)
+    p[,k+1L] <- ((2*k-1)*x*p[,k]-(k-1)*p[,k-1L])/k
+  p
+}
+
+.np_quad_gauss <- function(n) {
+  j <- seq_len(n-1L)
+  off <- j/sqrt(4*j*j-1)
+  a <- matrix(0,n,n)
+  a[cbind(j,j+1L)] <- a[cbind(j+1L,j)] <- off
+  eig <- eigen(a, symmetric=TRUE)
+  ord <- order(eig$values)
+  x <- eig$values[ord]
+  w <- 2*eig$vectors[1L,ord]^2
+  list(x=x, w=w,
+       project=t(.np_quad_legendre(x,n-1L)*w)*((2*(0:(n-1L))+1)/2))
+}
+
+.np_quad_primitive <- function(x, coef, positive, rule) {
+  n <- length(coef)
+  if(!positive) {
+    p <- .np_quad_legendre(x,n)
+    return(drop(coef[1L]*(x+1)+
+      (p[,3:(n+1L),drop=FALSE]-p[,1:(n-1L),drop=FALSE]) %*%
+        (coef[-1L]/(2*(1:(n-1L))+1))))
+  }
+  # Squaring a degree-31 root-density polynomial gives degree 62. The
+  # 32-point positive Gauss rule integrates it exactly, including partial
+  # intervals. This prevents polynomial undershoot from creating negative mass.
+  out <- numeric(length(x))
+  for(first in seq.int(1L,length(x),by=128L)) {
+    ix <- first:min(length(x),first+127L)
+    half <- (x[ix]+1)/2
+    nodes <- as.vector(outer(rule$x+1,half)-1)
+    values <- matrix(drop(.np_quad_legendre(nodes,n-1L) %*% coef)^2,
+                     nrow=length(rule$x))
+    out[ix] <- half*colSums(values*rule$w)
+  }
+  out
+}
+
+.np_density_integral <- function(fun, y, a, b, sample, scale,
+                                 breaks=numeric(), positive=FALSE,
+                                 widths=rep(scale,length(sample)),tol=1e-8) {
+  if(!is.finite(scale) || scale <= 0 || any(!is.finite(sample)))
+    stop("continuous density integration requires finite data and a positive finite scale")
+  if(!length(y)) return(list(F=numeric(),total=NA_real_))
+  # Geometry seeds resolve separated/narrow modes without using Y as a fit or
+  # integration grid. Retain representatives of occupied 4-bandwidth bins.
+  ord <- order(sample)
+  keep <- !duplicated(sample[ord])
+  sx <- sample[ord][keep]
+  widths <- widths[ord][keep]
+  if(length(widths)!=length(sx) || any(!is.finite(widths) | widths<=0))
+    stop("continuous density integration requires positive finite mode widths")
+  group <- floor((sx-sx[1L])/(4*scale))
+  retained <- unique(c(which(!duplicated(group)),length(sx)))
+  centers <- sx[retained]
+  radius <- widths[retained]
+  # Add mode shoulders only across a genuinely wide gap. Adding every shoulder
+  # in dense geometry needlessly partitions an already-resolved smooth region.
+  left.gap <- centers-c(a,head(centers,-1L))
+  right.gap <- c(tail(centers,-1L),b)-centers
+  left <- which(left.gap>8*radius)
+  right <- which(right.gap>8*radius)
+  seeds <- unique(c(centers,centers[left]-radius[left],
+                    centers[left]-8*radius[left],centers[right]+radius[right],
+                    centers[right]+8*radius[right],breaks))
+  span <- max(scale,diff(range(sx)))
+  if(is.finite(a) && is.finite(b)) {
+    to.unit <- function(x) (x-a)/(b-a)
+    from.unit <- function(t) a+(b-a)*t
+    jacobian <- function(t) rep(b-a,length(t))
+  } else if(is.finite(a)) {
+    to.unit <- function(x) {z <- x-a; ifelse(is.infinite(z),1,z/(span+z))}
+    from.unit <- function(t) a+span*t/(1-t)
+    jacobian <- function(t) span/(1-t)^2
+  } else if(is.finite(b)) {
+    to.unit <- function(x) {z <- b-x; ifelse(is.infinite(z),0,span/(span+z))}
+    from.unit <- function(t) b-span*(1-t)/t
+    jacobian <- function(t) span/t^2
+  } else {
+    center <- median(sx)
+    to.unit <- function(x) atan((x-center)/span)/pi+.5
+    from.unit <- function(t) center+span*tan(pi*(t-.5))
+    jacobian <- function(t) pi*span/cos(pi*(t-.5))^2
+  }
+  knots <- sort(unique(c(0,1,to.unit(seeds[seeds>a & seeds<b]))))
+  rule <- .np_quad_gauss(32L)
+  check <- .np_quad_gauss(8L)$x
+  check.basis <- .np_quad_legendre(check,31L)
+  evaluations <- 0L
+  if((length(knots)-1L)*40>200000L)
+    stop("continuous density integration exceeded its evaluation budget")
+  estimate <- function(left,right,depth) {
+    half <- (right-left)/2; middle <- (right+left)/2
+    nodes <- middle+half*c(rule$x,check)
+    values <- fun(from.unit(nodes))*jacobian(nodes)
+    evaluations <<- evaluations+length(nodes)
+    if(length(values)!=length(nodes) || any(!is.finite(values)))
+      stop("non-finite continuous density integrand")
+    if(positive) {
+      if(any(values<0)) stop("negative integrand in positive density quadrature")
+      fit.values <- sqrt(values[1:32])
+    } else fit.values <- values[1:32]
+    coef <- drop(rule$project %*% fit.values)
+    predicted <- drop(check.basis %*% coef)
+    if(positive) predicted <- predicted^2
+    residual <- max(abs(predicted-values[33:40]))
+    tail.bound <- sum(abs(coef[25:32]))
+    if(positive) tail.bound <- tail.bound*(2*sum(abs(coef))+tail.bound)
+    error <- 2*half*max(residual,tail.bound)
+    mass <- if(positive) half*sum(rule$w*fit.values^2) else 2*half*coef[1L]
+    list(left=left,right=right,depth=depth,coef=coef,mass=mass,error=error)
+  }
+  pieces <- Map(estimate,head(knots,-1L),tail(knots,-1L),0L)
+  # Allocate the absolute/relative error budget globally, refining the largest
+  # contributor. A per-unit-width budget unnecessarily demands near-machine
+  # relative precision in negligible endpoint slivers (e.g. square-root cusps).
+  # Summed partial-integral error estimates also protect every requested CDF.
+  repeat {
+    errors <- vapply(pieces,`[[`,0.0,"error")
+    masses <- vapply(pieces,`[[`,0.0,"mass")
+    if(sum(errors) <= tol*(1+sum(abs(masses)))) break
+    i <- which.max(errors)
+    cell <- pieces[[i]]
+    left <- cell$left; right <- cell$right; middle <- (left+right)/2
+    if(cell$depth>=30 || evaluations+80L>200000L || middle==left || middle==right)
+      stop("continuous density integration did not converge")
+    pieces[[i]] <- estimate(left,middle,cell$depth+1L)
+    pieces[[length(pieces)+1L]] <- estimate(middle,right,cell$depth+1L)
+  }
+  pieces <- pieces[order(vapply(pieces,`[[`,0.0,"left"))]
+  starts <- vapply(pieces,`[[`,0.0,"left")
+  cumulative <- c(0,cumsum(vapply(pieces,`[[`,0.0,"mass")))
+  target <- to.unit(y)
+  owner <- pmin(findInterval(target,starts),length(pieces))
+  F <- numeric(length(y))
+  for(i in unique(owner)) {
+    ix <- which(owner==i)
+    cell <- pieces[[i]]; half <- (cell$right-cell$left)/2
+    F[ix] <- cumulative[i]+half*.np_quad_primitive(
+      (target[ix]-cell$left)/half-1,cell$coef,positive,rule)
+  }
+  F[target==0] <- 0
+  F[target==1] <- tail(cumulative,1L)
+  list(F=F,total=tail(cumulative,1L))
+}
+
 ## No Zero Denominator, used in C code for kernel estimation...
 
 ## Original, better, best

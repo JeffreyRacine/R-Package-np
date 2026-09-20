@@ -113,13 +113,27 @@ and distribution function estimates over the range \eqn{[a,b]}
   regions from overlapping. Inadmissible explicit bandwidths or grid values
   are rejected rather than clipped.
 
-  Sampled numerical integration uses distinct integration coordinates and
-  restores their original order and multiplicity; training observations are
-  not deduplicated. Cumulative integrals are anchored at the smallest supplied
-  evaluation coordinate. Consequently the current \code{F} calculation on a
-  partial evaluation grid is not an absolute CDF from the support lower bound.
-  Endpoint correction is used for sampled total integrals only on uniform
-  grids. These distinctions also apply to bandwidth cross-validation.
+  \code{F} integrates the fitted density from \code{a} to each evaluation
+  point, including when \code{a=-Inf}. It is independent of the order,
+  multiplicity and extent of the requested evaluation grid. Continuous
+  quadrature shares an adaptive integration representation across evaluation
+  points; infinite supports are transformed without truncating their tails.
+  The ordinary unbounded Gaussian case uses its analytic distribution function.
+  Accurate CDFs on sparse evaluation grids can require substantially more work
+  than evaluating the density at those few points. This additional work occurs
+  after bandwidth selection, not within the cross-validation objective.
+
+  With \code{proper=TRUE}, the positive part of the raw fitted density is
+  normalized by its finite positive mass over the entire declared support.
+  The same normalization is used for \code{f} and \code{F}; the CDF is not
+  separately clipped or rescaled on the requested grid. This replaces the
+  former constant upward shift, which could create infinite mass on unbounded
+  support. Failed numerical convergence or invalid normalizing mass is reported
+  as an error. Raw \code{proper=FALSE} densities and CV objectives are unchanged.
+
+  Sampled total integrals used elsewhere in this helper collapse duplicate
+  integration coordinates, not training observations. Endpoint correction
+  applies only on uniform grids; irregular grids use the trapezoidal rule.
 
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
 
@@ -200,8 +214,8 @@ and distribution function estimates over the range \eqn{[a,b]}
 \value{
   \code{npuniden.boundary} returns the following components:
   
-  \item{f}{ estimated density at the points X }
-  \item{F}{ estimated distribution at the points X (numeric integral of f) }
+  \item{f}{ estimated density at \code{Y}, or \code{X} if \code{Y} is omitted }
+  \item{F}{ integral of the fitted density from \code{a} to each evaluation point }
   \item{sd.f}{ asymptotic standard error of the estimated density at the points X }
   \item{sd.F}{ asymptotic standard error of the estimated distribution at the points X }
   \item{h}{ bandwidth used }

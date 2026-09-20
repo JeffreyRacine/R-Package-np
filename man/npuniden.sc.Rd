@@ -134,9 +134,16 @@ This argument chooses the monotonicity, convexity, or log-shape constraint.
   training observations, and restores the evaluation order and multiplicity.
   Sampled total integrals use a uniform-grid endpoint correction only when
   the distinct coordinates are uniformly spaced; otherwise they use the
-  nonuniform trapezoidal rule. The \code{F} and \code{F.sc} calculations
-  currently integrate from the smallest evaluation coordinate, not from the
-  support lower bound when the requested grid covers only part of the support.
+  nonuniform trapezoidal rule. The \code{F} and \code{F.sc} calculations instead
+  integrate the retained fitted density functions from the declared support
+  lower bound, including infinite support. Integration does not add QP
+  constraint nodes or refit the coefficients. The sampled-range normalization
+  selected by \code{integral.equal} is preserved; these distribution integrals
+  do not separately force whole-support unit mass or impose shape constraints
+  away from the QP grid. Log-shaped fits are integrated on the density scale.
+  Accurate absolute integration can add noticeable work when only a few
+  evaluation points are requested; its adaptive representation is reused
+  across points and failed convergence is reported explicitly.
 
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
 
