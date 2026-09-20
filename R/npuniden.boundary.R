@@ -214,39 +214,42 @@ npuniden.boundary <- function(X=NULL,
         sapply(seq_along(X), function(i){.np_quadrature_total(X.seq,
             h*kernel(X[i],X.seq,h,a,b)**2, geometry)})
     }
-    fhat <- function(X,Y,h,a=0,b=1,proper=FALSE) {
-        f <- sapply(seq_along(Y), function(i){mean(kernel(Y[i],X,h,a,b))})
-        if(proper) {
-            if(is.finite(a) && is.finite(b)) X.seq <- seq(a,b,length=1000)
-            if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
-            if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
-            if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
-            f.seq <- sapply(seq_along(X.seq), function(i){mean(kernel(X.seq[i],X,h,a,b))})
-            if(any(f.seq<0)) {
-                f <- f - min(f.seq)
-                f.seq <- f.seq - min(f.seq)
-            }
-            int.f.seq <- .np_quadrature_total(X.seq,f.seq)
-            f <- f/int.f.seq
-        }
-        return(f)
+    fhat <- function(X,Y,h,a=0,b=1) {
+        sapply(seq_along(Y), function(i){mean(kernel(Y[i],X,h,a,b))})
     }
-    Fhat <- function(Y,f,a,b,proper=FALSE) {
-        ## Numerical integration of f, check for aberrant values, if
-        ## on range of data ensure F\in[0,1], if not make sure value
-        ## is proper (negative boundary kernel functions can cause
-        ## unwanted artifacts)
-        f[is.na(f)] <- 0
-        F <- integrate.trapezoidal(Y,f)
-        if(proper) {
-            if(min(Y)==a && max(Y)==b) {
-                F <- (F-min(F))/(max(F)-min(F))
-            } else {
-                if(min(F)<0) F <- F+min(F)
-                if(max(F)>1) F <- F/max(F)
-            }
+    final.fit <- function(h) {
+        density <- function(y) fhat(X,y,h,a,b)
+        f <- density(Y)
+        # Only the ordinary, unbounded Gaussian kernel has this analytic CDF.
+        if(kertype=="gaussian1" && !is.finite(a) && !is.finite(b)) {
+            F <- vapply(Y,function(y) mean(pnorm((y-X)/h)),0.0)
+            return(list(f=f,F=F))
         }
-        F
+        branch.points <- switch(kertype,
+            beta2=c(a+2*h*(b-a),b-2*h*(b-a)),
+            fb=c(a+h,b-h),fbl=a+h,fbu=b-h,numeric())
+        integration.scale <- if(beta.kernel) h*(b-a) else h
+        integration.widths <- rep(integration.scale,length(X))
+        if(beta.kernel) {
+            normalized.X <- (X-a)/(b-a)
+            integration.widths <- (b-a)*sqrt(h*(normalized.X*(1-normalized.X)+h))
+        } else if(kertype=="gamma") {
+            integration.widths <- sqrt(h*(X-a)+h*h)
+        } else if(kertype=="rigaussian") {
+            integration.widths[X>a] <- sqrt(h*(X[X>a]-a))
+            integration.scale <- min(integration.widths)
+        }
+        integrand <- if(proper) function(y) pmax(density(y),0) else density
+        integral <- .np_density_integral(integrand,Y,a,b,
+            X,integration.scale,branch.points,positive=proper,widths=integration.widths)
+        F <- integral$F
+        if(proper) {
+            if(!is.finite(integral$total) || integral$total<=0)
+                stop("proper density requires finite positive whole-support mass")
+            f <- pmax(f,0)/integral$total
+            F <- F/integral$total
+        }
+        list(f=f,F=F)
     }
     fhat.loo <- function(X,h,a=0,b=1) {
         n <- length(X)
@@ -334,9 +337,9 @@ npuniden.boundary <- function(X=NULL,
     }
     if(is.null(h.opt)) {
         ## Manual inputted bandwidth
-        f <- fhat(X,Y,h,a,b,proper=proper)
-        ## Numerical integration via the trapezoidal rule
-        F <- Fhat(Y,f,a,b,proper=proper)
+        fit <- final.fit(h)
+        f <- fit$f
+        F <- fit$F
         return(list(f=f,
                     F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(Y,h,a,b)/(h*length(X)))),
@@ -344,9 +347,9 @@ npuniden.boundary <- function(X=NULL,
                     h=h))
     } else {
         ## Search bandwidth
-        f <- fhat(X,Y,h.opt,a,b,proper=proper)
-        ## Numerical integration via the trapezoidal rule
-        F <- Fhat(Y,f,a,b,proper=proper)
+        fit <- final.fit(h.opt)
+        f <- fit$f
+        F <- fit$F
         return(list(f=f,
                     F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(Y,h.opt,a,b)/(h.opt*length(X)))),

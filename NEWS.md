@@ -9,7 +9,14 @@
   only; irregular-grid totals use the nonuniform trapezoidal rule. Training
   multiplicities are retained, and the IV derivative iteration reuses prepared
   shared integration geometry. Entropy's corrected-total arithmetic is unchanged.
-  Absolute auxiliary CDF integration on partial grids remains an open issue.
+
+* Auxiliary boundary and shape-constrained distribution estimates integrate
+  the retained fitted density from the true support lower bound, not the first
+  requested evaluation point. Infinite tails are not truncated and shape QPs
+  are not refitted for integration. Boundary proper=TRUE uses positive-part
+  whole-support normalization instead of a constant shift that could create
+  infinite mass. Sparse-grid CDF queries can have additional integration cost;
+  search objectives and raw density fitting are unchanged.
 
 * Conditional-mean and quantile specification bootstrap refits retain model
   observation weights and, for mean models, offsets. Weighted rq models use

@@ -126,6 +126,8 @@ npuniden.sc <- function(X=NULL,
 
     A <- W.kernel(X.grid,X,h,a=a,b=b,deriv=0)
     f <- colMeans(A)
+    density.a <- a
+    density.b <- b
 
     ## First or second order derivative needed, place them both in *.deriv
 
@@ -264,8 +266,25 @@ npuniden.sc <- function(X=NULL,
     se.f <- sqrt(abs(f*int.kernel.squared(X.grid,h,a,b)/(h*n.train)))[index]
     se.f.sc <- sqrt(abs(f.sc*int.kernel.squared(X.grid,h,a,b)/(h*n.train)))[index]
 
-    F <- integrate.trapezoidal(X.grid[index],f[index])
-    F.sc <- integrate.trapezoidal(X.grid[index],f.sc[index])
+    evaluation <- X.grid[index]
+    log.shape <- constraint %in% c("log-concave","log-convex")
+    if(!is.finite(density.a) && !is.finite(density.b) && !log.shape) {
+        # The retained density is an ordinary weighted Gaussian mixture.
+        F <- vapply(evaluation,function(y) mean(pnorm((y-X)/h)),0.0)
+        F.sc <- vapply(evaluation,function(y)
+            sum(pnorm((y-X)/h)*(1/n.train+output.QP$solution)),0.0)/corr.factor
+    } else {
+        density <- function(y) vapply(y,function(z)
+            mean(kernel(z,X,h,density.a,density.b)),0.0)
+        shape.density <- function(y) vapply(y,function(z) {
+            k <- kernel(z,X,h,density.a,density.b)
+            correction <- sum(k*output.QP$solution)
+            value <- if(log.shape) exp(log(mean(k))+correction) else mean(k)+correction
+            value/corr.factor
+        },0.0)
+        F <- .np_density_integral(density,evaluation,density.a,density.b,X,h)$F
+        F.sc <- .np_density_integral(shape.density,evaluation,density.a,density.b,X,h)$F
+    }
     f <- f[index]
     f.sc <- f.sc[index]
     f.deriv <- f.deriv[index]
