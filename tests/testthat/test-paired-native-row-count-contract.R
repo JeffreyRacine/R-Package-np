@@ -27,7 +27,11 @@ test_that("retained bandwidth routes reject recycling of paired rows", {
     args <- list(xdat=x,ydat=y$y,bandwidth.compute=FALSE,
       bws=if(family=="npindex") c(1,.3) else matrix(.3,2,1))
     if (family=="npplreg") args$zdat <- x
-    bw <- do.call(get(paste0(family,"bw")),args)
+    if (family=="npindex")
+      expect_warning(bw <- do.call(get(paste0(family,"bw")),args),
+                     "xdat has one dimension")
+    else
+      bw <- do.call(get(paste0(family,"bw")),args)
     for (idx in list(1:10,rep(1:20,2))) {
       args <- list(bws=bw,txdat=x,tydat=y$y[idx],se=FALSE)
       if (family=="npplreg") args$tzdat <- x

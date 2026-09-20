@@ -91,7 +91,8 @@ gaussian_convolution_moment_oracle <- function(x, y, hx, hy, order) {
 }
 
 test_that("Gaussian convolution and CVLS obey independent kernel calculus", {
-  old <- options(np.messages=FALSE, np.largeh=FALSE, np.largelambda=FALSE)
+  old <- options(np.messages=FALSE, np.largeh=FALSE, np.largelambda=FALSE,
+                 np.tree=getOption("np.tree"))
   on.exit(options(old), add=TRUE)
   dat <- data.frame(a=c(-.8,-.45,-.2,.03,.22,.47,.68,.91,1.1),
                     b=c(.9,.3,-.4,.15,.7,-.6,.05,1.2,-.1))

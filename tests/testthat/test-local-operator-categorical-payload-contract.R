@@ -1,5 +1,6 @@
 test_that("mixed beta NN operators carry the categorical compression policy", {
-  old <- options(np.messages=FALSE)
+  old <- options(np.messages=FALSE,
+                 np.categorical.compress=getOption("np.categorical.compress"))
   on.exit(options(old),add=TRUE)
   set.seed(92035)
   n <- 25L
