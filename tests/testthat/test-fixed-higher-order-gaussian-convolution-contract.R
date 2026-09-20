@@ -39,12 +39,12 @@ test_that("fixed higher-order Gaussian convolution is an isolated fallback", {
   )
   expect_match(
     helper,
-    "const double scale = ONE_OVER_SQRT_TWO_PI/(denominator*hy_power);",
+    "p = np_gaussian_convolution_prepare(kernel, h, hy);",
     fixed = TRUE
   )
   expect_match(
     helper,
-    "result[i] = xw[j]*kval;",
+    "np_gaussian_convolution_evaluate(&p, kernel, x-xt[i])",
     fixed = TRUE
   )
   expect_match(header, "attribute_hidden int", fixed = TRUE)
@@ -63,53 +63,72 @@ test_that("fixed higher-order Gaussian convolution is an isolated fallback", {
   expect_gt(fallback, direct)
 })
 
-test_that("fixed higher-order Gaussian CVLS retains frozen objectives", {
-  evaluate <- function(dat, bws, order) {
-    bw <- npudensbw(
-      dat = dat,
-      bws = bws,
-      bandwidth.compute = FALSE,
-      bwmethod = "cv.ls",
-      bwtype = "fixed",
-      ckertype = "gaussian",
-      ckerorder = order
-    )
-    value <- getFromNamespace("npudensbw.bandwidth", "np")(
-      dat = dat,
-      bws = bw,
-      bandwidth.compute = TRUE,
-      bwsolver = "powell",
-      eval.only = TRUE,
-      nmulti = 1L,
-      powell.remin = FALSE
-    )
-    if (!is.null(value$objective))
-      as.numeric(value$objective[[1L]])
-    else
-      -as.numeric(value$fval[[1L]])
+# Independent product-normal moment oracle, not the native Hermite expansion.
+gaussian_convolution_moment_oracle <- function(x, y, hx, hy, order) {
+  polynomial <- switch(as.character(order),
+    "4" = c(1.5, 0, -0.5),
+    "6" = c(1.875, 0, -1.25, 0, 0.125))
+  variance <- hx^2 + hy^2
+  mu <- (x*hy^2 + y*hx^2)/variance
+  sd <- hx*hy/sqrt(variance)
+  transform <- function(center, h) {
+    result <- numeric(length(polynomial))
+    for (k in 0:(length(polynomial)-1L))
+      for (j in 0:k)
+        result[j+1L] <- result[j+1L] +
+          polynomial[k+1L]*choose(k,j)*((mu-center)/h)^(k-j)*(sd/h)^j
+    result
   }
+  a <- transform(x, hx)
+  b <- transform(y, hy)
+  integral <- 0
+  for (i in seq_along(a)) for (j in seq_along(b)) {
+    k <- i+j-2L
+    moment <- if (k == 0L) 1 else if (k %% 2L) 0 else prod(seq(1,k-1,by=2))
+    integral <- integral + a[i]*b[j]*moment
+  }
+  dnorm((x-y)/sqrt(variance))/sqrt(variance)*integral
+}
 
-  set.seed(2026072501L + 257L)
-  dat <- data.frame(
-    x1 = rnorm(257L),
-    x2 = rnorm(257L),
-    x3 = rnorm(257L),
-    x4 = rnorm(257L)
-  )
-  expected <- c(
-    order4_q1 = -0.1600367782880025,
-    order4_q2 = 0.023778818772456245,
-    order6_q1 = -0.59980518555491569,
-    order6_q2 = -0.16100514309017225,
-    order8_q2 = -0.060404396873481092
-  )
-  observed <- c(
-    order4_q1 = evaluate(dat["x1"], 0.31, 4L),
-    order4_q2 = evaluate(dat[c("x1", "x2")], c(0.31, 0.35), 4L),
-    order6_q1 = evaluate(dat["x1"], 0.31, 6L),
-    order6_q2 = evaluate(dat[c("x1", "x2")], c(0.31, 0.35), 6L),
-    order8_q2 = evaluate(dat[c("x1", "x2")], c(0.31, 0.35), 8L)
-  )
-
-  expect_equal(unname(observed), unname(expected), tolerance = 5e-14)
+test_that("Gaussian convolution and CVLS obey independent kernel calculus", {
+  old <- options(np.messages=FALSE, np.largeh=FALSE, np.largelambda=FALSE)
+  on.exit(options(old), add=TRUE)
+  dat <- data.frame(a=c(-.8,-.45,-.2,.03,.22,.47,.68,.91,1.1),
+                    b=c(.9,.3,-.4,.15,.7,-.6,.05,1.2,-.1))
+  for (order in c(4L,6L)) for (p in 1:2) {
+    x <- dat[seq_len(p)]
+    h <- c(.31,.47)[seq_len(p)]
+    convolution <- matrix(1,nrow(x),nrow(x))
+    ordinary <- convolution
+    for (d in seq_len(p)) {
+      convolution <- convolution*outer(x[[d]],x[[d]],Vectorize(function(a,b)
+        gaussian_convolution_moment_oracle(a,b,h[d],h[d],order)))
+      z <- outer(x[[d]],x[[d]],"-")/h[d]
+      polynomial <- if (order==4L) 1.5-.5*z^2 else 1.875-1.25*z^2+.125*z^4
+      ordinary <- ordinary*dnorm(z)*polynomial/h[d]
+    }
+    diag(ordinary) <- 0
+    oracle <- mean(convolution)-2*sum(ordinary)/(nrow(x)*(nrow(x)-1L))
+    for (tree in c(FALSE,TRUE)) {
+      options(np.tree=tree)
+      actual <- npksum(txdat=x,exdat=x,bws=h,ckerorder=order,
+                       operator="convolution",bandwidth.divide=TRUE)$ksum
+      expect_equal(as.double(actual),rowSums(convolution),tolerance=2e-10)
+      shifted <- as.data.frame(lapply(x,function(v)v+2))
+      translated <- npksum(txdat=shifted,exdat=shifted,bws=h,ckerorder=order,
+                          operator="convolution",bandwidth.divide=TRUE)$ksum
+      expect_equal(as.double(translated),as.double(actual),tolerance=2e-10)
+      scaled <- as.data.frame(lapply(x,function(v)v*3))
+      rescaled <- npksum(txdat=scaled,exdat=scaled,bws=3*h,ckerorder=order,
+                        operator="convolution",bandwidth.divide=TRUE)$ksum
+      expect_equal(as.double(rescaled)*3^p,as.double(actual),tolerance=2e-10)
+      bw <- npudensbw(dat=x,bws=h,bandwidth.compute=FALSE,
+                     bwmethod="cv.ls",ckerorder=order)
+      result <- npudensbw.bandwidth(dat=x,bws=bw,bandwidth.compute=TRUE,
+                                   bwsolver="powell",eval.only=TRUE,nmulti=1L,
+                                   powell.remin=FALSE)
+      value <- if (!is.null(result$objective)) result$objective[[1L]] else -result$fval[[1L]]
+      expect_equal(as.double(value),oracle,tolerance=2e-10)
+    }
+  }
 })

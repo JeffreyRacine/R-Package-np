@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Fourth- and sixth-order Gaussian convolution calculations now preserve
+  translation and bandwidth-unit invariance. This corrects affected kernel
+  sums and density cross-validation calculations.
+
 * Auxiliary beta density kernels consistently use dimensionless bandwidths on
   normalized support. Beta2 rejects h > 1/4 and inadmissible explicit grids;
   automatic starts and optimizer bounds respect that same domain.
