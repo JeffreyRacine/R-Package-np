@@ -54,6 +54,23 @@ test_that("proper certificates reflect kernel signs and response geometry", {
   }
 })
 
+test_that("proper certificates preserve degree-zero and positive-degree roles", {
+  old <- options(np.messages=FALSE)
+  on.exit(options(old),add=TRUE)
+  x <- data.frame(x=seq(.1,.9,length.out=24))
+  y <- data.frame(y=sin(6*x$x))
+  for(family in c("npcdens","npcdist")) for(degree in 0:2) {
+    args <- list(txdat=x,tydat=y,exdat=data.frame(x=rep(.5,31)),
+      eydat=data.frame(y=seq(-2,2,length.out=31)),bws=c(.4,.3),
+      regtype="lp",degree=degree,se=FALSE)
+    raw <- do.call(get(family),args)
+    proper <- do.call(get(family),c(args,list(proper=TRUE)))
+    expect_identical(proper$proper.info$reason=="already_proper",degree==0L)
+    expect_identical(proper$proper.applied,degree!=0L)
+    if(degree==0L) expect_identical(fitted(proper),fitted(raw))
+  }
+})
+
 test_that("declared categorical response normalization controls certification", {
   old <- options(np.messages=FALSE)
   on.exit(options(old),add=TRUE)
