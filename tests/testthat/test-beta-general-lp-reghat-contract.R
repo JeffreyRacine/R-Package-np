@@ -1,16 +1,16 @@
 beta_lp_hat_oracle <- function(bws, training, evaluation, degree,
                                basis = "glp", bernstein = FALSE,
                                derivative = NULL) {
-  weights <- np:::.np_kernel_weights_direct(
+  weights <- npRmpi:::.np_kernel_weights_direct(
     bws = bws, txdat = training, exdat = evaluation,
     bandwidth.divide = TRUE, kernel.pow = 1.0,
-    int.do.tree = np:::DO_TREE_NO
+    int.do.tree = npRmpi:::DO_TREE_NO
   )
-  design <- np:::W.lp(
+  design <- npRmpi:::W.lp(
     xdat = training[, bws$icon, drop = FALSE], degree = degree,
     basis = basis, bernstein.basis = bernstein
   )
-  evaluation_design <- np:::W.lp(
+  evaluation_design <- npRmpi:::W.lp(
     xdat = training[, bws$icon, drop = FALSE],
     exdat = evaluation[, bws$icon, drop = FALSE], degree = degree,
     gradient.vec = derivative, basis = basis,

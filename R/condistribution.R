@@ -221,7 +221,6 @@ predict.condistribution <- function(object, se.fit = FALSE, ...) {
   }
   dots[["se"]] <- se.fit
   has.formula.route <- !is.null(object$bws$formula)
-  proper_arg <- dots[["proper", exact = TRUE]]
 
   if ((!is.null(dots$exdat) || !is.null(dots$eydat)) && !is.null(dots$newdata))
     dots$newdata <- NULL
@@ -237,18 +236,7 @@ predict.condistribution <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
-  if (is.null(proper_arg) && isTRUE(object$proper.requested)) {
-    dots$proper <- TRUE
-    proper_arg <- TRUE
-  }
-  if (isTRUE(proper_arg)) {
-    proper.control <- dots[["proper.control", exact = TRUE]]
-    if (is.null(proper.control))
-      proper.control <- list()
-    if (is.null(proper.control$fail.on.unsupported))
-      proper.control$fail.on.unsupported <- TRUE
-    dots$proper.control <- proper.control
-  }
+  dots <- .np_conditional_replay_proper(object, dots, prediction = TRUE)
 
   dots[[".np_lp_first_se_demand"]] <- FALSE
   dots[[".np_conditional_cat_se_demand"]] <- FALSE

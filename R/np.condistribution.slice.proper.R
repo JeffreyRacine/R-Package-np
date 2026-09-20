@@ -1,12 +1,5 @@
 .np_condist_slice_groups <- function(xeval) {
-  xeval <- toFrame(xeval)
-
-  if (ncol(xeval) == 0L) {
-    split(seq_len(nrow(xeval)), factor(rep.int("all", nrow(xeval))), drop = TRUE)
-  } else {
-    groups <- do.call(interaction, c(unname(xeval), list(drop = TRUE, lex.order = TRUE)))
-    split(seq_len(nrow(xeval)), groups, drop = TRUE)
-  }
+  .np_condens_slice_groups(xeval)
 }
 
 .np_condist_slice_bounds <- function(object, slice.context, proper.control) {

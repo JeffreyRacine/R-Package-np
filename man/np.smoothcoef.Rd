@@ -157,7 +157,10 @@ These arguments control where the smooth-coefficient fit is evaluated and which 
     which
     the regression will be estimated
     (evaluation data), which corresponds to \eqn{Z}
-    in the model equation. Defaults to be the same as \code{txdat}.
+    in the model equation. With separate training \code{tzdat}, this defaults
+    to \code{tzdat}; otherwise it follows \code{exdat}. Supplying only
+    \code{ezdat} evaluates at the original training \code{txdat}. The two
+    evaluation roles must have the same row count before omitting missing rows.
   }
 
 

@@ -1,5 +1,68 @@
 # npRmpi 0.80-1
 
+* Beta nearest-neighbour regression CVLS and density CVML use neighbourhoods
+  with the held-out occurrence excluded. Unconditional density CVLS applies
+  the same correction to its cross term while retaining the full-sample
+  integrated squared density. Fixed-bandwidth calculations are unchanged.
+
+* Conditional properization no longer treats LC/degree-zero fitting alone
+  as a guarantee of a proper density or CDF. The shortcut also checks kernel
+  positivity, response normalization and nearest-neighbour orientation.
+
+* Fixed categorical class-probability effect plots now apply the fitted
+  probability projection at both category endpoints before subtraction,
+  matching public class-probability predictions.
+
+* Conditional fitted objects retain their resolved properization controls for
+  prediction and plotting. Explicit consumer controls take precedence; older
+  objects without retained controls keep the historical default behavior.
+
+* Conditional density/distribution properization groups conditioning rows by
+  exact identity, avoiding merged slices after large coordinate translations
+  or numeric factor-label rounding.
+
+* Categorical recoding and declared-support reconstruction preserve valid
+  factor levels labelled NA without converting them to missing observations.
+  Actual missing factor codes remain missing.
+
+* Formula fits with native evaluation data no longer restore training
+  exclusions into an unrelated evaluation grid. Native evaluation arguments
+  consistently take precedence over formula newdata in these routes.
+
+* Smooth-coefficient and partially linear fits honor separately supplied
+  evaluation Z data when evaluation X defaults to the training data, and
+  validate the paired evaluation row counts.
+
+* Explicit evaluation responses at training locations follow the training-row
+  omission mask and native tree ordering. Single-index fits no longer overwrite those supplied
+  responses when calculating goodness-of-fit statistics.
+
+* Retained-bandwidth conditional, single-index, partially linear and
+  smooth-coefficient fits reject mismatched paired data rows before recycling
+  can alter the sample.
+
+* Uniform native quadrature grids retain the exact supplied support endpoints,
+  preventing roundoff from dropping a bounded-kernel endpoint contribution in
+  conditional and unconditional density cross-validation.
+
+* Mixed categorical/beta density and distribution operators now pass the
+  categorical-compression option to their shared native kernel-sum owner.
+
+* Mixed local-polynomial derivatives correctly differentiate every coordinate,
+  including constant factors and degree-zero axes. All-zero derivative orders
+  return the value basis, including its intercept.
+
+* Conditional fits, operators and bootstrap preparation consistently resolve
+  retained scale factors to physical bandwidths, including the separate X/Y
+  calculations used by local-polynomial fits. Resampling does not rescale the
+  selected smoothing parameters. Bias-corrected bootstrap pilots preserve
+  physical/scale-factor metadata in regression, conditional, smooth-coefficient
+  and partially linear bandwidth objects.
+
+* Fourth- and sixth-order Gaussian convolution calculations now preserve
+  translation and bandwidth-unit invariance. This corrects affected kernel
+  sums and density cross-validation calculations.
+
 * Auxiliary beta density kernels consistently use dimensionless bandwidths on
   normalized support. Beta2 rejects h > 1/4 and inadmissible explicit grids;
   automatic starts and optimizer bounds respect that same domain.

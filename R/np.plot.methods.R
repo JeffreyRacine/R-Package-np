@@ -761,8 +761,7 @@ np_render_control <- function(style = c("band", "bar"),
   )
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.condensity")
-  if (is.null(dots$proper) && isTRUE(object$proper.requested))
-    dots$proper <- TRUE
+  dots <- .np_conditional_replay_proper(object, dots)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_condistribution <- function(object, ..., .plot_dots_call = NULL) {
@@ -774,8 +773,7 @@ np_render_control <- function(style = c("band", "bar"),
   )
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.condistribution")
-  if (is.null(dots$proper) && isTRUE(object$proper.requested))
-    dots$proper <- TRUE
+  dots <- .np_conditional_replay_proper(object, dots)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_npdistribution <- function(object, ..., .plot_dots_call = NULL)
@@ -977,7 +975,7 @@ np_render_control <- function(style = c("band", "bar"),
 
 .np_plot_conmode_cast_like <- function(x, template) {
   if (is.factor(template))
-    return(factor(as.character(x),
+    return(.np_factor_with_levels(x,
                   levels = levels(template),
                   ordered = is.ordered(template)))
   if (is.integer(template))
@@ -989,7 +987,7 @@ np_render_control <- function(style = c("band", "bar"),
 
 .np_plot_conmode_grid_values <- function(x, neval, xtrim) {
   if (is.factor(x)) {
-    return(factor(levels(x), levels = levels(x), ordered = is.ordered(x)))
+    return(.np_factor_with_levels(levels(x), levels = levels(x), ordered = is.ordered(x)))
   }
   rng <- stats::quantile(x, probs = xtrim, names = FALSE, na.rm = TRUE)
   seq(rng[1L], rng[2L], length.out = neval)
@@ -1006,7 +1004,7 @@ np_render_control <- function(style = c("band", "bar"),
 
 .np_plot_conmode_level_factor <- function(ytrain, level, n) {
   y <- ytrain[[1L]]
-  factor(rep(level, n),
+  .np_factor_with_levels(rep(level, n),
          levels = levels(y),
          ordered = is.ordered(y))
 }
@@ -1480,6 +1478,11 @@ np_render_control <- function(style = c("band", "bar"),
           where = "plot.conmode"
         )
         eval.level <- function(z) {
+          if (isTRUE(object$proper.requested)) {
+            probability <- .np_plot_conmode_probability_matrix(
+              object, xtrain, ytrain, z, lev)$probabilities
+            return(as.vector(probability[, match(level, lev)]))
+          }
           as.vector(npcdenshat(
             bws = object$bws,
             txdat = xtrain,

@@ -5075,106 +5075,15 @@ double np_aconvol_gauss2(const double x, const double y,const double hx,const do
 }
 
 double np_aconvol_gauss4(const double x, const double y,const double hx,const double hy){
-  const double hx2 = hx*hx;
-  const double hy2 = hy*hy;
-  const double hxy2 = hx2+hy2;
-  const double x2 = x*x;
-  const double y2 = y*y;
-  const double hx3 = hx2*hx;
-  const double hy3 = hy2*hy;
-  const double hx5 = hx3*hx2;
-  const double hy5 = hy3*hy2;
-  const double hx7 = hx5*hx2;
-  const double hy7 = hy5*hy2;
-  const double hx9 = hx7*hx2;
-  const double hy9 = hy7*hy2;
-  
-  return((hx3*hy3*(y2*y2 - 4*x*y*y2 + x2*x2)
-                     + (6*hx3*hy3*x2 - 2*hx*hy7 - 6*hx3*hy5 - 12*hx5*hy3 - 2*hx7*hy)*y2
-                     + ((4*hx*hy7 + 24*hx3*hy5 + 24*hx5*hy3 + 4*hx7*hy)*x - 4*hx3*hy3*x2*x)*y
-                     + ( - 2*hx*hy7 - 12*hx3*hy5 - 12*hx5*hy3 - 2*hx7*hy)*x2
-                     + 6*hx*hy9 + 27*hx3*hy7 + 42*hx5*hy5 + 27*hx7*hy3 + 6*hx9*hy)*
-         exp(-0.5*(x-y)*(x-y)/hxy2)*ONE_OVER_SQRT_TWO_PI/(sqrt(hy2 + hx2)*4*hxy2*hxy2*hxy2*hxy2));
+  const np_gaussian_convolution_polynomial p =
+    np_gaussian_convolution_prepare(1, hx, hy);
+  return np_gaussian_convolution_evaluate(&p, 1, x-y);
 }
 
 double np_aconvol_gauss6(const double x, const double y,const double hx,const double hy){
-  const double hx2 = hx*hx;
-  const double hx4 = hx2*hx2;
-  const double hx6 = hx4*hx2;
-  const double hx8 = hx4*hx4;
-  const double hx10 = hx8*hx2;
-  const double hx12 = hx10*hx2;
-  const double hx14 = hx12*hx2;
-  const double hx16 = hx8*hx8;
-
-  const double x2 = x*x;
-  const double x3 = x*x2;
-  const double x4 = x2*x2;
-  const double x5 = x*x4;
-  const double x6 = x3*x3;
-  const double x7 = x*x6;
-  const double x8 = x4*x4;
-
-  
-  const double hy2 = hy*hy;
-  const double hy4 = hy2*hy2;
-  const double hy6 = hy4*hy2;
-  const double hy8 = hy4*hy4;
-  const double hy10 = hy8*hy2;
-  const double hy12 = hy10*hy2;
-  const double hy14 = hy12*hy2;
-  const double hy16 = hy8*hy8;
-
-  const double y2 = y*y;
-  const double y3 = y*y2;
-  const double y4 = y2*y2;
-  const double y5 = y*y4;
-  const double y6 = y3*y3;
-  const double y7 = y*y6;
-  const double y8 = y4*y4;
-  
-  const double hxy2 = hx2+hy2;
-  const double hxy4 = hxy2*hxy2;
-  const double hxy8 = hxy4*hxy4;
-    
-  return(hx*hy*(hx4*hy4*y8-8*hx4*hy4*x*y7+28*hx4*hy4*x2*y6-4*hx2*hy8*y6
-                -40*hx4*hy6*y6-40*hx6*hy4*y6-4*hx8*hy2*y6
-                -56*hx4*hy4*x3*y5+24*hx2*hy8*x*y5+240*hx4*hy6*x*y5
-                +240*hx6*hy4*x*y5+24*hx8*hy2*x*y5+70*hx4*hy4*x4*y4
-                -60*hx2*hy8*x2*y4-600*hx4*hy6*x2*y4
-                -600*hx6*hy4*x2*y4-60*hx8*hy2*x2*y4+8*hy12*y4
-                +108*hx2*hy10*y4+570*hx4*hy8*y4+940*hx6*hy6*y4
-                +570*hx8*hy4*y4+108*hx10*hy2*y4+8*hx12*y4
-                -56*hx4*hy4*x5*y3+80*hx2*hy8*x3*y3
-                +800*hx4*hy6*x3*y3+800*hx6*hy4*x3*y3
-                +80*hx8*hy2*x3*y3-32*hy12*x*y3-432*hx2*hy10*x*y3
-                -2280*hx4*hy8*x*y3-3760*hx6*hy6*x*y3
-                -2280*hx8*hy4*x*y3-432*hx10*hy2*x*y3-32*hx12*x*y3
-                +28*hx4*hy4*x6*y2-60*hx2*hy8*x4*y2
-                -600*hx4*hy6*x4*y2-600*hx6*hy4*x4*y2
-                -60*hx8*hy2*x4*y2+48*hy12*x2*y2+648*hx2*hy10*x2*y2
-                +3420*hx4*hy8*x2*y2+5640*hx6*hy6*x2*y2
-                +3420*hx8*hy4*x2*y2+648*hx10*hy2*x2*y2
-                +48*hx12*x2*y2-80*hy14*y2-740*hx2*hy12*y2
-                -3000*hx4*hy10*y2-5860*hx6*hy8*y2-5860*hx8*hy6*y2
-                -3000*hx10*hy4*y2-740*hx12*hy2*y2-80*hx14*y2
-                -8*hx4*hy4*x7*y+24*hx2*hy8*x5*y+240*hx4*hy6*x5*y
-                +240*hx6*hy4*x5*y+24*hx8*hy2*x5*y-32*hy12*x3*y
-                -432*hx2*hy10*x3*y-2280*hx4*hy8*x3*y
-                -3760*hx6*hy6*x3*y-2280*hx8*hy4*x3*y
-                -432*hx10*hy2*x3*y-32*hx12*x3*y+160*hy14*x*y
-                +1480*hx2*hy12*x*y+6000*hx4*hy10*x*y+11720*hx6*hy8*x*y
-                +11720*hx8*hy6*x*y+6000*hx10*hy4*x*y+1480*hx12*hy2*x*y
-                +160*hx14*x*y+hx4*hy4*x8-4*hx2*hy8*x6-40*hx4*hy6*x6
-                -40*hx6*hy4*x6-4*hx8*hy2*x6+8*hy12*x4
-                +108*hx2*hy10*x4+570*hx4*hy8*x4+940*hx6*hy6*x4
-                +570*hx8*hy4*x4+108*hx10*hy2*x4+8*hx12*x4
-                -80*hy14*x2-740*hx2*hy12*x2-3000*hx4*hy10*x2
-                -5860*hx6*hy8*x2-5860*hx8*hy6*x2-3000*hx10*hy4*x2
-                -740*hx12*hy2*x2-80*hx14*x2+120*hy16+1020*hx2*hy14
-                +3825*hx4*hy12+8040*hx6*hy10+10230*hx8*hy8
-                +8040*hx10*hy6+3825*hx12*hy4+1020*hx14*hy2+120*hx16)*
-         exp(-0.5*(x-y)*(x-y)/hxy2)*ONE_OVER_SQRT_TWO_PI/(sqrt(hxy2)*64*hxy8));
+  const np_gaussian_convolution_polynomial p =
+    np_gaussian_convolution_prepare(2, hx, hy);
+  return np_gaussian_convolution_evaluate(&p, 2, x-y);
 }
 
 double np_aconvol_gauss8(const double x, const double y,const double hx,const double hy){
@@ -23161,6 +23070,85 @@ static NP_ALWAYS_INLINE int np_regression_cv_finish_objective(
   return 0;
 }
 
+/* Explicit delete-one geometry for route-bearing beta row consumers.
+ * The row retains its kernel/response algebra. This owner only prepares the
+ * existing occurrence-aware radii once and selects adaptive fold radii into
+ * the row's borrowed bandwidth storage. Full fits and CVAIC do not enter. */
+typedef struct {
+  int num_obs;
+  int ncon;
+  double **train;
+  double **primary;
+  double **successor;
+  double **selected;
+  double *fold_scale;
+  void *allocation_marker;
+  int allocation_active;
+} NPBetaLooGeometry;
+
+static void np_beta_loo_geometry_clear(NPBetaLooGeometry *geometry, Rboolean jump)
+{
+  /* Clear after the beta row context, which was prepared later. R restores
+   * transient allocations itself during a longjmp. */
+  if(geometry->allocation_active && !jump)
+    vmaxset(geometry->allocation_marker);
+  memset(geometry, 0, sizeof(*geometry));
+}
+
+static int np_beta_loo_geometry_select(NPBetaLooGeometry *geometry, int row)
+{
+  return geometry->primary != NULL &&
+    np_nn_adaptive_fold_select_row(
+      geometry->num_obs, geometry->ncon, geometry->train,
+      geometry->primary, geometry->successor, geometry->fold_scale,
+      row, geometry->selected) != NP_NN_GEOMETRY_OK;
+}
+
+static int np_beta_loo_geometry_prepare(
+  NPBetaLooGeometry *geometry, int bandwidth_mode, int num_obs,
+  int ncon, int nuno, int nord, double **train, double *scale_factor,
+  double **bandwidth, double *lambda)
+{
+  NPNNGeometryContext context = {
+    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+    .eval_to_train = NULL,
+    .adaptive_successor = NULL
+  };
+  NPNNGeometryStatus status = NP_NN_GEOMETRY_OK;
+  double **target = bandwidth;
+
+  if(geometry == NULL || geometry->primary != NULL ||
+     (bandwidth_mode != BW_GEN_NN && bandwidth_mode != BW_ADAP_NN))
+    return 1;
+  geometry->num_obs = num_obs;
+  geometry->ncon = ncon;
+  geometry->train = train;
+  geometry->selected = bandwidth;
+  if(bandwidth_mode == BW_ADAP_NN) {
+    geometry->allocation_marker = vmaxget();
+    geometry->allocation_active = 1;
+    geometry->primary = (double **)R_alloc((size_t)ncon, sizeof(double *));
+    geometry->successor = (double **)R_alloc((size_t)ncon, sizeof(double *));
+    geometry->fold_scale = (double *)R_alloc((size_t)ncon, sizeof(double));
+    for(int coordinate = 0; coordinate < ncon; ++coordinate) {
+      geometry->primary[coordinate] =
+        (double *)R_alloc((size_t)num_obs, sizeof(double));
+      geometry->successor[coordinate] =
+        (double *)R_alloc((size_t)num_obs, sizeof(double));
+    }
+    target = geometry->primary;
+    context.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
+    context.adaptive_successor = geometry->successor;
+    context.adaptive_fold_scale = geometry->fold_scale;
+  }
+  if(kernel_bandwidth_mean_ctx(
+       0, bandwidth_mode, num_obs, num_obs, 0, 0, 0,
+       ncon, nuno, nord, 0, scale_factor, NULL, NULL, train, train,
+       NULL, target, lambda, &context, NULL, &status) != 0)
+    return 1;
+  return np_beta_loo_geometry_select(geometry, 0);
+}
+
 /*
  * Route-aware scalar regression objective.  This is an O(n) row consumer,
  * not a beta objective: the route owns continuous-kernel construction while
@@ -23191,6 +23179,7 @@ typedef struct {
 
 typedef struct {
   NPBetaScaledRowContext row_context;
+  NPBetaLooGeometry loo_geometry;
   int *operator;
   int *kernel_u;
   int *kernel_o;
@@ -23211,6 +23200,7 @@ static void np_regression_cv_scalar_route_owner_init(
   NPRegressionCvScalarRouteOwner *owner)
 {
   np_beta_scaled_row_context_init(&owner->row_context);
+  memset(&owner->loo_geometry, 0, sizeof(owner->loo_geometry));
   owner->operator = NULL;
   owner->kernel_u = NULL;
   owner->kernel_o = NULL;
@@ -23236,6 +23226,7 @@ static void np_regression_cv_scalar_route_owner_cleanup(
   if(!jump)
     np_continuous_kernel_beta_prepared_context_release(
       &owner->row_context.beta_prepared);
+  np_beta_loo_geometry_clear(&owner->loo_geometry, jump);
   if(owner->matrix_bandwidth != NULL)
     free_mat(owner->matrix_bandwidth,
              owner->matrix_bandwidth_columns);
@@ -23328,11 +23319,16 @@ static int np_regression_cv_scalar_continuous_route_body(
   for(evaluation = 0; evaluation < num_reg_ordered; ++evaluation)
     kernel_o[evaluation] = KERNEL_ordered_reg;
 
-  if(np_beta_continuous_bandwidth_prepare_canonical(
+  if(bwm == RBWM_CVLS && BANDWIDTH_reg != BW_FIXED ?
+     np_beta_loo_geometry_prepare(
+       &owner->loo_geometry, BANDWIDTH_reg, num_obs,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
+       matrix_X_continuous, vector_scale_factor, matrix_bandwidth, lambda) :
+     np_beta_continuous_bandwidth_prepare_canonical(
        BANDWIDTH_reg, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        matrix_X_continuous, matrix_X_continuous,
-       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL) != 0)
+       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL))
     goto cleanup_route;
 
   row_status = np_beta_scaled_row_context_prepare(
@@ -23354,6 +23350,8 @@ static int np_regression_cv_scalar_continuous_route_body(
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
+    if(np_beta_loo_geometry_select(&owner->loo_geometry, evaluation))
+      goto cleanup_route;
     row_status = np_beta_scaled_row_context_fill_omitting(
       row_context, evaluation, omitted, &row_sum, NULL);
     if(row_status != NP_CONTINUOUS_ROW_OK ||
@@ -23655,12 +23653,18 @@ static int np_regression_cv_scalar_gnn_continuous_route_parallel_body(
       owner->kernel_o[evaluation] = call->kernel_ordered;
   }
 
-  if(!local_fail && np_beta_continuous_bandwidth_prepare_canonical(
+  if(!local_fail && (call->bwm == RBWM_CVLS ?
+     np_beta_loo_geometry_prepare(
+       &owner->loo_geometry, call->bandwidth_mode, num_obs,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
+       call->matrix_X_continuous, call->scale_factor,
+       matrix_bandwidth, owner->lambda) :
+     np_beta_continuous_bandwidth_prepare_canonical(
        BW_GEN_NN, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        call->matrix_X_continuous, call->matrix_X_continuous,
        call->scale_factor, matrix_bandwidth, NULL,
-       owner->lambda, NULL, NULL) != 0)
+       owner->lambda, NULL, NULL)) != 0)
     local_fail = 1;
 
   if(!local_fail) {
@@ -23691,6 +23695,10 @@ static int np_regression_cv_scalar_gnn_continuous_route_parallel_body(
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
+    if(np_beta_loo_geometry_select(&owner->loo_geometry, evaluation)) {
+      local_fail = 1;
+      break;
+    }
     row_status = np_beta_scaled_row_context_fill_omitting(
       row_context, evaluation, omitted, &row_sum, NULL);
     if(row_status != NP_CONTINUOUS_ROW_OK ||
@@ -23856,12 +23864,18 @@ static int np_regression_cv_scalar_ann_continuous_route_parallel_body(
       owner->kernel_o[evaluation] = call->kernel_ordered;
   }
 
-  if(!local_fail && np_beta_continuous_bandwidth_prepare_canonical(
+  if(!local_fail && (call->bwm == RBWM_CVLS ?
+     np_beta_loo_geometry_prepare(
+       &owner->loo_geometry, call->bandwidth_mode, num_obs,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
+       call->matrix_X_continuous, call->scale_factor,
+       matrix_bandwidth, owner->lambda) :
+     np_beta_continuous_bandwidth_prepare_canonical(
        BW_ADAP_NN, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        call->matrix_X_continuous, call->matrix_X_continuous,
        call->scale_factor, matrix_bandwidth, NULL,
-       owner->lambda, NULL, NULL) != 0)
+       owner->lambda, NULL, NULL)) != 0)
     local_fail = 1;
 
   if(!local_fail) {
@@ -23892,6 +23906,10 @@ static int np_regression_cv_scalar_ann_continuous_route_parallel_body(
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
+    if(np_beta_loo_geometry_select(&owner->loo_geometry, evaluation)) {
+      local_fail = 1;
+      break;
+    }
     row_status = np_beta_scaled_row_context_fill_omitting(
       row_context, evaluation, omitted, &row_sum, NULL);
     if(row_status != NP_CONTINUOUS_ROW_OK ||
@@ -23996,6 +24014,7 @@ static NP_NOINLINE int np_regression_cv_scalar_ann_continuous_route_parallel(
 typedef struct {
   NPBetaScaledRowContext row_context;
   NPReghatLPWorkspace lp_workspace;
+  NPBetaLooGeometry loo_geometry;
   int *operator;
   int *kernel_u;
   int *kernel_o;
@@ -24019,6 +24038,7 @@ static void np_regression_cv_lp_route_owner_init(
 {
   np_beta_scaled_row_context_init(&owner->row_context);
   np_reghat_lp_workspace_init(&owner->lp_workspace);
+  memset(&owner->loo_geometry, 0, sizeof(owner->loo_geometry));
   owner->operator = NULL;
   owner->kernel_u = NULL;
   owner->kernel_o = NULL;
@@ -24047,6 +24067,7 @@ static void np_regression_cv_lp_route_owner_cleanup(
     np_continuous_kernel_beta_prepared_context_release(
       &owner->row_context.beta_prepared);
   np_reghat_lp_workspace_clear(&owner->lp_workspace);
+  np_beta_loo_geometry_clear(&owner->loo_geometry, jump);
   if(owner->matrix_bandwidth != NULL)
     free_mat(owner->matrix_bandwidth,
              owner->matrix_bandwidth_columns);
@@ -24178,11 +24199,16 @@ static int np_regression_cv_lp_continuous_route_body(
   for(evaluation = 0; evaluation < num_reg_ordered; ++evaluation)
     kernel_o[evaluation] = KERNEL_ordered_reg;
 
-  if(np_beta_continuous_bandwidth_prepare_canonical(
+  if(bwm == RBWM_CVLS && BANDWIDTH_reg != BW_FIXED ?
+     np_beta_loo_geometry_prepare(
+       &owner->loo_geometry, BANDWIDTH_reg, num_obs,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
+       matrix_X_continuous, vector_scale_factor, matrix_bandwidth, lambda) :
+     np_beta_continuous_bandwidth_prepare_canonical(
        BANDWIDTH_reg, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        matrix_X_continuous, matrix_X_continuous,
-       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL) != 0)
+       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL))
     goto cleanup_lp_route;
 
   row_status = np_beta_scaled_row_context_prepare(
@@ -24207,8 +24233,12 @@ static int np_regression_cv_lp_continuous_route_body(
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
-    row_status = np_beta_scaled_row_context_fill(
-      row_context, evaluation, NULL, NULL);
+    if(np_beta_loo_geometry_select(&owner->loo_geometry, evaluation))
+      goto cleanup_lp_route;
+    row_status = np_beta_scaled_row_context_fill_omitting(
+      row_context, evaluation,
+      bwm == RBWM_CVLS && BANDWIDTH_reg != BW_FIXED ? evaluation : -1,
+      NULL, NULL);
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup_lp_route;
 
@@ -24224,7 +24254,9 @@ static int np_regression_cv_lp_continuous_route_body(
     leverage = influence_row[evaluation];
     residual = vector_Y[evaluation] - fitted;
 
-    if(bwm == RBWM_CVLS) {
+    if(bwm == RBWM_CVLS && BANDWIDTH_reg != BW_FIXED) {
+      cv += residual*residual;
+    } else if(bwm == RBWM_CVLS) {
       double denominator;
 
       if(!np_lp_delete_denominator(leverage, &denominator))
@@ -24863,12 +24895,18 @@ static int np_regression_cv_lp_nn_continuous_route_parallel_body(
       owner->kernel_o[evaluation] = call->kernel_ordered;
   }
 
-  if(!local_fail && np_beta_continuous_bandwidth_prepare_canonical(
+  if(!local_fail && (call->bwm == RBWM_CVLS ?
+     np_beta_loo_geometry_prepare(
+       &owner->loo_geometry, call->bandwidth_mode, num_obs,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
+       call->matrix_X_continuous, call->scale_factor,
+       matrix_bandwidth, owner->lambda) :
+     np_beta_continuous_bandwidth_prepare_canonical(
        call->bandwidth_mode, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        call->matrix_X_continuous, call->matrix_X_continuous,
        call->scale_factor, matrix_bandwidth, NULL,
-       owner->lambda, NULL, NULL) != 0)
+       owner->lambda, NULL, NULL)) != 0)
     local_fail = 1;
 
   if(!local_fail) {
@@ -24900,8 +24938,13 @@ static int np_regression_cv_lp_nn_continuous_route_parallel_body(
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
-    row_status = np_beta_scaled_row_context_fill(
-      row_context, evaluation, NULL, NULL);
+    if(np_beta_loo_geometry_select(&owner->loo_geometry, evaluation)) {
+      local_fail = 1;
+      break;
+    }
+    row_status = np_beta_scaled_row_context_fill_omitting(
+      row_context, evaluation, call->bwm == RBWM_CVLS ? evaluation : -1,
+      NULL, NULL);
     if(row_status != NP_CONTINUOUS_ROW_OK) {
       local_fail = 1;
       break;
@@ -24919,15 +24962,8 @@ static int np_regression_cv_lp_nn_continuous_route_parallel_body(
       fitted += owner->influence_row[observation]*call->response[observation];
     leverage = owner->influence_row[evaluation];
     residual = call->response[evaluation] - fitted;
-    if(call->bwm == RBWM_CVLS) {
-      double denominator;
-
-      if(!np_lp_delete_denominator(leverage, &denominator)) {
-        local_fail = 1;
-        break;
-      }
-      residual /= denominator;
-    }
+    /* CVLS solved the occurrence-deleted row above. Its residual already
+     * is the delete-one residual; CVAIC retains the full-row leverage. */
     contributions[evaluation] = residual*residual;
     if(call->bwm == RBWM_CVAIC)
       contributions[num_obs + evaluation] = leverage;
@@ -41926,6 +41962,9 @@ static void np_fill_trapezoid_rule(double a,
     grid[i] = a + ((double)i)*step;
     weights[i] = step;
   }
+  /* Fused multiply-add may put the computed endpoint outside support. */
+  grid[0] = a;
+  grid[n - 1] = b;
   weights[0] *= 0.5;
   weights[n - 1] *= 0.5;
 }
@@ -51605,7 +51644,8 @@ static int np_density_cvml_beta_route(
   double **matrix_X_ordered,
   double **matrix_X_continuous,
   double **matrix_bandwidth,
-  const double *lambda,
+  double *lambda,
+  double *scale_factor,
   const int *operator,
   const int *kernel_unordered,
   const int *kernel_ordered,
@@ -51615,6 +51655,7 @@ static int np_density_cvml_beta_route(
   double *cv)
 {
   NPBetaScaledRowContext context;
+  NPBetaLooGeometry geometry = {0};
   NPContinuousKernelRowStatus row_status;
   double *contributions = NULL;
   double local_cv = 0.0;
@@ -51626,7 +51667,14 @@ static int np_density_cvml_beta_route(
   const int use_parallel_rows = np_objective_outer_rows_enabled(1);
 
   np_beta_scaled_row_context_init(&context);
-  row_status = np_beta_scaled_row_context_prepare(
+  if(bandwidth_mode != BW_FIXED &&
+     np_beta_loo_geometry_prepare(
+       &geometry, bandwidth_mode, num_obs, num_reg_continuous,
+       num_reg_unordered, num_reg_ordered, matrix_X_continuous,
+       scale_factor, matrix_bandwidth, lambda) != 0)
+    local_fail = 1;
+  if(!local_fail)
+    row_status = np_beta_scaled_row_context_prepare(
     &context, route, diagnostics, bandwidth_mode,
     num_obs, num_obs, num_reg_continuous,
     num_reg_unordered, num_reg_ordered,
@@ -51636,7 +51684,7 @@ static int np_density_cvml_beta_route(
     matrix_bandwidth, matrix_bandwidth, operator,
     kernel_unordered, kernel_ordered, lambda, num_categories,
     matrix_categorical_vals_extern, categorical_compress, row);
-  local_fail = row_status != NP_CONTINUOUS_ROW_OK;
+  local_fail = local_fail || row_status != NP_CONTINUOUS_ROW_OK;
 #ifdef MPI2
   if(use_parallel_rows) {
     int any_fail = 0;
@@ -51666,7 +51714,8 @@ static int np_density_cvml_beta_route(
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
-    if(np_density_cvml_beta_row_contribution(
+    if(np_beta_loo_geometry_select(&geometry, evaluation) ||
+       np_density_cvml_beta_row_contribution(
          &context, evaluation, num_obs, &contribution) != 0) {
       local_fail = 1;
       break;
@@ -51701,6 +51750,7 @@ static int np_density_cvml_beta_route(
 cleanup:
   free(contributions);
   np_beta_scaled_row_context_clear(&context);
+  np_beta_loo_geometry_clear(&geometry, FALSE);
   return status;
 }
 
@@ -51716,7 +51766,8 @@ static int np_density_cvls_beta_cross_term(
   double **matrix_X_ordered,
   double **matrix_X_continuous,
   double **matrix_bandwidth,
-  const double *lambda,
+  double *lambda,
+  double *scale_factor,
   const int *operator,
   const int *kernel_unordered,
   const int *kernel_ordered,
@@ -51727,6 +51778,7 @@ static int np_density_cvls_beta_cross_term(
   double *cross_term)
 {
   NPBetaScaledRowContext context;
+  NPBetaLooGeometry geometry = {0};
   NPContinuousKernelRowStatus row_status;
   int evaluation;
   int status = 1;
@@ -51734,6 +51786,12 @@ static int np_density_cvls_beta_cross_term(
   if(cross_term == NULL)
     return 1;
   np_beta_scaled_row_context_init(&context);
+  if(bandwidth_mode != BW_FIXED &&
+     np_beta_loo_geometry_prepare(
+       &geometry, bandwidth_mode, num_obs, num_reg_continuous,
+       num_reg_unordered, num_reg_ordered, matrix_X_continuous,
+       scale_factor, matrix_bandwidth, lambda) != 0)
+    goto cleanup;
   row_status = np_beta_scaled_row_context_prepare(
     &context, route, diagnostics, bandwidth_mode,
     num_obs, num_obs, num_reg_continuous,
@@ -51753,6 +51811,8 @@ static int np_density_cvls_beta_cross_term(
     double common_log_scale = 0.0;
     double fit_sum = 0.0;
 
+    if(np_beta_loo_geometry_select(&geometry, evaluation))
+      goto cleanup;
     row_status = np_beta_scaled_row_context_fill_omitting(
       &context, evaluation, evaluation,
       &scaled_sum, &common_log_scale);
@@ -51769,6 +51829,7 @@ static int np_density_cvls_beta_cross_term(
 
 cleanup:
   np_beta_scaled_row_context_clear(&context);
+  np_beta_loo_geometry_clear(&geometry, FALSE);
   return status;
 }
 
@@ -51790,7 +51851,8 @@ static int np_density_cvls_beta_cross_term_mpi(
   double **matrix_X_ordered,
   double **matrix_X_continuous,
   double **matrix_bandwidth,
-  const double *lambda,
+  double *lambda,
+  double *scale_factor,
   const int *operator,
   const int *kernel_unordered,
   const int *kernel_ordered,
@@ -51801,6 +51863,7 @@ static int np_density_cvls_beta_cross_term_mpi(
   double *cross_term)
 {
   NPBetaScaledRowContext context;
+  NPBetaLooGeometry geometry = {0};
   NPContinuousKernelRowStatus row_status;
   double *contributions = NULL;
   double local_cross_term = 0.0;
@@ -51813,7 +51876,14 @@ static int np_density_cvls_beta_cross_term_mpi(
   if(cross_term == NULL || !np_objective_outer_rows_enabled(1))
     return 1;
   np_beta_scaled_row_context_init(&context);
-  row_status = np_beta_scaled_row_context_prepare(
+  if(bandwidth_mode != BW_FIXED &&
+     np_beta_loo_geometry_prepare(
+       &geometry, bandwidth_mode, num_obs, num_reg_continuous,
+       num_reg_unordered, num_reg_ordered, matrix_X_continuous,
+       scale_factor, matrix_bandwidth, lambda) != 0)
+    local_fail = 1;
+  if(!local_fail)
+    row_status = np_beta_scaled_row_context_prepare(
     &context, route, diagnostics, bandwidth_mode,
     num_obs, num_obs, num_reg_continuous,
     num_reg_unordered, num_reg_ordered,
@@ -51823,7 +51893,7 @@ static int np_density_cvls_beta_cross_term_mpi(
     matrix_bandwidth, matrix_bandwidth, operator,
     kernel_unordered, kernel_ordered, lambda, num_categories,
     category_values, categorical_compress, row);
-  local_fail = row_status != NP_CONTINUOUS_ROW_OK;
+  local_fail = local_fail || row_status != NP_CONTINUOUS_ROW_OK;
 #ifdef MPI2
   {
     int any_fail = 0;
@@ -51852,6 +51922,10 @@ static int np_density_cvls_beta_cross_term_mpi(
     double fit_sum = 0.0;
     double contribution;
 
+    if(np_beta_loo_geometry_select(&geometry, evaluation)) {
+      local_fail = 1;
+      break;
+    }
     row_status = np_beta_scaled_row_context_fill_omitting(
       &context, evaluation, evaluation,
       &scaled_sum, &common_log_scale);
@@ -51889,6 +51963,7 @@ static int np_density_cvls_beta_cross_term_mpi(
 cleanup:
   free(contributions);
   np_beta_scaled_row_context_clear(&context);
+  np_beta_loo_geometry_clear(&geometry, FALSE);
   return status;
 }
 
@@ -52042,7 +52117,7 @@ double *cv){
                            NULL,
                            matrix_bandwidth,
                            lambda,
-                           exact_beta_route ? NULL : &nn_geometry_context,
+                           &nn_geometry_context,
                            NULL,
                            &nn_geometry_status)==1)){
     /* Beta candidates participate in optimizer penalty handling.  Preserve
@@ -52076,7 +52151,7 @@ double *cv){
       kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
       num_obs, num_reg_unordered, num_reg_ordered,
       num_reg_continuous, matrix_X_unordered, matrix_X_ordered,
-      matrix_X_continuous, matrix_bandwidth, lambda, operator,
+      matrix_X_continuous, matrix_bandwidth, lambda, vector_scale_factor, operator,
       kernel_u, kernel_o, num_categories, categorical_compress,
       rho, cv);
     goto cleanup_density_leave_one_out_cv;
@@ -52954,19 +53029,19 @@ double *cv){
   if(exact_beta_route) {
     if(np_objective_outer_rows_enabled(1)) {
       if(np_density_cvls_beta_cross_term_mpi(
-           kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
-           num_obs, num_reg_unordered, num_reg_ordered,
-           num_reg_continuous, matrix_X_unordered, matrix_X_ordered,
-           matrix_X_continuous, matrix_bandwidth, lambda, operator,
-           kernel_u, kernel_o, num_categories, matrix_categorical_vals,
-           categorical_compress,
-           res, &cv2) != 0)
+         kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
+         num_obs, num_reg_unordered, num_reg_ordered,
+         num_reg_continuous, matrix_X_unordered, matrix_X_ordered,
+         matrix_X_continuous, matrix_bandwidth, lambda, vector_scale_factor, operator,
+         kernel_u, kernel_o, num_categories, matrix_categorical_vals,
+         categorical_compress,
+         res, &cv2) != 0)
         goto cleanup_density_convolution_cv;
     } else if(np_density_cvls_beta_cross_term(
                 kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
                 num_obs, num_reg_unordered, num_reg_ordered,
                 num_reg_continuous, matrix_X_unordered, matrix_X_ordered,
-                matrix_X_continuous, matrix_bandwidth, lambda, operator,
+                matrix_X_continuous, matrix_bandwidth, lambda, vector_scale_factor, operator,
                 kernel_u, kernel_o, num_categories, matrix_categorical_vals,
                 categorical_compress,
                 res, &cv2) != 0) {
@@ -57895,6 +57970,7 @@ typedef struct {
   int *kernel_unordered;
   int *kernel_ordered;
   NPBetaScaledRowContext scaled_row;
+  NPBetaLooGeometry loo_geometry;
 } NPConditionalRouteRowContext;
 
 static void np_conditional_route_row_context_init(
@@ -57912,6 +57988,7 @@ static void np_conditional_route_row_context_clear(
   if(context == NULL)
     return;
   np_beta_scaled_row_context_clear(&context->scaled_row);
+  np_beta_loo_geometry_clear(&context->loo_geometry, FALSE);
   if(context->matrix_bandwidth != NULL)
     free_mat(context->matrix_bandwidth, context->num_continuous);
   free(context->scale_factor);
@@ -57943,7 +58020,8 @@ static int np_conditional_route_bandwidth_prepare(
   double **matrix_continuous_eval,
   double *scale_factor,
   double **matrix_bandwidth,
-  double *lambda)
+  double *lambda,
+  NPBetaLooGeometry *loo_geometry)
 {
   double * const saved_standard_deviation =
     vector_continuous_stddev_extern;
@@ -57954,7 +58032,12 @@ static int np_conditional_route_bandwidth_prepare(
   if(saved_standard_deviation != NULL)
     vector_continuous_stddev_extern =
       saved_standard_deviation + standard_deviation_offset;
-  status = np_beta_continuous_bandwidth_prepare_canonical(
+  status = loo_geometry != NULL ?
+    np_beta_loo_geometry_prepare(
+      loo_geometry, bandwidth_mode, num_train,
+      num_continuous, num_unordered, num_ordered,
+      matrix_continuous_train, scale_factor, matrix_bandwidth, lambda) :
+    np_beta_continuous_bandwidth_prepare_canonical(
     bandwidth_mode, num_train, num_eval,
     num_unordered, num_ordered, num_continuous,
     matrix_continuous_train, matrix_continuous_eval,
@@ -57989,7 +58072,8 @@ static int np_conditional_route_row_context_prepare_general(
   double **matrix_categorical_vals,
   const NPContinuousKernelRoute * const route,
   NPContinuousKernelDerivativeDiagnostics * const diagnostics,
-  const int categorical_compress)
+  const int categorical_compress,
+  const int leave_one_out)
 {
   const int num_continuous = is_x_side ?
     num_reg_continuous : num_var_continuous;
@@ -58009,6 +58093,8 @@ static int np_conditional_route_row_context_prepare_general(
      (operator_code != OP_NORMAL && operator_code != OP_INTEGRAL) ||
      (bandwidth_mode != BW_FIXED && bandwidth_mode != BW_GEN_NN &&
       bandwidth_mode != BW_ADAP_NN) ||
+     (leave_one_out && (num_train != num_eval ||
+       matrix_continuous_train != matrix_continuous_eval)) ||
      (categorical_compress != 0 && categorical_compress != 1))
     return 1;
 
@@ -58054,7 +58140,9 @@ static int np_conditional_route_row_context_prepare_general(
        num_unordered, num_ordered, num_continuous,
        matrix_continuous_train, matrix_continuous_eval,
        context->scale_factor,
-       context->matrix_bandwidth, context->lambda) != 0)
+       context->matrix_bandwidth, context->lambda,
+       leave_one_out && bandwidth_mode != BW_FIXED ?
+         &context->loo_geometry : NULL) != 0)
     goto fail_prepare;
   if(np_beta_scaled_row_context_prepare(
        &context->scaled_row, route, diagnostics,
@@ -58099,7 +58187,8 @@ static int np_conditional_route_row_context_prepare(
   double **matrix_categorical_vals,
   const NPContinuousKernelRoute * const route,
   NPContinuousKernelDerivativeDiagnostics * const diagnostics,
-  const int categorical_compress)
+  const int categorical_compress,
+  const int leave_one_out)
 {
   return np_conditional_route_row_context_prepare_general(
     context, is_x_side, bandwidth_mode, num_obs, num_obs,
@@ -58110,7 +58199,7 @@ static int np_conditional_route_row_context_prepare(
     matrix_unordered, matrix_ordered, matrix_continuous,
     OP_NORMAL, vector_scale_factor, num_categories,
     matrix_categorical_vals, route, diagnostics,
-    categorical_compress);
+    categorical_compress, leave_one_out);
 }
 
 /*
@@ -58208,10 +58297,13 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
          matrix_categorical_vals_extern_X,
          execution_context->x_route,
          execution_context->x_diagnostics,
-         execution_context->categorical_compress) != 0)
+         execution_context->categorical_compress, 1) != 0)
       local_fail = 1;
-  } else if(!local_fail && np_conditional_xrow_ctx_prepare_ctx(
-              vector_scale_factor, nn_geometry_context, &legacy_x) != 0) {
+  } else if(!local_fail && (BANDWIDTH_den == BW_ADAP_NN ?
+            np_conditional_xrow_ctx_prepare_adaptive_fold(
+              vector_scale_factor, &legacy_x) != 0 :
+            np_conditional_xrow_ctx_prepare_ctx(
+              vector_scale_factor, nn_geometry_context, &legacy_x) != 0)) {
     local_fail = 1;
   }
 
@@ -58226,11 +58318,16 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
          matrix_categorical_vals_extern_Y,
          execution_context->y_route,
          execution_context->y_diagnostics,
-         execution_context->categorical_compress) != 0)
+         execution_context->categorical_compress, 1) != 0)
       local_fail = 1;
-  } else if(!local_fail && np_conditional_yrow_ctx_prepare_ctx(
+  } else if(!local_fail && (BANDWIDTH_den == BW_ADAP_NN ?
+            np_conditional_yrow_ctx_prepare_adaptive_fold(
               vector_scale_factor, OP_NORMAL,
-              nn_geometry_context, &legacy_y) != 0) {
+              num_categories_extern_Y, matrix_categorical_vals_extern_Y,
+              &legacy_y) != 0 :
+            np_conditional_yrow_ctx_prepare_ctx(
+              vector_scale_factor, OP_NORMAL,
+              nn_geometry_context, &legacy_y) != 0)) {
     local_fail = 1;
   }
 
@@ -58278,6 +58375,10 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
       np_progress_bandwidth_loop_step();
 
     if(beta_x) {
+      if(np_beta_loo_geometry_select(&route_x.loo_geometry, evaluation)) {
+        local_fail = 1;
+        break;
+      }
       if(np_beta_scaled_row_context_fill(
            &route_x.scaled_row, evaluation, NULL, NULL) !=
          NP_CONTINUOUS_ROW_OK) {
@@ -58314,13 +58415,20 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
           xrow[observation] = observation == evaluation ?
             0.0 : xrow[observation]/delete_denominator;
       }
-    } else if(np_conditional_xrow_from_ctx(
+    } else if((BANDWIDTH_den == BW_ADAP_NN &&
+               np_conditional_xrow_ctx_select_adaptive_fold(
+                 &legacy_x, evaluation) != 0) ||
+              np_conditional_xrow_from_ctx(
                 &legacy_x, evaluation, xrow) != 0) {
       local_fail = 1;
       break;
     }
 
     if(beta_y) {
+      if(np_beta_loo_geometry_select(&route_y.loo_geometry, evaluation)) {
+        local_fail = 1;
+        break;
+      }
       if(np_beta_scaled_row_context_fill(
            &route_y.scaled_row, evaluation, NULL,
            &y_common_log_scale) != NP_CONTINUOUS_ROW_OK) {
@@ -58329,6 +58437,11 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
       }
       active_yrow = route_y.row;
     } else {
+      if(BANDWIDTH_den == BW_ADAP_NN &&
+         np_conditional_yrow_ctx_select_adaptive_fold(&legacy_y, evaluation) != 0) {
+        local_fail = 1;
+        break;
+      }
       if(np_conditional_yrow_from_ctx(
            &legacy_y, evaluation, yrow) != 0) {
         local_fail = 1;
@@ -58479,7 +58592,7 @@ static int np_conditional_cvls_route_context_prepare(
          matrix_X_continuous_train_extern, vector_scale_factor,
          num_categories_extern_X, matrix_categorical_vals_extern_X,
          execution_context->x_route, execution_context->x_diagnostics,
-         execution_context->categorical_compress) != 0)
+         execution_context->categorical_compress, 0) != 0)
       goto fail_prepare;
   } else if(np_conditional_xrow_ctx_prepare(
               vector_scale_factor, &context->legacy_x) != 0) {
@@ -58508,7 +58621,7 @@ static int np_conditional_cvls_route_context_prepare(
          response_operator, vector_scale_factor,
          num_categories_extern_Y, matrix_categorical_vals_extern_Y,
          execution_context->y_route, execution_context->y_diagnostics,
-         execution_context->categorical_compress) != 0)
+         execution_context->categorical_compress, 0) != 0)
       goto fail_prepare;
   } else if(response_operator == OP_NORMAL) {
     if(np_conditional_yrow_ctx_prepare(

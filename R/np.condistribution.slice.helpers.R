@@ -6,10 +6,7 @@
 }
 
 .np_condist_is_already_proper_by_design <- function(bws) {
-  spec <- .np_condist_engine_spec(bws)
-
-  identical(spec$reg.engine, "lc") ||
-    (identical(spec$reg.engine, "lp") && all(spec$degree.engine == 0L))
+  .np_conditional_proper_certificate(bws, cdf = TRUE)
 }
 
 .np_condist_slice_dispatch_enabled <- function() {

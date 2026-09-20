@@ -1600,9 +1600,9 @@ npcopula.default <- function(bws,
         x.q <- quantile(x.marginal,quantile.seq)
         x.eval <- sort(c(seq(x.er[1],x.er[2],length=round(n.quasi.inv/2)),x.q))
       } else {
-        x.u[,j] <- ordered(x.u[,j],levels=levels(x.marginal))
+        x.u[,j] <- .np_factor_with_levels(x.u[,j],levels=levels(x.marginal),ordered=TRUE)
         x.q <- sapply(seq_len(round(n.quasi.inv/2)), function(i) { uocquantile(x.marginal, quantile.seq[i]) })
-        x.eval <- sort(ordered(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal)))
+        x.eval <- sort(.np_factor_with_levels(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal),ordered=TRUE))
       }
       tdat <- .npcopula_marginal_data(bws, data, j)
       edat <- .npcopula_marginal_eval_data(bws, data.frame(x.eval), 1L)
@@ -1622,7 +1622,7 @@ npcopula.default <- function(bws,
     progress <- .npcopula_progress_step(progress, stage, "expand u grid")
     x.u <- expand.grid(data.frame(x.u))
     for (k in seq_len(ncol(x.u))) {
-      if(is.ordered(data[,k])) x.u[,k] <- ordered(x.u[,k],levels=levels(data[,k]))
+      if(is.ordered(data[,k])) x.u[,k] <- .np_factor_with_levels(x.u[,k],levels=levels(data[,k]),ordered=TRUE)
     }
     if(!density) {
       stage <- stage + 1L

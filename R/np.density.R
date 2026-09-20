@@ -51,7 +51,7 @@ npudens.formula <-
 
     tdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
 
-    has.eval <- !is.null(newdata)
+    has.eval <- !is.null(newdata) && !("edat" %in% names(dots))
     if (has.eval) {
       npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
@@ -70,7 +70,8 @@ npudens.formula <-
     ud.args$bws <- bws
     ev <- do.call(npudens, c(ud.args, dots))
 
-    ev$omit <- attr(umf,"na.action")
+    ev$omit <- .np_formula_output_action(ev, umf, has.eval)
+    eval.omit <- if (isTRUE(ev$trainiseval)) train.omit else ev$omit
     ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
     ev$train.rows.omit <- if (length(train.omit)) train.omit else NA

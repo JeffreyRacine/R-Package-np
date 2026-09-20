@@ -124,7 +124,7 @@ npindex.formula <-
           tydat <- model.response(tmf)
           txdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
         }
-        has.eval <- !is.null(newdata)
+        has.eval <- !is.null(newdata) && !("exdat" %in% names(dots))
         if (has.eval) {
           if (!y.eval){
             npValidateNewdataFormula(newdata, tt, include.response = FALSE)
@@ -179,7 +179,7 @@ npindex.formula <-
             ev$bws <- .np_bws_retain_fit_frame(ev$bws, tmf)
         }
 
-        ev$omit <- attr(umf,"na.action")
+        ev$omit <- .np_formula_output_action(ev, umf, has.eval)
         ev$rows.omit <- as.vector(ev$omit)
         ev$nobs.omit <- length(ev$rows.omit)
 
@@ -660,6 +660,7 @@ npindex.sibandwidth <-
     txdat <- toFrame(txdat)
     if (!(is.vector(tydat) || is.factor(tydat)))
       stop("'tydat' must be a vector or a factor")
+    .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
     tydat <-
       if (is.factor(tydat))
@@ -757,6 +758,8 @@ npindex.sibandwidth <-
 
     txdat <- txdat[keep.rows,,drop = FALSE]
     tydat <- tydat[keep.rows]
+    if (no.ex && !no.ey)
+      eydat <- eydat[keep.rows]
 
     if (!no.ex){
       keep.eval <- rep_len(TRUE, nrow(exdat))
@@ -828,7 +831,7 @@ npindex.sibandwidth <-
     if(no.ex) {
       index.eval <- index
       exdat <- txdat
-      eydat <- tydat
+      if (no.ey) eydat <- tydat
     } else {
       index.eval <- exdat %*% bws$beta
     }
@@ -1667,6 +1670,7 @@ npindex.sibandwidth <-
       ev.args$fit.mcfadden <- fit.mcfadden
     }
     ev <- do.call(singleindex, ev.args)
+    ev$eval.rows.omit <- if (no.ex) integer(0) else which(!keep.eval)
     fit.elapsed <- proc.time()[3] - fit.start
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
     total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)

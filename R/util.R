@@ -1247,12 +1247,16 @@ npCategoricalFirstDifferenceFrames <- function(exdat, index, where) {
   }
 
   lower <- upper <- exdat
-  lower[[index]] <- factor(
+  lower[[index]] <- .np_factor_with_levels(
     lev[lower.code], levels = lev, ordered = is.ordered(x)
   )
-  upper[[index]] <- factor(
+  upper[[index]] <- .np_factor_with_levels(
     lev[upper.code], levels = lev, ordered = is.ordered(x)
   )
+  if (anyNA(lev)) {
+    is.na(lower[[index]]) <- is.na(code)
+    is.na(upper[[index]]) <- is.na(code)
+  }
 
   list(lower = lower, upper = upper)
 }
@@ -3313,6 +3317,24 @@ coarseclass <- function(a) {
 
 # Return omissions in the current input, not historical indices left by an
 # earlier na.omit/na.exclude call. Do not alter the caller's restoration map.
+.np_formula_output_action <- function(object, frame, formula.eval) {
+  if (formula.eval || isTRUE(object[["trainiseval", exact = TRUE]]))
+    return(attr(frame, "na.action", exact = TRUE))
+  # External native rows belong to the native owner, never the training frame.
+  # Its established policy omits incomplete rows; do not inherit na.exclude.
+  omitted <- object[["eval.rows.omit", exact = TRUE]]
+  if (!length(omitted) || (length(omitted) == 1L && is.na(omitted)))
+    return(NULL)
+  structure(as.integer(omitted), class = "omit")
+}
+
+.np_require_paired_rows <- function(a, b, a.name, b.name) {
+  if (NROW(a) != NROW(b))
+    stop(sprintf("'%s' and '%s' must have the same number of rows", a.name, b.name),
+         call. = FALSE)
+  invisible(NULL)
+}
+
 .np_current_rows_omit <- function(frame) {
   if (!is.null(attr(frame, "na.action", exact = TRUE)))
     attr(frame, "na.action") <- NULL
@@ -3339,16 +3361,28 @@ toFrame <- function(frame) {
 }
 
 
+.np_factor_with_levels <- function(x, levels, ordered = is.ordered(x)) {
+  if (!anyNA(levels))
+    return(factor(x, levels = levels, ordered = ordered))
+  # A missing label may name a valid category. A missing factor code remains
+  # a missing observation: converting through character would conflate them.
+  lev <- base::levels(factor(character(), levels = levels, exclude = NULL))
+  codes <- if (is.factor(x))
+    match(base::levels(x), lev)[as.integer(x)] else match(as.character(x), lev)
+  structure(codes, levels = lev, names = names(x),
+            class = if (ordered) c("ordered", "factor") else "factor")
+}
+
 cast <- function(a, b, same.levels = TRUE){
   if(is.ordered(b)){
     if(same.levels)
-      ordered(a, levels = levels(b))
+      .np_factor_with_levels(a, levels = levels(b), ordered = TRUE)
     else
       ordered(a)
   }   
   else if(is.factor(b)){
     if(same.levels)
-      factor(a, levels = levels(b))
+      .np_factor_with_levels(a, levels = levels(b), ordered = FALSE)
     else
       factor(a)
   }
@@ -3409,7 +3443,7 @@ adjustLevels <- function(data, dati, allowNewCells = FALSE){
             .np_warning(paste("more than one 'new' category is redundant when estimating on unordered data.\n",
                           "training data categories: ", paste(dati$all.lev[[i]], collapse=" "),"\n",
                           "redundant estimation data categories: ", paste(newCats, collapse=" "), "\n", sep=""))
-          data[,i] <- factor(data[,i], levels = c(dati$all.lev[[i]], newCats))
+          data[,i] <- .np_factor_with_levels(data[,i], levels = c(dati$all.lev[[i]], newCats))
         } else {
           if (dati$inumord[i]){
             if (!isNum(newCats))
@@ -3422,15 +3456,16 @@ adjustLevels <- function(data, dati, allowNewCells = FALSE){
                        "categorical, qualitative variable is not supported.\n"))
           }
 
-          data[,i] <- ordered(data[,i], levels = sort(as.numeric(c(dati$all.lev[[i]], newCats))))
+          data[,i] <- .np_factor_with_levels(data[,i],
+            levels = sort(as.numeric(c(dati$all.lev[[i]], newCats))), ordered = TRUE)
         }
       } else {
-        data[,i] <- factor(data[,i], levels = dati$all.lev[[i]])
+        data[,i] <- .np_factor_with_levels(data[,i], levels = dati$all.lev[[i]])
       }
     } else {
       if (!all(is.element(levels(data[,i]), dati$all.lev[[i]])))
         stop("data contains unknown factors (wrong dataset provided?)")
-      data[,i] <- factor(data[,i], levels = dati$all.lev[[i]])
+      data[,i] <- .np_factor_with_levels(data[,i], levels = dati$all.lev[[i]])
     }
   }
 
@@ -5103,10 +5138,11 @@ W.lp <- function(xdat = NULL,
 
     ## Local constant OR no continuous variables
 
+    constant <- if (gradient.compute && any(gradient.vec > 0L)) 0 else 1
     if(is.null(exdat)) {
-      return(matrix(1,nrow=nrow(as.data.frame(xdat)),ncol=1))
+      return(matrix(constant,nrow=nrow(as.data.frame(xdat)),ncol=1))
     } else {
-      return(matrix(1,nrow=nrow(as.data.frame(exdat)),ncol=1))
+      return(matrix(constant,nrow=nrow(as.data.frame(exdat)),ncol=1))
     }
 
   } else {
@@ -5118,7 +5154,6 @@ W.lp <- function(xdat = NULL,
     } else {
       res <- rep.int(1,nrow(exdat.numeric))
     }
-    res.deriv <- 1
     if(degree[1] > 0) {
       res <- cbind(1, mypoly(x=xdat.numeric[,1],
                              ex=exdat.numeric[,1],
@@ -5128,8 +5163,6 @@ W.lp <- function(xdat = NULL,
                              Bernstein=Bernstein,
                              complete.glp=identical(basis, "glp")))[, 1 + z.noi[, 1]]
 
-      if(gradient.compute && gradient.vec[1] != 0) res.deriv <- cbind(1,matrix(NA,1,degree[1]))[, 1 + z.noi[, 1],drop=FALSE]
-      if(gradient.compute && gradient.vec[1] == 0) res.deriv <- cbind(1,matrix(0,1,degree[1]))[, 1 + z.noi[, 1],drop=FALSE]
     }
     if(k > 1) for (i in 2:k) if(degree[i] > 0) {
       res <- res * cbind(1, mypoly(x=xdat.numeric[,i],
@@ -5139,8 +5172,6 @@ W.lp <- function(xdat = NULL,
                                    r=gradient.vec[i],
                                    Bernstein=Bernstein,
                                    complete.glp=identical(basis, "glp")))[, 1 + z.noi[, i]]
-      if(gradient.compute && gradient.vec[i] != 0) res.deriv <- res.deriv * cbind(1,matrix(NA,1,degree[i]))[, 1 + z.noi[, i],drop=FALSE]
-      if(gradient.compute && gradient.vec[i] == 0) res.deriv <- res.deriv *cbind(1,matrix(0,1,degree[i]))[, 1 + z.noi[, i],drop=FALSE]
     }
 
     if(is.null(exdat)) {
@@ -5148,13 +5179,18 @@ W.lp <- function(xdat = NULL,
     } else {
       res <- matrix(res,nrow=NROW(exdat))
     }
-    if(gradient.compute) res.deriv <- matrix(res.deriv,nrow=1)
     colnames(res) <- apply(z.noi, 1L, function(x) paste(x, collapse = "."))
-    if(gradient.compute) colnames(res.deriv) <- apply(z.noi, 1L, function(x) paste(x, collapse = "."))
 
     if(gradient.compute) {
-      res[,!is.na(as.numeric(res.deriv))] <- 0
-      return(cbind(0,res))
+      # A constant factor on any differentiated axis annihilates the product.
+      # Nonconstant Bernstein column indices are not polynomial degrees;
+      # mypoly, not this mask, owns their within-axis derivatives.
+      axes <- which(gradient.vec > 0L)
+      if (length(axes)) {
+        zero <- rowSums(z.noi[, axes, drop = FALSE] == 0L) > 0L
+        res[, zero] <- 0
+      }
+      return(cbind(if (length(axes)) 0 else 1,res))
     } else {
       return(cbind(1,res))
     }

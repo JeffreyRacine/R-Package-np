@@ -388,7 +388,10 @@ test_that("wider LP NN objectives share one topology-neutral MPI owner", {
     "np_reghat_lp_workspace_influence_row(",
     fixed = TRUE
   )
-  expect_match(body, "np_lp_delete_denominator(", fixed = TRUE)
+  expect_false(grepl("np_lp_delete_denominator(", body, fixed = TRUE))
+  expect_match(body, "np_beta_loo_geometry_prepare(", fixed = TRUE)
+  expect_match(body, "np_beta_loo_geometry_select(", fixed = TRUE)
+  expect_match(body, "call->bwm == RBWM_CVLS ?", fixed = TRUE)
   expect_match(
     body,
     "contributions[num_obs + evaluation] = leverage;",
@@ -405,8 +408,8 @@ test_that("wider LP NN objectives share one topology-neutral MPI owner", {
     "np_beta_continuous_bandwidth_prepare_canonical(\n       call->bandwidth_mode",
     fixed = TRUE
   )
-  expect_false(grepl("np_beta_scaled_row_context_fill_omitting", body,
-                     fixed = TRUE))
+  expect_match(body, "np_beta_scaled_row_context_fill_omitting(", fixed = TRUE)
+  expect_match(body, "call->bwm == RBWM_CVLS ? evaluation : -1", fixed = TRUE)
   expect_false(grepl("alloc_matd(num_obs, num_obs)", body, fixed = TRUE))
   expect_false(grepl("diag(num_obs)", body, fixed = TRUE))
 })

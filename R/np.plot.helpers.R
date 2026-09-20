@@ -9217,7 +9217,7 @@
 .np_con_make_kbandwidth_x <- function(bws, xdat) {
   xdat <- toFrame(xdat)
   kbandwidth.numeric(
-    bw = bws$xbw,
+    bw = .npcdhat_physical_bandwidth(bws, "x"),
     bwscaling = FALSE,
     # npksum helper constructors require raw bandwidths; bwscaling flags are
     # non-fit-defining here and are intentionally normalized to FALSE.
@@ -9250,7 +9250,8 @@
   }
 
   kbandwidth.numeric(
-    bw = c(bws$xbw, bws$ybw),
+    bw = c(.npcdhat_physical_bandwidth(bws, "x"),
+           .npcdhat_physical_bandwidth(bws, "y")),
     bwscaling = FALSE,
     # npksum helper constructors require raw bandwidths; bwscaling flags are
     # non-fit-defining here and are intentionally normalized to FALSE.
@@ -9911,7 +9912,7 @@
   iuno <- bws[[if (xside) "ixuno" else "iyuno", exact = TRUE]]
   iord <- bws[[if (xside) "ixord" else "iyord", exact = TRUE]]
   dati <- bws[[if (xside) "xdati" else "ydati", exact = TRUE]]
-  bw <- bws[[if (xside) "xbw" else "ybw", exact = TRUE]]
+  bw <- .npcdhat_physical_bandwidth(bws, side)
   ukertype <- bws[[if (xside) "uxkertype" else "uykertype", exact = TRUE]]
   okertype <- bws[[if (xside) "oxkertype" else "oykertype", exact = TRUE]]
   lower <- bws[[if (xside) "cxkerlb" else "cykerlb", exact = TRUE]]
@@ -11615,10 +11616,12 @@ plotFactor <- function(f, y, ...){
   beta.kernel <- identical(bws$cxkertype, "beta") ||
     identical(bws$cykertype, "beta")
 
+  native.xbw <- .npcdhat_physical_bandwidth(bws, "x")
+  native.ybw <- .npcdhat_physical_bandwidth(bws, "y")
   myopti <- list(
     num_obs_train = tnrow,
     num_obs_eval = enrow,
-    int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
+    int_LARGE_SF = SF_ARB,
     BANDWIDTH_den_extern = switch(bws$type,
       fixed = BW_FIXED,
       generalized_nn = BW_GEN_NN,
@@ -11685,9 +11688,9 @@ plotFactor <- function(f, y, ...){
     as.double(eyuno), as.double(eyord), as.double(eycon),
     as.double(exuno), as.double(exord), as.double(excon),
     as.double(c(
-      bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-      bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-      bws$xbw[bws$ixuno], bws$xbw[bws$ixord]
+      native.xbw[bws$ixcon], native.ybw[bws$iycon],
+      native.ybw[bws$iyuno], native.ybw[bws$iyord],
+      native.xbw[bws$ixuno], native.xbw[bws$ixord]
     )),
     as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
     as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
@@ -16016,8 +16019,14 @@ compute.default.error.range <- function(center, err) {
     new.values[j] <- .np_plot_cat_lambda_pilot(current[j], upper, factor)
   }
 
+  raw.values <- new.values[cat.idx]
+  if (isTRUE(bws$scaling)) {
+    if (length(bws$ncatfac) != 1L || !is.finite(bws$ncatfac) || bws$ncatfac <= 0)
+      stop("scaled bootstrap pilot requires a valid categorical scale", call. = FALSE)
+    raw.values <- raw.values / bws$ncatfac
+  }
   if (!is.null(bws[[raw.field]]) && length(bws[[raw.field]]) >= max(cat.idx))
-    bws[[raw.field]][cat.idx] <- new.values[cat.idx]
+    bws[[raw.field]][cat.idx] <- raw.values
   if (side == "x") {
     if (!is.null(bws$bandwidth$x) && length(bws$bandwidth$x) >= max(cat.idx))
       bws$bandwidth$x[cat.idx] <- new.values[cat.idx]
@@ -16185,7 +16194,7 @@ compute.default.error.range <- function(center, err) {
 
   out <- bws
   out$bw[icon] <- out$bw[icon] * pilot$factor
-  out$bandwidth$x <- out$bw
+  out$bandwidth$x[icon] <- out$bandwidth$x[icon] * pilot$factor
   if (!is.null(out$sfactor$x) && length(out$sfactor$x) == length(out$bw)) {
     out$sfactor$x[icon] <- out$sfactor$x[icon] * pilot$factor
   }
@@ -16673,7 +16682,7 @@ compute.default.error.range <- function(center, err) {
   bw.name <- names(out$bandwidth)[1L]
   if (is.null(bw.name) || !nzchar(bw.name))
     bw.name <- "x"
-  out$bandwidth[[bw.name]] <- out$bw
+  out$bandwidth[[bw.name]][icon] <- out$bandwidth[[bw.name]][icon] * pilot$factor
   if (!is.null(out$sfactor[[bw.name]]) && length(out$sfactor[[bw.name]]) == length(out$bw))
     out$sfactor[[bw.name]][icon] <- out$sfactor[[bw.name]][icon] * pilot$factor
   if (!is.null(out$sumNum[[bw.name]]) && length(out$sumNum[[bw.name]]) == length(out$bw))
@@ -16714,7 +16723,7 @@ compute.default.error.range <- function(center, err) {
     if (!is.numeric(child$bw) || length(child$bw) != length(icon))
       stop("invalid partially linear child bandwidth vector for oversmoothed bootstrap center", call. = FALSE)
     child$bw[icon] <- child$bw[icon] * pilot$factor
-    child$bandwidth$x <- child$bw
+    child$bandwidth$x[icon] <- child$bandwidth$x[icon] * pilot$factor
     if (!is.null(child$sfactor$x) && length(child$sfactor$x) == length(child$bw))
       child$sfactor$x[icon] <- child$sfactor$x[icon] * pilot$factor
     if (!is.null(child$sumNum$x) && length(child$sumNum$x) == length(child$bw))

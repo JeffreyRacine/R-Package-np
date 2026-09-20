@@ -4,7 +4,12 @@
   if (ncol(xeval) == 0L) {
     split(seq_len(nrow(xeval)), factor(rep.int("all", nrow(xeval))), drop = TRUE)
   } else {
-    groups <- do.call(interaction, c(unname(xeval), list(drop = TRUE, lex.order = TRUE)))
+    # factor(numeric) formats labels before matching and may merge distinct
+    # doubles at a large origin. Match the numeric domain before formatting.
+    coded <- lapply(xeval, function(x) {
+      if (is.numeric(x)) match(x, sort(unique(x))) else x
+    })
+    groups <- do.call(interaction, c(unname(coded), list(drop = TRUE, lex.order = TRUE)))
     split(seq_len(nrow(xeval)), groups, drop = TRUE)
   }
 }

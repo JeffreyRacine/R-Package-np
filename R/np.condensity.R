@@ -55,7 +55,7 @@ npcdens.formula <-
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
 
-    has.eval <- !is.null(newdata)
+    has.eval <- !is.null(newdata) && !any(c("exdat", "eydat") %in% names(dots))
     if (has.eval) {
       npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
@@ -74,11 +74,11 @@ npcdens.formula <-
     cd.args$bws <- bws
     ev <- do.call(npcdens, c(cd.args, dots))
 
-    ev$omit <- attr(umf,"na.action")
+    ev$omit <- .np_formula_output_action(ev, umf, has.eval)
     ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
     train.omit <- as.vector(attr(tmf, "na.action"))
-    eval.omit <- if (has.eval) as.vector(attr(umf, "na.action")) else integer(0)
+    eval.omit <- if (isTRUE(ev$trainiseval)) integer(0) else as.vector(ev$omit)
     ev$train.rows.omit <- if (length(train.omit)) train.omit else NA
     ev$train.nobs.omit <- length(train.omit)
     ev$eval.rows.omit <- if (length(eval.omit)) eval.omit else NA
@@ -237,11 +237,13 @@ npcdens.conbandwidth <- function(bws,
 
   txdat = toFrame(txdat)
   tydat = toFrame(tydat)
+  .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
   bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
   if (!no.exy){
     exdat = toFrame(exdat)
     eydat = toFrame(eydat)
+    .np_require_paired_rows(exdat, eydat, "exdat", "eydat")
 
     if (! txdat %~% exdat )
       stop("'txdat' and 'exdat' are not similar data frames!")
@@ -476,10 +478,12 @@ npcdens.conbandwidth <- function(bws,
     gradients, glp.gradient.partial, glp.categorical.effects,
     bws, cat.se.demand)
 
+  native.xbw <- .npcdhat_physical_bandwidth(bws, "x")
+  native.ybw <- .npcdhat_physical_bandwidth(bws, "y")
   myopti <- list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,
-      int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
+      int_LARGE_SF = SF_ARB,
       BANDWIDTH_den_extern = switch(bws$type,
           fixed = BW_FIXED,
           generalized_nn = BW_GEN_NN,
@@ -541,9 +545,9 @@ npcdens.conbandwidth <- function(bws,
           as.double(txuno), as.double(txord), as.double(txcon),
           as.double(eyuno), as.double(eyord), as.double(eycon),
           as.double(exuno), as.double(exord), as.double(excon),
-          as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                      bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                      bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+          as.double(c(native.xbw[bws$ixcon], native.ybw[bws$iycon],
+                      native.ybw[bws$iyuno], native.ybw[bws$iyord],
+                      native.xbw[bws$ixuno], native.xbw[bws$ixord])),
           as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
           as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
           as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),

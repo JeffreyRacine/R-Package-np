@@ -218,6 +218,9 @@ npplreg.call <-
     xdat <- toFrame(xdat)
     zdat <- toFrame(zdat)
 
+    if (missing(exdat) && !missing(ezdat)) exdat <- xdat
+    if (!missing(exdat) && missing(ezdat)) ezdat <- zdat
+
     keep.rows <- rep_len(TRUE, nrow(xdat))
     rows.omit <- attr(na.omit(data.frame(xdat, ydat, zdat)), "na.action")
     if (length(rows.omit) > 0L)
@@ -234,6 +237,7 @@ npplreg.call <-
     if (!no.exz) {
       exdat <- toFrame(exdat)
       ezdat <- toFrame(ezdat)
+      .np_require_paired_rows(exdat, ezdat, "exdat", "ezdat")
 
       keep.eval <- rep_len(TRUE, nrow(exdat))
       rows.omit <- attr(na.omit(data.frame(exdat, ezdat)), "na.action")
@@ -513,7 +517,12 @@ npplreg.plbandwidth <-
 
     txdat = toFrame(txdat)
     tzdat = toFrame(tzdat)
+    .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
+    .np_require_paired_rows(txdat, tzdat, "txdat", "tzdat")
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat, zdat = tzdat)
+
+    if (missing(exdat) && !missing(ezdat)) exdat <- txdat
+    if (!missing(exdat) && missing(ezdat)) ezdat <- tzdat
     
     ## catch and destroy NA's, part 1
     keep.rows <- rep_len(TRUE, nrow(txdat))
@@ -539,9 +548,18 @@ npplreg.plbandwidth <-
     no.exz = missing(exdat)
     no.ey = missing(eydat)
 
+    if (no.exz && !no.ey) {
+      if (length(eydat) != length(keep.rows))
+        stop("'eydat' must have one value per original training row", call. = FALSE)
+      eydat <- eydat[keep.rows]
+    }
+
     if (!no.exz){
       exdat = toFrame(exdat)
       ezdat = toFrame(ezdat)
+      .np_require_paired_rows(exdat, ezdat, "exdat", "ezdat")
+      if (!no.ey)
+        .np_require_paired_rows(exdat, eydat, "exdat", "eydat")
       exdat.full <- exdat
       ezdat.full <- ezdat
 

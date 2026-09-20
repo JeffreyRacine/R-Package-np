@@ -395,6 +395,7 @@
   object$proper.requested <- args$proper.requested
   object$proper.applied <- FALSE
   object$proper.method <- if (isTRUE(args$proper.requested)) args$proper.method else NULL
+  object$proper.control <- if (isTRUE(args$proper.requested)) args$proper.control else NULL
   object$condist.raw <- NULL
   object$proper.info <- .np_condist_make_reason_info(
     reason = if (isTRUE(args$proper.requested)) "pending" else "not_requested",

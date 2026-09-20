@@ -273,7 +273,7 @@ npreg.formula <-
     response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
     txdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
-    has.eval <- !is.null(newdata)
+    has.eval <- !is.null(newdata) && !("exdat" %in% names(dots))
     if (has.eval) {
       if (!y.eval){
         npValidateNewdataFormula(newdata, tt, include.response = FALSE)
@@ -357,11 +357,11 @@ npreg.formula <-
       return(ev)
     }
 
-    ev$omit <- attr(umf,"na.action")
+    ev$omit <- .np_formula_output_action(ev, umf, has.eval)
     ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
     train.omit <- as.vector(attr(tmf, "na.action"))
-    eval.omit <- if (has.eval) as.vector(attr(umf, "na.action")) else integer(0)
+    eval.omit <- if (isTRUE(ev$trainiseval)) integer(0) else as.vector(ev$omit)
     ev$train.rows.omit <- if (length(train.omit)) train.omit else NA
     ev$train.nobs.omit <- length(train.omit)
     ev$eval.rows.omit <- if (length(eval.omit)) eval.omit else NA
@@ -776,6 +776,8 @@ npreg.rbandwidth <-
 
     txdat <- txdat[keep.rows,,drop = FALSE]
     tydat <- tydat[keep.rows]
+    if (no.ex && !no.ey)
+      eydat <- eydat[keep.rows]
     resid.response <- tydat
 
     ## no.ex = missing(exdat)

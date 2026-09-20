@@ -181,6 +181,12 @@ These arguments control optional post-estimation properization of the fitted con
     a logical value specifying whether to post-process the estimated
     conditional distribution so that it is monotone and bounded on the
     evaluation grid. Defaults to \code{FALSE}.
+    Local-constant or degree-zero fits bypass correction only when their
+    kernels and bandwidth geometry guarantee a convex mixture of proper
+    response CDFs. Signed kernels and generalized-nearest-neighbour response
+    bandwidths do not have this guarantee. Requested correction then uses
+    the existing supported grid or slice procedure, with its additional
+    evaluation cost and support requirements.
   }
 
 
@@ -188,6 +194,11 @@ These arguments control optional post-estimation properization of the fitted con
     a named list of control parameters for properization. Supported
     entries are \code{tol}, \code{grid.check}, \code{store.raw}, and
     \code{fail.on.unsupported}.
+    Resolved controls are retained in fitted objects and inherited by
+    \code{predict()} and \code{plot()} unless explicitly replaced. An
+    explicit control list replaces the retained list; unspecified entries
+    then use their defaults. Prediction still errors on unsupported
+    correction unless \code{fail.on.unsupported=FALSE} is explicitly supplied.
   }
 
 

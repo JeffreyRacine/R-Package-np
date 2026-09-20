@@ -95,7 +95,7 @@
       )
     } else {
       support <- .np_cat_profile_code_matrix(data.frame(
-        factor(levels(dat[[j]]),
+        .np_factor_with_levels(levels(dat[[j]]),
           levels = levels(dat[[j]]),
           ordered = is.ordered(dat[[j]])
         )
@@ -159,7 +159,7 @@
           replace = TRUE, prob = probs
         )
       }
-      out[[j]] <- factor(levels(side$data[[j]])[result],
+      out[[j]] <- .np_factor_with_levels(levels(side$data[[j]])[result],
         levels = levels(side$data[[j]]), ordered = is.ordered(side$data[[j]])
       )
     }

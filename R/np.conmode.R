@@ -274,7 +274,9 @@ npconmode.condbandwidth <-
   out <- rep(NA_character_, length(indices))
   valid <- indices > 0L
   out[valid] <- as.character(levels[indices[valid]])
-  factor(out, levels = as.character(levels), ordered = ordered)
+  out <- .np_factor_with_levels(out, levels = as.character(levels), ordered = ordered)
+  if (anyNA(levels)) is.na(out) <- !valid
+  out
 }
 
 .npConmodeOmitLength <- function(omit) {
@@ -294,9 +296,11 @@ npconmode.condbandwidth <-
   omit <- as.integer(omit)
   keep <- seq_len(NROW(x) + length(omit))[-omit]
   if (is.factor(x)) {
-    out <- factor(rep(NA_character_, length(x) + length(omit)),
+    out <- .np_factor_with_levels(rep(NA_character_, length(x) + length(omit)),
                   levels = levels(x), ordered = is.ordered(x))
+    if (anyNA(levels(x))) is.na(out) <- rep.int(TRUE, length(out))
     out[keep] <- x
+    if (anyNA(levels(x))) is.na(out)[keep[is.na(x)]] <- TRUE
     attr(out, "na.action") <- NULL
     return(out)
   }
@@ -573,9 +577,9 @@ npconmode.conbandwidth <-
       stop("'tydat' must consist of one (1) discrete variable")
 
     if(no.ey)
-      efac <- factor(bws$ydati$all.lev[[1]],levels = bws$ydati$all.lev[[1]], ordered = is.ordered(tydat[,1]))
+      efac <- .np_factor_with_levels(bws$ydati$all.lev[[1]],levels = bws$ydati$all.lev[[1]], ordered = is.ordered(tydat[,1]))
     else
-      efac <- factor(union(bws$ydati$all.lev[[1]], levels(eydat[,1])),
+      efac <- .np_factor_with_levels(union(bws$ydati$all.lev[[1]], levels(eydat[,1])),
                      levels = union(bws$ydati$all.lev[[1]], levels(eydat[,1])), ordered = is.ordered(tydat[,1]))
 
     nlev <- nlevels(efac)
