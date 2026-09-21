@@ -52801,7 +52801,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                            NULL,
                            matrix_bandwidth,
                            lambda,
-                           exact_beta_route ? NULL : nn_geometry_context,
+                           nn_geometry_context,
                            NULL,
                            &nn_geometry_status)==1){
     if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
