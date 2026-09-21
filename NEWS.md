@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Automatic fixed-bandwidth beta density CVLS now requires a positive
+  `scale.factor.search.lower` when the complete response sample contains
+  repeated observations at a declared endpoint. This conservative search
+  restriction leaves the default 0.1 floor, manual evaluation, and
+  nearest-neighbor searches unchanged; it does not insert a floor or jitter.
+
 * Beta density CVLS quadrature uses the interior-limit contribution of boundary
   observations instead of assigning positive integration weight to isolated
   endpoint spikes. This applies to unconditional and conditional objectives,

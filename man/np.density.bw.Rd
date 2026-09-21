@@ -479,6 +479,16 @@ or standard-deviation factors.
   supplied for storage with \code{bandwidth.compute = FALSE} are not
   rewritten by the search floor.
 
+  For automatic fixed-bandwidth CVLS with a beta kernel,
+  repeated complete observations at a declared endpoint require an
+  explicitly positive resolved \code{scale.factor.search.lower}. The default
+  \code{0.1} already satisfies this requirement. Endpoint repetitions can
+  cause the criterion to prefer vanishing bandwidths; this is a conservative
+  search-admissibility policy, not a claim that every such sample has a
+  divergent criterion. Manual bandwidth evaluation and nearest-neighbor
+  searches remain available. No positive floor is silently substituted for
+  an explicitly requested zero.
+
   Categorical search-start controls such as \code{dfac.init},
   \code{lbd.init}, and \code{hbd.init} have separate semantics and are
   not affected by \code{scale.factor.search.lower}.

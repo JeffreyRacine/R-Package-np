@@ -696,6 +696,40 @@ npResolveScaleFactorLowerBound <- function(value,
   npValidateScaleFactorLowerBound(value, argname = argname)
 }
 
+# Search admission only: repeated response endpoints can make beta CVLS prefer
+# a vanishing bandwidth. This conservative policy is not a divergence theorem
+# for signed LP weights. Keep the positive-floor fast path lazy in the data.
+.np_beta_cvls_search_admission <- function(bws, response, lower, automatic,
+                                           conditional = FALSE,
+                                           companion = NULL,
+                                           where = "density bandwidth search") {
+  if (!automatic || lower > 0 ||
+      !identical(bws[["type"]], "fixed") ||
+      !identical(bws[["method"]], "cv.ls"))
+    return(invisible(NULL))
+  kernel <- if (conditional) bws[["cykertype"]] else bws[["ckertype"]]
+  if (!identical(kernel, "beta"))
+    return(invisible(NULL))
+
+  continuous <- if (conditional) bws[["iycon"]] else bws[["icon"]]
+  if (!any(continuous))
+    return(invisible(NULL))
+  lb <- if (conditional) bws[["cykerlb"]] else bws[["ckerlb"]]
+  ub <- if (conditional) bws[["cykerub"]] else bws[["ckerub"]]
+  response <- toFrame(response)
+  keep <- if (is.null(companion)) complete.cases(response) else
+    complete.cases(response, toFrame(companion))
+  for (j in which(continuous)) {
+    y <- response[[j]][keep]
+    if (sum(y == lb[j]) > 1L || sum(y == ub[j]) > 1L)
+      stop(sprintf(paste0(
+        "%s: automatic fixed-bandwidth beta CVLS with repeated response ",
+        "endpoints requires a positive 'scale.factor.search.lower'; ",
+        "the default is 0.1"), where), call. = FALSE)
+  }
+  invisible(NULL)
+}
+
 npResolveScaleFactorSearchLower <- function(value,
                                             fallback = 0.1,
                                             argname = "scale.factor.search.lower") {

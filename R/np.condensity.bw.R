@@ -420,6 +420,11 @@ npcdensbw.conbandwidth <-
     if (dim(ydat)[1] != dim(xdat)[1])
       stop(paste("number of rows of", "'ydat'", "does not match", "'xdat'"))
 
+    .np_beta_cvls_search_admission(
+      bws, ydat, scale.factor.search.lower, automatic = bandwidth.compute,
+      conditional = TRUE, companion = xdat, where = "npcdensbw"
+    )
+
     if (bandwidth.compute && npBwsolverUsesMads(bwsolver)) {
       bws.regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
       bws.pregtype <- if (is.null(bws$pregtype)) "Local-Constant" else bws$pregtype
@@ -2414,6 +2419,11 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("bwsolver='mads' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
 
+  .np_beta_cvls_search_admission(
+    template, ydat, npGetScaleFactorSearchLower(template), automatic = TRUE,
+    conditional = TRUE, companion = xdat, where = "npcdensbw"
+  )
+
   source <- "explicit"
   reason <- NULL
   setup <- .npcdensbw_nomad_bw_setup(
@@ -3076,6 +3086,11 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
 
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("automatic degree search with search.engine='nomad' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
+
+  .np_beta_cvls_search_admission(
+    template, ydat, npGetScaleFactorSearchLower(template), automatic = TRUE,
+    conditional = TRUE, companion = xdat, where = "npcdensbw"
+  )
 
   setup <- .npcdensbw_nomad_bw_setup(
     xdat = xdat,

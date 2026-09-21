@@ -880,6 +880,11 @@ npudensbw.bandwidth <-
       .npudensbw_method_name(bws, where = "npudensbw")
     else as.character(bws$method)[1L]
 
+    .np_beta_cvls_search_admission(
+      bws, dat.frame, scale.factor.search.lower,
+      automatic = bandwidth.compute && !eval.only, where = "npudensbw"
+    )
+
     if (bandwidth.compute && !eval.only && npBwsolverUsesMads(bwsolver)) {
       return(.npudensbw_run_mads(
         dat = dat.frame,
