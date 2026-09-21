@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Bandwidth selection now reports activity during baseline-reference
+  evaluations without advancing optimizer iteration counts. Native progress
+  callbacks preserve interrupts instead of consuming Ctrl-C.
+
 * Automatic density-equality test bandwidths now use one pooled-sample search
   and the harmonic-mean sample size to rescale its bandwidth. The same physical
   bandwidth is held fixed in both samples and all bootstrap draws. Categorical
