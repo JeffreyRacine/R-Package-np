@@ -5398,6 +5398,17 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
   dbl_memfac_ccdf_extern = myoptd[CBW_MEMFACD];
   bwm_set_scale_factor_lower_bound(myoptd[CBW_SFLOORD]);
   double_bounded_cvls_quadrature_extend_factor_extern = myoptd[CBW_QUAD_EXTD];
+  double_bounded_cvls_quadrature_ratios_extern[0] = myoptd[CBW_QUAD_RATIO_UNIFORMD];
+  double_bounded_cvls_quadrature_ratios_extern[1] = myoptd[CBW_QUAD_RATIO_SAMPLED];
+  double_bounded_cvls_quadrature_ratios_extern[2] = myoptd[CBW_QUAD_RATIO_GLD];
+  for(int component = 0; component < 3; ++component)
+    if(!R_FINITE(double_bounded_cvls_quadrature_ratios_extern[component]) ||
+       double_bounded_cvls_quadrature_ratios_extern[component] < 0.0)
+      goto fail;
+  if(fabs(double_bounded_cvls_quadrature_ratios_extern[0] +
+          double_bounded_cvls_quadrature_ratios_extern[1] +
+          double_bounded_cvls_quadrature_ratios_extern[2] - 1.0) > 1.0e-8)
+    goto fail;
   if (!R_FINITE(double_bounded_cvls_quadrature_extend_factor_extern) ||
       double_bounded_cvls_quadrature_extend_factor_extern <= 0.0)
     goto fail;
