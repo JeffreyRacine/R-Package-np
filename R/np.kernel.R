@@ -340,7 +340,9 @@ npksum.default <-
 
     dim.in = c(twncol, tyncol, enrow)
 
-    dim.out = c(twncol, tyncol, enrow)
+    ## Missing weight/response roles are multiplicative identities in the
+    ## output, although the native input counts above remain zero.
+    dim.out = c(max(1L, twncol), max(1L, tyncol), enrow)
     
     length.out = prod(dim.out[which(dim.out > 0)])
 
