@@ -3318,9 +3318,13 @@ coarseclass <- function(a) {
 
 # Return omissions in the current input, not historical indices left by an
 # earlier na.omit/na.exclude call. Do not alter the caller's restoration map.
-.np_formula_output_action <- function(object, frame, formula.eval) {
+.np_formula_output_action <- function(object, frame, formula.eval,
+                                       native.restored = FALSE) {
   if (formula.eval || isTRUE(object[["trainiseval", exact = TRUE]]))
     return(attr(frame, "na.action", exact = TRUE))
+  # Quantile and class native owners already restore their external rows.
+  if (native.restored)
+    return(NULL)
   # External native rows belong to the native owner, never the training frame.
   # Its established policy omits incomplete rows; do not inherit na.exclude.
   omitted <- object[["eval.rows.omit", exact = TRUE]]
