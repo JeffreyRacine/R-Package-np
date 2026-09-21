@@ -215,6 +215,9 @@ npregivderiv.default <- function(y,
          call.=FALSE)
   }
 
+  if(!is.null(starting.values))
+    .np_quadrature_values(starting.values, .np_quadrature_prepare(z[[1L]]))
+
   ## For all results we need the density function for Z and the
   ## survivor function for Z (1-CDF of Z)
 

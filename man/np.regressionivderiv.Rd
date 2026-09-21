@@ -210,7 +210,10 @@ These arguments control residual smoothing and the initial derivative path.
   omitted, the initialization derivative is obtained from \code{start.from}
   (see details below). A separate \code{zeval} grid is not accepted with a
   supplied initialization because no interpolation rule for the externally
-  supplied derivative has been declared.
+  supplied derivative has been declared. Repeated training values of
+  \code{z} must have identical supplied derivative values; conflicting
+  values do not define a single-valued function and are rejected before
+  bandwidth preparation.
 }
 
   \item{stop.on.increase}{
