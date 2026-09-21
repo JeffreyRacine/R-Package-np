@@ -42,6 +42,20 @@ typedef struct {
   double **adaptive_full;
 } NPNNGeometryContext;
 
+/* Borrowed, call-local geometry for raw delete-one estimator weights. The
+ * public zero-diagonal kernel-sum primitive does not create this context. */
+typedef struct {
+  int num_train;
+  int num_eval;
+  int num_continuous;
+  const int *eval_to_train;
+  double **train;
+  double **primary;
+  double **successor;
+  double **selected;
+  double *scale;
+} NPNNKernelFold;
+
 #include "nn_radius_error.h"
 
 typedef enum {
@@ -527,6 +541,35 @@ int kernel_weighted_sum_np_route(
   const int categorical_compress,
   const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics);
+
+int kernel_weighted_sum_np_fold_route(
+  int *KERNEL_reg, int *KERNEL_unordered_reg, int *KERNEL_ordered_reg,
+  const int BANDWIDTH_reg, const int num_obs_train, const int num_obs_eval,
+  const int num_reg_unordered, const int num_reg_ordered,
+  const int num_reg_continuous, const int leave_one_out,
+  const int leave_one_out_offset, const int kernel_pow,
+  const int bandwidth_divide, const int bandwidth_divide_weights,
+  const int symmetric, const int gather_scatter,
+  const int drop_one_train, const int drop_which_train,
+  const int * const operator, const int permutation_operator,
+  int do_score, int do_ocg, int *bpso, const int suppress_parallel,
+  const int ncol_Y, const int ncol_W, const int int_TREE,
+  const int do_partial_tree, KDT * const kdt, NL * const inl,
+  int * const nld, int * const idx, double **matrix_X_unordered_train,
+  double **matrix_X_ordered_train, double **matrix_X_continuous_train,
+  double **matrix_X_unordered_eval, double **matrix_X_ordered_eval,
+  double **matrix_X_continuous_eval, double **matrix_Y,
+  double **matrix_W, double *sgn, double *vector_scale_factor,
+  int bandwidth_provided, double **matrix_bw_train,
+  double **matrix_bw_eval, double *lambda_pre, int *num_categories,
+  double **matrix_categorical_vals, int **matrix_ordered_indices,
+  double * const restrict weighted_sum,
+  double * const restrict weighted_permutation_sum,
+  double * const restrict kw, double * const restrict pkw,
+  const int categorical_compress,
+  const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+  const NPNNKernelFold *fold);
 
 int kernel_weighted_sum_np_route_power12(
   int *KERNEL_reg, int *KERNEL_unordered_reg, int *KERNEL_ordered_reg,

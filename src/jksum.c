@@ -10015,6 +10015,7 @@ typedef struct {
   const NPContinuousKernelRoute *route;
   NPContinuousKernelDerivativeDiagnostics *diagnostics;
   int categorical_compress;
+  const NPNNKernelFold *fold;
 } NPContinuousKernelExecutionContext;
 
 typedef struct {
@@ -11166,6 +11167,7 @@ typedef struct {
   int *support_rank;
   int support_cap;
   NPLPDesignSupport *support_design;
+  const NPNNKernelFold *fold;
 } NPBetaAbsoluteRouteCall;
 
 typedef struct {
@@ -11719,10 +11721,18 @@ static int np_beta_absolute_route_body(
   }
 
   for(evaluation = 0; evaluation < num_obs_eval; ++evaluation) {
-    const int omitted_observation = leave_one_out ?
-      evaluation + leave_one_out_offset : -1;
+    const int omitted_observation = call->fold != NULL ?
+      call->fold->eval_to_train[evaluation] :
+      (leave_one_out ? evaluation + leave_one_out_offset : -1);
     NPContinuousKernelRowStatus row_status;
     int observation;
+
+    if(call->fold != NULL && bandwidth_mode == BW_ADAP_NN &&
+       np_nn_adaptive_fold_select_row(num_obs_train, num_reg_continuous,
+         call->fold->train, call->fold->primary, call->fold->successor,
+         call->fold->scale, omitted_observation, call->fold->selected) !=
+       NP_NN_GEOMETRY_OK)
+      goto cleanup;
 
     if(has_categories)
       row_status =
@@ -11954,6 +11964,7 @@ static int np_beta_absolute_route_mpi_owner(
   const int original_train_is_eval =
     np_beta_absolute_route_train_is_eval(call);
   NPBetaAbsoluteRouteCall local_call = *call;
+  NPNNKernelFold local_fold;
   NPContinuousKernelDerivativeDiagnostics local_diagnostics = {
     .bad_coordinate = -1,
     .bad_observation = -1,
@@ -12021,6 +12032,12 @@ static int np_beta_absolute_route_mpi_owner(
 
     if(status == 0) {
       local_call.num_obs_eval = evaluation_count;
+      if(call->fold != NULL) {
+        local_fold = *call->fold;
+        local_fold.num_eval = evaluation_count;
+        local_fold.eval_to_train += evaluation_start;
+        local_call.fold = &local_fold;
+      }
       local_call.leave_one_out_train_is_eval = original_train_is_eval;
       local_call.leave_one_out_offset += evaluation_start;
       local_call.matrix_X_continuous_eval = continuous_eval_view;
@@ -13074,6 +13091,58 @@ static int np_regression_hc0_derivative_moments_accumulate(
 # define NP_OUTER_PACK_ADJACENT_HOT_ALIGN
 #endif
 
+/* Partition only the retained tree ranges, then reuse the canonical vector
+ * kernel for each of the two possible donor radii. No dense fold matrix and
+ * no scalar replacement of the kernel arithmetic are needed. */
+static int np_nn_fold_ckernelv(
+  const NPNNKernelFold *fold, int coordinate, int donor, int kernel_code,
+  const double *evaluation, int multiply, double *product, const XL *retained,
+  int divide, double lower, double upper, XL *primary, XL *successor)
+{
+  const double h[2] = {fold->primary[coordinate][donor],
+                       fold->successor[coordinate][donor]};
+  XL *ranges[2] = {primary, successor};
+  const int count = retained == NULL ? 1 : retained->n;
+  primary->n = successor->n = 0;
+  for(int r = 0; r < count; ++r) {
+    const int begin = retained == NULL ? 0 : retained->istart[r];
+    const int end = retained == NULL ? fold->num_eval : begin + retained->nlev[r];
+    for(int i = begin; i < end; ++i) {
+      const int excluded = fold->eval_to_train[i];
+      double radius;
+      if(excluded == donor) {
+        product[i] = 0.0;
+        continue;
+      }
+      const double distance = fabs(fold->train[coordinate][excluded] -
+                                    fold->train[coordinate][donor]) *
+        fold->scale[coordinate];
+      if(np_nn_two_slot_radius_select(h[0], h[1], distance, 1, &radius) != 0 ||
+         !(radius > 0.0))
+        return KWSNP_ERR_BADINVOC;
+      XL *list = ranges[radius == h[0] ? 0 : 1];
+      if(list->n > 0 &&
+         list->istart[list->n-1] + list->nlev[list->n-1] == i)
+        ++list->nlev[list->n-1];
+      else {
+        list->istart[list->n] = i;
+        list->nlev[list->n++] = 1;
+      }
+    }
+  }
+  for(int slot = 0; slot < 2; ++slot) {
+    if(ranges[slot]->n == 0) continue;
+    const double normalization = np_cker_bounded_norm(
+      kernel_code, fold->train[coordinate][donor], h[slot], lower, upper).
+      inverse_mass;
+    np_ckernelv(kernel_code, evaluation, fold->num_eval, multiply,
+                fold->train[coordinate][donor], h[slot], product, ranges[slot],
+                1, 1, 0, divide ? normalization/h[slot] : normalization,
+                0, lower, upper, NULL, NULL);
+  }
+  return 0;
+}
+
 static int NP_OUTER_PACK_ADJACENT_HOT_ALIGN kernel_weighted_sum_np_ctx_ex(
 int * KERNEL_reg,
 int * KERNEL_unordered_reg,
@@ -13156,7 +13225,22 @@ NPPermutationWeightOutput * const pkw_output,
     ((gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE));
   assert(np_gate_ctx_is_sane(gate_ctx));
 
-  if(kernel_execution_context != NULL) {
+  const NPNNKernelFold * const fold = kernel_execution_context == NULL ? NULL :
+    kernel_execution_context->fold;
+  if(fold != NULL) {
+    if(fold->num_train != num_obs_train || fold->num_eval != num_obs_eval ||
+       fold->num_continuous != num_reg_continuous || num_reg_continuous <= 0 ||
+       fold->eval_to_train == NULL || leave_one_out || drop_one_train ||
+       symmetric || gather_scatter || do_score || do_ocg ||
+       permutation_operator != OP_NOOP || dual_power_ctx != NULL ||
+       centered_moment_ctx != NULL || support_rank != NULL ||
+       (kernel_pow != 1 && kernel_pow != 2))
+      return KWSNP_ERR_BADINVOC;
+    for(int d = 0; d < num_reg_continuous + num_reg_unordered + num_reg_ordered; ++d)
+      if(operator[d] != OP_NORMAL) return KWSNP_ERR_BADINVOC;
+  }
+
+  if(kernel_execution_context != NULL && kernel_execution_context->route != NULL) {
     const NPContinuousKernelRoute * const kernel_route =
       kernel_execution_context->route;
     NPContinuousKernelDerivativeDiagnostics * const
@@ -13318,6 +13402,7 @@ NPPermutationWeightOutput * const pkw_output,
           centered_moment_ctx->centered_m2 : NULL,
         .kw = kw,
         .regression_moment_context = NULL,
+        .fold = kernel_execution_context->fold,
         .route_diagnostics = kernel_route_diagnostics,
         .progress = dual_power_ctx != NULL ? dual_power_ctx->progress :
           (centered_moment_ctx != NULL ? centered_moment_ctx->progress : NULL)
@@ -13365,6 +13450,18 @@ NPPermutationWeightOutput * const pkw_output,
 
   int p_nvar;
   const int is_adaptive = (BANDWIDTH_reg == BW_ADAP_NN);
+  const NPNNKernelFold * const adaptive_fold = is_adaptive ? fold : NULL;
+  XL fold_primary = {0}, fold_successor = {0};
+  if(adaptive_fold != NULL) {
+    if(!bandwidth_provided || adaptive_fold->primary == NULL ||
+       adaptive_fold->successor == NULL || adaptive_fold->scale == NULL ||
+       (kw != NULL && bandwidth_divide != bandwidth_divide_weights))
+      return KWSNP_ERR_BADINVOC;
+    fold_primary.istart = (int *)R_alloc((size_t)num_obs_eval, sizeof(int));
+    fold_primary.nlev = (int *)R_alloc((size_t)num_obs_eval, sizeof(int));
+    fold_successor.istart = (int *)R_alloc((size_t)num_obs_eval, sizeof(int));
+    fold_successor.nlev = (int *)R_alloc((size_t)num_obs_eval, sizeof(int));
+  }
 
 #ifdef MPI2
   if(!np_int_padded_count_nonnegative(num_obs_eval,
@@ -14798,7 +14895,8 @@ NPPermutationWeightOutput * const pkw_output,
           if(tree_use_active_dims && (tree_active_n < num_reg_continuous)){
             for(kk = 0; kk < tree_active_n; kk++){
               const int id = tree_active_dims[kk];
-              const double sf = m[id][jbw];
+              const double sf = adaptive_fold == NULL ? m[id][jbw] :
+                adaptive_fold->successor[id][jbw];
               if(!is_adaptive){
                 bb[2*id] = -cksup[KERNEL_reg_np[id]][1];
                 bb[2*id+1] = -cksup[KERNEL_reg_np[id]][0];
@@ -14815,7 +14913,8 @@ NPPermutationWeightOutput * const pkw_output,
             boxSearchNLPartial(kdt, &nls, bb, NULL, pxl, tree_active_dims, tree_active_n);
           } else {
             for(i = 0; i < num_reg_continuous; i++){
-              const double sf = m[i][jbw];
+              const double sf = adaptive_fold == NULL ? m[i][jbw] :
+                adaptive_fold->successor[i][jbw];
               if(!is_adaptive){
                 bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
                 bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -14833,7 +14932,8 @@ NPPermutationWeightOutput * const pkw_output,
           }
         } else {
           for(i = 0; i < num_reg_continuous; i++){
-            const double sf = m[i][jbw];
+            const double sf = adaptive_fold == NULL ? m[i][jbw] :
+              adaptive_fold->successor[i][jbw];
             if(!is_adaptive){
               bb[2*nld[i]] = -cksup[KERNEL_reg_np[i]][1];
               bb[2*nld[i]+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -14939,7 +15039,19 @@ NPPermutationWeightOutput * const pkw_output,
 
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
-    if(lean_reg_cont_loop){
+    if(adaptive_fold != NULL) {
+      for(i = 0, l = 0; i < num_reg_continuous; ++i, ++l) {
+        if(np_nn_fold_ckernelv(adaptive_fold, i, j, KERNEL_reg_np[i],
+             xtc[i], tprod_has_vals, tprod, pxl, bandwidth_divide,
+             vector_ckerlb_extern == NULL ? R_NegInf : vector_ckerlb_extern[i],
+             vector_ckerub_extern == NULL ? R_PosInf : vector_ckerub_extern[i],
+             &fold_primary, &fold_successor) != 0) {
+          status = KWSNP_ERR_BADINVOC;
+          goto cleanup;
+        }
+        tprod_has_vals = 1;
+      }
+    } else if(lean_reg_cont_loop){
 #if NP_ACCEL_GAUSS_COMPILED
       int fused_gaussian_product = 0;
 
@@ -15329,6 +15441,9 @@ NPPermutationWeightOutput * const pkw_output,
     }
 
     /* expand matrix outer product, multiply by kernel weights, etc, do sum */
+
+    if(fold != NULL && !is_adaptive)
+      tprod[fold->eval_to_train[j]] = 0.0;
 
     if (!(drop_one_train && do_psum && (j == drop_which_train))){
       if(support_rank != NULL && support_rank->count < support_rank->cap) {
@@ -16429,7 +16544,7 @@ NPContinuousKernelProgressFunction progress)
     NULL);
 }
 
-int kernel_weighted_sum_np_route(
+int kernel_weighted_sum_np_fold_route(
 int * KERNEL_reg,
 int * KERNEL_unordered_reg,
 int * KERNEL_ordered_reg,
@@ -16485,7 +16600,8 @@ double * const kw,
 double * const pkw,
 const int categorical_compress,
 const NPContinuousKernelRoute * const kernel_route,
-NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
+NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+const NPNNKernelFold * const fold){
   int status = 0;
   const int pkw_blocks = pkw == NULL ? 0 : np_pkw_block_count(
     num_reg_continuous, num_reg_unordered, num_reg_ordered,
@@ -16495,7 +16611,7 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
   NPPermutationWeightOutput * const pkw_output =
     pkw == NULL ? NULL : &pkw_storage;
   const NPContinuousKernelExecutionContext kernel_execution_context = {
-    kernel_route, kernel_route_diagnostics, categorical_compress
+    kernel_route, kernel_route_diagnostics, categorical_compress, fold
   };
   const NP_OuterPackCtx route_outer_pack_ctx = {
     .tree_outer_blas = int_TREE_OUTER_BLAS
@@ -16560,13 +16676,88 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
                                     NULL,
                                     route_outer_pack_ctx.tree_outer_blas ?
                                       &route_outer_pack_ctx : NULL,
-                                    kernel_route == NULL ? NULL :
+                                    (kernel_route == NULL && fold == NULL) ? NULL :
                                       &kernel_execution_context,
                                     NULL,
                                     0,
                                     pkw_output,
                                     NULL);
   return status;
+}
+
+int kernel_weighted_sum_np_route(
+int * KERNEL_reg,
+int * KERNEL_unordered_reg,
+int * KERNEL_ordered_reg,
+const int BANDWIDTH_reg,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+const int leave_one_out,
+const int leave_one_out_offset,
+const int kernel_pow,
+const int bandwidth_divide,
+const int bandwidth_divide_weights,
+const int symmetric,
+const int gather_scatter,
+const int drop_one_train,
+const int drop_which_train,
+const int * const operator,
+const int permutation_operator,
+int do_score,
+int do_ocg,
+int * bpso,
+const int suppress_parallel,
+const int ncol_Y,
+const int ncol_W,
+const int int_TREE,
+const int do_partial_tree,
+KDT * const kdt,
+NL * const inl,
+int * const nld,
+int * const idx,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_continuous_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double **matrix_X_continuous_eval,
+double **matrix_Y,
+double **matrix_W,
+double * sgn,
+double *vector_scale_factor,
+int bandwidth_provided,
+double ** matrix_bw_train,
+double ** matrix_bw_eval,
+double * lambda_pre,
+int *num_categories,
+double **matrix_categorical_vals,
+int ** matrix_ordered_indices,
+double * const weighted_sum,
+double * const weighted_permutation_sum,
+double * const kw,
+double * const pkw,
+const int categorical_compress,
+const NPContinuousKernelRoute * const kernel_route,
+NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
+  return kernel_weighted_sum_np_fold_route(
+    KERNEL_reg, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
+    num_obs_train, num_obs_eval, num_reg_unordered, num_reg_ordered,
+    num_reg_continuous, leave_one_out, leave_one_out_offset, kernel_pow,
+    bandwidth_divide, bandwidth_divide_weights, symmetric, gather_scatter,
+    drop_one_train, drop_which_train, operator, permutation_operator,
+    do_score, do_ocg, bpso, suppress_parallel,
+    ncol_Y, ncol_W, int_TREE, do_partial_tree,
+    kdt, inl, nld, idx,
+    matrix_X_unordered_train, matrix_X_ordered_train, matrix_X_continuous_train, matrix_X_unordered_eval,
+    matrix_X_ordered_eval, matrix_X_continuous_eval, matrix_Y, matrix_W,
+    sgn, vector_scale_factor, bandwidth_provided, matrix_bw_train,
+    matrix_bw_eval, lambda_pre, num_categories, matrix_categorical_vals,
+    matrix_ordered_indices, weighted_sum, weighted_permutation_sum, kw,
+    pkw, categorical_compress, kernel_route, kernel_route_diagnostics,
+    NULL);
 }
 
 int kernel_weighted_sum_np(

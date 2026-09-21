@@ -203,8 +203,16 @@
   )
 }
 
+.np_estimator_loo_ksum <- function(..., bws,
+                                   bandwidth.divide = identical(bws$type, "adaptive_nn")) {
+  # ANN scales vary by donor, so unlike fixed/GNN they cannot be cancelled
+  # from a local moment system. Keep explicit caller scaling for other roles.
+  do.call(npksum, c(list(...), list(bws = bws,
+    bandwidth.divide = bandwidth.divide, .np.internal.fold.geometry = TRUE)))
+}
+
 .npscoef_npksum <- function(...) {
-  npksum(..., .np.internal.tree.outer.blas = TRUE)
+  .np_estimator_loo_ksum(..., .np.internal.tree.outer.blas = TRUE)
 }
 
 .np_indexhat_scalar_source <- function(bws) {
@@ -997,6 +1005,7 @@
     txdat = state$z.train,
     exdat = eval.rows,
     bws = bw.use,
+    fold.rows = if (isTRUE(state$leave.one.out)) eval.indices else NULL,
     bandwidth.divide = TRUE,
     kernel.pow = 1.0
   )
@@ -1726,6 +1735,7 @@ npscoefhat <-
             txdat = lp_state$z.train,
             exdat = lp_state$z.eval[idx, , drop = FALSE],
             bws = lp_state$rbw,
+            fold.rows = if (leave.one.out) idx else NULL,
             bandwidth.divide = TRUE,
             kernel.pow = 1.0
           )
@@ -1819,6 +1829,7 @@ npscoefhat <-
           txdat = lp_state$z.train,
           exdat = lp_state$z.eval[idx, , drop = FALSE],
           bws = lp_state$rbw,
+          fold.rows = if (leave.one.out) idx else NULL,
           bandwidth.divide = TRUE,
           kernel.pow = 1.0
         )

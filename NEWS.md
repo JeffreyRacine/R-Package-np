@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Nearest-neighbour leave-one-out regression beta hats and smooth-coefficient
+  fits, hats, uncertainty and CV moments now construct raw weights after
+  excluding the held-out occurrence. Adaptive-NN LC moment calculations also
+  retain donor-specific bandwidth normalization. Ordinary public kernel-sum
+  zero-diagonal semantics and fixed-bandwidth geometry are unchanged.
+
 * Kernel sums with multiple weight columns and an omitted response now retain
   the correct output dimensions, including permutation sums. An omitted
   response acts as a column of ones; kernel calculations are unchanged.
