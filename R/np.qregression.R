@@ -1090,7 +1090,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
   early.dots <- .np_formula_dispatch_args(
     NULL, substitute(list(...))[-1L], environment())
   .npqreg_reject_gradient_order_dots(early.dots)
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =

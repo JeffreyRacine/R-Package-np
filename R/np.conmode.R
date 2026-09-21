@@ -767,7 +767,7 @@ npconmode.default <- function(bws, txdat, tydat,
   nomad <- npValidateNomadControl(nomad, "nomad")
   probabilities <- npValidateScalarLogical(probabilities, "probabilities")
   gradients <- npValidateScalarLogical(gradients, "gradients")
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
