@@ -1189,7 +1189,7 @@ double np_score_owang_van_ryzin(const double x, const double y, const double lam
   const int cxy = (int)fabs(x-y);
   if(cxy == 0) return -1.0;
   if(lambda == 0.0) return (cxy == 1) ? 0.5 : 0.0;
-  return 0.5*ipow(lambda, cxy - 1)*(cxy - 2.0*lambda);
+  return 0.5*ipow(lambda, cxy - 1)*(cxy - (cxy + 1.0)*lambda);
 }
 
 double np_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
@@ -1208,8 +1208,9 @@ double np_onli_racine(const double x, const double y, const double lambda, const
 
 double np_score_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
   const int cxy = (int)fabs(x-y);
-  if(cxy == 0) return -2.0;
-  return ipow(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0*lambda);
+  const double denominator = (1.0 + lambda)*(1.0 + lambda);
+  if(cxy == 0) return -2.0/denominator;
+  return ipow(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0*lambda)/denominator;
 }
 
 static inline void np_orly_term_deriv(const int d, const double lambda, double *term, double *dterm){
