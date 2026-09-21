@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Gaussian eighth-order and Epanechnikov convolution calculations now use
+  location-independent polynomial arithmetic. This prevents translation-driven
+  cancellation from corrupting kernel overlaps and density CVLS objectives.
+  Kernel definitions, bandwidth geometry and computational routing are unchanged.
+
 * Kernel sums with multiple weight and response columns now return the
   documented weight-by-response layout for every kernel and operator.
   Smooth-coefficient backfitting and IV moment consumers use that same layout.
