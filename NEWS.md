@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Kernel sums with multiple weight and response columns now return the
+  documented weight-by-response layout for every kernel and operator.
+  Smooth-coefficient backfitting and IV moment consumers use that same layout.
+
 * Kernel-sum bandwidth scores now differentiate the Wang--van Ryzin and
   normalized ordered Li--Racine kernels correctly at all category distances.
   Normal kernel sums and categorical contrast definitions are unchanged.

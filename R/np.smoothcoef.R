@@ -1083,7 +1083,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
                          bws=partial.bws,
                          leave.one.out=leave.one.out)$ksum
 
-          coef.mat[j,] <- twww[1,2,]/NZD(twww[2,2,])
+          coef.mat[j,] <- twww[2,1,]/NZD(twww[2,2,])
 
           ## estimate new full residuals
           resid <- partial - W[,j] * coef.mat[j,]

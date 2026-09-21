@@ -703,10 +703,10 @@ npregiv.default <- function(y,
 
       }
 
-      tww.array <- array(tww, dim=c(ncol(W)+1,ncol(W),n.eval))
-      tyw <- matrix(tww.array[1,,,drop=FALSE],
+      tww.array <- array(tww, dim=c(ncol(W),ncol(W)+1,n.eval))
+      tyw <- matrix(tww.array[,1,,drop=FALSE],
                     nrow=ncol(W), ncol=n.eval)
-      tww <- tww.array[-1,,,drop=FALSE]
+      tww <- tww.array[,-1,,drop=FALSE]
 
       coef.mat <- matrix(maxPenalty, ncol(W), n.eval)
       ridge.grid <- npRidgeSequenceAdditive(n.train = n.eval, cap = 1.0)
@@ -828,8 +828,8 @@ npregiv.default <- function(y,
                       okertype=okertype,
                       ...)$ksum
 
-        tyw <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[1,,]
-        tww <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[-1,,]
+        tyw <- matrix(tww[,1,,drop=FALSE], nrow=ncol(W), ncol=n)
+        tww <- tww[,-1,,drop=FALSE]
 
         mean.loo <- rep(maxPenalty, n)
         ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
@@ -958,8 +958,8 @@ npregiv.default <- function(y,
                       okertype=okertype,
                       ...)$ksum
 
-        tyw <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[1,,]
-        tww <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[-1,,]
+        tyw <- matrix(tww[,1,,drop=FALSE], nrow=ncol(W), ncol=n)
+        tww <- tww[,-1,,drop=FALSE]
 
         ghat <- rep(maxPenalty, n)
         ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)

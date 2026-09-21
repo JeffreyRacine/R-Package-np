@@ -540,6 +540,18 @@ npksum.default <-
               PACKAGE="np"), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])[return.names]
     }
 
+    if (!beta.kernel && twncol > 1L && tyncol > 1L) {
+      # Ordinary native sums pack response before weight; the public W'Y
+      # contract (and the beta owner) packs weight before response.
+      decode.roles <- function(value, blocks = 1L) {
+        dim(value) <- c(tyncol, twncol, enrow, blocks)
+        as.vector(aperm(value, c(2L, 1L, 3L, 4L)))
+      }
+      myout[["ksum"]] <- decode.roles(myout[["ksum"]])
+      if (has.pksum && p.length.out > 0L)
+        myout[["p.ksum"]] <- decode.roles(myout[["p.ksum"]], npvar)
+    }
+
     if (dim.out[1] > 1){
       dim(myout[["ksum"]]) <- dim.out
       if (dim.out[2] < 2)
