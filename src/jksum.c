@@ -13564,10 +13564,32 @@ NPPermutationWeightOutput * const pkw_output,
                              tprod, bpow[i]);
           tprod_has_vals = 1;
         } else {
-          np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j],
-                             matrix_alt_bandwidth[i], (BANDWIDTH_reg == BW_FIXED),
-                             m[i][jbw],
-                             tprod, bpow[i]);
+          /* Every permutation plane inherits this coordinate's convolution
+           * except the plane replacing it. Reuse the existing scratch row and
+           * canonical vector owners; clearing tprod_mp would not compute it. */
+          np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, 0, xc[i][j],
+                            matrix_alt_bandwidth[i], (BANDWIDTH_reg == BW_FIXED),
+                            m[i][jbw], perm_kbuf, bpow[i]);
+          for(ii = 0; ii < num_xt; ++ii)
+            tprod[ii] = l ? tprod[ii]*perm_kbuf[ii] : perm_kbuf[ii];
+          for(kk = 0; kk < p_nvar; ++kk) {
+            double * const plane = tprod_mp + (size_t)kk*num_xt;
+            if(bpso[l] && kk == k && permutation_operator != OP_CONVOLUTION) {
+              np_ckernelv(permutation_kernel[i], xtc[i], num_xt, l,
+                          xc[i][j], m[i][jbw], plane,
+                          p_pxl == NULL ? NULL : p_pxl + kk, swap_xxt,
+                          BANDWIDTH_reg != BW_FIXED, 1, p_invnorm,
+                          p_bounded_integral, vector_ckerlb_extern[i],
+                          vector_ckerub_extern[i],
+                          bounded_cdf_lower_fixed == NULL ? NULL :
+                            bounded_cdf_lower_fixed[i],
+                          bounded_cdf_den_fixed == NULL ? NULL :
+                            bounded_cdf_den_fixed[i]);
+            } else {
+              for(ii = 0; ii < num_xt; ++ii)
+                plane[ii] = l ? plane[ii]*perm_kbuf[ii] : perm_kbuf[ii];
+            }
+          }
         }
         dband *= ipow(m[i][jbw], bpow[i]);
 
