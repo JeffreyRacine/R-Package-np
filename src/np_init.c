@@ -5,6 +5,7 @@
 /* Routine registration for the npRmpi shared library. */
 
 /* .Call calls */
+extern SEXP C_np_ordered_rly_matrix(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_copula_density_se(SEXP);
 extern SEXP C_np_ann_geometry(SEXP, SEXP);
 extern SEXP C_np_ann_variance(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -167,6 +168,7 @@ extern SEXP np_mpi_fanout_finish(SEXP);
 extern SEXP np_mpi_fanout_owner(SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_ordered_rly_matrix", (DL_FUNC) &C_np_ordered_rly_matrix, 4},
     {"np_mpi_fanout_begin", (DL_FUNC) &np_mpi_fanout_begin, 2},
     {"np_mpi_fanout_send", (DL_FUNC) &np_mpi_fanout_send, 3},
     {"np_mpi_fanout_poll", (DL_FUNC) &np_mpi_fanout_poll, 1},

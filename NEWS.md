@@ -4,6 +4,13 @@
   evaluations without advancing optimizer iteration counts. Native progress
   callbacks preserve interrupts instead of consuming Ctrl-C.
 
+* Ordered Racine--Li--Yan kernels now share one retained-support implementation
+  for mass, CDF, bandwidth scores, overlaps and categorical profile plots.
+  Regression CV paired moments preserve directed donor weights and row-specific
+  AIC diagonals. Near-upper shortcuts certify the full retained support.
+  Numeric ordered levels require finite increasing integer spacings; use
+  nonnumeric ordinal labels when rank spacing is intended.
+
 * Explicitly disabling automatic dispatch now establishes local numerical
   ownership at estimator and bandwidth entry, including preparation and
   kernel sums. This prevents master-only calls from entering an unmatched

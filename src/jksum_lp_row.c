@@ -167,6 +167,8 @@ static void np_lp_accumulate_dense_row_1(
     for(i = 0; i < ctx->nsub; i++){
       const int orig_ii = ctx->row_j + 1 + i;
       const double weight = ctx->weights[i];
+      const double reverse_weight = np_lp_reverse_pair_weight(weight,
+        ctx->rly_log_normalizer,orig_ii,ctx->eval_idx);
 
       if(weight == 0.0)
         continue;
@@ -177,15 +179,17 @@ static void np_lp_accumulate_dense_row_1(
       }
 
       fixed_rhs += weight*ctx->response[orig_ii];
-      ctx->rhs[orig_ii] += weight*eval_response;
+      ctx->rhs[orig_ii] += reverse_weight*eval_response;
       fixed_moment += weight;
-      ctx->moments[orig_ii] += weight;
+      ctx->moments[orig_ii] += reverse_weight;
     }
   } else {
     for(i = 0; i < ctx->nsub; i++){
       const int orig_ii = ctx->row_j + 1 + i;
       const int ii = ctx->tree_lookup[orig_ii];
       const double weight = ctx->weights[ii];
+      const double reverse_weight = np_lp_reverse_pair_weight(weight,
+        ctx->rly_log_normalizer,ii,ctx->eval_idx);
 
       if(weight == 0.0)
         continue;
@@ -196,9 +200,9 @@ static void np_lp_accumulate_dense_row_1(
       }
 
       fixed_rhs += weight*ctx->response[ii];
-      ctx->rhs[orig_ii] += weight*eval_response;
+      ctx->rhs[orig_ii] += reverse_weight*eval_response;
       fixed_moment += weight;
-      ctx->moments[orig_ii] += weight;
+      ctx->moments[orig_ii] += reverse_weight;
     }
   }
 
@@ -229,6 +233,8 @@ static void np_lp_accumulate_dense_row_##WIDTH(                             \
     const int ii = ctx->use_tree ? ctx->tree_lookup[orig_ii] : orig_ii;      \
     const int widx = ctx->use_tree ? ii : i;                                \
     const double weight = ctx->weights[widx];                               \
+    const double reverse_weight = np_lp_reverse_pair_weight(weight,         \
+      ctx->rly_log_normalizer,ii,ctx->eval_idx);                             \
     double *moving_moments;                                                  \
     double *moving_rhs;                                                      \
     double yi;                                                               \
@@ -250,16 +256,16 @@ static void np_lp_accumulate_dense_row_##WIDTH(                             \
       const double weighted_bia = weight*bia;                               \
       fixed_rhs[a] += weighted_bia*yi;                                      \
       if((WIDTH) >= 3){                                                      \
-        moving_rhs[a] += weight*ctx->eval_ybasis[a];                         \
+        moving_rhs[a] += reverse_weight*ctx->eval_ybasis[a];                         \
         for(b = 0; b < (WIDTH); b++){                                        \
           fixed_moments[a*(WIDTH)+b] +=                                     \
             weighted_bia*ctx->basis[b][ii];                                 \
           moving_moments[a*(WIDTH)+b] +=                                    \
-            weight*ctx->eval_outer[a*(WIDTH)+b];                            \
+            reverse_weight*ctx->eval_outer[a*(WIDTH)+b];                            \
         }                                                                    \
       } else {                                                               \
         const double bja = ctx->basis[a][ctx->eval_idx];                    \
-        const double weighted_bja = weight*bja;                             \
+        const double weighted_bja = reverse_weight*bja;                             \
         moving_rhs[a] += weighted_bja*ctx->response[ctx->eval_idx];          \
         for(b = 0; b < (WIDTH); b++){                                        \
           fixed_moments[a*(WIDTH)+b] +=                                     \
@@ -323,6 +329,8 @@ static void np_lp_accumulate_dense_row_##WIDTH(                             \
     const int ii = ctx->use_tree ? ctx->tree_lookup[orig_ii] : orig_ii;      \
     const int widx = ctx->use_tree ? ii : i;                                \
     const double weight = ctx->weights[widx];                               \
+    const double reverse_weight = np_lp_reverse_pair_weight(weight,         \
+      ctx->rly_log_normalizer,ii,ctx->eval_idx);                             \
     double *moving_moments;                                                  \
     double *moving_rhs;                                                      \
     double yi;                                                               \
@@ -360,13 +368,13 @@ NP_LP_SYMMETRIC_MOVING_UPDATE(WIDTH)                                        \
 #if NP_LP_ROW_NEON
 #define NP_LP_SYMMETRIC_MOVING_UPDATE(WIDTH)                                \
     {                                                                        \
-      const float64x2_t vw = vdupq_n_f64(weight);                           \
+      const float64x2_t vw = vdupq_n_f64(reverse_weight);                           \
       for(a = 0; a + 1 < (WIDTH); a += 2)                                  \
         vst1q_f64(moving_rhs + a,                                           \
                   vfmaq_f64(vld1q_f64(moving_rhs + a), vw,                  \
                             vld1q_f64(ctx->eval_ybasis + a)));               \
       if(a < (WIDTH))                                                       \
-        moving_rhs[a] += weight*ctx->eval_ybasis[a];                        \
+        moving_rhs[a] += reverse_weight*ctx->eval_ybasis[a];                        \
       for(a = 0; a < (WIDTH); a++){                                         \
         const int begin = a*(WIDTH)+a;                                      \
         const int end = a*(WIDTH)+(WIDTH);                                  \
@@ -376,16 +384,16 @@ NP_LP_SYMMETRIC_MOVING_UPDATE(WIDTH)                                        \
                     vfmaq_f64(vld1q_f64(moving_moments + pos), vw,          \
                               vld1q_f64(ctx->eval_outer + pos)));            \
         if(pos < end)                                                       \
-          moving_moments[pos] += weight*ctx->eval_outer[pos];               \
+          moving_moments[pos] += reverse_weight*ctx->eval_outer[pos];               \
       }                                                                      \
     }
 #else
 #define NP_LP_SYMMETRIC_MOVING_UPDATE(WIDTH)                                \
     for(a = 0; a < (WIDTH); a++){                                           \
-      moving_rhs[a] += weight*ctx->eval_ybasis[a];                          \
+      moving_rhs[a] += reverse_weight*ctx->eval_ybasis[a];                          \
       for(b = a; b < (WIDTH); b++)                                          \
         moving_moments[a*(WIDTH)+b] +=                                      \
-          weight*ctx->eval_outer[a*(WIDTH)+b];                              \
+          reverse_weight*ctx->eval_outer[a*(WIDTH)+b];                              \
     }
 #endif
 
@@ -409,7 +417,8 @@ void np_lp_accumulate_dense_resident_row3(
     double *rhs,
     const double *eval_ybasis,
     const double *eval_outer,
-    int *support_count)
+    int *support_count,
+    const NPRlyNormalizer *rly_log_normalizer)
 {
   /*
    * Keep the unique upper triangle resident in the non-MPI pairwise route.
@@ -432,6 +441,7 @@ void np_lp_accumulate_dense_resident_row3(
     const int ii = use_tree ? tree_lookup[orig_ii] : orig_ii;
     const int widx = use_tree ? ii : i;
     const double w = weights[widx];
+    const double reverse_weight = np_lp_reverse_pair_weight(w,rly_log_normalizer,ii,eval_idx);
 
     if(w == 0.0)
       continue;
@@ -465,27 +475,27 @@ void np_lp_accumulate_dense_resident_row3(
 
 #if NP_LP_ROW_NEON
       {
-        const float64x2_t vw = vdupq_n_f64(w);
+        const float64x2_t vw = vdupq_n_f64(reverse_weight);
         vst1q_f64(ti,
                   vfmaq_f64(vld1q_f64(ti), vw, eval_y01));
         vst1q_f64(si,
                   vfmaq_f64(vld1q_f64(si), vw, eval_outer01));
         vst1q_f64(si + 4,
                   vfmaq_f64(vld1q_f64(si + 4), vw, eval_outer45));
-        ti[2] += w*eval_ybasis[2];
-        si[2] += w*eval_outer[2];
-        si[8] += w*eval_outer[8];
+        ti[2] += reverse_weight*eval_ybasis[2];
+        si[2] += reverse_weight*eval_outer[2];
+        si[8] += reverse_weight*eval_outer[8];
       }
 #else
-      ti[0] += w*eval_ybasis[0];
-      ti[1] += w*eval_ybasis[1];
-      ti[2] += w*eval_ybasis[2];
-      si[0] += w*eval_outer[0];
-      si[1] += w*eval_outer[1];
-      si[2] += w*eval_outer[2];
-      si[4] += w*eval_outer[4];
-      si[5] += w*eval_outer[5];
-      si[8] += w*eval_outer[8];
+      ti[0] += reverse_weight*eval_ybasis[0];
+      ti[1] += reverse_weight*eval_ybasis[1];
+      ti[2] += reverse_weight*eval_ybasis[2];
+      si[0] += reverse_weight*eval_outer[0];
+      si[1] += reverse_weight*eval_outer[1];
+      si[2] += reverse_weight*eval_outer[2];
+      si[4] += reverse_weight*eval_outer[4];
+      si[5] += reverse_weight*eval_outer[5];
+      si[8] += reverse_weight*eval_outer[8];
 #endif
     }
   }
@@ -525,6 +535,8 @@ static void np_lp_accumulate_dense_row_generic(
     const int ii = ctx->use_tree ? ctx->tree_lookup[orig_ii] : orig_ii;
     const int widx = ctx->use_tree ? ii : i;
     const double weight = ctx->weights[widx];
+    const double reverse_weight = np_lp_reverse_pair_weight(weight,
+      ctx->rly_log_normalizer,ii,ctx->eval_idx);
 
     if(weight == 0.0)
       continue;
@@ -549,12 +561,12 @@ static void np_lp_accumulate_dense_row_generic(
         const double bia = ctx->basis[a][ii];
         const double weighted_bia = weight*bia;
         fixed_rhs[a] += weighted_bia*yi;
-        moving_rhs[a] += weight*ctx->eval_ybasis[a];
+        moving_rhs[a] += reverse_weight*ctx->eval_ybasis[a];
         for(b = 0; b < nterms; b++){
           fixed_moments[a*nterms+b] +=
             weighted_bia*ctx->basis[b][ii];
           moving_moments[a*nterms+b] +=
-            weight*ctx->eval_outer[a*nterms+b];
+            reverse_weight*ctx->eval_outer[a*nterms+b];
         }
       }
     }
@@ -571,7 +583,7 @@ void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx)
       ctx->row_j, ctx->nsub, ctx->use_tree, ctx->eval_idx,
       ctx->track_lowsupport, ctx->tree_lookup, ctx->weights, ctx->basis,
       ctx->response, ctx->moments, ctx->rhs, ctx->eval_ybasis,
-      ctx->eval_outer, ctx->support_count);
+      ctx->eval_outer, ctx->support_count, ctx->rly_log_normalizer);
     return;
   case 4: np_lp_accumulate_dense_row_4(ctx); return;
   case 5: np_lp_accumulate_dense_row_5(ctx); return;

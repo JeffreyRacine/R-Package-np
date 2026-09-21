@@ -336,6 +336,12 @@
   via \code{ukertype="liracine"}.
 
   Ordered-categorical kernels (called via \code{okertype}):
+  Numeric ordered-factor levels retain their numeric distances, including
+  gaps. They must be finite and increasing, with integer distances and total
+  span less than \code{.Machine$integer.max}; fractional distances are rejected
+  rather than truncated. Nonnumeric ordered labels use their ordinal ranks.
+  Use explicit nonnumeric labels when rank distance, not numeric distance,
+  is intended.
   \deqn{L_{WvR}(x_i,x;\lambda)=
     \begin{cases}
       1-\lambda, & x_i=x\\
@@ -354,6 +360,11 @@
   \deqn{L_{RLY}(x_i,x;\lambda)=\frac{\lambda^{|x_i-x|}}{\sum_{z\in\mathcal{S}(x)}\lambda^{|x_i-z|}}}
   (Racine-Li-Yan ordered kernel, normalized on support \eqn{\mathcal{S}(x)}).
   exposed as \code{okertype="racineliyan"}.
+  Here the support is the retained set of factor levels, including unused
+  levels, not an integer interval filling its gaps. The normalizer is indexed
+  by the training value \eqn{x_i}, so weights need not be symmetric in training
+  and evaluation values. Cumulative kernels, overlap integrals, scores and
+  paired regression computations use that same support and direction.
 
   These univariate kernels are combined as generalized product kernels over
   mixed data types in the estimators and cross-validation criteria.

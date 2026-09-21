@@ -851,7 +851,144 @@ double *DIFF_KER_PPM)
 }
 
 
-double kernel_ordered(int KERNEL, double x, double y, double lambda)
+/* Canonical finite-support RLY arithmetic. Never fill gaps in retained
+ * support, and never substitute the infinite-lattice normalized LR kernel.
+ * Numeric ordered codes are validated as an integer lattice in R. */
+double np_ordered_rly_denom(const double train, const double lambda,
+                            const double *cats, const int ncat)
+{
+  double den = 0.0;
+  if(cats == NULL || ncat <= 0)
+    error("Racine-Li-Yan kernel requires retained ordered support");
+  for(int i = 0; i < ncat; ++i)
+    den += ipow(lambda, (int)fabs(train-cats[i]));
+  return den;
+}
+
+static double np_ordered_rly_normal(const double train, const double eval,
+                                    const double lambda, const double denominator)
+{
+  return ipow(lambda,(int)fabs(train-eval))/denominator;
+}
+
+double np_ordered_rly(const int op, const double train, const double eval,
+                      const double lambda, const double *cats, const int ncat)
+{
+  const double den = np_ordered_rly_denom(train, lambda, cats, ncat);
+  if(!(den > 0.0)) return 0.0;
+  if(op == 0)
+    return np_ordered_rly_normal(train,eval,lambda,den);
+  if(op == 1) {
+    const double den2 = np_ordered_rly_denom(eval, lambda, cats, ncat);
+    double total = 0.0;
+    if(!(den2 > 0.0)) return 0.0;
+    for(int i = 0; i < ncat; ++i)
+      total += ipow(lambda, (int)fabs(train-cats[i])) *
+               ipow(lambda, (int)fabs(eval-cats[i]));
+    return total/(den*den2);
+  }
+  if(op == 2) {
+    const int d = (int)fabs(train-eval);
+    const double num = ipow(lambda,d);
+    const double dnum = d == 0 ? 0.0 : d*ipow(lambda,d-1);
+    double dden = 0.0;
+    for(int i = 0; i < ncat; ++i) {
+      const int di = (int)fabs(train-cats[i]);
+      if(di > 0) dden += di*ipow(lambda,di-1);
+    }
+    return (dnum*den-num*dden)/(den*den);
+  }
+  if(op == 3) {
+    double total = 0.0;
+    for(int i = 0; i < ncat; ++i)
+      if(cats[i] <= eval)
+        total += ipow(lambda,(int)fabs(train-cats[i]));
+    return total/den;
+  }
+  error("unsupported Racine-Li-Yan operator");
+  return 0.0;
+}
+
+static int np_ordered_rly_support_contains(const double value,
+                                          const double *cats, const int ncat)
+{
+  int lo=0,hi=ncat;
+  if(!R_FINITE(value)) return 0;
+  while(lo<hi) {
+    const int mid=lo+(hi-lo)/2;
+    if(cats[mid]<value) lo=mid+1; else hi=mid;
+  }
+  return lo<ncat && cats[lo]==value;
+}
+
+/* Noncollective bridge for R profile consumers. The result is eval x donor;
+ * all inputs are borrowed and each donor normalizer is computed only once. */
+SEXP C_np_ordered_rly_matrix(SEXP train, SEXP evaluation, SEXP bandwidth,
+                            SEXP support)
+{
+  if(TYPEOF(train)!=REALSXP || TYPEOF(evaluation)!=REALSXP ||
+     TYPEOF(bandwidth)!=REALSXP || XLENGTH(bandwidth)!=1 ||
+     TYPEOF(support)!=REALSXP || XLENGTH(support)<1 ||
+     XLENGTH(train)>INT_MAX || XLENGTH(evaluation)>INT_MAX ||
+     XLENGTH(support)>INT_MAX)
+    error("invalid RLY profile matrix layout");
+  const int n=(int)XLENGTH(train),m=(int)XLENGTH(evaluation),nc=(int)XLENGTH(support);
+  const double lambda=REAL(bandwidth)[0];
+  const double *cats=REAL(support);
+  if(!R_FINITE(lambda) || lambda<0.0 || lambda>1.0 ||
+     (n>0 && (R_xlen_t)m>R_XLEN_T_MAX/n))
+    error("invalid RLY profile matrix bandwidth or dimensions");
+  for(int i=0;i<nc;++i) {
+    if(!R_FINITE(cats[i]) || (i>0 &&
+       (!(cats[i]>cats[i-1]) || cats[i]-cats[i-1]!=floor(cats[i]-cats[i-1]))))
+      error("RLY profile support must have finite increasing integer distances");
+  }
+  if(cats[nc-1]-cats[0]>=INT_MAX)
+    error("RLY profile support exceeds the native index range");
+  for(int i=0;i<n;++i)
+    if(!np_ordered_rly_support_contains(REAL(train)[i],cats,nc))
+      error("RLY profile donor is outside retained support");
+  for(int j=0;j<m;++j)
+    if(!np_ordered_rly_support_contains(REAL(evaluation)[j],cats,nc))
+      error("RLY profile evaluation is outside retained support");
+  SEXP result=PROTECT(allocMatrix(REALSXP,m,n));
+  for(int i=0;i<n;++i) {
+    const double donor=REAL(train)[i];
+    const double den=np_ordered_rly_denom(donor,lambda,cats,nc);
+    for(int j=0;j<m;++j)
+      REAL(result)[j+(R_xlen_t)m*i]=np_ordered_rly_normal(donor,REAL(evaluation)[j],lambda,den);
+  }
+  UNPROTECT(1);
+  return result;
+}
+
+void np_ordered_rly_range(const int op, const double lambda,
+                          const double *cats, const int ncat,
+                          double *lower, double *upper)
+{
+  if(cats == NULL || ncat <= 0)
+    error("Racine-Li-Yan kernel requires retained ordered support");
+  *lower = DBL_MAX;
+  *upper = -DBL_MAX;
+  for(int i = 0; i < ncat; ++i) {
+    if(op == 0) {
+      const double den = np_ordered_rly_denom(cats[i],lambda,cats,ncat);
+      const int distance = (int)fmax(fabs(cats[i]-cats[0]),
+                                      fabs(cats[i]-cats[ncat-1]));
+      *lower = fmin(*lower,ipow(lambda,distance)/den);
+      *upper = fmax(*upper,1.0/den);
+    } else {
+      for(int j = 0; j < ncat; ++j) {
+        const double value = np_ordered_rly(op,cats[i],cats[j],lambda,cats,ncat);
+        *lower = fmin(*lower,value);
+        *upper = fmax(*upper,value);
+      }
+    }
+  }
+}
+
+double kernel_ordered(int KERNEL, double x, double y, double lambda,
+                      int c, double *categorical_vals)
 {
 
 	double return_value = 0.0;
@@ -899,11 +1036,7 @@ double kernel_ordered(int KERNEL, double x, double y, double lambda)
 
 		case 3:
 
-			/*
-			  Racine-Li-Yan requires empirical support for exact normalization.
-			  This fallback is used where support is unavailable in this API.
-			*/
-			return_value = ipow(lambda,(int)fabs(x-y))*(1.0-lambda)/(1.0+lambda);
+			return_value = np_ordered_rly(0,y,x,lambda,categorical_vals,c);
 
 			break;
 
@@ -931,16 +1064,7 @@ double cdf_kernel_ordered(int KERNEL, double x, double y, double lambda, int c, 
 
 	if(KERNEL == 3)
 	{
-		double den = 0.0;
-		int i;
-		for(i = 0; i < c; i++)
-			den += ipow(lambda,(int)fabs(y-categorical_vals[i]));
-		if(den > 0.0)
-		{
-			for(i = 0; i < c; i++)
-				if(categorical_vals[i] <= x)
-					return_value += ipow(lambda,(int)fabs(y-categorical_vals[i]))/den;
-		}
+		return_value = np_ordered_rly(3,y,x,lambda,categorical_vals,c);
 	}
 	else
 	{
@@ -948,7 +1072,7 @@ double cdf_kernel_ordered(int KERNEL, double x, double y, double lambda, int c, 
 		{
 			if(l <= x)
 			{
-				return_value += kernel_ordered(KERNEL, l, y, lambda);
+				return_value += kernel_ordered(KERNEL, l, y, lambda,c,categorical_vals);
 			}
 		}
 	}
@@ -970,25 +1094,13 @@ double kernel_ordered_convolution(int KERNEL, double x, double y, double lambda,
 
 	if(KERNEL == 3)
 	{
-		double denx = 0.0;
-		double deny = 0.0;
-		for(i=0; i < c; i++)
-		{
-			denx += ipow(lambda,(int)fabs(x-c_vals[i]));
-			deny += ipow(lambda,(int)fabs(y-c_vals[i]));
-		}
-		if(denx > 0.0 && deny > 0.0)
-		{
-			for(i=0; i < c; i++)
-				return_value += (ipow(lambda,(int)fabs(x-c_vals[i]))/denx)*
-					(ipow(lambda,(int)fabs(y-c_vals[i]))/deny);
-		}
+		return_value = np_ordered_rly(1,x,y,lambda,c_vals,c);
 	}
 	else
 	{
 		for(i=0; i < c; i++)
 		{
-			return_value += kernel_ordered(KERNEL, x, *pc_vals, lambda)*kernel_ordered(KERNEL, y, *pc_vals, lambda);
+			return_value += kernel_ordered(KERNEL, x, *pc_vals, lambda,c,c_vals)*kernel_ordered(KERNEL, y, *pc_vals, lambda,c,c_vals);
 			pc_vals++;
 		}
 	}

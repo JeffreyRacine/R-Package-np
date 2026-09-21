@@ -331,7 +331,16 @@ double fGoodness_of_Fit(int iNum_Obs, double *fvector_Y, double *fkernel_fit);
 
 double kernel(int KERNEL, double z);
 double kernel_unordered(int KERNEL, double x, double y, double lambda, int c);
-double kernel_ordered(int KERNEL, double x, double y, double lambda);
+/* RLY uses retained support, with the first argument denoting the donor.
+ * Operators: 0 normal, 1 overlap, 2 bandwidth score, 3 cumulative. */
+double np_ordered_rly(int op, double train, double eval, double lambda,
+                      const double *cats, int ncat);
+double np_ordered_rly_denom(double train, double lambda,
+                            const double *cats, int ncat);
+void np_ordered_rly_range(int op, double lambda, const double *cats, int ncat,
+                          double *lower, double *upper);
+double kernel_ordered(int KERNEL, double x, double y, double lambda,
+                      int c, double *categorical_vals);
 double kernel_unordered_convolution(int KERNEL, double x, double y, double lambda, int c, double *c_vals);
 double kernel_ordered_convolution(int KERNEL, double x, double y, double lambda, int c, double *c_vals);
 double kernel_convol(int KERNEL, int BANDWIDTH, double z, double h1, double h2);

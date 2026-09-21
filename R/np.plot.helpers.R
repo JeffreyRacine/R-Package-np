@@ -3312,11 +3312,7 @@
 }
 
 .np_cat_ordered_support_values <- function(x) {
-  values <- suppressWarnings(as.numeric(levels(x)))
-  if (length(values) == nlevels(x) && !anyNA(values))
-    values
-  else
-    seq_len(nlevels(x))
+  dlev(x)
 }
 
 .np_cat_profile_kernel_matrix <- function(eval.codes,
@@ -3349,7 +3345,8 @@
         stop("unsupported unordered categorical kernel in profile bootstrap")
       }
     } else if (is.ordered(xdat[[j]])) {
-      d <- abs(outer(eval.codes[, j], train.codes[, j], "-"))
+      d <- if (!identical(okertype, "racineliyan"))
+        abs(outer(eval.codes[, j], train.codes[, j], "-"))
       if (identical(okertype, "wangvanryzin")) {
         Kj <- ifelse(d == 0, 1.0 - lambda[j],
                      (lambda[j]^d) * (1.0 - lambda[j]) * 0.5)
@@ -3359,10 +3356,9 @@
         Kj <- (lambda[j]^d) * (1.0 - lambda[j]) / (1.0 + lambda[j])
       } else if (identical(okertype, "racineliyan")) {
         support <- .np_cat_ordered_support_values(xdat[[j]])
-        den <- vapply(train.codes[, j],
-                      function(x) sum(lambda[j]^abs(x - support)),
-                      numeric(1))
-        Kj <- t(t(lambda[j]^d) / den)
+        Kj <- .Call(C_np_ordered_rly_matrix,
+                    as.double(train.codes[, j]), as.double(eval.codes[, j]),
+                    lambda[j], as.double(support))
       } else {
         stop("unsupported ordered categorical kernel in profile bootstrap")
       }

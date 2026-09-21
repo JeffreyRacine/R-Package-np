@@ -461,7 +461,9 @@ int itmax)
 
 				for(l = 0; l < num_reg_ordered; l++)
 				{
-					prod_kernel_cat *= kernel_ordered(KERNEL_ordered_reg, matrix_X_ordered_eval[l][j],matrix_X_ordered_train[l][i],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered]);
+					prod_kernel_cat *= kernel_ordered(KERNEL_ordered_reg, matrix_X_ordered_eval[l][j],matrix_X_ordered_train[l][i],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered],
+					  num_categories[l+num_var_unordered+num_var_ordered+num_reg_unordered],
+					  matrix_categorical_vals[l+num_var_unordered+num_var_ordered+num_reg_unordered]);
 				}
 
 				prod_kernel_marginal_cat = prod_kernel_cat;
@@ -524,7 +526,9 @@ int itmax)
 
 				for(l = 0; l < num_reg_ordered; l++)
 				{
-					prod_kernel_cat *= kernel_ordered(KERNEL_ordered_reg, matrix_X_ordered_eval[l][j],matrix_X_ordered_train[l][i],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered]);
+					prod_kernel_cat *= kernel_ordered(KERNEL_ordered_reg, matrix_X_ordered_eval[l][j],matrix_X_ordered_train[l][i],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered],
+					  num_categories[l+num_var_unordered+num_var_ordered+num_reg_unordered],
+					  matrix_categorical_vals[l+num_var_unordered+num_var_ordered+num_reg_unordered]);
 				}
 
 				prod_kernel_marginal_cat = prod_kernel_cat;
@@ -592,7 +596,9 @@ int itmax)
 
 				for(l = 0; l < num_reg_ordered; l++)
 				{
-					prod_kernel_cat *= kernel_ordered(KERNEL_ordered_reg, matrix_X_ordered_eval[l][j],matrix_X_ordered_train[l][i],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered]);
+					prod_kernel_cat *= kernel_ordered(KERNEL_ordered_reg, matrix_X_ordered_eval[l][j],matrix_X_ordered_train[l][i],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered],
+					  num_categories[l+num_var_unordered+num_var_ordered+num_reg_unordered],
+					  matrix_categorical_vals[l+num_var_unordered+num_var_ordered+num_reg_unordered]);
 				}
 
 				prod_kernel_marginal_cat = prod_kernel_cat;
