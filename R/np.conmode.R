@@ -513,6 +513,7 @@ npconmode.conbandwidth <-
     gradients <- npValidateScalarLogical(gradients, "gradients")
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
+    .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
     native.newdata <- list(...)[["newdata", exact = TRUE]]
@@ -530,6 +531,9 @@ npconmode.conbandwidth <-
 
     if (!no.ey)
       eydat = toFrame(eydat)
+
+    if (!no.ex && !no.ey)
+      .np_require_paired_rows(exdat, eydat, "exdat", "eydat")
 
     ## catch and destroy NA's
     keep.rows <- rep_len(TRUE, nrow(txdat))

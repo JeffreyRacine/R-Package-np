@@ -520,6 +520,7 @@ npsigtest.rbandwidth <- function(bws,
   xdat <- toFrame(xdat)
 
   if(B < 9) stop("number of bootstrap replications must be >= 9")
+  .np_require_paired_rows(xdat, ydat, "xdat", "ydat")
 
   ## catch and destroy NA's
   goodrows <- seq_len(nrow(xdat))

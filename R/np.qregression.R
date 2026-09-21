@@ -884,6 +884,7 @@ npqreg.condbandwidth <-
 
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
+    .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
     tau <- .npqreg_validate_tau(tau)
