@@ -771,7 +771,7 @@ npconmode.default <- function(bws, txdat, tydat,
   gradients <- npValidateScalarLogical(gradients, "gradients")
   .npRmpi_require_active_slave_pool(where = "npconmode()")
 
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
