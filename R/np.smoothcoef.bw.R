@@ -2326,6 +2326,9 @@ npscoefbw.scbandwidth <-
 
     if (!miss.z)
       zdat <- toFrame(zdat)
+    .np_require_paired_rows(xdat, ydat, "xdat", "ydat")
+    if (!miss.z)
+      .np_require_paired_rows(xdat, zdat, "xdat", "zdat")
 
     if (missing(nmulti)){
       nmulti <- npDefaultNmulti(if (miss.z) NCOL(xdat) else NCOL(zdat))
@@ -3742,9 +3745,12 @@ npscoefbw.default <-
 
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
+    .np_require_paired_rows(xdat, ydat, "xdat", "ydat")
 
     if(!miss.z)
       zdat <- toFrame(zdat)
+    if (!miss.z)
+      .np_require_paired_rows(xdat, zdat, "xdat", "zdat")
 
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
