@@ -7,7 +7,7 @@ test_that("Gaussian2 coefficients retain the continuous moment-ratio limit", {
   X <- seq(.03,.96,length.out=20)^1.3
   kernel <- owner(X,Y=.5,h=.18,a=0,b=1,kertype="gaussian2")$kernel
   # Independent integration of the original truncated-normal moments.
-  for(h in c(.18,.5,2)) for(y in c(.07,.31,.67,.91)) {
+  for(h in c(.18,.5,2,10,243,1000,9000)) for(y in c(.07,.31,.67,.91)) {
     lower <- -y/h; upper <- (1-y)/h
     m <- vapply(0:3,function(k)integrate(function(z)z^k*dnorm(z),lower,upper,
       rel.tol=1e-12,abs.tol=1e-13)$value,0.0)
