@@ -508,15 +508,22 @@ double np_beta_log_pdf_component_prepared(
     return -INFINITY;
   }
 
+  /* A boundary donor has a measure-zero point spike for positive
+   * concentration. Quadrature uses its interior limit, component by
+   * component; a zero-concentration (uniform) component must survive. */
   if(observation->endpoint < 0) {
-    if(component->alpha_minus_one == 0.0) {
+    if(component->alpha_minus_one == 0.0 &&
+       (observation->endpoint != NP_BETA_PDF_QUADRATURE_LOWER ||
+        component->beta_minus_one == 0.0)) {
       log_value = log(component->beta) - component->log_support_length;
     } else {
       np_beta_set_status(status, NP_BETA_OK);
       return -INFINITY;
     }
   } else if(observation->endpoint > 0) {
-    if(component->beta_minus_one == 0.0) {
+    if(component->beta_minus_one == 0.0 &&
+       (observation->endpoint != NP_BETA_PDF_QUADRATURE_UPPER ||
+        component->alpha_minus_one == 0.0)) {
       log_value = log(component->alpha) - component->log_support_length;
     } else {
       np_beta_set_status(status, NP_BETA_OK);

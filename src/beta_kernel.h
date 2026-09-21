@@ -52,6 +52,15 @@ typedef struct {
 /* PDF-only decomposition of np_beta_shape.  Observation state is immutable
  * within one native invocation; component state is immutable within one
  * evaluation row for fixed and generalized-NN bandwidths. */
+enum {
+  NP_BETA_PDF_LOWER = -1,
+  NP_BETA_PDF_UPPER = 1,
+  /* Integration contexts use the interior-limit representative at a donor
+   * boundary. The sign still identifies which support endpoint is present. */
+  NP_BETA_PDF_QUADRATURE_LOWER = -2,
+  NP_BETA_PDF_QUADRATURE_UPPER = 2
+};
+
 typedef struct {
   double log_unit;
   double log_complement_unit;

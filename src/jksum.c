@@ -25396,6 +25396,26 @@ NPContinuousKernelRowStatus np_beta_scaled_row_context_prepare(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+NPContinuousKernelRowStatus np_beta_scaled_row_context_prepare_quadrature(
+  NPBetaScaledRowContext *context)
+{
+  if(context == NULL || !context->ready ||
+     !context->beta_prepared.pdf_active ||
+     context->beta_prepared.pdf_observation == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(int d=0;d<context->beta_prepared.num_beta_coordinates;++d)
+    for(int i=0;i<context->plan.num_train;++i) {
+      np_beta_pdf_observation *observation=
+        &context->beta_prepared.pdf_observation[
+          (size_t)d*context->plan.num_train+i];
+      if(observation->endpoint == NP_BETA_PDF_LOWER)
+        observation->endpoint=NP_BETA_PDF_QUADRATURE_LOWER;
+      else if(observation->endpoint == NP_BETA_PDF_UPPER)
+        observation->endpoint=NP_BETA_PDF_QUADRATURE_UPPER;
+    }
+  return NP_CONTINUOUS_ROW_OK;
+}
+
 NPContinuousKernelRowStatus np_beta_scaled_row_context_fill_omitting(
   NPBetaScaledRowContext *context,
   int evaluation,
@@ -37696,6 +37716,8 @@ static int np_density_cvls_bounded_i1_quadrature_general(const int KERNEL_den,
         canonical_kernel_unordered, canonical_kernel_ordered,
         canonical_lambda, num_categories,
         matrix_categorical_vals, categorical_compress, beta_row);
+      if(row_status == NP_CONTINUOUS_ROW_OK)
+        row_status=np_beta_scaled_row_context_prepare_quadrature(&beta_context);
       if(row_status != NP_CONTINUOUS_ROW_OK) {
         np_beta_scaled_row_context_clear(&beta_context);
         goto cleanup_density_bounded_quad_general;
@@ -50863,6 +50885,8 @@ static int np_conditional_cvls_fold_grid_prepare(
            context->route_y.lambda, num_categories_extern_Y, matrix_categorical_vals_extern_Y,
            context->execution_context->categorical_compress, context->route_y.row) !=
            NP_CONTINUOUS_ROW_OK) goto cleanup;
+      if(np_beta_scaled_row_context_prepare_quadrature(&beta) !=
+           NP_CONTINUOUS_ROW_OK) goto cleanup;
       for(int e = 0; e < q; ++e) {
         beta.row_result.row = context->grid_values[v][e];
         if(np_beta_scaled_row_context_fill(&beta, e, NULL, &context->grid_logs[v][e]) !=
@@ -51068,6 +51092,11 @@ static int np_conditional_cvls_provider_y_eval_block(
     goto cleanup_eval;
   }
 
+  if(np_beta_scaled_row_context_prepare_quadrature(&eval_context) !=
+       NP_CONTINUOUS_ROW_OK) {
+    status=1;
+    goto cleanup_eval;
+  }
   for(evaluation = 0; evaluation < block_rows; ++evaluation) {
     eval_context.row_result.row = rows[evaluation];
     if(np_beta_scaled_row_context_fill(
