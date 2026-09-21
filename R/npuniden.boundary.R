@@ -59,6 +59,17 @@ npuniden.boundary <- function(X=NULL,
             z.b <- (b-x)/h
             pnorm.zb.m.pnorm.za <- (pnorm(z.b)-pnorm(z.a))
             mu.2 <- 1+(z.a*dnorm(z.a)-z.b*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
+            if(max(abs(z.a),abs(z.b)) < .1) {
+                # Integrate the Gaussian series directly: the closed moment
+                # formula above cancels to zero on narrow standardized support.
+                # Seven terms have remainder < (.005)^7/7! < 2e-20.
+                k <- 0:6
+                coefficient <- (-.5)^k/factorial(k)
+                moment.0 <- sum(coefficient*(z.b^(2*k+1)-z.a^(2*k+1))/(2*k+1))
+                moment.2 <- sum(coefficient*(z.b^(2*k+3)-z.a^(2*k+3))/(2*k+3))
+                pnorm.zb.m.pnorm.za <- dnorm(0)*moment.0
+                mu.2 <- moment.2/moment.0
+            }
             if((b-a)/h > 1e-04) {
                 # mu.3/mu.1 has a removable 0/0 at the support midpoint;
                 # the ordinates can also both underflow for narrow kernels.
