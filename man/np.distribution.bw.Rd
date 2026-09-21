@@ -585,6 +585,12 @@ or standard-deviation factors.
   with the point at which the cumulative distribution is estimated, \eqn{x}. Fixed bandwidths
   are constant over the support of \eqn{x}.
 
+  Nearest-neighbor cross-validation excludes the held-out observation from
+  both the kernel sum and the sample defining the neighborhood. An empirical
+  evaluation-grid row retains its training-query identity in that deleted
+  sample. An explicitly supplied grid is an external evaluation grid, even
+  when its coordinates equal observed values.
+
   Exact ties can make the literal \eqn{k}th continuous nearest-neighbor
   radius zero. Such a bandwidth is undefined and is rejected; see
   \code{\link{np.kernels}} for the precise contract and remedies.
