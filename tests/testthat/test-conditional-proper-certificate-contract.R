@@ -71,6 +71,26 @@ test_that("proper certificates preserve degree-zero and positive-degree roles", 
   }
 })
 
+test_that("unordered LR certification agrees with its finite-support PMF", {
+  old <- options(np.messages=FALSE)
+  on.exit(options(old),add=TRUE)
+  x <- data.frame(x=c(-.6,-.2,.1,.5,.9))
+  y <- data.frame(y=factor(c("a","b","a","c","b"),levels=c("a","b","c")))
+  ex <- data.frame(x=rep(.3,3L))
+  ey <- data.frame(y=factor(c("a","b","c"),levels=levels(y$y)))
+  wx <- dnorm((.3-x$x)/.4); wx <- wx/sum(wx)
+  for(lambda in c(0,.25,1)) {
+    bw <- npcdensbw(xdat=x,ydat=y,bws=c(lambda,.4),
+                    uykertype="liracine",bandwidth.compute=FALSE)
+    fit <- npcdens(bw,exdat=ex,eydat=ey,proper=TRUE)
+    prob <- vapply(levels(y$y),function(k)
+      sum(wx*ifelse(y$y==k,1,lambda)/(1+2*lambda)),0)
+    expect_equal(as.double(fitted(fit)),as.double(prob),tolerance=2e-12)
+    expect_identical(fit$proper.info$reason,"already_proper")
+    expect_equal(sum(fitted(fit)),1,tolerance=2e-12)
+  }
+})
+
 test_that("declared categorical response normalization controls certification", {
   old <- options(np.messages=FALSE)
   on.exit(options(old),add=TRUE)
@@ -86,10 +106,17 @@ test_that("declared categorical response normalization controls certification", 
     expect_identical(fit$proper.info$reason,"already_proper")
     expect_lt(abs(sum(fitted(fit))-1),1e-12)
     args[[if(ordered) "oykertype" else "uykertype"]] <- "liracine"
-    unnormalized <- do.call(npcdens,args)
-    expect_false(unnormalized$proper.info$supported)
-    expect_false(unnormalized$proper.info$reason=="already_proper")
-    args$proper.control <- list(fail.on.unsupported=TRUE)
-    expect_error(do.call(npcdens,args),"univariate continuous")
+    liracine <- do.call(npcdens,args)
+    if (ordered) {
+      expect_false(liracine$proper.info$supported)
+      expect_false(liracine$proper.info$reason=="already_proper")
+      args$proper.control <- list(fail.on.unsupported=TRUE)
+      expect_error(do.call(npcdens,args),"univariate continuous")
+    } else {
+      expect_identical(liracine$proper.info$reason,"already_proper")
+      expect_lt(abs(sum(fitted(liracine))-1),1e-12)
+      expect_equal(as.double(predict(liracine, exdat=args$exdat, eydat=ey)),
+                   as.double(fitted(liracine)), tolerance=1e-12)
+    }
   }
 })
