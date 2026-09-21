@@ -1,3 +1,30 @@
+test_that("fixed unit bandwidths do not enter nearest-neighbor validation", {
+  old <- options(np.messages = FALSE, np.largeh = FALSE)
+  on.exit(options(old))
+  x <- data.frame(x = c(-1.3, -.7, -.1, .25, .8, 1.4))
+  y <- sin(x$x)
+  for (h in c(.9999, 1, 1.0001)) for (rt in c("lc", "lp")) {
+    bw <- npregbw(xdat = x, ydat = y, bws = h, bwtype = "fixed",
+                  regtype = rt, degree = 0L, bandwidth.compute = FALSE)
+    for (external in c(FALSE, TRUE)) {
+      ex <- if (external) data.frame(x = c(-.8, .05, .9)) else NULL
+      eval <- if (external) ex$x else x$x
+      K <- outer(eval, x$x, function(a, b) dnorm((a-b)/h))
+      H <- K / rowSums(K)
+      dK <- -outer(eval, x$x, "-") / h^2 * K
+      dH <- (dK - H * rowSums(dK)) / rowSums(K)
+      a <- list(bws=bw, txdat=x)
+      if (external) a$exdat <- ex
+      expect_equal(unname(do.call(npreghat, c(a, list(output="matrix")))),
+                   H, tolerance=2e-12, ignore_attr=TRUE)
+      expect_equal(as.double(do.call(npreghat, c(a, list(y=y, output="apply")))),
+                   as.double(H %*% y), tolerance=2e-12)
+      expect_equal(as.double(do.call(npreghat, c(a, list(y=y, s=1L, output="apply")))),
+                   as.double(dH %*% y), tolerance=2e-12)
+    }
+  }
+})
+
 test_that("regression k1 capability is narrow and R-owned", {
   set.seed(20260817L)
   x <- data.frame(x = sort(runif(41L, -1, 1)))
