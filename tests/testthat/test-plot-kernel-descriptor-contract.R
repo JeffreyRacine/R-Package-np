@@ -33,8 +33,8 @@ test_that("direct plot weights use canonical kernel code and descriptor owners",
     "npContinuousKernelDescriptorOptions\\(bws\\)"
   )
   expect_match(
-    helper_text,
-    "divide.returned.kernel.weights = FALSE",
+    gsub("[[:space:]]+", "", helper_text),
+    "divide.returned.kernel.weights=identical(bws$type,\"adaptive_nn\")",
     fixed = TRUE
   )
 })

@@ -480,6 +480,7 @@ npreghat <-
       txdat = txdat,
       exdat = if (no.ex) txdat else eval.data,
       bandwidth.divide = !beta.kernel,
+      .np.internal.bandwidth.divide.weights = !beta.kernel,
       return.kernel.weights = TRUE,
       return.derivative.kernel.weights = TRUE,
       permutation.operator = "derivative"
@@ -1449,7 +1450,8 @@ npreghat <-
     suppress.parallel = 1L
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
-  myopti <- c(myopti, list(divide.returned.kernel.weights = FALSE))
+  myopti <- c(myopti, list(divide.returned.kernel.weights =
+                           identical(bws$type, "adaptive_nn")))
   if (identical(bws$ckertype, "beta") && bws$nuno + bws$nord > 0L) {
     myopti <- c(myopti, list(
       categorical.compress =
@@ -2563,6 +2565,7 @@ npreghat.rbandwidth <-
       bws = bws,
       return.kernel.weights = TRUE,
       bandwidth.divide = TRUE,
+      .np.internal.bandwidth.divide.weights = identical(bws$type, "adaptive_nn"),
       leave.one.out = leave.one.out
     )
     if (!no.ex)
