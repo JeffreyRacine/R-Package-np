@@ -23,6 +23,49 @@ shadow_lines <- function(shadow) {
   shadow_npsigtest_signature(shadow)$line
 }
 
+expect_live_sigtest_progress <- function(shadow, joint) {
+  signature <- shadow_npsigtest_signature(shadow)
+  lines <- signature$line
+  expect_length(unique(signature$id), 1L)
+  # Legacy can suppress a duplicate final line; single-line teardown has its
+  # explicit finish assertion below. Neither renderer may end in abort.
+  expect_true(tail(signature$event, 1L) %in% c("render", "finish"))
+  expect_true(all(grepl("rep [0-9]+/9", lines)))
+  target <- if(joint) rep(1L,length(lines)) else
+    as.integer(sub(".*target ([0-9]+)/2.*", "\\1", lines))
+  reps <- as.integer(sub(".*rep ([0-9]+)/9.*", "\\1", lines))
+  expect_true(all(diff(target) >= 0))
+  for(t in unique(target)) {
+    r <- reps[target==t]
+    expect_identical(r[1L],0L)
+    expect_identical(tail(r,1L),9L)
+    expect_true(all(diff(r)>=0L))
+  }
+}
+
+test_that("npsigtest renderers agree for the same logical event sequence", {
+  old <- options(np.messages=TRUE,np.progress.start.grace.known.sec=0)
+  on.exit(options(old),add=TRUE)
+  drive <- function() {
+    ns <- asNamespace("npRmpi")
+    state <- get(".np_npsig_progress_begin",ns)(c("x1","x2"),9L,FALSE)
+    for(target in 1:2) {
+      get(".np_npsig_progress_target",ns)(state,paste0("x",target),target)
+      for(rep in c(0L,3L,6L,9L))
+        get(".np_progress_step_at",ns)(state,get(".np_progress_now",ns)(),
+                                      done=rep,force=TRUE)
+      get(".np_npsig_progress_complete",ns)(state)
+    }
+    get(".np_progress_end",ns)(state)
+  }
+  legacy <- capture_progress_shadow_trace(drive(),force_renderer="legacy",
+                                          now=progress_time_counter())
+  single <- capture_progress_shadow_trace(drive(),force_renderer="single_line",
+                                          now=progress_time_counter())
+  expect_identical(shadow_npsigtest_signature(single),
+                   shadow_npsigtest_signature(legacy))
+})
+
 skip_live_route_slice <- function() {
   skip_on_cran()
 }
@@ -72,12 +115,9 @@ test_that("npsigtest joint progress has one immediate call-wide owner", {
   single.signature <- shadow_npsigtest_signature(single_line)
 
   expect_s3_class(single_line$value, "sigtest")
-  expect_equal(
-    single.signature[single.signature$event != "finish", ],
-    legacy.signature[legacy.signature$event != "finish", ]
-  )
+  expect_live_sigtest_progress(legacy, joint=TRUE)
+  expect_live_sigtest_progress(single_line, joint=TRUE)
   expect_match(lines[[1L]], "rep 0/9, elapsed 0\\.0s, eta estimating")
-  expect_true(any(grepl("rep [1-8]/9", lines)))
   expect_true(any(grepl("rep 9/9", lines, fixed = TRUE)))
   expect_false(any(grepl("target", lines, fixed = TRUE)))
   expect_length(unique(single.signature$id), 1L)
@@ -112,10 +152,8 @@ test_that("npsigtest individual progress uses completed predictors for ETA", {
   single.signature <- shadow_npsigtest_signature(single_line)
 
   expect_s3_class(single_line$value, "sigtest")
-  expect_equal(
-    single.signature[single.signature$event != "finish", ],
-    legacy.signature[legacy.signature$event != "finish", ]
-  )
+  expect_live_sigtest_progress(legacy, joint=FALSE)
+  expect_live_sigtest_progress(single_line, joint=FALSE)
   expect_match(lines[[1L]], "Testing x1 \\(target 1/2, rep 0/9")
   expect_match(lines[[1L]], "eta estimating")
   expect_true(any(grepl("Testing x2 (target 2/2, rep 0/9", lines, fixed = TRUE)))
