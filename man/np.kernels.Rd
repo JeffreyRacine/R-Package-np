@@ -198,6 +198,11 @@
   evaluation-specific metric bandwidth \eqn{h(x)} or observation-specific
   metric bandwidth \eqn{h_i}, after which the same beta concentration
   mapping is used.
+  For unconditional density and distribution fits, a generalized-NN query
+  identified as a training observation excludes that occurrence when selecting
+  its radius, for beta as for other continuous kernels. The full fit still
+  averages all donor contributions. Explicit external evaluation data remain
+  external even when their values equal training data.
   For overlap, generalized bandwidths are evaluated at both centers;
   adaptive bandwidths remain attached to training centers, while a genuinely
   new evaluation center receives the established generalized-NN auxiliary

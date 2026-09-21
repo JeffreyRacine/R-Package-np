@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Beta generalized-NN unconditional density and distribution fits now preserve
+  training-query identity when choosing radii, as other continuous kernels do.
+  Explicit external queries keep their external geometry; full-fit standard
+  errors use the same corrected contributions. This can change training fits.
+
 * Bandwidth selection now reports activity during baseline-reference
   evaluations without advancing optimizer iteration counts. Native progress
   callbacks preserve interrupts instead of consuming Ctrl-C.
