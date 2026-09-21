@@ -54,6 +54,11 @@ npindexbw.NULL <-
            ydat = stop("training data ydat missing"),
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     mc <- match.call(expand.dots = FALSE)
     dots <- list(...)
     dot.names <- names(dots)
@@ -2765,6 +2770,11 @@ npindexbw.default <-
            nomad.opts = list()){
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npindexbw")
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     mc <- match.call(expand.dots = FALSE)
     search.mc.names <- names(mc)
     dots <- list(...)
@@ -3163,6 +3173,11 @@ npindexbw.sibandwidth <-
       where = "npindexbw"
     )
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

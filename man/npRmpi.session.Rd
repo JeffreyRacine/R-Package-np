@@ -126,6 +126,11 @@ startup/teardown behavior:
   can be slower due to command marshalling/serialization overhead. A practical
   pattern is: keep auto-dispatch enabled for bandwidth selection, then set
   \code{options(npRmpi.autodispatch=FALSE)} for post-\code{bw} fit/predict.
+  With this option, numerical estimator, bandwidth and kernel-sum calls made
+  only on the master enter a scoped local native computation before preparing
+  their inputs. Explicit manual broadcasts remain collective; bootstrap and
+  plot coordinators retain their own worker dispatch. The active pool remains
+  available for subsequent calls, including after an ordinary local error.
   Manual-broadcast/profile mode often behaves closer to this low-overhead
   pattern.
 }

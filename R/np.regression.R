@@ -421,6 +421,11 @@ npreg.rbandwidth <-
     se <- npValidateScalarLogical(se, "se")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     .npRmpi_require_active_slave_pool(where = "npreg()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     dots <- list(...)
     npRejectLegacyBooleanErrors(dots, "npreg")
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
@@ -1167,6 +1172,11 @@ npreg.rbandwidth <-
 npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
                           se = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npreg()")
+  if (.npRmpi_master_local_entry_needed()) {
+    .np.local.entry <- new.env(parent=emptyenv())
+    on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+    .npRmpi_local_entry_begin(.np.local.entry)
+  }
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
   sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)

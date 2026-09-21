@@ -721,6 +721,38 @@
   isTRUE(getOption("npRmpi.autodispatch.context", FALSE))
 }
 
+# Explicit auto-off numerical entries are local unless the expression already
+# has a collective owner. Scope the original invocation: do not replay its call
+# or force argument promises a second time. Coordinators do not use this guard.
+.npRmpi_master_local_entry_needed <- function() {
+  if (!isFALSE(getOption("npRmpi.autodispatch", FALSE)) ||
+      isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) ||
+      .npRmpi_autodispatch_in_context() ||
+      .npRmpi_manual_bcast_in_context())
+    return(FALSE)
+  !.npRmpi_autodispatch_called_from_bcast()
+}
+
+.npRmpi_local_entry_begin <- function(owner) {
+  suspendInterrupts({
+    owner$options <- options(npRmpi.autodispatch.disable=TRUE,
+                             npRmpi.autodispatch.context=TRUE,
+                             npRmpi.local.regression.mode=TRUE)
+    owner$mode <- .Call("C_np_set_local_regression_mode", TRUE,
+                        PACKAGE="npRmpi")
+  })
+  invisible(NULL)
+}
+
+.npRmpi_local_entry_end <- function(owner) {
+  suspendInterrupts({
+    if (!is.null(owner$mode))
+      .Call("C_np_set_local_regression_mode", owner$mode, PACKAGE="npRmpi")
+    if (!is.null(owner$options)) options(owner$options)
+  })
+  invisible(NULL)
+}
+
 .npRmpi_manual_bcast_in_context <- function() {
   isTRUE(getOption("npRmpi.manual.bcast.context", FALSE))
 }

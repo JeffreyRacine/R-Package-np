@@ -345,6 +345,11 @@ npcdistbw.condbandwidth <-
       where = "npcdistbw"
     )
     .npRmpi_require_active_slave_pool(where = "npcdistbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     use.local.compiled.adaptive.cvls <- bandwidth.compute &&
       identical(bws$method, "cv.ls") &&
       identical(bws$type, "adaptive_nn")
@@ -3395,6 +3400,11 @@ npcdistbw.default <-
     if (is.null(degree.search)) {
       tbw <- do.call(condbandwidth, bw.args)
       .npRmpi_require_active_slave_pool(where = "npcdistbw()")
+      if (.npRmpi_master_local_entry_needed()) {
+        .np.local.entry <- new.env(parent=emptyenv())
+        on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+        .npRmpi_local_entry_begin(.np.local.entry)
+      }
       use.local.compiled.adaptive.cvls <- bandwidth.compute &&
         identical(tbw$method, "cv.ls") &&
         identical(tbw$type, "adaptive_nn")

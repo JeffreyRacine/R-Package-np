@@ -146,6 +146,11 @@ npcdens.conbandwidth <- function(bws,
     proper.control = proper.control
   )
   .npRmpi_require_active_slave_pool(where = "npcdens()")
+  if (.npRmpi_master_local_entry_needed()) {
+    .np.local.entry <- new.env(parent=emptyenv())
+    on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+    .npRmpi_local_entry_begin(.np.local.entry)
+  }
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
   reg.spec.preflight <- npConditionalRegEngineSpec(bws, where = "npcdens")
   glp.gradient.order.preflight <- npConditionalGradientOrder(
@@ -700,6 +705,11 @@ npcdens.conbandwidth <- function(bws,
 
 npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npcdens()")
+  if (.npRmpi_master_local_entry_needed()) {
+    .np.local.entry <- new.env(parent=emptyenv())
+    on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+    .npRmpi_local_entry_begin(.np.local.entry)
+  }
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
   nomad <- npValidateNomadControl(nomad, "nomad")
   sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())

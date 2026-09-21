@@ -112,6 +112,11 @@ npudens.bandwidth <-
 
   no.e = missing(edat)
   .npRmpi_require_active_slave_pool(where = "npudens()")
+  if (.npRmpi_master_local_entry_needed()) {
+    .np.local.entry <- new.env(parent=emptyenv())
+    on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+    .npRmpi_local_entry_begin(.np.local.entry)
+  }
   if (.npRmpi_autodispatch_active()) {
     tdat.preflight <- toFrame(tdat)
     if (anyNA(tdat.preflight) && !any(stats::complete.cases(tdat.preflight)))
@@ -316,6 +321,11 @@ npudens.bandwidth <-
 npudens.default <- function(bws, tdat, ..., se = FALSE){
   se <- npValidateScalarLogical(se, "se")
   .npRmpi_require_active_slave_pool(where = "npudens()")
+  if (.npRmpi_master_local_entry_needed()) {
+    .np.local.entry <- new.env(parent=emptyenv())
+    on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+    .npRmpi_local_entry_begin(.np.local.entry)
+  }
   bws.formula.early <- (!missing(bws)) && inherits(bws, "formula")
   tdat.formula.early <- (!missing(tdat)) && inherits(tdat, "formula")
   formula.input <- .np_formula_dispatch_args(

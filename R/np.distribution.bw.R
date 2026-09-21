@@ -126,6 +126,11 @@ npudistbw.NULL <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     dots <- list(...)
     .np_nomad_native_reject_unsupported_options_from_dots(
       dots,
@@ -896,6 +901,11 @@ npudistbw.dbandwidth <-
     if (!missing(nmulti))
       nmulti <- npValidateNmulti(nmulti)
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_autodispatch_active()) {
       if (bandwidth.compute)
         .npudistbw_method_name(bws, where = "npudistbw")
@@ -1263,6 +1273,11 @@ npudistbw.default <-
            nomad.opts = list()){
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudistbw")
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_autodispatch_active()) {
       dat.preflight <- toFrame(dat)
       if (anyNA(dat.preflight) && !any(stats::complete.cases(dat.preflight)))

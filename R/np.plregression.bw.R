@@ -56,6 +56,11 @@ npplregbw.NULL =
            zdat = stop("invoked without data `zdat'"),
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     mc <- match.call(expand.dots = FALSE)
     dots <- list(...)
     dot.names <- names(dots)
@@ -135,6 +140,11 @@ npplregbw.plbandwidth =
     }
     nmulti <- npValidateNmulti(nmulti)
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_autodispatch_active() &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -796,6 +806,11 @@ npplregbw.default =
            ...){
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)

@@ -499,6 +499,11 @@ npplreg.plbandwidth <-
     dots <- list(...)
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     .npRmpi_require_active_slave_pool(where = "npplreg()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     use.master.fit.progress <- .npRmpi_autodispatch_active() &&
       is.null(bws$degree.search) &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
@@ -764,6 +769,11 @@ npplreg.plbandwidth <-
 
 npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = FALSE) {
   .npRmpi_require_active_slave_pool(where = "npplreg()")
+  if (.npRmpi_master_local_entry_needed()) {
+    .np.local.entry <- new.env(parent=emptyenv())
+    on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+    .npRmpi_local_entry_begin(.np.local.entry)
+  }
   explicit.plbandwidth <- (!missing(bws)) && inherits(bws, "plbandwidth")
   formula.forwarded <- (!missing(txdat)) && inherits(txdat, "formula")
   early.dots <- .np_formula_dispatch_args(

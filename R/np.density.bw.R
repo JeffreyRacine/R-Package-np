@@ -72,6 +72,11 @@ npudensbw.NULL <-
       "native npudens NOMAD route"
     )
     .npRmpi_require_active_slave_pool(where = "npudensbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_autodispatch_active()) {
       dat.preflight <- toFrame(dat)
       if (anyNA(dat.preflight) && !any(stats::complete.cases(dat.preflight)))
@@ -841,6 +846,11 @@ npudensbw.bandwidth <-
     if (!missing(nmulti))
       nmulti <- npValidateNmulti(nmulti)
     .npRmpi_require_active_slave_pool(where = "npudensbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_autodispatch_active()) {
       if (bandwidth.compute)
         .npudensbw_method_name(bws, where = "npudensbw")
@@ -1177,6 +1187,11 @@ npudensbw.default <-
            nomad.opts = list()){
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudensbw")
     .npRmpi_require_active_slave_pool(where = "npudensbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_autodispatch_active()) {
       dat.preflight <- toFrame(dat)
       if (anyNA(dat.preflight) && !any(stats::complete.cases(dat.preflight)))

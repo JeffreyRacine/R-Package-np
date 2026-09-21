@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Explicitly disabling automatic dispatch now establishes local numerical
+  ownership at estimator and bandwidth entry, including preparation and
+  kernel sums. This prevents master-only calls from entering an unmatched
+  native collective. Manual broadcasts and bootstrap worker dispatch retain
+  their existing collective ownership; ordinary errors restore the pool state.
+
 * Automatic MPI dispatch retains already evaluated bandwidth arguments and
   shares one realization between formula detection and publication. Stateful
   native bandwidth expressions are no longer evaluated repeatedly; errors and

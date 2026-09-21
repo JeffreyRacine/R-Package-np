@@ -23,6 +23,11 @@ npksum.formula <-
   function(formula, data, newdata, subset, na.action, ...){
     dots <- list(...)
     .npRmpi_require_active_slave_pool(where = "npksum()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_npksum_should_localize(NULL, list(...)) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
@@ -83,6 +88,11 @@ npksum.numeric <-
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
     dots$return.derivative.kernel.weights <- NULL
     .npRmpi_require_active_slave_pool(where = "npksum()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_npksum_should_localize(bws, list(...)) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
@@ -192,6 +202,11 @@ npksum.default <-
     kernel.pow <- as.integer(kernel.pow)
 
     .npRmpi_require_active_slave_pool(where = "npksum()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_npksum_should_localize(bws, dots) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
       if (is.null(internal.entry.guard))

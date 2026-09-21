@@ -298,6 +298,11 @@ npindex.call <-
 npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
                             se = TRUE, ..., se.type = c("asymptotic", "bootstrap")){
   .npRmpi_require_active_slave_pool(where = "npindex()")
+  if (.npRmpi_master_local_entry_needed()) {
+    .np.local.entry <- new.env(parent=emptyenv())
+    on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+    .npRmpi_local_entry_begin(.np.local.entry)
+  }
   sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
@@ -646,6 +651,11 @@ npindex.sibandwidth <-
       stop("'B' must be a positive integer")
     B <- as.integer(B)
     .npRmpi_require_active_slave_pool(where = "npindex()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     spec <- .npindex_resolve_spec(bws, where = "npindex")
     native.newdata <- dots[["newdata", exact = TRUE]]
     if (missing(exdat) && !is.null(native.newdata)) {

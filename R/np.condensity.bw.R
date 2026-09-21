@@ -538,6 +538,11 @@ npcdensbw.conbandwidth <-
     )
     .npcdensbw_assert_bounded_cvls_supported(bws, where = "npcdensbw()")
     .npRmpi_require_active_slave_pool(where = "npcdensbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     keep_local_prepared_nn <- bandwidth.compute &&
       identical(spec$regtype.engine, "lp") &&
       identical(bws$method %in% c("cv.ml", "cv.ls"), TRUE) &&
@@ -4174,6 +4179,11 @@ npcdensbw.default <-
     if (is.null(degree.search)) {
       tbw <- do.call(conbandwidth, bw.args)
       .npRmpi_require_active_slave_pool(where = "npcdensbw()")
+      if (.npRmpi_master_local_entry_needed()) {
+        .np.local.entry <- new.env(parent=emptyenv())
+        on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+        .npRmpi_local_entry_begin(.np.local.entry)
+      }
       keep_local_prepared_nn <- bandwidth.compute &&
         identical(tbw$regtype.engine, "lp") &&
         identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&

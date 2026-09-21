@@ -76,6 +76,11 @@ npregbw.NULL <-
       dots$penalty.multiplier <-
         npValidateRegressionPenaltyMultiplier(dots$penalty.multiplier)
     .npRmpi_require_active_slave_pool(where = "npregbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     dot.names <- names(dots)
     nomad.requested <- ("nomad" %in% dot.names) &&
       npNomadControlRequested(dots$nomad, "nomad")
@@ -193,6 +198,11 @@ npregbw.rbandwidth <-
     nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
     .npRmpi_require_active_slave_pool(where = "npregbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
@@ -3289,6 +3299,11 @@ npregbw.default <-
     penalty.multiplier <-
       npValidateRegressionPenaltyMultiplier(penalty.multiplier)
     .npRmpi_require_active_slave_pool(where = "npregbw()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     lp.dot.args <- list(...)
     if ("remin" %in% names(lp.dot.args)) {
       legacy.remin <- npValidateScalarLogical(lp.dot.args$remin, "remin")

@@ -156,6 +156,11 @@ npscoef.call <-
 npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
                             se = FALSE, ...) {
   .npRmpi_require_active_slave_pool(where = "npscoef()")
+  if (.npRmpi_master_local_entry_needed()) {
+    .np.local.entry <- new.env(parent=emptyenv())
+    on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+    .npRmpi_local_entry_begin(.np.local.entry)
+  }
   explicit.scbandwidth <- (!missing(bws)) && inherits(bws, "scbandwidth")
   formula.forwarded <- (!missing(txdat)) && inherits(txdat, "formula")
   early.dots <- .np_formula_dispatch_args(
@@ -1405,6 +1410,11 @@ npscoef.scbandwidth <-
     tol <- as.double(tol)
 
     .npRmpi_require_active_slave_pool(where = "npscoef()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     if (.npRmpi_npscoef_should_localize(bws) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))

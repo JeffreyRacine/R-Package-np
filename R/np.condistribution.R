@@ -136,6 +136,11 @@ npcdist.condbandwidth <-
       proper.control = proper.control
     )
     .npRmpi_require_active_slave_pool(where = "npcdist()")
+    if (.npRmpi_master_local_entry_needed()) {
+      .np.local.entry <- new.env(parent=emptyenv())
+      on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+      .npRmpi_local_entry_begin(.np.local.entry)
+    }
     .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdist()")
     reg.spec.preflight <- npConditionalRegEngineSpec(bws, where = "npcdist")
     glp.gradient.order.preflight <- npConditionalGradientOrder(
@@ -688,6 +693,11 @@ npcdist.condbandwidth <-
 
 npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npcdist()")
+  if (.npRmpi_master_local_entry_needed()) {
+    .np.local.entry <- new.env(parent=emptyenv())
+    on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
+    .npRmpi_local_entry_begin(.np.local.entry)
+  }
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdist()")
   nomad <- npValidateNomadControl(nomad, "nomad")
   sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
