@@ -1,4 +1,6 @@
 test_that("kernel sums use weight-by-response layout across ordinary owners", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE, np.largeh=FALSE, np.largelambda=FALSE)
   on.exit(options(old), add=TRUE)
   set.seed(30921)
@@ -26,6 +28,8 @@ test_that("kernel sums use weight-by-response layout across ordinary owners", {
 })
 
 test_that("matrix role decoding covers permutations and paired powers", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE,np.tree=TRUE,np.largeh=FALSE,np.largelambda=FALSE)
   on.exit(options(old),add=TRUE)
   set.seed(34921); n<-24L
@@ -66,6 +70,8 @@ test_that("matrix role decoding covers permutations and paired powers", {
 })
 
 test_that("smooth coefficient backfitting keeps its scalar update contract", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.tree=FALSE,np.largeh=FALSE,np.largelambda=FALSE)
   on.exit(options(old),add=TRUE)
   set.seed(882);n<-24L;x<-data.frame(x=runif(n,.2,1.4));z<-data.frame(z=runif(n,.1,.9))
@@ -89,6 +95,8 @@ test_that("smooth coefficient backfitting keeps its scalar update contract", {
 })
 
 test_that("IV local moment consumers follow W-by-Y kernel sums", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.tree=FALSE,np.largeh=FALSE,np.largelambda=FALSE)
   on.exit(options(old),add=TRUE)
   # Exercise the actual nested owners without running a full IV bandwidth search.

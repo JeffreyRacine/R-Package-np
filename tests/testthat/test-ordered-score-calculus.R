@@ -10,6 +10,8 @@ ordered_score_oracle <- function(distance, lambda, kernel) {
 }
 
 test_that("ordered bandwidth scores differentiate their normal kernels", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE, np.largelambda=FALSE)
   on.exit(options(old), add=TRUE)
   for (values in list(0:3, c(0, 2, 5))) {
@@ -36,6 +38,8 @@ test_that("ordered bandwidth scores differentiate their normal kernels", {
 })
 
 test_that("ordered scores preserve selected-coordinate packing in mixed data", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE,np.largelambda=FALSE,np.largeh=FALSE)
   on.exit(options(old),add=TRUE)
   x <- data.frame(a=ordered(c(0,1,2,3,0,2),levels=0:3),
@@ -58,4 +62,3 @@ test_that("ordered scores preserve selected-coordinate packing in mixed data", {
     expect_equal(unname(as.matrix(actual$p.ksum)),expected,tolerance=2e-13)
   }
 })
-

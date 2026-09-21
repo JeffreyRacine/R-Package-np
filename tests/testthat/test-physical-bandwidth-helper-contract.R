@@ -1,4 +1,6 @@
 test_that("physical bandwidth extraction preserves scaled profile models", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE,np.categorical.compress=TRUE)
   on.exit(options(old),add=TRUE)
   i <- seq_len(30L)
@@ -31,6 +33,8 @@ test_that("physical bandwidth extraction preserves scaled profile models", {
 })
 
 test_that("scaled hats and bootstrap reuse equal their physical estimator", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE)
   on.exit(options(old),add=TRUE)
   i <- seq_len(30L)

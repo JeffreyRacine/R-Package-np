@@ -1,4 +1,6 @@
 test_that("convolution coordinates populate every replacement product", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE, np.largeh=FALSE, np.largelambda=FALSE)
   on.exit(options(old), add=TRUE)
   x <- data.frame(a=c(-1.1,-.7,-.2,.1,.35,.6,.95,1.3,1.8),
@@ -26,6 +28,8 @@ test_that("convolution coordinates populate every replacement product", {
 })
 
 test_that("Gaussian replacement products agree with analytic overlap calculus", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE,np.tree=FALSE,np.largeh=FALSE)
   on.exit(options(old),add=TRUE)
   x <- data.frame(a=c(-.8,-.3,.1,.6,1.2),b=c(.4,-.2,1.1,-.7,.8))
@@ -41,6 +45,8 @@ test_that("Gaussian replacement products agree with analytic overlap calculus", 
 })
 
 test_that("categorical score planes inherit continuous convolution products", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE,np.tree=FALSE)
   on.exit(options(old),add=TRUE)
   x <- data.frame(x=c(-.8,-.3,.1,.6,1.2),

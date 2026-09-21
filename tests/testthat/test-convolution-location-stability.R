@@ -12,6 +12,8 @@ convolution_kernel_oracle <- function(z, kernel, order) {
 }
 
 test_that("convolution pairs agree with centered integration after translation", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.largeh=FALSE,np.largelambda=FALSE)
   on.exit(options(old),add=TRUE)
   z<-c(-.8,-.45,-.2,.03,.22,.47,.68,.91,1.1);n<-length(z)
@@ -45,6 +47,8 @@ test_that("convolution pairs agree with centered integration after translation",
 })
 
 test_that("density CVLS is the independent overlap minus delete-one cross term", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.tree=FALSE,np.largeh=FALSE,np.largelambda=FALSE)
   on.exit(options(old),add=TRUE)
   z<-c(-.8,-.45,-.2,.03,.22,.47,.68,.91,1.1);h<-.31;n<-length(z)
@@ -70,6 +74,8 @@ test_that("density CVLS is the independent overlap minus delete-one cross term",
 })
 
 test_that("conditional CVLS convolution remains translation invariant", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.tree=FALSE,np.largeh=FALSE,np.largelambda=FALSE)
   on.exit(options(old),add=TRUE)
   set.seed(88921);n<-19L;x<-data.frame(x=runif(n,-1,1));y<-sin(x$x)+rnorm(n,sd=.3)

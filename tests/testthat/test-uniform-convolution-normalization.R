@@ -2,6 +2,8 @@ uniform_overlap_oracle <- function(a, b, ha, hb)
   pmax(0, pmin(a+ha,b+hb)-pmax(a-ha,b-hb))/4
 
 test_that("uniform convolution keeps bandwidth ownership at its caller", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.largeh=FALSE,np.largelambda=FALSE)
   on.exit(options(old),add=TRUE)
   z<-c(-.8,-.45,-.2,.03,.22,.47,.68,.91,1.1);n<-length(z)
@@ -31,6 +33,8 @@ test_that("uniform convolution keeps bandwidth ownership at its caller", {
 })
 
 test_that("uniform density CVLS agrees with independent support overlaps", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.tree=FALSE,np.largeh=FALSE)
   on.exit(options(old),add=TRUE)
   z<-c(-.8,-.45,-.2,.03,.22,.47,.68,.91,1.1);n<-length(z)
@@ -45,6 +49,8 @@ test_that("uniform density CVLS agrees with independent support overlaps", {
 })
 
 test_that("uniform conditional CVLS uses one response normalization", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.tree=FALSE,np.largeh=FALSE)
   on.exit(options(old),add=TRUE)
   set.seed(2481);n<-17L;x<-runif(n,-1,1);y<-sin(x)+rnorm(n,sd=.3)

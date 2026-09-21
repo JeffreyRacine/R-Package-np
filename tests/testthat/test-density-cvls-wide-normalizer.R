@@ -1,4 +1,6 @@
 test_that("density CVLS uses a wide sample-count normalizer", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages = FALSE, np.tree = FALSE,
                  np.categorical.compress = FALSE, np.largelambda = TRUE)
   on.exit(options(old), add = TRUE)
@@ -18,4 +20,3 @@ test_that("density CVLS uses a wide sample-count normalizer", {
     }
   }
 })
-
