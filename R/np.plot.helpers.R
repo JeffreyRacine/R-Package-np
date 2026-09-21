@@ -5598,10 +5598,12 @@
 }
 
 .np_con_xregtype <- function(bws) {
-  npConditionalRegEngineSpec(
+  spec <- npValidatedConditionalRegSpec(
     bws,
-    where = "conditional plot helper"
-  )$reg.engine
+    where = "conditional plot helper",
+    ncon.field = "xncon"
+  )
+  if (npIsCanonicalLp0Spec(spec, ncon = bws$xncon)) "lc" else spec$regtype.engine
 }
 
 .np_con_make_kbandwidth_x <- function(bws, xdat) {
