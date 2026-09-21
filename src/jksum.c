@@ -12490,9 +12490,11 @@ static int np_nn_fold_ckernelv(
     const double normalization = np_cker_bounded_norm(
       kernel_code, fold->train[coordinate][donor], h[slot], lower, upper).
       inverse_mass;
+    /* The parent owns large-h policy. A radius partition is not a new
+     * evaluation domain on which to admit a constant-kernel shortcut. */
     np_ckernelv(kernel_code, evaluation, fold->num_eval, multiply,
                 fold->train[coordinate][donor], h[slot], product, ranges[slot],
-                1, 1, 0, divide ? normalization/h[slot] : normalization,
+                1, 1, 1, divide ? normalization/h[slot] : normalization,
                 0, lower, upper, NULL, NULL);
   }
   return 0;
