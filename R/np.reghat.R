@@ -1217,7 +1217,8 @@ npreghat <-
                                       bandwidth.divide = TRUE,
                                       kernel.pow = 1.0,
                                       operator = NULL,
-                                      int.do.tree = NULL) {
+                                      int.do.tree = NULL,
+                                      fold.rows = NULL) {
   miss.ex <- is.null(exdat)
   txdat <- toFrame(txdat)
   if (!miss.ex) {
@@ -1286,6 +1287,14 @@ npreghat <-
   tnrow <- nrow(txdat)
   enrow <- if (miss.ex) tnrow else nrow(exdat)
   nkw <- tnrow * enrow
+  fold.geometry <- (leave.one.out || !is.null(fold.rows)) &&
+    bws$type %in% c("generalized_nn", "adaptive_nn") && bws$ncon > 0L
+  if (fold.geometry) {
+    if (is.null(fold.rows)) fold.rows <- seq_len(tnrow)
+    if (!is.integer(fold.rows) || length(fold.rows) != enrow ||
+        anyNA(fold.rows) || any(fold.rows < 1L | fold.rows > tnrow))
+      stop("invalid internal raw delete-one occurrence map")
+  }
 
   myopti <- list(
     num_obs_train = tnrow,
@@ -1317,7 +1326,7 @@ npreghat <-
       racineliyan = OKER_RLY
     ),
     miss.ex = miss.ex,
-    leave.one.out = leave.one.out,
+    leave.one.out = leave.one.out && !fold.geometry,
     bandwidth.divide = bandwidth.divide,
     mcv.numRow = attr(bws$xmcv, "num.row"),
     wncol = 0L,
@@ -1343,6 +1352,10 @@ npreghat <-
     if (is.null(data)) as.double(0.0) else as.double(data)
   }
 
+  myopti <- as.integer(myopti)
+  if (fold.geometry)
+    attr(myopti, "np.fold.train.index") <- fold.rows - 1L
+
   myout <- .Call(
     "C_np_kernelsum",
     asDouble(tuno), asDouble(tord), asDouble(tcon),
@@ -1351,7 +1364,7 @@ npreghat <-
     as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
     as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
     as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
-    as.integer(myopti), as.double(kernel.pow),
+    myopti, as.double(kernel.pow),
     as.integer(enrow),
     as.integer(0L),
     as.integer(nkw),

@@ -145,6 +145,10 @@ npksum.default <-
     dots$.np.internal.bandwidth.divide.weights <- NULL
     internal.eval.train.index <- dots$.np.internal.eval.train.index
     dots$.np.internal.eval.train.index <- NULL
+    internal.fold.geometry <- isTRUE(dots$.np.internal.fold.geometry)
+    dots$.np.internal.fold.geometry <- NULL
+    internal.fold.train.index <- dots$.np.internal.fold.train.index
+    dots$.np.internal.fold.train.index <- NULL
     internal.tree.outer.blas <- isTRUE(dots$.np.internal.tree.outer.blas)
     dots$.np.internal.tree.outer.blas <- NULL
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
@@ -325,6 +329,21 @@ npksum.default <-
 
     tnrow = nrow(txdat)
     enrow = (if (miss.ex) tnrow else nrow(exdat))
+    fold.geometry <- internal.fold.geometry &&
+      (leave.one.out || !is.null(internal.fold.train.index)) &&
+      bws$type %in% c("generalized_nn", "adaptive_nn") && bws$ncon > 0L
+    if (!is.null(internal.fold.train.index) &&
+        (!fold.geometry || miss.ex || leave.one.out ||
+         length(rows.omit) || length(attr(exdat, "na.action")) ||
+         !is.integer(internal.fold.train.index) ||
+         length(internal.fold.train.index) != enrow ||
+         anyNA(internal.fold.train.index) ||
+         any(internal.fold.train.index < 1L | internal.fold.train.index > tnrow)))
+      stop("invalid internal raw delete-one occurrence map")
+    if (fold.geometry && (internal.power12 || compute.ocg || compute.score ||
+                          permutation.operator != "none" ||
+                          any(operator != "normal") || !kernel.pow %in% c(1, 2)))
+      stop("invalid internal raw delete-one kernel-sum request")
     if (!is.null(internal.eval.train.index)) {
       if (miss.ex || leave.one.out || internal.power12 || beta.kernel ||
           bws$type != "generalized_nn" || bws$ncon < 1L ||
@@ -465,7 +484,15 @@ npksum.default <-
       ))
 
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+    if (fold.geometry) myopti$leave.one.out <- FALSE
     myopti <- as.integer(myopti)
+    if (fold.geometry) {
+      # Private estimator contract: delete the occurrence before constructing
+      # its NN geometry. Public leave.one.out keeps its zero-diagonal meaning.
+      attr(myopti, "np.fold.train.index") <-
+        (if (is.null(internal.fold.train.index)) seq_len(tnrow)
+         else internal.fold.train.index) - 1L
+    }
     if (!is.null(internal.eval.train.index))
       attr(myopti, "np.eval.train.index") <- internal.eval.train.index - 1L
     

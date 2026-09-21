@@ -169,6 +169,19 @@ npscoefbw.NULL <-
   if (any(!is.finite(bandwidth)))
     return(invisible(TRUE))
 
+  # This validator belongs to CV objectives: candidate geometry must also be
+  # admissible after deleting the held-out occurrence, not just on n rows.
+  fold.bandwidth <- .npscoef_nn_candidate_bandwidth(
+    param = scbw$bw, bwtype = scbw$type,
+    nobs = nrow(eval.zdat) - 1L, icon = scbw$icon
+  )[continuous]
+  if (any(!is.finite(fold.bandwidth))) {
+    .np_nn_abort_candidate_invalid(
+      sprintf("%s has an inadmissible nearest-neighbor count after deletion", owner),
+      owner = owner, point = as.double(scbw$bw)
+    )
+  }
+
   tie.maximum <- vapply(continuous, function(j) {
     value <- eval.zdat[[j]]
     max(tabulate(match(value, value), nbins = length(value)))
@@ -1239,7 +1252,7 @@ npscoefbw.scbandwidth <-
               if (use_cat_profile_cv_lc(sbw)) {
                 mean.loo <- lc_cat_profile_loo_mean(sbw)
               } else {
-                tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
+                tww <- .np_estimator_loo_ksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
                               leave.one.out = TRUE)$ksum
 
                 mean.loo <- rep(maxPenalty,n)
@@ -1385,7 +1398,7 @@ npscoefbw.scbandwidth <-
                     profile.sums = current.partial.profile
                   )
                 } else {
-                  tww <- npksum(txdat=zdat,
+                  tww <- .np_estimator_loo_ksum(txdat=zdat,
                                 tydat=cbind(partial.orig * wj, wj * wj),
                                 weights=cbind(partial.orig * wj, 1),
                                 bws=sbw,
@@ -1762,7 +1775,7 @@ npscoefbw.scbandwidth <-
 
                   if (identical(reg.engine, "lc")) {
                     wj <- W[,j]
-                    tww <- npksum(txdat=zdat,
+                    tww <- .np_estimator_loo_ksum(txdat=zdat,
                                   tydat=cbind(partial.orig * wj, wj * wj),
                                   weights=cbind(partial.orig * wj, 1),
                                   bws=bws)$ksum
@@ -2193,7 +2206,7 @@ npscoefbw.scbandwidth <-
       kernel.bws = bws,
       ytensor = cbind(ctx$ydat, ctx$W),
       Wz.eval = NULL,
-      bandwidth.divide = FALSE
+      bandwidth.divide = identical(bws$type, "adaptive_nn")
     ))
   }
 

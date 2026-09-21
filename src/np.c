@@ -7270,7 +7270,7 @@ static void np_kernelsum_common(double *tuno, double *tord, double *tcon,
                                 double *weighted_p_sum, double *kernel_weights,
                                 double *permutation_kernel_weights,
                                 double *ckerlb, double *ckerub,
-                                const int *eval_to_train);
+                                const int *eval_to_train, int fold_requested);
 void np_kernelsum(double * tuno, double * tord, double * tcon,
                   double * ty, double * weights,
                   double * euno, double * eord, double * econ,
@@ -12635,6 +12635,65 @@ static void np_beta_categorical_ingress_prepare_or_error(
   }
 }
 
+static int np_kernelsum_fold_prepare(
+  NPNNKernelFold *fold, int mode, int nt, int ne, int nc,
+  int nu, int no, double **train, double **evaluation, const int *map,
+  double *scale_factor, double *lambda, int select_rows, int suppress_parallel)
+{
+  const int columns = mode == BW_ADAP_NN ? nt : ne;
+  NPNNGeometryContext geometry = {.mode = NP_NN_QUERY_TRAINING_MAP,
+                                 .eval_to_train = map};
+  NPNNGeometryStatus status = NP_NN_GEOMETRY_OK;
+  double *fold_scale_factor = scale_factor;
+  fold->num_train = nt; fold->num_eval = ne; fold->num_continuous = nc;
+  fold->train = train; fold->eval_to_train = map;
+  fold->primary = (double **)R_alloc((size_t)nc, sizeof(double *));
+  for(int d = 0; d < nc; ++d)
+    fold->primary[d] = (double *)R_alloc((size_t)columns, sizeof(double));
+  if(mode == BW_GEN_NN) {
+    /* Resolve extended counts against the deleted sample, exactly as an
+       external evaluation on a literal n-1-observation fit does. */
+    fold_scale_factor = (double *)R_alloc((size_t)(nc + nu + no), sizeof(double));
+    fold->scale = (double *)R_alloc((size_t)nc, sizeof(double));
+    for(int d = 0; d < nc + nu + no; ++d) fold_scale_factor[d] = scale_factor[d];
+    for(int d = 0; d < nc; ++d) {
+      int lookup;
+      if(np_nn_lookup_from_scale(nt - 1, 1, scale_factor[d],
+           &lookup, &fold->scale[d], NULL) != 0)
+        return KWSNP_ERR_BADINVOC;
+      fold_scale_factor[d] = (double)lookup;
+    }
+  }
+  if(mode == BW_ADAP_NN) {
+    fold->successor = (double **)R_alloc((size_t)nc, sizeof(double *));
+    if(select_rows)
+      fold->selected = (double **)R_alloc((size_t)nc, sizeof(double *));
+    fold->scale = (double *)R_alloc((size_t)nc, sizeof(double));
+    for(int d = 0; d < nc; ++d) {
+      fold->successor[d] = (double *)R_alloc((size_t)nt, sizeof(double));
+      if(select_rows)
+        fold->selected[d] = (double *)R_alloc((size_t)nt, sizeof(double));
+    }
+    geometry.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
+    geometry.eval_to_train = NULL;
+    geometry.adaptive_successor = fold->successor;
+    geometry.adaptive_fold_scale = fold->scale;
+  }
+  if(kernel_bandwidth_mean_ctx(0, mode, nt, mode == BW_ADAP_NN ? nt : ne,
+       0, 0, 0, nc, nu, no, suppress_parallel, fold_scale_factor, NULL, NULL, train,
+       mode == BW_ADAP_NN ? train : evaluation, NULL, fold->primary, lambda,
+       &geometry, NULL, &status) != 0)
+    return KWSNP_ERR_BADINVOC;
+  if(mode == BW_GEN_NN)
+    for(int d = 0; d < nc; ++d)
+      for(int i = 0; i < ne; ++i) fold->primary[d][i] *= fold->scale[d];
+  if(select_rows && mode == BW_ADAP_NN && np_nn_adaptive_fold_select_row(
+       nt, nc, train, fold->primary, fold->successor, fold->scale, map[0],
+       fold->selected) != NP_NN_GEOMETRY_OK)
+    return KWSNP_ERR_BADINVOC;
+  return 0;
+}
+
 SEXP C_np_kernelsum(SEXP tuno,
                     SEXP tord,
                     SEXP tcon,
@@ -12710,17 +12769,24 @@ SEXP C_np_kernelsum(SEXP tuno,
   n_pkw = (return_kernel_weights && (p_nvar > 0)) ? ((R_xlen_t)n_kw * (R_xlen_t)p_nvar) : 0;
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
-  if(INTEGER(myopti_i)[KWS_BWI] == BW_GEN_NN) {
-    SEXP map = getAttrib(myopti, install("np.eval.train.index"));
+  const int fold_requested =
+    getAttrib(myopti, install("np.fold.train.index")) != R_NilValue;
+  if(INTEGER(myopti_i)[KWS_BWI] == BW_GEN_NN || fold_requested) {
+    SEXP map = getAttrib(myopti, install(fold_requested ?
+                        "np.fold.train.index" : "np.eval.train.index"));
     if(map != R_NilValue) {
       const int nt = INTEGER(myopti_i)[KWS_TNOBSI];
       const int ne = INTEGER(myopti_i)[KWS_ENOBSI];
       if(TYPEOF(map) != INTSXP || nt <= 0 || ne <= 0 ||
          XLENGTH(map) != ne || ncon <= 0 ||
-         descriptor.family == NP_CKERNEL_FAMILY_BETA ||
-         INTEGER(myopti_i)[KWS_TISEI] || INTEGER(myopti_i)[KWS_LOOI] ||
+         (!fold_requested && (descriptor.family == NP_CKERNEL_FAMILY_BETA ||
+                               INTEGER(myopti_i)[KWS_TISEI])) ||
+         INTEGER(myopti_i)[KWS_LOOI] ||
+         (fold_requested && INTEGER(myopti_i)[KWS_BWI] != BW_GEN_NN &&
+          INTEGER(myopti_i)[KWS_BWI] != BW_ADAP_NN) ||
          !np_real_buffer_has_matrix(tcon_r, nt, ncon) ||
-         !np_real_buffer_has_matrix(econ_r, ne, ncon))
+         (!INTEGER(myopti_i)[KWS_TISEI] &&
+          !np_real_buffer_has_matrix(econ_r, ne, ncon)))
         error("C_np_kernelsum: invalid internal NN training map");
       eval_to_train = INTEGER(map);
       for(int j = 0; j < ne; ++j)
@@ -12733,6 +12799,16 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(out_pksum = allocVector(REALSXP, n_pksum));
   PROTECT(out_kw = allocVector(REALSXP, n_kw));
   PROTECT(out_pkw = allocVector(REALSXP, n_pkw));
+
+  if(fold_requested) {
+    if(p_operator != OP_NOOP || do_score || do_ocg ||
+       (REAL(kpow_r)[0] != 1.0 && REAL(kpow_r)[0] != 2.0) ||
+       XLENGTH(op_i) != ncon + nuno + nord)
+      error("invalid operator for raw delete-one kernel weights");
+    for(int d = 0; d < ncon + nuno + nord; ++d)
+      if(INTEGER(op_i)[d] != OP_NORMAL)
+        error("raw delete-one kernel weights require normal operators");
+  }
 
   if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     const int num_train = INTEGER(myopti_i)[KWS_TNOBSI];
@@ -12828,7 +12904,7 @@ SEXP C_np_kernelsum(SEXP tuno,
          !np_real_buffer_has_matrix(mcv_r, max_levels, ncat))
         error("C_np_kernelsum: invalid categorical support metadata");
     }
-    if(beta_bandwidth_code != BW_FIXED) {
+    if(beta_bandwidth_code != BW_FIXED && !fold_requested) {
       const int need_eval = (beta_bandwidth_code == BW_GEN_NN) || has_overlap;
       const int need_train = (beta_bandwidth_code == BW_ADAP_NN) || has_overlap;
       double *bandwidth_eval_storage = need_eval ?
@@ -12886,6 +12962,7 @@ SEXP C_np_kernelsum(SEXP tuno,
       double **weight_columns = NULL;
       NPBetaCategoricalIngress categorical_ingress;
       int route_status;
+      NPNNKernelFold fold = {0};
 
       route.segment_count = 1;
       route.segment[0].descriptor = descriptor;
@@ -12933,7 +13010,17 @@ SEXP C_np_kernelsum(SEXP tuno,
             (size_t)i * (size_t)num_train;
       }
 
-      route_status = kernel_weighted_sum_np_route(
+      if(fold_requested) {
+        if(np_kernelsum_fold_prepare(&fold, beta_bandwidth_code,
+          num_train, num_eval, ncon, 0, 0, train_columns, evaluation_columns,
+          eval_to_train, REAL(bw_r), NULL, 1, 0) != 0)
+          error("raw delete-one kernel geometry failed");
+        if(beta_bandwidth_code == BW_GEN_NN)
+          bandwidth_eval_columns = fold.primary;
+        else
+          bandwidth_train_columns = fold.selected;
+      }
+      route_status = kernel_weighted_sum_np_fold_route(
         NULL, categorical_ingress.kernel_unordered,
         categorical_ingress.kernel_ordered,
         beta_bandwidth_code, num_train, num_eval,
@@ -12957,7 +13044,7 @@ SEXP C_np_kernelsum(SEXP tuno,
         REAL(out_ksum), REAL(out_pksum),
         return_kernel_weights ? REAL(out_kw) : NULL, NULL,
         categorical_compress, &route,
-        &route_diagnostics);
+        &route_diagnostics, fold_requested ? &fold : NULL);
       undefined_count = route_diagnostics.undefined_count;
       if(route_status != 0 &&
          route_diagnostics.beta_status != NP_BETA_OK)
@@ -13040,7 +13127,7 @@ SEXP C_np_kernelsum(SEXP tuno,
                  REAL(mcv_r), REAL(padnum_r),
                  INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
                  REAL(out_ksum), NULL, REAL(out_pksum), REAL(out_kw), REAL(out_pkw),
-                 ckerlb_p, ckerub_p, eval_to_train);
+                 ckerlb_p, ckerub_p, eval_to_train, fold_requested);
   }
 
   PROTECT(out = allocVector(VECSXP, 4));
@@ -21985,7 +22072,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                 double * kernel_weights,
                                 double * permutation_kernel_weights,
                                 double * ckerlb, double * ckerub,
-                                const int *eval_to_train){
+                                const int *eval_to_train, int fold_requested){
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
       
@@ -22001,6 +22088,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   int p_operator, do_score, do_ocg, p_nvar = 0;
   int tree_outer_blas_requested = 0;
   int query_bandwidth_provided = 0;
+  NPNNKernelFold fold = {0};
 
   int use_tree = 0;
   int allocated_X_train = 1, allocated_X_eval = 1;
@@ -22470,18 +22558,28 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
    * matrix, apply, density, distribution, and derivative consumers share one
    * geometry contract while the weighted-sum engine remains unchanged.
    */
-  if(BANDWIDTH_reg_extern == BW_GEN_NN && (train_is_eval || eval_to_train != NULL) &&
+  const int *query_map = eval_to_train;
+  if(eval_to_train != NULL && use_tree) {
+    int *inverse_train = (int *)R_alloc((size_t)num_obs_train_extern, sizeof(int));
+    int *permuted_map = (int *)R_alloc((size_t)num_obs_eval_extern, sizeof(int));
+    for(i = 0; i < num_obs_train_extern; ++i) inverse_train[ipt[i]] = i;
+    for(i = 0; i < num_obs_eval_extern; ++i)
+      permuted_map[i] = inverse_train[eval_to_train[ipe[i]]];
+    query_map = permuted_map;
+  }
+  if(fold_requested) {
+    query_lambda = (double *)R_alloc(
+      (size_t)MAX(1, num_reg_unordered_extern + num_reg_ordered_extern), sizeof(double));
+    npks_err = np_kernelsum_fold_prepare(&fold, BANDWIDTH_reg_extern,
+      num_obs_train_extern, num_obs_eval_extern, num_reg_continuous_extern,
+      num_reg_unordered_extern, num_reg_ordered_extern,
+      matrix_X_continuous_train_extern, matrix_X_continuous_eval_extern,
+      query_map, &vector_scale_factor[1], query_lambda, 0, 0);
+    if(npks_err != 0) goto cleanup_kernelsum_fold;
+    query_bandwidth = fold.primary;
+    query_bandwidth_provided = 1;
+  } else if(BANDWIDTH_reg_extern == BW_GEN_NN && (train_is_eval || eval_to_train != NULL) &&
      num_reg_continuous_extern > 0){
-    const int *query_map = eval_to_train;
-    if(eval_to_train != NULL && use_tree) {
-      int *inverse_train = (int *)R_alloc((size_t)num_obs_train_extern, sizeof(int));
-      int *permuted_map = (int *)R_alloc((size_t)num_obs_eval_extern, sizeof(int));
-      for(i = 0; i < num_obs_train_extern; ++i)
-        inverse_train[ipt[i]] = i;
-      for(i = 0; i < num_obs_eval_extern; ++i)
-        permuted_map[i] = inverse_train[eval_to_train[ipe[i]]];
-      query_map = permuted_map;
-    }
     const NPNNGeometryContext query_geometry = {
       .mode = query_map == NULL ? NP_NN_QUERY_TRAINING_IDENTITY :
                                  NP_NN_QUERY_TRAINING_MAP,
@@ -22592,7 +22690,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       pkw);
   } else {
     int_TREE_OUTER_BLAS = tree_outer_blas_requested;
-    npks_err = kernel_weighted_sum_np(kernel_c,
+    npks_err = kernel_weighted_sum_np_fold_route(kernel_c,
                                       kernel_u,
                                       kernel_o,
                                       BANDWIDTH_reg_extern,
@@ -22642,13 +22740,15 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       ksum,
                                       p_ksum,
                                       kw,
-                                      pkw);
+                                      pkw, 0, NULL, NULL,
+                                      fold_requested ? &fold : NULL);
   }
-  if(query_bandwidth != NULL)
+  if(query_bandwidth != NULL && !fold_requested)
     free_tmat(query_bandwidth);
-  free(query_lambda);
+  if(!fold_requested) free(query_lambda);
 
   if(npks_err != 0){
+    if(fold_requested) goto cleanup_kernelsum_fold;
     if(npks_err == KWSNP_ERR_ZERO_NN_RADIUS) {
       const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
         BANDWIDTH_reg_extern, num_obs_train_extern, num_obs_eval_extern,
@@ -22719,7 +22819,9 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
     }
 
   }
-  /* clean up */
+cleanup_kernelsum_fold:
+  /* Fold-geometry/accumulator errors release the existing ingress workspace
+     before signalling. The new geometry itself is call-local R storage. */
 
   if(allocated_X_train){
     free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
@@ -22788,6 +22890,8 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   num_obs_train_extern = 0;
   num_obs_eval_extern = 0;
 
+  if(fold_requested && npks_err != 0)
+    error("raw delete-one kernel geometry or accumulation failed with code %d", npks_err);
   return;
 }
 
@@ -22807,7 +22911,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                       operator, myopti, kpow,
                       weighted_sum, NULL, weighted_p_sum,
                       kernel_weights, permutation_kernel_weights,
-                      ckerlb, ckerub, NULL);
+                      ckerlb, ckerub, NULL, 0);
 }
 
 void np_kernelsum_power12(double * tuno, double * tord, double * tcon,
@@ -22828,7 +22932,7 @@ void np_kernelsum_power12(double * tuno, double * tord, double * tcon,
                       operator, myopti, kpow,
                       weighted_sum, weighted_sum_power2, weighted_p_sum,
                       kernel_weights, permutation_kernel_weights,
-                      ckerlb, ckerub, NULL);
+                      ckerlb, ckerub, NULL, 0);
 }
 
 
