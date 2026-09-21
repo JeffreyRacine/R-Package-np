@@ -53228,7 +53228,8 @@ double *cv){
 
     for(i = 0, cv1 = 0.0; i < num_obs; i++) cv1 += res[i];
 
-    cv1 /= num_obs*num_obs;
+    /* Match the compressed owner: square in double, not 32-bit integer. */
+    cv1 /= (double)num_obs*(double)num_obs;
   }
 
   // then the cross term
