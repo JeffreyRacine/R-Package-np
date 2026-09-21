@@ -16,6 +16,42 @@ test_that("autodispatch materialization preserves explicit argument expressions"
   expect_false(identical(prepared$tmpvals[[bws.ref]], bws))
 })
 
+test_that("formula probing and publication share one argument realization", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+  state <- new.env(parent = emptyenv()); state$n <- 0L
+  value <- function() { state$n <- state$n + 1L; .4 }
+  prepared <- materialize(quote(npqreg(bws = value(), txdat = 1:4)), environment())
+  expect_identical(state$n, 1L)
+  expect_identical(prepared$tmpvals[[as.character(prepared$call$bws)]], .4)
+  x <- 1:4; y <- 4:1
+  value <- function() { state$n <- state$n + 1L; y ~ x }
+  for (argument in c("bws", "formula")) {
+    state$n <- 0L
+    mc <- as.call(c(list(quote(npreg)), setNames(list(quote(value())), argument)))
+    prepared <- materialize(mc, environment())
+    expect_identical(state$n, 1L)
+    expect_identical(prepared$tmpvals[[as.character(prepared$call$data)]],
+                     data.frame(y = y, x = x))
+  }
+  state$n <- 0L
+  value <- function() { state$n <- state$n + 1L; NULL }
+  expect_null(materialize(quote(npreg(bws = value())), environment())$call$bws)
+  expect_identical(state$n, 1L)
+  state$n <- 0L
+  value <- function() { state$n <- state$n + 1L; stop("single failure") }
+  expect_error(materialize(quote(npreg(bws = value())), environment()), "single failure")
+  expect_identical(state$n, 1L)
+  state$n <- 0L
+  value <- function() {
+    state$n <- state$n + 1L
+    signalCondition(structure(list(), class = c("interrupt", "condition")))
+  }
+  interrupted <- tryCatch(materialize(quote(npreg(bws = value())), environment()),
+                          interrupt = identity)
+  expect_s3_class(interrupted, "interrupt")
+  expect_identical(state$n, 1L)
+})
+
 test_that("row-purpose controls are values, not escaped caller expressions", {
   materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
   flags <- c(".np.require.complete", ".np.defer.empty.rows")

@@ -11,9 +11,8 @@ test_that("quantile and classification defaults retain positional manual bandwid
     bw <- if(family=="npqreg") c(.4,.35) else c(.2,.35)
     named <- ff(bws=bw,txdat=x,tydat=y,se=FALSE)
     for(shape in c("native","all.positional","partial","wrapper")) {
-      # This test covers argument matching and the retained requested model.
-      # MPI expression single-evaluation is a separately tracked owner issue.
-      value <- function() bw
+      state <- new.env(parent = emptyenv()); state$n <- 0L
+      value <- function() { state$n <- state$n + 1L; bw }
       set.seed(315); before <- .Random.seed
       fit <- switch(shape,
         native=ff(value(),txdat=x,tydat=y,se=FALSE),
@@ -21,6 +20,7 @@ test_that("quantile and classification defaults retain positional manual bandwid
         partial=ff(bw=value(),txdat=x,tydat=y,se=FALSE),
         wrapper=(function(...) ff(...))(value(),txdat=x,tydat=y,se=FALSE))
       expect_identical(.Random.seed,before)
+      expect_identical(state$n, 1L)
       expect_equal(c(fit$bws$ybw,fit$bws$xbw),bw,tolerance=0)
       expect_equal(fitted(fit),fitted(named),tolerance=0)
     }

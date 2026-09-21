@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Automatic MPI dispatch retains already evaluated bandwidth arguments and
+  shares one realization between formula detection and publication. Stateful
+  native bandwidth expressions are no longer evaluated repeatedly; errors and
+  interrupts propagate without retrying the formula probe.
+
 * Automatic density-equality test bandwidths now use one pooled-sample search
   and the harmonic-mean sample size to rescale its bandwidth. The same physical
   bandwidth is held fixed in both samples and all bootstrap draws. Categorical

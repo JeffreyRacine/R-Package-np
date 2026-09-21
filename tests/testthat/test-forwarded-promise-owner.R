@@ -73,6 +73,37 @@ test_that("native dispatch consumes unchanged actual method data promises once",
   expect_identical(bind(changed, owner, original, unrelated, environment()), changed)
 })
 
+test_that("bandwidth dispatch retains the actual method promise and leaf replacements", {
+  bind <- getFromNamespace(".npRmpi_autodispatch_bind_data_promises", "npRmpi")
+  method <- function(bws, ...) {
+    force(bws)
+    mc <- match.call(expand.dots = FALSE)
+    mc[[1L]] <- quote(npqreg)
+    .npRmpi_autodispatch_bind_data_promises(mc, environment(), sys.call(),
+      sys.function(), parent.frame())
+  }
+  environment(method) <- asNamespace("npRmpi")
+  state <- new.env(parent = emptyenv()); state$n <- 0L
+  value <- function() { state$n <- state$n + 1L; c(.4, .35) }
+  expect_identical(method(value())$bws, c(.4, .35))
+  expect_identical(state$n, 1L)
+  wrapper <- function(...) method(...)
+  expect_identical(wrapper(bws = value())$bws, c(.4, .35))
+  expect_identical(state$n, 2L)
+  original <- quote(method(bws = original.bw))
+  changed <- quote(npqreg(bws = replacement.bw))
+  owner <- list2env(list(bws = c(.4, .35)))
+  expect_identical(bind(changed, owner, original, method, environment()), changed)
+  # A realized language value must survive materialization without evaluation
+  # or rebuilding a formula in the transport frame.
+  f <- local({ retained <- 7; y ~ x + retained })
+  expect_identical(eval(method(f)$bws), f)
+  expect_identical(environment(eval(method(f)$bws)), environment(f))
+  language.value <- quote(stop("must not execute a realized bandwidth value"))
+  expect_identical(eval(method(language.value)$bws), language.value)
+  expect_identical(eval(method(quote(retained))$bws), quote(retained))
+})
+
 test_that("public native constructors materialize stateful data once before transport", {
   withr::local_options(np.messages = FALSE)
   captured <- NULL

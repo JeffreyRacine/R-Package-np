@@ -2286,50 +2286,33 @@
   has_data_inputs <- !is.null(nms) && any(nms %in% c("data", "xdat", "ydat", "txdat", "tydat", "zdat"))
 
   formula.expr <- NULL
+  probe.index <- NA_integer_
+  probe.value <- NULL
   if (!is.null(nms) && any(nms == "formula")) {
-    formula.expr <- arg.list[[which(nms == "formula")[1L]]]
+    probe.index <- which(nms == "formula")[1L]
+    formula.expr <- arg.list[[probe.index]]
+    probe.value <- .npRmpi_autodispatch_resolve_owned_arg(
+      formula.expr, "formula", caller_env, owner.dot.names)
   } else if (!is.null(nms) && any(nms == "bws")) {
-    bexpr <- arg.list[[which(nms == "bws")[1L]]]
-    bval <- tryCatch(
-      .npRmpi_autodispatch_resolve_owned_arg(
-        expr = bexpr,
-        argname = "bws",
-        caller_env = caller_env,
-        dot.names = owner.dot.names
-      ),
-      error = function(e) NULL
-    )
-    if (!is.null(bval) && inherits(bval, "formula"))
+    probe.index <- which(nms == "bws")[1L]
+    bexpr <- arg.list[[probe.index]]
+    probe.value <- .npRmpi_autodispatch_resolve_owned_arg(
+      bexpr, "bws", caller_env, owner.dot.names)
+    if (inherits(probe.value, "formula"))
       formula.expr <- bexpr
   } else if (length(arg.list) >= 2L) {
     nm2 <- if (!is.null(nms) && length(nms) >= 2L) nms[[2L]] else ""
     if (is.null(nm2) || identical(nm2, "")) {
-      fval <- tryCatch(
-        .npRmpi_autodispatch_resolve_owned_arg(
-          expr = arg.list[[2L]],
-          argname = "bws",
-          caller_env = caller_env,
-          dot.names = owner.dot.names
-        ),
-        error = function(e) NULL
-      )
-      if (!is.null(fval) && inherits(fval, "formula"))
+      probe.index <- 2L
+      probe.value <- .npRmpi_autodispatch_resolve_owned_arg(
+        arg.list[[2L]], "bws", caller_env, owner.dot.names)
+      if (inherits(probe.value, "formula"))
         formula.expr <- arg.list[[2L]]
     }
   }
 
   if (!has_data_inputs && !is.null(formula.expr)) {
-    formula.argname <- if (!is.null(nms) && any(nms == "formula")) {
-      "formula"
-    } else {
-      "bws"
-    }
-    fval <- .npRmpi_autodispatch_resolve_owned_arg(
-      expr = formula.expr,
-      argname = formula.argname,
-      caller_env = caller_env,
-      dot.names = owner.dot.names
-    )
+    fval <- probe.value
     vars <- all.vars(fval)
     if (length(vars)) {
       formula.env <- environment(fval)
@@ -2365,7 +2348,9 @@
     # `..N` placeholder whose numeric position belongs to an outer generic.
     # Materialize from the method frame that owns the promise; never search
     # unrelated dynamic frames for a same-named binding.
-    val <- .npRmpi_autodispatch_resolve_owned_arg(
+    # Formula detection and transport share the same realization, including
+    # NULL. A failed probe propagates its condition and is never retried.
+    val <- if (identical(i, probe.index)) probe.value else .npRmpi_autodispatch_resolve_owned_arg(
       expr = expr_i,
       argname = nm,
       caller_env = caller_env,
@@ -2948,15 +2933,20 @@
       !identical(environment(definition), asNamespace("npRmpi"))) return(mc)
   original <- match.call(definition = definition, call = owner.call,
                          expand.dots = FALSE, envir = caller)
-  data.names <- c("xdat", "ydat", "zdat", "dat", "txdat", "tydat", "tzdat",
+  data.names <- c("bws", "xdat", "ydat", "zdat", "dat", "txdat", "tydat", "tzdat",
                   "tdat", "exdat", "eydat", "ezdat", "edat")
   owned <- intersect(names(mc), intersect(data.names,
     intersect(names(formals(definition)), names(original))))
   for (name in owned) {
     # A method can deliberately replace an argument for its dispatched leaf.
     # Only its unchanged original argument denotes the owned formal promise.
-    if (identical(mc[[name]], original[[name]]))
-      mc[name] <- list(get(name, envir = owner, inherits = FALSE))
+    if (identical(mc[[name]], original[[name]])) {
+      value <- get(name, envir = owner, inherits = FALSE)
+      # A realized formula/call is a value, not another expression to execute.
+      if (identical(name, "bws") && is.language(value))
+        value <- substitute(quote(VALUE), list(VALUE = value))
+      mc[name] <- list(value)
+    }
   }
   mc
 }
