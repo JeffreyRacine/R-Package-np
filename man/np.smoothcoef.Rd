@@ -248,6 +248,14 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   }
 }
 \details{
+  In native calls, three unnamed arguments follow the fitter's bandwidth-first
+  convention: \code{npscoef(bws, txdat, tydat)}; the smoothing data default
+  to the training predictors. Numeric argument types cannot distinguish this
+  from an intended data-first call. To select bandwidths with separate smoothing
+  data, write \code{npscoef(xdat, ydat, zdat = zdat)} or name all data roles.
+  The selector \code{npscoefbw(xdat, ydat, zdat)} retains its data-first
+  convention. No argument roles are inferred from vector lengths or values.
+
   With a formula-derived bandwidth object, supplying only \code{tydat}
   replaces the evaluated response in retained-training-sample order: one row
   per observation retained after the original subset and missing-value selection.
