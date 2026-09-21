@@ -1,3 +1,21 @@
+test_that("adaptive fold moments initialize row state on repeated calls", {
+  old <- options(np.messages = FALSE, np.largeh = FALSE, np.tree = FALSE)
+  on.exit(options(old))
+  z <- data.frame(z = c(.02, .06, .13, .22, .35, .51, .64, .79, .98))
+  y <- seq_len(nrow(z)) / nrow(z)
+  bw <- npregbw(xdat = z, ydat = y, bws = 3,
+                bandwidth.compute = FALSE, bwtype = "adaptive_nn")
+  reference <- vapply(seq_len(nrow(z)), function(i) {
+    npksum(txdat = z[-i, , drop = FALSE], exdat = z[i, , drop = FALSE],
+           tydat = y[-i], bws = bw, bandwidth.divide = TRUE)$ksum[1L]
+  }, numeric(1))
+  for (iteration in seq_len(4L)) {
+    actual <- .np_estimator_loo_ksum(txdat = z, tydat = y, bws = bw,
+                                   leave.one.out = TRUE, bandwidth.divide = TRUE)$ksum
+    expect_equal(as.double(actual), reference, tolerance = 2e-12)
+  }
+})
+
 test_that("raw fold radius partitions retain parent approximation ownership", {
   old <- options(np.messages=FALSE,np.largeh=TRUE,np.largelambda=TRUE,np.tree=TRUE)
   on.exit(options(old))
