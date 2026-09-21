@@ -400,6 +400,8 @@ double np_beta_log_abs_overlap_order(double center_one,
 
 int np_beta_order_supported(int order);
 
+double np_beta_log_add_pair(double accumulator, double term);
+
 np_beta_status np_beta_signed_log_absolute(double positive_log,
                                            double negative_log,
                                            double *log_absolute,
