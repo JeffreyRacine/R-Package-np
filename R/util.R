@@ -2696,6 +2696,7 @@ npRegressionNnSearchLowerBound <- function(bws,
 
 npRegressionK1GeometryValidate <- function(bws, txdat, exdat = NULL) {
   if (!inherits(bws, "rbandwidth") ||
+      !identical(bws[["type", exact = TRUE]], "generalized_nn") ||
       !identical(npRegressionNnLowerBound(bws), 1L))
     return(invisible(TRUE))
 
