@@ -802,7 +802,7 @@ npqreg.formula <-
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
 
-    has.eval <- !is.null(newdata)
+    has.eval <- !is.null(newdata) && !("exdat" %in% names(dots))
     if (has.eval) {
       tt <- .np_formula_conditional_rhs_terms(bws)
       npValidateNewdataFormula(newdata, tt, include.response = FALSE)
@@ -818,7 +818,7 @@ npqreg.formula <-
     q.args$bws <- bws
     tbw <- do.call(npqreg, c(q.args, .npqreg_fit_dots(dots)))
 
-    tbw$omit <- attr(umf,"na.action")
+    tbw$omit <- .np_formula_output_action(tbw, umf, has.eval, native.restored = TRUE)
     tbw$rows.omit <- as.vector(tbw$omit)
     tbw$nobs.omit <- length(tbw$rows.omit)
 
@@ -1076,6 +1076,8 @@ npqreg.condbandwidth <-
                 se = se,
                 timing = bws$timing, total.time = total.time,
                 optim.time = optim.time, fit.time = fit.elapsed)
+    fit$eval.rows.omit <- if (no.ex) integer(0) else as.vector(eval.omit)
+    fit$eval.nobs.omit <- length(fit$eval.rows.omit)
     .npreg_finish_empty_rows(fit, empty.flags, omitted = eval.omit,
                              row.labels = empty.row.labels, owner = "npqreg")
   }

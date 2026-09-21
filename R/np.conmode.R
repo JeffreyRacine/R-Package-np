@@ -69,7 +69,7 @@ npconmode.formula <-
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
     .npConmodeValidateCategoricalResponse(tydat)
 
-    has.eval <- !is.null(newdata)
+    has.eval <- !is.null(newdata) && !any(c("exdat", "eydat") %in% names(dots))
     if (has.eval) {
       has.ey <- bws$variableNames[["response"]] %in% names(newdata)
       eval.tt <- if (has.ey) tt else .np_formula_conditional_rhs_terms(bws)
@@ -102,13 +102,12 @@ npconmode.formula <-
     cm.args$bws <- bws
     ev <- do.call(npconmode, c(cm.args, dots))
 
+    output.omit <- .np_formula_output_action(ev, umf, has.eval, native.restored = TRUE)
     ev <- .npConmodeRecordOmit(ev, train.omit)
     if (has.eval) {
       ev <- .npConmodeRecordEvalOmit(ev, eval.omit)
-      ev <- .npConmodePadRowOutputs(ev, eval.omit)
-    } else {
-      ev <- .npConmodePadRowOutputs(ev, train.omit)
     }
+    ev <- .npConmodePadRowOutputs(ev, output.omit)
 
     return(ev)
   }
