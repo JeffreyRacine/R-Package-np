@@ -13295,7 +13295,10 @@ compute.bootstrap.errors.conbandwidth =
     if (is.null(boot.out))
       stop("no canonical helper path available for this conditional bootstrap configuration", call. = FALSE)
 
-    if (!identical(tboo, "quant") && isTRUE(proper)) {
+    # Resampling preserves the certificate's kernel/topology/degree contract.
+    # Do not renormalize an already proper estimator over a finite plot grid.
+    if (!identical(tboo, "quant") && isTRUE(proper) &&
+        !.np_conditional_proper_certificate(bws, cdf = cdf)) {
       proper.progress.label <- .np_plot_bootstrap_stage_label(
         stage = "Projecting proper bootstrap surfaces",
         target_label = progress.target
