@@ -229,6 +229,11 @@ static double np_beta_log_add(double accumulator, double term)
   return maximum + log1p(exp(minimum - maximum));
 }
 
+double np_beta_log_add_pair(double accumulator, double term)
+{
+  return np_beta_log_add(accumulator, term);
+}
+
 np_beta_status np_beta_signed_log_absolute(double positive_log,
                                            double negative_log,
                                            double *log_absolute,

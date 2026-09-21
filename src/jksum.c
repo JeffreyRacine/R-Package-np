@@ -38011,6 +38011,10 @@ typedef struct {
                         int evaluation,
                         double *row,
                         double *common_log_scale);
+  /* Optional deleted-sample response contraction. Returns absolute fits;
+   * ordinary providers retain the original BLAS/common-scale path. */
+  int (*fold_fit_block)(void *context, int first_fold, int folds,
+                        double **xrows, int queries, double *fits);
 } NPConditionalCVLSRowProvider;
 
 static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_scale_factor,
@@ -38783,8 +38787,17 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   const int ncon = num_var_continuous_extern;
   const int nuno = num_var_unordered_extern;
   const int nord = num_var_ordered_extern;
+  const int folded = provider != NULL && provider->fold_fit_block != NULL;
+  const NPBoundedCVLSConditionalQuadContext *quad_ctx =
+    &np_bounded_cvls_conditional_quad_ctx;
+  const int retained_scalar_grid = folded && ncon == 1 && nuno == 0 && nord == 0 &&
+    quad_ctx->ready && quad_ctx->num_obs == num_obs && quad_ctx->q >= 2 &&
+    quad_ctx->base_grid != NULL && quad_ctx->base_weights != NULL;
   int q = np_bounded_cvls_conditional_grid_points(ncon);
-  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_preferred_block_size(num_obs), 64));
+  const int reserve_slabs = folded && ncon >= 1 && ncon <= 2 ? (1 << ncon) + 2 : 1;
+  const int block_size = MAX(1, MIN(folded ?
+    np_conditional_lp_cvls_block_size(num_obs, (size_t)reserve_slabs + 4U, 0U) :
+    np_conditional_lp_cvls_preferred_block_size(num_obs), 64));
   const int max_group_width = 4;
   size_t total_eval = 0;
   NPConditionalYRowCtx yctx = {0};
@@ -38809,6 +38822,11 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
     return 1;
   if(q < 2)
     return 1;
+  if(retained_scalar_grid) q = quad_ctx->q;
+  else if(folded && ncon == 1 && nuno == 0 && nord == 0 && quad_ctx->required) {
+    np_bwm_set_deferred_error("bounded npcdens cv.ls quadrature context is missing");
+    return 1;
+  }
 
   /*
    * Retain a bounded group of X slabs so each invariant response-quadrature
@@ -38828,10 +38846,10 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
     max_group_width,
     (num_obs / block_size) + ((num_obs % block_size) != 0)
   );
-  if(budget_slabs <= 1)
+  if(budget_slabs <= (size_t)reserve_slabs)
     requested_group_width = 1;
-  else if((size_t)requested_group_width > (budget_slabs - 1))
-    requested_group_width = (int)(budget_slabs - 1);
+  else if((size_t)requested_group_width > (budget_slabs - reserve_slabs))
+    requested_group_width = (int)(budget_slabs - reserve_slabs);
 
   for(group_width = 0;
       group_width < requested_group_width;
@@ -38877,7 +38895,10 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
     quad_ub
   );
 
-  if((ncon == 1) &&
+  if(retained_scalar_grid) {
+    memcpy(cont_grid[0],quad_ctx->base_grid,(size_t)q*sizeof(double));
+    memcpy(cont_weight[0],quad_ctx->base_weights,(size_t)q*sizeof(double));
+  } else if((ncon == 1) &&
      (int_bounded_cvls_quadrature_grid_extern != NP_BOUNDED_CVLS_GRID_UNIFORM)){
     int q_actual = 0;
     if(np_bounded_cvls_build_conditional_grid_1d_extern(
@@ -38988,8 +39009,15 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
       for(g = 0; g < group_width && block_rows[g] > 0; g++){
         const int ib = block_rows[g];
 
-        np_blas_dgemm_tn_int(eb, ib, num_obs,
-                             yevalblock[0], xblocks[g][0], fit_block);
+        if(provider != NULL && provider->fold_fit_block != NULL) {
+          if(provider->fold_fit_block(provider->context,
+               i0 + g*block_size, ib, xblocks[g], eb, fit_block) != 0) {
+            goto cleanup_bounded_cvls_quad_general;
+          }
+        } else {
+          np_blas_dgemm_tn_int(eb, ib, num_obs,
+                               yevalblock[0], xblocks[g][0], fit_block);
+        }
         for(b = 0; b < ib; b++){
           const int row = g*block_size + b;
           const int offset = b*eb;
@@ -38998,7 +39026,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
           for(e = 0; e < eb; e++){
             double fit = fit_block[offset + e];
 
-            if(provider != NULL &&
+            if(provider != NULL && provider->fold_fit_block == NULL &&
                np_continuous_kernel_scaled_restore(
                  fit, yeval_log_scale[e], 1, &fit) !=
                NP_CONTINUOUS_ROW_OK)
@@ -41916,6 +41944,10 @@ static int np_conditional_density_cvls_lp_stream_impl(
   int i0, j0, ii, jj;
   int status = 1;
   NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
+
+  if(int_cyker_bound_extern != 0 && num_var_continuous_extern > 0 &&
+     (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN))
+    return np_conditional_density_cvls_lp_stream_ctx(vector_scale_factor, NULL, cv);
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
@@ -51220,15 +51252,17 @@ cleanup_route:
 
 /*
  * Conditional CVLS route adapter.  It owns only persistent row/bandwidth
- * state; the established bounded-quadrature and analytic-convolution owners
- * retain every objective contraction and accumulation.  X providers expose
- * only the canonical signed delete-one influence row required by both owners.
- * Every persistent buffer is O(n) or depends only on LP basis width.
+ * state plus bounded response-radius tiles. The established quadrature and
+ * analytic-convolution owners retain objective accumulation. X providers
+ * expose canonical signed delete-one influence rows; bounded NN providers
+ * contract fold-specific Y planes before returning absolute fits. Persistent
+ * storage is linear in n at the fixed tile width, never a fold-by-query tensor.
  */
 typedef struct {
   int ready;
   int beta_x;
   int beta_y;
+  int fold_geometry;
   double *vector_scale_factor;
   double *eval_basis;
   NPConditionalRouteRowContext route_x;
@@ -51237,8 +51271,34 @@ typedef struct {
   NPConditionalYRowCtx legacy_y;
   NPConditionalYRowCtx legacy_y_convolution;
   NPReghatLPWorkspace lp_workspace;
+  int grid_rows;
+  int grid_variants;
+  double **grid_eval;
+  double **grid_primary;
+  double **grid_successor;
+  double *grid_scale;
+  double **grid_values[4];
+  double *grid_logs[4];
   const NPConditionalKernelExecutionContext *execution_context;
 } NPConditionalCVLSRouteContext;
+
+static void np_conditional_cvls_fold_grid_clear(
+  NPConditionalCVLSRouteContext *context)
+{
+  /* Variant zero is borrowed from the bounded quadrature owner. */
+  for(int v = 1; v < 4; ++v) {
+    if(context->grid_values[v] != NULL) free_tmat(context->grid_values[v]);
+    free(context->grid_logs[v]);
+  }
+  if(context->grid_primary != NULL) free_tmat(context->grid_primary);
+  if(context->grid_successor != NULL) free_tmat(context->grid_successor);
+  free(context->grid_scale);
+  context->grid_primary = context->grid_successor = NULL;
+  context->grid_scale = NULL;
+  context->grid_rows = context->grid_variants = 0;
+  memset(context->grid_values, 0, sizeof(context->grid_values));
+  memset(context->grid_logs, 0, sizeof(context->grid_logs));
+}
 
 static void np_conditional_cvls_route_context_init(
   NPConditionalCVLSRouteContext * const context)
@@ -51256,6 +51316,7 @@ static void np_conditional_cvls_route_context_clear(
 {
   if(context == NULL)
     return;
+  np_conditional_cvls_fold_grid_clear(context);
   np_conditional_route_row_context_clear(&context->route_y);
   np_conditional_route_row_context_clear(&context->route_x);
   np_conditional_xrow_ctx_clear(&context->legacy_x);
@@ -51279,17 +51340,23 @@ static int np_conditional_cvls_route_context_prepare(
   const int use_bernstein = int_glp_bernstein_extern != 0;
 
   if(context == NULL || vector_scale_factor == NULL ||
-     execution_context == NULL || num_obs < 2 || num_y_eval <= 0 ||
+     num_obs < 2 || num_y_eval <= 0 ||
      (response_operator != OP_NORMAL &&
       response_operator != OP_INTEGRAL) ||
      (np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
       np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
     return 1;
 
-  context->beta_x = execution_context->x_route != NULL;
-  context->beta_y = execution_context->y_route != NULL;
+  context->beta_x = execution_context != NULL && execution_context->x_route != NULL;
+  context->beta_y = execution_context != NULL && execution_context->y_route != NULL;
+  context->fold_geometry = response_operator == OP_NORMAL &&
+    int_cyker_bound_extern != 0 && num_var_continuous_extern > 0 &&
+    (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN);
   context->vector_scale_factor = vector_scale_factor;
   context->execution_context = execution_context;
+  const NPNNGeometryContext training_geometry = {
+    .mode = NP_NN_QUERY_TRAINING_IDENTITY
+  };
 
   if(context->beta_x) {
     if(np_conditional_route_row_context_prepare(
@@ -51302,10 +51369,14 @@ static int np_conditional_cvls_route_context_prepare(
          matrix_X_continuous_train_extern, vector_scale_factor,
          num_categories_extern_X, matrix_categorical_vals_extern_X,
          execution_context->x_route, execution_context->x_diagnostics,
-         execution_context->categorical_compress, 0) != 0)
+         execution_context->categorical_compress, context->fold_geometry) != 0)
       goto fail_prepare;
-  } else if(np_conditional_xrow_ctx_prepare(
-              vector_scale_factor, &context->legacy_x) != 0) {
+  } else if(context->fold_geometry && BANDWIDTH_den_extern == BW_ADAP_NN ?
+            np_conditional_xrow_ctx_prepare_adaptive_fold(
+              vector_scale_factor, &context->legacy_x) != 0 :
+            np_conditional_xrow_ctx_prepare_ctx(
+              vector_scale_factor, context->fold_geometry ? &training_geometry : NULL,
+              &context->legacy_x) != 0) {
     goto fail_prepare;
   }
 
@@ -51331,11 +51402,15 @@ static int np_conditional_cvls_route_context_prepare(
          response_operator, vector_scale_factor,
          num_categories_extern_Y, matrix_categorical_vals_extern_Y,
          execution_context->y_route, execution_context->y_diagnostics,
-         execution_context->categorical_compress, 0) != 0)
+         execution_context->categorical_compress, context->fold_geometry) != 0)
       goto fail_prepare;
   } else if(response_operator == OP_NORMAL) {
-    if(np_conditional_yrow_ctx_prepare(
-         vector_scale_factor, OP_NORMAL, &context->legacy_y) != 0)
+    if(context->fold_geometry && BANDWIDTH_den_extern == BW_ADAP_NN ?
+       np_conditional_yrow_ctx_prepare_adaptive_fold(vector_scale_factor, OP_NORMAL,
+         num_categories_extern_Y, matrix_categorical_vals_extern_Y,
+         &context->legacy_y) != 0 :
+       np_conditional_yrow_ctx_prepare_ctx(vector_scale_factor, OP_NORMAL,
+         context->fold_geometry ? &training_geometry : NULL, &context->legacy_y) != 0)
       goto fail_prepare;
     if(int_cyker_bound_extern == 0 &&
        np_conditional_yrow_ctx_prepare(
@@ -51349,6 +51424,32 @@ static int np_conditional_cvls_route_context_prepare(
               matrix_Y_continuous_eval_extern,
               num_y_eval, &context->legacy_y) != 0) {
     goto fail_prepare;
+  }
+
+  /* Saturated/extended GNN specifications are decoded on n-1, exactly as
+   * in the external deleted-sample fit. Regular counts need no re-preparation. */
+  if(context->fold_geometry && BANDWIDTH_den_extern == BW_GEN_NN) {
+    for(int side=0;side<2;++side) {
+      const int nc=side ? num_var_continuous_extern : num_reg_continuous_extern;
+      const int beta=side ? context->beta_y : context->beta_x;
+      const double *sf=side ?
+        (beta ? context->route_y.scale_factor : context->legacy_y.vsfy) :
+        (beta ? context->route_x.scale_factor : context->legacy_x.vsfx);
+      double **train=side ? matrix_Y_continuous_train_extern : matrix_X_continuous_train_extern;
+      double **bw=side ?
+        (beta ? context->route_y.matrix_bandwidth : context->legacy_y.matrix_bandwidth_y) :
+        (beta ? context->route_x.matrix_bandwidth : context->legacy_x.matrix_bandwidth_x);
+      for(int l=0;l<nc;++l) {
+        int k;
+        double scale;
+        if(np_nn_lookup_from_scale(num_obs-1,1,sf[l],&k,&scale,NULL) != 0)
+          goto fail_prepare;
+        if(scale == 1.0 && k == np_fround(sf[l])) continue;
+        if(compute_nn_distance_train_eval_ctx(num_obs,num_obs,1,train[l],train[l],k,
+             &training_geometry,bw[l]) != NP_NN_GEOMETRY_OK) goto fail_prepare;
+        for(int i=0;i<num_obs;++i) bw[l][i]*=scale;
+      }
+    }
   }
 
   if(context->beta_x && use_general_lp) {
@@ -51406,6 +51507,15 @@ static int np_conditional_cvls_provider_x_row(
      evaluation < 0 || evaluation >= num_obs)
     return 1;
 
+  if(context->fold_geometry) {
+    if(context->beta_x) {
+      if(np_beta_loo_geometry_select(&context->route_x.loo_geometry, evaluation))
+        return 1;
+    } else if(BANDWIDTH_den_extern == BW_ADAP_NN &&
+              np_conditional_xrow_ctx_select_adaptive_fold(
+                &context->legacy_x, evaluation) != 0)
+      return 1;
+  }
   if(!context->beta_x)
     return np_conditional_xrow_from_ctx(
       &context->legacy_x, evaluation, row);
@@ -51458,6 +51568,15 @@ static int np_conditional_cvls_provider_y_train_row(
      evaluation >= num_obs_train_extern)
     return 1;
   *common_log_scale = 0.0;
+  if(context->fold_geometry) {
+    if(context->beta_y) {
+      if(np_beta_loo_geometry_select(&context->route_y.loo_geometry, evaluation))
+        return 1;
+    } else if(BANDWIDTH_den_extern == BW_ADAP_NN &&
+              np_conditional_yrow_ctx_select_adaptive_fold(
+                &context->legacy_y, evaluation) != 0)
+      return 1;
+  }
   if(!context->beta_y)
     return np_conditional_yrow_from_ctx(
       &context->legacy_y, evaluation, row);
@@ -51488,6 +51607,206 @@ static int np_conditional_cvls_provider_y_convolution_row(
     &context->legacy_y_convolution, evaluation, row);
 }
 
+/* Immutable query nodes have at most 2^d distinct response-radius planes.
+ * Selection depends on the held-out occurrence, not its value or row number
+ * in a quadrature grid. All planes use the existing kernel-row owners. */
+static int np_conditional_cvls_fold_grid_prepare(
+  NPConditionalCVLSRouteContext *context, int q,
+  double **yu, double **yo, double **yc, double **rows, double *logs)
+{
+  const int n = num_obs_train_extern, d = num_var_continuous_extern;
+  const int adaptive = BANDWIDTH_den_extern == BW_ADAP_NN;
+  const int nr = adaptive ? n : q;
+  const NPNNGeometryContext external_geometry = {.mode = NP_NN_QUERY_EXTERNAL};
+  double **active = NULL;
+  NPBetaScaledRowContext beta;
+  int status = 1;
+  np_beta_scaled_row_context_init(&beta);
+  if(!context->fold_geometry || d < 1 || d > 2 || q < 1 || yc == NULL)
+    return 1;
+  np_conditional_cvls_fold_grid_clear(context);
+  context->grid_rows = q;
+  context->grid_variants = 1 << d;
+  context->grid_eval = yc;
+  context->grid_values[0] = rows;
+  context->grid_logs[0] = logs;
+  context->grid_primary = alloc_tmatd(nr, d);
+  context->grid_successor = alloc_tmatd(nr, d);
+  context->grid_scale = alloc_vecd(d);
+  active = alloc_tmatd(nr, d);
+  if(context->grid_primary == NULL || context->grid_successor == NULL ||
+     context->grid_scale == NULL || active == NULL) goto cleanup;
+  for(int l = 0; l < d; ++l) {
+    if(adaptive) {
+      double **primary = context->beta_y ?
+        context->route_y.loo_geometry.primary : context->legacy_y.matrix_bandwidth_y;
+      double **successor = context->beta_y ?
+        context->route_y.loo_geometry.successor :
+        context->legacy_y.matrix_bandwidth_y_successor;
+      const double *scale = context->beta_y ?
+        context->route_y.loo_geometry.fold_scale : context->legacy_y.adaptive_fold_scale_y;
+      if(primary == NULL || successor == NULL || scale == NULL) goto cleanup;
+      memcpy(context->grid_primary[l], primary[l], (size_t)n*sizeof(double));
+      memcpy(context->grid_successor[l], successor[l], (size_t)n*sizeof(double));
+      context->grid_scale[l] = scale[l];
+    } else {
+      const double h = context->beta_y ? context->route_y.scale_factor[l] :
+        context->legacy_y.vsfy[l];
+      int k;
+      double scale;
+      if(np_nn_lookup_from_scale(n-1, 1, h, &k, &scale, NULL) != 0 ||
+         compute_nn_distance_train_eval_ctx(n, q, 1,
+           matrix_Y_continuous_train_extern[l], yc[l], k, &external_geometry,
+           context->grid_primary[l]) != NP_NN_GEOMETRY_OK ||
+         compute_nn_distance_train_eval_ctx(n, q, 1,
+           matrix_Y_continuous_train_extern[l], yc[l], k+1, &external_geometry,
+           context->grid_successor[l]) != NP_NN_GEOMETRY_OK) goto cleanup;
+      context->grid_scale[l] = scale;
+      for(int e = 0; e < q; ++e) {
+        context->grid_primary[l][e] *= scale;
+        context->grid_successor[l][e] *= scale;
+      }
+    }
+  }
+  for(int v = 0; v < context->grid_variants; ++v) {
+    if(v > 0) {
+      context->grid_values[v] = alloc_tmatd(n, q);
+      context->grid_logs[v] = alloc_vecd(q);
+      if(context->grid_values[v] == NULL || context->grid_logs[v] == NULL) goto cleanup;
+    }
+    for(int l = 0; l < d; ++l)
+      memcpy(active[l], (v & (1 << l)) ? context->grid_successor[l] :
+        context->grid_primary[l], (size_t)nr*sizeof(double));
+    if(context->beta_y) {
+      if(np_beta_scaled_row_context_prepare(
+           &beta, context->execution_context->y_route,
+           context->execution_context->y_diagnostics,
+           BANDWIDTH_den_extern, n, q, d, num_var_unordered_extern, num_var_ordered_extern,
+           matrix_Y_continuous_train_extern, yc,
+           matrix_Y_unordered_train_extern, yu, matrix_Y_ordered_train_extern, yo,
+           active, active, context->route_y.operator_code,
+           context->route_y.kernel_unordered, context->route_y.kernel_ordered,
+           context->route_y.lambda, num_categories_extern_Y, matrix_categorical_vals_extern_Y,
+           context->execution_context->categorical_compress, context->route_y.row) !=
+           NP_CONTINUOUS_ROW_OK) goto cleanup;
+      for(int e = 0; e < q; ++e) {
+        beta.row_result.row = context->grid_values[v][e];
+        if(np_beta_scaled_row_context_fill(&beta, e, NULL, &context->grid_logs[v][e]) !=
+           NP_CONTINUOUS_ROW_OK) goto cleanup;
+      }
+      np_beta_scaled_row_context_clear(&beta);
+    } else {
+      /* Borrow scratch/kernel metadata; no ownership passes to the view. */
+      NPConditionalYRowCtx view = context->legacy_y;
+      view.matrix_bandwidth_y = active;
+      for(int e = 0; e < q; ++e) {
+        if(np_conditional_y_eval_from_ctx(&view,e,yu,yo,yc,q,0,
+             context->grid_values[v][e]) != 0) goto cleanup;
+        context->grid_logs[v][e] = 0.0;
+      }
+    }
+  }
+  status = 0;
+cleanup:
+  np_beta_scaled_row_context_clear(&beta);
+  if(active != NULL) free_tmat(active);
+  return status;
+}
+
+static int np_conditional_cvls_fold_grid_mask(
+  const NPConditionalCVLSRouteContext *context, int fold, int row, int *mask)
+{
+  const int adaptive = BANDWIDTH_den_extern == BW_ADAP_NN;
+  const int held = int_TREE_Y == NP_TREE_TRUE ? ipt_lookup_extern_Y[fold] : fold;
+  const int position = adaptive && int_TREE_Y == NP_TREE_TRUE ?
+    ipt_lookup_extern_Y[row] : row;
+  *mask = 0;
+  if(adaptive && row == fold) return 0; /* X weight is identically zero. */
+  for(int l = 0; l < num_var_continuous_extern; ++l) {
+    const double primary = context->grid_primary[l][position];
+    double radius;
+    const double centre = adaptive ? matrix_Y_continuous_train_extern[l][position] :
+      context->grid_eval[l][row];
+    const double distance = fabs(matrix_Y_continuous_train_extern[l][held]-centre) *
+      context->grid_scale[l];
+    if(np_nn_two_slot_radius_select(primary,context->grid_successor[l][position],
+         distance,1,&radius) != 0 || !(radius > 0.0)) return 1;
+    if(radius != primary) *mask |= 1 << l;
+  }
+  return 0;
+}
+
+static int np_conditional_cvls_fold_fit_block(
+  void *raw, int first, int ib, double **xrows, int q, double *fits)
+{
+  NPConditionalCVLSRouteContext *context = (NPConditionalCVLSRouteContext *)raw;
+  const int n = num_obs_train_extern;
+  const int adaptive = BANDWIDTH_den_extern == BW_ADAP_NN;
+  double **masked = NULL;
+  double *partial = NULL, *positive = NULL, *negative = NULL;
+  unsigned char *masks = NULL;
+  int status = 1;
+  if(context == NULL || !context->fold_geometry || q != context->grid_rows ||
+     ib < 1 || first < 0 || first+ib > n) return 1;
+  partial = alloc_vecd(q*ib);
+  masks = (unsigned char *)np_jksum_malloc_array_or_die(
+    (size_t)ib*(size_t)(adaptive ? n : q),sizeof(unsigned char),
+    "conditional CVLS fold radius masks");
+  if(adaptive) masked = alloc_tmatd(n, ib);
+  if(adaptive && context->beta_y) {
+    positive = alloc_vecd(q*ib);
+    negative = alloc_vecd(q*ib);
+  }
+  if(partial == NULL || masks == NULL || (adaptive && masked == NULL) ||
+     (adaptive && context->beta_y && (positive == NULL || negative == NULL)))
+    goto cleanup;
+  for(int b=0;b<ib;++b) for(int j=0;j<(adaptive ? n : q);++j) {
+    int mask;
+    if(np_conditional_cvls_fold_grid_mask(context,first+b,j,&mask)) goto cleanup;
+    masks[(size_t)b*(size_t)(adaptive ? n : q)+j]=(unsigned char)mask;
+  }
+  for(int t=0;t<q*ib;++t) {
+    fits[t]=0.0;
+    if(positive != NULL) positive[t]=negative[t]=-INFINITY;
+  }
+  for(int v=0;v<context->grid_variants;++v) {
+    if(adaptive) {
+      for(int b=0;b<ib;++b) for(int j=0;j<n;++j) {
+        masked[b][j] = masks[(size_t)b*(size_t)n+j] == v ? xrows[b][j] : 0.0;
+      }
+    }
+    np_blas_dgemm_tn_int(q,ib,n,context->grid_values[v][0],
+                         adaptive ? masked[0] : xrows[0],partial);
+    for(int b=0;b<ib;++b) for(int e=0;e<q;++e) {
+      const int t=b*q+e;
+      if(!adaptive) {
+        if(masks[t] != v) continue;
+        if(np_continuous_kernel_scaled_restore(partial[t],context->grid_logs[v][e],
+             1,&fits[t]) != NP_CONTINUOUS_ROW_OK) goto cleanup;
+      } else if(!context->beta_y) {
+        fits[t] += partial[t];
+      } else if(partial[t] != 0.0) {
+        const double term=log(fabs(partial[t]))+context->grid_logs[v][e];
+        if(partial[t]>0.0) positive[t]=np_beta_log_add_pair(positive[t],term);
+        else negative[t]=np_beta_log_add_pair(negative[t],term);
+      }
+    }
+  }
+  if(adaptive && context->beta_y) for(int t=0;t<q*ib;++t) {
+    double absolute;
+    int sign;
+    if(np_beta_signed_log_absolute(positive[t],negative[t],&absolute,&sign) != NP_BETA_OK ||
+       np_continuous_kernel_signed_log_restore(absolute,sign,&fits[t]) !=
+         NP_CONTINUOUS_ROW_OK) goto cleanup;
+  }
+  status=0;
+cleanup:
+  if(masked != NULL) free_tmat(masked);
+  free(partial); free(positive); free(negative);
+  free(masks);
+  return status;
+}
+
 static int np_conditional_cvls_provider_y_eval_block(
   void *raw_context,
   const int block_rows,
@@ -51512,6 +51831,10 @@ static int np_conditional_cvls_provider_y_eval_block(
   if(context == NULL || !context->ready || block_rows <= 0 ||
      rows == NULL || common_log_scale == NULL)
     return 1;
+  if(context->fold_geometry)
+    return np_conditional_cvls_fold_grid_prepare(context, block_rows,
+      matrix_Y_unordered_eval, matrix_Y_ordered_eval, matrix_Y_continuous_eval,
+      rows, common_log_scale);
   if(!context->beta_y) {
     const int legacy_status =
       np_conditional_y_eval_any_block_stream_core(
@@ -51803,8 +52126,9 @@ cleanup_provider_supertile:
 
 /*
  * Route-bearing sibling for conditional-density CVLS.  Null execution
- * delegates to the literal incumbent owner.  Once a valid beta route is
- * selected, every failure is terminal: there is no legacy or sidecar fallback.
+ * delegates to the literal incumbent owner except for bounded NN objectives,
+ * which share the fold provider with beta routes. Once selected, provider
+ * failure is terminal: there is no legacy or sidecar fallback.
  */
 int np_conditional_density_cvls_lp_stream_ctx(
   double *vector_scale_factor,
@@ -51815,10 +52139,12 @@ int np_conditional_density_cvls_lp_stream_ctx(
   NPConditionalCVLSRowProvider provider;
   int status = 1;
 
-  if(execution_context == NULL)
+  if(execution_context == NULL &&
+     !(int_cyker_bound_extern != 0 && num_var_continuous_extern > 0 &&
+       (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN)))
     return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
 
-  if(!np_conditional_kernel_execution_context_valid(
+  if(execution_context != NULL && !np_conditional_kernel_execution_context_valid(
      execution_context, KERNEL_reg_extern, KERNEL_den_extern,
      num_reg_continuous_extern, num_var_continuous_extern))
     error("conditional density CVLS kernel route has an invalid layout");
@@ -51835,8 +52161,17 @@ int np_conditional_density_cvls_lp_stream_ctx(
     np_conditional_cvls_provider_y_convolution_row;
   provider.y_eval_block = np_conditional_cvls_provider_y_eval_block;
   provider.y_integral_row = NULL;
+  provider.fold_fit_block = route_context.fold_geometry ?
+    np_conditional_cvls_fold_fit_block : NULL;
 
-  if(np_conditional_density_cvls_bounded_scalar_route_ok()) {
+  if(route_context.fold_geometry &&
+     (np_conditional_density_cvls_bounded_scalar_route_ok() ||
+      np_conditional_density_cvls_bounded_general_route_ok())) {
+    /* Reuse scalar nodes, but bound all NN variant and masked-X planes with
+     * the existing multidimensional quadrature tile owner. */
+    status = np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
+      vector_scale_factor, cv, &provider);
+  } else if(np_conditional_density_cvls_bounded_scalar_route_ok()) {
     status = np_conditional_density_cvls_bounded_i1_quadrature_row_stream(
       vector_scale_factor, cv, &provider);
   } else if(np_conditional_density_cvls_bounded_general_route_ok()) {
@@ -51899,6 +52234,7 @@ int np_conditional_distribution_cvls_lp_stream_ctx(
   provider.y_eval_block = NULL;
   provider.y_integral_row =
     np_conditional_cvls_provider_y_integral_row;
+  provider.fold_fit_block = NULL;
 
   status = np_conditional_distribution_cvls_provider_supertile(
     vector_scale_factor, cv, &provider);

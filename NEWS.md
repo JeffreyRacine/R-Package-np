@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Bounded conditional-density nearest-neighbour CVLS now evaluates both
+  objective terms using the sample with the held-out occurrence removed.
+  Response quadrature reuses the existing nodes and bounded work tiles while
+  selecting fold-specific radii. This can change selected NN bandwidths;
+  fixed bandwidths and unbounded analytic-convolution objectives are unchanged.
+
 * Nearest-neighbour leave-one-out regression beta hats and smooth-coefficient
   fits, hats, uncertainty and CV moments now construct raw weights after
   excluding the held-out occurrence. Adaptive-NN LC moment calculations also
