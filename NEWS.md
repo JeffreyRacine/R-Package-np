@@ -193,8 +193,11 @@
   symbolic-name interpretation; formulas are not re-evaluated to decode names.
 
 * MPI apply and bootstrap collectors now limit the terminal handshake after
-  all numerical results are complete, and each cooperative cleanup attempt,
-  to 30 seconds by default. Separate `npRmpi.fanout.terminal.timeout` and
+  all numerical results are complete to 30 seconds per outstanding handshake
+  stage, and each cooperative cleanup attempt to 30 seconds in total, by
+  default. Queued receipts
+  are consumed before expiry checks; acknowledging one worker does not extend
+  another worker's wait. Separate `npRmpi.fanout.terminal.timeout` and
   `npRmpi.fanout.cleanup.timeout` options control these maxima; the latter
   replaces the session receive option for this purpose. Running numerical
   work has no new deadline. Incomplete cleanup quarantines the pool without

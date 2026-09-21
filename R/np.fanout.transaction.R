@@ -171,6 +171,8 @@
   tx$seen <- rep.int(FALSE, n)
   tx$completed <- 0L
   tx$terminal.started <- NA_real_
+  tx$terminal.deadline <- rep.int(Inf, workers)
+  tx$finish.started <- NA_real_
   tx$terminal.budget <- .npRmpi_fanout_budget("terminal")
   tx$terminal.expired <- FALSE
   tx$weights <- if (is.null(weights)) rep.int(1L, n) else weights
@@ -192,19 +194,37 @@
 # No clock is read until every numerical task, including the master's, is done.
 .npRmpi_fanout_result_complete <- function(tx, count) {
   tx$completed <- tx$completed + count
-  if (tx$completed == tx$n && is.na(tx$terminal.started))
+  if (tx$completed == tx$n && is.na(tx$terminal.started)) {
     tx$terminal.started <- unname(proc.time()[["elapsed"]])
+  }
   invisible(NULL)
 }
 
 .npRmpi_fanout_terminal_boundary <- function(tx) {
-  if (is.finite(tx$terminal.started) &&
-      unname(proc.time()[["elapsed"]]) - tx$terminal.started >= tx$terminal.budget) {
+  if (!is.finite(tx$terminal.started)) return(invisible(NULL))
+  now <- unname(proc.time()[["elapsed"]])
+  # Arm only when a receipt is actually outstanding after probing. Result
+  # publication/callbacks can delay the master before it first enters a wait.
+  # Once armed, unrelated traffic never extends this rank's deadline.
+  pending <- tx$rank != "closed" & !is.finite(tx$terminal.deadline)
+  tx$terminal.deadline[pending] <- now + tx$terminal.budget
+  deadline <- if (is.finite(tx$finish.started))
+    tx$finish.started + tx$terminal.budget else
+    min(c(Inf, tx$terminal.deadline[tx$rank != "closed"]))
+  if (is.finite(deadline) && now >= deadline) {
     tx$terminal.expired <- TRUE
     stop(structure(list(message = "MPI numerical results are complete, but the terminal handshake budget was exhausted; the pool is quarantined",
                         call = NULL),
                    class = c("npRmpi_cleanup_pending", "error", "condition")))
   }
+  invisible(NULL)
+}
+
+.npRmpi_fanout_terminal_stage <- function(tx, rank) {
+  # Only a validated control transition can start another finite wait, and
+  # only for that rank. Numerical work never acquires a terminal deadline.
+  if (is.finite(tx$terminal.started))
+    tx$terminal.deadline[[rank]] <- Inf
   invisible(NULL)
 }
 
@@ -253,6 +273,7 @@
     was.stopping <- tx$rank[[source]] == "stopping"
     tx$rank[[source]] <- "terminal"
     .npRmpi_fanout_native("send", tx$comm, as.integer(source), 2L)
+    .npRmpi_fanout_terminal_stage(tx, source)
     if (!discard && (any(!tx$seen[assigned]) ||
         (identical(tx$scheduler, "dynamic") && !was.stopping)))
       .npRmpi_fanout_protocol_error()
@@ -308,7 +329,8 @@
     # callers keep their chosen cadence.
     if (!poll) sleep <- 0.0005
     poll <- TRUE
-    .npRmpi_fanout_terminal_boundary(tx)
+    # First consume queued receipts. A paused master must not time out before
+    # it can acknowledge a ready terminal and enable that rank's CLOSED stage.
   }
   if (poll) {
     while (!isTRUE(mpi.iprobe(mpi.any.source(), mpi.any.tag(), tx$comm))) {
@@ -349,6 +371,7 @@
     if (length(tasks)) tx$scheduled <- max(tx$scheduled, tasks)
     tx$tags[[rank]] <- as.integer(tag)
     tx$rank[[rank]] <- if (length(tasks)) "busy" else "stopping"
+    if (!length(tasks)) .npRmpi_fanout_terminal_stage(tx, rank)
   })
   invisible(NULL)
 }
@@ -446,6 +469,7 @@
     value <- force(code)
     if (any(tx$rank != "closed"))
       stop("MPI fan-out returned before worker quiescence", call. = FALSE)
+    tx$finish.started <- unname(proc.time()[["elapsed"]])
     while (!identical(.npRmpi_fanout_native("poll", tx$comm), 1L)) {
       .npRmpi_fanout_terminal_boundary(tx)
       Sys.sleep(0.0005)

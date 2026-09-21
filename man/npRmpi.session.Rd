@@ -217,8 +217,13 @@ quarantined. The \code{npRmpi.fanout.cleanup.timeout} R option limits each
 cleanup attempt (default 30 seconds, a finite positive value). This replaces
 the former use of \code{npRmpi.session.recv.timeout} for fan-out cleanup.
 The separate \code{npRmpi.fanout.terminal.timeout} option (also default 30
-seconds, finite and positive) bounds the completion handshake only after all
-numerical result payloads, including the master's work, are accounted for.
+seconds, finite and positive) bounds each outstanding worker handshake stage
+only after all numerical result payloads, including the master's work, are
+accounted for. Sending a stop command or retirement acknowledgement starts the
+newly enabled stage for that worker. Its budget starts at the first wait for
+an unavailable receipt, without extending other workers' already armed budgets.
+Queued replies are consumed before an idle wait is declared expired.
+Final native request retirement has a separate budget of the same length.
 Neither limit sets a deadline for ongoing numerical computation. These are
 maximum waits, not mandatory delays, and do not arm the worker watchdog.
 The cleanup clock starts afresh for each explicit attempt and is not reset by
