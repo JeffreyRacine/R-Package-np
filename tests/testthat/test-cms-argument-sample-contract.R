@@ -10,7 +10,7 @@ test_that("CMS inference uses the compact model sample with na.exclude", {
       qcms = quantreg::rq(y ~ x, data = d, model = TRUE, na.action = policy))
     omit <- make(na.omit); exclude <- make(na.exclude)
     immutable <- c("x", "y", "residuals", "fitted.values", "na.action", "coefficients", "call")
-    before <- serialize(exclude[immutable], NULL)
+    before <- unserialize(serialize(exclude[immutable], NULL))
     fun <- get(if (kind == "qcms") "npqcmstest" else "npcmstest", asNamespace("npRmpi"))
     for (distribution in c("asymptotic", "bootstrap")) {
       for (route in c("formula", "native")) {
@@ -24,7 +24,7 @@ test_that("CMS inference uses the compact model sample with na.exclude", {
         expect_identical(a[fields], b[fields])
       }
     }
-    expect_identical(serialize(exclude[immutable], NULL), before)
+    expect_identical(exclude[immutable], before)
     expect_error(do.call(fun, list(xdat = rev(d$x), ydat = rev(d$y), model = exclude,
       bws = .4, bandwidth.compute = FALSE)), "same complete observations")
   }

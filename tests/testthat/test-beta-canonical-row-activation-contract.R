@@ -77,7 +77,7 @@ test_that("activated beta absolute rows enter the canonical central engine", {
   expect_length(derivative_sidecar_calls, 0L)
   expect_false(grepl("KWS_DOTREEI", activation, fixed = TRUE))
 
-  route_start <- regexpr("if(kernel_execution_context != NULL)", engine,
+  route_start <- regexpr("if(kernel_execution_context != NULL && kernel_execution_context->route != NULL)", engine,
                          fixed = TRUE)[[1L]]
   legacy_start <- regexpr(
     "This function takes a vector Y and returns a kernel weighted",
