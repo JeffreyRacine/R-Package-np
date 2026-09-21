@@ -4945,7 +4945,10 @@ double np_aconvol_epan8(const double x, const double y,
 }
 
 double np_aconvol_rect(const double x, const double y,const double hx,const double hy){
-  return (fabs(x-y) >= (hx+hy)) ? 0.0 : 0.25/(hx*hy)*(MIN(x+hx,y+hy) - MAX(x-hx,y-hy));
+  /* Raw overlap, like the other scalar convolution owners. The vector
+   * caller owns bandwidth division; doing it here would apply it twice. */
+  const double overlap = MIN(2.0*MIN(hx,hy), hx+hy-fabs(x-y));
+  return overlap > 0.0 ? 0.25*overlap : 0.0;
 }
 
 // end kernels
