@@ -110,7 +110,7 @@ di_literal <- function(x, y, bx, by, B = 9L, seed = 42L) {
     In.P = mean(draws[2L, ] >= observed[2L]))
 }
 
-test_that("density equality selects one first-sample common bandwidth", {
+test_that("density equality preserves supplied and manual common bandwidths", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
   d <- di_fixture()

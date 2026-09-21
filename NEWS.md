@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Automatic density-equality test bandwidths now use one pooled-sample search
+  and the harmonic-mean sample size to rescale its bandwidth. The same physical
+  bandwidth is held fixed in both samples and all bootstrap draws. Categorical
+  rescaling is constrained to the kernel's legal maximum, with a warning when
+  reached. Supplied bandwidths and manual scale-factor interpretation are
+  unchanged; this is a selection policy, not a claim of power optimality.
+
 * Adaptive nearest-neighbor leave-one-out kernel moments no longer risk a crash
   from uninitialized state, including smooth-coefficient bandwidth selection.
 
@@ -186,11 +193,10 @@
   symbolic-name interpretation; formulas are not re-evaluated to decode names.
 
 * Density-equality tests now use one common bandwidth in both samples and
-  all bootstrap replications. Automatic selection uses first-sample LSCV,
-  following the archived table scripts; explicit CV-method choices remain
-  available. One supplied bandwidth is reused without a search; incompatible
-  two-bandwidth inputs are rejected. The paper's pooled-selection description
-  and this first-sample implementation are distinguished in the help page.
+  all bootstrap replications. Automatic selection uses pooled LSCV with the
+  harmonic-mean reference-size adjustment described above; explicit CV-method
+  choices remain available. One supplied bandwidth is reused without a search;
+  incompatible two-bandwidth inputs are rejected.
   This test now explicitly rejects nearest-neighbour bandwidths and
   boundary-normalized/beta kernels, whose directed cross sums need not be
   symmetric as its statistic and studentizer require. Fixed unnormalized
