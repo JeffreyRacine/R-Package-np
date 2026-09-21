@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Kernel sums with multiple weight columns and an omitted response now retain
+  the correct output dimensions, including permutation sums. An omitted
+  response acts as a column of ones; kernel calculations are unchanged.
+
 * Beta nearest-neighbour regression CVLS and density CVML use neighbourhoods
   with the held-out occurrence excluded. Unconditional density CVLS applies
   the same correction to its cross term while retaining the full-sample
