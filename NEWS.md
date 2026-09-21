@@ -1,5 +1,41 @@
 # npRmpi 0.80-1
 
+* Adaptive nearest-neighbor leave-one-out kernel moments no longer risk a crash
+  from uninitialized state, including smooth-coefficient bandwidth selection.
+
+* Convolution kernel sums now compute requested derivative and categorical
+  replacement products instead of reading uninitialized permutation buffers.
+  Raw exported kernel-weight matrices also honor their documented independence
+  from sum normalization, including adaptive nearest-neighbor bandwidths.
+
+* Scaled bandwidth objects now supply their retained physical bandwidths to
+  categorical profile fits, ridge scaling, hat operators and wild bootstrap
+  helpers. Fixed bandwidths equal to one are no longer misclassified as
+  nearest-neighbor geometry by the regression validator.
+
+* Conditional properness certification recognizes normalized unordered
+  Li--Racine response kernels. Bootstrap surfaces use the same properness
+  certificate as the point estimator instead of renormalizing an already
+  proper estimator on its finite plotting grid. Degree-zero conditional
+  local-polynomial bootstrap helpers share the local-constant operator.
+
+* Quantile and classification formula fits preserve the effective evaluation
+  rows when native evaluation arguments override newdata, without applying
+  training omissions to the new sample. Their default methods retain positional
+  manual bandwidths. Joint native inputs with inconsistent row counts are
+  rejected before recycling in quantile, classification, significance-test
+  and smooth-coefficient bandwidth routes.
+
+* Scalar bounded conditional CVLS now honors explicit hybrid quadrature ratios;
+  uniform components retain the exact declared support endpoints. Gaussian2
+  auxiliary boundary-density moments use stable arithmetic at large bandwidths.
+  IV derivative initialization rejects contradictory supplied values at repeated
+  coordinates before bandwidth preparation. Bootstrap plots distinguish a
+  legitimate NA-labelled factor level from a missing observation.
+
+* Uniform-kernel convolution no longer divides by its bandwidths twice.
+  This corrects overlap sums and density CVLS objectives at non-unit bandwidths.
+
 * Gaussian eighth-order and Epanechnikov convolution calculations now use
   location-independent polynomial arithmetic. This prevents translation-driven
   cancellation from corrupting kernel overlaps and density CVLS objectives.
