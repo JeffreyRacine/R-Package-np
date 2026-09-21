@@ -164,8 +164,7 @@
   }
 }
 
-# The archived simulation drivers select on sample A by LSCV, then use the
-# same smoothing specification in both samples and all resamples.
+# Both samples and all resamples use the same smoothing specification.
 .npdeneq_check_kernel <- function(bwtype, ckertype, ckerbound = "none",
                                   ckerlb = NULL, ckerub = NULL,
                                   okertype = NULL, ordered = FALSE) {
@@ -280,9 +279,55 @@
   do.call(kbandwidth.numeric, args)
 }
 
-.npdeneq_common_bandwidth <- function(x, bw.x, bw.y, ...) {
-  if (is.null(bw.x) && is.null(bw.y))
-    return(.npdeneq_prepare_bandwidth(.npdeneq_select_bandwidth(x, ...), x))
+.npdeneq_reference_bandwidth <- function(bw, n1, n2) {
+  # Equal weighting of the two density risks gives variance coefficient 1/nH.
+  # Preserve the pooled spread; change only the reference sample-size factors.
+  bw <- .npdeneq_validate_bandwidth(bw)
+  kbw <- if (inherits(bw, "kbandwidth")) bw else kbandwidth(bw)
+  n1 <- as.double(n1)
+  n2 <- as.double(n2)
+  nH <- 2 / (1 / n1 + 1 / n2)
+  ratio <- (n1 + n2) / nH
+  exponent <- 1 / (2 * kbw[["ckerorder"]] + kbw[["ncon"]])
+  adjusted <- kbw[["bw"]]
+  continuous <- kbw[["icon"]]
+  adjusted[continuous] <- adjusted[continuous] * ratio^exponent
+  categorical <- which(!continuous)
+  adjusted[categorical] <- adjusted[categorical] * ratio^(2 * exponent)
+  upper <- vapply(categorical, function(j) {
+    nlev <- kbw[["xdati"]][["all.nlev"]][[j]]
+    if (kbw[["iord"]][j]) oMaxL(nlev, kbw[["okertype"]]) else
+      uMaxL(nlev, kbw[["ukertype"]])
+  }, numeric(1L))
+  capped <- categorical[adjusted[categorical] > upper]
+  if (length(capped)) {
+    warning(paste0("npdeneqtest: harmonic-mean bandwidth adjustment reached ",
+      "the categorical kernel upper bound for: ",
+      paste(kbw[["xnames"]][capped], collapse = ", ")), call. = FALSE)
+    adjusted[categorical] <- pmin(adjusted[categorical], upper)
+  }
+  args <- kbw[c("ckertype", "ckerorder", "ckerbound", "ckerlb",
+                "ckerub", "ukertype", "okertype", "xdati", "xnames", "nobs")]
+  args$bw <- adjusted
+  args$bwtype <- kbw[["type"]]
+  # Uniform order has already been resolved by the density-to-kernel owner.
+  if (identical(args$ckertype, "uniform")) args$ckerorder <- NULL
+  do.call(kbandwidth.numeric, args)
+}
+
+.npdeneq_common_bandwidth <- function(x, y, bw.x, bw.y,
+                                      bandwidth.compute = TRUE, ...) {
+  if (is.null(bw.x) && is.null(bw.y)) {
+    # Manual scale factors retain their historical first-sample interpretation.
+    bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    if (!bandwidth.compute)
+      return(.npdeneq_prepare_bandwidth(
+        .npdeneq_select_bandwidth(x, bandwidth.compute = FALSE, ...), x))
+    pool <- rbind(x, y)
+    pooled <- .npdeneq_prepare_bandwidth(
+      .npdeneq_select_bandwidth(pool, bandwidth.compute = TRUE, ...), pool)
+    return(.npdeneq_reference_bandwidth(pooled, nrow(x), nrow(y)))
+  }
   if (!is.null(bw.x)) bw.x <- .npdeneq_prepare_bandwidth(bw.x, x)
   if (!is.null(bw.y)) bw.y <- .npdeneq_prepare_bandwidth(bw.y, x)
   if (is.null(bw.x)) return(bw.y)
@@ -327,7 +372,7 @@ npdeneqtest <- function(x = NULL,
     list(bw.x, bw.y, if (is.null(bw.x) && is.null(bw.y)) list(...)[["bws"]]))
   x <- support$x
   y <- support$y
-  bw.x <- .npdeneq_common_bandwidth(x, bw.x, bw.y, ...)
+  bw.x <- .npdeneq_common_bandwidth(x, y, bw.x, bw.y, ...)
   bw.y <- bw.x
 
   ## Save seed prior to setting

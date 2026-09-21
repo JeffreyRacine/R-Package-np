@@ -24,8 +24,9 @@ These arguments identify the two samples and any supplied bandwidths.
 
   \item{bw.x,bw.y}{
     optional common bandwidth specification. If neither is supplied, one
-    bandwidth is selected on \code{x} by least-squares cross-validation
-    (\code{bwmethod = "cv.ls"}, overridable through \code{\dots}).
+    bandwidth is selected on the pooled sample by least-squares cross-validation
+    (\code{bwmethod = "cv.ls"}, overridable through \code{\dots}), then
+    rescaled to the harmonic-mean sample size as described below.
     If only one is supplied it is reused for both samples without a search.
     If both are supplied their effective bandwidths, kernels and support
     specifications must agree; incompatible specifications are rejected.
@@ -130,20 +131,39 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   details.
 
   The same bandwidth is held fixed in both samples and every bootstrap
-  replication. Automatic selection follows the archived simulation drivers
-  used for the paper's tables: select on the first sample. The methodological
-  description in the paper instead discusses pooled-sample selection.
-  First-sample selection makes sample ordering relevant when a bandwidth is
-  selected automatically. To choose on the pool explicitly, construct a
-  bandwidth with \code{npudensbw(dat = rbind(x, y), bwmethod = "cv.ls")}
-  and supply it as \code{bw.x}.
+  replication. Automatic selection uses one pooled-sample search, followed by
+  a \emph{harmonic-mean reference-size adjustment}. Write
+  \eqn{N=n_1+n_2} and \eqn{n_H=2/(1/n_1+1/n_2)}, where the sample sizes count
+  complete observations. Retaining the pooled spread estimates, continuous
+  bandwidths are multiplied by \eqn{(N/n_H)^{1/(2P+q)}} and categorical
+  bandwidths by \eqn{(N/n_H)^{2/(2P+q)}}, following the scale-factor convention
+  of \code{\link{npudensbw}}. Here \eqn{P} is the continuous kernel order
+  (two by default), and \eqn{q} is the number of continuous variables.
+  For the default second-order kernel the continuous exponent is
+  \eqn{1/(4+q)}. Categorical parameters cannot exceed their kernel's permitted
+  maximum: an adjusted value above that maximum is set to the maximum and a
+  warning names the affected variables.
+
+  Under a common density, the leading variance coefficient of the equally
+  weighted average of the two density-estimation risks is
+  \eqn{(1/n_1+1/n_2)/2=1/n_H}. This motivates the common reference size;
+  it is not a claim of optimal test power or exact finite-sample calibration.
+  The mixed-data and higher-order adjustments use the existing bandwidth
+  scaling convention. This rule differs from the archived first-sample
+  simulation implementation and from unadjusted pooled selection.
+  To use an unadjusted pooled bandwidth, construct it with
+  \code{npudensbw(dat = rbind(x, y), bwmethod = "cv.ls")} and supply it as
+  \code{bw.x}. Explicit \code{bw.x}/\code{bw.y} are never rescaled.
+  Likewise, \code{bws = ..., bandwidth.compute = FALSE} in \code{\dots}
+  remains a manual specification, with scale factors interpreted using
+  \code{x}'s complete observations rather than the pool.
 
   Categorical coordinates use the union of the declared levels in both samples
   and supplied bandwidth objects, including unused levels. The same domain
   and effective kernel metadata are retained in every contraction and bootstrap
   draw. Ordered domains must have an unambiguous common order; otherwise declare
-  the same ordered levels in both samples. Automatic selection still uses only
-  the first sample's observations, with this common metadata.
+  the same ordered levels in both samples. Automatic selection uses both
+  samples with this common metadata.
   A raw numeric bandwidth retains the default raw kernel-sum conventions;
   a density bandwidth object retains its selected density-kernel conventions,
   including normalized ordered Li--Racine masses. Selection arguments in
