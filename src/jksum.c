@@ -14081,7 +14081,8 @@ NPPermutationWeightOutput * const pkw_output,
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
     if(adaptive_fold != NULL) {
-      for(i = 0, l = 0; i < num_reg_continuous; ++i, ++l) {
+      /* Fold requests have no permutations; initialize their common tail index. */
+      for(i = 0, l = 0, k = 0; i < num_reg_continuous; ++i, ++l) {
         if(np_nn_fold_ckernelv(adaptive_fold, i, j, KERNEL_reg_np[i],
              xtc[i], tprod_has_vals, tprod, pxl, bandwidth_divide,
              vector_ckerlb_extern == NULL ? R_NegInf : vector_ckerlb_extern[i],
