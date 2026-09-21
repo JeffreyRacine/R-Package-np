@@ -134,7 +134,9 @@ test_that("conditional CVLS route sibling delegates null and owns routed adapter
   expect_match(
     sibling,
     paste0(
-      "if(execution_context == NULL)\n",
+      "if(execution_context == NULL &&\n",
+      "     !(int_cyker_bound_extern != 0 && num_var_continuous_extern > 0 &&\n",
+      "       (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN)))\n",
       "    return np_conditional_density_cvls_lp_stream("
     ),
     fixed = TRUE

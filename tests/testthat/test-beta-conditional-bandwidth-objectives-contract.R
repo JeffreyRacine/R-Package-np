@@ -268,16 +268,16 @@ test_that("sample-grid conditional beta CVLS uses its actual generalized-NN grid
     0.5 * (grid[3:length(grid)] - grid[1:(length(grid) - 2L)]),
     0.5 * (grid[length(grid)] - grid[length(grid) - 1L])
   )
-  wx <- conditional_beta_bw_weights(x, x, hx, "generalized_nn")
-  wy.train <- conditional_beta_bw_weights(y, y, hy, "generalized_nn")
-  wy.grid <- conditional_beta_bw_weights(y, grid, hy, "generalized_nn")
   oracle <- 0
   for (i in seq_along(x)) {
     keep <- setdiff(seq_along(x), i)
-    denominator <- sum(wx[keep, i])
-    fit.grid <- colSums(wx[keep, i] * wy.grid[keep, , drop = FALSE]) /
+    wx <- conditional_beta_bw_weights(x[keep],x[i],hx,"generalized_nn")[,1L]
+    wy.train <- conditional_beta_bw_weights(y[keep],y[i],hy,"generalized_nn")[,1L]
+    wy.grid <- conditional_beta_bw_weights(y[keep],grid,hy,"generalized_nn")
+    denominator <- sum(wx)
+    fit.grid <- colSums(wx * wy.grid) /
       denominator
-    fit.at.yi <- sum(wx[keep, i] * wy.train[keep, i]) / denominator
+    fit.at.yi <- sum(wx * wy.train) / denominator
     oracle <- oracle + sum(weights * fit.grid^2) - 2 * fit.at.yi
   }
   oracle <- oracle / length(x)
@@ -299,12 +299,12 @@ test_that("conditional beta CVML agrees with nearest-neighbor weight ratios", {
   for (bwtype in c("generalized_nn", "adaptive_nn")) {
     hx <- 3
     hy <- 3
-    wx <- conditional_beta_bw_weights(x, x, hx, bwtype)
-    wy <- conditional_beta_bw_weights(y, y, hy, bwtype)
-    diagonal <- cbind(seq_along(x), seq_along(x))
-    wx[diagonal] <- 0
-    wy[diagonal] <- 0
-    oracle <- -sum(log(colSums(wx * wy) / colSums(wx)))
+    loo <- vapply(seq_along(x),function(i) {
+      wx <- conditional_beta_bw_weights(x[-i],x[i],hx,bwtype)[,1L]
+      wy <- conditional_beta_bw_weights(y[-i],y[i],hy,bwtype)[,1L]
+      sum(wx*wy)/sum(wx)
+    },0)
+    oracle <- -sum(log(loo))
     bw <- conditional_beta_manual_bw(
       x, y, hx, hy, method = "cv.ml", bwtype = bwtype
     )

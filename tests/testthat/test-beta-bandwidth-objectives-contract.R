@@ -188,10 +188,12 @@ test_that("mixed beta density objectives match independent kernel-weight oracles
       ## exposes that low-level variant as nliracine.
       oracle_bw <- bw
       oracle_bw[["okertype"]] <- "nliracine"
-      loo_weights <- npksum(
-        bws = oracle_bw, txdat = training, leave.one.out = TRUE,
-        return.kernel.weights = TRUE
-      )$kw
+      # Delete the occurrence before constructing NN radii, not afterwards.
+      loo_weights <- matrix(0,nrow(training),nrow(training))
+      for(i in seq_len(nrow(training)))
+        loo_weights[-i,i] <- npksum(bws=oracle_bw,
+          txdat=training[-i,,drop=FALSE],exdat=training[i,,drop=FALSE],
+          return.kernel.weights=TRUE)$kw[,1L]
       loo_density <- colSums(loo_weights) / (nrow(training) - 1L)
       expected_ml <- sum(vapply(
         loo_density, guarded_log, numeric(1L)

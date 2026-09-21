@@ -42,7 +42,7 @@ test_that("npcdens formula reentry honors explicit data argument", {
   expect_equal(fitted(fit), fitted(direct), tolerance = 1e-12)
 })
 
-test_that("npcdens proper repair warns on under-covering grids and tolerates numeric x jitter", {
+test_that("npcdens proper repair warns on narrow grids and preserves exact X slices", {
   set.seed(2202)
   n <- 80L
   x <- runif(n, -1, 1)
@@ -76,9 +76,11 @@ test_that("npcdens proper repair warns on under-covering grids and tolerates num
   )
 
   expect_true(isTRUE(fit.full$proper.applied))
-  expect_true(isTRUE(fit.jitter$proper.applied))
-  expect_equal(fit.jitter$proper.info$slice.count, fit.full$proper.info$slice.count)
-  expect_equal(fitted(fit.jitter), fitted(fit.full), tolerance = 1e-7)
+  expect_false(isTRUE(fit.jitter$proper.applied))
+  expect_identical(fit.jitter$proper.info$slice.count,0L)
+  raw.jitter <- npcdens(bws=bw,txdat=data.frame(x=x),tydat=data.frame(y=y),
+    exdat=jitter.grid["x"],eydat=jitter.grid["y"],proper=FALSE)
+  expect_identical(fitted(fit.jitter),fitted(raw.jitter))
 
   expect_warning(
     fit.narrow <- npcdens(
@@ -111,9 +113,12 @@ test_that("npcdens records train and evaluation omit metadata without changing l
   )
   fit <- npcdens(bws = bw, txdat = tx, tydat = ty, exdat = ex, eydat = ey)
 
-  expect_equal(unname(fit$rows.omit), c(2L, 3L))
-  expect_equal(unname(fit$train.rows.omit), c(3L, 6L))
-  expect_equal(unname(fit$eval.rows.omit), c(2L, 3L))
+  expect_equal(as.integer(fit$rows.omit), c(2L, 3L))
+  expect_equal(as.integer(fit$train.rows.omit), c(3L, 6L))
+  expect_equal(as.integer(fit$eval.rows.omit), c(2L, 3L))
+  expect_s3_class(fit$rows.omit,"omit")
+  expect_s3_class(fit$train.rows.omit,"omit")
+  expect_s3_class(fit$eval.rows.omit,"omit")
   expect_equal(fit$train.nobs.omit, 2L)
   expect_equal(fit$eval.nobs.omit, 2L)
 })
