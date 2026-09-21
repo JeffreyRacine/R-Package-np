@@ -454,7 +454,7 @@
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
   myopti <- c(myopti, list(
-    divide.returned.kernel.weights = FALSE,
+    divide.returned.kernel.weights = identical(bws$type, "adaptive_nn"),
     categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
   ))
 

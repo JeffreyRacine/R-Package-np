@@ -13970,6 +13970,26 @@ NPPermutationWeightOutput * const pkw_output,
 
     }
 
+    /* Convolution embeds its other-side bandwidth divisor in the product.
+     * Sums and normalized private consumers above keep that representation;
+     * raw exports must not inherit the sum's bandwidth.divide option. */
+    if((kw != NULL || pkw_output != NULL) && !bandwidth_divide_weights &&
+       bandwidth_divide && any_convolution) {
+      for(int coordinate = 0, plane = 0; coordinate < num_reg_continuous;
+          plane += bpso[coordinate], ++coordinate) {
+        if(operator[coordinate] != OP_CONVOLUTION) continue;
+        for(int row = 0; row < num_xt; ++row) {
+          const double scale = matrix_alt_bandwidth[coordinate][
+            BANDWIDTH_reg == BW_FIXED ? 0 : row];
+          if(kw != NULL) tprod[row] *= scale;
+          if(pkw_output != NULL)
+            for(int block = 0; block < p_nvar; ++block)
+              if(!bpso[coordinate] || block != plane)
+                tprod_mp[(size_t)block*num_xt + row] *= scale;
+        }
+      }
+    }
+
     if(kw != NULL){
       if(NP_UNLIKELY(row_tile_sink != NULL)){
         NP_KernelRowTileSink * const sink = row_tile_sink;

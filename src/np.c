@@ -22168,8 +22168,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   do_divide_bw = myopti[KWS_BDIVI];
   do_divide_returned_weights = myopti[KWS_BDIVWI];
   do_divide_returned_bw =
-    (do_divide_returned_weights || BANDWIDTH_reg_extern == BW_ADAP_NN) ?
-      do_divide_bw : 0;
+    do_divide_returned_weights ? do_divide_bw : 0;
   
   max_lev = myopti[KWS_MLEVI];
   pad_num = *padnum;

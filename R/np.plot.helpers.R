@@ -2628,6 +2628,7 @@
     bws = bws,
     return.kernel.weights = TRUE,
     bandwidth.divide = identical(bws$type, "adaptive_nn"),
+    .np.internal.bandwidth.divide.weights = identical(bws$type, "adaptive_nn"),
     leave.one.out = FALSE
   )$kw
   if (!is.matrix(kw))
