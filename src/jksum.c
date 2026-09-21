@@ -24561,152 +24561,357 @@ static NPDistributionCvlsFinalizeStatus np_distribution_cvls_finalize(
   return NP_DISTRIBUTION_CVLS_FINALIZE_OK;
 }
 
-/*
- * Exact adaptive-NN empirical CDF-CV owner. For held-out observation i,
- * donor l uses the radius computed from D_n without i and l; the resulting
- * fold row is evaluated at each remaining empirical support point j. The
- * shared adaptive row context owns kernel and categorical arithmetic, while
- * this family owner retains only the empirical indicator, omission, loss,
- * and final pair-count normalization. MPI partitions complete held-out rows
- * and restores canonical row order through one O(n) contribution buffer.
- */
-static int np_distribution_adaptive_exact_training_grid(
-  const int num_obs,
-  const int num_reg_unordered,
-  const int num_reg_ordered,
-  const int num_reg_continuous,
-  double **matrix_X_unordered,
-  double **matrix_X_ordered,
-  double **matrix_X_continuous,
-  int *num_categories,
-  double **matrix_categorical_vals,
-  int *kernel_c,
-  int *kernel_u,
-  int *kernel_o,
-  int *operator,
-  double *lambda,
-  double **primary_bandwidth,
-  double **successor_bandwidth,
-  const double *fold_scale,
-  double **selected_bandwidth,
-  double * const cv)
+/* Exact NN CDF CV on empirical or external query grids. The two possible
+ * donor radii after one deletion are prepared once. Canonical scalar CDF factors
+ * are cached per query/dimension/donor, not reevaluated for each fold.
+ * No new kernel formula or finite-support approximation is introduced. */
+typedef struct {
+  int bandwidth_mode,n,m,nuno,nord,ncon,cdfontrain,kernel_c,kernel_u,kernel_o;
+  double **train_u,**train_o,**train_c,**eval_u,**eval_o,**eval_c;
+  double *vsf; int *num_categories; double **categories;
+  const NPContinuousKernelRoute *route; double *cv;
+  double **primary,**successor;
+  double *scale,*lambda,*factors,*categorical,*contributions;
+  int *sorted,*left,*right,*position;
+  long double *difference;
+  KDT *fold_tree;
+  double **fold_coordinates;
+  int *fold_order;
+  long double *node_sum,*fold_sum;
+  int batch,*slots;
+  int status;
+} NPDistributionNnCvOwner;
+
+/* The factors of one donor are constant on boxes of held-out occurrence
+ * ranks. Add a homogeneous product once to a node; otherwise subdivide.
+ * This is exact fold bookkeeping, independent of the public kernel-tree
+ * option. Unit leaves guarantee termination even for duplicate values. */
+static void np_distribution_fold_add(NPDistributionNnCvOwner *c,
+    const int node, const int donor)
 {
-  NPAdaptiveFoldRowContext row_context;
-  const int use_parallel_rows = np_objective_outer_rows_enabled(1);
-  double *contributions = NULL;
-  int owned_start = 0;
-  int owned_rows = num_obs;
-  int local_fail = 0;
-  int held_out;
-  int status = 1;
+  const KDN *box=c->fold_tree->kdn+node;
+  int mixed=0;
+  for(int d=0;d<c->ncon;++d) {
+    const size_t offset=(size_t)d*c->n;
+    const int rank=c->position[offset+donor];
+    const int lower=c->left[offset+rank],upper=c->right[offset+rank];
+    if(box->bb[2*d]>=lower && box->bb[2*d+1]<upper)c->slots[d]=1;
+    else if(box->bb[2*d+1]<lower || box->bb[2*d]>=upper)c->slots[d]=0;
+    else {mixed=1;break;}
+  }
+  if(mixed) {
+    np_distribution_fold_add(c,box->childl,donor);
+    np_distribution_fold_add(c,box->childu,donor);
+    return;
+  }
+  for(int q=0;q<c->batch;++q) {
+    double weight=c->categorical[(size_t)q*c->n+donor];
+    const double *factor=c->factors+(size_t)q*2*c->ncon*c->n;
+    for(int d=0;d<c->ncon;++d)
+      weight*=factor[((size_t)2*d+c->slots[d])*c->n+donor];
+    c->node_sum[(size_t)node*16+q]+=weight;
+  }
+}
 
-  np_adaptive_fold_row_context_init(&row_context);
-  if(cv == NULL || primary_bandwidth == NULL ||
-     successor_bandwidth == NULL || fold_scale == NULL ||
-     selected_bandwidth == NULL)
-    goto cleanup_adaptive_distribution;
-  if(np_objective_outer_buffer_prepare(
-       use_parallel_rows, (size_t)num_obs, &contributions) != 0)
-    goto cleanup_adaptive_distribution;
-  if(!np_adaptive_fold_row_context_prepare(
-       &row_context, num_obs, 1,
-       num_reg_unordered, num_reg_ordered, num_reg_continuous,
-       matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
-       num_categories, matrix_categorical_vals,
-       kernel_c, kernel_u, kernel_o, operator, lambda,
-       selected_bandwidth))
-    local_fail = 1;
-  if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
-    goto cleanup_adaptive_distribution;
+static void np_distribution_fold_resolve(NPDistributionNnCvOwner *c,
+    const int node, const long double *inherited)
+{
+  const KDN *box=c->fold_tree->kdn+node;
+  long double total[16];
+  for(int q=0;q<c->batch;++q)
+    total[q]=inherited[q]+c->node_sum[(size_t)node*16+q];
+  if(box->childl==KD_NOCHILD) {
+    const int held=c->fold_order[box->istart];
+    for(int q=0;q<c->batch;++q)c->fold_sum[(size_t)q*c->n+held]=total[q];
+    return;
+  }
+  np_distribution_fold_resolve(c,box->childl,total);
+  np_distribution_fold_resolve(c,box->childu,total);
+}
 
-  *cv = 0.0;
-  np_objective_outer_owned_rows(
-    0, num_obs, use_parallel_rows, &owned_start, &owned_rows);
-  for(held_out = owned_start;
-      held_out < owned_start + owned_rows;
-      ++held_out){
-    double row_contribution = 0.0;
-    int evaluation;
+static void np_distribution_nn_cv_cleanup(void *data, Rboolean jump)
+{
+  NPDistributionNnCvOwner *c=(NPDistributionNnCvOwner *)data;
+  (void)jump;
+  if(c->primary != NULL) free_tmat(c->primary);
+  if(c->successor != NULL) free_tmat(c->successor);
+  free(c->scale);free(c->lambda);free(c->factors);free(c->categorical);
+  free(c->contributions);
+  free(c->sorted);free(c->left);free(c->right);free(c->position);
+  free(c->difference);
+  if(c->fold_tree!=NULL)free_kdtree(&c->fold_tree);
+  if(c->fold_coordinates!=NULL)free_tmat(c->fold_coordinates);
+  free(c->fold_order);free(c->node_sum);free(c->fold_sum);free(c->slots);
+}
 
-    if((held_out & 31) == 0)
+static SEXP np_distribution_nn_cv_execute(void *data)
+{
+  NPDistributionNnCvOwner *call=(NPDistributionNnCvOwner *)data;
+  const int bandwidth_mode=call->bandwidth_mode,n=call->n,m=call->m;
+  const int nuno=call->nuno,nord=call->nord,ncon=call->ncon,cdfontrain=call->cdfontrain;
+  const int kernel_c=call->kernel_c,kernel_o=call->kernel_o;
+  double **train_o=call->train_o,**train_c=call->train_c;
+  double **eval_o=call->eval_o,**eval_c=call->eval_c;
+  double *vsf=call->vsf,*cv=call->cv;
+  int *num_categories=call->num_categories;double **categories=call->categories;
+  const NPContinuousKernelRoute *route=call->route;
+
+  const int radius_rows = n;
+  double **primary = NULL, **successor = NULL;
+  double *scale = NULL, *lambda = NULL, *factors = NULL;
+  double *categorical = NULL, *contributions = NULL;
+  size_t factor_count,batched_factor_count;
+  const int batch_capacity=ncon>1 ? 16 : 1;
+  int failure = 0, status = 1, owned_start = 0, owned_rows = m;
+  NPNNGeometryContext geometry = {0};
+  NPNNGeometryStatus geometry_status = NP_NN_GEOMETRY_OK;
+#ifdef MPI2
+  const int parallel = np_objective_outer_rows_enabled(1);
+#endif
+
+  if(n < 3 || m < 1 || ncon < 1 || nuno != 0 || cv == NULL ||
+     bandwidth_mode != BW_ADAP_NN ||
+     (cdfontrain && n != m) ||
+     (route != NULL &&
+      (np_continuous_kernel_route_validate(route,ncon) != NP_CKERNEL_ROUTE_OK ||
+       !np_continuous_kernel_route_has_beta(route))) ||
+     !np_size_mul_checked((size_t)ncon, (size_t)n, &factor_count) ||
+     !np_size_mul_checked(factor_count, 2U, &factor_count) ||
+     !np_size_mul_checked(factor_count, (size_t)batch_capacity, &batched_factor_count))
+    return R_NilValue;
+  primary = call->primary = alloc_tmatd(radius_rows, ncon);
+  successor = call->successor = alloc_tmatd(radius_rows, ncon);
+  scale = call->scale = (double *)calloc((size_t)ncon, sizeof(double));
+  lambda = call->lambda = (double *)calloc((size_t)MAX(1,nord), sizeof(double));
+  categorical = call->categorical = (double *)calloc((size_t)n*batch_capacity, sizeof(double));
+  contributions = call->contributions = (double *)calloc((size_t)m, sizeof(double));
+  failure = primary == NULL || successor == NULL || scale == NULL ||
+    lambda == NULL || categorical == NULL || contributions == NULL ||
+    np_native_malloc_array((void **)&factors, batched_factor_count,
+                            sizeof(double)) != NP_NATIVE_ALLOC_OK;
+  call->factors=factors;
+  if(failure)
+    goto finish_distribution_nn_grid;
+
+  geometry.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
+  geometry.adaptive_successor = successor;
+  geometry.adaptive_fold_scale = scale;
+  failure = kernel_bandwidth_mean_ctx(
+    route != NULL ? 0 : kernel_c, bandwidth_mode,
+    n,n,0,0,0,ncon,nuno,nord,1,vsf,
+    NULL,NULL,train_c,train_c,NULL,
+    primary,lambda,&geometry,NULL,&geometry_status) != 0;
+  if(failure)
+    goto finish_distribution_nn_grid;
+
+  /* One occurrence-safe interval map per coordinate. Keep the prepared
+   * radius scaled: dividing it back could move an inclusive boundary tie. */
+  const size_t interval_count = factor_count/2;
+  call->sorted=(int *)calloc(interval_count,sizeof(int));
+  call->left=(int *)calloc(interval_count,sizeof(int));
+  call->right=(int *)calloc(interval_count,sizeof(int));
+  call->position=(int *)calloc(interval_count,sizeof(int));
+  if(ncon == 1)
+    call->difference=(long double *)calloc((size_t)n+1,sizeof(long double));
+  failure = call->sorted==NULL || call->left==NULL || call->right==NULL ||
+    call->position==NULL || (ncon==1 && call->difference==NULL);
+  for(int d=0;d<ncon && !failure;++d) {
+    const size_t offset=(size_t)d*n;
+    failure=np_nn_two_slot_exclusion_intervals_scaled(
+      primary[d],successor[d],train_c[d],n,scale[d],NULL,
+      call->sorted+offset,call->left+offset,call->right+offset) != 0;
+    if(!failure)
+      for(int rank=0;rank<n;++rank)
+        call->position[offset+call->sorted[offset+rank]]=rank;
+  }
+  if(failure)
+    goto finish_distribution_nn_grid;
+  if(ncon>1) {
+    call->fold_coordinates=alloc_tmatd(n,ncon);
+    call->fold_order=(int *)calloc((size_t)n,sizeof(int));
+    call->fold_sum=(long double *)calloc((size_t)n*16,sizeof(long double));
+    call->slots=(int *)calloc((size_t)ncon,sizeof(int));
+    if(call->fold_coordinates==NULL || call->fold_order==NULL ||
+       call->fold_sum==NULL || call->slots==NULL || n>INT_MAX/2) {failure=1;goto finish_distribution_nn_grid;}
+    for(int i=0;i<n;++i) {
+      call->fold_order[i]=i;
+      for(int d=0;d<ncon;++d)
+        call->fold_coordinates[d][i]=call->position[(size_t)d*n+i];
+    }
+    build_kdtree(call->fold_coordinates,n,ncon,1,call->fold_order,&call->fold_tree);
+    call->node_sum=(long double *)calloc((size_t)call->fold_tree->numnode*16,
+                                        sizeof(long double));
+    if(call->node_sum==NULL) {failure=1;goto finish_distribution_nn_grid;}
+  }
+#ifdef MPI2
+  np_objective_outer_owned_rows(0,m,parallel,&owned_start,&owned_rows);
+#endif
+  for(int first=owned_start; first<owned_start+owned_rows && !failure;
+      first+=batch_capacity) {
+    call->batch=MIN(batch_capacity,owned_start+owned_rows-first);
+    for(int q=0;q<call->batch && !failure;++q) {
+      const int j=first+q;
+      categorical=call->categorical+(size_t)q*n;
+      factors=call->factors+(size_t)q*factor_count;
+    if((j & 15) == 0)
       np_progress_bandwidth_loop_step();
-    if(np_nn_adaptive_fold_select_row(
-         num_obs, num_reg_continuous, matrix_X_continuous,
-         primary_bandwidth, successor_bandwidth, fold_scale, held_out,
-         selected_bandwidth) != NP_NN_GEOMETRY_OK){
-      local_fail = 1;
-      break;
+    for(int donor=0; donor<n; ++donor) {
+      double weight = 1.0;
+      for(int d=0; d<nord; ++d) {
+        const int count = num_categories[d];
+        const double *support = categories[d];
+        weight *= np_ordered_kernel_eval(kernel_o + 12,
+          train_o[d][donor], eval_o[d][j], lambda[d], support, count,
+          support[0], support[count - 1]);
+      }
+      categorical[donor] = weight;
     }
-
-    for(evaluation = 0; evaluation < num_obs; ++evaluation){
-      double common_log_scale = 0.0;
-      double scaled_sum = 0.0;
-      double restored_sum;
-      double difference;
-      int indicator = 1;
-      int coordinate;
-      int donor;
-
-      if(evaluation == held_out)
-        continue;
-      if(np_adaptive_fold_row_context_fill_selected(
-           &row_context, evaluation, &common_log_scale) !=
-           NP_CONTINUOUS_ROW_OK){
-        local_fail = 1;
-        break;
-      }
-      for(donor = 0; donor < num_obs; ++donor)
-        if(donor != held_out)
-          scaled_sum += row_context.row[donor];
-      if(np_continuous_kernel_scaled_restore(
-           scaled_sum, common_log_scale, 1, &restored_sum) !=
-           NP_CONTINUOUS_ROW_OK){
-        local_fail = 1;
-        break;
-      }
-
-      for(coordinate = 0;
-          coordinate < num_reg_ordered && indicator != 0;
-          ++coordinate)
-        indicator *= matrix_X_ordered[coordinate][held_out] <=
-          matrix_X_ordered[coordinate][evaluation];
-      for(coordinate = 0;
-          coordinate < num_reg_continuous && indicator != 0;
-          ++coordinate)
-        indicator *= matrix_X_continuous[coordinate][held_out] <=
-          matrix_X_continuous[coordinate][evaluation];
-      difference = indicator - restored_sum/(double)(num_obs - 1);
-      row_contribution += difference*difference;
-      if(!R_FINITE(row_contribution)){
-        local_fail = 1;
-        break;
+    for(int d=0; d<ncon && !failure; ++d) {
+      const NPContinuousKernelSegment *segment = route == NULL ? NULL :
+        np_continuous_kernel_route_segment(route,d);
+      if(route != NULL && segment == NULL) {failure=1;break;}
+      const np_continuous_kernel_family family = segment == NULL ?
+        NP_CKERNEL_FAMILY_LEGACY : segment->descriptor.family;
+      const int code = segment == NULL ? kernel_c : segment->descriptor.legacy_code;
+      const int order = segment == NULL ? (kernel_c==8 ? 2 : 2*((kernel_c%4)+1)) :
+        segment->descriptor.order;
+      const int local = segment == NULL ? d : d-segment->coordinate_offset;
+      const double lower = segment == NULL ? vector_ckerlb_extern[d] : segment->lower[local];
+      const double upper = segment == NULL ? vector_ckerub_extern[d] : segment->upper[local];
+      for(int slot=0; slot<2 && !failure; ++slot)for(int donor=0; donor<n; ++donor) {
+        if((donor & 4095) == 0) np_progress_bandwidth_loop_step();
+        const double h = (slot ? successor : primary)[d][donor];
+        double log_abs;
+        int sign;
+        failure = np_continuous_kernel_scalar_log(family,code,order,1,
+          eval_c[d][j],train_c[d][donor],h,lower,upper,&log_abs,&sign) !=
+          NP_CONTINUOUS_KERNEL_SCALAR_OK;
+        if(failure)
+          break;
+        factors[((size_t)2*d+slot)*n+donor] = sign == 0 ? 0.0 : sign*exp(log_abs);
       }
     }
-    if(local_fail)
-      break;
-    if(use_parallel_rows)
-      contributions[held_out] = row_contribution;
-    else
-      *cv += row_contribution;
+    /* In one dimension ANN deletion changes donor factors on contiguous
+     * intervals of held-out occurrences. Reuse the canonical interval map
+     * and accumulate range differences; do not rescan every donor per fold. */
+    if(ncon==1 && !failure) {
+      long double base=0.0L,adjustment=0.0L;
+      memset(call->difference,0,((size_t)n+1)*sizeof(long double));
+      for(int rank=0;rank<n;++rank) {
+        const int donor=call->sorted[rank];
+        const long double first=(long double)categorical[donor]*factors[donor];
+        const long double delta=(long double)categorical[donor]*factors[n+donor]-first;
+        base+=first;
+        call->difference[call->left[rank]]+=delta;
+        call->difference[call->right[rank]]-=delta;
+      }
+      for(int rank=0;rank<n;++rank) {
+        const int held=call->sorted[rank];
+        int indicator=train_c[0][held]<=eval_c[0][j];
+        adjustment+=call->difference[rank];
+        if(cdfontrain && held==j)continue;
+        for(int d=0;d<nord && indicator;++d)
+          indicator=train_o[d][held]<=eval_o[d][j];
+        const long double sum=base+adjustment-
+          (long double)categorical[held]*factors[n+held];
+        const double error=indicator-(double)(sum/(n-1));
+        contributions[j]+=error*error;
+      }
+      failure=!R_FINITE(contributions[j]);
+      continue;
+    }
+    } /* canonical factors / one-dimensional interval sibling */
+    if(failure)break;
+    if(ncon==1)continue;
+    memset(call->node_sum,0,(size_t)call->fold_tree->numnode*16*sizeof(long double));
+    for(int donor=0;donor<n;++donor) {
+      if((donor & 31)==0)np_progress_bandwidth_loop_step();
+      np_distribution_fold_add(call,0,donor);
+    }
+    const long double zero[16]={0};
+    np_distribution_fold_resolve(call,0,zero);
+    for(int q=0;q<call->batch;++q) {
+      const int j=first+q;
+      categorical=call->categorical+(size_t)q*n;
+      factors=call->factors+(size_t)q*factor_count;
+    for(int held=0;held<n;++held) {
+      int indicator=1;
+      double self=categorical[held];
+      if(cdfontrain && held==j)continue;
+      for(int d=0;d<ncon;++d) {
+        self*=factors[((size_t)2*d+1)*n+held];
+        indicator &= train_c[d][held]<=eval_c[d][j];
+      }
+      for(int d=0;d<nord && indicator;++d)
+        indicator=train_o[d][held]<=eval_o[d][j];
+      const double error=indicator-(double)((call->fold_sum[(size_t)q*n+held]-self)/(n-1));
+      contributions[j]+=error*error;
+    }
+    failure|=!R_FINITE(contributions[j]);
+    }
   }
 
-  if(np_objective_outer_buffer_finish(
-       use_parallel_rows, num_obs, local_fail, contributions,
+finish_distribution_nn_grid:
+#ifdef MPI2
+  if(np_objective_outer_preflight_failed(parallel,failure))
+    goto cleanup_distribution_nn_grid;
+  if(np_objective_outer_buffer_finish(parallel,m,0,contributions,
        "NP_RMPI_INJECT_UDIST_ADAPTIVE_EXACT_FAIL_RANK",
-       "unconditional distribution exact adaptive rows MPI_Allreduce") != 0)
-    goto cleanup_adaptive_distribution;
-  if(use_parallel_rows)
-    for(held_out = 0; held_out < num_obs; ++held_out)
-      *cv += contributions[held_out];
-  status = np_distribution_cvls_finalize(
-    *cv, num_obs, num_obs, 1, cv) ==
-      NP_DISTRIBUTION_CVLS_FINALIZE_OK ? 0 : 1;
+       "unconditional distribution NN fold grid MPI_Allreduce") != 0)
+    goto cleanup_distribution_nn_grid;
+#else
+  if(failure)
+    goto cleanup_distribution_nn_grid;
+#endif
+  *cv = 0.0;
+  for(int j=0; j<m; ++j)
+    *cv += contributions[j];
+  status = np_distribution_cvls_finalize(*cv,n,m,cdfontrain,cv) ==
+    NP_DISTRIBUTION_CVLS_FINALIZE_OK ? 0 : 1;
 
-cleanup_adaptive_distribution:
-  np_adaptive_fold_row_context_clear(&row_context);
-  free(contributions);
-  return status;
+cleanup_distribution_nn_grid:
+  call->status=status;
+  return R_NilValue;
 }
+
+static int np_distribution_adaptive_exact_grid(
+  const int bandwidth_mode, const int n, const int m,
+  const int nuno, const int nord, const int ncon, const int cdfontrain,
+  const int kernel_c, const int kernel_u, const int kernel_o,
+  double **train_u, double **train_o, double **train_c,
+  double **eval_u, double **eval_o, double **eval_c,
+  double *vsf, int *num_categories, double **categories,
+  const NPContinuousKernelRoute *route, double *cv)
+{
+  NPDistributionNnCvOwner call={0};
+  call.bandwidth_mode=bandwidth_mode;
+  call.n=n;
+  call.m=m;
+  call.nuno=nuno;
+  call.nord=nord;
+  call.ncon=ncon;
+  call.cdfontrain=cdfontrain;
+  call.kernel_c=kernel_c;
+  call.kernel_u=kernel_u;
+  call.kernel_o=kernel_o;
+  call.train_u=train_u;
+  call.train_o=train_o;
+  call.train_c=train_c;
+  call.eval_u=eval_u;
+  call.eval_o=eval_o;
+  call.eval_c=eval_c;
+  call.vsf=vsf;
+  call.num_categories=num_categories;
+  call.categories=categories;
+  call.route=route;
+  call.cv=cv;
+  call.status=1;
+  R_UnwindProtect(np_distribution_nn_cv_execute,&call,
+                  np_distribution_nn_cv_cleanup,&call,NULL);
+  return call.status;
+}
+
+
 
 /*
  * Keep the compressed ordered-profile CVLS workspace absolutely bounded.
@@ -25855,6 +26060,16 @@ const NPContinuousKernelRoute * const kernel_route,
 NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
 const int categorical_compress,
 double * cv){
+  /* All continuous ANN CDF losses use literal delete-one donor geometry,
+   * including external grids. Fixed/GNN/categorical-only owners are unchanged. */
+  if(BANDWIDTH_den == BW_ADAP_NN &&
+     num_reg_continuous > 0)
+    return np_distribution_adaptive_exact_grid(
+      BANDWIDTH_den,num_obs_train,num_obs_eval,num_reg_unordered,num_reg_ordered,
+      num_reg_continuous,cdfontrain,KERNEL_den,KERNEL_den_unordered,KERNEL_den_ordered,
+      matrix_X_unordered_train,matrix_X_ordered_train,matrix_X_continuous_train,
+      matrix_X_unordered_eval,matrix_X_ordered_eval,matrix_X_continuous_eval,
+      vsf,num_categories,matrix_categorical_vals,kernel_route,cv);
   const int exact_beta_route = kernel_route != NULL;
   const NPDistributionProfileCvStatus profile_status = exact_beta_route ?
     NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE :
@@ -25894,23 +26109,11 @@ double * cv){
   int status = 0;
   int gate_override_active = 0;
   int all_large_gate = 0;
-  int adaptive_exact_training_grid =
-    !exact_beta_route && BANDWIDTH_den == BW_ADAP_NN && cdfontrain &&
-    num_obs_eval == num_obs_train && num_obs_train <= INT_MAX &&
-    num_reg_continuous > 0 && vsf != NULL;
   int *ov_cont_ok = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double **matrix_bandwidth = NULL;
-  double **adaptive_successor_bandwidth = NULL;
-  double *adaptive_fold_scale = NULL;
-  double **adaptive_selected_bandwidth = NULL;
   double *lambda = NULL;
   double *beta_row = NULL;
-  NPNNGeometryContext nn_geometry_context = {
-    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
-    .eval_to_train = NULL,
-    .adaptive_successor = NULL
-  };
   NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 
   if(exact_beta_route &&
@@ -26023,38 +26226,9 @@ double * cv){
   matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
-  if(adaptive_exact_training_grid){
-    int allocation_ok;
 
-    adaptive_successor_bandwidth =
-      alloc_tmatd(num_obs_train, num_reg_continuous);
-    adaptive_fold_scale = alloc_vecd(num_reg_continuous);
-    adaptive_selected_bandwidth =
-      alloc_tmatd(num_obs_train, num_reg_continuous);
-    allocation_ok = adaptive_successor_bandwidth != NULL &&
-      adaptive_fold_scale != NULL &&
-      adaptive_selected_bandwidth != NULL;
-#ifdef MPI2
-    {
-      int all_allocation_ok = 0;
-      MPI_Allreduce(&allocation_ok, &all_allocation_ok, 1,
-                    MPI_INT, MPI_MIN, comm[1]);
-      allocation_ok = all_allocation_ok;
-    }
-#endif
-    if(!allocation_ok){
-      status = 1;
-      goto cleanup_distribution_ls_cv;
-    }
-    nn_geometry_context.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
-    nn_geometry_context.adaptive_successor =
-      adaptive_successor_bandwidth;
-    nn_geometry_context.adaptive_fold_scale = adaptive_fold_scale;
-  }
 
-  if(np_adaptive_geometry_preflight_failed(
-       adaptive_exact_training_grid,
-       kernel_bandwidth_mean_ctx(exact_beta_route ? 0 : KERNEL_den,
+  if(kernel_bandwidth_mean_ctx(exact_beta_route ? 0 : KERNEL_den,
                                BANDWIDTH_den,
                                num_obs_train,
                                num_obs_eval,
@@ -26070,18 +26244,14 @@ double * cv){
                                NULL,
                                matrix_bandwidth,
                                lambda,
-                               adaptive_exact_training_grid ?
-                                 &nn_geometry_context : NULL,
                                NULL,
-                               &nn_geometry_status)==1)){
+                               NULL,
+                               &nn_geometry_status)==1){
     if(exact_beta_route) {
       status = 1;
       goto cleanup_distribution_ls_cv;
     }
-    if(adaptive_exact_training_grid){
-      status = 1;
-      goto cleanup_distribution_ls_cv;
-    }
+
     if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
       status = 1;
       goto cleanup_distribution_ls_cv;
@@ -26089,19 +26259,7 @@ double * cv){
     error("\n** Error: invalid bandwidth.");
   }
 
-  if(adaptive_exact_training_grid){
-    status = np_distribution_adaptive_exact_training_grid(
-      num_obs_train, num_reg_unordered, num_reg_ordered,
-      num_reg_continuous,
-      matrix_X_unordered_train, matrix_X_ordered_train,
-      matrix_X_continuous_train, num_categories,
-      matrix_categorical_vals, kernel_c, kernel_u, kernel_o,
-      operator, lambda, matrix_bandwidth,
-      adaptive_successor_bandwidth, adaptive_fold_scale,
-      adaptive_selected_bandwidth,
-      cv);
-    goto cleanup_distribution_ls_cv;
-  }
+
 
   if(exact_beta_route) {
     if(np_objective_outer_rows_enabled(1)) {
@@ -26420,11 +26578,6 @@ cleanup_distribution_ls_cv:
   free(kernel_o);
   free(mean);
   free(lambda);
-  if(adaptive_successor_bandwidth != NULL)
-    free_tmat(adaptive_successor_bandwidth);
-  if(adaptive_selected_bandwidth != NULL)
-    free_tmat(adaptive_selected_bandwidth);
-  free(adaptive_fold_scale);
   free_mat(matrix_bandwidth, num_reg_continuous);
 
   free(matrix_wX_continuous_eval);

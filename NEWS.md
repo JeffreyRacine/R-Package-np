@@ -4,6 +4,12 @@
   evaluations without advancing optimizer iteration counts. Native progress
   callbacks preserve interrupts instead of consuming Ctrl-C.
 
+* Adaptive nearest-neighbor distribution CV now evaluates donor radii on each
+  deleted sample for beta kernels and external grids as well as empirical
+  grids. Canonical CDF factors and occurrence-safe exclusion intervals are
+  reused across folds. This can change selected adaptive-NN bandwidths;
+  fixed and generalized-NN criteria are unchanged by this repair.
+
 * Ordered Racine--Li--Yan kernels now share one retained-support implementation
   for mass, CDF, bandwidth scores, overlaps and categorical profile plots.
   Regression CV paired moments preserve directed donor weights and row-specific
