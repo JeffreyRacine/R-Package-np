@@ -3330,7 +3330,7 @@
     stop("profile code matrices must have matching columns")
 
   W <- matrix(1.0, nrow = nrow(eval.codes), ncol = nrow(train.codes))
-  lambda <- as.double(bws$bw)
+  lambda <- as.double(.np_physical_bandwidth(bws))
   okertype <- if (density) .np_kbandwidth_okertype(bws) else bws$okertype
 
   for (j in seq_len(ncol(train.codes))) {
@@ -3389,7 +3389,7 @@
 # the profile moment's units.
 .np_regression_cat_profile_ridge_scale <- function(xdat, bws) {
   xdat <- toFrame(xdat)
-  lambda <- as.double(bws$bw)
+  lambda <- as.double(.np_physical_bandwidth(bws))
   if (length(lambda) != ncol(xdat))
     stop("categorical profile ridge scale requires one bandwidth per column")
 
@@ -7758,7 +7758,7 @@
 .np_make_kbandwidth_unconditional <- function(bws, xdat) {
   xdat <- toFrame(xdat)
   kbandwidth.numeric(
-    bw = bws$bw,
+    bw = .np_physical_bandwidth(bws),
     bwscaling = FALSE,
     # npksum helper constructors require raw bandwidths; bwscaling flags are
     # non-fit-defining here and are intentionally normalized to FALSE.

@@ -1,3 +1,19 @@
+# Numerical helpers consume physical smoothing parameters, never search scale
+# factors. Conditional objects have two roles; other bandwidth families retain
+# one vector (possibly wrapped in a named list for display).
+.np_physical_bandwidth <- function(bws, role = NULL) {
+  raw <- bws[[if (is.null(role)) "bw" else paste0(role, "bw"), exact = TRUE]]
+  if (!isTRUE(bws[["scaling", exact = TRUE]]))
+    return(raw)
+  retained <- bws[["bandwidth", exact = TRUE]]
+  physical <- if (is.null(role)) unlist(retained, use.names = FALSE) else
+    retained[[role, exact = TRUE]]
+  if (!is.numeric(physical) || length(physical) != length(raw) ||
+      any(!is.finite(physical)))
+    stop("numerical operator requires retained physical bandwidths", call. = FALSE)
+  physical
+}
+
 kbandwidth <-
   function(bw = stop("kbandwidth:argument 'bw' missing"), ...) {
     UseMethod("kbandwidth")
