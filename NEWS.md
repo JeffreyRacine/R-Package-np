@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Uncompressed density CVLS now squares sample counts in floating-point
+  arithmetic, avoiding integer overflow that could corrupt bandwidth selection
+  for large samples. Kernel calculations and computational routing are unchanged.
+
 * Bounded conditional-density nearest-neighbour CVLS now evaluates both
   objective terms using the sample with the held-out occurrence removed.
   Response quadrature reuses the existing nodes and bounded work tiles while
