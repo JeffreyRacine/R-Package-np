@@ -1,12 +1,5 @@
 .npcdhat_physical_bandwidth <- function(bws, role) {
-  raw <- bws[[paste0(role, "bw"), exact = TRUE]]
-  if (!isTRUE(bws[["scaling", exact = TRUE]]))
-    return(raw)
-  physical <- bws[["bandwidth", exact = TRUE]][[role, exact = TRUE]]
-  if (!is.numeric(physical) || length(physical) != length(raw) ||
-      any(!is.finite(physical)))
-    stop("conditional operator requires retained physical bandwidths", call. = FALSE)
-  physical
+  .np_physical_bandwidth(bws, role)
 }
 
 .npcdhat_make_xbw <- function(bws, txdat) {

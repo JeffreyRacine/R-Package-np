@@ -462,7 +462,7 @@ npreghat <-
       )
     }
 
-    h <- as.double(bws$bw[bws$icon])
+    h <- as.double(.np_physical_bandwidth(bws)[bws$icon])
     dband <- 1.0
     p.dband <- 1.0
     for (j in seq_along(h)) {
@@ -1074,7 +1074,9 @@ npreghat <-
     racineliyan = OKER_RLY
   )
 
-  bw.vec <- as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord]))
+  physical.bw <- .np_physical_bandwidth(bws)
+  bw.vec <- as.double(c(physical.bw[bws$icon], physical.bw[bws$iuno],
+                        physical.bw[bws$iord]))
   tree.flag <- !beta.kernel && identical(
       .npreg_fit_tree_code(
         bws,
