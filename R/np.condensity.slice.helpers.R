@@ -33,7 +33,8 @@
                  any(is.finite(bws$cykerub[bws$iycon]))))
       return(FALSE)
   }
-  if (bws$ynuno > 0L && !identical(bws$uykertype, "aitchisonaitken") &&
+  # Both unordered density kernels are normalized over the retained support.
+  if (bws$ynuno > 0L && !(bws$uykertype %in% c("aitchisonaitken", "liracine")) &&
       any(bws$ybw[bws$iyuno] != 0))
     return(FALSE)
   if (bws$ynord > 0L && !identical(bws$oykertype, "racineliyan") &&
