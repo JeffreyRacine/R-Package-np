@@ -36627,6 +36627,9 @@ static int np_bounded_cvls_fill_uniform_nodes_1d(const double lb,
 
   for(i = 0; i < q; i++)
     grid_out[i] = lb + ((double)i)*step;
+  /* Keep support membership exact, as in the full uniform rule. */
+  grid_out[0] = lb;
+  grid_out[q - 1] = ub;
 
   return 0;
 }
@@ -36675,7 +36678,8 @@ static void np_bounded_cvls_fill_remaining_uniform_nodes_1d(const double lb,
       return;
 
     for(i = 0; (i < q_try) && (*count < q_target); i++){
-      const double value = lb + ((double)i)*step;
+      const double value = i == 0 ? lb :
+        (i == q_try - 1 ? ub : lb + ((double)i)*step);
       np_bounded_cvls_append_unique_node_1d(grid, count, q_target, value);
     }
   }
