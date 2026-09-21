@@ -43,6 +43,11 @@ typedef struct {
 void np_beta_scaled_row_context_init(NPBetaScaledRowContext *context);
 void np_beta_scaled_row_context_clear(NPBetaScaledRowContext *context);
 
+/* Mark this context's owned PDF cache for Lebesgue quadrature. Public point
+ * values and CDF contexts must not call this preparation step. */
+NPContinuousKernelRowStatus np_beta_scaled_row_context_prepare_quadrature(
+  NPBetaScaledRowContext *context);
+
 NPContinuousKernelRowStatus np_beta_scaled_row_context_prepare(
   NPBetaScaledRowContext *context,
   const NPContinuousKernelRoute *route,

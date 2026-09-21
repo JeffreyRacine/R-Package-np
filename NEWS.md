@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Beta density CVLS quadrature uses the interior-limit contribution of boundary
+  observations instead of assigning positive integration weight to isolated
+  endpoint spikes. This applies to unconditional and conditional objectives,
+  including distributed quadrature. Ordinary PDF values and CV cross terms
+  are unchanged; zero-concentration uniform components remain included.
+
 * Beta generalized-NN unconditional density and distribution fits now preserve
   training-query identity when choosing radii, as other continuous kernels do.
   Explicit external queries keep their external geometry; full-fit standard

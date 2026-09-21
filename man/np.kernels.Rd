@@ -175,6 +175,17 @@
   adaptive-NN rule. These are derivatives of the fitted smoother conditional
   on its realized bandwidths, not derivatives of the NN selection map.
 
+  Density CVLS quadrature integrates with respect to the continuous support
+  measure. At a boundary observation, it therefore uses the interior-limit
+  PDF contribution rather than assigning integration mass to an isolated
+  endpoint value. This is applied separately to each multiscale component;
+  zero-concentration uniform components remain included. Ordinary PDF point
+  evaluations and the leave-one-out cross term retain their point values.
+  This integration convention alone does not guarantee a finite optimum
+  when an automatic search permits bandwidths tending to zero and the data
+  contain repeated boundary observations. Existing positive search bounds
+  are unchanged.
+
   An observation exactly equal to the lower (upper) support endpoint makes
   its matching scalar PDF contribution jump downward (upward) when the target
   crosses that endpoint. The scalar derivative is consequently reported as
