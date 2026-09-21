@@ -368,6 +368,11 @@ int np_nn_two_slot_radius_select(double primary_radius,
                                  double base_distance,
                                  int distinct_base_exclusion,
                                  double *radius);
+int np_nn_two_slot_exclusion_intervals_scaled(
+  const double *primary_radius, const double *successor_radius,
+  const double *training_values, int num_train, double distance_scale,
+  const int *occurrence_to_position, int *sorted_occurrences,
+  int *interval_start, int *interval_end);
 int np_nn_two_slot_exclusion_intervals(
   const double *primary_radius,
   const double *successor_radius,

@@ -871,11 +871,12 @@ static int np_nn_two_slot_order_entry_compare(const void *left,
  * the half-open interval of base occurrences whose deletion advances the
  * prepared primary radius. Inclusive support-boundary ties are retained.
  * Storage is linear and the single sort is shared by all fold queries. */
-int np_nn_two_slot_exclusion_intervals(
+int np_nn_two_slot_exclusion_intervals_scaled(
   const double *primary_radius,
   const double *successor_radius,
   const double *training_values,
   const int num_train,
+  const double distance_scale,
   const int *occurrence_to_position,
   int *sorted_occurrences,
   int *interval_start,
@@ -888,6 +889,7 @@ int np_nn_two_slot_exclusion_intervals(
 
   if(primary_radius == NULL || successor_radius == NULL ||
      training_values == NULL || num_train <= 0 ||
+     !isfinite(distance_scale) || distance_scale <= 0.0 ||
      sorted_occurrences == NULL || interval_start == NULL ||
      interval_end == NULL)
     return 1;
@@ -933,7 +935,7 @@ int np_nn_two_slot_exclusion_intervals(
 
     while(lo < hi){
       const int mid = lo + (hi - lo)/2;
-      if(fabs(order[mid].value - query_value) > radius)
+      if(fabs(order[mid].value - query_value)*distance_scale > radius)
         lo = mid + 1;
       else
         hi = mid;
@@ -944,7 +946,7 @@ int np_nn_two_slot_exclusion_intervals(
     hi = num_train;
     while(lo < hi){
       const int mid = lo + (hi - lo)/2;
-      if(fabs(order[mid].value - query_value) <= radius)
+      if(fabs(order[mid].value - query_value)*distance_scale <= radius)
         lo = mid + 1;
       else
         hi = mid;
@@ -961,6 +963,18 @@ cleanup_two_slot_intervals:
   free(order);
   free(seen_position);
   return status;
+}
+
+/* Preserve the scale-one contract for incumbent conditional callers. */
+int np_nn_two_slot_exclusion_intervals(
+  const double *primary_radius, const double *successor_radius,
+  const double *training_values, const int num_train,
+  const int *occurrence_to_position, int *sorted_occurrences,
+  int *interval_start, int *interval_end)
+{
+  return np_nn_two_slot_exclusion_intervals_scaled(
+    primary_radius, successor_radius, training_values, num_train, 1.0,
+    occurrence_to_position, sorted_occurrences, interval_start, interval_end);
 }
 
 static NPNNGeometryStatus
