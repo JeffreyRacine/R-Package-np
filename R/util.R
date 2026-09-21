@@ -1831,8 +1831,18 @@ numNotIn <- function(x){
 dlev <- function(x){
   if(is.ordered(x))
     x.dlev <- suppressWarnings(as.numeric(levels(x)))
-  if (!is.ordered(x) || any(is.na(x.dlev)))
+  if (!is.ordered(x) || any(is.na(x.dlev))) {
     x.dlev <- as.numeric(seq_len(nlevels(x)))
+  } else if (length(x.dlev)) {
+    spacing <- diff(x.dlev)
+    if (any(!is.finite(x.dlev)) || any(spacing <= 0) ||
+        any(spacing != floor(spacing)) ||
+        x.dlev[length(x.dlev)] - x.dlev[1L] >= .Machine$integer.max)
+      stop(paste0("numeric ordered-factor levels must be finite, increasing, ",
+                  "and separated by integer distances within the native index range; ",
+                  "use explicit nonnumeric labels if ordinal rank distances are intended"),
+           call. = FALSE)
+  }
   x.dlev
 }
 

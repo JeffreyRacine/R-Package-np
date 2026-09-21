@@ -26,6 +26,8 @@ static inline int np_lp_delete_denominator(const double leverage,
   return isfinite(*denominator) && (*denominator != 0.0);
 }
 
+typedef struct { double value; double log_value; } NPRlyNormalizer;
+
 /* Borrowed view for one resident-row accumulation call. All pointed-to
  * storage remains caller-owned and must outlive the call. Inputs (including
  * basis, despite its historical non-const pointer type) are read-only here.
@@ -50,7 +52,24 @@ typedef struct {
   const double *eval_ybasis;
   const double *eval_outer;
   int *support_count;
+  const NPRlyNormalizer *rly_log_normalizer;
 } NPLPDenseRowContext;
+
+/* Reverse a directed pair without recomputing its continuous or categorical
+ * kernel. NULL preserves the symmetric transcript. The log-domain branch
+ * avoids overflowing the ratio when its final weighted value is representable. */
+static inline double np_lp_reverse_pair_weight(const double weight,
+    const NPRlyNormalizer *log_normalizer, const int donor, const int evaluation)
+{
+  if(log_normalizer == NULL || weight == 0.0) return weight;
+  const double numerator = log_normalizer[donor].value;
+  const double denominator = log_normalizer[evaluation].value;
+  if(isfinite(numerator) && isfinite(denominator))
+    return weight*(numerator/denominator);
+  const double difference = log_normalizer[donor].log_value-log_normalizer[evaluation].log_value;
+  if(fabs(difference) < 350.0) return weight*exp(difference);
+  return copysign(exp(log(fabs(weight))+difference),weight);
+}
 
 /*
  * Width six is the established resident/packed crossover boundary and is
@@ -71,7 +90,8 @@ static inline void np_lp_accumulate_sparse_pair_resident6(
     const double *eval_outer,
     const int orig_ii,
     const int tree_ii,
-    const double weight)
+    const double weight,
+    const double reverse_weight)
 {
   enum { nterms = 6 };
   const double yi = response[tree_ii];
@@ -91,14 +111,14 @@ static inline void np_lp_accumulate_sparse_pair_resident6(
   }
 
   {
-    const float64x2_t vw = vdupq_n_f64(weight);
+    const float64x2_t vw = vdupq_n_f64(reverse_weight);
 
     for(a = 0; a + 1 < nterms; a += 2)
       vst1q_f64(moving_rhs + a,
                 vfmaq_f64(vld1q_f64(moving_rhs + a), vw,
                           vld1q_f64(eval_ybasis + a)));
     if(a < nterms)
-      moving_rhs[a] += weight*eval_ybasis[a];
+      moving_rhs[a] += reverse_weight*eval_ybasis[a];
 
     for(a = 0; a < nterms; a++){
       const int end = a*nterms + nterms;
@@ -109,7 +129,7 @@ static inline void np_lp_accumulate_sparse_pair_resident6(
                   vfmaq_f64(vld1q_f64(moving_moments + pos), vw,
                             vld1q_f64(eval_outer + pos)));
       if(pos < end)
-        moving_moments[pos] += weight*eval_outer[pos];
+        moving_moments[pos] += reverse_weight*eval_outer[pos];
     }
   }
 }
@@ -134,6 +154,7 @@ void np_lp_accumulate_dense_resident_row3(
   double *rhs,
   const double *eval_ybasis,
   const double *eval_outer,
-  int *support_count);
+  int *support_count,
+  const NPRlyNormalizer *rly_log_normalizer);
 
 #endif

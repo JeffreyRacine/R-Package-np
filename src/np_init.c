@@ -5,6 +5,7 @@
 /* Routine registration for the serial np shared library. */
 
 /* .Call calls */
+extern SEXP C_np_ordered_rly_matrix(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_copula_density_se(SEXP);
 extern SEXP C_np_ann_geometry(SEXP, SEXP);
 extern SEXP C_np_ann_variance(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -74,6 +75,7 @@ extern SEXP C_np_set_seed(SEXP);
 extern SEXP C_np_release_static_buffers(void);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_ordered_rly_matrix", (DL_FUNC) &C_np_ordered_rly_matrix, 4},
     {"C_np_dim_basis",                 (DL_FUNC) &C_np_dim_basis,                  6},
     {"C_np_density",                   (DL_FUNC) &C_np_density,                   17},
     {"C_np_density_bw",                (DL_FUNC) &C_np_density_bw,                12},
