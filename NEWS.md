@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Bandwidth selection now reports activity during baseline-reference
+  evaluations without advancing optimizer iteration counts. Native progress
+  callbacks preserve interrupts instead of consuming Ctrl-C.
+
 * Explicitly disabling automatic dispatch now establishes local numerical
   ownership at estimator and bandwidth entry, including preparation and
   kernel sums. This prevents master-only calls from entering an unmatched

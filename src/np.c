@@ -309,6 +309,62 @@ static clock_t fit_progress_last_signal_clock = 0;
 static int fit_progress_last_signal_eval = 0;
 static int nomad_degree_progress_active = 0;
 
+/* Progress must not consume interrupts. Serial callers unwind normally;
+ * active MPI commands retain the existing deferred-interrupt owner; NOMAD
+ * observers return an explicit outcome through their C ABI. */
+typedef struct {
+  SEXP call;
+  SEXP environment;
+  int *error;
+  int *interrupt;
+} NPProgressEvaluation;
+
+static SEXP np_progress_evaluate_body(void *data)
+{
+  NPProgressEvaluation *evaluation = (NPProgressEvaluation *)data;
+  return Rf_eval(evaluation->call, evaluation->environment);
+}
+
+static SEXP np_progress_evaluate_condition(SEXP condition, void *data)
+{
+  NPProgressEvaluation *evaluation = (NPProgressEvaluation *)data;
+  if (Rf_inherits(condition, "interrupt")) {
+    if (evaluation->interrupt != NULL)
+      *evaluation->interrupt = 1;
+#ifdef MPI2
+    else if (np_mpi_distributed_interrupt_active())
+      np_mpi_interrupt_pending = 1;
+#endif
+  } else {
+    *evaluation->error = 1;
+  }
+  return R_NilValue;
+}
+
+static SEXP np_progress_evaluate(SEXP call, SEXP environment, int *error,
+                                 int *interrupt)
+{
+  NPProgressEvaluation evaluation = {call, environment, error, interrupt};
+  int defer_interrupt = interrupt != NULL;
+  *error = 0;
+  if (interrupt != NULL)
+    *interrupt = 0;
+#ifdef MPI2
+  defer_interrupt |= np_mpi_distributed_interrupt_active();
+#endif
+  if (!defer_interrupt)
+    return R_tryCatchError(np_progress_evaluate_body, &evaluation,
+                          np_progress_evaluate_condition, &evaluation);
+  SEXP classes = PROTECT(Rf_allocVector(STRSXP, 2));
+  SET_STRING_ELT(classes, 0, Rf_mkChar("interrupt"));
+  SET_STRING_ELT(classes, 1, Rf_mkChar("error"));
+  SEXP value = R_tryCatch(np_progress_evaluate_body, &evaluation, classes,
+                         np_progress_evaluate_condition, &evaluation,
+                         NULL, NULL);
+  UNPROTECT(1);
+  return value;
+}
+
 static void np_progress_signal(const char *event, const char *surface, const int current, const int total)
 {
   SEXP package = R_NilValue;
@@ -343,7 +399,7 @@ static void np_progress_signal(const char *event, const char *surface, const int
   PROTECT(current_s = Rf_ScalarInteger(current));
   PROTECT(total_s = Rf_ScalarInteger(total));
   PROTECT(call = Rf_lang5(fn, event_s, surface_s, current_s, total_s));
-  R_tryEval(call, ns, &err);
+  (void) np_progress_evaluate(call, ns, &err, NULL);
   UNPROTECT(8);
 }
 
@@ -425,7 +481,7 @@ static void np_progress_nomad_degree_step(const int current_eval,
     INTEGER(best_degree_s)[i] = best_degree == NULL ? NA_INTEGER : best_degree[i];
   PROTECT(best_objective_s = Rf_ScalarReal(best_objective));
   PROTECT(call = Rf_lang5(fn, iter_s, current_degree_s, best_degree_s, best_objective_s));
-  R_tryEval(call, ns, &err);
+  (void) np_progress_evaluate(call, ns, &err, NULL);
   UNPROTECT(8);
 
   *last_eval = current_eval;
@@ -458,7 +514,7 @@ static int np_nomad_progress_observer_config(double *interval_sec)
   PROTECT(fn = Rf_findFun(
     Rf_install(".np_progress_nomad_native_observer_config"), ns));
   PROTECT(call = Rf_lang1(fn));
-  value = R_tryEvalSilent(call, ns, &err);
+  value = np_progress_evaluate(call, ns, &err, NULL);
   if (err || value == R_NilValue) {
     UNPROTECT(4);
     return 0;
@@ -494,6 +550,7 @@ static int np_nomad_progress_observer(
   int nprotect = 0;
   int err = 0;
   int status = CRS_NOMAD_OBSERVER_OUTCOME_ERROR;
+  int interrupted = 0;
   int j;
 
   if (event == NULL) {
@@ -542,7 +599,11 @@ static int np_nomad_progress_observer(
                           current_degree,
                           best_degree,
                           best_objective)); nprotect++;
-  value = R_tryEvalSilent(call, ns, &err);
+  value = np_progress_evaluate(call, ns, &err, &interrupted);
+  if (interrupted) {
+    status = CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT;
+    goto observer_done;
+  }
   if (err || value == R_NilValue || !Rf_isNewList(value) || XLENGTH(value) < 2) {
     if (message != NULL && message_size > 0)
       snprintf(message, message_size, "npRmpi NOMAD progress dispatcher failed");
@@ -554,16 +615,17 @@ static int np_nomad_progress_observer(
   if (status < CRS_NOMAD_OBSERVER_OUTCOME_OK ||
       status > CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT)
     status = CRS_NOMAD_OBSERVER_OUTCOME_ERROR;
-  if (status == CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT &&
-      np_mpi_distributed_interrupt_active()) {
-    np_mpi_interrupt_pending = 1;
-    status = CRS_NOMAD_OBSERVER_OUTCOME_OK;
-  }
   if (message != NULL && message_size > 0 &&
       VECTOR_ELT(value, 1) != R_NilValue && XLENGTH(VECTOR_ELT(value, 1)) > 0) {
     SEXP message_char = Rf_asChar(VECTOR_ELT(value, 1));
     if (message_char != NA_STRING)
       snprintf(message, message_size, "%s", CHAR(message_char));
+  }
+observer_done:
+  if (status == CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT &&
+      np_mpi_distributed_interrupt_active()) {
+    np_mpi_interrupt_pending = 1;
+    status = CRS_NOMAD_OBSERVER_OUTCOME_OK;
   }
   UNPROTECT(nprotect);
   return status;
@@ -590,7 +652,7 @@ static void np_nomad_progress_observer_report(const char *message)
   PROTECT(message_s = Rf_mkString(
     message != NULL && message[0] != '\0' ? message : "unknown observer error"));
   PROTECT(call = Rf_lang2(fn, message_s));
-  (void) R_tryEvalSilent(call, ns, &err);
+  (void) np_progress_evaluate(call, ns, &err, NULL);
   UNPROTECT(5);
 }
 
@@ -1123,7 +1185,8 @@ static void np_progress_bandwidth_multistart_step(const int done, const int tota
 
 static void np_progress_bandwidth_activity_step(const int done)
 {
-  if (done < 1)
+  /* Zero is a heartbeat during an uncounted reference evaluation. */
+  if (done < 0)
     return;
 
   np_progress_signal("bandwidth_activity_step", "bandwidth", done, 0);
@@ -3959,7 +4022,7 @@ static void bwm_maybe_signal_activity(void)
   double since_last = 0.0;
   double wall_since_last = 0.0;
 
-  if (current_eval < 1)
+  if (current_eval < 1 && !bwm_progress_eval_active)
     return;
 
   if (nomad_c_callback_active) {
@@ -4239,6 +4302,37 @@ static int bwm_active_floor_candidate_ok(double *p)
     bwm_floor_context_coeff);
 }
 
+/* Reference/verification evaluations use the same numerical objective but
+ * need activity before the first counted optimizer evaluation. Do not invent
+ * an evaluation count. Restore the entry state on both return and R unwind. */
+typedef struct {
+  double *point;
+  double value;
+  int prior_active;
+} NPBandwidthActivityCall;
+
+static SEXP bwm_raw_activity_execute(void *data)
+{
+  NPBandwidthActivityCall *call=(NPBandwidthActivityCall *)data;
+  call->value=bwmfunc_raw(call->point);
+  return R_NilValue;
+}
+
+static void bwm_raw_activity_cleanup(void *data)
+{
+  NPBandwidthActivityCall *call=(NPBandwidthActivityCall *)data;
+  bwm_progress_eval_active=call->prior_active;
+}
+
+static double bwmfunc_raw_activity(double *point)
+{
+  if(bwm_progress_eval_active)return bwmfunc_raw(point);
+  NPBandwidthActivityCall call={point,DBL_MAX,bwm_progress_eval_active};
+  bwm_progress_eval_active=1;
+  R_ExecWithCleanup(bwm_raw_activity_execute,&call,bwm_raw_activity_cleanup,&call);
+  return call.value;
+}
+
 static double bwmfunc_wrapper(double *p)
 {
   double val;
@@ -4298,7 +4392,7 @@ static double bwmfunc_wrapper(double *p)
   if (!cache_hit) {
     guarded_before = np_guarded_cvml_hits_get();
     bwm_progress_eval_active = 1;
-    val = bwmfunc_raw(use_p);
+    val = bwmfunc_raw_activity(use_p);
     bwm_progress_eval_active = 0;
     bwm_nn_cache_note_raw_eval();
     bwm_objective_cache_note_raw_eval();
@@ -4396,7 +4490,7 @@ static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
   int i;
 
   if (!bwm_use_transform)
-    return bwmfunc_raw(vector_scale_factor);
+    return bwmfunc_raw_activity(vector_scale_factor);
 
   double *tmp = bwm_alloc_transform_tmp(n + bwm_num_extra_params + 1);
   if (tmp == NULL)
@@ -4407,7 +4501,7 @@ static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
   }
   for (i = 1; i <= bwm_num_extra_params; i++)
     tmp[n + i] = vector_scale_factor[n + i];
-  val = bwmfunc_raw(tmp);
+  val = bwmfunc_raw_activity(tmp);
   safe_free(tmp);
   return val;
 }
@@ -6202,7 +6296,7 @@ static void np_conditional_density_refresh_penalty_canonical(
         if (!advanced)
           break;
 
-        baseline = bwmfunc_raw(tmp);
+        baseline = bwmfunc_raw_activity(tmp);
         if (account_probes) {
           bwm_eval_count += 1.0;
           if (!R_FINITE(baseline) || baseline == DBL_MAX)
@@ -14541,7 +14635,7 @@ static void np_density_refresh_penalty(double *vector_scale_factor,
             num_reg_unordered_extern + 1 + i;
           tmp[idx] = 0.5;
         }
-        baseline = bwmfunc_raw(tmp);
+        baseline = bwmfunc_raw_activity(tmp);
         bwm_eval_count += 1.0;
         if (!R_FINITE(baseline) || baseline == DBL_MAX)
           bwm_invalid_count += 1.0;
@@ -14591,7 +14685,7 @@ static void np_distribution_refresh_penalty(double *vector_scale_factor,
             num_reg_unordered_extern + 1 + i;
           tmp[idx] = 0.5;
         }
-        baseline = bwmfunc_raw(tmp);
+        baseline = bwmfunc_raw_activity(tmp);
       }
       safe_free(tmp);
     }
@@ -17580,7 +17674,7 @@ static void np_conditional_distribution_prepared_context_refresh_penalty(
                         context->num_reg_continuous; i++)
         tmp[i] *= 2.0;
       bwm_set_categorical_midpoints(tmp);
-      baseline = bwmfunc_raw(tmp);
+      baseline = bwmfunc_raw_activity(tmp);
     }
     safe_free(tmp);
   }
@@ -18628,7 +18722,7 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
         for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
           tmp[i] *= 2.0;
         bwm_set_categorical_midpoints(tmp);
-        baseline = bwmfunc_raw(tmp);
+        baseline = bwmfunc_raw_activity(tmp);
       }
       safe_free(tmp);
     }
