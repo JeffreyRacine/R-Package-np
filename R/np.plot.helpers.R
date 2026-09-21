@@ -1575,7 +1575,7 @@
   # Columns belong to the evaluation grid, not the observed training levels.
   # Retain declared-but-unused categories and the caller's evaluation order.
   u.lev <- as.character(eval.values)
-  if (length(u.lev) != ncol(boot.frame) || anyNA(u.lev) ||
+  if (length(u.lev) != ncol(boot.frame) || anyNA(eval.values) ||
       any(!u.lev %in% tdati$all.lev[[ti]]))
     stop("categorical bootstrap evaluation labels do not match the retained levels and draw columns",
          call. = FALSE)
