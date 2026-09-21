@@ -1120,7 +1120,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
             leave.one.out=leave.one.out
           )$ksum
 
-          coef.mat[j,] <- twww[1,2,]/NZD(twww[2,2,])
+          coef.mat[j,] <- twww[2,1,]/NZD(twww[2,2,])
           resid <- partial - W[,j] * coef.mat[j,]
           if (!is.null(fit.progress.step))
             fit.progress.step(sprintf("backfit cycle %d partial %d/%d", i, j, n.part))

@@ -3177,7 +3177,7 @@ npscoefbw.scbandwidth <-
                                 bws=sbw,
                                 leave.one.out=TRUE)$ksum
 
-                  partial.loo <- wj * tww[1,2,]/NZD(tww[2,2,])
+                  partial.loo <- wj * tww[2,1,]/NZD(tww[2,2,])
                 }
               } else {
                 partial.loo <- wj * lp_partial_coef(
@@ -3552,7 +3552,7 @@ npscoefbw.scbandwidth <-
                                   tydat=cbind(partial.orig * wj, wj * wj),
                                   weights=cbind(partial.orig * wj, 1),
                                   bws=bws)$ksum
-                    scoef$beta[,j] <- tww[1,2,]/NZD(tww[2,2,])
+                    scoef$beta[,j] <- tww[2,1,]/NZD(tww[2,2,])
                   } else {
                     wj <- W[,j]
                     scoef$beta[,j] <- lp_partial_coef(
