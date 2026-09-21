@@ -1,5 +1,33 @@
+test_that("raw fold radius partitions retain parent approximation ownership", {
+  old <- options(np.messages=FALSE,np.largeh=TRUE,np.largelambda=TRUE,np.tree=TRUE)
+  on.exit(options(old))
+  # A preceding ordinary fit refreshes the parent's default approximation policy.
+  invisible(npreg(txdat=data.frame(x=c(0,1,2)),tydat=c(0,1,2),bws=.4))
+  set.seed(542)
+  n <- 23L
+  z <- data.frame(a=sample(seq(.02,.97,length.out=n)),b=runif(n,.04,.96),
+    u=factor(rep(letters[1:3],length.out=n)),o=ordered(rep(1:3,length.out=n)))
+  z[2,1:2] <- z[1,1:2]
+  y <- rnorm(n)
+  indices <- c(21L,2L,1L,2L,5L)
+  for(tree in c(FALSE,TRUE)) for(kernel in c("gaussian","epanechnikov")) {
+    options(np.tree=tree)
+    bw <- npregbw(xdat=z,ydat=y,bws=c(9,10,.2,.25),bwtype="adaptive_nn",
+      bandwidth.compute=FALSE,ckertype=kernel,ckerbound="fixed",ckerlb=c(0,0),ckerub=c(1,1))
+    all <- .np_kernel_weights_direct(bw,z,leave.one.out=TRUE)
+    part <- .np_kernel_weights_direct(bw,z,z[indices,,drop=FALSE],fold.rows=indices)
+    oracle <- vapply(indices,function(i) {
+      out <- numeric(n)
+      out[-i] <- .np_kernel_weights_direct(bw,z[-i,,drop=FALSE],z[i,,drop=FALSE])
+      out
+    },numeric(n))
+    expect_equal(part,oracle,tolerance=2e-12,ignore_attr=TRUE)
+    expect_equal(part,all[,indices],tolerance=2e-12,ignore_attr=TRUE)
+  }
+})
+
 test_that("private NN fold weights and moments delete occurrences before geometry", {
-  old <- options(np.messages = FALSE, np.largeh = FALSE, np.largelambda = FALSE)
+  old <- options(np.messages = FALSE, np.largeh = FALSE, np.largelambda = FALSE, np.tree = TRUE)
   on.exit(options(old))
   set.seed(542)
   n <- 23L
