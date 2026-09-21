@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Generalized-nearest-neighbor distribution CV now evaluates each bandwidth
+  neighborhood on the deleted sample. Empirical query rows retain their
+  training identity; explicit grids retain external-query geometry. Canonical
+  kernel factors are reused across folds, preserving tree and MPI ownership
+  in the corresponding package. Corrected criteria can change selected
+  generalized-NN bandwidths.
+
 * Automatic fixed-bandwidth beta density CVLS now requires a positive
   `scale.factor.search.lower` when the complete response sample contains
   repeated observations at a declared endpoint. This conservative search
