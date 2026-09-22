@@ -53570,14 +53570,13 @@ double *cv){
     goto cleanup_density_convolution_cv;
   }
 
-  /* The whole-support owner is admitted only for the continuous, unbounded
-   * generalized-NN density route while its public occurrence mapping is
-   * unchanged. Other families retain their incumbent owner until their own
-   * focused proof admits them. */
+  /* The squared full-sample density integral is invariant to the training
+   * tree permutation. The old convolution's pair pruning is not valid for
+   * query-dependent GNN radii; tree selection must not change this objective.
+   * The cross term below retains the canonical tree-capable row engine. */
   if(!exact_beta_route && BANDWIDTH_den == BW_GEN_NN &&
      int_cker_bound_extern == 0 && num_reg_continuous > 0 &&
-     num_reg_unordered == 0 && num_reg_ordered == 0 &&
-     int_TREE_X != NP_TREE_TRUE) {
+     num_reg_unordered == 0 && num_reg_ordered == 0) {
     if(np_gnn_density_integral_unconditional(
            num_obs,num_reg_continuous,KERNEL_den,matrix_X_continuous,
            vector_scale_factor,&cv1) != 0)
@@ -53762,7 +53761,7 @@ double *cv){
    * while correcting only the radius contract. */
   if(BANDWIDTH_den == BW_GEN_NN && int_cker_bound_extern == 0 &&
      num_reg_continuous > 0 && num_reg_unordered == 0 &&
-     num_reg_ordered == 0 && int_TREE_X != NP_TREE_TRUE){
+     num_reg_ordered == 0){
     if(np_density_gnn_deleteone_bandwidth(
          num_obs, num_reg_continuous, matrix_X_continuous,
          vector_scale_factor, &deleteone_bandwidth) != 0)
