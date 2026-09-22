@@ -7,12 +7,21 @@
 #include <float.h>
 #include <time.h>
 #include <stdint.h>
+#include <math.h>
 #include <Rinternals.h>
 
 #include "tree.h"
 #include "kernel_registry.h"
 #include "regression_contract.h"
 #include "jksum_lp_solve.h"
+
+/* Numeric ordered labels lie on a validated integer lattice. Round the
+ * difference so decimal offsets cannot reduce an integer distance by one.
+ * Cache indices and scalar/retained-support kernels share this conversion. */
+static inline int np_ordered_lattice_distance(const double x, const double y)
+{
+  return (int)round(fabs(x-y));
+}
 
 typedef struct NPContinuousKernelDerivativeDiagnostics
   NPContinuousKernelDerivativeDiagnostics;
