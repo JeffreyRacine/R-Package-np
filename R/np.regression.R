@@ -724,12 +724,15 @@ npreg.rbandwidth <-
       econ = data.frame()
     }
 
+    # Fit the bandwidth retained by the constructor. Native scale-factor
+    # reconstruction uses a legacy scale rule and can fit a different model.
+    physical.bw <- .np_physical_bandwidth(bws)
     myopti = list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,
       num_uno = bws$nuno, num_ord = bws$nord,
       num_con = bws$ncon,
-      int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
+      int_LARGE_SF = SF_ARB,
       BANDWIDTH_reg_extern = switch(bws$type,
         fixed = BW_FIXED,
         generalized_nn = BW_GEN_NN,
@@ -799,7 +802,7 @@ npreg.rbandwidth <-
       .Call("C_np_regression",
             asDouble(tuno), asDouble(tord), asDouble(tcon), asDouble(tydat),
             asDouble(euno), asDouble(eord), asDouble(econ), asDouble(eydat),
-            asDouble(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+            asDouble(c(physical.bw[bws$icon], physical.bw[bws$iuno], physical.bw[bws$iord])),
             asDouble(bws$xmcv), asDouble(attr(bws$xmcv, "pad.num")),
             asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
             as.integer(myopti),
