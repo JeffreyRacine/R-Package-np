@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Copula marginal estimators now use the physical bandwidth retained by the
+  joint bandwidth object instead of interpreting scale factors as bandwidths.
+  This aligns probability coordinates, density ratios, uncertainty and
+  bootstrap marginal operators for scaled and equivalent unscaled objects.
+
 * Unconditional density and distribution fits now consistently use the
   physical bandwidth retained by scaled bandwidth objects. This corrects
   fixed beta-kernel estimates and dependent copula results when

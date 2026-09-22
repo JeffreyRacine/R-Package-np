@@ -234,7 +234,7 @@ npcopula <- function(bws, ...) {
   continuous.slot <- .npcopula_continuous_slot(bws, j)
   out <- list(
     dat = dat,
-    bws = bws$bw[j],
+    bws = .np_physical_bandwidth(bws)[j],
     bandwidth.compute = FALSE,
     bwtype = bws$type,
     ckerorder = bws$ckerorder,
@@ -376,7 +376,7 @@ npcopula <- function(bws, ...) {
   bws <- x$bws
   bw.args <- list(
     dat = data,
-    bws = bws$bw,
+    bws = .np_physical_bandwidth(bws),
     bandwidth.compute = FALSE,
     bwtype = bws$type,
     ckerorder = bws$ckerorder,
