@@ -4,6 +4,11 @@
   and matching scale metadata for the tested predictors together. Previously,
   scaled objects could retain the original smoothing parameters after a search.
 
+* Regression fitting now consumes the physical bandwidth retained by its
+  bandwidth object, as numerical hat operators already do. This removes a
+  legacy scale reconstruction that could fit a different model when
+  `bwscaling = TRUE`; unscaled fitting and bandwidth searches are unchanged.
+
 * Generalized-nearest-neighbor distribution CV now evaluates each bandwidth
   neighborhood on the deleted sample. Empirical query rows retain their
   training identity; explicit grids retain external-query geometry. Canonical
