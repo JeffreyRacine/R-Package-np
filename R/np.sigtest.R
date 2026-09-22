@@ -484,6 +484,22 @@ npsigtest.npregression <-
   invisible(TRUE)
 }
 
+# Bootstrap II changes only the tested smoothing coordinates. Keep every
+# representation together: pairwise reselection can also change the scale
+# of a continuous predictor. The full selected object remains the hot start.
+.np_npsig_replace_bandwidth <- function(original, selected, index) {
+  out <- original
+  for (field in c("bandwidth", "sfactor", "sumNum"))
+    out[[field]][["x"]][index] <- selected[[field]][["x"]][index]
+  out[["bw"]][index] <- if (isTRUE(out[["scaling"]]))
+    selected[["sfactor"]][["x"]][index] else
+    selected[["bandwidth"]][["x"]][index]
+  continuous <- which(out[["icon"]])
+  replaced <- which(continuous %in% index)
+  out[["sdev"]][replaced] <- selected[["sdev"]][replaced]
+  out
+}
+
 .np_npsig_bootstrap_bw_reselect <- function(xdat,
                                             ydat,
                                             bws.seed,
@@ -853,12 +869,7 @@ npsigtest.rbandwidth <- function(bws,
 
         bws.boot.prev <- bws.boot
 
-        ## Copy the new cross-validated bandwidth for variable i into
-        ## bw.original and use this below.
-
-        bws <- bws.original
-
-        bws$bw[index] <- bws.boot$bw[index]
+        bws <- .np_npsig_replace_bandwidth(bws.original, bws.boot, index)
 
       }
 
@@ -1167,12 +1178,7 @@ npsigtest.rbandwidth <- function(bws,
 
           bws.boot.prev <- bws.boot
           
-          ## Copy the new cross-validated bandwidth for variable i into
-          ## bw.original and use this below.
-          
-          bws <- bws.original
-          
-          bws$bw[i] <- bws.boot$bw[i]
+          bws <- .np_npsig_replace_bandwidth(bws.original, bws.boot, i)
           
         }
         
