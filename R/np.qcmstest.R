@@ -122,12 +122,12 @@ npqcmstest <- function(formula,
 
   prodh <- if (bw$ncon == 0) 1.0
   else
-    prod(bw$bw[bw$icon])
+    prod(kernel.bw$bw[kernel.bw$icon])
 
   if (!density.weighted)
     fhat <- npksum(txdat = xdat,
                    bws = kernel.bw, leave.one.out = TRUE,
-                   bandwidth.divide = FALSE)$ksum/(n*prodh)
+                   bandwidth.divide = TRUE)$ksum/n
 
   if(min(fhat) == 0)
   stop(paste(sep="","\nAttempt to divide by zero density.",
@@ -160,7 +160,7 @@ npqcmstest <- function(formula,
     
     varepsilon <- qresidual(model.resid, tau)
 
-    return( 2*prod(bw$bw[bw$icon])*
+    return( 2*prodh*
            sum(varepsilon^2*
                npksum(txdat=xdat,
                       tydat=varepsilon^2,
