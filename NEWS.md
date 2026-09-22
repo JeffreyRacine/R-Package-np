@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Type-II significance-test reselection now replaces the physical bandwidth
+  and matching scale metadata for the tested predictors together. Previously,
+  scaled objects could retain the original smoothing parameters after a search.
+
 * Generalized-nearest-neighbor distribution CV now evaluates each bandwidth
   neighborhood on the deleted sample. Empirical query rows retain their
   training identity; explicit grids retain external-query geometry. Canonical
