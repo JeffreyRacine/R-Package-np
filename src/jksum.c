@@ -37433,6 +37433,1035 @@ static int np_conditional_density_cvls_bounded_general_route_ok(void){
                                                vector_cykerub_extern);
 }
 
+/* Whole-support GNN integration geometry. Shared by unconditional density
+ * and deleted-sample conditional CVLS. It borrows the original coordinate;
+ * sorted occurrence identities, pieces and masks are invocation-owned.
+ * No kernel, solver, normalization or tree policy is defined here. */
+typedef struct {
+  double lo, hi, anchor;
+} NPGNNIntegralPiece;
+
+typedef struct {
+  double lo, hi, primary_anchor, successor_anchor;
+  int first_deleted, end_deleted;
+} NPGNNIntegralInterval;
+
+typedef struct {
+  int n, k, folded, count;
+  double scale;
+  double *sorted;
+  int *order;
+  NPGNNIntegralPiece *primary, *successor;
+  NPGNNIntegralInterval *intervals;
+} NPGNNIntegralGeometry;
+
+static void np_gnn_integral_geometry_clear(NPGNNIntegralGeometry *g)
+{
+  if(g == NULL) return;
+  free(g->sorted);
+  free(g->order);
+  free(g->primary);
+  free(g->successor);
+  free(g->intervals);
+  memset(g, 0, sizeof(*g));
+}
+
+static int np_gnn_integral_pieces(const double *x, int n, int k,
+                                  NPGNNIntegralPiece *out)
+{
+  int count = 0;
+  for(int j = 0; j <= n-k; ++j) {
+    const double lo = j == 0 ? R_NegInf : .5*x[j-1] + .5*x[j+k-1];
+    const double hi = j == n-k ? R_PosInf : .5*x[j] + .5*x[j+k];
+    const double mid = .5*x[j] + .5*x[j+k-1];
+    if(lo < mid)
+      out[count++] = (NPGNNIntegralPiece){lo, mid, x[j+k-1]};
+    if(mid < hi)
+      out[count++] = (NPGNNIntegralPiece){mid, hi, x[j]};
+  }
+  return count;
+}
+
+static int np_gnn_integral_geometry_prepare(NPGNNIntegralGeometry *g,
+                                            const double *data, int n,
+                                            double request, int folded)
+{
+  int primary_count, successor_count, a = 0, b = 0;
+  size_t bytes;
+  if(g == NULL || data == NULL || n < 2 ||
+     (folded != 0 && folded != 1)) return 1;
+  memset(g, 0, sizeof(*g));
+  if(np_nn_lookup_from_scale(n-folded, 1, request,
+                             &g->k, &g->scale, NULL) != 0 ||
+     g->k < 1 || g->k + folded > n) return 1;
+  g->n = n;
+  g->folded = folded;
+  if(!np_size_mul_checked((size_t)n, 4*sizeof(NPGNNIntegralInterval),
+                           &bytes)) goto fail;
+  g->intervals = (NPGNNIntegralInterval *)malloc(bytes);
+  if(!np_size_mul_checked((size_t)n, 2*sizeof(NPGNNIntegralPiece),
+                           &bytes)) goto fail;
+  g->primary = (NPGNNIntegralPiece *)malloc(bytes);
+  g->successor = (NPGNNIntegralPiece *)malloc(bytes);
+  if(!np_size_mul_checked((size_t)n, sizeof(double), &bytes)) goto fail;
+  g->sorted = (double *)malloc(bytes);
+  if(!np_size_mul_checked((size_t)n, sizeof(int), &bytes)) goto fail;
+  g->order = (int *)malloc(bytes);
+  if(g->intervals == NULL || g->primary == NULL || g->successor == NULL ||
+     g->sorted == NULL || g->order == NULL) goto fail;
+  for(int i = 0; i < n; ++i) {
+    if(!R_FINITE(data[i])) goto fail;
+    g->sorted[i] = data[i];
+    g->order[i] = i;
+  }
+  R_qsort_I(g->sorted, g->order, 1, n);
+  primary_count = np_gnn_integral_pieces(g->sorted, n, g->k, g->primary);
+  successor_count = np_gnn_integral_pieces(g->sorted, n, g->k+folded,
+                                           g->successor);
+  while(a < primary_count && b < successor_count) {
+    const NPGNNIntegralPiece p = g->primary[a], s = g->successor[b];
+    const double lo = fmax(p.lo, s.lo), hi = fmin(p.hi, s.hi);
+    if(lo < hi) {
+      int first = 0, end = 0;
+      /* Select a strictly interior finite query. Reciprocal coordinates are
+       * used only when the endpoint is not a zero-radius anchor. At a zero
+       * endpoint, the ordinary finite midpoint gives the same occurrence set.
+       * Integration, not geometry construction, owns singularity policy. */
+      const double query = !R_FINITE(lo) ? hi-fmax(1.0,fabs(hi)) :
+                           !R_FINITE(hi) ? lo+fmax(1.0,fabs(lo)) :
+                           .5*lo+.5*hi;
+      const double radius = fabs(query-p.anchor);
+      if(!R_FINITE(query) || !R_FINITE(radius)) goto fail;
+      if(folded) {
+        while(first < n && fabs(g->sorted[first]-query) > radius) ++first;
+        end = first;
+        while(end < n && fabs(g->sorted[end]-query) <= radius) ++end;
+      }
+      g->intervals[g->count++] = (NPGNNIntegralInterval){
+        lo, hi, p.anchor, s.anchor, first, end};
+    }
+    if(p.hi <= s.hi) {
+      if(p.hi == s.hi) ++b;
+      ++a;
+    } else ++b;
+  }
+  if(g->count == 0 || g->intervals[0].lo != R_NegInf ||
+     g->intervals[g->count-1].hi != R_PosInf) goto fail;
+  return 0;
+fail:
+  np_gnn_integral_geometry_clear(g);
+  return 1;
+}
+
+/* Whole-support coordinate overlaps. Geometry and canonical kernels are
+ * borrowed; this owner never uses a fixed-bandwidth convolution or a finite
+ * tail cutoff. Caller-owned output is one bounded donor-pair slab across
+ * occurrences, not an observation-pair matrix. */
+typedef struct {
+  double first, second, scale;
+  int kernel;
+} NPGNNIntegralPair;
+
+static void np_gnn_integral_pair_values(double *u, int count, void *raw)
+{
+  const NPGNNIntegralPair *p = (const NPGNNIntegralPair *)raw;
+  for(int q = 0; q < count; ++q) {
+    const double a = (1.0+p->first*u[q])/p->scale;
+    const double b = (1.0+p->second*u[q])/p->scale;
+    u[q] = allck[p->kernel](a)*allck[p->kernel](b)/
+      (p->scale*p->scale);
+  }
+}
+
+static int np_gnn_integral_clip(double delta, double radius,
+                                double *lo, double *hi)
+{
+  /* All canonical compact kernels have open support. At delta == 0 the
+   * anchor donor stays exactly on that boundary for the entire NN piece. */
+  if(delta == 0.0) return 1.0 < radius;
+  const double left = (-radius-1.0)/delta;
+  const double right = (radius-1.0)/delta;
+  *lo = fmax(*lo, fmin(left,right));
+  *hi = fmin(*hi, fmax(left,right));
+  return *lo < *hi;
+}
+
+/* Return 0 for a finite integral, 1 for numerical failure, and 2 for a
+ * divergent constant transformed integrand. No R longjmp originates here. */
+static int np_gnn_integral_pair_interval(
+  const NPGNNIntegralGeometry *g, int kernel,
+  double qlo, double qhi, double anchor, double first, double second,
+  int *iwork, double *work, double *result, double *abserr)
+{
+  NPGNNIntegralPair p = {anchor-first, anchor-second, g->scale, kernel};
+  /* Left and right zero-radius endpoints approach the anchor from opposite
+   * sides. Keep their infinite transformed limits, including k=1/ties. */
+  const double u0 = qlo == anchor ? R_PosInf : 1.0/(qlo-anchor);
+  const double u1 = qhi == anchor ? R_NegInf : 1.0/(qhi-anchor);
+  double lo = fmin(u0,u1), hi = fmax(u0,u1);
+  *result = *abserr = 0.0;
+  if(kernel < 0 || kernel > 8 || !(lo < hi)) return 1;
+  if(kernel >= 4) {
+    const double support = kernel == 8 ? 1.0 : sqrt(5.0);
+    if(!np_gnn_integral_clip(p.first,g->scale*support,&lo,&hi) ||
+       !np_gnn_integral_clip(p.second,g->scale*support,&lo,&hi)) return 0;
+  }
+  if(p.first == 0.0 && p.second == 0.0) {
+    double value = 0.0;
+    np_gnn_integral_pair_values(&value,1,&p);
+    if(value == 0.0) return 0;
+    if(!R_FINITE(lo) || !R_FINITE(hi)) return 2;
+    *result = value*(hi-lo);
+    return R_FINITE(*result) ? 0 : 1;
+  }
+  if(kernel == 0) {
+    const double radius = hypot(p.first,p.second);
+    const double left = (radius*lo+(p.first+p.second)/radius)/g->scale;
+    const double right = (radius*hi+(p.first+p.second)/radius)/g->scale;
+    const double mass = left < 0.0 ?
+      pnorm5(right,0.0,1.0,1,0)-pnorm5(left,0.0,1.0,1,0) :
+      pnorm5(left,0.0,1.0,0,0)-pnorm5(right,0.0,1.0,0,0);
+    *result = allck[0]((p.first-p.second)/(g->scale*radius))*
+      mass/(g->scale*radius);
+    return R_FINITE(*result) ? 0 : 1;
+  }
+  if(kernel >= 4) {
+    if(!R_FINITE(lo) || !R_FINITE(hi)) return 1;
+    const double middle = .5*lo+.5*hi, half = .5*hi-.5*lo;
+    double value = middle;
+    np_gnn_integral_pair_values(&value,1,&p);
+    if(kernel == 8) {
+      *result = value*(hi-lo);
+    } else {
+      const int row = kernel <= 5 ? 0 : kernel-5;
+      const int points = row+3;
+      value *= np_epan_overlap_weights[row][0];
+      for(int q=1; q<points; ++q) {
+        double pair[2] = {middle-half*np_epan_overlap_nodes[row][q],
+                          middle+half*np_epan_overlap_nodes[row][q]};
+        np_gnn_integral_pair_values(pair,2,&p);
+        value += np_epan_overlap_weights[row][q]*(pair[0]+pair[1]);
+      }
+      *result = half*value;
+    }
+    return R_FINITE(*result) ? 0 : 1;
+  }
+  double epsabs = 1e-12/(4*g->n), epsrel = 1e-10;
+  int limit=200, lenw=800, neval, ier, last;
+  if(R_FINITE(lo) && R_FINITE(hi)) {
+    Rdqags(np_gnn_integral_pair_values,&p,&lo,&hi,&epsabs,&epsrel,
+            result,abserr,&neval,&ier,&limit,&lenw,&last,iwork,work);
+  } else {
+    double bound = R_FINITE(lo) ? lo : (R_FINITE(hi) ? hi : 0.0);
+    int direction = R_FINITE(lo) ? 1 : (R_FINITE(hi) ? -1 : 2);
+    Rdqagi(np_gnn_integral_pair_values,&p,&bound,&direction,&epsabs,&epsrel,
+            result,abserr,&neval,&ier,&limit,&lenw,&last,iwork,work);
+  }
+  return ier == 0 && R_FINITE(*result) ? 0 : 1;
+}
+
+/* One pair across all folds. Its linear scratch is supplied by the outer
+ * bounded workspace owner and reused for subsequent pairs/coordinates. */
+static int np_gnn_integral_pair_folds(
+  const NPGNNIntegralGeometry *g, int kernel, double first, double second,
+  double *changes, double *out, int *iwork, double *work, double *error_bound)
+{
+  const int folds = g->folded ? g->n : 1;
+  long double base = 0.0, accumulated_error = 0.0;
+  memset(changes,0,((size_t)folds+1)*sizeof(double));
+  for(int z=0; z<g->count; ++z) {
+    const NPGNNIntegralInterval t = g->intervals[z];
+    double primary, successor, error;
+    int status = np_gnn_integral_pair_interval(g,kernel,t.lo,t.hi,
+      t.primary_anchor,first,second,iwork,work,&primary,&error);
+    if(status) return status;
+    accumulated_error += error;
+    base += primary;
+    if(g->folded && t.first_deleted != t.end_deleted) {
+      status = np_gnn_integral_pair_interval(g,kernel,t.lo,t.hi,
+        t.successor_anchor,first,second,iwork,work,&successor,&error);
+      if(status) return status;
+      accumulated_error += error;
+      changes[t.first_deleted] += successor-primary;
+      changes[t.end_deleted] -= successor-primary;
+    }
+  }
+  long double cumulative = 0.0;
+  for(int f=0; f<folds; ++f) {
+    cumulative += changes[f];
+    out[g->folded ? g->order[f] : f] = (double)(base+cumulative);
+  }
+  *error_bound = (double)accumulated_error;
+  return 0;
+}
+
+/* Gaussian2 donor representation. NN geometry is always built from actual
+ * observations; virtual donors interpolate only the canonical kernel factor.
+ * Sampling chooses pivots. A separate integrated residual qualifies them. */
+typedef struct {
+  int n, m, rank, sample_rows;
+  double delta, chebyshev_norm;
+  double *donors, *sample, *tau, *lapack_work, *transform, *basis;
+  double *arguments, *factors;
+  int *pivots, *splits;
+} NPGNNIntegralBasis;
+
+static void np_gnn_integral_basis_clear(NPGNNIntegralBasis *b)
+{
+  if(b == NULL) return;
+  free(b->donors); free(b->sample); free(b->tau); free(b->lapack_work);
+  free(b->transform); free(b->basis); free(b->arguments); free(b->factors);
+  free(b->pivots); free(b->splits);
+  memset(b,0,sizeof(*b));
+}
+
+static double np_gnn_integral_interpolation_logbound(double ratio, int degree)
+{
+  /* The envelope is convex in log(rho). Bisection solves its derivative,
+   * without a new optimizer, objective or numerical kernel approximation. */
+  double left=.001,right=3.0;
+  for(int iteration=0; iteration<64; ++iteration) {
+    const double t=.5*left+.5*right;
+    const double derivative=ratio*ratio*sinh(t)*cosh(t)-degree-
+      exp(t)/expm1(t);
+    if(derivative>0.0) right=t; else left=t;
+  }
+  const double t=.5*left+.5*right;
+  return log(1.6)+.5*pow(ratio*sinh(t),2.0)-degree*t-log(expm1(t));
+}
+
+/* Geometry-only admission, before sampling/integration. Returning zero
+ * selects the exact overlap sibling; a failure after admission is terminal. */
+static int np_gnn_integral_basis_size(const NPGNNIntegralGeometry *g,
+                                     double *delta)
+{
+  const double half=.5*g->sorted[g->n-1]-.5*g->sorted[0];
+  double minimum=R_PosInf;
+  for(int i=0;i<=g->n-g->k;++i)
+    minimum=fmin(minimum,.5*g->sorted[i+g->k-1]-.5*g->sorted[i]);
+  if(!(minimum>0.0) || !(half>0.0)) return 0;
+  const double ratio=(half/minimum)/g->scale;
+  for(int degree=16;degree<=256 && degree+1<g->n;degree+=8) {
+    const double bound=np_gnn_integral_interpolation_logbound(ratio,degree);
+    if(bound<=log(1e-15)) {
+      *delta=exp(bound);
+      return degree+1;
+    }
+  }
+  return 0;
+}
+
+static int np_gnn_integral_basis_prepare(
+  NPGNNIntegralBasis *b, const NPGNNIntegralGeometry *g,
+  const double *data, int m, double delta,
+  const double *nodes, const double *weights, int nq,
+  size_t budget)
+{
+  size_t rows=0, cells, bytes;
+  int info=0,lwork=-1;
+  double work_query;
+  if(b==NULL || g==NULL || data==NULL || m<2 || nq<1 || nq>64) return 1;
+  memset(b,0,sizeof(*b));b->n=g->n;b->m=m;b->delta=delta;
+  b->donors=(double *)malloc((size_t)m*sizeof(double));
+  b->splits=(int *)malloc((size_t)2*g->count*sizeof(int));
+  if(b->donors==NULL || b->splits==NULL) goto fail;
+  const double center=.5*g->sorted[0]+.5*g->sorted[g->n-1];
+  const double half=.5*g->sorted[g->n-1]-.5*g->sorted[0];
+  for(int j=0;j<m;++j)b->donors[j]=center+half*cos(M_PI*j/(m-1));
+  for(int z=0;z<g->count;++z)for(int s=0;s<(g->folded?2:1);++s) {
+    const NPGNNIntegralInterval t=g->intervals[z];
+    const double a=s?t.successor_anchor:t.primary_anchor;
+    if(t.lo==a || t.hi==a) goto fail;
+    const double width=fabs(1.0/(t.lo-a)-1.0/(t.hi-a));
+    const double slope=fmax(fabs(a-b->donors[0]),fabs(a-b->donors[m-1]))/g->scale;
+    const double pieces=fmax(1.0,ceil(width*slope/2.0));
+    if(!R_FINITE(pieces) || pieces>INT_MAX/nq ||
+       rows>(size_t)INT_MAX-(size_t)pieces*nq) goto fail;
+    b->splits[2*z+s]=(int)pieces;
+    rows+=(size_t)pieces*nq;
+  }
+  /* Broad/extended counts may have fewer geometry panels than donors. QR
+   * still needs at least m sampled rows; refine those same whole-line panels,
+   * rather than reading a nonexistent triangular row or changing the basis. */
+  if(rows>0 && rows<(size_t)m) {
+    const int multiplier=(int)(((size_t)m+rows-1)/rows);
+    for(int z=0;z<g->count;++z)for(int s=0;s<(g->folded?2:1);++s)
+      b->splits[2*z+s]*=multiplier;
+    rows*=multiplier;
+  }
+  if(rows<(size_t)m || !np_size_mul_checked(rows,(size_t)m,&cells) ||
+     !np_size_mul_checked(cells,sizeof(double),&bytes) || bytes>budget) goto fail;
+  b->sample_rows=(int)rows;
+  b->sample=(double *)malloc(bytes);
+  b->arguments=(double *)malloc((size_t)nq*m*sizeof(double));
+  b->factors=(double *)malloc((size_t)nq*m*sizeof(double));
+  b->pivots=(int *)calloc(m,sizeof(int));
+  b->tau=(double *)malloc((size_t)m*sizeof(double));
+  if(!b->sample || !b->arguments || !b->factors || !b->pivots || !b->tau) goto fail;
+  size_t row=0;
+  for(int z=0;z<g->count;++z) {
+    np_progress_bandwidth_loop_step();
+    const NPGNNIntegralInterval t=g->intervals[z];
+    for(int s=0;s<(g->folded?2:1);++s) {
+      const double a=s?t.successor_anchor:t.primary_anchor;
+      const double u0=1.0/(t.lo-a),u1=1.0/(t.hi-a);
+      const double lo=fmin(u0,u1),hi=fmax(u0,u1);
+      const int pieces=b->splits[2*z+s];
+      for(int part=0;part<pieces;++part) {
+        const double left=lo+(hi-lo)*part/pieces;
+        const double right=lo+(hi-lo)*(part+1)/pieces;
+        const double mid=.5*left+.5*right,width=.5*right-.5*left;
+        for(int j=0;j<m;++j)for(int q=0;q<nq;++q)
+          b->arguments[j*nq+q]=-(1+(a-b->donors[j])*(mid+width*nodes[q]))/g->scale;
+        np_ckernelv(0,b->arguments,m*nq,0,0,1,b->factors,NULL,
+                     0,0,1,1/g->scale,0,0,0,NULL,NULL);
+        for(int j=0;j<m;++j)for(int q=0;q<nq;++q)
+          b->sample[(size_t)j*rows+row+q]=b->factors[j*nq+q]*sqrt(width*weights[q]);
+        row+=nq;
+      }
+    }
+  }
+  F77_CALL(dgeqp3)(&b->sample_rows,&m,b->sample,&b->sample_rows,
+    b->pivots,b->tau,&work_query,&lwork,&info);
+  if(info || !R_FINITE(work_query) || work_query<1 || work_query>INT_MAX) goto fail;
+  lwork=(int)ceil(work_query);
+  b->lapack_work=(double *)malloc((size_t)lwork*sizeof(double));
+  if(!b->lapack_work) goto fail;
+  F77_CALL(dgeqp3)(&b->sample_rows,&m,b->sample,&b->sample_rows,
+    b->pivots,b->tau,b->lapack_work,&lwork,&info);
+  if(info) goto fail;
+  long double tail=0;
+  b->rank=m;
+  for(int i=m-1;i>0;--i) {
+    for(int j=i;j<m;++j) {
+      const double value=b->sample[(size_t)j*rows+i];
+      tail+=(long double)value*value;
+    }
+    if(tail<1e-28L)b->rank=i;else break;
+  }
+  const int r=b->rank;
+  b->transform=(double *)calloc((size_t)r*m,sizeof(double));
+  if(!np_size_mul_checked((size_t)g->n,(size_t)r,&cells) ||
+     !np_size_mul_checked(cells,sizeof(double),&bytes)) goto fail;
+  b->basis=(double *)malloc(bytes);
+  if(!b->transform || !b->basis)goto fail;
+  for(int j=0;j<m;++j) {
+    const int original=b->pivots[j]-1;
+    if(original<0 || original>=m)goto fail;
+    double *column=b->transform+(size_t)original*r;
+    if(j<r)column[j]=1.0;
+    else {
+      for(int i=r-1;i>=0;--i) {
+        long double value=b->sample[(size_t)j*rows+i];
+        for(int k=i+1;k<r;++k)value-=b->sample[(size_t)k*rows+i]*column[k];
+        const double diagonal=b->sample[(size_t)i*rows+i];
+        if(diagonal==0 || !R_FINITE(diagonal))goto fail;
+        column[i]=(double)(value/diagonal);
+        if(!R_FINITE(column[i]))goto fail;
+      }
+    }
+  }
+  /* Reuse the now-unneeded argument plane for one barycentric row. No
+   * n-by-m identity/interpolation matrix is retained. */
+  for(int i=0;i<g->n;++i) {
+    int match=-1;
+    long double denominator=0,norm=0;
+    for(int j=0;j<m;++j) {
+      if(data[i]==b->donors[j])match=j;
+      const double weight=(j==0 || j==m-1)?.5:1.0;
+      b->arguments[j]=(j&1?-weight:weight)/(data[i]-b->donors[j]);
+      denominator+=b->arguments[j];
+    }
+    if(match<0 && (denominator==0 || !R_FINITE((double)denominator)))goto fail;
+    for(int j=0;j<m;++j) {
+      b->arguments[j]=match>=0 ? (double)(j==match) :
+        (double)(b->arguments[j]/denominator);
+      norm+=(long double)b->arguments[j]*b->arguments[j];
+    }
+    b->chebyshev_norm=fmax(b->chebyshev_norm,(double)norm);
+    for(int k=0;k<r;++k) {
+      long double value=0;
+      for(int j=0;j<m;++j)value+=b->transform[(size_t)j*r+k]*b->arguments[j];
+      b->basis[(size_t)k*g->n+i]=(double)value;
+    }
+  }
+  for(int j=0;j<m;++j)--b->pivots[j];
+  free(b->sample);b->sample=NULL;free(b->tau);b->tau=NULL;
+  free(b->lapack_work);b->lapack_work=NULL;
+  free(b->arguments);b->arguments=NULL;free(b->factors);b->factors=NULL;
+  free(b->splits);b->splits=NULL;
+  return 0;
+fail:
+  np_gnn_integral_basis_clear(b);
+  return 1;
+}
+
+typedef struct {
+  int folds, rank, stride;
+  double *values;
+  int *position;
+} NPGNNIntegralGram;
+
+typedef struct {
+  const NPGNNIntegralGeometry *geometry;
+  const NPGNNIntegralBasis *basis;
+  int nq[2], cells;
+  const double *nodes[2], *weights[2];
+  double anchor;
+  double *arguments, *factors, *coefficients, *weighted, *scratch;
+  double *base, *primary, *successor;
+} NPGNNIntegralGramWorkspace;
+
+static void np_gnn_integral_gram_workspace_clear(NPGNNIntegralGramWorkspace *c)
+{
+  free(c->arguments);free(c->factors);free(c->coefficients);free(c->weighted);free(c->scratch);
+  free(c->base);free(c->primary);free(c->successor);memset(c,0,sizeof(*c));
+}
+
+static void np_gnn_integral_gram_clear(NPGNNIntegralGram *g)
+{
+  if(g==NULL)return;
+  free(g->values);free(g->position);memset(g,0,sizeof(*g));
+}
+
+static void np_gnn_integral_gram_rule(NPGNNIntegralGramWorkspace *c,
+                                     double lo,double hi,int rule,double *out)
+{
+  const NPGNNIntegralBasis *b=c->basis;
+  const int q=c->nq[rule],m=b->m,r=b->rank;
+  const double mid=.5*lo+.5*hi,half=.5*hi-.5*lo;
+  const double one=1.0,zero=0.0,scale=c->geometry->scale;
+  for(int j=0;j<m;++j)for(int z=0;z<q;++z)
+    c->arguments[j*q+z]=-(1+(c->anchor-b->donors[j])*(mid+half*c->nodes[rule][z]))/scale;
+  np_ckernelv(0,c->arguments,m*q,0,0,1,c->factors,NULL,0,0,1,1/scale,
+               0,0,0,NULL,NULL);
+  for(int j=0;j<r;++j)
+    memcpy(c->coefficients+j*q,c->factors+b->pivots[j]*q,q*sizeof(double));
+  F77_CALL(dgemm)("N","N",&q,&m,&r,&one,c->coefficients,&q,
+    b->transform,&r,&zero,c->coefficients+r*q,&q FCONE FCONE);
+  for(int j=0;j<m;++j)for(int z=0;z<q;++z)
+    c->coefficients[(r+j)*q+z]-=c->factors[j*q+z];
+  for(int j=0;j<r;++j)for(int z=0;z<q;++z)
+    c->weighted[j*q+z]=c->coefficients[j*q+z]*half*c->weights[rule][z];
+  F77_CALL(dgemm)("T","N",&r,&r,&q,&one,c->coefficients,&q,
+    c->weighted,&q,&zero,out,&r FCONE FCONE);
+  long double tail=0;
+  for(int j=r;j<m+r;++j)for(int z=0;z<q;++z)
+    tail+=(long double)c->coefficients[j*q+z]*c->coefficients[j*q+z]*
+      half*c->weights[rule][z];
+  out[r*r]=(double)tail;
+}
+
+static int np_gnn_integral_gram_integrate(NPGNNIntegralGramWorkspace *c,
+                                         double lo,double hi,int depth,double *out)
+{
+  const int cells=c->cells;
+  double *low=c->scratch+(size_t)depth*3*cells;
+  double *high=low+cells,*other=high+cells;
+  np_gnn_integral_gram_rule(c,lo,hi,0,low);
+  np_gnn_integral_gram_rule(c,lo,hi,1,high);
+  int pass=1;
+  for(int j=0;j<cells;++j) {
+    if(!R_FINITE(high[j]))return 1;
+    const double budget=j==cells-1?2.5e-26:1e-12;
+    const double relative=j==cells-1?1e-3:1e-10;
+    if(fabs(high[j]-low[j])>ldexp(budget/(4*c->geometry->n),-depth)+
+         relative*fabs(high[j]))pass=0;
+  }
+  double variation=0;
+  for(int j=0;j<c->basis->m;++j)
+    variation=fmax(variation,fabs(c->anchor-c->basis->donors[j]));
+  if(variation*(hi-lo)/c->geometry->scale>4)pass=0;
+  if(pass){memcpy(out,high,cells*sizeof(double));return 0;}
+  if(depth>=20)return 1;
+  const double mid=.5*lo+.5*hi;
+  if(!(lo<mid && mid<hi))return 1;
+  if(np_gnn_integral_gram_integrate(c,lo,mid,depth+1,out) ||
+     np_gnn_integral_gram_integrate(c,mid,hi,depth+1,other))return 1;
+  for(int j=0;j<cells;++j)out[j]+=other[j];
+  return 0;
+}
+
+static int np_gnn_integral_gram_interval(NPGNNIntegralGramWorkspace *c,
+                                        double lo,double hi,double anchor,
+                                        double *out)
+{
+  if(lo==anchor || hi==anchor)return 1;
+  c->anchor=anchor;
+  const double u0=1/(lo-anchor),u1=1/(hi-anchor);
+  const int status=np_gnn_integral_gram_integrate(c,fmin(u0,u1),fmax(u0,u1),0,out);
+  out[c->cells]=fabs(u0-u1)/(c->geometry->scale*c->geometry->scale);
+  return status;
+}
+
+static int np_gnn_integral_gram_prepare(
+  NPGNNIntegralGram *gram, NPGNNIntegralGramWorkspace *c,
+  const NPGNNIntegralGeometry *geometry,
+  const NPGNNIntegralBasis *basis, const double *nodes4,const double *weights4,
+  const double *nodes8,const double *weights8,size_t budget)
+{
+  *c=(NPGNNIntegralGramWorkspace){.geometry=geometry,.basis=basis,
+    .nq={4,8},.nodes={nodes4,nodes8},.weights={weights4,weights8}};
+  size_t cells,bytes;
+  int status=1;
+  if(gram==NULL || geometry==NULL || basis==NULL || basis->rank<1)return 1;
+  memset(gram,0,sizeof(*gram));
+  const int r=basis->rank,m=basis->m;
+  const int folds=geometry->folded?geometry->n:1;
+  if(r>257)return 1;
+  c->cells=r*r+1;
+  const int stride=c->cells+1;
+  if(!np_size_mul_checked((size_t)folds+1,(size_t)stride,&cells) ||
+     !np_size_mul_checked(cells,sizeof(double),&bytes) || bytes>budget)return 1;
+  gram->values=(double *)calloc(cells,sizeof(double));
+  gram->position=(int *)malloc((size_t)folds*sizeof(int));
+  c->arguments=(double *)malloc((size_t)8*m*sizeof(double));
+  c->factors=(double *)malloc((size_t)8*m*sizeof(double));
+  c->coefficients=(double *)malloc((size_t)8*(m+r)*sizeof(double));
+  c->weighted=(double *)malloc((size_t)8*r*sizeof(double));
+  c->scratch=(double *)malloc((size_t)21*3*c->cells*sizeof(double));
+  c->base=(double *)calloc(stride,sizeof(double));
+  c->primary=(double *)malloc((size_t)stride*sizeof(double));
+  c->successor=(double *)malloc((size_t)stride*sizeof(double));
+  if(!gram->values || !gram->position || !c->arguments || !c->factors ||
+     !c->coefficients || !c->weighted || !c->scratch || !c->base || !c->primary || !c->successor)
+    goto cleanup;
+  for(int z=0;z<geometry->count;++z) {
+    np_progress_bandwidth_loop_step();
+    const NPGNNIntegralInterval t=geometry->intervals[z];
+    if(np_gnn_integral_gram_interval(c,t.lo,t.hi,t.primary_anchor,c->primary))goto cleanup;
+    for(int j=0;j<stride;++j)c->base[j]+=c->primary[j];
+    if(geometry->folded && t.first_deleted!=t.end_deleted) {
+      if(np_gnn_integral_gram_interval(c,t.lo,t.hi,t.successor_anchor,c->successor))goto cleanup;
+      for(int j=0;j<stride;++j) {
+        gram->values[(size_t)t.first_deleted*stride+j]+=c->successor[j]-c->primary[j];
+        gram->values[(size_t)t.end_deleted*stride+j]-=c->successor[j]-c->primary[j];
+      }
+    }
+  }
+  /* Prefix accumulation transforms the difference buffer in place. Keep the
+   * fold permutation separately rather than duplicating n coordinate Grams. */
+  for(int f=0;f<folds;++f) {
+    double *row=gram->values+(size_t)f*stride;
+    for(int j=0;j<stride;++j){c->base[j]+=row[j];row[j]=c->base[j];}
+    gram->position[geometry->folded?geometry->order[f]:f]=f;
+  }
+  gram->folds=folds;gram->rank=r;gram->stride=stride;
+  status=0;
+cleanup:
+  np_gnn_integral_gram_workspace_clear(c);
+  if(status)np_gnn_integral_gram_clear(gram);
+  return status;
+}
+
+typedef int (*NPGNNIntegralWeightRow)(void *context,int evaluation,double *row);
+
+typedef struct {
+  double *x,*phi,*moments,*left,*right,*norms;
+} NPGNNIntegralContractWorkspace;
+
+static void np_gnn_integral_contract_workspace_clear(NPGNNIntegralContractWorkspace *w)
+{
+  free(w->x);free(w->phi);free(w->moments);free(w->left);free(w->right);free(w->norms);
+  memset(w,0,sizeof(*w));
+}
+
+/* Contract complete signed projections in bounded X/feature slabs. The row
+ * callback is the existing estimator owner; no dense n-by-n X weight matrix
+ * is prepared or retained. Output and error bounds are per original fold. */
+static int np_gnn_integral_basis_contract(
+  NPGNNIntegralContractWorkspace *workspace,
+  const NPGNNIntegralBasis *basis,const NPGNNIntegralGram *gram,int dimensions,
+  int first_fold,int end_fold,NPGNNIntegralWeightRow row,void *context,
+  size_t budget,double *values,double *bounds)
+{
+  double *x=NULL,*phi=NULL,*moments=NULL,*left=NULL,*right=NULL,*norms=NULL;
+  int status=1;
+  size_t cells,bytes,total=0;
+  if(dimensions<1 || dimensions>2 || row==NULL)return 1;
+  const int n=basis[0].n,r1=basis[0].rank;
+  const int r2=dimensions==2?basis[1].rank:1;
+  const int features=r1*r2,quantities=features<256?features:256;
+  int block=end_fold-first_fold<64?end_fold-first_fold:64;
+  if(n<=0 || first_fold<0 || end_fold>gram[0].folds || block<1)return 1;
+  /* These are the established bounded moment shapes, with checked storage.
+   * Shrinking this new workspace is not changing estimator eligibility. */
+  for(;;) {
+    if(!np_size_mul_checked((size_t)n,(size_t)(block+quantities),&cells) ||
+       !np_size_mul_checked(cells,sizeof(double),&total) ||
+       !np_size_mul_checked((size_t)features,(size_t)(block+2),&cells) ||
+       !np_size_mul_checked(cells,sizeof(double),&bytes) || total>SIZE_MAX-bytes)
+      return 1;
+    total+=bytes;
+    if(total<=budget)break;
+    if(block==1)return 1;
+    block=(block+1)/2;
+  }
+  x=workspace->x=(double *)malloc((size_t)n*block*sizeof(double));
+  phi=workspace->phi=(double *)malloc((size_t)n*quantities*sizeof(double));
+  moments=workspace->moments=(double *)malloc((size_t)features*block*sizeof(double));
+  left=workspace->left=(double *)malloc((size_t)features*sizeof(double));
+  right=workspace->right=(double *)malloc((size_t)features*sizeof(double));
+  norms=workspace->norms=(double *)malloc((size_t)block*sizeof(double));
+  if(!x || !phi || !moments || !left || !right || !norms)goto cleanup;
+  const double one=1,zero=0;
+  for(int first=first_fold;first<end_fold;first+=block) {
+    const int count=end_fold-first<block?end_fold-first:block;
+    np_progress_bandwidth_loop_step();
+    for(int f=0;f<count;++f) {
+      if(row(context,first+f,x+(size_t)f*n))goto cleanup;
+      long double norm=0;
+      for(int i=0;i<n;++i) {
+        if(!R_FINITE(x[(size_t)f*n+i]))goto cleanup;
+        norm+=fabs(x[(size_t)f*n+i]);
+      }
+      norms[f]=(double)norm;
+    }
+    for(int start=0;start<features;start+=quantities) {
+      const int width=features-start<quantities?features-start:quantities;
+      for(int c=0;c<width;++c) {
+        const int j=(start+c)%r1,k=(start+c)/r1;
+        for(int i=0;i<n;++i)
+          phi[(size_t)c*n+i]=basis[0].basis[(size_t)j*n+i]*
+            (dimensions==2?basis[1].basis[(size_t)k*n+i]:1.0);
+      }
+      F77_CALL(dgemm)("T","N",&width,&count,&n,&one,phi,&n,x,&n,
+        &zero,moments+start,&features FCONE FCONE);
+    }
+    for(int f=0;f<count;++f) {
+      double *m=moments+(size_t)f*features;
+      const double *g1=gram[0].values+(size_t)gram[0].position[first+f]*gram[0].stride;
+      F77_CALL(dgemm)("N","N",&r1,&r2,&r1,&one,g1,&r1,m,&r1,&zero,left,&r1 FCONE FCONE);
+      if(dimensions==2) {
+        const double *g2=gram[1].values+(size_t)gram[1].position[first+f]*gram[1].stride;
+        F77_CALL(dgemm)("N","N",&r1,&r2,&r2,&one,m,&r1,g2,&r2,&zero,right,&r1 FCONE FCONE);
+      } else memcpy(right,m,(size_t)features*sizeof(double));
+      long double integral=0;
+      for(int j=0;j<features;++j)integral+=(long double)left[j]*right[j];
+      if(!R_FINITE((double)integral))goto cleanup;
+      double error=0,magnitude=1;
+      for(int d=0;d<dimensions;++d) {
+        const int r=basis[d].rank;
+        const double *g=gram[d].values+(size_t)gram[d].position[first+f]*gram[d].stride;
+        if(!(g[r*r+1]>0) || g[r*r]<-2.5e-26)goto cleanup;
+        const double norm=sqrt(g[r*r+1]);
+        const double discarded=r==basis[d].m?0:
+          sqrt(basis[d].chebyshev_norm*(fabs(g[r*r])*1.001+2.5e-26));
+        const double current_error=discarded+basis[d].delta*norm;
+        const double current_magnitude=.4*norm;
+        error=error*current_magnitude+(magnitude+error)*current_error;
+        magnitude*=current_magnitude;
+      }
+      values[first+f]=(double)integral;
+      bounds[first+f]=norms[f]*norms[f]*(2*magnitude*error+error*error);
+    }
+  }
+  status=0;
+cleanup:
+  np_gnn_integral_contract_workspace_clear(workspace);
+  return status;
+}
+
+typedef double (*NPGNNIntegralCategoryOverlap)(void *context,int first,int second);
+
+typedef struct {
+  int n,dimensions,folded,kernel,has_categories,status,representation;
+  double **data,*counts,*values,*bounds;
+  NPGNNIntegralWeightRow row;
+  NPGNNIntegralCategoryOverlap category_overlap;
+  void *context;
+  size_t budget;
+  NPGNNIntegralGeometry *geometry;
+  NPGNNIntegralBasis basis[2];
+  NPGNNIntegralGram gram[2];
+  NPGNNIntegralGramWorkspace gram_workspace[2];
+  NPGNNIntegralContractWorkspace contract_workspace;
+  double *left,*right,*weight_row,*changes,*overlap,*products;
+} NPGNNIntegralOwner;
+
+static const double np_gnn_integral_nodes4[4]={
+  -.86113631159405257522,-.33998104358485626480,
+   .33998104358485626480, .86113631159405257522};
+static const double np_gnn_integral_weights4[4]={
+  .34785484513745385737,.65214515486254614263,
+  .65214515486254614263,.34785484513745385737};
+static const double np_gnn_integral_nodes8[8]={
+  -.96028985649753623168,-.79666647741362673959,
+  -.52553240991632898582,-.18343464249564980494,
+   .18343464249564980494, .52553240991632898582,
+   .79666647741362673959, .96028985649753623168};
+static const double np_gnn_integral_weights8[8]={
+  .10122853629037625915,.22238103445337447054,
+  .31370664587788728734,.36268378337836198297,
+  .36268378337836198297,.31370664587788728734,
+  .22238103445337447054,.10122853629037625915};
+
+static void np_gnn_integral_owner_cleanup(void *raw,Rboolean jump)
+{
+  NPGNNIntegralOwner *c=(NPGNNIntegralOwner *)raw;
+  (void)jump;
+  if(c->geometry)for(int d=0;d<c->dimensions;++d)
+    np_gnn_integral_geometry_clear(c->geometry+d);
+  free(c->geometry);c->geometry=NULL;
+  for(int d=0;d<2;++d) {
+    np_gnn_integral_basis_clear(c->basis+d);
+    np_gnn_integral_gram_clear(c->gram+d);
+    np_gnn_integral_gram_workspace_clear(c->gram_workspace+d);
+  }
+  np_gnn_integral_contract_workspace_clear(&c->contract_workspace);
+  free(c->left);free(c->right);free(c->weight_row);
+  free(c->changes);free(c->overlap);free(c->products);
+  c->left=c->right=c->weight_row=c->changes=c->overlap=c->products=NULL;
+}
+
+static int np_gnn_integral_size_add(size_t *total,size_t count,size_t width)
+{
+  size_t bytes;
+  if(!np_size_mul_checked(count,width,&bytes) || *total>SIZE_MAX-bytes)return 1;
+  *total+=bytes;return 0;
+}
+
+/* Conservative pre-integration storage certificate. Use the interpolation
+ * widths, not a hoped-for QR rank. This is a bound for the new representation,
+ * not a RAM-dependent estimator limit or an exclusion of exact computation. */
+static int np_gnn_integral_representation_storage(NPGNNIntegralOwner *c,
+                                                  const int *m,size_t *used)
+{
+  size_t total=0,peak=0,cells;
+  const size_t n=(size_t)c->n,folds=c->folded?n:1;
+  int maximum=0;
+  for(int d=0;d<c->dimensions;++d) {
+    if(!np_size_mul_checked(n,(size_t)m[d],&cells) ||
+       np_gnn_integral_size_add(&total,cells,sizeof(double)) ||
+       np_gnn_integral_size_add(&total,(size_t)m[d]*m[d],sizeof(double)) ||
+       !np_size_mul_checked(folds+1,(size_t)m[d]*m[d]+2,&cells) ||
+       np_gnn_integral_size_add(&total,cells,sizeof(double)) ||
+       np_gnn_integral_size_add(&total,folds,sizeof(int)))return 1;
+    if(m[d]>maximum)maximum=m[d];
+  }
+  if(!np_size_mul_checked(n,(size_t)c->dimensions,&cells) ||
+     np_gnn_integral_size_add(&total,cells,
+       4*sizeof(NPGNNIntegralInterval)+4*sizeof(NPGNNIntegralPiece)+sizeof(double)+sizeof(int)))
+    return 1;
+  if(np_gnn_integral_size_add(&peak,(size_t)63*(maximum*maximum+1),sizeof(double)) ||
+     np_gnn_integral_size_add(&peak,(size_t)64*maximum,sizeof(double)) ||
+     total>SIZE_MAX-peak)return 1;
+  *used=total;
+  return total+peak>c->budget;
+}
+
+static int np_gnn_integral_exact_contract(NPGNNIntegralOwner *c)
+{
+  const int n=c->n,folds=c->folded?n:1;
+  int tile=n<32?n:32;
+  size_t cells,bytes;
+  while(tile>1 && (double)folds*(2.0*tile+3.0)*sizeof(double)>c->budget/2)
+    tile=(tile+1)/2;
+  if(!np_size_mul_checked((size_t)folds,(size_t)tile,&cells) ||
+     !np_size_mul_checked(cells,sizeof(double),&bytes))return 1;
+  c->left=(double *)malloc(bytes);c->right=(double *)malloc(bytes);
+  c->weight_row=(double *)malloc((size_t)n*sizeof(double));
+  c->changes=(double *)malloc(((size_t)folds+1)*sizeof(double));
+  c->overlap=(double *)malloc((size_t)folds*sizeof(double));
+  c->products=(double *)malloc((size_t)folds*sizeof(double));
+  if(!c->left || !c->right || !c->weight_row || !c->changes || !c->overlap || !c->products)
+    return 1;
+  int iw[200];double work[800];
+  for(int first=0;first<n;first+=tile) {
+    const int ni=n-first<tile?n-first:tile;
+    np_progress_bandwidth_loop_step();
+    for(int f=0;f<folds;++f) {
+      if(c->row(c->context,f,c->weight_row))return 1;
+      for(int i=0;i<ni;++i)c->left[(size_t)i*folds+f]=c->weight_row[first+i];
+    }
+    for(int second=0;second<=first;second+=tile) {
+      const int nj=n-second<tile?n-second:tile;
+      if(second!=first)for(int f=0;f<folds;++f) {
+        if(c->row(c->context,f,c->weight_row))return 1;
+        for(int j=0;j<nj;++j)c->right[(size_t)j*folds+f]=c->weight_row[second+j];
+      }
+      const double *right=second==first?c->left:c->right;
+      for(int i=0;i<ni;++i)for(int j=0;j<nj && second+j<=first+i;++j) {
+        np_progress_bandwidth_loop_step();
+        const int ii=first+i,jj=second+j;
+        const double categorical=c->category_overlap?
+          c->category_overlap(c->context,ii,jj):1.0;
+        if(!R_FINITE(categorical))return 1;
+        if(categorical==0.0)continue;
+        for(int f=0;f<folds;++f)c->products[f]=categorical;
+        for(int d=0;d<c->dimensions;++d) {
+          double error;
+          const int status=np_gnn_integral_pair_folds(c->geometry+d,c->kernel,
+            c->data[d][ii],c->data[d][jj],c->changes,c->overlap,iw,work,&error);
+          if(status)return status;
+          for(int f=0;f<folds;++f)c->products[f]*=c->overlap[f];
+        }
+        for(int f=0;f<folds;++f) {
+          const double value=(ii==jj?1.0:2.0)*c->left[(size_t)i*folds+f]*
+            right[(size_t)j*folds+f]*c->products[f];
+          c->values[f]+=value;
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+static SEXP np_gnn_integral_owner_execute(void *raw)
+{
+  NPGNNIntegralOwner *c=(NPGNNIntegralOwner *)raw;
+  const int n=c->n,p=c->dimensions,folds=c->folded?n:1;
+  int m[2]={0,0};double delta[2]={0,0};size_t retained=0;
+  c->status=1;
+  c->geometry=(NPGNNIntegralGeometry *)calloc(p,sizeof(*c->geometry));
+  if(!c->geometry)return R_NilValue;
+  for(int d=0;d<p;++d)
+    if(np_gnn_integral_geometry_prepare(c->geometry+d,c->data[d],n,c->counts[d],c->folded))
+      return R_NilValue;
+  c->representation=c->kernel==0 && p<=2 && !c->has_categories;
+  if(c->representation)for(int d=0;d<p;++d) {
+    m[d]=np_gnn_integral_basis_size(c->geometry+d,delta+d);
+    if(!m[d])c->representation=0;
+  }
+  if(c->representation && np_gnn_integral_representation_storage(c,m,&retained))
+    c->representation=0;
+  if(c->representation) {
+    for(int d=0;d<p;++d)
+      if(np_gnn_integral_basis_prepare(c->basis+d,c->geometry+d,c->data[d],m[d],delta[d],
+           np_gnn_integral_nodes4,np_gnn_integral_weights4,4,c->budget))return R_NilValue;
+    for(int d=0;d<p;++d)
+      if(np_gnn_integral_gram_prepare(c->gram+d,c->gram_workspace+d,c->geometry+d,c->basis+d,
+          np_gnn_integral_nodes4,np_gnn_integral_weights4,
+          np_gnn_integral_nodes8,np_gnn_integral_weights8,c->budget))return R_NilValue;
+    /* Reconcile actual retained rank storage before requesting contraction
+     * scratch; the conservative admission above did not assume compression. */
+    size_t actual=0;
+    for(int d=0;d<p;++d) {
+      const int r=c->basis[d].rank;
+      if(np_gnn_integral_size_add(&actual,(size_t)n*r,sizeof(double)) ||
+         np_gnn_integral_size_add(&actual,(size_t)m[d]*r,sizeof(double)) ||
+         np_gnn_integral_size_add(&actual,((size_t)folds+1)*(r*r+2),sizeof(double)))
+        return R_NilValue;
+    }
+    if(actual>=c->budget)return R_NilValue;
+    c->status=np_gnn_integral_basis_contract(&c->contract_workspace,c->basis,c->gram,p,
+      0,folds,c->row,c->context,c->budget-actual,c->values,c->bounds);
+  } else c->status=np_gnn_integral_exact_contract(c);
+  return R_NilValue;
+}
+
+static int np_gnn_density_integral(int n,int dimensions,int folded,int kernel,
+  double **data,double *counts,NPGNNIntegralWeightRow row,
+  NPGNNIntegralCategoryOverlap categories,void *context,int has_categories,
+  size_t budget,double *values,double *bounds)
+{
+  if(n<2 || dimensions<1 || data==NULL || counts==NULL || row==NULL ||
+     values==NULL || bounds==NULL || (folded!=0 && folded!=1) || kernel<0 || kernel>8)
+    return 1;
+  const int folds=folded?n:1;
+  memset(values,0,(size_t)folds*sizeof(double));
+  memset(bounds,0,(size_t)folds*sizeof(double));
+  NPGNNIntegralOwner call={.n=n,.dimensions=dimensions,.folded=folded,.kernel=kernel,
+    .data=data,.counts=counts,.row=row,.category_overlap=categories,.context=context,
+    .has_categories=has_categories,.budget=budget,.values=values,.bounds=bounds,.status=1};
+  R_UnwindProtect(np_gnn_integral_owner_execute,&call,np_gnn_integral_owner_cleanup,&call,NULL);
+  return call.status;
+}
+
+typedef struct {
+  int n;
+} NPGNNIntegralUniformContext;
+
+static int np_gnn_integral_uniform_row(void *raw,int evaluation,double *row)
+{
+  const NPGNNIntegralUniformContext *c=(const NPGNNIntegralUniformContext *)raw;
+  (void)evaluation;
+  for(int i=0;i<c->n;++i)row[i]=1.0/c->n;
+  return 0;
+}
+
+static int np_gnn_density_integral_unconditional(
+  const int n,const int dimensions,const int kernel,double **data,const double *request,
+  double *value)
+{
+  NPGNNIntegralUniformContext context;
+  double *bounds=(double *)R_alloc(1,sizeof(double));
+  double *values=(double *)R_alloc(1,sizeof(double));
+  double *counts=(double *)R_alloc((size_t)dimensions,sizeof(double));
+  if(n<2 || dimensions<1 || data==NULL || request==NULL || value==NULL)
+    return 1;
+  for(int d=0;d<dimensions;++d)counts[d]=request[d];
+  memset(&context,0,sizeof(context));
+  context.n=n;
+  {
+    const int status=np_gnn_density_integral(
+      n,dimensions,0,kernel,data,counts,
+      np_gnn_integral_uniform_row,NULL,&context,0,
+      NP_CONDITIONAL_LP_TILE_BUDGET_BYTES,values,bounds);
+    if(status!=0)return status;
+    *value=values[0];
+  }
+  return 0;
+}
+
+/* Materialize the external-query radii used by the delete-one CVLS cross
+ * term.  An in-sample GNN fit has the query occurrence in its support, while
+ * a leave-one-out query does not; the latter therefore needs the same
+ * order-statistic contract as an external query with n-1 donors.  Keep this
+ * as one occurrence-aware geometry owner rather than asking the ordinary
+ * leave-one-out row engine to reuse an in-sample radius. */
+static int np_density_gnn_deleteone_bandwidth(
+  const int num_obs, const int num_reg_continuous,
+  double **matrix_X_continuous, const double *request,
+  double ***bandwidth_out)
+{
+  double **bandwidth = NULL;
+  const NPNNGeometryContext identity_geometry = {
+    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+    .eval_to_train = NULL,
+    .adaptive_successor = NULL
+  };
+
+  if(num_obs < 3 || num_reg_continuous <= 0 ||
+     matrix_X_continuous == NULL || request == NULL ||
+     bandwidth_out == NULL)
+    return 1;
+  *bandwidth_out = NULL;
+  bandwidth = alloc_tmatd(num_obs, num_reg_continuous);
+  if(bandwidth == NULL)
+    return 1;
+  for(int coordinate = 0; coordinate < num_reg_continuous; ++coordinate){
+    int lookup = 0;
+    double scale = 0.0;
+    double *radius = (double *)malloc((size_t)num_obs*sizeof(double));
+
+    if(radius == NULL ||
+       np_nn_lookup_from_scale(num_obs - 1, 1, request[coordinate],
+                               &lookup, &scale, NULL) != 0 ||
+       compute_nn_distance_train_eval_ctx(
+         num_obs, num_obs, 1,
+         matrix_X_continuous[coordinate], matrix_X_continuous[coordinate],
+         lookup, &identity_geometry, radius) != NP_NN_GEOMETRY_OK){
+      free(radius);
+      free_tmat(bandwidth);
+      return 1;
+    }
+    for(int observation = 0; observation < num_obs; ++observation){
+      bandwidth[coordinate][observation] = radius[observation]*scale;
+      if(!R_FINITE(bandwidth[coordinate][observation]) ||
+         bandwidth[coordinate][observation] <= 0.0){
+        free(radius);
+        free_tmat(bandwidth);
+        return 1;
+      }
+    }
+    free(radius);
+  }
+  *bandwidth_out = bandwidth;
+  return 0;
+}
+
+
 /*
  * Family-neutral row seam for bounded conditional-density CVLS.  The
  * quadrature and scalar/general-LP objective cores own estimator algebra;
@@ -45444,6 +46473,8 @@ double *cv){
   int *kernel_c = NULL, *kernel_u = NULL, *kernel_o = NULL;
   double **matrix_bandwidth = NULL;
   double **full_design_bandwidth = NULL;
+  double **cross_bandwidth = NULL;
+  double **deleteone_bandwidth = NULL;
   double **adaptive_successor_bandwidth = NULL;
   double *adaptive_fold_scale = NULL;
   double **adaptive_selected_bandwidth = NULL;
@@ -45553,6 +46584,7 @@ double *cv){
   }
   full_design_bandwidth = adaptive_successor_bandwidth != NULL ?
     adaptive_selected_bandwidth : matrix_bandwidth;
+  cross_bandwidth = matrix_bandwidth;
 
   if(!exact_beta_route && adaptive_successor_bandwidth == NULL &&
      np_density_categorical_profile_cv(kernel_c,
@@ -45576,7 +46608,19 @@ double *cv){
     goto cleanup_density_convolution_cv;
   }
 
-  if(bounded_scalar_quadrature && !exact_beta_route){
+  /* The whole-support owner is admitted only for the continuous, unbounded
+   * generalized-NN density route while its public occurrence mapping is
+   * unchanged. Other families retain their incumbent owner until their own
+   * focused proof admits them. */
+  if(!exact_beta_route && BANDWIDTH_den == BW_GEN_NN &&
+     int_cker_bound_extern == 0 && num_reg_continuous > 0 &&
+     num_reg_unordered == 0 && num_reg_ordered == 0 &&
+     int_TREE_X != NP_TREE_TRUE) {
+    if(np_gnn_density_integral_unconditional(
+           num_obs,num_reg_continuous,KERNEL_den,matrix_X_continuous,
+           vector_scale_factor,&cv1) != 0)
+      goto cleanup_density_convolution_cv;
+  } else if(bounded_scalar_quadrature && !exact_beta_route){
     if(np_density_cvls_bounded_i1_quadrature(KERNEL_den,
                                              BANDWIDTH_den,
                                              num_obs,
@@ -45711,6 +46755,21 @@ double *cv){
     *cv = cv1 - 2.0*cv2;
     status = 0;
     goto cleanup_density_convolution_cv;
+  }
+
+  /* The ordinary GNN matrix is an in-sample query radius.  For the CVLS
+   * cross term the query observation has been deleted, so reconstruct the
+   * external-query radius once per coordinate and reuse it for the complete
+   * row engine.  This keeps the canonical kernel arithmetic and normalization
+   * while correcting only the radius contract. */
+  if(BANDWIDTH_den == BW_GEN_NN && int_cker_bound_extern == 0 &&
+     num_reg_continuous > 0 && num_reg_unordered == 0 &&
+     num_reg_ordered == 0 && int_TREE_X != NP_TREE_TRUE){
+    if(np_density_gnn_deleteone_bandwidth(
+         num_obs, num_reg_continuous, matrix_X_continuous,
+         vector_scale_factor, &deleteone_bandwidth) != 0)
+      goto cleanup_density_convolution_cv;
+    cross_bandwidth = deleteone_bandwidth;
   }
 
   if((num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
@@ -45864,7 +46923,7 @@ double *cv){
                          NULL, // no weights
                          NULL, // no sgn
                          vector_scale_factor,
-                         1,matrix_bandwidth,matrix_bandwidth,lambda,
+                         1,cross_bandwidth,cross_bandwidth,lambda,
                          num_categories,
                          matrix_categorical_vals_extern,
                          NULL, // no ocg
@@ -45894,6 +46953,8 @@ cleanup_density_convolution_cv:
   if(adaptive_selected_bandwidth != NULL)
     free_tmat(adaptive_selected_bandwidth);
   free(adaptive_fold_scale);
+  if(deleteone_bandwidth != NULL)
+    free_tmat(deleteone_bandwidth);
   free_mat(matrix_bandwidth, num_reg_continuous);
   if(gate_override_active) np_gate_ctx_clear(&gate_x_ctx);
   if(ov_cont_ok != NULL) free(ov_cont_ok);
@@ -50712,7 +51773,6 @@ typedef struct {
   double *grid_logs[4];
   const NPConditionalKernelExecutionContext *execution_context;
 } NPConditionalCVLSRouteContext;
-
 static void np_conditional_cvls_fold_grid_clear(
   NPConditionalCVLSRouteContext *context)
 {
