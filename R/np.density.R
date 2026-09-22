@@ -208,13 +208,14 @@ npudens.bandwidth <-
     econ = data.frame()
   }
 
+  physical.bw <- .np_physical_bandwidth(bws)
   myopti = list(
     num_obs_train = tnrow,
     num_obs_eval = enrow,
     num_uno = bws$nuno,
     num_ord = bws$nord,
     num_con = bws$ncon,
-    int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
+    int_LARGE_SF = SF_ARB,
     BANDWIDTH_den_extern = switch(bws$type,
       fixed = BW_FIXED,
       generalized_nn = BW_GEN_NN,
@@ -259,7 +260,7 @@ npudens.bandwidth <-
     .Call("C_np_density",
           as.double(tuno), as.double(tord), as.double(tcon),
           as.double(euno), as.double(eord), as.double(econ),
-          as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+          as.double(c(physical.bw[bws$icon], physical.bw[bws$iuno], physical.bw[bws$iord])),
           as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
           as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
           as.integer(myopti),

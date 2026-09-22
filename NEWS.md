@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Unconditional density and distribution fits now consistently use the
+  physical bandwidth retained by scaled bandwidth objects. This corrects
+  fixed beta-kernel estimates and dependent copula results when
+  `bwscaling = TRUE`.
+
 * Type-II significance-test reselection now replaces the physical bandwidth
   and matching scale metadata for the tested predictors together. Previously,
   scaled objects could retain the original smoothing parameters after a search.
