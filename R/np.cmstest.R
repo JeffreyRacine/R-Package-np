@@ -439,7 +439,7 @@ npcmstest <- function(formula,
 
   prodh <- if (bw$ncon == 0) 1.0
   else
-    prod(bw$bw[bw$icon])
+    prod(kernel.bw$bw[kernel.bw$icon])
 
   if (!density.weighted)
     fhat <- npksum(txdat = xdat,

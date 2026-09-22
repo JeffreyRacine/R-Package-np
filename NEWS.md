@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Conditional-moment test covariance factors now use physical bandwidths,
+  including for scaled objects. Quantile-test density weights use normalized
+  kernel sums, preserving row/donor-local nearest-neighbor radii rather than
+  treating neighbor counts as kernel volumes. This can change non-density-
+  weighted NN tests; fixed-bandwidth standardized tests retain their existing
+  cancellation of the common scale factor, up to roundoff.
+
 * Copula marginal estimators now use the physical bandwidth retained by the
   joint bandwidth object instead of interpreting scale factors as bandwidths.
   This aligns probability coordinates, density ratios, uncertainty and
