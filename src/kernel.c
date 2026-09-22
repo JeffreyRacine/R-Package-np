@@ -861,14 +861,14 @@ double np_ordered_rly_denom(const double train, const double lambda,
   if(cats == NULL || ncat <= 0)
     error("Racine-Li-Yan kernel requires retained ordered support");
   for(int i = 0; i < ncat; ++i)
-    den += ipow(lambda, (int)fabs(train-cats[i]));
+    den += ipow(lambda, np_ordered_lattice_distance(train,cats[i]));
   return den;
 }
 
 static double np_ordered_rly_normal(const double train, const double eval,
                                     const double lambda, const double denominator)
 {
-  return ipow(lambda,(int)fabs(train-eval))/denominator;
+  return ipow(lambda,np_ordered_lattice_distance(train,eval))/denominator;
 }
 
 double np_ordered_rly(const int op, const double train, const double eval,
@@ -883,17 +883,17 @@ double np_ordered_rly(const int op, const double train, const double eval,
     double total = 0.0;
     if(!(den2 > 0.0)) return 0.0;
     for(int i = 0; i < ncat; ++i)
-      total += ipow(lambda, (int)fabs(train-cats[i])) *
-               ipow(lambda, (int)fabs(eval-cats[i]));
+      total += ipow(lambda, np_ordered_lattice_distance(train,cats[i])) *
+               ipow(lambda, np_ordered_lattice_distance(eval,cats[i]));
     return total/(den*den2);
   }
   if(op == 2) {
-    const int d = (int)fabs(train-eval);
+    const int d = np_ordered_lattice_distance(train,eval);
     const double num = ipow(lambda,d);
     const double dnum = d == 0 ? 0.0 : d*ipow(lambda,d-1);
     double dden = 0.0;
     for(int i = 0; i < ncat; ++i) {
-      const int di = (int)fabs(train-cats[i]);
+      const int di = np_ordered_lattice_distance(train,cats[i]);
       if(di > 0) dden += di*ipow(lambda,di-1);
     }
     return (dnum*den-num*dden)/(den*den);
@@ -902,7 +902,7 @@ double np_ordered_rly(const int op, const double train, const double eval,
     double total = 0.0;
     for(int i = 0; i < ncat; ++i)
       if(cats[i] <= eval)
-        total += ipow(lambda,(int)fabs(train-cats[i]));
+        total += ipow(lambda,np_ordered_lattice_distance(train,cats[i]));
     return total/den;
   }
   error("unsupported Racine-Li-Yan operator");
@@ -939,11 +939,15 @@ SEXP C_np_ordered_rly_matrix(SEXP train, SEXP evaluation, SEXP bandwidth,
      (n>0 && (R_xlen_t)m>R_XLEN_T_MAX/n))
     error("invalid RLY profile matrix bandwidth or dimensions");
   for(int i=0;i<nc;++i) {
-    if(!R_FINITE(cats[i]) || (i>0 &&
-       (!(cats[i]>cats[i-1]) || cats[i]-cats[i-1]!=floor(cats[i]-cats[i-1]))))
+    const double offset = cats[i]-cats[0];
+    const double lattice = floor(offset+0.5);
+    if(!R_FINITE(cats[i]) || !R_FINITE(offset) ||
+       fabs(offset-lattice) > 8.0*DBL_EPSILON*fmax(1.0,fabs(offset)) ||
+       (i>0 && (!(cats[i]>cats[i-1]) ||
+                 lattice<=floor(cats[i-1]-cats[0]+0.5))))
       error("RLY profile support must have finite increasing integer distances");
   }
-  if(cats[nc-1]-cats[0]>=INT_MAX)
+  if(floor(cats[nc-1]-cats[0]+0.5)>=INT_MAX)
     error("RLY profile support exceeds the native index range");
   for(int i=0;i<n;++i)
     if(!np_ordered_rly_support_contains(REAL(train)[i],cats,nc))
@@ -973,8 +977,9 @@ void np_ordered_rly_range(const int op, const double lambda,
   for(int i = 0; i < ncat; ++i) {
     if(op == 0) {
       const double den = np_ordered_rly_denom(cats[i],lambda,cats,ncat);
-      const int distance = (int)fmax(fabs(cats[i]-cats[0]),
-                                      fabs(cats[i]-cats[ncat-1]));
+      const int left = np_ordered_lattice_distance(cats[i],cats[0]);
+      const int right = np_ordered_lattice_distance(cats[i],cats[ncat-1]);
+      const int distance = left > right ? left : right;
       *lower = fmin(*lower,ipow(lambda,distance)/den);
       *upper = fmax(*upper,1.0/den);
     } else {
@@ -1007,7 +1012,7 @@ double kernel_ordered(int KERNEL, double x, double y, double lambda,
 			}
 			else
 			{
-				return_value = ipow(lambda,(int)fabs(x-y))*(1.0-lambda)*0.5;
+				return_value = ipow(lambda,np_ordered_lattice_distance(x,y))*(1.0-lambda)*0.5;
 			}
 
 			break;
@@ -1022,7 +1027,7 @@ double kernel_ordered(int KERNEL, double x, double y, double lambda,
 			}
 			else
 			{
-				return_value = ipow(lambda,(int)fabs(x-y));
+				return_value = ipow(lambda,np_ordered_lattice_distance(x,y));
 			}
 
 			break;
@@ -1030,7 +1035,7 @@ double kernel_ordered(int KERNEL, double x, double y, double lambda,
 		case 2:
 
 			/* Normalized Li-Racine on infinite integer support */
-			return_value = ipow(lambda,(int)fabs(x-y))*(1.0-lambda)/(1.0+lambda);
+			return_value = ipow(lambda,np_ordered_lattice_distance(x,y))*(1.0-lambda)/(1.0+lambda);
 
 			break;
 

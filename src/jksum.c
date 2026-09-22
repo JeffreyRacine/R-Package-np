@@ -1182,32 +1182,32 @@ double np_score_unli_racine(const int same_cat, const double lambda, const int c
 }
 
 double np_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
-  return (x == y)?(1.0-lambda):ipow(lambda, (int)fabs(x-y))*(1.0-lambda)*0.5;
+  return (x == y)?(1.0-lambda):ipow(lambda, np_ordered_lattice_distance(x,y))*(1.0-lambda)*0.5;
 }
 
 double np_score_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
-  const int cxy = (int)fabs(x-y);
+  const int cxy = np_ordered_lattice_distance(x,y);
   if(cxy == 0) return -1.0;
   if(lambda == 0.0) return (cxy == 1) ? 0.5 : 0.0;
   return 0.5*ipow(lambda, cxy - 1)*(cxy - (cxy + 1.0)*lambda);
 }
 
 double np_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  return ipow(lambda, (int)fabs(x-y));
+  return ipow(lambda, np_ordered_lattice_distance(x,y));
 }
 
 double np_score_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  const int cxy = (int)fabs(x-y);
+  const int cxy = np_ordered_lattice_distance(x,y);
   if (cxy == 0) return 0.0;
   return (cxy * ipow(lambda, cxy - 1));
 }
 
 double np_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  return ipow(lambda, (int)fabs(x-y))*(1.0 - lambda)/(1.0 + lambda);
+  return ipow(lambda, np_ordered_lattice_distance(x,y))*(1.0 - lambda)/(1.0 + lambda);
 }
 
 double np_score_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  const int cxy = (int)fabs(x-y);
+  const int cxy = np_ordered_lattice_distance(x,y);
   const double denominator = (1.0 + lambda)*(1.0 + lambda);
   if(cxy == 0) return -2.0/denominator;
   return ipow(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0*lambda)/denominator;
@@ -1219,7 +1219,7 @@ static inline double np_ordered_eval_cached012(const int kernel,
                                                const double lambda,
                                                const int max_cxy,
                                                const double * const lpow){
-  const int cxy = (int)fabs(x-y);
+  const int cxy = np_ordered_lattice_distance(x,y);
   const double gee = (lpow != NULL && cxy <= max_cxy) ? lpow[cxy] : R_pow_di(lambda, cxy);
   switch(kernel){
     case 0:
@@ -4165,7 +4165,7 @@ double np_econvol_onli_racine(const double x, const double y, const double lambd
   if(lambda == 1.0)
     return 0.0;
 
-  const int cxy = (int)fabs(x-y);
+  const int cxy = np_ordered_lattice_distance(x,y);
   const double lnorm = (1.0 - lambda)/(1.0 + lambda);
   const double l2 = lambda*lambda;
   return lnorm*lnorm*R_pow_di(lambda, cxy)*((1.0 + l2)/(1.0 - l2) + cxy);
@@ -4180,7 +4180,7 @@ double np_econvol_owang_van_ryzin(const double x, const double y, const double l
 
   if(x == y) return 0.5*(1.0-lambda)*(1.0-lambda)*(1.0 + 1.0/(1.0-lambda*lambda));
 
-  const int cxy = (int)fabs(x-y);
+  const int cxy = np_ordered_lattice_distance(x,y);
   const double lnorm = 0.5*(1.0 - lambda);
   const double l2 = lambda*lambda;
   return lnorm*lnorm*R_pow_di(lambda, cxy)*(1.0 + cxy + 2.0/(1.0-l2));
@@ -4630,7 +4630,7 @@ static inline double np_cker_base_eval(const int kernel,
 
 double np_cdf_owang_van_ryzin(const double y, const double x, const double lambda, const double cl, const double ch){
   if(x == y) return 1.0 - 0.5*lambda;
-  const int cxy = (int)fabs(x-y);
+  const int cxy = np_ordered_lattice_distance(x,y);
   const double gee = R_pow_di(lambda, cxy);
   /* Above the center, subtract the PMF tail starting at the next integer. */
   return (x < y) ? 0.5*gee : (1.0 - 0.5*lambda*gee);
@@ -4645,25 +4645,23 @@ static inline double np_geom_sum_nonneg_lambda(const int n, const double lambda)
 }
 
 double np_cdf_oli_racine(const double y, const double x, const double lambda, const double cl, const double ch){
-  const int xh = (x > ch) ? (int)ch : (int)x;
-  const int yi = (int)y;
-  const int cli = (int)cl;
-  const int cxy = abs(xh - yi);
+  const double xh = (x > ch) ? ch : x;
+  const int cxy = np_ordered_lattice_distance(xh,y);
 
   if(x < y){
-    const int nx = (int)x - cli;
     if(x < cl)
       return 0.0;
+    const int nx = np_ordered_lattice_distance(x,cl);
     return R_pow_di(lambda, cxy) * np_geom_sum_nonneg_lambda(nx, lambda);
   } else{
-    const int n1 = yi - cli;
-    const int n2 = xh - yi;
+    const int n1 = np_ordered_lattice_distance(y,cl);
+    const int n2 = np_ordered_lattice_distance(xh,y);
     return np_geom_sum_nonneg_lambda(n1, lambda) + np_geom_sum_nonneg_lambda(n2, lambda) - 1.0;
   }
 }
 
 double np_cdf_onli_racine(const double y, const double x, const double lambda, const double cl, const double ch){
-  const int cxy = (int)fabs(x-y);
+  const int cxy = np_ordered_lattice_distance(x,y);
   const double gee = R_pow_di(lambda, cxy)/(1.0+lambda);
   return (x < y) ? gee : 1.0 - lambda*gee;
 }
@@ -7066,7 +7064,7 @@ void np_p_okernelv(const int KERNEL,
   
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
-  const int max_cxy = (int)fabs(ch-cl);
+  const int max_cxy = np_ordered_lattice_distance(ch,cl);
   const int fast_kernel = (KERNEL >= 0 && KERNEL <= 3 && cats != NULL);
   const int fast_p_kernel = (P_KERNEL >= 0 && P_KERNEL <= 3 && cats != NULL);
   double *lpow = NULL;
@@ -7183,7 +7181,7 @@ void np_okernelv(const int KERNEL,
 
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
-  const int max_cxy = (int)fabs(ch-cl);
+  const int max_cxy = np_ordered_lattice_distance(ch,cl);
   const int fast_kernel = (KERNEL >= 0 && KERNEL <= 3 && cats != NULL);
 
   if(fast_kernel && max_cxy >= 0){

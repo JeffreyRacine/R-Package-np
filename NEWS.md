@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Ordered factors with decimal-offset integer-spaced labels now preserve their
+  intended distances in kernels, bandwidth scores, CDFs and overlap sums.
+  Validation tolerates bounded floating-point representation error while
+  continuing to reject genuinely fractional spacing; numeric gaps are retained.
+
 * Conditional-moment test covariance factors now use physical bandwidths,
   including for scaled objects. Quantile-test density weights use normalized
   kernel sums, preserving row/donor-local nearest-neighbor radii rather than
