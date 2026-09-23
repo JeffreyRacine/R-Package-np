@@ -382,6 +382,13 @@ Further arguments passed to the default kernel-sum method.
   \code{p.ksum}. This option does not work in conjunction with
   \code{permutation.operator}.
 
+  For categorical variables with \code{kernel.pow=1}, the score differentiates
+  the requested operator with respect to its categorical bandwidth: ordinary
+  weights for \code{"normal"}, overlap weights for \code{"convolution"},
+  and ordered cumulative weights for \code{"integral"}. An unordered
+  \code{"integral"} retains its ordinary-weight convention. Convolution
+  scores include both factors and, where applicable, both normalizers.
+
   The option \code{compute.ocg=} works much like \code{permutation.operator},
   but for discrete variables. The kernel is evaluated at a reference
   category in each dimension: for ordered data, the next lowest category

@@ -871,6 +871,46 @@ static double np_ordered_rly_normal(const double train, const double eval,
   return ipow(lambda,np_ordered_lattice_distance(train,eval))/denominator;
 }
 
+static double np_ordered_rly_denom_score(const double train, const double lambda,
+                                        const double *cats, const int ncat)
+{
+  double derivative = 0.0;
+  for(int i = 0; i < ncat; ++i) {
+    const int d = np_ordered_lattice_distance(train,cats[i]);
+    if(d > 0) derivative += d*ipow(lambda,d-1);
+  }
+  return derivative;
+}
+
+/* Keep the new, heavier score bodies out of the ordinary kernel dispatcher
+ * so normal-value/score callers do not inherit their register-save frame. */
+static double
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+np_ordered_rly_operator_score(const int op, const double train,
+    const double eval, const double lambda, const double *cats,
+    const int ncat, const double den)
+{
+  const double dden = np_ordered_rly_denom_score(train,lambda,cats,ncat);
+  const double den2 = op == 4 ? np_ordered_rly_denom(eval,lambda,cats,ncat) : 1.0;
+  const double dden2 = op == 4 ? np_ordered_rly_denom_score(eval,lambda,cats,ncat) : 0.0;
+  double total = 0.0, derivative = 0.0;
+  for(int i = 0; i < ncat; ++i) {
+    if(op == 5 && cats[i] > eval) continue;
+    const int da = np_ordered_lattice_distance(train,cats[i]);
+    const double a = ipow(lambda,da);
+    const double ap = da == 0 ? 0.0 : da*ipow(lambda,da-1);
+    const int db = op == 4 ? np_ordered_lattice_distance(eval,cats[i]) : 0;
+    const double b = ipow(lambda,db);
+    const double bp = db == 0 ? 0.0 : db*ipow(lambda,db-1);
+    total += a*b;
+    derivative += ap*b+a*bp;
+  }
+  const double divisor = den*den2;
+  return (derivative*divisor-total*(dden*den2+den*dden2))/(divisor*divisor);
+}
+
 double np_ordered_rly(const int op, const double train, const double eval,
                       const double lambda, const double *cats, const int ncat)
 {
@@ -891,11 +931,7 @@ double np_ordered_rly(const int op, const double train, const double eval,
     const int d = np_ordered_lattice_distance(train,eval);
     const double num = ipow(lambda,d);
     const double dnum = d == 0 ? 0.0 : d*ipow(lambda,d-1);
-    double dden = 0.0;
-    for(int i = 0; i < ncat; ++i) {
-      const int di = np_ordered_lattice_distance(train,cats[i]);
-      if(di > 0) dden += di*ipow(lambda,di-1);
-    }
+    const double dden = np_ordered_rly_denom_score(train,lambda,cats,ncat);
     return (dnum*den-num*dden)/(den*den);
   }
   if(op == 3) {
@@ -905,6 +941,10 @@ double np_ordered_rly(const int op, const double train, const double eval,
         total += ipow(lambda,np_ordered_lattice_distance(train,cats[i]));
     return total/den;
   }
+  /* Scores differentiate the requested retained-support operator, including
+   * both normalizers in a convolution. No finite differences or new support. */
+  if(op == 4 || op == 5)
+    return np_ordered_rly_operator_score(op,train,eval,lambda,cats,ncat,den);
   error("unsupported Racine-Li-Yan operator");
   return 0.0;
 }

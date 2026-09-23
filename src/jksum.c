@@ -4674,6 +4674,108 @@ double np_onull(const double x, const double y, const double lambda, const doubl
 }
 
 
+/* Categorical operator scores. Normal scores remain their existing owners;
+ * these product/quotient rules differentiate convolution and CDF values. */
+static double np_score_unordered_convolution(const int same, const double lambda,
+    const int ncat, double (*normal)(int,double,int),
+    double (*score)(int,double,int))
+{
+  const double a = normal(1,lambda,ncat), b = normal(0,lambda,ncat);
+  const double ap = score(1,lambda,ncat), bp = score(0,lambda,ncat);
+  if(ncat < 2) return 0.0;
+  return same ? 2.0*(a*ap+(ncat-1.0)*b*bp) :
+    2.0*(ap*b+a*bp+(ncat-2.0)*b*bp);
+}
+
+static double np_score_convol_uaa(const int same, const double lambda, const int ncat)
+{
+  return np_score_unordered_convolution(same,lambda,ncat,np_uaa,np_score_uaa);
+}
+
+static double np_score_convol_unli(const int same, const double lambda, const int ncat)
+{
+  return np_score_unordered_convolution(same,lambda,ncat,np_unli_racine,np_score_unli_racine);
+}
+
+/* Derivative of sum_{i=0}^n lambda^i. Binary concatenation uses only positive
+ * sums/products on [0,1], including the endpoints, in O(log(n+1)) work. */
+static double np_geom_sum_score(const int n, const double lambda)
+{
+  if(n <= 0) return 0.0;
+  unsigned int remaining = (unsigned int)n+1U;
+  double power = lambda, power_score = 1.0;
+  double sum = 1.0, sum_score = 0.0;
+  double prefix = 1.0, prefix_score = 0.0, result = 0.0;
+  while(remaining) {
+    if(remaining & 1U) {
+      result += prefix_score*sum+prefix*sum_score;
+      prefix_score = prefix_score*power+prefix*power_score;
+      prefix *= power;
+    }
+    remaining >>= 1;
+    if(!remaining) break;
+    sum_score = sum_score*(1.0+power)+sum*power_score;
+    sum *= 1.0+power;
+    power_score *= 2.0*power;
+    power *= power;
+  }
+  return result;
+}
+
+static double NP_NOINLINE np_ordered_operator_score(const int kernel, const int op,
+    const double train, const double eval, const double lambda,
+    const double *cats, const int ncat, const double cl, const double ch)
+{
+  if(kernel == 3)
+    return np_ordered_rly(op == OP_CONVOLUTION ? 4 : 5,
+                          train,eval,lambda,cats,ncat);
+  const int d = np_ordered_lattice_distance(train,eval);
+  const double p = ipow(lambda,d);
+  const double dp = d == 0 ? 0.0 : d*ipow(lambda,d-1);
+  const double plus = 1.0+lambda, minus = 1.0-lambda;
+  if(op == OP_CONVOLUTION) {
+    if(kernel == 1) {
+      double result = 0.0;
+      for(int i = 0; i < ncat; ++i)
+        result += np_score_oli_racine(train,cats[i],lambda,cl,ch)*
+                    np_oli_racine(eval,cats[i],lambda,cl,ch)+
+                  np_oli_racine(train,cats[i],lambda,cl,ch)*
+                    np_score_oli_racine(eval,cats[i],lambda,cl,ch);
+      return result;
+    }
+    if(kernel == 0) {
+      if(d == 0) return -minus-1.0/(plus*plus);
+      const double a = minus*minus*(d+1.0)+2.0*minus/plus;
+      const double ap = -2.0*minus*(d+1.0)-4.0/(plus*plus);
+      return 0.25*(dp*a+p*ap);
+    }
+    const double plus3 = plus*plus*plus;
+    const double a = minus*(1.0+lambda*lambda)/plus3+
+      d*minus*minus/(plus*plus);
+    const double ap = (-1.0+2.0*lambda-3.0*lambda*lambda)/plus3-
+      3.0*minus*(1.0+lambda*lambda)/(plus3*plus)-
+      4.0*d*minus/plus3;
+    return dp*a+p*ap;
+  }
+  if(kernel == 0) {
+    if(eval == train) return -0.5;
+    return eval < train ? 0.5*dp : -0.5*(d+1.0)*p;
+  }
+  if(kernel == 2)
+    return eval < train ? dp/plus-p/(plus*plus) :
+      -(d+1.0)*p/plus+lambda*p/(plus*plus);
+  if(eval < cl) return 0.0;
+  const double capped = eval > ch ? ch : eval;
+  if(eval < train) {
+    const int n = np_ordered_lattice_distance(eval,cl);
+    return np_score_oli_racine(train,capped,lambda,cl,ch)*
+             np_geom_sum_nonneg_lambda(n,lambda)+
+           np_oli_racine(train,capped,lambda,cl,ch)*np_geom_sum_score(n,lambda);
+  }
+  return np_geom_sum_score(np_ordered_lattice_distance(train,cl),lambda)+
+         np_geom_sum_score(np_ordered_lattice_distance(capped,train),lambda);
+}
+
 static inline double np_ordered_kernel_eval(const int code,
     const double train, const double eval, const double lambda,
     const double *cats, const int ncat, const double cl, const double ch)
@@ -4684,7 +4786,12 @@ static inline double np_ordered_kernel_eval(const int code,
     np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, NULL,
     np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, NULL
   };
-  if(code < 0 || code >= 16) error("unsupported ordered kernel code");
+  if(code < 0 || code >= 24) error("unsupported ordered kernel code");
+  if(code >= 16)
+    return np_ordered_operator_score(code & 3,
+      code < 20 ? OP_CONVOLUTION : OP_INTEGRAL,train,eval,lambda,cats,ncat,cl,ch);
+  if(code == 5)
+    return kernel_ordered_convolution(1,train,eval,lambda,ncat,(double *)cats);
   if((code & 3) == 3)
     return np_ordered_rly(code/4,train,eval,lambda,cats,ncat);
   return kernel[code](train,eval,lambda,cl,ch);
@@ -6820,7 +6927,8 @@ void np_p_ukernelv(const int KERNEL,
 
   double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
                                              np_econvol_uaa, np_econvol_unli_racine,
-                                             np_score_uaa, np_score_unli_racine };
+                                             np_score_uaa, np_score_unli_racine,
+                                             np_score_convol_uaa, np_score_convol_unli };
   const int kernel = KERNEL;
   const int p_kernel = P_KERNEL;
 
@@ -12182,11 +12290,16 @@ NPPermutationWeightOutput * const pkw_output,
       ps_okernel = (int *) malloc(num_reg_ordered*sizeof(int));
 
       for(i = 0; i < num_reg_unordered; i++){
-        ps_ukernel[i] = KERNEL_unordered_reg[i] + OP_UFUN_OFFSETS[OP_DERIVATIVE];
+        ps_ukernel[i] = KERNEL_unordered_reg[i] +
+          (operator[num_reg_continuous+i] == OP_CONVOLUTION ? 6 :
+           OP_UFUN_OFFSETS[OP_DERIVATIVE]);
       }
 
       for(i = 0; i < num_reg_ordered; i++){
-        ps_okernel[i] = KERNEL_ordered_reg[i] + OP_OFUN_OFFSETS[OP_DERIVATIVE];
+        const int op = operator[num_reg_continuous+num_reg_unordered+i];
+        ps_okernel[i] = KERNEL_ordered_reg[i] +
+          (op == OP_CONVOLUTION ? 16 : op == OP_INTEGRAL ? 20 :
+           OP_OFUN_OFFSETS[OP_DERIVATIVE]);
       }
     } else if(do_ocg) {
       ps_ukernel = KERNEL_unordered_reg;
