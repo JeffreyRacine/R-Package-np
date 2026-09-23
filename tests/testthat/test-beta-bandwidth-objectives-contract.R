@@ -1,3 +1,45 @@
+beta_deleted_cdf_predictions <- function(dat, bws, empirical = FALSE) {
+  n <- nrow(dat)
+  fit <- matrix(NA_real_, n, n)
+  for (held in seq_len(n)) {
+    donor <- setdiff(seq_len(n), held)
+    args <- list(bws=bws, tdat=dat[donor, , drop=FALSE])
+    # Explicit external grids include all queries; empirical queries retain
+    # occurrence identity on the deleted training sample.
+    if (!empirical) args$edat <- dat
+    query <- if (empirical) donor else seq_len(n)
+    fit[held, query] <- as.numeric(fitted(do.call(npudist, args)))
+  }
+  fit
+}
+
+test_that("beta deleted-CDF test helper agrees with independent distance ranks", {
+  dat <- data.frame(x=c(.03,.08,.15,.29,.41,.53,.69,.81,.92))
+  n <- nrow(dat); k <- 3L
+  for (type in c("generalized_nn", "adaptive_nn")) {
+    bw <- npudistbw(dat=dat, bws=k, bandwidth.compute=FALSE,
+      bwtype=type, ckertype="beta", ckerbound="fixed", ckerlb=0, ckerub=1)
+    for (empirical in c(FALSE, TRUE)) {
+      expected <- matrix(NA_real_, n, n)
+      for (i in seq_len(n)) {
+        donor <- setdiff(seq_len(n), i)
+        for (j in if (empirical) donor else seq_len(n)) {
+          h <- if (type=="adaptive_nn") vapply(donor, function(d) {
+            sort(abs(dat$x[setdiff(donor,d)] - dat$x[d]))[k]
+          }, numeric(1L)) else {
+            neighbor <- if (empirical) setdiff(donor,j) else donor
+            sort(abs(dat$x[neighbor] - dat$x[j]))[k]
+          }
+          expected[i,j] <- mean(pbeta(dat$x[j], 1+dat$x[donor]/h^2,
+            1+(1-dat$x[donor])/h^2))
+        }
+      }
+      expect_equal(beta_deleted_cdf_predictions(dat,bw,empirical), expected,
+        tolerance=3e-13, info=paste(type, empirical))
+    }
+  }
+})
+
 beta_density_objective <- function(x, bandwidth, method = c("cv.ml", "cv.ls"),
                                    order = 2L, bwtype = "fixed",
                                    bwscaling = FALSE) {
@@ -290,13 +332,7 @@ test_that("beta CDF cross-validation matches all order and topology oracles", {
         ckertype = "beta", ckerorder = order,
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
-      weights <- npksum(
-        bws = bws, txdat = x, exdat = x,
-        operator = "integral", return.kernel.weights = TRUE
-      )$kw
-      fitted_loo <-
-        (matrix(colSums(weights), nrow(x), nrow(x), byrow = TRUE) -
-           weights) / (nrow(x) - 1L)
+      fitted_loo <- beta_deleted_cdf_predictions(x, bws)
       expected <- mean((outer(xval, xval, "<=") - fitted_loo)^2)
 
       expect_equal(
@@ -335,22 +371,12 @@ test_that("mixed beta CDF cross-validation matches ordered-product oracles", {
         ckertype = "beta", ckerorder = order,
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
-      ## Distribution objectives use the normalized ordered Li--Racine
-      ## kernel. npksum() names that explicit low-level variant nliracine.
-      oracle.bws <- bws
-      oracle.bws[["okertype"]] <- "nliracine"
-      weights <- npksum(
-        bws = oracle.bws, txdat = training, exdat = training,
-        operator = rep("integral", ncol(training)),
-        return.kernel.weights = TRUE
-      )$kw
-      fitted.loo <-
-        (matrix(colSums(weights), n, n, byrow = TRUE) - weights) /
-        (n - 1L)
+      fitted.loo <- beta_deleted_cdf_predictions(training, bws)
       expected <- mean((empirical.cdf - fitted.loo)^2)
-      squared <- (empirical.cdf - fitted.loo)^2
-      expected.on.train <-
-        (sum(squared) - sum(diag(squared))) / (n * (n - 1L))
+      empirical.fit <- beta_deleted_cdf_predictions(
+        training, bws, empirical=TRUE)
+      squared <- (empirical.cdf - empirical.fit)^2
+      expected.on.train <- sum(squared[!diag(n)]) / (n * (n - 1L))
 
       options(np.categorical.compress = FALSE)
       ordinary <- beta_distribution_objective(
