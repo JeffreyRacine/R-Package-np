@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Compact generalized nearest-neighbor convolution tree queries now account
+  for both kernels' bandwidths, retaining donors whose supports overlap.
+  Fixed-bandwidth and adaptive-neighbor computational choices are unchanged.
+
 * Categorical kernel-sum scores now differentiate the requested convolution
   or ordered CDF operator, rather than substituting the ordinary-kernel
   derivative. Li--Racine convolutions also use their retained-support owner
