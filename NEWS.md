@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Regression hat applications use the regression's retained numerical coding
+  when borrowing an implicit factor response from a formula, bandwidth object
+  or fitted model. Explicit numerical response payloads are unchanged.
+
 * Quantile prediction preserves native exdat coordinates for formula fits,
   avoiding repeated predictor transformations. Native evaluation retains
   precedence over raw formula newdata.
