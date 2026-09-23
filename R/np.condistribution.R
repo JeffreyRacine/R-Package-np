@@ -199,7 +199,7 @@ npcdist.condbandwidth <-
       return(.npRmpi_with_local_cdist_eval(.npRmpi_eval_without_dispatch(dispatch.call, parent.frame())))
     }
     if (.npRmpi_autodispatch_active()) {
-      out <- .npRmpi_autodispatch_call(dispatch.call, parent.frame())
+      out <- .npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npcdist.condbandwidth")
       out <- .npRmpi_restore_nomad_fit_bws_metadata(out, bws)
       if (inherits(out, "condistribution") &&
           !is.null(out$proper.requested) &&
@@ -785,7 +785,7 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       !bws.formula &&
       !txdat.formula &&
       !dots.formula)
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npcdist.default"))
 
   ## autodispatch normalizes calls via match.call(), which can turn an
   ## originally unnamed formula first argument into named bws=... .

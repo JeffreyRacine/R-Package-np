@@ -98,7 +98,7 @@ npplregbw.NULL =
     if (.npRmpi_autodispatch_active() &&
         !isTRUE(automatic.degree.search) &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
-      return(.npRmpi_autodispatch_call(mc, parent.frame()))
+      return(.npRmpi_autodispatch_call(mc, parent.frame(), owner.name = "npplregbw.NULL"))
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
@@ -147,7 +147,7 @@ npplregbw.plbandwidth =
     }
     if (.npRmpi_autodispatch_active() &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npplregbw.plbandwidth"))
 
     xdat = toFrame(xdat)
     zdat = toFrame(zdat)
@@ -945,7 +945,7 @@ npplregbw.default =
     if (.npRmpi_autodispatch_active() &&
         is.null(degree.search) &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npplregbw.default"))
 
     reg.args <- list(
       regtype = spec$regtype.engine,

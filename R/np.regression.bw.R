@@ -115,7 +115,7 @@ npregbw.NULL <-
         !isTRUE(legacy.remin))
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_as_generic_call("npregbw", mc),
-        parent.frame()))
+        parent.frame(), owner.name = "npregbw.NULL"))
 
     xdat <- toFrame(xdat)
 
@@ -206,7 +206,7 @@ npregbw.rbandwidth <-
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
-        parent.frame()))
+        parent.frame(), owner.name = "npregbw.rbandwidth"))
 
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
@@ -3395,7 +3395,7 @@ npregbw.default <-
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
-        parent.frame()))
+        parent.frame(), owner.name = "npregbw.default"))
 
     npWarnIgnoredUniformKernelOrder(
       call.names = mc.names,

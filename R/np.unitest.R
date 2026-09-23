@@ -148,7 +148,7 @@ npunitest <- function(data.x = NULL,
     npRejectLegacyBootstrapCount(names(list(...)), "npunitest")
   .npRmpi_require_active_slave_pool(where = "npunitest()")
   if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npunitest"))
 
   if(is.null(data.x) || is.null(data.y)) stop(" you must enter data vectors for x and y")
   if(is.data.frame(data.x) || is.data.frame(data.y)) stop(" you must enter data vectors (not data frames)")

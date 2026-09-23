@@ -515,7 +515,7 @@ npplreg.plbandwidth <-
       dispatch.call <- match.call()
       dispatch.call$se <- se
       dispatch.call$.np.defer.empty.rows <- TRUE
-      result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame())
+      result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npplreg.plbandwidth")
       return(.npreg_finish_empty_rows(.npRmpi_restore_nomad_fit_bws_metadata(result, bws),
         defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]), owner = "npplreg"))
     }
@@ -800,7 +800,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
       !isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
     dispatch.call <- match.call()
     dispatch.call$se <- se
-    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npplreg.default"))
   }
 
   sc.names <- names(sc)

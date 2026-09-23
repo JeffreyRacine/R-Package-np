@@ -555,7 +555,7 @@ npreg.rbandwidth <-
     if (.npRmpi_autodispatch_active()) {
       dispatch.call <- match.call()
       dispatch.call$.np.defer.empty.rows <- TRUE
-      result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame())
+      result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npreg.rbandwidth")
       if (is.list(result) && is.list(bws)) {
         has.nomad.optim <- (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) ||
           (!is.null(bws$powell.time) && is.finite(bws$powell.time))
@@ -1224,7 +1224,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
 
   has.fixed.bws.value <- !missing(bws) && !isa(bws, "rbandwidth")
   if (.npRmpi_autodispatch_active() && !npNomadControlRequested(nomad) && !isTRUE(has.fixed.bws.value))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npreg.default"))
 
   sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)

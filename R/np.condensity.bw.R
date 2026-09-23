@@ -556,7 +556,7 @@ npcdensbw.conbandwidth <-
         !keep_local_prepared_nn)
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
-        parent.frame()))
+        parent.frame(), owner.name = "npcdensbw.conbandwidth"))
 
     xdat = xdat[goodrows,,drop = FALSE]
     ydat = ydat[goodrows,,drop = FALSE]
@@ -4207,7 +4207,7 @@ npcdensbw.default <-
           !keep_local_prepared_nn)
         return(.npRmpi_autodispatch_call(
           .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
-          parent.frame()))
+          parent.frame(), owner.name = "npcdensbw.default"))
     }
     reg.bwmethod <- if (is.null(reg.args$bwmethod)) "cv.ls" else reg.args$bwmethod
     if (isTRUE(bandwidth.compute) &&

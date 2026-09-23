@@ -1484,7 +1484,7 @@ npqreg.condbandwidth <-
         .npRmpi_eval_without_dispatch(dispatch.call, parent.frame())
       ))
     if (.npRmpi_autodispatch_active() && !isTRUE(parallel.cond))
-      return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+      return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npqreg.condbandwidth"))
 
     no.ex = missing(exdat)
 
@@ -1828,7 +1828,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
       .npRmpi_eval_without_dispatch(dispatch.call, parent.frame())
     ))
   if (.npRmpi_autodispatch_active() && !isTRUE(parallel.cond))
-    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npqreg.default"))
 
   sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)

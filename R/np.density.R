@@ -126,7 +126,7 @@ npudens.bandwidth <-
       if (anyNA(edat.preflight) && !any(stats::complete.cases(edat.preflight)))
         stop("Evaluation data has no rows without NAs")
     }
-    result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+    result <- .npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npudens.bandwidth")
     return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
   }
 
@@ -336,7 +336,7 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
       (missing(bws) || "bws" %in% names(sc)) &&
       !bws.formula.early &&
       !tdat.formula.early && !inherits(formula.input, "formula"))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npudens.default"))
 
   sc.names <- names(sc)
 

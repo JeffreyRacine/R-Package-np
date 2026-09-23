@@ -100,7 +100,7 @@ npregivderiv.default <- function(y,
   if (.npRmpi_autodispatch_active()) {
     dispatch.call <- match.call()
     dispatch.call[[1L]] <- quote(npregivderiv)
-    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npregivderiv.default"))
   }
 
   ptm.start <- proc.time()

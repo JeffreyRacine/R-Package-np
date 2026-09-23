@@ -362,7 +362,7 @@ npcdistbw.condbandwidth <-
         !keep_local_cvls_nn)
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
-        parent.frame()))
+        parent.frame(), owner.name = "npcdistbw.condbandwidth"))
 
     xdat = xdat[goodrows,,drop = FALSE]
     ydat = ydat[goodrows,,drop = FALSE]
@@ -3417,7 +3417,7 @@ npcdistbw.default <-
           !keep_local_cvls_nn)
         return(.npRmpi_autodispatch_call(
           .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
-          parent.frame()))
+          parent.frame(), owner.name = "npcdistbw.default"))
     }
 
     npWarnIgnoredUniformKernelOrder(

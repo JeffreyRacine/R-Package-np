@@ -1049,7 +1049,17 @@
       .GlobalEnv[[nm]] <- bundle[[nm]]
   }
 
-  res <- .npRmpi_eval_scmd(call.obj, envir = .GlobalEnv)
+  eval.env <- .GlobalEnv
+  call.owner <- payload[["call.owner", exact = TRUE]]
+  if (!is.null(call.owner)) {
+    # Preserve the already selected package definition even when a rank has
+    # a same-name global binding. Keep a symbolic call and its original data
+    # lookup parent; no closure head or temporary global function is needed.
+    eval.env <- new.env(parent = .GlobalEnv)
+    assign(call.owner, get(call.owner, envir = asNamespace("npRmpi"),
+                           mode = "function", inherits = FALSE), envir = eval.env)
+  }
+  res <- .npRmpi_eval_scmd(call.obj, envir = eval.env)
   tmpreplace <- tmpvals
   if (!is.null(prepublish.names) && length(prepublish.names)) {
     prepublish.names <- unique(as.character(prepublish.names))
@@ -2874,6 +2884,15 @@
     lease.bindings = prepared$lease.bindings,
     publication = publication
   )
+  if (isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE))) {
+    head <- prepared$call[[1L]]
+    if (!is.symbol(head) ||
+        !is.function(get0(as.character(head), envir = asNamespace("npRmpi"),
+                          mode = "function", inherits = FALSE)))
+      stop("invalid materialized package call owner", call. = FALSE)
+    payload$call.owner <- as.character(head)
+    attr(payload$call, ".npRmpi.bound.call.owner") <- NULL
+  }
 
   cmd <- substitute({
     exec.step <- get(".npRmpi_spmd_execute_step", envir = asNamespace("npRmpi"), inherits = FALSE)
@@ -2983,7 +3002,27 @@
   mc
 }
 
-.npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
+.npRmpi_autodispatch_bind_call_owner <- function(mc, owner.name, owner.call,
+                                                definition) {
+  if (is.null(owner.name) || !is.call(mc)) return(mc)
+  head <- as.name(owner.name)
+  generic <- sub("\\..*$", "", owner.name)
+  # Bind the invocation (or S3 generic replay) of the executing package function.
+  # Explicit leaf/lease rewrites and user definitions keep their own identity;
+  # never evaluate an alias or a side-effecting function-head expression again.
+  if (!is.call(owner.call) ||
+      !(identical(mc[[1L]], owner.call[[1L]]) || identical(mc[[1L]], head) ||
+        (nzchar(generic) && identical(mc[[1L]], as.name(generic)))) ||
+      !is.function(definition) ||
+      !identical(definition, get0(owner.name, envir = asNamespace("npRmpi"),
+                                  mode = "function", inherits = FALSE))) return(mc)
+  mc[[1L]] <- head
+  attr(mc, ".npRmpi.bound.call.owner") <- TRUE
+  mc
+}
+
+.npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L,
+                                     owner.name = NULL) {
   .npRmpi_warn_pkg_conflict_once()
   .npRmpi_warn_rmpi_conflict_once()
   if (missing(caller_env) || !is.environment(caller_env))
@@ -2992,9 +3031,11 @@
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
   method <- sys.parent()
+  definition <- if (method > 0L) sys.function(method) else NULL
+  owner.call <- sys.call(method)
+  mc <- .npRmpi_autodispatch_bind_call_owner(mc, owner.name, owner.call, definition)
   mc <- .npRmpi_autodispatch_bind_data_promises(mc, owner = parent.frame(),
-    owner.call = sys.call(method),
-    definition = if (method > 0L) sys.function(method) else NULL,
+    owner.call = owner.call, definition = definition,
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
   .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE)
 }

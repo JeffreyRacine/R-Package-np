@@ -351,7 +351,7 @@ npdeneqtest <- function(x = NULL,
     npRejectLegacyBootstrapCount(names(list(...)), "npdeneqtest")
   .npRmpi_require_active_slave_pool(where = "npdeneqtest()")
   if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npdeneqtest"))
 
   ## Some testing of input values
 

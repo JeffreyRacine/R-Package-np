@@ -83,7 +83,7 @@ npudensbw.NULL <-
         stop("Data has no rows without NAs")
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
-        parent.frame()))
+        parent.frame(), owner.name = "npudensbw.NULL"))
     }
 
     t.names <- NULL
@@ -859,7 +859,7 @@ npudensbw.bandwidth <-
         stop("Data has no rows without NAs")
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
-        parent.frame()))
+        parent.frame(), owner.name = "npudensbw.bandwidth"))
     }
 
     dat = toFrame(dat)
@@ -1203,7 +1203,7 @@ npudensbw.default <-
         stop("Data has no rows without NAs")
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
-        parent.frame()))
+        parent.frame(), owner.name = "npudensbw.default"))
     }
 
     t.names <- NULL

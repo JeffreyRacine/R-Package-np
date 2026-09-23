@@ -190,7 +190,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       (missing(bws) || "bws" %in% names(sc)) &&
       !formula.forwarded && !formula.only &&
       (explicit.scbandwidth || identical(degree.select.value, "manual")))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npscoef.default"))
 
   sc.names <- names(sc)
 
@@ -1432,7 +1432,7 @@ npscoef.scbandwidth <-
       isTRUE(fit.progress.allow) &&
       isTRUE(.np_progress_enabled(domain = "bandwidth"))
     if (!use.master.fit.progress && .npRmpi_autodispatch_active()) {
-      result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+      result <- .npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npscoef.scbandwidth")
       return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
     }
 

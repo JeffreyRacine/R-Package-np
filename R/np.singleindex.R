@@ -338,7 +338,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
     dispatch.call <- match.call()
     if (explicit.sibandwidth && isTRUE(.np_progress_enabled(domain = "bandwidth")))
       dispatch.call$.np_lc_fixed_progress_route <- TRUE
-    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npindex.default"))
   }
 
   if (!explicit.sibandwidth && (bws.formula || bws.call) && !no.txdat && !no.tydat) {
@@ -732,7 +732,7 @@ npindex.sibandwidth <-
         dispatch.call$.np_lc_fixed_progress_route <- TRUE
       }
       dispatch.call$.np.defer.empty.rows <- TRUE
-      result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame())
+      result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npindex.sibandwidth")
       return(.npreg_finish_empty_rows(.npRmpi_restore_nomad_fit_bws_metadata(result, bws),
         defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]), owner = "npindex"))
     }

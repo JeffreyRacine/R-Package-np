@@ -144,7 +144,7 @@ npsymtest <- function(data = NULL,
     npRejectLegacyBootstrapCount(names(list(...)), "npsymtest")
   .npRmpi_require_active_slave_pool(where = "npsymtest()")
   if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npsymtest"))
 
   if(is.data.frame(data)) stop(" you must enter a data vector (not data frame)")
   if(is.null(data)) stop(" you must enter a data vector")

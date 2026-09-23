@@ -150,7 +150,7 @@ npsdeptest <- function(data = NULL,
                        random.seed = 42) {
   .npRmpi_require_active_slave_pool(where = "npsdeptest()")
   if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npsdeptest"))
   
   ## Trap fatal errors
 

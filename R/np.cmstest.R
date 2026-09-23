@@ -355,7 +355,7 @@ npcmstest <- function(formula,
     if (!missing(formula) && missing(xdat) && missing(ydat) && !missing(subset))
       dispatch.call[c("data", "subset")] <- .np_formula_subset_inputs(
         data, substitute(subset), parent.frame())
-    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npcmstest"))
   }
   
   .np_cms_validate_model(model, quantile = FALSE)

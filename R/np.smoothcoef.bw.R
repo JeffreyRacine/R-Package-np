@@ -121,7 +121,7 @@ npscoefbw.NULL <-
       search.engine = search.engine.value
     )
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
-      return(.npRmpi_autodispatch_call(mc, parent.frame()))
+      return(.npRmpi_autodispatch_call(mc, parent.frame(), owner.name = "npscoefbw.NULL"))
 
     miss.z <- missing(zdat)
 
@@ -885,7 +885,7 @@ npscoefbw.NULL <-
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     mc <- match.call()
     mc[[1L]] <- .npRmpi_lease_context_symbol()
-    return(.npRmpi_autodispatch_call(mc, parent.frame()))
+    return(.npRmpi_autodispatch_call(mc, parent.frame(), owner.name = ".npscoefbw_nomad_context_prepare"))
   }
   ctx
 }
@@ -2383,7 +2383,7 @@ npscoefbw.scbandwidth <-
       .npRmpi_local_entry_begin(.np.local.entry)
     }
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npscoefbw.scbandwidth"))
 
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
@@ -3864,7 +3864,7 @@ npscoefbw.default <-
     )
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
     if (.npRmpi_autodispatch_active() && is.null(degree.search))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npscoefbw.default"))
 
     ## first grab dummy args for scbandwidth() and perform 'bootstrap'
     ## bandwidth call

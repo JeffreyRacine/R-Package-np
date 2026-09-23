@@ -97,7 +97,7 @@ npksum.numeric <-
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npksum.numeric"))
 
     txdat <- toFrame(txdat)
     if (!missing(exdat)) {
@@ -234,7 +234,7 @@ npksum.default <-
       }))
     }
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npksum.default"))
 
     miss.ty <- missing(tydat)
     miss.ex <- missing(exdat)

@@ -209,7 +209,7 @@ npcdens.conbandwidth <- function(bws,
     return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(dispatch.call, parent.frame())))
   }
   if (.npRmpi_autodispatch_active()) {
-    out <- .npRmpi_autodispatch_call(dispatch.call, parent.frame())
+    out <- .npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npcdens.conbandwidth")
     out <- .npRmpi_restore_nomad_fit_bws_metadata(out, bws)
     if (inherits(out, "condensity") &&
         !is.null(out$proper.requested) &&
@@ -791,7 +791,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       !bws.formula &&
       !txdat.formula &&
       !dots.formula)
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npcdens.default"))
 
   ## autodispatch normalizes calls via match.call(), which can turn an
   ## originally unnamed formula first argument into named bws=... .

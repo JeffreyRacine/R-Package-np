@@ -1381,7 +1381,7 @@ nplsqregbw.default <-
         !inherits(tau.dispatch, "try-error") &&
         length(tau.dispatch) == 1L &&
         !isTRUE(coordinate.cell))
-      return(.npRmpi_autodispatch_call(mc.dispatch, environment()))
+      return(.npRmpi_autodispatch_call(mc.dispatch, environment(), owner.name = "nplsqregbw.default"))
 
     elapsed.start <- proc.time()[3]
     progress.wrapped <- isTRUE(.np_progress_runtime$nplsqreg_bw_wrapped)
@@ -1978,7 +1978,7 @@ nplsqreg.default <-
         !inherits(tau.dispatch, "try-error") &&
         length(tau.dispatch) == 1L) {
       mc.dispatch$.np.defer.empty.rows <- TRUE
-      result <- .npRmpi_autodispatch_call(mc.dispatch, environment())
+      result <- .npRmpi_autodispatch_call(mc.dispatch, environment(), owner.name = "nplsqreg.default")
       return(.npreg_finish_empty_rows(result,
         defer = isTRUE(dots.dispatch[[".np.defer.empty.rows", exact = TRUE]]), owner = "nplsqreg"))
     }

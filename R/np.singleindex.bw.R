@@ -109,7 +109,7 @@ npindexbw.NULL <-
            isTRUE(collective.degree.search) ||
            isTRUE(ichimura.lp.nomad.degree.search) ||
            .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
-      return(.npRmpi_autodispatch_call(mc, parent.frame()))
+      return(.npRmpi_autodispatch_call(mc, parent.frame(), owner.name = "npindexbw.NULL"))
 
     xdat <- toFrame(xdat)
 
@@ -2820,7 +2820,7 @@ npindexbw.default <-
            isTRUE(collective.degree.search) ||
            isTRUE(ichimura.lp.nomad.degree.search) ||
            .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
-      return(.npRmpi_autodispatch_call(mc, parent.frame()))
+      return(.npRmpi_autodispatch_call(mc, parent.frame(), owner.name = "npindexbw.default"))
 
     xdat <- toFrame(xdat)
 
@@ -3179,7 +3179,7 @@ npindexbw.sibandwidth <-
       .npRmpi_local_entry_begin(.np.local.entry)
     }
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npindexbw.sibandwidth"))
 
     if (bws$method == "kleinspady" && !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
