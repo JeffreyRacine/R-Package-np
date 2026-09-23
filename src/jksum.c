@@ -27889,11 +27889,29 @@ static int np_regression_projected_next(
 static int np_regression_hc0_lp_prepare_row(
   double **basis, const int nterms, const double *projection,
   const double *kernel_row, NPRegressionResidualPreparation *preparation,
-  const int evaluation)
+  const int evaluation, const int unregularized)
 {
   NPResidualOffDiagonal state = {0};
   long double normalized = 0.0L;
   const int self = preparation->evaluation_to_donor[evaluation];
+  /* A full-rank square supported design interpolates its own observations.
+   * Count occurrences, not distinct basis rows or a rank bound capped at p.
+   * Stop at the first extra donor, normally after p+1 stored weights. Keep
+   * counting out of the full projection loop. Positive ridge and a missing
+   * self weight cannot certify identity. */
+  int support_count = unregularized && isfinite(kernel_row[self]) &&
+    kernel_row[self] != 0.0 ? 1 : nterms + 1;
+  /* Begin beside the known supported occurrence, then wrap once. This avoids
+   * repeatedly scanning leading zeros in compact, ordered training rows. */
+  for(int donor = self + 1; donor < preparation->num_obs_train &&
+        support_count <= nterms; ++donor) {
+    if(kernel_row[donor] != 0.0)
+      ++support_count;
+  }
+  for(int donor = 0; donor < self && support_count <= nterms; ++donor) {
+    if(kernel_row[donor] != 0.0)
+      ++support_count;
+  }
 #if NP_REGRESSION_PROJECTED_PAIR
   NPRegressionProjectedCursor cursor = {0};
 #endif
@@ -27912,6 +27930,11 @@ static int np_regression_hc0_lp_prepare_row(
     np_residual_offdiag_add(&state, influence,
       (long double)preparation->response[self] -
         (long double)preparation->response[donor]);
+  }
+  if(!state.invalid && support_count == nterms) {
+    preparation->normalized_residual[self] = 0.0;
+    preparation->information[self] = NP_RESIDUAL_UNIDENTIFIED;
+    return 1;
   }
   const NPResidualInformation information =
     np_residual_offdiag_finish(&state, 1.0L, &normalized);
@@ -29397,7 +29420,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                 NP_LP_SOLVE_POLICY_OK ||
 	               !np_regression_hc0_lp_prepare_row(
 	                 owner->basis, owner->nterms, owner->solve_workspace.rhs_work,
-	                 owner->mpi_kernel_row, preparation, jj)) {
+	                 owner->mpi_kernel_row, preparation, jj,
+	                 solve_diagnostics_owner.ridge_total == 0.0)) {
 	              owner_solve_failed = 1;
 	              break;
 	            }
@@ -29855,7 +29879,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
            pristine_anchor, &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK ||
          !np_regression_hc0_lp_prepare_row(
            owner->basis, owner->nterms, owner->solve_workspace.rhs_work,
-           hc0_kernel_row, preparation, j)) {
+           hc0_kernel_row, preparation, j,
+           solve_diagnostics.ridge_total == 0.0)) {
         execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
         return R_NilValue;
       }

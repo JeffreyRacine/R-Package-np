@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Local polynomial uncertainty recognizes exact interpolation when an accepted
+  unregularized local design has exactly as many supported observations as
+  coefficients. Unidentified uncertainty is reported as unavailable instead of
+  amplifying solve roundoff; point estimates and ridge admission are unchanged.
+
 * Conditional quantile plots preserve fitted numerical extraction controls,
   including resampled fits and bootstrap centers. Explicit plot controls
   take precedence; default and legacy-object behavior is unchanged.
