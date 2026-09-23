@@ -44,12 +44,109 @@ test_that("MPI higher-order Gaussian product fusion is narrow and rank-local", {
   )
 })
 
-test_that("MPI higher-order numerical formulas require an active pool", {
-  skip_if(
-    identical(environmentName(environment(npksum)), "npRmpi"),
-    paste(
-      "independent order-4/6/8 fixed, generalized-NN, and adaptive-NN",
-      "oracles are covered by active one- and multi-slave sentinels"
-    )
+test_that("higher-order Gaussian fusion matches independent formulas", {
+  skip_if_not(.mpi_pool_active(), "independent numerical oracle needs an active pool")
+  old_options <- options(
+    np.messages = FALSE,
+    np.tree = FALSE,
+    np.largeh = FALSE,
+    np.macMseries.accelerate = TRUE
   )
+  on.exit(options(old_options), add = TRUE)
+
+  gaussian_higher <- function(z, order) {
+    z2 <- z * z
+    polynomial <- switch(
+      as.character(order),
+      `4` = 1.5 - 0.5 * z2,
+      `6` = 1.875 + z2 * (z2 * 0.125 - 1.25),
+      `8` = 2.1875 + z2 *
+        (-2.1875 + z2 * (0.4375 - z2 * 0.02083333333))
+    )
+    (1 / sqrt(2 * pi)) * polynomial * exp(-0.5 * z2)
+  }
+  adaptive_radius <- function(train, k) {
+    vapply(seq_along(train), function(i) {
+      distance <- abs(train - train[[i]])
+      positive <- sort(distance[distance > 0])
+      duplicate_count <- sum(distance == 0) - 1L
+      if (duplicate_count >= k) positive[[1L]] else
+        positive[[max(1L, k - duplicate_count)]]
+    }, numeric(1L))
+  }
+  generalized_radius <- function(train, eval, k) {
+    vapply(eval, function(value) sort(abs(train - value))[[k]], numeric(1L))
+  }
+
+  set.seed(2026073119L)
+  ntrain <- 260L
+  neval <- 256L
+  xtrain <- data.frame(
+    x1 = runif(ntrain, -0.9, 0.9),
+    x2 = runif(ntrain, -0.8, 0.85)
+  )
+  xeval <- data.frame(
+    x1 = runif(neval, -0.87, 0.88),
+    x2 = runif(neval, -0.78, 0.82)
+  )
+  fixed_h <- c(0.31, 0.37)
+  k <- c(79L, 83L)
+
+  for (order in c(4L, 6L, 8L)) {
+    for (topology in c("fixed", "generalized_nn", "adaptive_nn")) {
+      bws <- if (topology == "fixed") fixed_h else k
+      bandwidth <- switch(
+        topology,
+        fixed = lapply(fixed_h, rep, times = neval),
+        generalized_nn = Map(generalized_radius, xtrain, xeval, k),
+        adaptive_nn = Map(adaptive_radius, xtrain, k)
+      )
+      oracle <- matrix(1, nrow = ntrain, ncol = neval)
+      denominator <- matrix(1, nrow = ntrain, ncol = neval)
+      for (d in 1:2) {
+        hmat <- if (topology == "adaptive_nn") {
+          matrix(bandwidth[[d]], nrow = ntrain, ncol = neval)
+        } else {
+          matrix(bandwidth[[d]], nrow = ntrain, ncol = neval, byrow = TRUE)
+        }
+        z <- outer(
+          xtrain[[d]], xeval[[d]], function(train, eval) eval - train
+        ) / hmat
+        oracle <- oracle * gaussian_higher(z, order)
+        denominator <- denominator * hmat
+      }
+
+      raw <- npksum(
+        bws = bws,
+        txdat = xtrain,
+        exdat = xeval,
+        bwtype = topology,
+        ckertype = "gaussian",
+        ckerorder = order,
+        return.kernel.weights = TRUE
+      )
+      divided <- npksum(
+        bws = bws,
+        txdat = xtrain,
+        exdat = xeval,
+        bwtype = topology,
+        ckertype = "gaussian",
+        ckerorder = order,
+        bandwidth.divide = TRUE,
+        return.kernel.weights = TRUE
+      )
+
+      expect_equal(as.matrix(raw$kw), oracle, tolerance = 2e-12)
+      expect_equal(
+        as.numeric(raw$ksum), colSums(oracle), tolerance = 2e-11
+      )
+      expect_equal(
+        as.numeric(divided$ksum),
+        colSums(oracle / denominator),
+        tolerance = 2e-10
+      )
+      # Every topology exports raw weights independently of sum normalization.
+      expect_equal(as.matrix(divided$kw), oracle, tolerance = 2e-10)
+    }
+  }
 })

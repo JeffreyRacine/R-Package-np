@@ -77,10 +77,7 @@ test_that("ordinary-Gaussian fusion admits all scalar-bandwidth row owners", {
 })
 
 test_that("adaptive Gaussian fusion matches observation-specific bandwidths", {
-  skip_if(
-    identical(environmentName(environment(npksum)), "npRmpi"),
-    "npRmpi numerical oracle is covered by active-pool parity tests"
-  )
+  skip_if_not(.mpi_pool_active(), "independent numerical oracle needs an active pool")
 
   adaptive_radius <- function(train, k) {
     vapply(seq_along(train), function(i) {
@@ -142,7 +139,8 @@ test_that("adaptive Gaussian fusion matches observation-specific bandwidths", {
 
   expect_equal(as.matrix(raw$kw), oracle, tolerance = 2e-13)
   expect_equal(as.numeric(raw$ksum), colSums(oracle), tolerance = 2e-13)
-  expect_equal(as.matrix(divided$kw), oracle_divided, tolerance = 2e-12)
+  # bandwidth.divide normalizes sums, not the exported raw product weights.
+  expect_equal(as.matrix(divided$kw), oracle, tolerance = 2e-12)
   expect_equal(
     as.numeric(divided$ksum), colSums(oracle_divided), tolerance = 2e-12
   )
