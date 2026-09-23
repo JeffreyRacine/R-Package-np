@@ -374,6 +374,14 @@ prediction/evaluation route, or plot route as appropriate.
   \code{npconmode} returns a \code{conmode} object with the following
   components:
 
+  \item{omit, rows.omit, nobs.omit}{ omitted-row information for the active
+    result: training rows for training evaluation, otherwise evaluation rows.
+    Existing NA padding of row outputs is unchanged. }
+  \item{train.rows.omit, train.nobs.omit}{ training omissions, retained
+    separately even when the result evaluates external data. }
+  \item{eval.omit, eval.rows.omit, eval.nobs.omit}{ omission information for
+    external evaluation data, when supplied. }
+
   \item{bws}{ the \code{conbandwidth} object used to compute the conditional
     mode }
   \item{conmode}{ a vector of type \code{factor} (or \code{ordered
