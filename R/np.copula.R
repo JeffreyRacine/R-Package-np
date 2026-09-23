@@ -274,6 +274,12 @@ npcopula <- function(bws, ...) {
   do.call(if (identical(target, "density")) npudensbw else npudistbw, args)
 }
 
+.npcopula_grid_matrix <- function(values, grid) {
+  if (length(values) != length(grid$row.order))
+    stop("npcopula surface values are incompatible with the rendering grid")
+  matrix(values[grid$row.order], nrow = length(grid$u1), ncol = length(grid$u2))
+}
+
 .npcopula_grid_eval <- function(x) {
   dat <- as.data.frame(x)
   xnames <- x$xnames
@@ -287,21 +293,26 @@ npcopula <- function(bws, ...) {
     ugrid <- as.data.frame(x$u.grid)
     if (ncol(ugrid) != 2L || nrow(ugrid) != nrow(dat))
       stop("npcopula requested grid metadata is incompatible with the fitted surface")
-    u1 <- sort(unique(ugrid[[1L]]))
-    u2 <- sort(unique(ugrid[[2L]]))
   } else {
-    u1 <- sort(unique(dat$u1))
-    u2 <- sort(unique(dat$u2))
+    ugrid <- dat[, c("u1", "u2"), drop = FALSE]
   }
+  u1 <- sort(unique(ugrid[[1L]]))
+  u2 <- sort(unique(ugrid[[2L]]))
   if (length(u1) != grid.dim[1L] || length(u2) != grid.dim[2L])
     stop("npcopula grid output is not rectangular")
+  cell <- match(ugrid[[1L]], u1) + length(u1) * (match(ugrid[[2L]], u2) - 1L)
+  if (anyDuplicated(cell))
+    stop("npcopula grid output is not rectangular")
   xgrid <- .npcopula_eval_xgrid(x)
-  list(
+  grid <- list(
     u1 = u1,
     u2 = u2,
     xgrid = xgrid,
-    z = matrix(dat$copula, nrow = length(u1), ncol = length(u2))
+    # Only display matrices change order; estimation and returned rows do not.
+    row.order = order(cell)
   )
+  grid$z <- .npcopula_grid_matrix(dat$copula, grid)
+  grid
 }
 
 .npcopula_empirical_eval <- function(x) {
@@ -1065,15 +1076,13 @@ plot.npcopula <- function(x,
 
   lerr <- herr <- lerr.all <- herr.all <- NULL
   if (!is.null(payload)) {
-    lerr <- matrix(payload$center - payload$err[, 1L],
-                   nrow = length(u1), ncol = length(u2))
-    herr <- matrix(payload$center + payload$err[, 2L],
-                   nrow = length(u1), ncol = length(u2))
+    lerr <- .npcopula_grid_matrix(payload$center - payload$err[, 1L], grid)
+    herr <- .npcopula_grid_matrix(payload$center + payload$err[, 2L], grid)
     if (identical(band, "all") && !is.null(payload$all.err)) {
       lerr.all <- lapply(payload$all.err, function(te)
-        matrix(payload$center - te[, 1L], nrow = length(u1), ncol = length(u2)))
+        .npcopula_grid_matrix(payload$center - te[, 1L], grid))
       herr.all <- lapply(payload$all.err, function(te)
-        matrix(payload$center + te[, 2L], nrow = length(u1), ncol = length(u2)))
+        .npcopula_grid_matrix(payload$center + te[, 2L], grid))
     }
   }
   if (is.null(zlim)) {
