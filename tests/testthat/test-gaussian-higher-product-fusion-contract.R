@@ -143,11 +143,8 @@ test_that("higher-order Gaussian fusion matches independent formulas", {
         colSums(oracle / denominator),
         tolerance = 2e-10
       )
-      if (topology == "adaptive_nn") {
-        expect_equal(
-          as.matrix(divided$kw), oracle / denominator, tolerance = 2e-10
-        )
-      }
+      # Every topology exports raw weights independently of sum normalization.
+      expect_equal(as.matrix(divided$kw), oracle, tolerance = 2e-10)
     }
   }
 })

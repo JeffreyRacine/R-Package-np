@@ -137,7 +137,8 @@ test_that("adaptive Gaussian fusion matches observation-specific bandwidths", {
 
   expect_equal(as.matrix(raw$kw), oracle, tolerance = 2e-13)
   expect_equal(as.numeric(raw$ksum), colSums(oracle), tolerance = 2e-13)
-  expect_equal(as.matrix(divided$kw), oracle_divided, tolerance = 2e-12)
+  # bandwidth.divide normalizes sums, not the exported raw product weights.
+  expect_equal(as.matrix(divided$kw), oracle, tolerance = 2e-12)
   expect_equal(
     as.numeric(divided$ksum), colSums(oracle_divided), tolerance = 2e-12
   )

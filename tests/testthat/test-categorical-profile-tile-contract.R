@@ -63,7 +63,7 @@ profile_ordered_derivative <- function(train, eval, lambda, support, kernel) {
     return(ifelse(
       distance == 0L,
       -1,
-      0.5 * lambda^(distance - 1L) * (distance - 2 * lambda)
+      0.5 * lambda^(distance - 1L) * (distance - (distance + 1) * lambda)
     ))
   }
   if (kernel == 1L) {
@@ -72,7 +72,7 @@ profile_ordered_derivative <- function(train, eval, lambda, support, kernel) {
   }
   if (kernel == 2L) {
     return(lambda^(distance - 1L) *
-             (distance * (1 - lambda^2) - 2 * lambda))
+             (distance * (1 - lambda^2) - 2 * lambda) / (1 + lambda)^2)
   }
 
   vapply(seq_along(train), function(i) {
