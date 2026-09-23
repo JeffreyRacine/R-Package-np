@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Partially linear hat application preserves response column names after
+  MPI row fan-out, matching local application. Single-response vector output
+  and numerical values are unchanged.
+
 * Density bandwidth documentation now explains how to identify and interpret
   solutions at the fixed-bandwidth search floor, including beta CVLS
   sensitivity to endpoint observations.

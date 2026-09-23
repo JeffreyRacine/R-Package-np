@@ -1460,6 +1460,9 @@ npplreghat <-
     if (!is.null(fanout)) {
       if (ncol(fanout) == 1L)
         return(as.vector(fanout))
+      response.names <- .npreghat_apply_colnames(yy)
+      if (!identical(colnames(fanout), response.names))
+        colnames(fanout) <- response.names
       return(fanout)
     }
 
