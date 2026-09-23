@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Conditional-mode class support now remains owned by the fitted training
+  data. Evaluation response levels contribute to diagnostic tables without
+  adding probability columns or changing fitted class probabilities.
+
 * Mixed convolution/tree kernel-weight exports now clear scratch entries
   outside the certified product-kernel support. Sums were already restricted
   to that support; raw matrices now agree with their kernel products.
