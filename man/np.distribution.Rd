@@ -101,6 +101,14 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   }
 }
 \details{
+  With generalized nearest-neighbor bandwidths, query identity matters when
+  selecting a radius: a training observation excludes its own occurrence,
+  whereas explicit evaluation data remain external queries even if their
+  values equal training observations. Consequently,
+  \code{predict(fit, newdata = training.data)} can differ from
+  \code{fitted(fit)}. This does not omit the training contribution from the
+  fitted estimator. See \code{\link{np.kernels}} for the radius convention.
+
   For native (non-formula) objects, named \code{newdata} columns are matched
   to the retained variable names and reordered as needed. Extra columns are
   ignored; missing, duplicate or ambiguous names are errors. An unnamed

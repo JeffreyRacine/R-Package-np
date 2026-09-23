@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Kernel-sum documentation distinguishes zero-diagonal leave-one-out sums
+  from deleted-sample nearest-neighbor geometry, and raw weight exports from
+  bandwidth-normalized sums. Estimator documentation now explains the existing
+  generalized-neighbor distinction between training and explicit evaluation rows.
+
 * Higher and mixed local-polynomial hat derivatives with automatic ridging now
   share the canonical LP solve-admission policy. This avoids spurious ridge
   after translating predictors. Explicit positive ridge remains unchanged;
