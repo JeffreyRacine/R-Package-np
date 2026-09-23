@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+* Mixed-data copula marginals now retain the bounds of their original
+  variable, independently of where categorical columns occur in the data.
+
 * Smooth-coefficient evaluation preserves positional native predictor columns
   when preparing large-bandwidth eligibility geometry; harmless vector/frame
   naming differences no longer stop evaluation or bypass qualified shortcuts.

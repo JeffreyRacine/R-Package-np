@@ -222,16 +222,10 @@ npcopula <- function(bws, ...) {
   out
 }
 
-.npcopula_continuous_slot <- function(bws, j) {
-  if (is.null(bws$icon) || j > length(bws$icon) || !isTRUE(bws$icon[j]))
-    return(NA_integer_)
-  as.integer(sum(bws$icon[seq_len(j)]))
-}
-
 .npcopula_marginal_bw_args <- function(bws, data, j, target = c("distribution", "density")) {
   target <- match.arg(target)
   dat <- .npcopula_marginal_data(bws, data, j)
-  continuous.slot <- .npcopula_continuous_slot(bws, j)
+  continuous <- isTRUE(bws$icon[j])
   out <- list(
     dat = dat,
     bws = .np_physical_bandwidth(bws)[j],
@@ -243,12 +237,13 @@ npcopula <- function(bws, ...) {
   )
   if (identical(target, "density"))
     out$ukertype <- bws$ukertype
-  if (!is.na(continuous.slot) && !is.null(bws$ckerbound))
+  if (continuous && !is.null(bws$ckerbound))
     out$ckerbound <- bws$ckerbound
-  if (!is.null(bws$ckerlb) && !is.na(continuous.slot))
-    out$ckerlb <- bws$ckerlb[continuous.slot]
-  if (!is.null(bws$ckerub) && !is.na(continuous.slot))
-    out$ckerub <- bws$ckerub[continuous.slot]
+  # Bounds, like bandwidths, retain original-column indexing.
+  if (continuous && !is.null(bws$ckerlb))
+    out$ckerlb <- bws$ckerlb[j]
+  if (continuous && !is.null(bws$ckerub))
+    out$ckerub <- bws$ckerub[j]
   out
 }
 
