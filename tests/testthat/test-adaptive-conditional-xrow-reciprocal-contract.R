@@ -13,30 +13,37 @@ locate_conditional_xrow_source <- function() {
   file.path(roots[[1L]], "src", "jksum.c")
 }
 
+adaptive_reciprocal_radius <- function(values, k) {
+  # These distinct, interior-count fixtures need no tie or extended-NN policy.
+  stopifnot(!anyDuplicated(values), k == as.integer(k),
+            k >= 1L, k < length(values))
+  vapply(seq_along(values), function(i) {
+    sort(abs(values[-i] - values[i]))[k]
+  }, numeric(1L))
+}
+
+adaptive_reciprocal_gaussian8 <- function(u) {
+  dnorm(u) * (105 - 105*u^2 + 21*u^4 - u^6)/48
+}
+
 adaptive_signed_wls_rows <- function(xdat, bw) {
   n <- nrow(xdat)
-  basis <- np:::W.lp(
-    xdat = xdat,
-    degree = bw$degree.engine,
-    basis = bw$basis.engine,
-    bernstein.basis = bw$bernstein.basis.engine
-  )
+  stopifnot(ncol(xdat) == 2L, all(bw$degree.engine == 2L),
+            identical(bw$basis.engine, "glp"), !bw$bernstein.basis.engine,
+            bw$cxkerorder == 8L, bw$cykerorder == 2L)
+  basis <- with(xdat, cbind(1, x1, x1^2, x2, x1*x2, x2^2))
   delete_one <- matrix(0, nrow = n, ncol = n)
 
   for (held_out in seq_len(n)) {
     donor <- setdiff(seq_len(n), held_out)
-    weight <- as.numeric(npksum(
-      bws = bw$xbw,
-      txdat = xdat[donor, , drop = FALSE],
-      exdat = xdat[held_out, , drop = FALSE],
-      bwtype = bw$type,
-      ckertype = bw$cxkertype,
-      ckerorder = bw$cxkerorder,
-      operator = "normal",
-      return.kernel.weights = TRUE,
-      bandwidth.divide = TRUE,
-      .np.internal.bandwidth.divide.weights = TRUE
-    )$kw)
+    # Numeric npksum dispatch returns raw exported weights: its constructor
+    # dots are not the default method's private divided-row API. Build the
+    # independently normalized Gaussian8 product, including every donor h.
+    weight <- Reduce(`*`, lapply(seq_len(ncol(xdat)), function(j) {
+      h <- adaptive_reciprocal_radius(xdat[donor, j], bw$xbw[j])
+      adaptive_reciprocal_gaussian8(
+        (xdat[donor, j] - xdat[held_out, j])/h)/h
+    }))
     donor_basis <- basis[donor, , drop = FALSE]
     coefficient <- solve(
       crossprod(donor_basis, donor_basis * weight), basis[held_out, ]
@@ -52,18 +59,8 @@ adaptive_cvml_signed_wls_oracle <- function(xdat, ydat, bw) {
   delete_one <- adaptive_signed_wls_rows(xdat, bw)
   fit <- vapply(seq_len(n), function(held_out) {
     donor <- setdiff(seq_len(n), held_out)
-    ykernel <- as.numeric(npksum(
-      bws = bw$ybw,
-      txdat = ydat[donor, , drop = FALSE],
-      exdat = ydat[held_out, , drop = FALSE],
-      bwtype = bw$type,
-      ckertype = bw$cykertype,
-      ckerorder = bw$cykerorder,
-      operator = "normal",
-      return.kernel.weights = TRUE,
-      bandwidth.divide = TRUE,
-      .np.internal.bandwidth.divide.weights = TRUE
-    )$kw)
+    h <- adaptive_reciprocal_radius(ydat[donor, 1L], bw$ybw[1L])
+    ykernel <- dnorm((ydat[donor, 1L] - ydat[held_out, 1L])/h)/h
     sum(delete_one[donor, held_out] * ykernel)
   }, numeric(1L))
 
@@ -83,16 +80,10 @@ adaptive_cdist_signed_wls_oracle <- function(xdat, ydat, bw) {
 
   for (held_out in seq_len(n)) {
     donor <- setdiff(seq_len(n), held_out)
-    yintegral <- npksum(
-      bws = bw$ybw,
-      txdat = ydat[donor, , drop = FALSE],
-      exdat = ydat,
-      bwtype = bw$type,
-      ckertype = bw$cykertype,
-      ckerorder = bw$cykerorder,
-      operator = "integral",
-      return.kernel.weights = TRUE
-    )$kw
+    h <- adaptive_reciprocal_radius(ydat[donor, 1L], bw$ybw[1L])
+    yintegral <- vapply(ydat[[1L]], function(at) {
+      pnorm((at - ydat[donor, 1L])/h)
+    }, numeric(length(donor)))
     fit <- colSums(delete_one[donor, held_out] * yintegral)
     indicator <- as.numeric(ydat[[1L]][[held_out]] <= ydat[[1L]])
     keep <- seq_len(n) != held_out
@@ -225,6 +216,19 @@ test_that("admitted adaptive Gaussian CVML retains the signed-WLS objective orac
 
   expect_true(is.finite(objective))
   expect_equal(as.numeric(objective), oracle, tolerance = 5e-8)
+
+  held <- 7L
+  donor <- setdiff(seq_len(n), held)
+  fold <- npcdensbw(xdat=xdat[donor, ], ydat=ydat[donor, , drop=FALSE],
+    bws=c(bw$ybw, bw$xbw), bandwidth.compute=FALSE, bwtype="adaptive_nn",
+    regtype="lp", degree=c(2L,2L), basis="glp", bernstein.basis=FALSE,
+    cxkertype="gaussian", cxkerorder=8L, cykertype="gaussian", cykerorder=2L)
+  fitted.fold <- fitted(npcdens(bws=fold, txdat=xdat[donor, ],
+    tydat=ydat[donor, , drop=FALSE], exdat=xdat[held, ], eydat=ydat[held, , drop=FALSE]))
+  h <- adaptive_reciprocal_radius(ydat[donor, 1L], bw$ybw[1L])
+  expected <- sum(adaptive_signed_wls_rows(xdat, bw)[donor, held] *
+    dnorm((ydat[donor, 1L] - ydat[held, 1L])/h)/h)
+  expect_equal(as.numeric(fitted.fold), expected, tolerance=5e-8)
 })
 
 test_that("adaptive conditional-distribution CVLS shares the signed-WLS rows", {
@@ -271,4 +275,19 @@ test_that("adaptive conditional-distribution CVLS shares the signed-WLS rows", {
 
   expect_true(is.finite(objective))
   expect_equal(as.numeric(objective), oracle, tolerance = 5e-8)
+
+  held <- 7L
+  donor <- setdiff(seq_len(n), held)
+  fold <- npcdistbw(xdat=xdat[donor, ], ydat=ydat[donor, , drop=FALSE],
+    bws=c(bw$ybw, bw$xbw), bandwidth.compute=FALSE, bwtype="adaptive_nn",
+    regtype="lp", degree=c(2L,2L), basis="glp", bernstein.basis=FALSE,
+    cxkertype="gaussian", cxkerorder=8L, cykertype="gaussian", cykerorder=2L)
+  fitted.fold <- fitted(npcdist(bws=fold, txdat=xdat[donor, ],
+    tydat=ydat[donor, , drop=FALSE], exdat=xdat[rep(held,n), ], eydat=ydat))
+  h <- adaptive_reciprocal_radius(ydat[donor, 1L], bw$ybw[1L])
+  influence <- adaptive_signed_wls_rows(xdat, bw)[donor, held]
+  expected <- vapply(ydat[[1L]], function(at) {
+    sum(influence * pnorm((at - ydat[donor, 1L])/h))
+  }, numeric(1L))
+  expect_equal(as.numeric(fitted.fold), expected, tolerance=5e-8)
 })
