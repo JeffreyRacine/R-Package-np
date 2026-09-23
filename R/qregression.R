@@ -1,6 +1,7 @@
 qregression <- 
     function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, quantgerr = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
-             timing = NA, total.time = NA, optim.time = NA, fit.time = NA, se = TRUE){
+             timing = NA, total.time = NA, optim.time = NA, fit.time = NA, se = TRUE,
+             fit.controls = NULL){
 
         if (missing(bws) || missing(xeval) || missing(tau) || missing(quantile) || missing(ntrain))
             stop("improper invocation of qregression constructor")
@@ -38,6 +39,7 @@ qregression <-
             trainiseval = trainiseval,
             gradients = gradients,
             se = se,
+            fit.controls = fit.controls,
             timing = timing, total.time = total.time,
             optim.time = optim.time, fit.time = fit.time)
 
@@ -94,6 +96,15 @@ quantile.qregression <- function(x, ...){ x$quantile }
     newdata, list(exdat = object$bws$xnames), "predict.npqreg")$exdat
 }
 
+.npqreg_replay_controls <- function(object, dots) {
+  controls <- object[["fit.controls", exact = TRUE]]
+  for (name in c("tol", "small", "itmax")) {
+    if (!(name %in% names(dots)) && !is.null(controls[[name, exact = TRUE]]))
+      dots[[name]] <- controls[[name, exact = TRUE]]
+  }
+  dots
+}
+
 predict.qregression <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
@@ -102,6 +113,7 @@ predict.qregression <- function(object, se.fit = FALSE, ...) {
     stop("conflicting 'se' and 'se.fit' requests; use se.fit to request prediction standard errors",
          call. = FALSE)
   dots[["se"]] <- se.fit
+  dots <- .npqreg_replay_controls(object, dots)
   has.formula.route <- !is.null(object$bws$formula)
 
   if (!is.null(dots$exdat) && !is.null(dots$newdata))

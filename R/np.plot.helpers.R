@@ -14931,7 +14931,8 @@ plotFactor <- function(f, y, ...){
         timing = bws$timing,
         total.time = total.time,
         optim.time = optim.time,
-        fit.time = fit.elapsed
+        fit.time = fit.elapsed,
+        fit.controls = list(tol = tol, small = small, itmax = itmax)
       )
       .npreg_publish_plot_rows(fit, empty.flags, report = .np.empty.report,
         omitted = eval.omit, row.labels = empty.row.labels, owner = "plot(npqreg)")

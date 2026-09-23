@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Conditional quantile fits retain their resolved numerical extraction controls.
+  Prediction reuses them unless explicitly overridden; old saved objects without
+  these controls retain the historical defaults.
+
 * Single-index fitting, prediction and inference carry retained fixed kernel
   endpoints into their regression and kernel-sum consumers, including bootstrap
   resamples. The fitted domain no longer disappears during these calls.
