@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Categorical kernel-sum scores now differentiate the requested convolution
+  or ordered CDF operator, rather than substituting the ordinary-kernel
+  derivative. Li--Racine convolutions also use their retained-support owner
+  when scores or categorical profile caching are active.
+
 * Ordered factors with decimal-offset integer-spaced labels now preserve their
   intended distances in kernels, bandwidth scores, CDFs and overlap sums.
   Validation tolerates bounded floating-point representation error while
