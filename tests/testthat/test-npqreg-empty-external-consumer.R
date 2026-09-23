@@ -40,8 +40,10 @@ test_that("selected-CDF inversion preserves healthy work and typed empty-row ide
     }
     controls[[as.character(enabled)]] <- lapply(c(.25, .5, .75), function(tau)
       invoke(healthy, cache = cache, tau = tau))
-    expect_identical(calls, if (enabled) 45L else 51L)
-    expect_identical(rows, if (enabled) 132L else 255L)
+    # Span 2 and width allowance .00021 require 14 midpoint refinements.
+    # Three taus: 48 calls before cache sharing; six calls are shared.
+    expect_identical(calls, if (enabled) 42L else 48L)
+    expect_identical(rows, if (enabled) 123L else 240L)
     expect_identical(cache$hits, if (enabled) 35L else 0L)
   }
   expect_identical(controls[["TRUE"]], controls[["FALSE"]])

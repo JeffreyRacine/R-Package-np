@@ -178,14 +178,20 @@ These arguments control the one-dimensional numerical quantile extraction step.
 
 
   \item{small}{
-    minimum interval width used by the one-dimensional quantile
-    refinement. Defaults to \code{1.490116e-05}
+    absolute interval-width allowance, in response units, added to the
+    relative stopping tolerance in the one-dimensional quantile refinement.
+    Defaults to \code{1.490116e-05}
     (approximately \code{1000*sqrt(.Machine$double.eps)}).
   }
 
 
   \item{tol}{
-    tolerance on the one-dimensional quantile location refinement.
+    relative tolerance on the one-dimensional quantile location refinement.
+    Refinement stops when the bracket width is at most \code{tol} times
+    the initial observed response range plus \code{small}, or when no
+    distinct floating-point midpoint remains. The relative scale does not
+    depend on the response origin. When rescaling the response, rescale
+    \code{small} in the same units to retain the same accuracy contract.
     Defaults to \code{1.490116e-04}
     (approximately \code{10000*sqrt(.Machine$double.eps)}).
   }
