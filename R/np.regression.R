@@ -667,8 +667,8 @@ npreg.rbandwidth <-
       where = "npreg",
       ncon.field = "ncon"
     )
-    if (isTRUE(gradients) && identical(bws$regtype, "lc")) {
-      npValidateLcGradientOrder(
+    if (isTRUE(gradients) && bws$regtype %in% c("lc", "ll")) {
+      npValidateFirstDerivativeOrder(
         regtype = bws$regtype,
         gradient.order = gradient.order,
         ncon = bws$ncon,

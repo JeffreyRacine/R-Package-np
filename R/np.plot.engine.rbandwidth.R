@@ -63,8 +63,8 @@
     )
     plot.gradient.order.label <- rep.int(1L, bws$ndim)
     plot.gradient.available <- rep.int(TRUE, bws$ndim)
-    if (gradients && identical(reg.spec$regtype, "lc")) {
-      npValidateLcGradientOrder(
+    if (gradients && reg.spec$regtype %in% c("lc", "ll")) {
+      npValidateFirstDerivativeOrder(
         regtype = reg.spec$regtype,
         gradient.order = gradient.order,
         ncon = bws$ncon,

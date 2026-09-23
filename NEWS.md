@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Explicit gradient orders are now checked consistently by regression fits,
+  regression plots and stored gradient/gradient-SE extractors. Unsupported
+  higher orders no longer silently return first derivatives; existing LP
+  partial availability and categorical first differences are preserved.
+
 * Conditional-mode class support now remains owned by the fitted training
   data. Evaluation response levels contribute to diagnostic tables without
   adding probability columns or changing fitted class probabilities.

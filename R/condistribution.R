@@ -151,6 +151,9 @@ gradients.condistribution <- function(x, se = FALSE, gradient.order = NULL, ...)
     }
     return(gout)
   }
+  if (!identical(reg.spec$reg.engine, "lp") && !is.null(gradient.order))
+    npConditionalGradientOrder(x$bws, reg.spec$reg.engine, gradient.order,
+                               where = "gradients.condistribution")
   if (!identical(reg.spec$reg.engine, "lp") || is.null(gradient.order))
     return(gout)
 
