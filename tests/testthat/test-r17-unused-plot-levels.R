@@ -52,8 +52,13 @@ test_that("unused factor levels remain evaluated and labelled in bootstrap plots
   n <- 48L
   x <- runif(n)
   y <- x + rep(c(0, 1), n / 2L) + rnorm(n, sd = .2)
-  for (ordered in c(FALSE, TRUE)) for (lev in list(c("0", "1", "2"), c("1", "0", "2"), c("1", "2", "0"))) {
-    f <- factor(rep(c("1", "2"), n / 2L), levels = lev, ordered = ordered)
+  for (ordered in c(FALSE, TRUE)) for (position in seq_len(3L)) {
+    # Numeric ordered labels describe lattice coordinates, not a permutation
+    # of ranks. Move the unused observation level, not that ordered lattice.
+    lev <- if (ordered) c("0", "1", "2") else
+      list(c("0", "1", "2"), c("1", "0", "2"), c("1", "2", "0"))[[position]]
+    observed <- if (ordered) lev[-position] else c("1", "2")
+    f <- factor(rep(observed, n / 2L), levels = lev, ordered = ordered)
     d <- data.frame(y = y, x = x, f = f)
     for (fam in c("reg", "dens", if (ordered) "dist")) {
       b <- switch(fam,
