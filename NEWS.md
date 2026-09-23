@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Higher and mixed local-polynomial hat derivatives with automatic ridging now
+  share the canonical LP solve-admission policy. This avoids spurious ridge
+  after translating predictors. Explicit positive ridge remains unchanged;
+  default operators report all-zero external rows as unavailable.
+
 * Local polynomial uncertainty recognizes exact interpolation when an accepted
   unregularized local design has exactly as many supported observations as
   coefficients. Unidentified uncertainty is reported as unavailable instead of

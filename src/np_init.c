@@ -31,6 +31,7 @@ extern SEXP C_np_lc_hat_normalize(SEXP, SEXP);
 extern SEXP C_np_lp_batch_project(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lp_batch_project_ranked(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lp_adjoint_prepared(SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_lp_adjoint_prepared_ridge(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lp_support_rank(SEXP, SEXP, SEXP);
 extern SEXP C_np_lp_design_identity(SEXP);
 extern SEXP C_np_lp_design_support_rank(SEXP, SEXP, SEXP, SEXP);
@@ -97,6 +98,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_lp_batch_project",             (DL_FUNC) &C_np_lp_batch_project,              5},
     {"C_np_lp_batch_project_ranked", (DL_FUNC) &C_np_lp_batch_project_ranked, 6},
     {"C_np_lp_adjoint_prepared", (DL_FUNC) &C_np_lp_adjoint_prepared, 4},
+    {"C_np_lp_adjoint_prepared_ridge", (DL_FUNC) &C_np_lp_adjoint_prepared_ridge, 4},
     {"C_np_lp_support_rank", (DL_FUNC) &C_np_lp_support_rank, 3},
     {"C_np_lp_design_identity", (DL_FUNC) &C_np_lp_design_identity, 1},
     {"C_np_lp_design_support_rank", (DL_FUNC) &C_np_lp_design_support_rank, 4},

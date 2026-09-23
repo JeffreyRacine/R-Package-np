@@ -222,9 +222,20 @@ npreghat <-
 }
 
 .npreghat_solve_eval <- function(W, w.eval, k, ridge.base,
-                                  intercept.correction = FALSE) {
+                                  intercept.correction = FALSE,
+                                  canonical.lp = FALSE,
+                                  allow.empty.rows = FALSE) {
   XtWX <- crossprod(W, W * k)
   p <- nrow(XtWX)
+  if (canonical.lp && ridge.base == 0 && p > 1L) {
+    if (any(!is.finite(XtWX)) || any(!is.finite(w.eval)) || any(!is.finite(k)))
+      stop("LP solve failed in R hat-matrix path: non-finite system")
+    support <- min(p, sum(k != 0.0))
+    if (allow.empty.rows && support == 0L)
+      return(list(v = rep.int(NA_real_, p), ridge = NA_real_, empty = TRUE))
+    return(.Call("C_np_lp_adjoint_prepared_ridge", XtWX, as.double(w.eval),
+                 as.integer(nrow(W)), as.integer(support), PACKAGE = "np"))
+  }
   diag.loc <- cbind(seq_len(p), seq_len(p))
   XtWX.diag <- XtWX[diag.loc]
   ridge.grid <- npRidgeSequenceFromBase(
@@ -2284,6 +2295,7 @@ npreghat.rbandwidth <-
       W.eval <- matrix(W.eval, nrow = neval, byrow = FALSE)
 
     ridge.used <- rep.int(0.0, neval)
+    empty.rows <- NULL
 
     if (matrix.output) {
       H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
@@ -2298,13 +2310,19 @@ npreghat.rbandwidth <-
         W = W,
         w.eval = W.eval[i, ],
         k = kw[, i],
-        ridge.base = ridge
+        ridge.base = ridge,
+        canonical.lp = TRUE,
+        allow.empty.rows = allow.empty.rows
       )
 
       if (is.null(solve.out))
         stop(sprintf("failed to solve local hat system at evaluation row %d", i))
 
       ridge.used[i] <- solve.out$ridge
+      if (isTRUE(solve.out[["empty", exact = TRUE]])) {
+        if (is.null(empty.rows)) empty.rows <- integer(neval)
+        empty.rows[i] <- 1L
+      }
       h.row <- kw[, i] * drop(W %*% solve.out$v)
 
       if (matrix.output) {
@@ -2316,15 +2334,16 @@ npreghat.rbandwidth <-
 
     if (identical(output, "apply")) {
       if (ncol(out) == 1L)
-        return(as.vector(out))
+        return(finish.empty.rows(as.vector(out), empty.rows))
       response.names <- .npreghat_apply_colnames(y)
       if (!identical(colnames(out), response.names))
         colnames(out) <- response.names
-      return(out)
+      return(finish.empty.rows(out, empty.rows))
     }
 
     if (constraint.output)
-      return(.np_hat_constraint_from_matrix(H, y, "npreghat"))
+      return(finish.empty.rows(
+        .np_hat_constraint_from_matrix(H, y, "npreghat"), empty.rows))
 
     class(H) <- c("npreghat", "matrix")
     attr(H, "bws") <- bws
@@ -2349,7 +2368,7 @@ npreghat.rbandwidth <-
       attr(H, "Hy") <- Hy
     }
 
-    H
+    finish.empty.rows(H, empty.rows)
   }
 
 npreghat.default <-
