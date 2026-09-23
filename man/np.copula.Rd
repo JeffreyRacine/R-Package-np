@@ -16,6 +16,8 @@
   copula density. It can be called with an existing unconditional
   distribution/density bandwidth object, or with a one-sided formula in
   which case the appropriate bandwidth object is selected internally.
+  Continuous marginal kernel bounds retain their original variable identity
+  when continuous and categorical columns are mixed or reordered.
 }
 
 \usage{
