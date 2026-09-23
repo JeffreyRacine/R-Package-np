@@ -64,7 +64,9 @@ These arguments identify the fitted bandwidth object, formula/data interface, tr
     training-observation or external-query identity, including when changing
     the derivative order. An explicit grid remains external even when its
     coordinates equal the training data; this distinction can affect
-    nearest-neighbor radii.}
+    nearest-neighbor radii. Formula newdata is evaluated with the trained
+    predictor transformations. Explicit native \code{exdat} takes precedence
+    over \code{newdata} and is already in the transformed predictor coordinates.}
 
 
   \item{txdat}{Training predictors.}

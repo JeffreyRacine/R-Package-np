@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Prediction from a formula regression hat operator now evaluates newdata
+  with the trained predictor transformations. Explicit native exdat takes
+  precedence and is not transformed again.
+
 * Recomputing a retained regression hat operator now preserves whether its
   targets are training observations or external queries. Explicit new grids
   remain external even when their coordinates equal the training data.
