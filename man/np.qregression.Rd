@@ -440,8 +440,9 @@ prediction/evaluation route, or plot route as appropriate.
   \item{se}{ whether asymptotic uncertainty was requested }
   \item{tau}{ the quantile probability or probabilities computed }
   \item{fit.controls}{ resolved \code{tol}, \code{small}, and \code{itmax}
-    controls used for numerical quantile extraction. Prediction reuses these
-    values unless the corresponding argument is explicitly supplied. Older
+    controls used for numerical quantile extraction. Prediction and quantile
+    plots (including bootstrap fits and centers) reuse these values unless the
+    corresponding argument is explicitly supplied. Older
     objects without this component use the historical defaults. }
 
 

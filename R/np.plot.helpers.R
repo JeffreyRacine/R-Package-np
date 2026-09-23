@@ -9344,7 +9344,10 @@ plotFactor <- function(f, y, ...){
                                                     tau,
                                                     counts = NULL,
                                                     counts.drawer = NULL,
-                                                    progress.label = NULL) {
+                                                    progress.label = NULL,
+                                                    tol = 1.490116e-04,
+                                                    small = 1.490116e-05,
+                                                    itmax = 10000) {
   xdat <- toFrame(xdat)
   ydat <- as.double(ydat)
   exdat <- toFrame(exdat)
@@ -9358,6 +9361,7 @@ plotFactor <- function(f, y, ...){
 
   fit.fun <- function(x.train, y.train) {
     as.vector(.np_plot_quantile_eval(
+      tol = tol, small = small, itmax = itmax,
       bws = bws,
       txdat = x.train,
       tydat = y.train,
@@ -9425,7 +9429,10 @@ plotFactor <- function(f, y, ...){
                                                        gradient.index,
                                                        counts = NULL,
                                                        counts.drawer = NULL,
-                                                       progress.label = NULL) {
+                                                       progress.label = NULL,
+                                                       tol = 1.490116e-04,
+                                                       small = 1.490116e-05,
+                                                       itmax = 10000) {
   xdat <- toFrame(xdat)
   ydat <- as.double(ydat)
   exdat <- toFrame(exdat)
@@ -9439,6 +9446,7 @@ plotFactor <- function(f, y, ...){
 
   fit.fun <- function(x.train, y.train) {
     g <- .np_plot_quantile_eval(
+      tol = tol, small = small, itmax = itmax,
       bws = bws,
       txdat = x.train,
       tydat = y.train,
@@ -13060,7 +13068,10 @@ compute.bootstrap.errors.conbandwidth =
            proper.method = NULL,
            proper.control = list(),
            ...,
-           bws){
+           bws,
+           tol = 1.490116e-04,
+           small = 1.490116e-05,
+           itmax = 10000) {
     prep.label <- .np_plot_bootstrap_stage_label(
       stage = "Preparing plot bootstrap",
       method_label = plot.errors.boot.method,
@@ -13208,6 +13219,7 @@ compute.bootstrap.errors.conbandwidth =
       }
       boot.out <- tryCatch(
         .np_inid_boot_from_quantile_level_local(
+          tol = tol, small = small, itmax = itmax,
           xdat = xdat,
           ydat = ydat[[1L]],
           exdat = exdat,
@@ -13273,6 +13285,7 @@ compute.bootstrap.errors.conbandwidth =
       }
       boot.out <- tryCatch(
         .np_inid_boot_from_quantile_gradient_local(
+          tol = tol, small = small, itmax = itmax,
           xdat = xdat,
           ydat = ydat[[1L]],
           exdat = exdat,

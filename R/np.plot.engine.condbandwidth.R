@@ -57,7 +57,11 @@
            proper.method = c("isotonic"),
            proper.control = list(),
            ...,
-           random.seed, .np.empty.report = NULL){
+           random.seed, .np.empty.report = NULL,
+           tol = 1.490116e-04, small = 1.490116e-05, itmax = 10000){
+
+    if (!isTRUE(quantreg) && (!missing(tol) || !missing(small) || !missing(itmax)))
+      stop("'tol', 'small', and 'itmax' apply only to quantile plots", call. = FALSE)
 
     sub.supplied <- !missing(sub)
 
@@ -310,6 +314,7 @@
 
       if (quantreg) {
         tobj <- .np_plot_quantile_eval(
+          tol = tol, small = small, itmax = itmax,
           allow.external = TRUE,
           need.errors = plot.behavior != "plot" || plot.errors.method == "asymptotic",
           txdat = xdat,
@@ -353,7 +358,7 @@
       herr.all <- NULL
       
       if (plot.errors.method == "bootstrap"){
-        terr.obj <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+        terr.obj <- compute.bootstrap.errors(tol = tol, small = small, itmax = itmax,xdat = xdat, ydat = ydat,
           exdat = tex, eydat = tey,
           cdf = cdf,
           quantreg = quantreg,
@@ -436,6 +441,7 @@
         ret.args <- list(bws = bws, xeval = tex, ntrain = dim(xdat)[1])
         if (quantreg) {
           ret.args$tau <- tau
+          ret.args$fit.controls <- list(tol = tol, small = small, itmax = as.integer(itmax))
           ret.args$quantile <- tcomp
           ret.args$quanterr <- terr[,1:2]
         } else {
@@ -831,6 +837,7 @@
 
         if (quantreg) {
           tobj <- .np_plot_quantile_eval(
+            tol = tol, small = small, itmax = itmax,
             allow.external = TRUE,
             need.errors = plot.behavior != "plot" || plot.errors.method == "asymptotic",
             txdat = xdat,
@@ -954,7 +961,7 @@
               }
             }
             else if (plot.errors.method == "bootstrap"){
-              temp.boot.raw <- compute.bootstrap.errors(
+              temp.boot.raw <- compute.bootstrap.errors(tol = tol, small = small, itmax = itmax,
                         xdat = xdat,
                         ydat = ydat,
                         exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
@@ -1246,6 +1253,7 @@
 
           if (quantreg) {
             tobj <- .np_plot_quantile_eval(
+              tol = tol, small = small, itmax = itmax,
               allow.external = TRUE,
               need.errors = plot.behavior != "plot" || plot.errors.method == "asymptotic",
               txdat = xdat,
@@ -1329,7 +1337,7 @@
                 temp.all.err <- asym.obj$all.err
               }
               else if (plot.errors.method == "bootstrap"){
-                temp.boot <- compute.bootstrap.errors(
+                temp.boot <- compute.bootstrap.errors(tol = tol, small = small, itmax = itmax,
                           xdat = xdat,
                           ydat = ydat,
                           exdat = exdat[seq_len(xi.neval),, drop = FALSE],

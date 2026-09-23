@@ -759,6 +759,8 @@ np_render_control <- function(style = c("band", "bar"),
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.qregression")
   if (is.null(dots$quantreg))
     dots$quantreg <- TRUE
+  if (isTRUE(dots$quantreg))
+    dots <- .npqreg_replay_controls(object, dots)
   if (is.null(dots$tau) && !is.null(object$tau))
     dots$tau <- object$tau
   if (is.null(dots$plot.data.overlay) && !isTRUE(dots$gradients))
