@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Non-beta first local-polynomial hat derivatives now retain undefined
+  external rows as NA with the existing row warning, consistently across
+  matrix, application and prediction. Internal finite-operator consumers
+  remain strict; native beta partial-row behavior is unchanged.
+
 * Automatic nearest-neighbor distribution-bandwidth recovery now respects
   the deleted-sample count domain. It can recover a valid ordinary candidate
   from a failed boundary start without replacing explicit or extended starts.

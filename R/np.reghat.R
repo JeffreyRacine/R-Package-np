@@ -2482,16 +2482,20 @@ npreghat.rbandwidth <-
         tydat = as.vector(y[, 1L]),
         exdat = if (no.ex) NULL else exdat,
         gradients = any(s > 0L),
-        gradient.order = 1L
+        gradient.order = 1L,
+        allow.empty.rows = allow.empty.rows && !beta.kernel &&
+          identical(reg.spec$regtype.engine, "lp")
       )
       direct.out <- .npRmpi_with_local_regression(do.call(.np_regression_direct, direct.args))
 
       if (!any(s > 0L))
-        return(as.vector(direct.out$mean))
+        return(finish.empty.rows(as.vector(direct.out$mean),
+          attr(direct.out, ".np.empty.rows", exact = TRUE)))
 
       target.cont <- which(s == 1L)
       target.col <- which(bws$icon)[target.cont]
-      return(as.vector(direct.out$grad[, target.col]))
+      return(finish.empty.rows(as.vector(direct.out$grad[, target.col]),
+        attr(direct.out, ".np.empty.rows", exact = TRUE)))
     }
 
     if (exact.core.route) {
@@ -2535,14 +2539,17 @@ npreghat.rbandwidth <-
           s = s,
           basis = reg.spec$basis.engine,
           degree = reg.spec$degree.engine,
-          bernstein.basis = reg.spec$bernstein.basis.engine
+          bernstein.basis = reg.spec$bernstein.basis.engine,
+          allow.empty.rows = allow.empty.rows
         ))
       } else {
         .npreghat_exact_matrix_from_core(
           bws = bws,
           txdat = txdat,
           exdat = if (no.ex) NULL else exdat,
-          s = s
+          s = s,
+          allow.empty.rows = allow.empty.rows &&
+            identical(reg.spec$regtype.engine, "lp")
         )
       }
 
@@ -2569,6 +2576,8 @@ npreghat.rbandwidth <-
       } else {
         rep.int(0.0, nrow(H))
       }
+      if (!is.null(empty.rows) && identical(reg.spec$regtype.engine, "lp"))
+        ridge.used[empty.rows == 1L] <- NA_real_
 
       class(H) <- c("npreghat", "matrix")
       attr(H, "bws") <- bws
