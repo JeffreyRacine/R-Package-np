@@ -1910,6 +1910,10 @@ npreghat.rbandwidth <-
       ncon = ncon,
       where = "npreghat"
     )
+    # All operator owners, including direct-fit and unit-vector shortcuts,
+    # must see the same resolved public and engine specification.
+    if (!identical(base.spec, reg.spec))
+      bws[names(reg.spec)] <- reg.spec
     constant.basis <- npIsCanonicalLp0Spec(reg.spec, ncon = ncon)
     beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
 

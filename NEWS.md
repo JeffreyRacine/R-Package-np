@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Regression hat applications now pass resolved degree, basis and Bernstein
+  overrides consistently to every numerical owner, including single-response
+  shortcuts and retained-operator prediction.
+
 * Prediction from a formula regression hat operator now evaluates newdata
   with the trained predictor transformations. Explicit native exdat takes
   precedence and is not transformed again.
