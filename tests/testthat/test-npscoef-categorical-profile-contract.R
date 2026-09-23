@@ -241,9 +241,11 @@ test_that("npscoefhat categorical profile ridge uses the canonical weight scale"
           ifelse(same, 1, lambda) / (1 + (nc - 1) * lambda) else
           ifelse(same, 1 - lambda, lambda / (nc - 1))
       }
+      moment <- crossprod(W, W * weights)
+      rhs <- crossprod(W, y * weights)
+      rhs[1L] <- rhs[1L] + 0.25 * rhs[1L] / moment[1L, 1L]
       drop(E[i, , drop = FALSE] %*%
-             solve(crossprod(W, W * weights) + diag(0.25, ncol(W)),
-                   crossprod(W, y * weights)))
+             solve(moment + diag(0.25, ncol(W)), rhs))
     }, numeric(1L))
     expect_equal(as.vector(H %*% y), oracle, tolerance = 1e-11, info = ukertype)
     expect_equal(as.vector(applied.profile), oracle, tolerance = 1e-11,
