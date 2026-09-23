@@ -36,10 +36,11 @@ test_that("fixed-objective width-one rows use an implicit scalar basis", {
   expect_true(grepl("if(!ctx->use_tree)", scalar, fixed = TRUE))
   expect_true(grepl("fixed_rhs += weight*ctx->response[orig_ii]", scalar,
                     fixed = TRUE))
-  expect_true(grepl("ctx->rhs[orig_ii] += weight*eval_response", scalar,
+  expect_true(grepl("np_lp_reverse_pair_weight(weight,", scalar, fixed = TRUE))
+  expect_true(grepl("ctx->rhs[orig_ii] += reverse_weight*eval_response", scalar,
                     fixed = TRUE))
   expect_true(grepl("fixed_moment += weight", scalar, fixed = TRUE))
-  expect_true(grepl("ctx->moments[orig_ii] += weight", scalar,
+  expect_true(grepl("ctx->moments[orig_ii] += reverse_weight", scalar,
                     fixed = TRUE))
   expect_true(grepl("np_lp_dense_support_add(", scalar, fixed = TRUE))
   expect_false(grepl("ctx->basis", scalar, fixed = TRUE))
@@ -77,9 +78,9 @@ test_that("sparse-tree width-one pairs use the same implicit scalar algebra", {
   expect_gt(wider_start, scalar_start)
   scalar <- substr(pair, scalar_start, wider_start - 1L)
   expect_true(grepl("tj[0] += w*yi", scalar, fixed = TRUE))
-  expect_true(grepl("ti[0] += w*eval_ybasis[0]", scalar, fixed = TRUE))
+  expect_true(grepl("ti[0] += reverse_weight*eval_ybasis[0]", scalar, fixed = TRUE))
   expect_true(grepl("sj[0] += w", scalar, fixed = TRUE))
-  expect_true(grepl("si[0] += w", scalar, fixed = TRUE))
+  expect_true(grepl("si[0] += reverse_weight", scalar, fixed = TRUE))
   expect_false(grepl("(^|[^[:alnum:]_])basis\\[", scalar, perl = TRUE))
   expect_false(grepl("F77_", scalar, fixed = TRUE))
 })
