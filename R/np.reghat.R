@@ -3,6 +3,10 @@ npreghat <-
     args <- list(...)
 
     if (!missing(bws)){
+      # A fitted model owns a registered method; its call is not a bandwidth
+      # constructor call. Keep ordinary S3 precedence for inherited classes.
+      if (inherits(bws, "npregression"))
+        UseMethod("npreghat", bws)
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$txdat))
           UseMethod("npreghat", bws$formula)
