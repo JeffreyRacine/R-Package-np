@@ -161,6 +161,8 @@ These arguments control where the smooth-coefficient fit is evaluated and which 
     to \code{tzdat}; otherwise it follows \code{exdat}. Supplying only
     \code{ezdat} evaluates at the original training \code{txdat}. The two
     evaluation roles must have the same row count before omitting missing rows.
+    Native \code{exdat} and \code{ezdat} columns correspond positionally to
+    their training roles; different column labels do not change this mapping.
   }
 
 

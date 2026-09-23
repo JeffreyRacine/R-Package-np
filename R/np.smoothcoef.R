@@ -904,7 +904,14 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     }
 
     do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex && identical(reg.engine, "lc"))
-    gate.zdat <- if (miss.ex) tzdat else rbind(tzdat, ezdat)
+    gate.zdat <- if (miss.ex) tzdat else {
+      # Native columns are positional. Align only the eligibility copy;
+      # rbind.data.frame otherwise imposes an unrelated name-matching rule.
+      gate.eval <- ezdat
+      if (!identical(colnames(gate.eval), colnames(tzdat)))
+        colnames(gate.eval) <- colnames(tzdat)
+      rbind(tzdat, gate.eval)
+    }
     fast.largeh.lc <- identical(reg.engine, "lc") &&
       !leave.one.out &&
       identical(bws$type, "fixed") &&
