@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* MPI dispatch retains the selected package function when invoked through a
+  local alias, computed function head or forwarding wrapper, including when
+  a worker has a same-name global function. Argument expressions retain their
+  original single-evaluation ownership.
+
 * Partially linear hat application preserves response column names after
   MPI row fan-out, matching local application. Single-response vector output
   and numerical values are unchanged.
