@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Mixed convolution/tree kernel-weight exports now clear scratch entries
+  outside the certified product-kernel support. Sums were already restricted
+  to that support; raw matrices now agree with their kernel products.
+
 * Compact generalized nearest-neighbor convolution tree queries now account
   for both kernels' bandwidths, retaining donors whose supports overlap.
   Fixed-bandwidth and adaptive-neighbor computational choices are unchanged.

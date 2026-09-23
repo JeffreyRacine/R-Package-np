@@ -1482,6 +1482,32 @@ static double *NP_NOINLINE np_tree_convolution_maxima(const int dimensions,
   return maximum;
 }
 
+/* Convolution kernels fill a dense scratch vector; subsequent tree-filtered
+ * coordinates only update admitted ranges. Sums already use that support,
+ * but primary row exports must not expose stale partial products in its
+ * complement. Keep this export-only pass out of kernel accumulation. */
+static int NP_NOINLINE np_kernel_row_zero_outside_support(
+    double * const row, const int rows, const XL * const support)
+{
+  if(support == NULL) return 1;
+  if(rows < 0 || support->n < 0 ||
+     (support->n > 0 &&
+      (support->istart == NULL || support->nlev == NULL))) return 0;
+  int cursor = 0;
+  for(int block = 0; block < support->n; ++block) {
+    const int begin = support->istart[block];
+    const int count = support->nlev[block];
+    if(begin < cursor || begin > rows || count < 0 || count > rows-begin)
+      return 0;
+    if(begin > cursor)
+      memset(row+cursor,0,(size_t)(begin-cursor)*sizeof(double));
+    cursor = begin+count;
+  }
+  if(cursor < rows)
+    memset(row+cursor,0,(size_t)(rows-cursor)*sizeof(double));
+  return 1;
+}
+
 double np_uaa(const int same_cat,const double lambda, const int c){
   if(c < 2)
     return same_cat ? 1.0 : 0.0;
@@ -14716,6 +14742,11 @@ NPPermutationWeightOutput * const pkw_output,
     }
 
     if(kw_work != NULL){
+      if(np_ks_tree_use && any_convolution &&
+         !np_kernel_row_zero_outside_support(tprod,num_xt,pxl)) {
+        status = KWSNP_ERR_BADINVOC;
+        goto cleanup;
+      }
       if(NP_UNLIKELY(row_tile_sink != NULL)){
         NP_KernelRowTileSink * const sink = row_tile_sink;
         double * const tile_row =
