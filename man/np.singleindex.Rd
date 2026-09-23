@@ -202,6 +202,10 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   }
 }
 \details{
+  Fixed kernel endpoints retained in the bandwidth object are also used by
+  fitting, prediction, inference and bootstrap resamples. They are not
+  recomputed from the evaluation grid or from a resampled training set.
+
   With a formula-derived bandwidth object, supplying only \code{tydat}
   replaces the evaluated response in retained-training-sample order: one row
   per observation retained after the original subset and missing-value selection.

@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Single-index fitting, prediction and inference carry retained fixed kernel
+  endpoints into their regression and kernel-sum consumers, including bootstrap
+  resamples. The fitted domain no longer disappears during these calls.
+
 * The Gaussian2 boundary-density helper preserves its selected second-order
   kernel at very large bandwidths instead of switching to a uniform density.
   This removes an artificial discontinuity in fitted values and CV objectives.

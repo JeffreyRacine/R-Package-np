@@ -212,6 +212,10 @@ npindex.call <-
   )
   if (!is.null(bws$ckerbound))
     args$ckerbound <- bws$ckerbound
+  if (identical(bws$ckerbound, "fixed")) {
+    args$ckerlb <- bws$ckerlb
+    args$ckerub <- bws$ckerub
+  }
   args
 }
 
@@ -864,7 +868,8 @@ npindex.sibandwidth <-
       regtype = regtype,
       warn.glp.gradient = FALSE
     )
-    npreg.idx.args <- c(npreg.idx.args, .np_index_kernel_args(bws))
+    kernel.args <- .np_index_kernel_args(bws)
+    npreg.idx.args <- c(npreg.idx.args, kernel.args)
     if (identical(regtype, "lp")) {
       npreg.idx.args$basis <- spec$basis.engine
       npreg.idx.args$degree <- spec$degree.engine
@@ -957,7 +962,9 @@ npindex.sibandwidth <-
             bwtype = bws$type,
             ckertype = bws$ckertype,
             ckerorder = bws$ckerorder,
-            ckerbound = bws$ckerbound
+            ckerbound = bws$ckerbound,
+            ckerlb = kernel.args$ckerlb,
+            ckerub = kernel.args$ckerub
           ))$ksum
           row_matrix(.npRmpi_with_local_regression(.np_index_normalized_mean(
             tww, index.df, eval.df[rows, , drop = FALSE], bws,
@@ -1086,7 +1093,9 @@ npindex.sibandwidth <-
             bwtype = bws$type,
             ckertype = bws$ckertype,
             ckerorder = bws$ckerorder,
-            ckerbound = bws$ckerbound
+            ckerbound = bws$ckerbound,
+            ckerlb = kernel.args$ckerlb,
+            ckerub = kernel.args$ckerub
           )$ksum
           as.double(.np_index_normalized_mean(
             tww.fast, index.df, index.eval.df[1L, , drop = FALSE], bws))
@@ -1103,7 +1112,9 @@ npindex.sibandwidth <-
               bwtype = bws$type,
               ckertype = bws$ckertype,
               ckerorder = bws$ckerorder,
-              ckerbound = bws$ckerbound
+              ckerbound = bws$ckerbound,
+              ckerlb = kernel.args$ckerlb,
+              ckerub = kernel.args$ckerub
             )$ksum
             as.double(.np_index_normalized_mean(
               tww.fast, index.df, index.df[1L, , drop = FALSE], bws))
@@ -1286,7 +1297,9 @@ npindex.sibandwidth <-
               bwtype = bws$type,
               ckertype = bws$ckertype,
               ckerorder = bws$ckerorder,
-              ckerbound = bws$ckerbound
+              ckerbound = bws$ckerbound,
+              ckerlb = kernel.args$ckerlb,
+              ckerub = kernel.args$ckerub
             ))
             cbind(t(moments$numerator), moments$denominator)
           }
@@ -1367,6 +1380,8 @@ npindex.sibandwidth <-
           ckertype = bws$ckertype,
           ckerorder = bws$ckerorder,
           ckerbound = bws$ckerbound,
+          ckerlb = kernel.args$ckerlb,
+          ckerub = kernel.args$ckerub,
           regtype = regtype,
           gradients = TRUE,
           warn.glp.gradient = FALSE,
@@ -1395,7 +1410,9 @@ npindex.sibandwidth <-
                         bwtype = bws$type,
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder,
-                        ckerbound = bws$ckerbound)$ksum
+                        ckerbound = bws$ckerbound,
+                        ckerlb = kernel.args$ckerlb,
+                        ckerub = kernel.args$ckerub)$ksum
 
           record_empty_rows(.np_index_normalized_mean(
             tww, rindex, index.eval, bws, allow.empty.rows = TRUE),
@@ -1412,6 +1429,8 @@ npindex.sibandwidth <-
             ckerbound = bws$ckerbound,
             regtype = regtype,
             gradients = FALSE,
+            ckerlb = kernel.args$ckerlb,
+            ckerub = kernel.args$ckerub,
             warn.glp.gradient = FALSE,
             .np.require.complete = FALSE
           )
@@ -1478,6 +1497,8 @@ npindex.sibandwidth <-
                 ckertype = bws$ckertype,
                 ckerorder = bws$ckerorder,
                 ckerbound = bws$ckerbound,
+                ckerlb = kernel.args$ckerlb,
+                ckerub = kernel.args$ckerub,
                 regtype = regtype,
                 gradients = TRUE,
                 warn.glp.gradient = FALSE,
@@ -1514,7 +1535,9 @@ npindex.sibandwidth <-
                 bwtype = bws$type,
                 ckertype = bws$ckertype,
                 ckerorder = bws$ckerorder,
-                ckerbound = bws$ckerbound
+                ckerbound = bws$ckerbound,
+                ckerlb = kernel.args$ckerlb,
+                ckerub = kernel.args$ckerub
               ))$ksum
               row_matrix(.npRmpi_with_local_regression(.np_index_normalized_mean(
                 tww, rindex.df, index.eval.df[rows, , drop = FALSE], bws,
@@ -1542,6 +1565,8 @@ npindex.sibandwidth <-
                 ckerbound = bws$ckerbound,
                 regtype = regtype,
                 gradients = FALSE,
+                ckerlb = kernel.args$ckerlb,
+                ckerub = kernel.args$ckerub,
                 warn.glp.gradient = FALSE,
                 .np.require.complete = FALSE
               )
