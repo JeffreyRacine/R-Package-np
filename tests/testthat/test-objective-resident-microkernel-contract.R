@@ -36,7 +36,8 @@ test_that("LP row NEON is an Apple-arm64 moving-row specialization", {
   expect_match(row_text, "vfmaq_f64(vld1q_f64(si), vw, eval_outer01)",
                fixed = TRUE)
   expect_match(row_text, "tj0 += wb0*yi;", fixed = TRUE)
-  expect_match(row_text, "#else\n      ti[0] += w*eval_ybasis[0];",
+  expect_match(row_text, "vdupq_n_f64(reverse_weight)", fixed = TRUE)
+  expect_match(row_text, "#else\n      ti[0] += reverse_weight*eval_ybasis[0];",
                fixed = TRUE)
 })
 

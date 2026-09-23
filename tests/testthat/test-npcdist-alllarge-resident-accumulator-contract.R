@@ -65,7 +65,19 @@ test_that("empirical CDF-CV normalization has one checked finalizer", {
   calls <- gregexpr(
     "np_distribution_cvls_finalize(", source, fixed = TRUE
   )[[1L]]
-  expect_length(calls[calls > 0L], 23L)
+  expect_length(calls[calls > 0L], 24L)
+  # The GNN deleted-fit grid now shares the same checked normalization.
+  start <- regexpr("static SEXP np_distribution_gnn_cv_execute(", source,
+                   fixed = TRUE)[[1L]]
+  stop <- regexpr("static int np_distribution_nn_exact_grid(", source,
+                  fixed = TRUE)[[1L]]
+  expect_gt(start, 0L)
+  expect_gt(stop, start)
+  gnn <- substr(source, start, stop - 1L)
+  expect_match(gnn,
+    "c->status=np_distribution_cvls_finalize(*c->cv,n,m,c->cdfontrain,c->cv)==",
+    fixed = TRUE)
+  expect_match(gnn, "NP_DISTRIBUTION_CVLS_FINALIZE_OK?0:1;", fixed = TRUE)
   expect_false(grepl(
     "*cv /= np_distribution_cvls_pair_count(", source, fixed = TRUE
   ))
