@@ -1935,6 +1935,14 @@ npreghat <-
   if (isTRUE(local.mode)) .npRmpi_with_local_regression(evaluate()) else evaluate()
 }
 
+.npreghat_formula_eval_data <- function(bws, newdata, tt = terms(bws)) {
+  npValidateNewdataFormula(newdata, tt, include.response = FALSE)
+  et <- delete.response(tt)
+  emf <- do.call(.np_formula_model_frame, list(formula = et, data = newdata),
+                 envir = environment(tt))
+  emf[, .np_formula_term_names(attr(attr(emf, "terms"), "term.labels")), drop = FALSE]
+}
+
 npreghat.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
@@ -1963,13 +1971,9 @@ npreghat.formula <-
     y <- model.response(mf)
     txdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
 
-    has.eval <- !is.null(newdata)
+    has.eval <- is.null(dots[["exdat", exact = TRUE]]) && !is.null(newdata)
     if (has.eval) {
-      npValidateNewdataFormula(newdata, tt, include.response = FALSE)
-      et <- delete.response(tt)
-      emf <- do.call(.np_formula_model_frame, list(formula = et, data = newdata),
-                     envir = environment(tt))
-      exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"), "term.labels")), drop = FALSE]
+      exdat <- .npreghat_formula_eval_data(bws, newdata, tt)
     }
 
     hat.args <- list(bws = bws, txdat = txdat)
@@ -2718,6 +2722,8 @@ predict.npreghat <-
       stop("object does not carry 'bws' and training data attributes")
 
     object.s <- attr(object, "s")
+    if (!is.null(dots[["exdat", exact = TRUE]]))
+      newdata <- NULL
     object.loo <- attr(object, "leave.one.out")
     if (is.null(object.loo))
       object.loo <- FALSE
@@ -2760,10 +2766,11 @@ predict.npreghat <-
       ridge = if (is.null(attr(object, "ridge", exact = TRUE))) 0 else attr(object, "ridge", exact = TRUE),
       leave.one.out = leave.one.out
     )
-    if (!is.null(newdata) && is.null(bws$formula) &&
-        is.null(dots[["exdat", exact = TRUE]]))
-      newdata <- .np_native_newdata_parts(
-        newdata, list(exdat = bws$xnames), "predict.npreghat")$exdat
+    if (!is.null(newdata))
+      newdata <- if (is.null(bws$formula)) {
+        .np_native_newdata_parts(
+          newdata, list(exdat = bws$xnames), "predict.npreghat")$exdat
+      } else .npreghat_formula_eval_data(bws, newdata)
     if (!is.null(newdata))
       call.args$exdat <- newdata
     else if (!isTRUE(leave.one.out) &&
