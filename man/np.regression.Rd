@@ -210,6 +210,14 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   }
 }
 \details{
+  With generalized nearest-neighbor bandwidths, query identity matters when
+  selecting a radius: a training observation excludes its own occurrence,
+  whereas explicit evaluation data remain external queries even if their
+  values equal training observations. Consequently,
+  \code{predict(fit, newdata = training.data)} can differ from
+  \code{fitted(fit)}. This does not omit the training contribution from the
+  fitted estimator. See \code{\link{np.kernels}} for the radius convention.
+
   With a formula-derived bandwidth object, supplying only \code{tydat}
   replaces the evaluated response in retained-training-sample order: one row
   per observation retained after the original subset and missing-value selection.

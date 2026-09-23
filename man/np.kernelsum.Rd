@@ -120,7 +120,9 @@ evaluation, operator variants, and returned kernel weights.
 
   \item{leave.one.out}{
     a single, non-missing logical value specifying whether or not to
-    compute the leave one out sums. Will not work if \code{exdat} is
+    compute the leave one out sums. The matching contribution is omitted;
+    nearest-neighbor radii retain the full-sample geometry. This flag alone
+    is not a literal deleted-sample estimator refit. Will not work if \code{exdat} is
     specified. Defaults to \code{FALSE}.
   }
 
@@ -406,15 +408,19 @@ Further arguments passed to the default kernel-sum method.
   
   The option \code{return.kernel.weights=TRUE} returns a matrix of
   dimension \sQuote{number of training observations} by \sQuote{number
-  of evaluation observations} and contains only the generalized product
-  kernel weights ignoring all other objects and options that may be
-  provided to \code{npksum} (e.g. \code{bandwidth.divide=TRUE} will be
-  ignored, etc.). Summing the columns of the weight matrix and dividing
-  by \sQuote{number of training observations} times the product of the
-  bandwidths (i.e. \code{\link{colMeans}(foo$kw)/prod(h)}) would produce
-  the kernel estimator of a (multivariate) density
-  (\code{operator="normal"}) or multivariate cumulative distribution
-  (\code{operator="integral"}).
+  of evaluation observations} containing generalized product kernel weights,
+  not response- or observation-weighted sums. The \code{bandwidth.divide}
+  flag controls normalization of \code{ksum}, not this raw \code{kw} export.
+  For purely continuous data with fixed physical bandwidths
+  \code{h} and unbounded ordinary location kernels,
+  \code{\link{colMeans}(foo$kw)/prod(h)} gives a density estimate
+  when every operator is \code{"normal"}. With every operator
+  \code{"integral"}, the corresponding distribution estimate is
+  \code{colMeans(foo$kw)}, without division by the bandwidth product.
+  Mixed operators require their coordinate-specific normalizations.
+  Nearest-neighbor and associated beta kernels must use their own
+  bandwidth/normalization conventions; one global bandwidth product is
+  not a general reconstruction rule.
 
 }
 \value{
