@@ -490,6 +490,17 @@ or standard-deviation factors.
   searches remain available. No positive floor is silently substituted for
   an explicitly requested zero.
 
+  A selected scale factor at this floor is a boundary solution of the
+  constrained search, not evidence of an interior optimum. In particular,
+  endpoint observations can make beta CVLS sensitive to the chosen floor.
+  For a returned fixed-bandwidth object \code{bw}, inspect
+  \code{bw$sfactor$x[bw$icon]} alongside
+  \code{bw$scale.factor.search.lower}; the physical bandwidth is on a
+  different scale and should not be compared directly with this dimensionless
+  bound. Near-bound solutions merit the same sensitivity consideration, but
+  proximity alone does not prove that the unconstrained criterion diverges.
+  Changing the floor changes the admissible search problem.
+
   Categorical search-start controls such as \code{dfac.init},
   \code{lbd.init}, and \code{hbd.init} have separate semantics and are
   not affected by \code{scale.factor.search.lower}.
