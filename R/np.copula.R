@@ -231,10 +231,14 @@ npcopula <- function(bws, ...) {
     bws = .np_physical_bandwidth(bws)[j],
     bandwidth.compute = FALSE,
     bwtype = bws$type,
-    ckerorder = bws$ckerorder,
-    ckertype = bws$ckertype,
     okertype = bws$okertype
   )
+  # A categorical-only child has no continuous kernel to inherit. In
+  # particular, a joint beta kernel must not impose bounds on that child.
+  if (continuous) {
+    out$ckerorder <- bws$ckerorder
+    out$ckertype <- bws$ckertype
+  }
   if (identical(target, "density"))
     out$ukertype <- bws$ukertype
   if (continuous && !is.null(bws$ckerbound))
@@ -251,8 +255,10 @@ npcopula <- function(bws, ...) {
   marginal <- list(
     bw = args$bws,
     type = args$bwtype,
-    ckerorder = args$ckerorder,
-    ckertype = args$ckertype,
+    # The kbandwidth adapter supplies these slots explicitly; use the
+    # constructor defaults only for inactive (categorical-only) slots.
+    ckerorder = if (is.null(args$ckerorder)) 2L else args$ckerorder,
+    ckertype = if (is.null(args$ckertype)) "gaussian" else args$ckertype,
     ckerbound = args$ckerbound,
     ckerlb = args$ckerlb,
     ckerub = args$ckerub,
