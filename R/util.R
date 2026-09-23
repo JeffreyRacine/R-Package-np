@@ -943,12 +943,12 @@ npValidateCategoricalFirstDifferenceGradientOrder <- function(
   invisible(NULL)
 }
 
-npValidateLcGradientOrder <- function(regtype,
+npValidateFirstDerivativeOrder <- function(regtype,
                                       gradient.order,
                                       ncon,
                                       argname = "gradient.order",
                                       where = "local-constant regression") {
-  if (!identical(regtype, "lc"))
+  if (!regtype %in% c("lc", "ll"))
     return(invisible(NULL))
 
   gradient.order <- npValidateGlpGradientOrder(
@@ -958,12 +958,20 @@ npValidateLcGradientOrder <- function(regtype,
     argname = argname
   )
   if (any(gradient.order != 1L)) {
-    stop(sprintf("%s supports only first derivatives for regtype='lc'; use regtype='lp' with sufficient degree for higher-order derivatives",
-                 where),
+    stop(sprintf("%s supports only first derivatives for regtype='%s'; use regtype='lp' with sufficient degree for higher-order derivatives",
+                 where, regtype),
          call. = FALSE)
   }
 
   gradient.order
+}
+
+npValidateLcGradientOrder <- function(regtype, gradient.order, ncon,
+                                      argname = "gradient.order",
+                                      where = "local-constant regression") {
+  if (!identical(regtype, "lc"))
+    return(invisible(NULL))
+  npValidateFirstDerivativeOrder(regtype, gradient.order, ncon, argname, where)
 }
 
 npGlpDegree0FirstDerivativeLcOk <- function(regtype.engine,

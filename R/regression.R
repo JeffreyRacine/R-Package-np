@@ -116,8 +116,8 @@ gradients.npregression <- function(x, se = FALSE, gradient.order = NULL, ...) {
         "gradient standard errors were not computed.",
       switches = if (!se) "gradients = TRUE" else "gradients = TRUE, se = TRUE")
 
-  if (identical(x$bws$regtype, "lc") && !is.null(gradient.order)) {
-    npValidateLcGradientOrder(
+  if (x$bws$regtype %in% c("lc", "ll") && !is.null(gradient.order)) {
+    npValidateFirstDerivativeOrder(
       regtype = x$bws$regtype,
       gradient.order = gradient.order,
       ncon = x$bws$ncon,
