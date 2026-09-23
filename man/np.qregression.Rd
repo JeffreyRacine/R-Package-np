@@ -400,7 +400,8 @@ prediction/evaluation route, or plot route as appropriate.
   non-formula fits, \code{newdata} is translated to the native
   evaluator argument \code{exdat} when \code{exdat} is not supplied.
   The native \code{exdat} argument remains available for advanced
-  workflows and takes precedence if both \code{newdata} and
+  workflows, contains already transformed predictor coordinates for formula
+  fits, and takes precedence if both \code{newdata} and
   \code{exdat} are supplied. If \code{tau} is omitted in
   \code{predict}, the fitted object's stored \code{tau} value is used.
 
