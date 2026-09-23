@@ -1275,6 +1275,7 @@ npplreghat <-
 
     resx.train <- matrix(0.0, nrow = n, ncol = p)
     resx.eval <- matrix(0.0, nrow = m, ncol = p)
+    formation.error <- numeric(p)
 
     if (matrix.output) {
       H.y.eval <- .npreghat_complete(
@@ -1301,9 +1302,11 @@ npplreghat <-
 
         resx.train[, j] <- x.train.num[, j] - xhat.train
         resx.eval[, j] <- x.eval.num[, j] - xhat.eval
+        formation.error[j] <- .np_plreg_residual_formation_error(x.train.num[, j], xhat.train)
       }
 
       qrR <- qr(resx.train, tol = .Machine$double.eps)
+      .np_plreg_check_residualized_rank(qrR, p, "npplreghat", formation.error)
       H.y.train <- .npreghat_complete(
         bws = bws$bw$yzbw,
         txdat = tzdat,
@@ -1312,7 +1315,6 @@ npplreghat <-
       H.y.train[] <- -H.y.train
       diag(H.y.train) <- diag(H.y.train) + 1.0
       A <- qr.coef(qrR, H.y.train)
-      A[is.na(A)] <- 0.0
       H <- H.y.eval + resx.eval %*% A
       if (constraint.output)
         return(.np_hat_constraint_from_matrix(H, y, "npplreghat"))
@@ -1339,9 +1341,11 @@ npplreghat <-
       )
       resx.train[, j] <- x.train.num[, j] - as.vector(xhat.train)
       resx.eval[, j] <- x.eval.num[, j] - as.vector(xhat.eval)
+      formation.error[j] <- .np_plreg_residual_formation_error(x.train.num[, j], xhat.train)
     }
 
     qrR <- qr(resx.train, tol = .Machine$double.eps)
+    .np_plreg_check_residualized_rank(qrR, p, "npplreghat", formation.error)
 
     Hy.eval <- .npreghat_complete(
       bws = bws$bw$yzbw,
@@ -1363,7 +1367,6 @@ npplreghat <-
       Hy.train <- matrix(Hy.train, ncol = ncol(yy))
 
     B <- qr.coef(qrR, yy - Hy.train)
-    B[is.na(B)] <- 0.0
 
     out <- Hy.eval + resx.eval %*% B
     if (ncol(out) == 1L) as.vector(out) else out
