@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* The Gaussian2 boundary-density helper preserves its selected second-order
+  kernel at very large bandwidths instead of switching to a uniform density.
+  This removes an artificial discontinuity in fitted values and CV objectives.
+
 * Copula plots align surfaces and uncertainty layers with their probability
   axes when supplied grids are unsorted. Stored fits and returned plot data
   retain their original row order.
