@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Smooth-coefficient level hat operators include the fitted model's intercept
+  correction after a positive ridge, including categorical-profile and
+  local-polynomial paths. Zero-ridge solves and ridge selection are unchanged.
+
 * Partially linear hat operators apply the fitter's identification check to
   the residualized linear design, including subtraction error. Unidentified
   models now fail consistently instead of returning row-order-dependent hats.

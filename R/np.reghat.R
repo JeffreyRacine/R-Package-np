@@ -221,7 +221,8 @@ npreghat <-
   "direct"
 }
 
-.npreghat_solve_eval <- function(W, w.eval, k, ridge.base) {
+.npreghat_solve_eval <- function(W, w.eval, k, ridge.base,
+                                  intercept.correction = FALSE) {
   XtWX <- crossprod(W, W * k)
   p <- nrow(XtWX)
   diag.loc <- cbind(seq_len(p), seq_len(p))
@@ -238,8 +239,11 @@ npreghat <-
     for (ridge.try in ridge.grid) {
       denominator <- XtWX.diag[1L] + ridge.try
       v <- w.eval[1L] / denominator
-      if (is.finite(denominator) && is.finite(v))
+      if (is.finite(denominator) && is.finite(v)) {
+        if (intercept.correction && ridge.try > 0)
+          v <- v + npRidgeInterceptCorrection(ridge.try, v, XtWX.diag[1L])
         return(list(v = v, ridge = ridge.try))
+      }
     }
     return(NULL)
   }
@@ -264,6 +268,8 @@ npreghat <-
   if (!solved)
     return(NULL)
 
+  if (intercept.correction && ridge > 0)
+    v[1L] <- v[1L] + npRidgeInterceptCorrection(ridge, v[1L], XtWX.diag[1L])
   list(v = v, ridge = ridge)
 }
 

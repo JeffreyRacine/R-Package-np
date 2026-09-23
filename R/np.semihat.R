@@ -1512,6 +1512,9 @@ npscoefhat <-
             error = function(e) NULL
           )
           if (!is.null(v) && all(is.finite(v))) {
+            if (ridge.try > 0)
+              v[1L] <- v[1L] + npRidgeInterceptCorrection(
+                ridge.try * ridge.scale, v[1L], XtWX.diag[1L])
             out[ii, ] <- drop(t(v) %*% rhs)
             solved <- TRUE
             break
@@ -1557,7 +1560,8 @@ npscoefhat <-
                 W = W.train,
                 w.eval = W.eval[ii, ],
                 k = kw.chunk[, jj],
-                ridge.base = ridge
+                ridge.base = ridge,
+                intercept.correction = TRUE
               )
               if (is.null(solve.out))
                 stop(sprintf("failed to solve local hat system at evaluation row %d", ii))
@@ -1571,7 +1575,8 @@ npscoefhat <-
                 W = W.train,
                 w.eval = W.eval[ii, ],
                 k = kw.chunk[, jj],
-                ridge.base = ridge
+                ridge.base = ridge,
+                intercept.correction = TRUE
               )
               if (is.null(solve.out))
                 stop(sprintf("failed to solve local hat system at evaluation row %d", ii))
@@ -1616,7 +1621,8 @@ npscoefhat <-
                 W = tensor.train,
                 w.eval = tensor.eval[ii, ],
                 k = kw.chunk[, jj],
-                ridge.base = ridge
+                ridge.base = ridge,
+                intercept.correction = TRUE
               )
               if (is.null(solve.out))
                 stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", ii))
@@ -1630,7 +1636,8 @@ npscoefhat <-
                 W = tensor.train,
                 w.eval = tensor.eval[ii, ],
                 k = kw.chunk[, jj],
-                ridge.base = ridge
+                ridge.base = ridge,
+                intercept.correction = TRUE
               )
               if (is.null(solve.out))
                 stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", ii))
@@ -1667,7 +1674,8 @@ npscoefhat <-
             W = W.train,
             w.eval = W.eval[ii, ],
             k = kw.chunk[, jj],
-            ridge.base = ridge
+            ridge.base = ridge,
+            intercept.correction = TRUE
           )
           if (is.null(solve.out))
             stop(sprintf("failed to solve local hat system at evaluation row %d", ii))
@@ -1709,7 +1717,8 @@ npscoefhat <-
             W = tensor.train,
             w.eval = tensor.eval[ii, ],
             k = kw.chunk[, jj],
-            ridge.base = ridge
+            ridge.base = ridge,
+            intercept.correction = TRUE
           )
           if (is.null(solve.out))
             stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", ii))
