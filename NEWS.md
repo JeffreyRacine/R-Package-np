@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Conditional quantile plots preserve fitted numerical extraction controls,
+  including resampled fits and bootstrap centers. Explicit plot controls
+  take precedence; default and legacy-object behavior is unchanged.
+
 * Smooth-coefficient level hat operators include the fitted model's intercept
   correction after a positive ridge, including categorical-profile and
   local-polynomial paths. Zero-ridge solves and ridge selection are unchanged.

@@ -13887,14 +13887,19 @@ plotFactor <- function(f, y, ...){
 
 .np_plot_quantile_bootstrap_fit <- function(bws, xdat, ydat, exdat, tau,
                                              gradients = FALSE,
-                                             gradient.index = NULL) {
+                                             gradient.index = NULL,
+                                             tol = 1.490116e-04,
+                                             small = 1.490116e-05,
+                                             itmax = 10000) {
   if (!gradients) {
     return(as.vector(.np_plot_quantile_eval(
+      tol = tol, small = small, itmax = itmax,
       bws = bws, txdat = xdat, tydat = ydat, exdat = exdat, tau = tau,
       gradients = FALSE, need.errors = FALSE
     )$quantile))
   }
   g <- .np_plot_quantile_eval(
+    tol = tol, small = small, itmax = itmax,
     bws = bws,
     txdat = xdat,
     tydat = ydat,
@@ -14017,7 +14022,10 @@ plotFactor <- function(f, y, ...){
                                                     counts = NULL,
                                                     counts.drawer = NULL,
                                                     progress.label = NULL,
-                                                    center = NULL) {
+                                                    center = NULL,
+                                                    tol = 1.490116e-04,
+                                                    small = 1.490116e-05,
+                                                    itmax = 10000) {
   xdat <- toFrame(xdat)
   ydat <- as.double(ydat)
   exdat <- toFrame(exdat)
@@ -14031,6 +14039,7 @@ plotFactor <- function(f, y, ...){
 
   fit.fun <- function(x.train, y.train) {
     .np_plot_quantile_bootstrap_fit(
+      tol = tol, small = small, itmax = itmax,
       bws = bws, xdat = x.train, ydat = y.train, exdat = exdat, tau = tau
     )
   }
@@ -14095,7 +14104,10 @@ plotFactor <- function(f, y, ...){
                                                        counts = NULL,
                                                        counts.drawer = NULL,
                                                        progress.label = NULL,
-                                                       center = NULL) {
+                                                       center = NULL,
+                                                       tol = 1.490116e-04,
+                                                       small = 1.490116e-05,
+                                                       itmax = 10000) {
   xdat <- toFrame(xdat)
   ydat <- as.double(ydat)
   exdat <- toFrame(exdat)
@@ -14109,6 +14121,7 @@ plotFactor <- function(f, y, ...){
 
   fit.fun <- function(x.train, y.train) {
     .np_plot_quantile_bootstrap_fit(
+      tol = tol, small = small, itmax = itmax,
       bws = bws, xdat = x.train, ydat = y.train, exdat = exdat, tau = tau,
       gradients = TRUE, gradient.index = gradient.index
     )
@@ -14352,11 +14365,15 @@ plotFactor <- function(f, y, ...){
                                                   tau,
                                                   counts = NULL,
                                                   counts.drawer = NULL,
-                                                  progress.label = NULL) {
+                                                  progress.label = NULL,
+                                                  tol = 1.490116e-04,
+                                                  small = 1.490116e-05,
+                                                  itmax = 10000) {
   use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (!isTRUE(use.mpi)) {
     return(.np_inid_boot_from_quantile_level_local(
+      tol = tol, small = small, itmax = itmax,
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
@@ -14382,6 +14399,7 @@ plotFactor <- function(f, y, ...){
 
   t0 <- .npRmpi_with_local_bootstrap(
     .np_plot_quantile_bootstrap_fit(
+      tol = tol, small = small, itmax = itmax,
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
@@ -14446,6 +14464,7 @@ plotFactor <- function(f, y, ...){
 
     .npRmpi_with_local_bootstrap(
       .np_inid_boot_from_quantile_level_local(
+        tol = tol, small = small, itmax = itmax,
         xdat = xdat,
         ydat = ydat,
         exdat = exdat,
@@ -14471,6 +14490,7 @@ plotFactor <- function(f, y, ...){
       master_local_chunk = TRUE,
       required.bindings = c(
         list(
+          tol = tol, small = small, itmax = itmax,
           xdat = xdat,
           ydat = ydat,
           exdat = exdat,
@@ -14504,11 +14524,15 @@ plotFactor <- function(f, y, ...){
                                                      gradient.index,
                                                      counts = NULL,
                                                      counts.drawer = NULL,
-                                                     progress.label = NULL) {
+                                                     progress.label = NULL,
+                                                     tol = 1.490116e-04,
+                                                     small = 1.490116e-05,
+                                                     itmax = 10000) {
   use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (!isTRUE(use.mpi)) {
     return(.np_inid_boot_from_quantile_gradient_local(
+      tol = tol, small = small, itmax = itmax,
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
@@ -14535,6 +14559,7 @@ plotFactor <- function(f, y, ...){
 
   t0 <- .npRmpi_with_local_bootstrap(
     .np_plot_quantile_bootstrap_fit(
+      tol = tol, small = small, itmax = itmax,
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
@@ -14601,6 +14626,7 @@ plotFactor <- function(f, y, ...){
 
     .npRmpi_with_local_bootstrap(
       .np_inid_boot_from_quantile_gradient_local(
+        tol = tol, small = small, itmax = itmax,
         xdat = xdat,
         ydat = ydat,
         exdat = exdat,
@@ -14627,6 +14653,7 @@ plotFactor <- function(f, y, ...){
       master_local_chunk = TRUE,
       required.bindings = c(
         list(
+          tol = tol, small = small, itmax = itmax,
           xdat = xdat,
           ydat = ydat,
           exdat = exdat,
@@ -18309,7 +18336,10 @@ compute.bootstrap.errors.conbandwidth =
            proper.method = NULL,
            proper.control = list(),
            ...,
-           bws){
+           bws,
+           tol = 1.490116e-04,
+           small = 1.490116e-05,
+           itmax = 10000) {
     prep.label <- .np_plot_bootstrap_stage_label(
       stage = "Preparing plot bootstrap",
       method_label = plot.errors.boot.method,
@@ -18506,6 +18536,7 @@ compute.bootstrap.errors.conbandwidth =
       boot.out <- .npRmpi_with_local_bootstrap({
         tryCatch(
           .npRmpi_inid_boot_from_quantile_level(
+            tol = tol, small = small, itmax = itmax,
             xdat = xdat,
             ydat = ydat[[1L]],
             exdat = exdat,
@@ -18539,6 +18570,7 @@ compute.bootstrap.errors.conbandwidth =
       boot.out <- .npRmpi_with_local_bootstrap({
         tryCatch(
           .npRmpi_inid_boot_from_quantile_gradient(
+            tol = tol, small = small, itmax = itmax,
             xdat = xdat,
             ydat = ydat[[1L]],
             exdat = exdat,
