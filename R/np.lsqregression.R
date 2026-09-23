@@ -1327,7 +1327,7 @@ nplsqregbw.formula <-
     xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
     out <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = tau), dots))
     out <- .nplsqreg_record_omit(out, attr(mf, "na.action"))
-    out$formula <- bws
+    out <- .nplsqreg_retain_formula_terms(out, bws, attr(mf, "terms"))
     out <- .nplsqreg_set_response_name(
       out, .nplsqreg_formula_response_name(bws))
     out$call <- match.call(expand.dots = FALSE)
@@ -1845,20 +1845,17 @@ nplsqreg.formula <-
     ydat <- model.response(mf)
     xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
 
+    tt <- attr(mf, "terms")
     has.eval <- !is.null(native.exdat) || !is.null(newdata)
     if (!is.null(native.exdat)) {
-      npValidateNewdataFormula(native.exdat, delete.response(tt),
-                               include.response = FALSE)
-      emf <- do.call(.np_formula_model_frame,
-                     list(formula = .np_formula_aligned_terms(delete.response(tt)), data = native.exdat),
-                     envir = parent.frame())
-      eval.omit <- attr(emf, "na.action")
-      exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"), "term.labels")), drop = FALSE]
+      prepared <- .nplsqreg_prepare_eval_data(native.exdat)
+      eval.omit <- prepared$omit
+      exdat <- prepared$exdat
     } else if (has.eval) {
       npValidateNewdataFormula(newdata, delete.response(tt),
                                include.response = FALSE)
       emf <- do.call(.np_formula_model_frame,
-                     list(formula = .np_formula_aligned_terms(delete.response(tt)), data = newdata),
+                     list(formula = delete.response(tt), data = newdata),
                      envir = parent.frame())
       eval.omit <- attr(emf, "na.action")
       exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"), "term.labels")), drop = FALSE]
@@ -1882,7 +1879,7 @@ nplsqreg.formula <-
     }
     out$call <- match.call(expand.dots = FALSE)
     out$call <- .nplsqreg_describe_call(out$call, parent.frame())
-    out$bws$formula <- bws
+    out <- .nplsqreg_retain_formula_terms(out, bws, tt)
     out <- .nplsqreg_set_response_name(out, response.name)
     out <- .nplsqreg_record_omit(out, train.omit)
     out$bws <- .nplsqreg_record_omit(out$bws, train.omit)
@@ -1895,12 +1892,6 @@ nplsqreg.formula <-
       out$eval.nobs.omit <- length(eval.omit)
       out <- .nplsqreg_pad_fit_outputs(out, eval.omit)
     }
-    if (!is.null(out$bws$tau.bws))
-      for (j in seq_along(out$bws$tau.bws))
-        out$bws$tau.bws[[j]]$formula <- bws
-    if (!is.null(out$tau.fits))
-      for (j in seq_along(out$tau.fits))
-        out$tau.fits[[j]]$bws$formula <- bws
     out
   }
 
