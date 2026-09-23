@@ -33,10 +33,9 @@
   denominator <- sums[2L, 2L, ]
   denominator <- .np_normalization_denominator(
     denominator, "npindex", allow.empty.rows = allow.empty.rows,
-    zero.rows = .np_indexhat_zero_moment_rows(list(
-      txdat = toFrame(txdat), exdat = toFrame(exdat), bws = bws$bw,
-      bwtype = bws$type, ckertype = bws$ckertype,
-      ckerorder = bws$ckerorder, ckerbound = bws$ckerbound), denominator))
+    zero.rows = .np_indexhat_zero_moment_rows(c(list(
+      txdat = toFrame(txdat), exdat = toFrame(exdat), bws = bws$bw),
+      .np_index_kernel_args(bws)), denominator))
   .np_normalization_finish(sums[1L, 2L, ] / denominator, denominator,
                            "npindex", defer.empty.rows = TRUE)
 }
@@ -48,10 +47,9 @@
       !is.null(attr(fit, ".np.empty.rows", exact = TRUE)) || !anyNA(fit$mean))
     return(fit)
   rows <- which(is.na(fit$mean))
-  args <- list(txdat = toFrame(txdat),
-    exdat = toFrame(exdat)[rows, , drop = FALSE], bws = bws$bw,
-    bwtype = bws$type, ckertype = bws$ckertype,
-    ckerorder = bws$ckerorder, ckerbound = bws$ckerbound)
+  args <- c(list(txdat = toFrame(txdat),
+    exdat = toFrame(exdat)[rows, , drop = FALSE], bws = bws$bw),
+    .np_index_kernel_args(bws))
   moments <- do.call(.np_index_kernel_moments,
     c(list(y = rep.int(1.0, NROW(txdat))), args))
   empty <- .np_indexhat_zero_moment_rows(args, moments$denominator)
