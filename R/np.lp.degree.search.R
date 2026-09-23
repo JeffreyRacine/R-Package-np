@@ -94,7 +94,8 @@
   as.double(value)
 }
 
-.np_nn_ordinary_schedule <- function(point, nn.indices, caps) {
+.np_nn_ordinary_schedule <- function(point, nn.indices, caps,
+                                     incumbent.caps = caps) {
   point <- as.double(point)
   nn.indices <- as.integer(nn.indices)
   caps <- as.double(caps)
@@ -112,6 +113,14 @@
     stop("internal NN recovery adapter has invalid ordinary caps",
          call. = FALSE)
   }
+  incumbent.caps <- as.double(incumbent.caps)
+  if (length(incumbent.caps) == 1L)
+    incumbent.caps <- rep.int(incumbent.caps, length(nn.indices))
+  if (length(incumbent.caps) != length(caps) || anyNA(incumbent.caps) ||
+      any(!is.finite(incumbent.caps)) || any(incumbent.caps < caps) ||
+      any(incumbent.caps > .Machine$integer.max) ||
+      any(incumbent.caps != floor(incumbent.caps)))
+    stop("internal NN recovery adapter has invalid incumbent caps", call. = FALSE)
 
   current <- point[nn.indices]
   if (anyNA(current) || any(!is.finite(current)) ||
@@ -124,11 +133,18 @@
     stop("internal NN recovery incumbent lies outside the ordinary NN domain",
          call. = FALSE)
   }
-  if (any(current > caps))
+  if (any(current > incumbent.caps))
     return(list())
-  point[nn.indices] <- current
 
   out <- list()
+  if (any(current > caps)) {
+    # An automatic public-domain point can exceed a deleted fit's domain.
+    # Probe its fold boundary once; genuinely extended incumbents stay out.
+    current <- pmin(current, caps)
+    point[nn.indices] <- current
+    out[[1L]] <- point
+  }
+  point[nn.indices] <- current
   repeat {
     incremented <- pmin(caps, current + 1)
     doubled <- ifelse(current <= floor(caps / 2), 2 * current, caps)
@@ -142,11 +158,12 @@
   out
 }
 
-.np_nn_find_raw_valid_start <- function(point, nn.indices, caps, raw.eval) {
+.np_nn_find_raw_valid_start <- function(point, nn.indices, caps, raw.eval,
+                                       incumbent.caps = caps) {
   if (!is.function(raw.eval))
     stop("internal NN recovery adapter requires a raw evaluator", call. = FALSE)
 
-  schedule <- .np_nn_ordinary_schedule(point, nn.indices, caps)
+  schedule <- .np_nn_ordinary_schedule(point, nn.indices, caps, incumbent.caps)
   for (i in seq_along(schedule)) {
     candidate <- schedule[[i]]
     value <- tryCatch(

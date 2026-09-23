@@ -23,7 +23,7 @@ test_that("distribution MADS recovers an automatic raw-invalid NN plateau", {
         witness <- restarts[[2L]]$recovery_witness
         expect_true(isTRUE(witness$found))
         expect_identical(as.numeric(restarts[[2L]]$start), as.numeric(witness$point))
-        expect_true(all(witness$point <= if (type == "adaptive_nn") 22 else 23))
+        expect_true(all(witness$point <= 22))
         expect_gt(restarts[[2L]]$native$compiled_callback_calls, 0)
       }
     }

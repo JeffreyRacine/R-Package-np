@@ -4506,18 +4506,20 @@ static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
   return val;
 }
 
-static int np_ordinary_nn_find_finite_raw_seed(
+static int np_ordinary_nn_find_finite_raw_seed_domain(
   double *candidate,
   const int num_continuous,
   const int num_obs,
   const int maximum_k,
   const int num_raw_var,
+  const int recover_fold_boundary,
   double * const objective)
 {
   int i;
   int probe;
   int probe_limit = 1;
   int remaining = maximum_k;
+  int boundary_probe = 0;
 
   if (candidate == NULL || objective == NULL || num_continuous <= 0 ||
       num_obs < 3 || maximum_k < 1 || num_raw_var < num_continuous)
@@ -4531,20 +4533,26 @@ static int np_ordinary_nn_find_finite_raw_seed(
     if (np_nn_lookup_from_scale(
           num_obs, 1, candidate[i],
           &lookup_k, &distance_scale, &is_extended) != 0 ||
-        is_extended || lookup_k < 1 || lookup_k > maximum_k)
+        is_extended || lookup_k < 1 ||
+        (lookup_k > maximum_k && !recover_fold_boundary))
       return 0;
-    candidate[i] = (double)lookup_k;
+    if (lookup_k > maximum_k)
+      boundary_probe = 1;
+    candidate[i] = (double)MIN(lookup_k, maximum_k);
   }
 
   while (remaining > 1) {
     ++probe_limit;
     remaining = (remaining + 1)/2;
   }
+  if (boundary_probe)
+    ++probe_limit;
 
   for (probe = 0; probe < probe_limit; ++probe) {
     double value;
 
-    if (!np_ordinary_nn_joint_advance(
+    if (!(probe == 0 && boundary_probe) &&
+        !np_ordinary_nn_joint_advance(
           candidate, num_continuous, maximum_k))
       break;
 
@@ -4562,6 +4570,20 @@ static int np_ordinary_nn_find_finite_raw_seed(
   }
 
   return 0;
+}
+
+/* Existing callers retain their ordinary-domain admission. Only an owner
+ * with a distinct deleted-sample cap opts into the boundary probe above. */
+static int np_ordinary_nn_find_finite_raw_seed(
+  double *candidate,
+  const int num_continuous,
+  const int num_obs,
+  const int maximum_k,
+  const int num_raw_var,
+  double * const objective)
+{
+  return np_ordinary_nn_find_finite_raw_seed_domain(
+    candidate, num_continuous, num_obs, maximum_k, num_raw_var, 0, objective);
 }
 
 extern double *vector_continuous_stddev_extern;
@@ -16529,19 +16551,18 @@ distribution_powell_attempt:
           (num_obs_train_extern >= 3)) {
         double finite_seed = DBL_MAX;
         int found_finite_seed;
-        const int maximum_k =
-          (BANDWIDTH_den_extern == BW_GEN_NN) ?
-          num_obs_train_extern - 1 : num_obs_train_extern - 2;
+        const int maximum_k = num_obs_train_extern - 2;
 
         nn_retry_history_index = (iImproved > 0) ? iImproved - 1 : 0;
         nn_retry_improved = iImproved;
         bwm_reset_counters();
-        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed_domain(
           vector_scale_factor,
           num_reg_continuous_extern,
           num_obs_train_extern,
           maximum_k,
           num_var,
+          1,
           &finite_seed);
         if (found_finite_seed &&
             bwm_penalty_mode == 1 &&

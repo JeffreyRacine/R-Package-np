@@ -660,16 +660,14 @@ npNomadNativeSearchDistribution <- function(prep,
       } else {
         1L
       }
-      ordinary.cap <- if (identical(template$type, "adaptive_nn")) {
-        setup$nobs - 2L
-      } else {
-        setup$nobs - 1L
-      }
+      # Both NN CDF criteria evaluate an n-1-row deleted-sample fit.
+      ordinary.cap <- setup$nobs - 2L
       recovery <- .np_nn_find_raw_valid_start(
         point = native.results[[incumbent.index]]$best_point,
         nn.indices = seq_len(bounds$ncon),
         caps = rep.int(ordinary.cap, bounds$ncon),
-        raw.eval = raw_eval_fun
+        raw.eval = raw_eval_fun,
+        incumbent.caps = rep.int(setup$nobs - 1L, bounds$ncon)
       )
       if (isTRUE(recovery$found)) {
         recovery.index <- length(native.results) + 1L
