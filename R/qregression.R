@@ -107,10 +107,9 @@ predict.qregression <- function(object, se.fit = FALSE, ...) {
   if (!is.null(dots$exdat) && !is.null(dots$newdata))
     dots$newdata <- NULL
   if (has.formula.route) {
-    if (!is.null(dots$exdat)) {
-      dots$newdata <- .npqreg_predict_newdata_to_exdat(object, dots$exdat)
-      dots$exdat <- NULL
-    } else if (!is.null(dots$newdata)) {
+    # Native exdat already contains model coordinates. Only raw newdata
+    # belongs to the formula validation/transformation owner.
+    if (!is.null(dots$newdata)) {
       dots$newdata <- .npqreg_predict_newdata_to_exdat(object, dots$newdata)
     }
   } else {

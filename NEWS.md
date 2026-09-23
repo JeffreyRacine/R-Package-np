@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Quantile prediction preserves native exdat coordinates for formula fits,
+  avoiding repeated predictor transformations. Native evaluation retains
+  precedence over raw formula newdata.
+
 * Regression hat applications now pass resolved degree, basis and Bernstein
   overrides consistently to every numerical owner, including single-response
   shortcuts and retained-operator prediction.
