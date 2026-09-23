@@ -1195,6 +1195,17 @@ npqreg <-
 
   lo <- rep.int(y.min, n.eval)
   hi <- rep.int(y.max, n.eval)
+  # Relative accuracy is a property of the response span, not its origin.
+  span <- y.max - y.min
+  width.tolerance <- (if (is.finite(span)) tol * span else
+                       tol * y.max - tol * y.min) + small
+  midpoint <- function(lower, upper) {
+    value <- (lower + upper) / 2.0
+    overflow <- !is.finite(value)
+    if (any(overflow))
+      value[overflow] <- lower[overflow] / 2.0 + upper[overflow] / 2.0
+    value
+  }
   cdf_values <- if (isTRUE(parallel)) {
     function(bws, xdat, ydat, exdat, ycand) {
       .npqreg_selected_cdf_values_parallel(
@@ -1267,7 +1278,14 @@ npqreg <-
   iter <- 0L
   while (any(active) && iter < maxiter) {
     iter <- iter + 1L
-    mid <- (lo[active] + hi[active]) / 2.0
+    mid <- midpoint(lo[active], hi[active])
+    # No distinct representable midpoint: further CDF calls cannot refine it.
+    interior <- mid > lo[active] & mid < hi[active]
+    if (!all(interior)) {
+      active[which(active)[!interior]] <- FALSE
+      mid <- mid[interior]
+      if (!length(mid)) break
+    }
     fmid <- cdf_values_cached(
       bws = bws,
       xdat = xdat,
@@ -1293,14 +1311,15 @@ npqreg <-
     lo[active.idx[!upper]] <- mid[!upper]
 
     width <- hi[active.idx] - lo[active.idx]
-    scale <- pmax(abs(hi[active.idx]), abs(lo[active.idx]), 1.0)
-    active[active.idx] <- width > (tol * scale + small)
+    next.mid <- midpoint(lo[active.idx], hi[active.idx])
+    active[active.idx] <- width > width.tolerance &
+      next.mid > lo[active.idx] & next.mid < hi[active.idx]
   }
 
   if (any(active))
     stop("npqreg selected-CDF inversion failed to converge within 'itmax'")
 
-  out <- (lo + hi) / 2.0
+  out <- midpoint(lo, hi)
   out[done.low] <- y.min
   out[done.high] <- y.max
   out[empty.idx] <- NA_real_

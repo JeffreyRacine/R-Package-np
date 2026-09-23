@@ -36,7 +36,8 @@ test_that("npqreg selected-CDF inversion honors iteration, midpoint, and clamp c
   out <- inv(bws, xdat, ydat, exdat, tau = 0.6, tol = 0.5,
              small = .Machine$double.eps, itmax = 1500L,
              cdf.values = linear_cdf)
-  expect_equal(as.numeric(out), 0.25, tolerance = 0)
+  # tol * initial span = 1: the first half-bracket already meets tolerance.
+  expect_equal(as.numeric(out), 0.5, tolerance = 0)
   expect_identical(quantile_clamp(out), "none")
 })
 
