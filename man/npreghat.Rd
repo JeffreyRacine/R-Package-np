@@ -58,7 +58,12 @@ These arguments identify the fitted bandwidth object, formula/data interface, tr
   \item{exdat}{Optional evaluation predictors.}
 
 
-  \item{newdata}{Optional evaluation data for formula and predict methods.}
+  \item{newdata}{Optional evaluation data for formula and predict methods.
+    Without a new evaluation grid, prediction retains the operator's original
+    training-observation or external-query identity, including when changing
+    the derivative order. An explicit grid remains external even when its
+    coordinates equal the training data; this distinction can affect
+    nearest-neighbor radii.}
 
 
   \item{txdat}{Training predictors.}
