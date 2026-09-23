@@ -1448,10 +1448,38 @@ static inline double np_nn_rect(const double difference, const double radius)
 static inline void np_nn_rect_box(const int kernel, const int nn_bandwidth,
                                   double *lower, double *upper)
 {
-  if(nn_bandwidth && kernel == 8) {
+  if(nn_bandwidth && (kernel == 8 || (kernel >= 14 && kernel <= 18))) {
     *lower = nextafter(*lower, -INFINITY);
     *upper = nextafter(*upper, INFINITY);
   }
+}
+
+/* Compact convolution support is the sum of two kernel radii. The table's
+ * convolution radius is for equal h, so use the mean of query h and a cold
+ * conservative maximum of the other-side h. Normal/fixed routes are intact. */
+static inline double np_tree_convolution_scale(const int kernel,
+    const double bandwidth, const double *alternate_max, const int dimension)
+{
+  return alternate_max != NULL && kernel >= 14 && kernel <= 18 ?
+    0.5*bandwidth + 0.5*alternate_max[dimension] : bandwidth;
+}
+
+static double *NP_NOINLINE np_tree_convolution_maxima(const int dimensions,
+    const int *kernels, const int rows, double * const *alternate)
+{
+  int needed = 0;
+  for(int d = 0; d < dimensions; ++d)
+    needed |= kernels[d] >= 14 && kernels[d] <= 18;
+  if(!needed) return NULL;
+  double *maximum = (double *)np_jksum_malloc_array_or_die(
+    (size_t)dimensions, sizeof(double), "convolution tree bandwidth maxima");
+  for(int d = 0; d < dimensions; ++d) {
+    maximum[d] = 0.0;
+    if(kernels[d] < 14 || kernels[d] > 18) continue;
+    for(int i = 0; i < rows; ++i)
+      if(alternate[d][i] > maximum[d]) maximum[d] = alternate[d][i];
+  }
+  return maximum;
 }
 
 double np_uaa(const int same_cat,const double lambda, const int c){
@@ -12841,6 +12869,7 @@ NPPermutationWeightOutput * const pkw_output,
   double *perm_kbuf = NULL, *kw_work = NULL;
   double **bounded_cdf_lower_fixed = NULL;
   double **bounded_cdf_den_fixed = NULL;
+  double *tree_convolution_alt_max = NULL;
   double *blas_Apack_owned = NULL;
   const double *blas_Apack = NULL;
   NP_TreeOuterBlasWorkspace tree_outer_workspace = {0};
@@ -13096,6 +13125,10 @@ NPPermutationWeightOutput * const pkw_output,
     }
 
   }
+
+  if(np_ks_tree_use && BANDWIDTH_reg == BW_GEN_NN && any_convolution)
+    tree_convolution_alt_max = np_tree_convolution_maxima(
+      num_reg_continuous, KERNEL_reg_np, num_xt, matrix_alt_bandwidth);
 
   /*
    * A tree is an invocation-local arithmetic owner, not a persistent property
@@ -13943,8 +13976,9 @@ NPPermutationWeightOutput * const pkw_output,
           if(tree_use_active_dims && (tree_active_n < num_reg_continuous)){
             for(kk = 0; kk < tree_active_n; kk++){
               const int id = tree_active_dims[kk];
-              const double sf = adaptive_fold == NULL ? m[id][jbw] :
-                adaptive_fold->successor[id][jbw];
+              const double sf = np_tree_convolution_scale(KERNEL_reg_np[id],
+                adaptive_fold == NULL ? m[id][jbw] : adaptive_fold->successor[id][jbw],
+                tree_convolution_alt_max, id);
               if(!is_adaptive){
                 bb[2*id] = -cksup[KERNEL_reg_np[id]][1];
                 bb[2*id+1] = -cksup[KERNEL_reg_np[id]][0];
@@ -13961,8 +13995,9 @@ NPPermutationWeightOutput * const pkw_output,
             boxSearchNLPartial(kdt, &nls, bb, NULL, pxl, tree_active_dims, tree_active_n);
           } else {
             for(i = 0; i < num_reg_continuous; i++){
-              const double sf = adaptive_fold == NULL ? m[i][jbw] :
-                adaptive_fold->successor[i][jbw];
+              const double sf = np_tree_convolution_scale(KERNEL_reg_np[i],
+                adaptive_fold == NULL ? m[i][jbw] : adaptive_fold->successor[i][jbw],
+                tree_convolution_alt_max, i);
               if(!is_adaptive){
                 bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
                 bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -13980,8 +14015,9 @@ NPPermutationWeightOutput * const pkw_output,
           }
         } else {
           for(i = 0; i < num_reg_continuous; i++){
-            const double sf = adaptive_fold == NULL ? m[i][jbw] :
-              adaptive_fold->successor[i][jbw];
+            const double sf = np_tree_convolution_scale(KERNEL_reg_np[i],
+              adaptive_fold == NULL ? m[i][jbw] : adaptive_fold->successor[i][jbw],
+              tree_convolution_alt_max, i);
             if(!is_adaptive){
               bb[2*nld[i]] = -cksup[KERNEL_reg_np[i]][1];
               bb[2*nld[i]+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -14021,7 +14057,8 @@ NPPermutationWeightOutput * const pkw_output,
                   bb[2*i] = cksup[knp][0];
                   bb[2*i+1] = cksup[knp][1];
                 }
-                const double sf = m[i][jbw];
+                const double sf = np_tree_convolution_scale(knp,m[i][jbw],
+                  tree_convolution_alt_max,i);
                 bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
                 bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
                 np_nn_rect_box(knp, BANDWIDTH_reg != BW_FIXED,
@@ -14039,7 +14076,8 @@ NPPermutationWeightOutput * const pkw_output,
                   bb[2*nld[i]] = cksup[knp][0];
                   bb[2*nld[i]+1] = cksup[knp][1];
                 }
-                const double sf = m[i][jbw];
+                const double sf = np_tree_convolution_scale(knp,m[i][jbw],
+                  tree_convolution_alt_max,i);
                 bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
                 bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
                 np_nn_rect_box(knp, BANDWIDTH_reg != BW_FIXED,
@@ -15030,6 +15068,7 @@ cleanup:
 
   if(bounded_cdf_lower_fixed != NULL) free_tmat(bounded_cdf_lower_fixed);
   if(bounded_cdf_den_fixed != NULL) free_tmat(bounded_cdf_den_fixed);
+  free(tree_convolution_alt_max);
 
   free(tprod);
   free(bpow);
