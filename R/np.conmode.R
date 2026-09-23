@@ -577,11 +577,11 @@ npconmode.conbandwidth <-
     if (bws$yndim != 1 || bws$yncon > 0)
       stop("'tydat' must consist of one (1) discrete variable")
 
-    if(no.ey)
-      efac <- .np_factor_with_levels(bws$ydati$all.lev[[1]],levels = bws$ydati$all.lev[[1]], ordered = is.ordered(tydat[,1]))
-    else
-      efac <- .np_factor_with_levels(union(bws$ydati$all.lev[[1]], levels(eydat[,1])),
-                     levels = union(bws$ydati$all.lev[[1]], levels(eydat[,1])), ordered = is.ordered(tydat[,1]))
+    # Evaluation outcomes own goodness-of-fit diagnostics, never the fitted
+    # response support or the probability projection domain.
+    efac <- .np_factor_with_levels(
+      bws$ydati$all.lev[[1]], levels = bws$ydati$all.lev[[1]],
+      ordered = is.ordered(tydat[,1]))
 
     nlev <- nlevels(efac)
     level.values <- levels(efac)

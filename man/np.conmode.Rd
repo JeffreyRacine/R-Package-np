@@ -240,6 +240,9 @@ normalization, and level-specific class-probability effects.
   \item{probabilities}{
     a logical value. If \code{TRUE}, store the full matrix of fitted
     probabilities over the discrete response support in the returned object.
+    This support is retained from the fitted training data. Response values
+    supplied for evaluation diagnostics, including unused or unseen factor
+    levels, do not enlarge or reorder the predicted class support.
     The default \code{FALSE} keeps returned objects compact. If
     \code{gradients=TRUE}, probabilities are stored automatically because
     they are the object-fed target for \code{\link{plot.conmode}}.
