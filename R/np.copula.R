@@ -1592,6 +1592,9 @@ npcopula.default <- function(bws,
       quantile.seq <- seq(0,1,length=round(n.quasi.inv/2))
       if(is.numeric(x.marginal)) {
         x.er <- extendrange(x.marginal,f=er.quasi.inv)
+        # Keep the inverse grid within the fitted marginal kernel domain.
+        if (!is.null(bws$ckerlb)) x.er[1L] <- max(x.er[1L], bws$ckerlb[j])
+        if (!is.null(bws$ckerub)) x.er[2L] <- min(x.er[2L], bws$ckerub[j])
         x.q <- quantile(x.marginal,quantile.seq)
         x.eval <- sort(c(seq(x.er[1],x.er[2],length=round(n.quasi.inv/2)),x.q))
       } else {

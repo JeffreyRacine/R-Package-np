@@ -379,7 +379,8 @@ prediction/evaluation route, or graphics renderer as appropriate.
   The \sQuote{quasi-inverse} is computed via Definition 2.3.6 from
   Nelsen (2006). An equi-quantile grid on the data range of length
   \code{n.quasi.inv/2} is combined with an equi-spaced grid on the data
-  range extended by \code{er.quasi.inv}; the sorted union forms the
+  range extended by \code{er.quasi.inv} and intersected with the fitted
+  marginal kernel's bounds; the sorted union forms the
   grid used for marginal inversion. If requested probability values lie
   outside the attainable estimated marginal distribution range, they
   are reset to the nearest attainable endpoint. Inspect the returned

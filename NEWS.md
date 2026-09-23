@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Copula probability-grid evaluation keeps marginal inverse grids inside the
+  fitted kernel domain, allowing bounded kernels to retain their valid support
+  when the requested grid extension reaches beyond it.
+
 * Mixed-data copula marginals now retain the bounds of their original
   variable, independently of where categorical columns occur in the data.
 
