@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Recomputing a retained regression hat operator now preserves whether its
+  targets are training observations or external queries. Explicit new grids
+  remain external even when their coordinates equal the training data.
+
 * npreghat() now dispatches fitted regression objects to their registered
   method before inspecting saved calls, preserving retained training inputs
   and ordinary subclass dispatch.

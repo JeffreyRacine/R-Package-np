@@ -2399,8 +2399,11 @@ predict.npreghat <-
         is.null(dots[["exdat", exact = TRUE]]))
       newdata <- .np_native_newdata_parts(
         newdata, list(exdat = bws$xnames), "predict.npreghat")$exdat
-    if (!is.null(newdata) || !isTRUE(leave.one.out))
-      call.args$exdat <- if (is.null(newdata)) attr(object, "exdat") else newdata
+    if (!is.null(newdata))
+      call.args$exdat <- newdata
+    else if (!isTRUE(leave.one.out) &&
+             !isTRUE(attr(object, "trainiseval", exact = TRUE)))
+      call.args$exdat <- attr(object, "exdat")
     do.call(npreghat, .np_args_with_defaults(call.args, dots))
   }
 
