@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Density bandwidth documentation now explains how to identify and interpret
+  solutions at the fixed-bandwidth search floor, including beta CVLS
+  sensitivity to endpoint observations.
+
 * Non-beta first local-polynomial hat derivatives now retain undefined
   external rows as NA with the existing row warning, consistently across
   matrix, application and prediction. Internal finite-operator consumers
