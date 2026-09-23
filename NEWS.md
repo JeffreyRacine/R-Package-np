@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Copula plots align surfaces and uncertainty layers with their probability
+  axes when supplied grids are unsorted. Stored fits and returned plot data
+  retain their original row order.
+
 * Copula probability-grid evaluation keeps marginal inverse grids inside the
   fitted kernel domain, allowing bounded kernels to retain their valid support
   when the requested grid extension reaches beyond it.
