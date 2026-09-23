@@ -2284,6 +2284,10 @@ npreghat.rbandwidth <-
     bernstein.basis <- operator.spec$bernstein.basis
     s <- operator.spec$s
     reg.spec <- operator.spec$reg.spec
+    # Bind the resolved state at the computation owner, not in the pure
+    # specification helper whose local bandwidth copy is not returned.
+    if (!identical(reg.spec.raw, reg.spec))
+      bws[names(reg.spec)] <- reg.spec
     constant.basis <- operator.spec$constant.basis
     first.derivative.request <- operator.spec$first.derivative.request
     simple.operator.request <- operator.spec$simple.operator.request

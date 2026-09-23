@@ -65,7 +65,9 @@ These arguments identify the fitted bandwidth object, formula/data interface, tr
     coordinates equal the training data; this distinction can affect
     nearest-neighbor radii. Formula newdata is evaluated with the trained
     predictor transformations. Explicit native \code{exdat} takes precedence
-    over \code{newdata} and is already in the transformed predictor coordinates.}
+    over \code{newdata} and is already in the transformed predictor coordinates.
+    Retained operators carry their effective polynomial specification,
+    including construction-time degree, basis and Bernstein overrides.}
 
 
   \item{txdat}{Training predictors.}
