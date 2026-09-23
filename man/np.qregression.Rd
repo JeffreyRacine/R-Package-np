@@ -439,6 +439,10 @@ prediction/evaluation route, or plot route as appropriate.
     This component is \code{NULL} when \code{se=FALSE}. }
   \item{se}{ whether asymptotic uncertainty was requested }
   \item{tau}{ the quantile probability or probabilities computed }
+  \item{fit.controls}{ resolved \code{tol}, \code{small}, and \code{itmax}
+    controls used for numerical quantile extraction. Prediction reuses these
+    values unless the corresponding argument is explicitly supplied. Older
+    objects without this component use the historical defaults. }
 
 
 }

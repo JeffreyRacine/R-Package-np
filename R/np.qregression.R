@@ -1080,7 +1080,8 @@ npqreg.condbandwidth <-
                 gradients = gradients,
                 se = se,
                 timing = bws$timing, total.time = total.time,
-                optim.time = optim.time, fit.time = fit.elapsed)
+                optim.time = optim.time, fit.time = fit.elapsed,
+                fit.controls = list(tol = tol, small = small, itmax = itmax))
     fit$eval.rows.omit <- if (no.ex) integer(0) else as.vector(eval.omit)
     fit$eval.nobs.omit <- length(fit$eval.rows.omit)
     .npreg_finish_empty_rows(fit, empty.flags, omitted = eval.omit,
