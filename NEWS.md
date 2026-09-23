@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Partially linear hat operators apply the fitter's identification check to
+  the residualized linear design, including subtraction error. Unidentified
+  models now fail consistently instead of returning row-order-dependent hats.
+
 * Location-scale quantile fits retain trained formula transformations for
   prediction and scalar children of vector-tau fits. Native exdat is already
   in model coordinates and takes precedence without a second transformation.
