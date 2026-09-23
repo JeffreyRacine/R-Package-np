@@ -405,6 +405,22 @@ lsqregression <-
   paste(deparse(stats::formula(formula)[[2L]]), collapse = "")
 }
 
+.nplsqreg_retain_formula_terms <- function(bws, formula, terms) {
+  if (inherits(bws, "lsqregression")) {
+    bws$bws <- .nplsqreg_retain_formula_terms(bws$bws, formula, terms)
+    if (!is.null(bws$tau.fits))
+      bws$tau.fits <- lapply(bws$tau.fits, .nplsqreg_retain_formula_terms,
+                             formula = formula, terms = terms)
+    return(bws)
+  }
+  bws$formula <- formula
+  bws$terms <- terms
+  if (!is.null(bws$tau.bws))
+    bws$tau.bws <- lapply(bws$tau.bws, .nplsqreg_retain_formula_terms,
+                          formula = formula, terms = terms)
+  bws
+}
+
 .nplsqreg_set_response_name <- function(x, response.name) {
   x$ynames <- response.name
   if (!is.null(x$reg.bws))
@@ -748,8 +764,10 @@ gradients.lsqregression <- function(x, se = FALSE,
 }
 
 .nplsqreg_predict_formula_newdata_to_exdat <- function(object, newdata) {
-  tt <- stats::terms(object$bws$formula)
-  rhs <- .np_formula_aligned_terms(stats::delete.response(tt))
+  tt <- object$bws[["terms", exact = TRUE]]
+  if (is.null(tt))
+    tt <- stats::terms(object$bws$formula)
+  rhs <- stats::delete.response(tt)
   npValidateNewdataFormula(newdata, rhs, include.response = FALSE)
   mf <- do.call(.np_formula_model_frame, list(formula = rhs, data = newdata),
                 envir = environment(tt))

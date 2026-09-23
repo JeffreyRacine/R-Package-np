@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Location-scale quantile fits retain trained formula transformations for
+  prediction and scalar children of vector-tau fits. Native exdat is already
+  in model coordinates and takes precedence without a second transformation.
+
 * Conditional quantile fits retain their resolved numerical extraction controls.
   Prediction reuses them unless explicitly overridden; old saved objects without
   these controls retain the historical defaults.

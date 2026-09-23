@@ -149,6 +149,13 @@ selection, prediction, or plotting route.
   }
 }
 \details{
+  Formula fits retain trained terms and prediction expressions, so
+  data-dependent transformations are reused for \code{newdata} rather than
+  recalculated on each prediction grid. The same terms are retained by the
+  scalar children of vector-\code{tau} fits. Native \code{exdat} already
+  contains model coordinates and is not transformed again. Older saved
+  objects without trained terms retain their formula-based fallback.
+
   Omitted training rows are restored as \code{NA} in fitted values and
   residuals, including fits obtained from a retained bandwidth object and
   multiple quantile probabilities. Prediction restores omitted evaluation
