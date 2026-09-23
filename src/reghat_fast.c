@@ -78,8 +78,8 @@ SEXP C_np_lc_hat_normalize(SEXP kw, SEXP denominator)
 
 /* Preserve the caller's explicit R matrix-product arithmetic while sharing
  * the response/adjoint rank and ridge policy with the compiled row owner. */
-SEXP C_np_lp_adjoint_prepared(SEXP gram, SEXP rhs, SEXP ntrain_arg,
-                              SEXP rank_arg)
+static SEXP np_lp_adjoint_prepared(SEXP gram, SEXP rhs, SEXP ntrain_arg,
+                                    SEXP rank_arg, const int return_ridge)
 {
   int nr = 0, p = 0;
   const int ntrain = asInteger(ntrain_arg);
@@ -105,12 +105,36 @@ SEXP C_np_lp_adjoint_prepared(SEXP gram, SEXP rhs, SEXP ntrain_arg,
   if(status == NP_LP_SOLVE_POLICY_OK)
     memcpy(REAL(out), workspace.rhs_work, (size_t)p*sizeof(double));
   np_lp_solve_workspace_clear(&workspace);
-  UNPROTECT(1);
   if(status == NP_LP_SOLVE_POLICY_NONFINITE)
     error("LP solve failed in R hat-matrix path: non-finite system");
   if(status != NP_LP_SOLVE_POLICY_OK)
     error("LP solve failed in R hat-matrix path after bounded ridging");
+  if(return_ridge) {
+    SEXP result = PROTECT(allocVector(VECSXP, 2));
+    SEXP names = PROTECT(allocVector(STRSXP, 2));
+    SET_VECTOR_ELT(result, 0, out);
+    SET_VECTOR_ELT(result, 1, ScalarReal(diagnostics.ridge_total));
+    SET_STRING_ELT(names, 0, mkChar("v"));
+    SET_STRING_ELT(names, 1, mkChar("ridge"));
+    setAttrib(result, R_NamesSymbol, names);
+    UNPROTECT(3);
+    return result;
+  }
+  UNPROTECT(1);
   return out;
+}
+
+SEXP C_np_lp_adjoint_prepared(SEXP gram, SEXP rhs, SEXP ntrain_arg,
+                              SEXP rank_arg)
+{
+  return np_lp_adjoint_prepared(gram, rhs, ntrain_arg, rank_arg, 0);
+}
+
+/* Metadata is allocated only for callers retaining the accepted ridge. */
+SEXP C_np_lp_adjoint_prepared_ridge(SEXP gram, SEXP rhs, SEXP ntrain_arg,
+                                    SEXP rank_arg)
+{
+  return np_lp_adjoint_prepared(gram, rhs, ntrain_arg, rank_arg, 1);
 }
 
 static SEXP np_reghat_width_one_matrix(SEXP kw,

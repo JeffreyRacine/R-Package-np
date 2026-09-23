@@ -102,7 +102,9 @@ These arguments control local-polynomial basis, degree, derivatives, leave-one-o
   existing automatic numerical ridging policy. Computational owners that
   implement only that policy reject an explicit nonzero value rather than
   ignoring it; the generic mixed-derivative owner continues to support an
-  explicit base ridge. Automatic increments are \code{1/n.train}.
+  explicit base ridge, with absolute increments \code{1/n.train} on that
+  explicit-ridge route. Default higher and mixed derivatives instead share
+  the canonical LP solve-admission and automatic ridge policy used by fitting.
   Wider systems restore the response intercept from the signed pristine
   Gram intercept.}
 
@@ -200,6 +202,13 @@ bandwidths. Unsupported rows become \code{NA}, while supported derivative
 rows keep their usual values. A zero sum formed by cancellation of nonzero
 weights, non-finite arithmetic, and invalid nearest-neighbor radii remain
 errors; they are not classified as empty rows.
+
+Default higher and mixed local-polynomial derivative operators also use the
+finite-pristine-system, all-zero-weight certificate for external rows. Their
+\code{ridge.used} entries are then \code{NA}, with the same warning and output
+shapes described above. An explicit positive \code{ridge} retains its requested
+regularized operator; it is not replaced by automatic ridging or this default
+unavailable-row policy.
 
 For local-constant beta kernels, one first derivative is evaluated by the
 same analytic C kernel used by \code{npreg(..., gradients=TRUE)}. If an exact
