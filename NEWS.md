@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* npreghat() now dispatches fitted regression objects to their registered
+  method before inspecting saved calls, preserving retained training inputs
+  and ordinary subclass dispatch.
+
 * Quantile formula refits now consume the resolved missing-data policy before
   filtering numerical controls, allowing the documented replacement-data
   na.action override without weakening native argument validation.
