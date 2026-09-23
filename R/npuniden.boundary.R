@@ -50,46 +50,47 @@ npuniden.boundary <- function(X=NULL,
         }
     } else if(kertype=="gaussian2") {
         ## Gaussian reweighted second-order boundary kernel function
-        ## (bias of O(h^2)). Instability surfaces for extremely large
-        ## bandwidths relative to range of the data, so we shrink to
-        ## the uniform when h exceeds 10,000 times the range (b-a)
+        ## (bias of O(h^2)), including its nonuniform large-h limit.
         kernel <- function(x,X,h,a=0,b=1) {
             z <- (x-X)/h
             z.a <- (a-x)/h
             z.b <- (b-x)/h
+            if(max(abs(z.a),abs(z.b)) < .1) {
+                # Cancel common powers of support-width/h before taking moment
+                # ratios. Unit-support moments stay finite even as h grows.
+                width <- b-a
+                epsilon <- width/h
+                lower <- (a-x)/width
+                upper <- (b-x)/width
+                k <- 0:6
+                coefficient <- (-.5*epsilon^2)^k/factorial(k)
+                moment.0 <- sum(coefficient*(upper^(2*k+1)-lower^(2*k+1))/(2*k+1))
+                moment.2 <- sum(coefficient*(upper^(2*k+3)-lower^(2*k+3))/(2*k+3))
+                r <- (x-(a+width/2))/width
+                t2 <- (r*epsilon^2/2)^2
+                ratio <- .25+r^2-
+                    (r^2*epsilon^2/2)*(1/3-t2*(1/45-2*t2/945))
+                w <- (x-X)/width
+                return((ratio-w^2)/(ratio-moment.2/moment.0) *
+                    exp(-.5*z^2)/(width*moment.0))
+            }
             pnorm.zb.m.pnorm.za <- (pnorm(z.b)-pnorm(z.a))
             mu.2 <- 1+(z.a*dnorm(z.a)-z.b*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            if(max(abs(z.a),abs(z.b)) < .1) {
-                # Integrate the Gaussian series directly: the closed moment
-                # formula above cancels to zero on narrow standardized support.
-                # Seven terms have remainder < (.005)^7/7! < 2e-20.
-                k <- 0:6
-                coefficient <- (-.5)^k/factorial(k)
-                moment.0 <- sum(coefficient*(z.b^(2*k+1)-z.a^(2*k+1))/(2*k+1))
-                moment.2 <- sum(coefficient*(z.b^(2*k+3)-z.a^(2*k+3))/(2*k+3))
-                pnorm.zb.m.pnorm.za <- dnorm(0)*moment.0
-                mu.2 <- moment.2/moment.0
-            }
-            if((b-a)/h > 1e-04) {
-                # mu.3/mu.1 has a removable 0/0 at the support midpoint;
-                # the ordinates can also both underflow for narrow kernels.
-                # This algebraic ratio preserves the same kernel everywhere.
-                half.width <- (b-a)/(2*h)
-                delta <- (x-(a+(b-a)/2))/h
-                t <- abs(half.width*delta)
-                if(t < 1e-3) {
-                    t2 <- t*t
-                    ratio <- half.width^2+delta^2-
-                        2*t2*(1/3-t2*(1/45-2*t2/945))
-                } else {
-                    ratio <- 2+min(abs(z.a),abs(z.b))^2-4*t/expm1(2*t)
-                }
-                aa <- ratio/(ratio-mu.2)
-                bb <- -1/(ratio-mu.2)
-                (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
+            # mu.3/mu.1 has a removable 0/0 at the support midpoint;
+            # the ordinates can also both underflow for narrow kernels.
+            half.width <- (b-a)/(2*h)
+            delta <- (x-(a+(b-a)/2))/h
+            t <- abs(half.width*delta)
+            if(t < 1e-3) {
+                t2 <- t*t
+                ratio <- half.width^2+delta^2-
+                    2*t2*(1/3-t2*(1/45-2*t2/945))
             } else {
-                rep(1/(b-a),length(X))
+                ratio <- 2+min(abs(z.a),abs(z.b))^2-4*t/expm1(2*t)
             }
+            aa <- ratio/(ratio-mu.2)
+            bb <- -1/(ratio-mu.2)
+            (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
         }
     } else if(kertype=="beta1") {
         ## Chen (1999), Beta 1 kernel function (bias of O(h), function

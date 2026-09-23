@@ -135,7 +135,9 @@ and distribution function estimates over the range \eqn{[a,b]}
   The \code{"gaussian2"} kernel uses the continuous limit of its truncated-
   moment ratios at the support midpoint. The same stable algebra also avoids
   loss of these ratios when both boundary Gaussian ordinates underflow; no
-  different kernel is substituted.
+  different kernel is substituted. At arbitrarily large bandwidths, moments
+  are scaled to the declared support before taking ratios, retaining the
+  Gaussian2 limit rather than replacing it by a uniform kernel.
 
   Sampled total integrals used elsewhere in this helper collapse duplicate
   integration coordinates, not training observations. Endpoint correction
