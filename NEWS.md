@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Smooth-coefficient evaluation preserves positional native predictor columns
+  when preparing large-bandwidth eligibility geometry; harmless vector/frame
+  naming differences no longer stop evaluation or bypass qualified shortcuts.
+
 * Regression hat applications use the regression's retained numerical coding
   when borrowing an implicit factor response from a formula, bandwidth object
   or fitted model. Explicit numerical response payloads are unchanged.
