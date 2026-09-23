@@ -130,7 +130,11 @@ These arguments control whether the operator is returned as a matrix, applied di
   \item{output}{Either \code{"matrix"} for the hat matrix, \code{"apply"} for direct application to \code{y}, or \code{"constraint"} for the row-weighted transpose \code{t(H) * y}.}
 
 
-  \item{y}{Optional response vector or matrix for apply mode. For \code{output = "constraint"}, \code{y} is required and must be a vector or one-column object.}
+  \item{y}{Optional response vector or matrix for apply mode. For \code{output = "constraint"}, \code{y} is required and must be a vector or one-column object.
+    When omitted and borrowed from a formula, bandwidth object or fitted model,
+    a factor response uses the fitted regression's numerical level coding,
+    including numeric level labels. Explicit numerical vectors or matrices are
+    applied as supplied, without recoding.}
 
 
 \subsection{Additional Arguments}{

@@ -1714,6 +1714,7 @@ npreghat.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
     dots <- list(...)
+    implicit.response <- !("y" %in% names(dots))
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
@@ -1736,6 +1737,8 @@ npreghat.formula <-
     tt <- attr(mf, "terms")
 
     y <- model.response(mf)
+    if (implicit.response && is.factor(y))
+      y <- .np_plreg_numeric_response(y, bws$ydati)
     txdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
 
     has.eval <- is.null(dots[["exdat", exact = TRUE]]) && !is.null(newdata)
@@ -1756,8 +1759,12 @@ npreghat.formula <-
 
 npreghat.call <-
   function(bws, ...) {
-    ev <- do.call(npreghat, .np_retained_training_args(
-      bws, c(txdat = "xdat", y = "ydat"), list(...)))
+    dots <- list(...)
+    args <- .np_retained_training_args(
+      bws, c(txdat = "xdat", y = "ydat"), dots)
+    if (!("y" %in% names(dots)) && is.factor(args$y))
+      args$y <- .np_plreg_numeric_response(args$y, bws$ydati)
+    ev <- do.call(npreghat, args)
     attr(ev, "call") <- match.call(expand.dots = FALSE)
     ev
   }
@@ -1770,8 +1777,11 @@ npreghat.npregression <-
     if (missing(txdat))
       txdat <- .np_eval_bws_call_arg(rbw, "xdat")
 
-    if (missing(y))
+    if (missing(y)) {
       y <- .np_eval_bws_call_arg(rbw, "ydat")
+      if (is.factor(y))
+        y <- .np_plreg_numeric_response(y, rbw$ydati)
+    }
 
     npreghat(bws = rbw, txdat = txdat, y = y, ...)
   }
