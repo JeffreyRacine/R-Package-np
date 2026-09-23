@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Quantile formula refits now consume the resolved missing-data policy before
+  filtering numerical controls, allowing the documented replacement-data
+  na.action override without weakening native argument validation.
+
 * Explicit gradient orders are now checked consistently by regression fits,
   regression plots and stored gradient/gradient-SE extractors. Unsupported
   higher orders no longer silently return first derivatives; existing LP

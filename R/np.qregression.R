@@ -799,6 +799,10 @@ npqreg.formula <-
     tt <- attr(tmf, "terms")
     bws <- .np_bws_retain_fit_frame(bws, tmf)
 
+    # The formula frame owns this control. Do not forward an already resolved
+    # NA policy to the numerical quantile-fit filter (or evaluate it twice).
+    dots$na.action <- NULL
+
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
 
