@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Automatic nearest-neighbor distribution-bandwidth recovery now respects
+  the deleted-sample count domain. It can recover a valid ordinary candidate
+  from a failed boundary start without replacing explicit or extended starts.
+
 * Conditional-mode omission metadata now describes the active evaluation
   result; separate training omission fields retain the training history.
   Estimates, standard errors, class probabilities and NA padding are unchanged.
