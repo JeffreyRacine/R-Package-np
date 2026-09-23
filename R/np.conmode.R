@@ -103,10 +103,8 @@ npconmode.formula <-
     ev <- do.call(npconmode, c(cm.args, dots))
 
     output.omit <- .np_formula_output_action(ev, umf, has.eval, native.restored = TRUE)
-    ev <- .npConmodeRecordOmit(ev, train.omit)
-    if (has.eval) {
-      ev <- .npConmodeRecordEvalOmit(ev, eval.omit)
-    }
+    ev <- .npConmodeRecordSampleOmissions(ev, train.omit,
+      if (has.eval) eval.omit else ev[["eval.omit", exact = TRUE]])
     ev <- .npConmodePadRowOutputs(ev, output.omit)
 
     return(ev)
@@ -333,6 +331,15 @@ npconmode.condbandwidth <-
   obj$eval.rows.omit <- .npConmodeOmitRows(omit)
   obj$eval.nobs.omit <- .npConmodeOmitLength(omit)
   obj
+}
+
+.npConmodeRecordSampleOmissions <- function(obj, train.omit, eval.omit = NULL) {
+  obj$train.rows.omit <- .npConmodeOmitRows(train.omit)
+  obj$train.nobs.omit <- .npConmodeOmitLength(train.omit)
+  if (isTRUE(obj[["trainiseval", exact = TRUE]]))
+    return(.npConmodeRecordOmit(obj, train.omit))
+  obj <- .npConmodeRecordEvalOmit(obj, eval.omit)
+  .npConmodeRecordOmit(obj, eval.omit)
 }
 
 .npConmodePadRowOutputs <- function(obj, omit) {
@@ -743,11 +750,10 @@ npconmode.conbandwidth <-
       fit.mcfadden <- sum(t.diag) - (sum(confusion.matrix^2)-sum(t.diag^2))
       con.mode$fit.mcfadden <- fit.mcfadden
     }
-    con.mode <- .npConmodeRecordOmit(con.mode, train.omit)
+    con.mode <- .npConmodeRecordSampleOmissions(con.mode, train.omit, eval.omit)
     if (no.ex) {
       con.mode <- .npConmodePadRowOutputs(con.mode, train.omit)
     } else {
-      con.mode <- .npConmodeRecordEvalOmit(con.mode, eval.omit)
       con.mode <- .npConmodePadRowOutputs(con.mode, eval.omit)
     }
     .npreg_finish_empty_rows(con.mode, empty.rows,

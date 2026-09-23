@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Conditional-mode omission metadata now describes the active evaluation
+  result; separate training omission fields retain the training history.
+  Estimates, standard errors, class probabilities and NA padding are unchanged.
+
 * Kernel-sum documentation distinguishes zero-diagonal leave-one-out sums
   from deleted-sample nearest-neighbor geometry, and raw weight exports from
   bandwidth-normalized sums. Estimator documentation now explains the existing
