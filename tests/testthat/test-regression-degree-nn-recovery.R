@@ -16,7 +16,7 @@ test_that("automatic degree search resumes from a raw-valid ordinary NN point", 
     expect_identical(rs[[1L]]$start, c(7, 7, 1, 1))
     expect_true(rs[[2L]]$recovery)
     witness <- rs[[2L]]$recovery_witness
-    cap <- if (type == "adaptive_nn") 46 else 47
+    cap <- 46 # A deleted sample of 47 admits ordinary counts through 46.
     expect_identical(witness$point, c(cap, cap, 1, 1))
     expect_identical(witness$evaluations, 3L)
     expect_identical(rs[[2L]]$start, witness$point)

@@ -24,7 +24,11 @@ test_that("conditional-density MADS recovers only automatic invalid NN starts", 
     controls$bws <- rep(7, 3)
     controls$nomad.opts <- list(MAX_BB_EVAL = 1L)
     expect_error(do.call(npcdensbw, controls), "did not return a raw-valid solution")
-    controls$bws <- rep(if (type == "adaptive_nn") 46 else 47, 3)
+    if (type == "generalized_nn" && method == "cv.ml") {
+      controls$bws <- rep(47, 3)
+      expect_error(do.call(npcdensbw, controls), "did not return a raw-valid solution")
+    }
+    controls$bws <- rep(if (type == "adaptive_nn" || method == "cv.ml") 46 else 47, 3)
     explicit <- do.call(npcdensbw, controls)
     expect_false(any(vapply(explicit$nomad.restart.results,
       function(z) isTRUE(z$recovery), logical(1L))))
