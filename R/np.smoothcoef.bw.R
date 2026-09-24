@@ -1713,17 +1713,18 @@ npscoefbw.NULL <-
         .npscoefbw_collective_transaction(collective.state,
           function() recovery.raw.eval.local(point), allow.typed.rejection = TRUE)
     }
-    ordinary.caps <- rep.int(NROW(eval.zdat) - 1L, ncon)
+    ordinary.caps <- rep.int(NROW(eval.zdat) - 2L, ncon)
     ordinary.start <- recovery.start[seq_len(ncon)]
     recovery <- if (length(ordinary.start) &&
                     all(ordinary.caps >= 2L) &&
                     all(ordinary.start >= 2L) &&
-                    all(ordinary.start <= ordinary.caps)) {
+                    all(ordinary.start <= NROW(eval.zdat) - 1L)) {
       .np_nn_find_raw_valid_start(
         point = recovery.start,
         nn.indices = seq_len(ncon),
         caps = ordinary.caps,
-        raw.eval = recovery.raw.eval
+        raw.eval = recovery.raw.eval,
+        incumbent.caps = NROW(eval.zdat) - 1L
       )
     } else {
       list(found = FALSE, point = NULL, objective = NA_real_, evaluations = 0L)
@@ -3387,17 +3388,18 @@ npscoefbw.scbandwidth <-
               }
               as.double(value)
             }
-            ordinary.caps <- rep.int(n - 1L, sum(dati$icon))
+            ordinary.caps <- rep.int(n - 2L, sum(dati$icon))
             ordinary.start <- first.automatic.start[dati$icon]
             recovery <- if (length(ordinary.start) &&
                             all(ordinary.caps >= 2L) &&
                             all(ordinary.start >= 2L) &&
-                            all(ordinary.start <= ordinary.caps)) {
+                            all(ordinary.start <= n - 1L)) {
               .np_nn_find_raw_valid_start(
                 point = first.automatic.start,
                 nn.indices = which(dati$icon),
                 caps = ordinary.caps,
-                raw.eval = recovery.raw.eval
+                raw.eval = recovery.raw.eval,
+                incumbent.caps = n - 1L
               )
             } else {
               list(found = FALSE, point = NULL, objective = NA_real_, evaluations = 0L)
