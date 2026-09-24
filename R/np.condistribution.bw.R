@@ -2301,15 +2301,15 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
           out$objective
         }
         incumbent.point <- native.results[[incumbent.index]]$best_point
-      caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
-        isTRUE(opt.args$do.full.integral))
-      incumbent.caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
-        isTRUE(opt.args$do.full.integral), incumbent = TRUE)
-      nn.point <- round(incumbent.point[seq_along(setup$cont_flat)])
-      recovery <- if (all(nn.point >= 1L & nn.point <= incumbent.caps)) {
-        .np_nn_find_raw_valid_start(point = incumbent.point,
-          nn.indices = seq_along(setup$cont_flat), caps = caps,
-          raw.eval = recovery.raw.eval, incumbent.caps = incumbent.caps)
+        caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
+          isTRUE(opt.args$do.full.integral))
+        incumbent.caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
+          isTRUE(opt.args$do.full.integral), incumbent = TRUE)
+        nn.point <- round(incumbent.point[seq_along(setup$cont_flat)])
+        recovery <- if (all(nn.point >= 1L & nn.point <= incumbent.caps)) {
+          .np_nn_find_raw_valid_start(point = incumbent.point,
+            nn.indices = seq_along(setup$cont_flat), caps = caps,
+            raw.eval = recovery.raw.eval, incumbent.caps = incumbent.caps)
         } else NULL
         if (isTRUE(recovery$found)) {
           .np_progress_bandwidth_activity_step(force = TRUE)

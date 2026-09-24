@@ -18,7 +18,7 @@ test_that("conditional CDF degree NOMAD recovers automatic NN starts with the ri
     expect_length(rr,2L)
     expect_true(isTRUE(rr[[2L]]$recovery))
     expect_identical(rr[[2L]]$recovery_witness$evaluations,3L)
-    caps <- if(type=="adaptive_nn")rep(46,3L) else c(if(grid=="training")46 else 47,47,47)
+    caps <- if(type=="adaptive_nn" || grid!="training")rep(46,3L) else c(46,47,47)
     expect_equal(rr[[2L]]$start,c(caps,1,1),tolerance=0)
     expect_identical(bw$nomad.best.restart,2L)
     raw <- .npcdistbw_eval_only(xdat=x,ydat=y,gydat=controls$gydat,bws=bw,
