@@ -1910,6 +1910,7 @@ dlev <- function(x){
                        y = bws[["ydati", exact = TRUE]]) else bws[["dati", exact = TRUE]]
   for (role in names(info)) {
     d <- info[[role]]
+    if (is.null(d)) next
     columns <- which(d[["iord", exact = TRUE]])
     if (!length(columns)) next
     kernel <- if (raw && role == "x") bws[["okertype", exact = TRUE]] else

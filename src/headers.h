@@ -22,7 +22,6 @@ static inline int np_ordered_lattice_distance(const double x, const double y)
 {
   const double distance = fabs(x-y), lattice = round(distance);
   if(!R_FINITE(distance) || lattice >= INT_MAX ||
-     (distance > 0.0 && lattice == 0.0) ||
      fabs(distance-lattice) > 8.0*DBL_EPSILON*fmax(1.0,distance))
     Rf_error("ordered unit-lattice kernel requires integer distances within the native index range; use Li-Racine weights or Racine-Li-Yan for fractional distances");
   return (int)lattice;
