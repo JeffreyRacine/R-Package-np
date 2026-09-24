@@ -1379,10 +1379,16 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
 }
 
 .npcdistbw_nn_recovery_caps <- function(template, setup, gydat = NULL,
-                                        do.full.integral = FALSE) {
+                                        do.full.integral = FALSE,
+                                        incumbent = FALSE) {
   n <- setup[["nobs"]]
   ncon <- length(setup[["cont_flat"]])
   if (identical(template[["type"]], "adaptive_nn"))
+    return(rep.int(n - 2L, ncon))
+  if (!incumbent && identical(template[["type"]], "generalized_nn") &&
+      (!is.null(gydat) || !isTRUE(do.full.integral)) &&
+      !identical(template[["cxkertype"]], "beta") &&
+      !identical(template[["cykertype"]], "beta"))
     return(rep.int(n - 2L, ncon))
   caps <- rep.int(n - 1L, ncon)
   # Empirical response-grid CDF folds omit both response indices; X omits one.
@@ -1699,6 +1705,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       incumbent.point <- native.results[[incumbent.index]]$best_point
       caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
         opt.value("do.full.integral", FALSE))
+      incumbent.caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
+        opt.value("do.full.integral", FALSE), incumbent = TRUE)
       recovery.raw.eval <- function(point) {
         out <- raw_eval_point(point)
         native.num.feval.total <<- native.num.feval.total + out$num.feval
@@ -1710,10 +1718,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       # strictly ordinary-NN, monotone recovery policy.
       if (length(incumbent.point) == bwdim && all(is.finite(incumbent.point)) &&
           all(round(incumbent.point[seq_len(bounds$ncon)]) >= 1L) &&
-          all(round(incumbent.point[seq_len(bounds$ncon)]) <= caps)) {
+          all(round(incumbent.point[seq_len(bounds$ncon)]) <= incumbent.caps)) {
         recovery <- .np_nn_find_raw_valid_start(
           point = incumbent.point, nn.indices = seq_len(bounds$ncon),
-          caps = caps, raw.eval = recovery.raw.eval)
+          caps = caps, raw.eval = recovery.raw.eval,
+          incumbent.caps = incumbent.caps)
         if (isTRUE(recovery$found)) {
           .np_progress_bandwidth_activity_step(force = TRUE)
           native.start.matrix <- rbind(native.start.matrix, recovery$point)
@@ -2292,13 +2301,15 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
           out$objective
         }
         incumbent.point <- native.results[[incumbent.index]]$best_point
-        caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
-          isTRUE(opt.args$do.full.integral))
-        nn.point <- round(incumbent.point[seq_along(setup$cont_flat)])
-        recovery <- if (all(nn.point >= 1L & nn.point <= caps)) {
-          .np_nn_find_raw_valid_start(point = incumbent.point,
-            nn.indices = seq_along(setup$cont_flat), caps = caps,
-            raw.eval = recovery.raw.eval)
+      caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
+        isTRUE(opt.args$do.full.integral))
+      incumbent.caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
+        isTRUE(opt.args$do.full.integral), incumbent = TRUE)
+      nn.point <- round(incumbent.point[seq_along(setup$cont_flat)])
+      recovery <- if (all(nn.point >= 1L & nn.point <= incumbent.caps)) {
+        .np_nn_find_raw_valid_start(point = incumbent.point,
+          nn.indices = seq_along(setup$cont_flat), caps = caps,
+          raw.eval = recovery.raw.eval, incumbent.caps = incumbent.caps)
         } else NULL
         if (isTRUE(recovery$found)) {
           .np_progress_bandwidth_activity_step(force = TRUE)

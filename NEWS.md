@@ -5,6 +5,11 @@
   radii, retaining the empirical-grid convention, row/block work ownership
   and existing tree-selection policy.
 
+* Failed automatic non-beta generalized-neighbor conditional-distribution
+  searches now recover within the deleted-sample count domain on external
+  grids. Explicit/extended starts, selected solvers, empirical grids and
+  other kernel/bandwidth routes retain their existing policies.
+
 * Automatic nearest-neighbor density, regression and conditional-density
   recovery now uses each criterion's deleted-sample count domain while
   retaining the full-sample CVAIC endpoint. Explicit and genuinely extended

@@ -19338,14 +19338,23 @@ conditional_distribution_powell_attempt:
           (num_obs_train_extern >= 3)) {
         double finite_seed = DBL_MAX;
         int found_finite_seed;
+        const int external_gnn_fold =
+          BANDWIDTH_den_extern == BW_GEN_NN && !cdfontrain &&
+          KERNEL_reg_extern != NP_CKERNEL_COORDINATE_CODE &&
+          KERNEL_den_extern != NP_CKERNEL_COORDINATE_CODE;
         const int maximum_k =
-          (BANDWIDTH_den_extern == BW_GEN_NN) ?
+          (BANDWIDTH_den_extern == BW_GEN_NN && !external_gnn_fold) ?
           num_obs_train_extern - 1 : num_obs_train_extern - 2;
 
         nn_retry_history_index = (iImproved > 0) ? iImproved - 1 : 0;
         nn_retry_improved = iImproved;
         bwm_reset_counters();
-        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+        found_finite_seed = external_gnn_fold ?
+          np_ordinary_nn_find_finite_raw_seed_domain(
+            vector_scale_factor,
+            num_var_continuous_extern + num_reg_continuous_extern,
+            num_obs_train_extern, maximum_k, num_all_var, 1,
+            &finite_seed) : np_ordinary_nn_find_finite_raw_seed(
           vector_scale_factor,
           num_var_continuous_extern + num_reg_continuous_extern,
           num_obs_train_extern,
