@@ -21,6 +21,7 @@
 static inline int np_ordered_lattice_distance(const double x, const double y)
 {
   const double distance = fabs(x-y), lattice = round(distance);
+  if(distance == lattice && lattice < INT_MAX) return (int)lattice;
   if(!R_FINITE(distance) || lattice >= INT_MAX ||
      fabs(distance-lattice) > 8.0*DBL_EPSILON*fmax(1.0,distance))
     Rf_error("ordered unit-lattice kernel requires integer distances within the native index range; use Li-Racine weights or Racine-Li-Yan for fractional distances");
@@ -32,6 +33,7 @@ static inline int np_ordered_lattice_distance(const double x, const double y)
 static inline double np_ordered_metric_distance(const double x, const double y)
 {
   const double distance = fabs(x-y), lattice = round(distance);
+  if(distance == lattice) return distance;
   return (lattice > 0.0 &&
           fabs(distance-lattice) <= 8.0*DBL_EPSILON*fmax(1.0,distance)) ?
     lattice : distance;
@@ -563,6 +565,23 @@ double func_con_density_quantile(double *quantile);
 int kernel_estimate_quantile(int gradient_compute, int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs_train, int num_obs_eval, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered_train, double **matrix_Y_ordered_train, double **matrix_Y_continuous_train, double **matrix_Y_unordered_eval, double **matrix_Y_ordered_eval, double **matrix_Y_continuous_eval, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double *vector_scale_factor, double *quan, double *quan_stderr, double **quan_gradient, int seed, double ftol, double tol, double small, int itmax, int iMax_Num_Multistart, double zero, double lbc_dir, int dfc_dir, double c_dir,double initc_dir,double lbd_dir,double  hbd_dir,double  d_dir,double  initd_dir);
 
 double ipow(double x, int n);
+
+/* Common integer data keep the incumbent ipow operation without traversing
+ * the real-distance tolerance and exponent classifiers for every support
+ * term. This is arithmetic selection, not a support or bandwidth change. */
+static inline double np_ordered_metric_power_between(const double lambda,
+                                                      const double x,
+                                                      const double y)
+{
+  double distance = fabs(x-y);
+  const double lattice = round(distance);
+  if(distance == lattice)
+    return distance < INT_MAX ? ipow(lambda,(int)distance) : pow(lambda,distance);
+  if(lattice > 0.0 &&
+     fabs(distance-lattice) <= 8.0*DBL_EPSILON*fmax(1.0,distance))
+    return lattice < INT_MAX ? ipow(lambda,(int)lattice) : pow(lambda,lattice);
+  return pow(lambda,distance);
+}
 
 static inline double np_ordered_metric_power(const double lambda, const double d)
 {
