@@ -41,8 +41,16 @@ NPNNZeroRadiusInfo np_nn_zero_radius_info(
   NPNNZeroRadiusInfo info = {bandwidth_type, NA_INTEGER, NA_INTEGER,
     NA_INTEGER, NA_INTEGER, NA_REAL, NA_REAL};
   const int adaptive = bandwidth_type == BW_ADAP_NN;
-  const NPNNQueryMode mode = adaptive ? NP_NN_QUERY_TRAINING_IDENTITY :
+  const NPNNQueryMode requested_mode = adaptive ? NP_NN_QUERY_TRAINING_IDENTITY :
     (geometry == NULL ? NP_NN_QUERY_EXTERNAL : geometry->mode);
+  const int deleted_query = !adaptive &&
+    (requested_mode == NP_NN_QUERY_DELETE_ONE_IDENTITY ||
+     requested_mode == NP_NN_QUERY_DELETE_ONE_MAP);
+  const NPNNQueryMode mode =
+    requested_mode == NP_NN_QUERY_DELETE_ONE_IDENTITY ?
+      NP_NN_QUERY_TRAINING_IDENTITY :
+    requested_mode == NP_NN_QUERY_DELETE_ONE_MAP ?
+      NP_NN_QUERY_TRAINING_MAP : requested_mode;
 
   /* Fold-specific support is not reconstructed by this explanation helper. */
   if(geometry != NULL && geometry->mode == NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE)
@@ -55,7 +63,7 @@ NPNNZeroRadiusInfo np_nn_zero_radius_info(
   for(int d = 0; d < ncon; ++d) {
     int k, extended;
     double distance_scale;
-    if(np_nn_lookup_from_scale(ntrain, 1, scale[d], &k,
+    if(np_nn_lookup_from_scale(ntrain - deleted_query, 1, scale[d], &k,
                                &distance_scale, &extended) != 0)
       continue;
     int finite = 1;

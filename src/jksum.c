@@ -20360,6 +20360,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
   const int leave_one_out = ((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
                              (bwm == RBWM_CVKS))?1:0;
+  if(leave_one_out && BANDWIDTH_reg == BW_GEN_NN)
+    nn_geometry_context.mode = NP_NN_QUERY_DELETE_ONE_IDENTITY;
 
   if(!np_reg_cv_core_cache_prepare(KERNEL_reg,
                                    KERNEL_unordered_reg,
@@ -21021,7 +21023,8 @@ static int np_beta_loo_geometry_prepare(
   double **bandwidth, double *lambda)
 {
   NPNNGeometryContext context = {
-    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+    .mode = bandwidth_mode == BW_GEN_NN ?
+      NP_NN_QUERY_DELETE_ONE_IDENTITY : NP_NN_QUERY_TRAINING_IDENTITY,
     .eval_to_train = NULL,
     .adaptive_successor = NULL
   };
@@ -32927,10 +32930,15 @@ static const NPNNGeometryContext np_conditional_training_identity_geometry = {
   .eval_to_train = NULL
 };
 
+static const NPNNGeometryContext np_conditional_deleted_identity_geometry = {
+  .mode = NP_NN_QUERY_DELETE_ONE_IDENTITY,
+  .eval_to_train = NULL
+};
+
 static const NPNNGeometryContext *
-np_conditional_gnn_training_geometry(const int bandwidth_mode){
+np_conditional_gnn_deleted_geometry(const int bandwidth_mode){
   return bandwidth_mode == BW_GEN_NN ?
-    &np_conditional_training_identity_geometry : NULL;
+    &np_conditional_deleted_identity_geometry : NULL;
 }
 
 static int np_conditional_xrow_ctx_prepare_impl(
@@ -34508,7 +34516,7 @@ int np_regression_lp_leave_one_out_influence(
   else
     prepare_status = np_regression_xrow_ctx_prepare(
       vector_scale_factor,
-      np_conditional_gnn_training_geometry(BANDWIDTH_den_extern),
+      np_conditional_gnn_deleted_geometry(BANDWIDTH_den_extern),
       &xctx);
   if(prepare_status != 0){
     if(prepare_status == 2)
@@ -41748,7 +41756,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   const int use_row_ctx = (BANDWIDTH_den_extern == BW_GEN_NN) ||
     (BANDWIDTH_den_extern == BW_ADAP_NN);
   const NPNNGeometryContext * const nn_geometry_context =
-    np_conditional_gnn_training_geometry(BANDWIDTH_den_extern);
+    np_conditional_gnn_deleted_geometry(BANDWIDTH_den_extern);
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
   double *xrow = NULL, *yrow = NULL;
@@ -41865,7 +41873,7 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
   for(i0 = 0; i0 < num_obs; i0 += block_size){
     const int ib = MIN(block_size, num_obs - i0);
     NPNNGeometryContext block_geometry = {
-      .mode = NP_NN_QUERY_TRAINING_MAP,
+      .mode = NP_NN_QUERY_DELETE_ONE_MAP,
       .eval_to_train = eval_to_train
     };
     const NPNNGeometryContext * const nn_geometry_context =
@@ -46240,7 +46248,8 @@ double *cv){
   double **adaptive_selected_bandwidth = NULL;
   double *lambda = NULL;
   NPNNGeometryContext nn_geometry_context = {
-    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+    .mode = BANDWIDTH_den == BW_GEN_NN ?
+      NP_NN_QUERY_DELETE_ONE_IDENTITY : NP_NN_QUERY_TRAINING_IDENTITY,
     .eval_to_train = NULL,
     .adaptive_successor = NULL
   };
@@ -46337,8 +46346,10 @@ double *cv){
     /* Beta candidates participate in optimizer penalty handling.  Preserve
        the incumbent hard error for legacy callers, but let the canonical
        beta callback convert an invalid candidate into DBL_MAX. */
-    if(exact_beta_route)
+    if(exact_beta_route) {
+      status = 1;
       goto cleanup_density_leave_one_out_cv;
+    }
     if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ||
        nn_geometry_status == NP_NN_GEOMETRY_INVALID_SCALE) {
       status = 1;
@@ -47775,7 +47786,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs:1);
   const NPNNGeometryContext * const nn_geometry_context =
-    np_conditional_gnn_training_geometry(BANDWIDTH_den);
+    np_conditional_gnn_deleted_geometry(BANDWIDTH_den);
   NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 
 	//const double log_DBL_MIN = log(DBL_MIN);
@@ -51741,7 +51752,7 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
   const int use_general_lp = np_lp_engine_extern == NP_LP_ENGINE_GENERAL;
   const int use_bernstein = int_glp_bernstein_extern != 0;
   const NPNNGeometryContext * const nn_geometry_context =
-    np_conditional_gnn_training_geometry(BANDWIDTH_den);
+    np_conditional_gnn_deleted_geometry(BANDWIDTH_den);
   NPConditionalRouteRowContext route_x;
   NPConditionalRouteRowContext route_y;
   NPConditionalXRowCtx legacy_x = {0};

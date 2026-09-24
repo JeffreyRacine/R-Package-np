@@ -40,7 +40,11 @@ typedef enum {
   NP_NN_QUERY_EXTERNAL = 0,
   NP_NN_QUERY_TRAINING_IDENTITY = 1,
   NP_NN_QUERY_TRAINING_MAP = 2,
-  NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE = 3
+  NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE = 3,
+  /* Bandwidth-preparation-only modes: use the deleted donor count, then
+   * normalize to ordinary identity/map before cache or distance queries. */
+  NP_NN_QUERY_DELETE_ONE_IDENTITY = 4,
+  NP_NN_QUERY_DELETE_ONE_MAP = 5
 } NPNNQueryMode;
 
 typedef struct {
