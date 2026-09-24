@@ -8,7 +8,7 @@ conditional_declared_support_contract <- function(package) {
     u=factor(rep(c(1,2,4),4),levels=1:16),
     o=ordered(rep(c(.5,1.5,3.5),4),levels=seq(.5,15.5)))
   y<-data.frame(y=ordered(rep(c(1.5,2.5,4.5,2.5),3),levels=seq(.5,15.5)))
-  for(type in c("fixed"))
+  for(type in c("fixed","generalized_nn","adaptive_nn"))
     for(degree in c(0L,2L)) {
       b<-bwfun(xdat=x,ydat=y,bws=c(.3,if(type=="fixed").3 else 7,.25,.3),
         bwtype=type,bwmethod="cv.ml",regtype="lp",degree=degree,
