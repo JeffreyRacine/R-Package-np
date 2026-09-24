@@ -1247,13 +1247,11 @@ double np_score_owang_van_ryzin(const double x, const double y, const double lam
 }
 
 double np_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  return ipow(lambda, np_ordered_lattice_distance(x,y));
+  return np_ordered_metric_power(lambda, np_ordered_metric_distance(x,y));
 }
 
 double np_score_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  const int cxy = np_ordered_lattice_distance(x,y);
-  if (cxy == 0) return 0.0;
-  return (cxy * ipow(lambda, cxy - 1));
+  return np_ordered_metric_score(lambda, np_ordered_metric_distance(x,y));
 }
 
 double np_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
@@ -1273,8 +1271,12 @@ static inline double np_ordered_eval_cached012(const int kernel,
                                                const double lambda,
                                                const int max_cxy,
                                                const double * const lpow){
-  const int cxy = np_ordered_lattice_distance(x,y);
-  const double gee = (lpow != NULL && cxy <= max_cxy) ? lpow[cxy] : R_pow_di(lambda, cxy);
+  const double distance = kernel == 1 ? np_ordered_metric_distance(x,y) :
+    (double)np_ordered_lattice_distance(x,y);
+  const int indexed = distance < INT_MAX && distance == floor(distance);
+  const int cxy = indexed ? (int)distance : -1;
+  const double gee = (lpow != NULL && cxy >= 0 && cxy <= max_cxy) ?
+    lpow[cxy] : (indexed ? R_pow_di(lambda,cxy) : pow(lambda,distance));
   switch(kernel){
     case 0:
       return (cxy == 0) ? (1.0-lambda) : (0.5*(1.0-lambda)*gee);
@@ -4783,12 +4785,8 @@ static double NP_NOINLINE np_ordered_operator_score(const int kernel, const int 
   if(kernel == 3)
     return np_ordered_rly(op == OP_CONVOLUTION ? 4 : 5,
                           train,eval,lambda,cats,ncat);
-  const int d = np_ordered_lattice_distance(train,eval);
-  const double p = ipow(lambda,d);
-  const double dp = d == 0 ? 0.0 : d*ipow(lambda,d-1);
-  const double plus = 1.0+lambda, minus = 1.0-lambda;
-  if(op == OP_CONVOLUTION) {
-    if(kernel == 1) {
+  if(kernel == 1) {
+    if(op == OP_CONVOLUTION) {
       double result = 0.0;
       for(int i = 0; i < ncat; ++i)
         result += np_score_oli_racine(train,cats[i],lambda,cl,ch)*
@@ -4797,6 +4795,14 @@ static double NP_NOINLINE np_ordered_operator_score(const int kernel, const int 
                     np_score_oli_racine(eval,cats[i],lambda,cl,ch);
       return result;
     }
+    if(np_ordered_lattice_span(cats,ncat) < 0)
+      return np_ordered_lr_finite_cumulative(1,train,eval,lambda,cats,ncat);
+  }
+  const int d = np_ordered_lattice_distance(train,eval);
+  const double p = ipow(lambda,d);
+  const double dp = d == 0 ? 0.0 : d*ipow(lambda,d-1);
+  const double plus = 1.0+lambda, minus = 1.0-lambda;
+  if(op == OP_CONVOLUTION) {
     if(kernel == 0) {
       if(d == 0) return -minus-1.0/(plus*plus);
       const double a = minus*minus*(d+1.0)+2.0*minus/plus;
@@ -4848,6 +4854,8 @@ static inline double np_ordered_kernel_eval(const int code,
     return kernel_ordered_convolution(1,train,eval,lambda,ncat,(double *)cats);
   if((code & 3) == 3)
     return np_ordered_rly(code/4,train,eval,lambda,cats,ncat);
+  if(code == 13 && np_ordered_lattice_span(cats,ncat) < 0)
+    return np_ordered_lr_finite_cumulative(0,train,eval,lambda,cats,ncat);
   return kernel[code](train,eval,lambda,cl,ch);
 }
 
@@ -7226,12 +7234,12 @@ void np_p_okernelv(const int KERNEL,
   
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
-  const int max_cxy = np_ordered_lattice_distance(ch,cl);
+  const int max_cxy = np_ordered_lattice_span(cats,ncat);
   const int fast_kernel = (KERNEL >= 0 && KERNEL <= 3 && cats != NULL);
   const int fast_p_kernel = (P_KERNEL >= 0 && P_KERNEL <= 3 && cats != NULL);
   double *lpow = NULL;
 
-  if((fast_kernel || fast_p_kernel) && max_cxy >= 0){
+  if(((fast_kernel && KERNEL != 3) || (fast_p_kernel && P_KERNEL != 3)) && max_cxy >= 0){
     lpow = (double *)malloc((size_t)(max_cxy+1)*sizeof(double));
     if(lpow == NULL) error("memory allocation failed");
     lpow[0] = 1.0;
@@ -7343,15 +7351,18 @@ void np_okernelv(const int KERNEL,
 
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
-  const int max_cxy = np_ordered_lattice_distance(ch,cl);
+  const int max_cxy = np_ordered_lattice_span(cats,ncat);
   const int fast_kernel = (KERNEL >= 0 && KERNEL <= 3 && cats != NULL);
 
-  if(fast_kernel && max_cxy >= 0){
-    double *lpow = (double *)malloc((size_t)(max_cxy+1)*sizeof(double));
-    if(lpow == NULL) error("memory allocation failed");
-    lpow[0] = 1.0;
-    for(int c = 1; c <= max_cxy; c++)
-      lpow[c] = lpow[c-1]*lambda;
+  if(fast_kernel){
+    double *lpow = NULL;
+    if(KERNEL != 3 && max_cxy >= 0) {
+      lpow = (double *)malloc((size_t)(max_cxy+1)*sizeof(double));
+      if(lpow == NULL) error("memory allocation failed");
+      lpow[0] = 1.0;
+      for(int c = 1; c <= max_cxy; c++)
+        lpow[c] = lpow[c-1]*lambda;
+    }
 
     if(!swap_xxt){
       if(xl == NULL){
@@ -7473,6 +7484,7 @@ void np_okernelv(const int KERNEL,
 #define NP_RLY_1(a,b,l,lo,hi) np_ordered_rly(1,a,b,l,cats,ncat)
 #define NP_RLY_2(a,b,l,lo,hi) np_ordered_rly(2,a,b,l,cats,ncat)
 #define NP_RLY_3(a,b,l,lo,hi) np_ordered_rly(3,a,b,l,cats,ncat)
+#define NP_LR_CDF(a,b,l,lo,hi) np_ordered_lr_finite_cumulative(0,a,b,l,cats,ncat)
   switch(KERNEL){
     case 0: NP_OKERNELV_APPLY(np_owang_van_ryzin); break;
     case 1: NP_OKERNELV_APPLY(np_oli_racine); break;
@@ -7487,7 +7499,10 @@ void np_okernelv(const int KERNEL,
     case 10: NP_OKERNELV_APPLY(np_score_onli_racine); break;
     case 11: NP_OKERNELV_APPLY(NP_RLY_2); break;
     case 12: NP_OKERNELV_APPLY(np_cdf_owang_van_ryzin); break;
-    case 13: NP_OKERNELV_APPLY(np_cdf_oli_racine); break;
+    case 13:
+      if(max_cxy < 0) { NP_OKERNELV_APPLY(NP_LR_CDF); }
+      else { NP_OKERNELV_APPLY(np_cdf_oli_racine); }
+      break;
     case 14: NP_OKERNELV_APPLY(np_cdf_onli_racine); break;
     case 15: NP_OKERNELV_APPLY(NP_RLY_3); break;
     default:
@@ -7499,6 +7514,7 @@ void np_okernelv(const int KERNEL,
 #undef NP_RLY_1
 #undef NP_RLY_2
 #undef NP_RLY_3
+#undef NP_LR_CDF
 }
 
 // W = A

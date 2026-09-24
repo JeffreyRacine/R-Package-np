@@ -853,7 +853,7 @@ double *DIFF_KER_PPM)
 
 /* Canonical finite-support RLY arithmetic. Never fill gaps in retained
  * support, and never substitute the infinite-lattice normalized LR kernel.
- * Numeric ordered codes are validated as an integer lattice in R. */
+ * Numeric distances retain their original units, including real gaps. */
 double np_ordered_rly_denom(const double train, const double lambda,
                             const double *cats, const int ncat)
 {
@@ -861,14 +861,14 @@ double np_ordered_rly_denom(const double train, const double lambda,
   if(cats == NULL || ncat <= 0)
     error("Racine-Li-Yan kernel requires retained ordered support");
   for(int i = 0; i < ncat; ++i)
-    den += ipow(lambda, np_ordered_lattice_distance(train,cats[i]));
+    den += np_ordered_metric_power(lambda, np_ordered_metric_distance(train,cats[i]));
   return den;
 }
 
 static double np_ordered_rly_normal(const double train, const double eval,
                                     const double lambda, const double denominator)
 {
-  return ipow(lambda,np_ordered_lattice_distance(train,eval))/denominator;
+  return np_ordered_metric_power(lambda,np_ordered_metric_distance(train,eval))/denominator;
 }
 
 static double np_ordered_rly_denom_score(const double train, const double lambda,
@@ -876,8 +876,8 @@ static double np_ordered_rly_denom_score(const double train, const double lambda
 {
   double derivative = 0.0;
   for(int i = 0; i < ncat; ++i) {
-    const int d = np_ordered_lattice_distance(train,cats[i]);
-    if(d > 0) derivative += d*ipow(lambda,d-1);
+    const double d = np_ordered_metric_distance(train,cats[i]);
+    derivative += np_ordered_metric_score(lambda,d);
   }
   return derivative;
 }
@@ -898,12 +898,12 @@ np_ordered_rly_operator_score(const int op, const double train,
   double total = 0.0, derivative = 0.0;
   for(int i = 0; i < ncat; ++i) {
     if(op == 5 && cats[i] > eval) continue;
-    const int da = np_ordered_lattice_distance(train,cats[i]);
-    const double a = ipow(lambda,da);
-    const double ap = da == 0 ? 0.0 : da*ipow(lambda,da-1);
-    const int db = op == 4 ? np_ordered_lattice_distance(eval,cats[i]) : 0;
-    const double b = ipow(lambda,db);
-    const double bp = db == 0 ? 0.0 : db*ipow(lambda,db-1);
+    const double da = np_ordered_metric_distance(train,cats[i]);
+    const double a = np_ordered_metric_power(lambda,da);
+    const double ap = np_ordered_metric_score(lambda,da);
+    const double db = op == 4 ? np_ordered_metric_distance(eval,cats[i]) : 0;
+    const double b = np_ordered_metric_power(lambda,db);
+    const double bp = np_ordered_metric_score(lambda,db);
     total += a*b;
     derivative += ap*b+a*bp;
   }
@@ -923,14 +923,14 @@ double np_ordered_rly(const int op, const double train, const double eval,
     double total = 0.0;
     if(!(den2 > 0.0)) return 0.0;
     for(int i = 0; i < ncat; ++i)
-      total += ipow(lambda, np_ordered_lattice_distance(train,cats[i])) *
-               ipow(lambda, np_ordered_lattice_distance(eval,cats[i]));
+      total += np_ordered_metric_power(lambda, np_ordered_metric_distance(train,cats[i])) *
+               np_ordered_metric_power(lambda, np_ordered_metric_distance(eval,cats[i]));
     return total/(den*den2);
   }
   if(op == 2) {
-    const int d = np_ordered_lattice_distance(train,eval);
-    const double num = ipow(lambda,d);
-    const double dnum = d == 0 ? 0.0 : d*ipow(lambda,d-1);
+    const double d = np_ordered_metric_distance(train,eval);
+    const double num = np_ordered_metric_power(lambda,d);
+    const double dnum = np_ordered_metric_score(lambda,d);
     const double dden = np_ordered_rly_denom_score(train,lambda,cats,ncat);
     return (dnum*den-num*dden)/(den*den);
   }
@@ -938,7 +938,7 @@ double np_ordered_rly(const int op, const double train, const double eval,
     double total = 0.0;
     for(int i = 0; i < ncat; ++i)
       if(cats[i] <= eval)
-        total += ipow(lambda,np_ordered_lattice_distance(train,cats[i]));
+        total += np_ordered_metric_power(lambda,np_ordered_metric_distance(train,cats[i]));
     return total/den;
   }
   /* Scores differentiate the requested retained-support operator, including
@@ -980,15 +980,10 @@ SEXP C_np_ordered_rly_matrix(SEXP train, SEXP evaluation, SEXP bandwidth,
     error("invalid RLY profile matrix bandwidth or dimensions");
   for(int i=0;i<nc;++i) {
     const double offset = cats[i]-cats[0];
-    const double lattice = floor(offset+0.5);
     if(!R_FINITE(cats[i]) || !R_FINITE(offset) ||
-       fabs(offset-lattice) > 8.0*DBL_EPSILON*fmax(1.0,fabs(offset)) ||
-       (i>0 && (!(cats[i]>cats[i-1]) ||
-                 lattice<=floor(cats[i-1]-cats[0]+0.5))))
-      error("RLY profile support must have finite increasing integer distances");
+       (i>0 && !(cats[i]>cats[i-1])))
+      error("RLY profile support must have finite increasing numeric levels");
   }
-  if(floor(cats[nc-1]-cats[0]+0.5)>=INT_MAX)
-    error("RLY profile support exceeds the native index range");
   for(int i=0;i<n;++i)
     if(!np_ordered_rly_support_contains(REAL(train)[i],cats,nc))
       error("RLY profile donor is outside retained support");
@@ -1017,10 +1012,10 @@ void np_ordered_rly_range(const int op, const double lambda,
   for(int i = 0; i < ncat; ++i) {
     if(op == 0) {
       const double den = np_ordered_rly_denom(cats[i],lambda,cats,ncat);
-      const int left = np_ordered_lattice_distance(cats[i],cats[0]);
-      const int right = np_ordered_lattice_distance(cats[i],cats[ncat-1]);
-      const int distance = left > right ? left : right;
-      *lower = fmin(*lower,ipow(lambda,distance)/den);
+      const double left = np_ordered_metric_distance(cats[i],cats[0]);
+      const double right = np_ordered_metric_distance(cats[i],cats[ncat-1]);
+      const double distance = left > right ? left : right;
+      *lower = fmin(*lower,np_ordered_metric_power(lambda,distance)/den);
       *upper = fmax(*upper,1.0/den);
     } else {
       for(int j = 0; j < ncat; ++j) {
@@ -1067,7 +1062,7 @@ double kernel_ordered(int KERNEL, double x, double y, double lambda,
 			}
 			else
 			{
-				return_value = ipow(lambda,np_ordered_lattice_distance(x,y));
+				return_value = np_ordered_metric_power(lambda,np_ordered_metric_distance(x,y));
 			}
 
 			break;
@@ -1095,6 +1090,23 @@ double kernel_ordered(int KERNEL, double x, double y, double lambda,
 /* Cumulative version of Aitchenson and Aitken's beautiful categorical
 kernel. */
 
+/* Nonlattice LR has no intervening integer points: its unnormalized
+ * cumulative operator sums the retained counting support, in original units. */
+double np_ordered_lr_finite_cumulative(const int score, const double train,
+    const double eval, const double lambda, const double *cats, const int ncat)
+{
+  double total = 0.0;
+  if(cats == NULL || ncat <= 0)
+    error("Li-Racine cumulative kernel requires retained ordered support");
+  for(int i = 0; i < ncat; ++i) {
+    if(cats[i] > eval) break;
+    const double d = np_ordered_metric_distance(train,cats[i]);
+    total += score ? np_ordered_metric_score(lambda,d) :
+      np_ordered_metric_power(lambda,d);
+  }
+  return total;
+}
+
 double cdf_kernel_ordered(int KERNEL, double x, double y, double lambda, int c, double *categorical_vals)
 {
 
@@ -1107,7 +1119,11 @@ double cdf_kernel_ordered(int KERNEL, double x, double y, double lambda, int c, 
 /* Now going from -max to max in steps of 1 - Ahmad & Cerrito claim that this must */
 /* integrate to onc from -infty to infty - using sample analog */
 
-	if(KERNEL == 3)
+	if(KERNEL == 1 && np_ordered_lattice_span(categorical_vals,c) < 0)
+	{
+		return_value = np_ordered_lr_finite_cumulative(0,y,x,lambda,categorical_vals,c);
+	}
+	else if(KERNEL == 3)
 	{
 		return_value = np_ordered_rly(3,y,x,lambda,categorical_vals,c);
 	}

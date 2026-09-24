@@ -212,6 +212,7 @@ sibandwidth <-
     mybw$pmethod <- "Manual"
 
   class(mybw) = "sibandwidth"
+  mybw <- .np_ordered_bandwidth_contract(mybw)
   if(!any(is.na(mybw$bandwidth)))
     validateBandwidth(mybw)
   mybw

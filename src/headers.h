@@ -20,7 +20,36 @@
  * Cache indices and scalar/retained-support kernels share this conversion. */
 static inline int np_ordered_lattice_distance(const double x, const double y)
 {
-  return (int)round(fabs(x-y));
+  const double distance = fabs(x-y), lattice = round(distance);
+  if(!R_FINITE(distance) || lattice >= INT_MAX ||
+     (distance > 0.0 && lattice == 0.0) ||
+     fabs(distance-lattice) > 8.0*DBL_EPSILON*fmax(1.0,distance))
+    Rf_error("ordered unit-lattice kernel requires integer distances within the native index range; use Li-Racine weights or Racine-Li-Yan for fractional distances");
+  return (int)lattice;
+}
+
+/* Preserve the incumbent decimal-offset integer convention, but never round
+ * a genuine real distance into an integer index or collapse distinct levels. */
+static inline double np_ordered_metric_distance(const double x, const double y)
+{
+  const double distance = fabs(x-y), lattice = round(distance);
+  return (lattice > 0.0 &&
+          fabs(distance-lattice) <= 8.0*DBL_EPSILON*fmax(1.0,distance)) ?
+    lattice : distance;
+}
+
+/* -1 denotes non-indexed support, not an unsupported statistical kernel. */
+static inline int np_ordered_lattice_span(const double *cats, const int ncat)
+{
+  if(cats == NULL || ncat <= 0) return -1;
+  double previous = -1.0;
+  for(int i = 0; i < ncat; ++i) {
+    const double d = np_ordered_metric_distance(cats[i],cats[0]);
+    if(!R_FINITE(d) || d >= INT_MAX || d != floor(d) || d <= previous)
+      return -1;
+    previous = d;
+  }
+  return (int)previous;
 }
 
 typedef struct NPContinuousKernelDerivativeDiagnostics
@@ -535,6 +564,23 @@ double func_con_density_quantile(double *quantile);
 int kernel_estimate_quantile(int gradient_compute, int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs_train, int num_obs_eval, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered_train, double **matrix_Y_ordered_train, double **matrix_Y_continuous_train, double **matrix_Y_unordered_eval, double **matrix_Y_ordered_eval, double **matrix_Y_continuous_eval, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double *vector_scale_factor, double *quan, double *quan_stderr, double **quan_gradient, int seed, double ftol, double tol, double small, int itmax, int iMax_Num_Multistart, double zero, double lbc_dir, int dfc_dir, double c_dir,double initc_dir,double lbd_dir,double  hbd_dir,double  d_dir,double  initd_dir);
 
 double ipow(double x, int n);
+
+static inline double np_ordered_metric_power(const double lambda, const double d)
+{
+  if(d < INT_MAX && d == floor(d)) return ipow(lambda,(int)d);
+  return pow(lambda,d);
+}
+
+static inline double np_ordered_metric_score(const double lambda, const double d)
+{
+  if(d == 0.0) return 0.0;
+  if(lambda == 0.0 && d < 1.0)
+    Rf_error("ordered bandwidth score at lambda = 0 is not finite for distances below 1; use an interior bandwidth for scores");
+  return d*np_ordered_metric_power(lambda,d-1.0);
+}
+
+double np_ordered_lr_finite_cumulative(int score, double train, double eval,
+                                      double lambda, const double *cats, int ncat);
 
 double cv_func_regression_categorical_aic_c(double *vector_scale_factor);
 

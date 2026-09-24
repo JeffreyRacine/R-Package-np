@@ -1877,18 +1877,55 @@ dlev <- function(x){
     x.dlev <- as.numeric(seq_len(nlevels(x)))
   } else if (length(x.dlev)) {
     offset <- x.dlev - x.dlev[1L]
-    lattice <- round(offset)
-    tolerance <- 8 * .Machine$double.eps * pmax(1, abs(offset))
     if (any(!is.finite(x.dlev)) || any(!is.finite(offset)) ||
-        any(diff(x.dlev) <= 0) || any(diff(lattice) <= 0) ||
-        any(abs(offset-lattice) > tolerance) ||
-        lattice[length(lattice)] >= .Machine$integer.max)
-      stop(paste0("numeric ordered-factor levels must be finite, increasing, ",
-                  "and separated by integer distances within the native index range; ",
+        any(diff(x.dlev) <= 0))
+      stop(paste0("numeric ordered-factor levels must be finite and increasing; ",
                   "use explicit nonnumeric labels if ordinal rank distances are intended"),
            call. = FALSE)
   }
   x.dlev
+}
+
+# Representation is metric; admission belongs to the actual smoothing role.
+# Density/CDF 'liracine' is normalized LR, unlike raw regression/kernel weights.
+.np_ordered_levels_contract <- function(levels, kernel = "lattice") {
+  if (!length(levels)) return(invisible(TRUE))
+  offset <- levels - levels[1L]
+  if (any(!is.finite(levels)) || any(!is.finite(offset)) || any(diff(levels) <= 0))
+    stop("numeric ordered-factor levels must be finite and increasing", call. = FALSE)
+  if (!kernel %in% c("liracine", "racineliyan")) {
+    lattice <- round(offset)
+    tolerance <- 8 * .Machine$double.eps * pmax(1, abs(offset))
+    if (any(diff(lattice) <= 0) || any(abs(offset-lattice) > tolerance) ||
+        tail(lattice, 1L) >= .Machine$integer.max)
+      stop(paste0("ordered ", kernel, " role requires integer distances within the native index range; ",
+                  "use Li-Racine weights or Racine-Li-Yan for fractional distances"), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+.np_ordered_bandwidth_contract <- function(bws) {
+  raw <- inherits(bws, "kbandwidth")
+  info <- if (raw) list(x = bws[["xdati", exact = TRUE]],
+                       y = bws[["ydati", exact = TRUE]]) else bws[["dati", exact = TRUE]]
+  for (role in names(info)) {
+    d <- info[[role]]
+    columns <- which(d[["iord", exact = TRUE]])
+    if (!length(columns)) next
+    kernel <- if (raw && role == "x") bws[["okertype", exact = TRUE]] else
+      bws[["klist", exact = TRUE]][[role]][["okertype", exact = TRUE]]
+    if (is.null(kernel)) kernel <- "lattice"
+    normalized <- (inherits(bws, c("bandwidth", "dbandwidth")) && role == "x") ||
+      (inherits(bws, c("conbandwidth", "condbandwidth")) && role == "y")
+    if (normalized && identical(kernel, "liracine")) kernel <- "nliracine"
+    for (i in columns) .np_ordered_levels_contract(d[["all.dlev", exact = TRUE]][[i]], kernel)
+    d[[".np.ordered.kernel"]] <- kernel
+    info[[role]] <- d
+    alias <- if (role == "index") "idati" else paste0(role, "dati")
+    if (!is.null(bws[[alias, exact = TRUE]])) bws[[alias]] <- d
+  }
+  if (!raw) bws[["dati"]] <- info
+  bws
 }
 
 isNum <- function(x){
@@ -2483,6 +2520,7 @@ npKernelBoundsMarshal <- function(kerlb, kerub) {
 }
 
 validateBandwidth <- function(bws){
+  bws <- .np_ordered_bandwidth_contract(bws)
   vari <- names(bws$bandwidth)
   bchecker <- function(j){
     v <- vari[j]
@@ -3286,6 +3324,7 @@ subcol <- function(x, v, i){
 }
 
 .np_native_categorical_support <- function(bws) {
+  bws <- .np_ordered_bandwidth_contract(bws)
   info <- bws[["dati", exact = TRUE]]
   if (!is.list(info) || is.null(info[["x", exact = TRUE]]))
     stop("bandwidth object is missing declared training support")
@@ -3365,6 +3404,12 @@ adjustLevels <- function(data, dati, allowNewCells = FALSE){
     }
   }
 
+  # Validate newly admitted evaluation levels against this role, before MPI
+  # dispatch/native arithmetic. Old objects without policy keep their lattice
+  # admission until reconstructed by a bandwidth constructor.
+  kernel <- dati[[".np.ordered.kernel", exact = TRUE]]
+  if (is.null(kernel)) kernel <- "lattice"
+  for (i in which(dati$iord)) .np_ordered_levels_contract(dlev(data[, i]), kernel)
   data
 }
 

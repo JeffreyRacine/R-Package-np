@@ -54,16 +54,21 @@ test_that("ordered kernels and caches preserve decimal-offset integer gaps", {
     }
 })
 
-test_that("ordered validation admits integer lattices but not fractional distances", {
+test_that("ordered representation is metric and lattice admission is role-specific", {
   dlev <- getFromNamespace("dlev", "np")
   for (s in list(.1+0:9, .212+c(0,1,4,7), -8.788+c(0,1,4,7))) {
     x <- ordered(s,levels=s)
     expect_equal(dlev(x), s, tolerance=1e-15)
   }
-  for (s in list(c(0,.5,1),c(.1,1.10000001,4.1),
-                c(0,2,1),c(0,Inf),c(0,.Machine$integer.max))) {
+  for (s in list(c(0,2,1),c(0,Inf))) {
     x <- ordered(s,levels=s)
-    expect_error(dlev(x),"integer distances")
+    expect_error(dlev(x),"finite and increasing")
+  }
+  for (s in list(c(0,.5,1),c(.1,1.10000001,4.1),c(0,.Machine$integer.max))) {
+    expect_identical(dlev(ordered(s,levels=s)),s)
+    d <- data.frame(o=ordered(s,levels=s))
+    expect_error(npksum(txdat=d,bws=.35,okertype="wangvanryzin"),"integer distances")
+    expect_error(npksum(txdat=d,bws=.35,okertype="nliracine"),"integer distances")
   }
   expect_identical(dlev(ordered(c("low","high"),levels=c("low","high"))),c(1,2))
   bridge <- function(s) .Call("C_np_ordered_rly_matrix", s,s,.35,s,PACKAGE="np")
@@ -72,7 +77,8 @@ test_that("ordered validation admits integer lattices but not fractional distanc
     expect_equal(bridge(s+offset),t(r21_ordered_oracle(s,.35,"racineliyan")),
                  tolerance=2e-13)
   }
-  expect_error(bridge(c(.1,1.10000001,4.1)),"integer distances")
+  s <- c(.1,1.10000001,4.1)
+  expect_equal(bridge(s),t(r21_ordered_oracle(s,.35,"racineliyan")),tolerance=2e-13)
 })
 
 test_that("ordered lattice conversion reaches bandwidth families without recoding", {
