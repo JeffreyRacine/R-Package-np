@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Conditional-quantile inversion accuracy scales with the observed response
+  span rather than its absolute location, so translating the response no
+  longer loosens the requested accuracy.
+
+* Mixed-data beta copulas retain the applicable kernel components in each
+  marginal, including categorical-only marginals, without discarding the
+  beta kernels used by continuous variables.
+
 * Density bandwidth documentation now explains how to identify and interpret
   solutions at the fixed-bandwidth search floor, including beta CVLS
   sensitivity to endpoint observations.
