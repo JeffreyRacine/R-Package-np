@@ -5061,7 +5061,8 @@ static double NP_NOINLINE np_ordered_operator_score(const int kernel, const int 
                     np_score_oli_racine(eval,cats[i],lambda,cl,ch);
       return result;
     }
-    if(np_ordered_lattice_span(cats,ncat) < 0)
+    if(np_ordered_lattice_span(cats,ncat) < 0 ||
+       !np_ordered_pair_on_lattice(train,eval,cl))
       return np_ordered_lr_finite_cumulative(1,train,eval,lambda,cats,ncat);
   }
   const int d = np_ordered_lattice_distance(train,eval);
@@ -5120,7 +5121,8 @@ static inline double np_ordered_kernel_eval(const int code,
     return kernel_ordered_convolution(1,train,eval,lambda,ncat,(double *)cats);
   if((code & 3) == 3)
     return np_ordered_rly(code/4,train,eval,lambda,cats,ncat);
-  if(code == 13 && np_ordered_lattice_span(cats,ncat) < 0)
+  if(code == 13 && (np_ordered_lattice_span(cats,ncat) < 0 ||
+                   !np_ordered_pair_on_lattice(train,eval,cl)))
     return np_ordered_lr_finite_cumulative(0,train,eval,lambda,cats,ncat);
   return kernel[code](train,eval,lambda,cl,ch);
 }
@@ -7842,7 +7844,10 @@ void np_okernelv(const int KERNEL,
 #define NP_RLY_1(a,b,l,lo,hi) np_ordered_rly(1,a,b,l,cats,ncat)
 #define NP_RLY_2(a,b,l,lo,hi) np_ordered_rly(2,a,b,l,cats,ncat)
 #define NP_RLY_3(a,b,l,lo,hi) np_ordered_rly(3,a,b,l,cats,ncat)
-#define NP_LR_CDF(a,b,l,lo,hi) np_ordered_lr_finite_cumulative(0,a,b,l,cats,ncat)
+#define NP_LR_CDF(a,b,l,lo,hi) \
+  ((max_cxy < 0 || !np_ordered_pair_on_lattice(a,b,lo)) ? \
+   np_ordered_lr_finite_cumulative(0,a,b,l,cats,ncat) : \
+   np_cdf_oli_racine(a,b,l,lo,hi))
   switch(KERNEL){
     case 0: NP_OKERNELV_APPLY(np_owang_van_ryzin); break;
     case 1: NP_OKERNELV_APPLY(np_oli_racine); break;
@@ -7857,10 +7862,7 @@ void np_okernelv(const int KERNEL,
     case 10: NP_OKERNELV_APPLY(np_score_onli_racine); break;
     case 11: NP_OKERNELV_APPLY(NP_RLY_2); break;
     case 12: NP_OKERNELV_APPLY(np_cdf_owang_van_ryzin); break;
-    case 13:
-      if(max_cxy < 0) { NP_OKERNELV_APPLY(NP_LR_CDF); }
-      else { NP_OKERNELV_APPLY(np_cdf_oli_racine); }
-      break;
+    case 13: NP_OKERNELV_APPLY(NP_LR_CDF); break;
     case 14: NP_OKERNELV_APPLY(np_cdf_onli_racine); break;
     case 15: NP_OKERNELV_APPLY(NP_RLY_3); break;
     default:

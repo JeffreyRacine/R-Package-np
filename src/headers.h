@@ -39,6 +39,17 @@ static inline double np_ordered_metric_distance(const double x, const double y)
     lattice : distance;
 }
 
+/* A lattice support does not imply that a newly supplied evaluation value
+ * lies on that lattice. Only cumulative LR needs this pair-level distinction. */
+static inline int np_ordered_pair_on_lattice(const double train,
+    const double eval, const double origin)
+{
+  const double dt = np_ordered_metric_distance(train,origin);
+  const double de = np_ordered_metric_distance(eval,origin);
+  return R_FINITE(dt) && R_FINITE(de) && dt < INT_MAX && de < INT_MAX &&
+    dt == floor(dt) && de == floor(de);
+}
+
 /* -1 denotes non-indexed support, not an unsupported statistical kernel. */
 static inline int np_ordered_lattice_span(const double *cats, const int ncat)
 {
