@@ -2229,12 +2229,14 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
         nomad.num.feval.guarded.total <<- nomad.num.feval.guarded.total + out[[4L]]
         out[[1L]]
       }
-      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn")) 2L else 1L
+      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn") ||
+                                      identical(template$method, "cv.ml")) 2L else 1L
       recovery <- .np_nn_find_raw_valid_start(
         point = native.results[[incumbent.index]]$best_point,
         nn.indices = seq_along(setup$cont_flat),
         caps = rep.int(ordinary.cap, length(setup$cont_flat)),
-        raw.eval = recovery.raw.eval)
+        raw.eval = recovery.raw.eval,
+        incumbent.caps = setup$nobs - 1L)
       if (isTRUE(recovery$found)) {
         native.start.matrix <- rbind(native.start.matrix, recovery$point)
         recovery.index <- nrow(native.start.matrix)
@@ -2994,12 +2996,14 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
         native.num.feval.guarded.total <<- native.num.feval.guarded.total + out[[4L]]
         out[[1L]]
       }
-      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn")) 2L else 1L
+      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn") ||
+                                      identical(template$method, "cv.ml")) 2L else 1L
       recovery <- .np_nn_find_raw_valid_start(
         point = native.results[[incumbent.index]]$best_point,
         nn.indices = seq_along(setup$cont_flat),
         caps = rep.int(ordinary.cap, length(setup$cont_flat)),
-        raw.eval = recovery.raw.eval)
+        raw.eval = recovery.raw.eval,
+        incumbent.caps = setup$nobs - 1L)
       if (isTRUE(recovery$found)) {
         .np_progress_bandwidth_activity_step(force = TRUE)
         native.start.matrix <- rbind(native.start.matrix, recovery$point)

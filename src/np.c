@@ -15512,19 +15512,18 @@ density_powell_attempt:
           (num_obs_train_extern >= 3)) {
         double finite_seed = DBL_MAX;
         int found_finite_seed;
-        const int maximum_k =
-          (BANDWIDTH_den_extern == BW_GEN_NN) ?
-          num_obs_train_extern - 1 : num_obs_train_extern - 2;
+        const int maximum_k = num_obs_train_extern - 2;
 
         nn_retry_history_index = (iImproved > 0) ? iImproved - 1 : 0;
         nn_retry_improved = iImproved;
         bwm_reset_counters();
-        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed_domain(
           vector_scale_factor,
           num_reg_continuous_extern,
           num_obs_train_extern,
           maximum_k,
           num_var,
+          1,
           &finite_seed);
         if (found_finite_seed &&
             bwm_penalty_mode == 1 &&
@@ -17290,19 +17289,20 @@ conditional_density_powell_attempt:
           (num_obs_train_extern >= 3)) {
         double finite_seed = DBL_MAX;
         int found_finite_seed;
-        const int maximum_k =
-          (BANDWIDTH_den_extern == BW_GEN_NN) ?
-          num_obs_train_extern - 1 : num_obs_train_extern - 2;
+        const int deleted_fit =
+          BANDWIDTH_den_extern == BW_ADAP_NN || ibwmfunc == CBWM_CVML;
+        const int maximum_k = num_obs_train_extern - (deleted_fit ? 2 : 1);
 
         nn_retry_history_index = (iImproved > 0) ? iImproved - 1 : 0;
         nn_retry_improved = iImproved;
         bwm_reset_counters();
-        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed_domain(
           vector_scale_factor,
           num_var_continuous_extern + num_reg_continuous_extern,
           num_obs_train_extern,
           maximum_k,
           num_all_var,
+          deleted_fit,
           &finite_seed);
         if (np_bwm_get_deferred_error() != NULL) {
           bw_error_msg = np_bwm_get_deferred_error();
@@ -22070,12 +22070,14 @@ regression_powell_attempt:
           (iImproved > 0) ? iImproved - 1 : 0;
         adaptive_retry_improved = iImproved;
         bwm_reset_counters();
-        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed_domain(
           vector_scale_factor,
           num_reg_continuous_extern,
           num_obs_train_extern,
-          num_obs_train_extern - 2,
+          num_obs_train_extern -
+            ((lsq_check_mode || myopti[RBW_MI] != RBWM_CVAIC) ? 2 : 1),
           num_var,
+          lsq_check_mode || myopti[RBW_MI] != RBWM_CVAIC,
           &finite_seed);
         if (found_finite_seed &&
             bwm_penalty_mode == 1 &&
@@ -22131,12 +22133,14 @@ regression_powell_attempt:
           (iImproved > 0) ? iImproved - 1 : 0;
         adaptive_retry_improved = iImproved;
         bwm_reset_counters();
-        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed_domain(
           vector_scale_factor,
           num_reg_continuous_extern,
           num_obs_train_extern,
-          num_obs_train_extern - 1,
+          num_obs_train_extern -
+            ((lsq_check_mode || myopti[RBW_MI] != RBWM_CVAIC) ? 2 : 1),
           num_var,
+          lsq_check_mode || myopti[RBW_MI] != RBWM_CVAIC,
           &finite_seed);
         if (found_finite_seed &&
             bwm_penalty_mode == 1 &&

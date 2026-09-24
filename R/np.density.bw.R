@@ -608,16 +608,13 @@ npRmpiNomadNativeSearchDensity <- function(prep,
       } else {
         1L
       }
-      ordinary.cap <- if (identical(template$type, "adaptive_nn")) {
-        setup$nobs - 2L
-      } else {
-        setup$nobs - 1L
-      }
+      ordinary.cap <- setup$nobs - 2L
       recovery <- .np_nn_find_raw_valid_start(
         point = native.results[[incumbent.index]]$best_point,
         nn.indices = seq_len(bounds$ncon),
         caps = rep.int(ordinary.cap, bounds$ncon),
-        raw.eval = raw_eval_fun
+        raw.eval = raw_eval_fun,
+        incumbent.caps = setup$nobs - 1L
       )
       if (isTRUE(recovery$found)) {
         recovery.index <- length(native.results) + 1L
