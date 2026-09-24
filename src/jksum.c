@@ -35526,16 +35526,46 @@ static int np_conditional_yrow_eval_two_slot_ctx_prepare(
     num_var_unordered_extern + num_var_ordered_extern;
   double *successor_scale = NULL;
   double *successor_lambda = NULL;
+  double *primary_scale = NULL;
+  int prepare_status;
   int l;
 
   if(BANDWIDTH_den_extern != BW_GEN_NN ||
      mapped_query_geometry == NULL || ctx == NULL)
     return 1;
-  if(np_conditional_yrow_eval_ctx_prepare_ctx(
-       vector_scale_factor, operator_code,
+  /* Let the canonical initializer prepare the required external primary
+   * radius once. Only its temporary Y counts change: categorical scaling,
+   * validation and parallel preparation retain their existing owner. */
+  if(mapped_query_geometry->mode == NP_NN_QUERY_EXTERNAL &&
+     num_var_continuous_extern > 0){
+    const int num_all_var = num_var_tot + num_reg_continuous_extern +
+      num_reg_unordered_extern + num_reg_ordered_extern;
+    if(vector_scale_factor == NULL)
+      return 1;
+    primary_scale = alloc_vecd(num_all_var);
+    if(primary_scale == NULL)
+      return 1;
+    for(l = 0; l < num_all_var; ++l)
+      primary_scale[l] = vector_scale_factor[l];
+    for(l = 0; l < num_var_continuous_extern; ++l){
+      int k;
+      double scale;
+      if(np_nn_lookup_from_scale(num_train - 1, 1,
+           vector_scale_factor[num_reg_continuous_extern + l],
+           &k, &scale, NULL) != 0){
+        free(primary_scale);
+        return 1;
+      }
+      primary_scale[num_reg_continuous_extern + l] = (double)k;
+    }
+  }
+  prepare_status = np_conditional_yrow_eval_ctx_prepare_ctx(
+       primary_scale != NULL ? primary_scale : vector_scale_factor, operator_code,
        matrix_Y_unordered_eval, matrix_Y_ordered_eval,
        matrix_Y_continuous_eval, num_eval,
-       mapped_query_geometry, ctx) != 0)
+       mapped_query_geometry, ctx);
+  free(primary_scale);
+  if(prepare_status != 0)
     return 1;
 
   if(num_var_continuous_extern <= 0){
@@ -35543,13 +35573,9 @@ static int np_conditional_yrow_eval_two_slot_ctx_prepare(
     return 0;
   }
 
-  successor_scale = alloc_vecd(MAX(1, num_var_tot));
-  successor_lambda = alloc_vecd(MAX(1, num_var_unordered_extern +
-                                         num_var_ordered_extern));
   ctx->matrix_bandwidth_y_successor =
     alloc_tmatd(num_eval, num_var_continuous_extern);
-  if(successor_scale == NULL || successor_lambda == NULL ||
-     ctx->matrix_bandwidth_y_successor == NULL)
+  if(ctx->matrix_bandwidth_y_successor == NULL)
     goto fail_two_slot_prepare;
 
   /* External CDF queries have no training occurrence to exclude. Decode on
@@ -35563,12 +35589,9 @@ static int np_conditional_yrow_eval_two_slot_ctx_prepare(
     for(l = 0; l < num_var_continuous_extern; ++l){
       int k;
       double scale;
+      ctx->vsfy[l] = vector_scale_factor[num_reg_continuous_extern + l];
       if(np_nn_lookup_from_scale(num_train - 1, 1, ctx->vsfy[l],
                                  &k, &scale, NULL) != 0 ||
-         compute_nn_distance_train_eval_ctx(num_train, num_eval, 1,
-           matrix_Y_continuous_train_extern[l], matrix_Y_continuous_eval[l],
-           k, mapped_query_geometry, ctx->matrix_bandwidth_y[l]) !=
-             NP_NN_GEOMETRY_OK ||
          compute_nn_distance_train_eval_ctx(num_train, num_eval, 1,
            matrix_Y_continuous_train_extern[l], matrix_Y_continuous_eval[l],
            k + 1, mapped_query_geometry, ctx->matrix_bandwidth_y_successor[l]) !=
@@ -35576,11 +35599,15 @@ static int np_conditional_yrow_eval_two_slot_ctx_prepare(
         goto fail_two_slot_prepare;
       ctx->base_exclusion_scale[l] = scale;
     }
-    free(successor_scale);
-    free(successor_lambda);
     ctx->base_exclusion_successor_ready = 1;
     return 0;
   }
+
+  successor_scale = alloc_vecd(MAX(1, num_var_tot));
+  successor_lambda = alloc_vecd(MAX(1, num_var_unordered_extern +
+                                         num_var_ordered_extern));
+  if(successor_scale == NULL || successor_lambda == NULL)
+    goto fail_two_slot_prepare;
 
   for(l = 0; l < num_var_tot; ++l)
     successor_scale[l] = ctx->vsfy[l];

@@ -10,6 +10,10 @@
   grids. Explicit/extended starts, selected solvers, empirical grids and
   other kernel/bandwidth routes retain their existing policies.
 
+* External non-beta generalized-neighbor conditional-CDF objectives reuse
+  their prepared primary response radii instead of computing them twice;
+  other response-context consumers and row/block selection are unchanged.
+
 * Automatic nearest-neighbor density, regression and conditional-density
   recovery now uses each criterion's deleted-sample count domain while
   retaining the full-sample CVAIC endpoint. Explicit and genuinely extended
