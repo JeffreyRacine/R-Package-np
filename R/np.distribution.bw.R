@@ -340,7 +340,8 @@ npudistbw.NULL <-
     penalty_mode = as.integer(if (invalid.penalty == "baseline") 1L else 0L),
     penalty_multiplier = as.double(penalty.multiplier),
     ckerlb = as.double(cker.bounds$lb),
-    ckerub = as.double(cker.bounds$ub)
+    ckerub = as.double(cker.bounds$ub),
+    declared.support = .np_native_categorical_support(bws)
   )
 }
 
@@ -378,6 +379,7 @@ npNomadNativeSearchDistribution <- function(prep,
     as.double(prep$penalty_multiplier),
     as.double(prep$ckerlb),
     as.double(prep$ckerub),
+    prep$declared.support,
     PACKAGE = "npRmpi"
   ), capture.output = TRUE)
   .np_nomad_native_call_value(native.call)
@@ -1103,6 +1105,7 @@ npudistbw.dbandwidth <-
                   as.double(penalty.multiplier),
                   as.double(cker.bounds.c$lb),
                   as.double(cker.bounds.c$ub),
+                  .np_native_categorical_support(bws),
                   PACKAGE="npRmpi")
         } else {
           myout <-
@@ -1116,6 +1119,7 @@ npudistbw.dbandwidth <-
                 as.double(penalty.multiplier),
                 as.double(cker.bounds.c$lb),
                 as.double(cker.bounds.c$ub),
+                .np_native_categorical_support(bws),
                 PACKAGE="npRmpi")
         }
         total.time <- proc.time()[3] - elapsed.start

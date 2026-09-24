@@ -224,7 +224,8 @@ test_that("prepared scalar categorical CVML retains the canonical finite penalty
       penalty.multiplier = p$penalty_multiplier, degree = p$degree,
       bernstein = p$bernstein, basis = p$basis, regtype = p$regtype,
       cxkerlb = p$cxkerlb, cxkerub = p$cxkerub,
-      cykerlb = p$cykerlb, cykerub = p$cykerub
+      cykerlb = p$cykerlb, cykerub = p$cykerub,
+      declared.support = p$declared.support
     )
     mpi.barrier(1L)
     first <- evaluate(bw = as.double(p$rbw), degree = as.integer(p$degree))

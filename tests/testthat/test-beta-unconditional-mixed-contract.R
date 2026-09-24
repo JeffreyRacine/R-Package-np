@@ -115,7 +115,7 @@ test_that("mixed beta density and distribution objectives are active", {
     ckertype = "beta", ckerorder = 4,
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
-  objective <- np:::npudensbw.bandwidth(
+  objective <- npRmpi:::npudensbw.bandwidth(
     dat = training, bws = bw, bandwidth.compute = TRUE,
     eval.only = TRUE, nmulti = 1L, invalid.penalty = "dbmax"
   )
@@ -127,7 +127,7 @@ test_that("mixed beta density and distribution objectives are active", {
     ckertype = "beta", ckerorder = 4,
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
-  dist.objective <- np:::npudistbw.dbandwidth(
+  dist.objective <- npRmpi:::npudistbw.dbandwidth(
     dat = training[c("x", "o")], bws = dist.bw,
     bandwidth.compute = TRUE, eval.only = TRUE, nmulti = 1L,
     invalid.penalty = "dbmax"
@@ -164,7 +164,7 @@ test_that("native MADS searches mixed beta distribution objectives", {
     bws = bw, tdat = training,
     edat = training[seq_len(4L), , drop = FALSE]
   )
-  replay <- np:::npudistbw.dbandwidth(
+  replay <- npRmpi:::npudistbw.dbandwidth(
     dat = training, bws = bw, bandwidth.compute = TRUE,
     eval.only = TRUE, nmulti = 1L, invalid.penalty = "dbmax"
   )
@@ -195,7 +195,7 @@ test_that("Powell searches mixed beta distribution objectives", {
     bws = bw, tdat = training,
     edat = training[seq_len(4L), , drop = FALSE]
   )
-  replay <- np:::npudistbw.dbandwidth(
+  replay <- npRmpi:::npudistbw.dbandwidth(
     dat = training, bws = bw, bandwidth.compute = TRUE,
     eval.only = TRUE, nmulti = 1L, invalid.penalty = "dbmax"
   )
@@ -221,19 +221,20 @@ test_that("native density objective ingress requires compression state", {
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
   prepare <- getFromNamespace(
-    ".npudensbw_nomad_native_prepare_args", "np"
+    ".npudensbw_nomad_native_prepare_args", "npRmpi"
   )
   prep <- prepare(training, bw, invalid.penalty = "dbmax")
   native_eval <- function(myopti) {
-    .Call(
+    getFromNamespace(".npRmpi_with_local_regression","npRmpi")(.Call(
       "C_np_density_bw_eval",
       prep$duno, prep$dord, prep$dcon, prep$mysd,
       myopti, prep$myoptd, as.double(bw$bw),
       1L,
       prep$penalty_mode, prep$penalty_multiplier,
       prep$ckerlb, prep$ckerub,
-      PACKAGE = "np"
-    )
+      prep$declared.support,
+      PACKAGE = "npRmpi"
+    ))
   }
 
   expect_error(
@@ -254,19 +255,19 @@ test_that("native distribution objective ingress requires compression state", {
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
   prepare <- getFromNamespace(
-    ".npudistbw_nomad_native_prepare_args", "np"
+    ".npudistbw_nomad_native_prepare_args", "npRmpi"
   )
   prep <- prepare(training, bw, invalid.penalty = "dbmax")
   native_eval <- function(myopti) {
-    .Call(
+    getFromNamespace(".npRmpi_with_local_regression","npRmpi")(.Call(
       "C_np_distribution_bw_eval",
       prep$duno, prep$dord, prep$dcon,
       prep$guno, prep$gord, prep$gcon, prep$mysd,
       myopti, prep$myoptd, as.double(bw$bw), 1L,
       prep$penalty_mode, prep$penalty_multiplier,
-      prep$ckerlb, prep$ckerub,
-      PACKAGE = "np"
-    )
+      prep$ckerlb, prep$ckerub, prep$declared.support,
+      PACKAGE = "npRmpi"
+    ))
   }
 
   expect_error(
@@ -300,7 +301,7 @@ test_that("native regression objective ingress requires compression state", {
         prep$penalty_mode, prep$penalty_multiplier,
         prep$degree, prep$bernstein, prep$basis,
         prep$ckerlb, prep$ckerub,
-        PACKAGE = "npRmpi"
+        prep$declared.support, PACKAGE = "npRmpi"
       )
     )
   }
@@ -371,7 +372,7 @@ test_that("mixed beta routes reject invalid categorical compression state", {
     fixed = TRUE
   )
   expect_error(
-    np:::npudistbw.dbandwidth(
+    npRmpi:::npudistbw.dbandwidth(
       dat = training, bws = distribution.bw,
       bandwidth.compute = TRUE, eval.only = TRUE, nmulti = 1L
     ),

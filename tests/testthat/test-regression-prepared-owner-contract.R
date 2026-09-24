@@ -98,7 +98,7 @@ test_that("MPI native regression search evaluates one retained prepared state", 
   expect_false(grepl("NP_NOMAD_CALLBACK_FREE", callback, fixed = TRUE))
   expect_match(
     prepare,
-    "&np_regression_prepared, 1, degree_search[0]);",
+    "&np_regression_prepared, 1, degree_search[0], support);",
     fixed = TRUE
   )
   expect_false(grepl("NPRegressionNomadShadowCtx", source, fixed = TRUE))

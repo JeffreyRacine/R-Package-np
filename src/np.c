@@ -56,6 +56,81 @@ extern MPI_Comm	*comm;
 #include "np_native_safety.h"
 #include "tree.h"
 
+/* Declared categorical support is preparation metadata, never inferred from
+ * the observed subset. The transient view is rooted by the .Call argument;
+ * native contexts copy values before returning and own their usual matrices. */
+typedef struct {
+  int columns;
+  int max_levels;
+  const double **values;
+  int *counts;
+} NPCategoricalSupport;
+
+static NPCategoricalSupport np_categorical_support_parse(
+  SEXP support, const int n, const int dimensions[4], const SEXP data[4])
+{
+  NPCategoricalSupport out = {0};
+  R_xlen_t columns = 0;
+  if(n < 1)
+    error("native categorical support requires positive training size");
+  for(int group = 0; group < 4; ++group) {
+    if(dimensions[group] < 0)
+      error("native categorical support has invalid dimensions");
+    columns += dimensions[group];
+    if(dimensions[group] > 0 &&
+       (TYPEOF(data[group]) != REALSXP ||
+        XLENGTH(data[group]) != (R_xlen_t)n*dimensions[group]))
+      error("native categorical support does not match training dimensions");
+  }
+  if(columns > INT_MAX || TYPEOF(support) != VECSXP ||
+     XLENGTH(support) != columns)
+    error("native categorical support does not match categorical dimensions");
+  out.columns = (int)columns;
+  out.max_levels = n;
+  if(columns == 0)
+    return out;
+  out.values = (const double **)R_alloc((size_t)columns, sizeof(double *));
+  out.counts = (int *)R_alloc((size_t)columns, sizeof(int));
+  int column = 0;
+  for(int group = 0; group < 4; ++group) {
+    for(int d = 0; d < dimensions[group]; ++d, ++column) {
+      SEXP levels = VECTOR_ELT(support, column);
+      const R_xlen_t count = XLENGTH(levels);
+      if(TYPEOF(levels) != REALSXP || count < 1 || count > INT_MAX)
+        error("native categorical support requires nonempty numeric levels");
+      const double *v = REAL(levels);
+      for(int k = 0; k < count; ++k)
+        if(!R_FINITE(v[k]) || (k > 0 && v[k] <= v[k-1]))
+          error("native categorical support levels must be finite and increasing");
+      const double *observed = REAL(data[group]) + (size_t)d*n;
+      for(int i = 0; i < n; ++i) {
+        int lo = 0, hi = (int)count;
+        const double value = observed[i];
+        while(lo < hi) {
+          const int mid = lo + (hi-lo)/2;
+          if(v[mid] < value) lo = mid+1; else hi = mid;
+        }
+        if(!R_FINITE(value) || lo == count || v[lo] != value)
+          error("native training value is outside declared categorical support");
+      }
+      out.values[column] = v;
+      out.counts[column] = (int)count;
+      out.max_levels = MAX(out.max_levels, (int)count);
+    }
+  }
+  return out;
+}
+
+static void np_categorical_support_copy(const NPCategoricalSupport *support,
+                                        int *counts, double **values)
+{
+  for(int d = 0; d < support->columns; ++d) {
+    counts[d] = support->counts[d];
+    memcpy(values[d], support->values[d],
+           (size_t)support->counts[d]*sizeof(double));
+  }
+}
+
 static np_continuous_kernel_descriptor
 np_continuous_kernel_descriptor_or_error(int family,
                                          int code,
@@ -1694,7 +1769,7 @@ static int np_density_prepared_context_prepare(
   double *myuno, double *myord, double *mycon, double *mysd,
   int *myopti, double *myoptd, const double *bw,
   int penalty_mode, double penalty_mult,
-  double *ckerlb, double *ckerub);
+  double *ckerlb, double *ckerub, const NPCategoricalSupport *support);
 static int np_density_prepared_context_eval(
   NPDensityPreparedCtx *context, const double *bw,
   int penalty_mode, double penalty_mult, double out[5]);
@@ -1733,7 +1808,7 @@ static int np_distribution_prepared_context_prepare(
   double *myeuno, double *myeord, double *myecon, double *mysd,
   int *myopti, double *myoptd, const double *bw,
   int penalty_mode, double penalty_mult,
-  double *ckerlb, double *ckerub);
+  double *ckerlb, double *ckerub, const NPCategoricalSupport *support);
 static int np_distribution_prepared_context_eval(
   NPDistributionPreparedCtx *context, const double *bw,
   int penalty_mode, double penalty_mult, double out[5]);
@@ -1795,7 +1870,8 @@ static void np_regression_bw_mode(
   double lsq_delta_lower, double lsq_delta_upper,
   double *lsq_delta_out,
   NPRegressionPreparedCtx *retained_context,
-  int prepare_only, int degree_search);
+  int prepare_only, int degree_search,
+                                  const NPCategoricalSupport *support);
 
 static NPRegressionPreparedCtx np_regression_prepared = {0};
 
@@ -1945,7 +2021,8 @@ static void np_distribution_conditional_bw_mode(
   int *glp_degree, int *glp_bernstein, int *glp_basis, int *regtype,
   double *cxkerlb, double *cxkerub, double *cykerlb, double *cykerub,
   int eval_only, NPConditionalDistributionPreparedCtx *retained_context,
-  int prepare_only, int degree_search);
+  int prepare_only, int degree_search,
+                                    const NPCategoricalSupport *support);
 
 static NPConditionalDensityPreparedCtx np_conditional_density_prepared_context =
   {0};
@@ -1975,7 +2052,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
                                                                double *cykerub,
                                                                int retain_powell_geometry,
                                                                int eval_only,
-                                                               int *support_failure);
+                                                               int *support_failure,
+                                                               const NPCategoricalSupport *support);
 
 static int np_mpi_comm1_all_ok(const int local_ok)
 {
@@ -5262,7 +5340,8 @@ static int np_regression_prepared_prepare_internal(
   double *mysd, int *myopti, double *myoptd, double *rbw,
   int *penalty_mode, double *penalty_mult,
   int *glp_degree, int *glp_bernstein, int *glp_basis,
-  int *degree_search, double *ckerlb, double *ckerub)
+  int *degree_search, double *ckerlb, double *ckerub,
+  const NPCategoricalSupport *support)
 {
   double fval[3] = {R_NaN, R_NaN, R_NaN};
   double history[1] = {R_NaN};
@@ -5279,7 +5358,7 @@ static int np_regression_prepared_prepare_internal(
     ckerlb, ckerub,
     1, 0, NULL, 0.5, 0.5, DBL_EPSILON,
     1.0 - DBL_EPSILON, NULL,
-    &np_regression_prepared, 1, degree_search[0]);
+    &np_regression_prepared, 1, degree_search[0], support);
 
   if (!np_regression_prepared.active)
     return 0;
@@ -5301,7 +5380,8 @@ SEXP C_np_regression_prepared_prepare(SEXP runo,
                                       SEXP glp_basis,
                                       SEXP degree_search,
                                       SEXP ckerlb,
-                                      SEXP ckerub)
+                                      SEXP ckerub,
+                                      SEXP declared_support)
 {
   SEXP runo_r = R_NilValue, rord_r = R_NilValue, rcon_r = R_NilValue, y_r = R_NilValue;
   SEXP mysd_r = R_NilValue, myopti_i = R_NilValue, myoptd_r = R_NilValue;
@@ -5339,6 +5419,12 @@ SEXP C_np_regression_prepared_prepare(SEXP runo,
        XLENGTH(glp_degree_i) != INTEGER(myopti_i)[RBW_NCONI])) {
     ok = 0;
   } else {
+  int support_dimensions[4] = {0, 0, INTEGER(myopti_i)[RBW_NUNOI],
+    INTEGER(myopti_i)[RBW_NORDI]};
+  SEXP support_data[4] = {R_NilValue, R_NilValue, runo_r, rord_r};
+  NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[RBW_NOBSI],
+    support_dimensions, support_data);
     ok = np_regression_prepared_prepare_internal(REAL(runo_r),
                                                  REAL(rord_r),
                                                  REAL(rcon_r),
@@ -5354,7 +5440,7 @@ SEXP C_np_regression_prepared_prepare(SEXP runo,
                                                  INTEGER(glp_basis_i),
                                                  INTEGER(degree_search_i),
                                                  REAL(ckerlb_r),
-                                                 REAL(ckerub_r));
+                                                 REAL(ckerub_r), &support);
   }
 
   ok = np_mpi_comm1_all_ok(ok);
@@ -6527,7 +6613,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
                                                                 double *cykerub,
                                                                 int retain_powell_geometry,
                                                                 int eval_only,
-                                                                int *support_failure)
+                                                                int *support_failure,
+                                                                const NPCategoricalSupport *support)
 {
   int i, j;
   int num_all_var, num_all_cvar, num_all_uvar, num_all_ovar;
@@ -6833,14 +6920,14 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
   np_conditional_density_prepared_context.scale_factor_startbest =
     retain_powell_geometry ? alloc_vecd(num_all_var + 1) : NULL;
   matrix_categorical_vals_extern =
-    alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern +
+    alloc_matd(support->max_levels, num_var_unordered_extern + num_var_ordered_extern +
                num_reg_unordered_extern + num_reg_ordered_extern);
   matrix_categorical_vals_extern_X =
-    alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+    alloc_matd(support->max_levels, num_reg_unordered_extern + num_reg_ordered_extern);
   matrix_categorical_vals_extern_Y =
-    need_y_side ? alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern) : NULL;
+    need_y_side ? alloc_matd(support->max_levels, num_var_unordered_extern + num_var_ordered_extern) : NULL;
   matrix_categorical_vals_extern_XY =
-    alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern +
+    alloc_matd(support->max_levels, num_var_unordered_extern + num_var_ordered_extern +
                num_reg_unordered_extern + num_reg_ordered_extern);
   matrix_XY_continuous_train_extern = alloc_matd(num_obs_train_extern, num_all_cvar);
   matrix_XY_unordered_train_extern = alloc_matd(num_obs_train_extern, num_all_uvar);
@@ -7128,7 +7215,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
       ipt_lookup_XY[ipt_XY[i]] = i;
   }
 
-  determine_categorical_vals(num_obs_train_extern,
+  if(int_VERBOSE == 1 || int_DEBUG == 1)
+    determine_categorical_vals(num_obs_train_extern,
                              num_var_unordered_extern,
                              num_var_ordered_extern,
                              num_reg_unordered_extern,
@@ -7139,6 +7227,9 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
                              matrix_X_ordered_train_extern,
                              num_categories_extern,
                              matrix_categorical_vals_extern);
+
+  np_categorical_support_copy(support, num_categories_extern,
+                              matrix_categorical_vals_extern);
 
   np_splitxy_vsf_mcv_nc(num_var_unordered_extern, num_var_ordered_extern, num_var_continuous_extern,
                         num_reg_unordered_extern, num_reg_ordered_extern, num_reg_continuous_extern,
@@ -7373,7 +7464,8 @@ SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno,
                                                    SEXP cxkerlb,
                                                    SEXP cxkerub,
                                                    SEXP cykerlb,
-                                                   SEXP cykerub)
+                                                   SEXP cykerub,
+                                                   SEXP declared_support)
 {
   SEXP c_uno_r = R_NilValue, c_ord_r = R_NilValue, c_con_r = R_NilValue;
   SEXP u_uno_r = R_NilValue, u_ord_r = R_NilValue, u_con_r = R_NilValue;
@@ -7419,6 +7511,13 @@ SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno,
               XLENGTH(glp_degree_i) != INTEGER(myopti_i)[CBW_UNCONI])) {
     ok = 0;
   } else {
+    const int support_dimensions[4] = {
+      INTEGER(myopti_i)[CBW_CNUNOI], INTEGER(myopti_i)[CBW_CNORDI],
+      INTEGER(myopti_i)[CBW_UNUNOI], INTEGER(myopti_i)[CBW_UNORDI]};
+    const SEXP support_data[4] = {c_uno_r, c_ord_r, u_uno_r, u_ord_r};
+    const NPCategoricalSupport support = np_categorical_support_parse(
+      declared_support, INTEGER(myopti_i)[CBW_NOBSI],
+      support_dimensions, support_data);
     ok = np_conditional_density_prepared_context_prepare_internal(REAL(c_uno_r),
                                                               REAL(c_ord_r),
                                                               REAL(c_con_r),
@@ -7441,7 +7540,7 @@ SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno,
                                                               REAL(cykerub_r),
                                                               0,
                                                               0,
-                                                              &support_failure);
+                                                              &support_failure, &support);
   }
 
   support_failure = np_mpi_comm1_max_int(support_failure);
@@ -8615,7 +8714,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                   double * lsq_delta_out,
                                   NPRegressionPreparedCtx *retained_context,
                                   const int prepare_only,
-                                  const int degree_search);
+                                  const int degree_search,
+                                  const NPCategoricalSupport *support);
 
 void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * euno, double * eord, double * econ, double * ey,
@@ -8678,7 +8778,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * objective_function_guarded,
                    int * penalty_mode, double * penalty_mult,
                    double * ckerlb, double * ckerub,
-                   const int eval_only);
+                   const int eval_only, const NPCategoricalSupport *support);
 void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         double * myeuno, double * myeord, double * myecon, double * mysd,
                         int * myopti, double * myoptd, double * myans, double * fval,
@@ -8687,7 +8787,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         double * objective_function_fast,
                         int * penalty_mode, double * penalty_mult,
                         double * ckerlb, double * ckerub,
-                        const int eval_only);
+                        const int eval_only, const NPCategoricalSupport *support);
 void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * u_uno, double * u_ord, double * u_con,
                                double * mysd,
@@ -8703,7 +8803,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                int * regtype,
                                double * cxkerlb, double * cxkerub,
                                double * cykerlb, double * cykerub,
-                               const int eval_only);
+                               const int eval_only, const NPCategoricalSupport *support);
 void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     double * u_uno, double * u_ord, double * u_con,
                                     double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
@@ -8718,7 +8818,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     int * regtype,
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub,
-                                    const int eval_only);
+                                    const int eval_only,
+                                    const NPCategoricalSupport *support);
 static void np_kernelsum_common(double *tuno, double *tord, double *tcon,
                                 double *ty, double *weights,
                                 double *euno, double *eord, double *econ,
@@ -8785,6 +8886,7 @@ static SEXP C_np_regression_bw_common(SEXP runo,
                                       SEXP glp_basis,
                                       SEXP ckerlb,
                                       SEXP ckerub,
+                                      SEXP declared_support,
                                       const int eval_only)
 {
   SEXP runo_r = R_NilValue, rord_r = R_NilValue, rcon_r = R_NilValue;
@@ -8829,6 +8931,13 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   if (XLENGTH(myopti_i) <= RBW_NNMINI)
     error("C_np_regression_bw: regression NN minimum is missing");
 
+  int support_dimensions[4] = {0, 0, INTEGER(myopti_i)[RBW_NUNOI],
+    INTEGER(myopti_i)[RBW_NORDI]};
+  SEXP support_data[4] = {R_NilValue, R_NilValue, runo_r, rord_r};
+  NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[RBW_NOBSI],
+    support_dimensions, support_data);
+
   ncon = (int)INTEGER(myopti_i)[RBW_NCONI];
   if (ncon < 0)
     error("C_np_regression_bw: invalid number of continuous regressors");
@@ -8853,7 +8962,7 @@ static SEXP C_np_regression_bw_common(SEXP runo,
                         REAL(out_fast),
                         &pmode, &pmult, INTEGER(degree_i), &bern, &basis, ckerlb_p, ckerub_p,
                         eval_only, 0, NULL, 0.5, 0.5, DBL_EPSILON,
-                        1.0 - DBL_EPSILON, NULL, NULL, 0, 0);
+                        1.0 - DBL_EPSILON, NULL, NULL, 0, 0, &support);
   bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
   PROTECT(out = allocVector(VECSXP, 8));
@@ -8896,14 +9005,15 @@ SEXP C_np_regression_bw(SEXP runo,
                         SEXP glp_bernstein,
                         SEXP glp_basis,
                         SEXP ckerlb,
-                        SEXP ckerub)
+                        SEXP ckerub,
+                        SEXP declared_support)
 {
   np_reset_c_rng_for_bandwidth_search();
 
   return C_np_regression_bw_common(runo, rord, rcon, y, mysd, myopti, myoptd,
                                    rbw, hist_len, penalty_mode, penalty_mult,
                                    glp_degree, glp_bernstein, glp_basis,
-                                   ckerlb, ckerub, 0);
+                                   ckerlb, ckerub, declared_support, 0);
 }
 
 SEXP C_np_regression_bw_eval(SEXP runo,
@@ -8921,12 +9031,13 @@ SEXP C_np_regression_bw_eval(SEXP runo,
                              SEXP glp_bernstein,
                              SEXP glp_basis,
                              SEXP ckerlb,
-                             SEXP ckerub)
+                             SEXP ckerub,
+                        SEXP declared_support)
 {
   return C_np_regression_bw_common(runo, rord, rcon, y, mysd, myopti, myoptd,
                                    rbw, hist_len, penalty_mode, penalty_mult,
                                    glp_degree, glp_bernstein, glp_basis,
-                                   ckerlb, ckerub, 1);
+                                   ckerlb, ckerub, declared_support, 1);
 }
 
 static SEXP C_np_lsqregression_bw_common(SEXP runo,
@@ -8949,7 +9060,8 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
                                          SEXP glp_basis,
                                          SEXP ckerlb,
                                          SEXP ckerub,
-                                         const int eval_only)
+                                         SEXP declared_support,
+                                      const int eval_only)
 {
   SEXP runo_r = R_NilValue, rord_r = R_NilValue, rcon_r = R_NilValue;
   SEXP y_r = R_NilValue, scale_r = R_NilValue, mysd_r = R_NilValue;
@@ -8997,6 +9109,13 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
   if (XLENGTH(myopti_i) < RBW_OPTIONS_COUNT)
     error("C_np_lsqregression_bw: regression NN minimum is missing");
 
+  int support_dimensions[4] = {0, 0, INTEGER(myopti_i)[RBW_NUNOI],
+    INTEGER(myopti_i)[RBW_NORDI]};
+  SEXP support_data[4] = {R_NilValue, R_NilValue, runo_r, rord_r};
+  NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[RBW_NOBSI],
+    support_dimensions, support_data);
+
   ncon = (int)INTEGER(myopti_i)[RBW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
@@ -9019,7 +9138,7 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
                         &pmode, &pmult, INTEGER(degree_i), &bern, &basis, ckerlb_p, ckerub_p,
                         eval_only, 1, REAL(scale_r), asReal(tau), asReal(delta_start),
                         REAL(delta_bounds_r)[0], REAL(delta_bounds_r)[1], &delta_out,
-                        NULL, 0, 0);
+                        NULL, 0, 0, &support);
   REAL(out_delta)[0] = delta_out;
   bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
@@ -9069,14 +9188,15 @@ SEXP C_np_lsqregression_bw(SEXP runo,
                            SEXP glp_bernstein,
                            SEXP glp_basis,
                            SEXP ckerlb,
-                           SEXP ckerub)
+                           SEXP ckerub,
+                        SEXP declared_support)
 {
   np_reset_c_rng_for_bandwidth_search();
   return C_np_lsqregression_bw_common(runo, rord, rcon, y, scale, tau,
                                       delta_start, delta_bounds, mysd, myopti,
                                       myoptd, rbw, hist_len, penalty_mode,
                                       penalty_mult, glp_degree, glp_bernstein,
-                                      glp_basis, ckerlb, ckerub, 0);
+                                      glp_basis, ckerlb, ckerub, declared_support, 0);
 }
 
 SEXP C_np_lsqregression_bw_eval(SEXP runo,
@@ -9098,13 +9218,14 @@ SEXP C_np_lsqregression_bw_eval(SEXP runo,
                                 SEXP glp_bernstein,
                                 SEXP glp_basis,
                                 SEXP ckerlb,
-                                SEXP ckerub)
+                                SEXP ckerub,
+                        SEXP declared_support)
 {
   return C_np_lsqregression_bw_common(runo, rord, rcon, y, scale, tau,
                                       delta_start, delta_bounds, mysd, myopti,
                                       myoptd, rbw, hist_len, penalty_mode,
                                       penalty_mult, glp_degree, glp_bernstein,
-                                      glp_basis, ckerlb, ckerub, 1);
+                                      glp_basis, ckerlb, ckerub, declared_support, 1);
 }
 
 SEXP C_np_regression(SEXP tuno,
@@ -10585,7 +10706,8 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
                                                      SEXP sigtest_pivotal,
                                                      SEXP sigtest_null_mean,
                                                      SEXP sigtest_residual_pool,
-                                                     SEXP allow_empty_rows)
+                                                     SEXP allow_empty_rows,
+                                                     SEXP declared_support)
 {
   SEXP txuno_r = R_NilValue, txord_r = R_NilValue, txcon_r = R_NilValue;
   SEXP exuno_r = R_NilValue, exord_r = R_NilValue, excon_r = R_NilValue;
@@ -10816,6 +10938,11 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
     empty_rows_ptr = &empty_rows;
   }
 
+  const int support_dimensions[4] = {0, 0, ncol_txuno, ncol_txord};
+  const SEXP support_data[4] = {R_NilValue, R_NilValue, txuno_r, txord_r};
+  const NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, num_obs_train, support_dimensions, support_data);
+
   np_native_estimator_state_active = 1;
   num_obs_train_extern = num_obs_train;
   num_obs_eval_extern = num_obs_eval;
@@ -10924,24 +11051,21 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   }
 
   num_categories_extern_X = alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
-  matrix_categorical_vals_extern_X = alloc_matd(num_obs_train, num_reg_unordered_extern + num_reg_ordered_extern);
+  matrix_categorical_vals_extern_X = alloc_matd(support.max_levels, num_reg_unordered_extern + num_reg_ordered_extern);
   if((num_reg_unordered_extern + num_reg_ordered_extern > 0) &&
      (num_categories_extern_X == NULL ||
       matrix_categorical_vals_extern_X == NULL)) {
     failure_message = "categorical-metadata allocation failed";
     goto cleanup_lp_apply_wrapper;
   }
-  determine_categorical_vals(num_obs_train,
-                             0,
-                             0,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             NULL,
-                             NULL,
-                             matrix_X_unordered_train_extern,
-                             matrix_X_ordered_train_extern,
-                             num_categories_extern_X,
-                             matrix_categorical_vals_extern_X);
+  if(int_VERBOSE == 1 || int_DEBUG == 1)
+    determine_categorical_vals(num_obs_train, 0, 0,
+      num_reg_unordered_extern, num_reg_ordered_extern,
+      NULL, NULL, matrix_X_unordered_train_extern,
+      matrix_X_ordered_train_extern, num_categories_extern_X,
+      matrix_categorical_vals_extern_X);
+  np_categorical_support_copy(&support, num_categories_extern_X,
+                              matrix_categorical_vals_extern_X);
 
   np_lp_engine_extern = lp_engine;
   vector_glp_degree_extern = INTEGER(degree_i);
@@ -11118,7 +11242,8 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
                                           SEXP ckerlb,
                                           SEXP ckerub,
                                           SEXP categorical_compress,
-                                          SEXP return_hat)
+                                          SEXP return_hat,
+                                          SEXP declared_support)
 {
   return np_regression_lp_apply_conditional_impl(
     txuno, txord, txcon, exuno, exord, excon, rhs, rbw, bwtype,
@@ -11127,7 +11252,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
     categorical_compress, return_hat, R_NilValue, R_NilValue,
     R_NilValue, R_NilValue, R_NilValue, R_NilValue,
-    R_NilValue, R_NilValue, R_NilValue);
+    R_NilValue, R_NilValue, R_NilValue, declared_support);
 }
 
 SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
@@ -11155,7 +11280,8 @@ SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
                                               SEXP return_hat,
                                               SEXP train_is_eval,
                                               SEXP leave_one_out,
-                                              SEXP allow_empty_rows)
+                                              SEXP allow_empty_rows,
+                                              SEXP declared_support)
 {
   return np_regression_lp_apply_conditional_impl(
     txuno, txord, txcon, exuno, exord, excon, rhs, rbw, bwtype,
@@ -11164,7 +11290,7 @@ SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
     categorical_compress, return_hat, train_is_eval, leave_one_out,
     R_NilValue, R_NilValue, R_NilValue, R_NilValue,
-    R_NilValue, R_NilValue, allow_empty_rows);
+    R_NilValue, R_NilValue, allow_empty_rows, declared_support);
 }
 
 SEXP C_np_regression_lp_sigtest_conditional_ctx(
@@ -11198,7 +11324,8 @@ SEXP C_np_regression_lp_sigtest_conditional_ctx(
   SEXP sigtest_response_ready,
   SEXP sigtest_pivotal,
   SEXP sigtest_null_mean,
-  SEXP sigtest_residual_pool)
+  SEXP sigtest_residual_pool,
+  SEXP declared_support)
 {
   return np_regression_lp_apply_conditional_impl(
     txuno, txord, txcon, exuno, exord, excon, donor_index, rbw, bwtype,
@@ -11208,13 +11335,13 @@ SEXP C_np_regression_lp_sigtest_conditional_ctx(
     categorical_compress, return_hat, train_is_eval, leave_one_out,
     sigtest_mode, sigtest_coordinate, sigtest_response_ready,
     sigtest_pivotal, sigtest_null_mean,
-    sigtest_residual_pool, R_NilValue);
+    sigtest_residual_pool, R_NilValue, declared_support);
 }
 
 static void np_density_bw_integer_contract_or_error(SEXP myopti,
                                                      const char *where)
 {
-  if(XLENGTH(myopti) <= BW_CKRNEVI)
+  if(XLENGTH(myopti) <= BW_NCONI)
     error("%s: integer option contract is incomplete", where);
   if(INTEGER(myopti)[BW_CKRNEVI] != NP_CKERNEL_COORDINATE_CODE)
     return;
@@ -11236,7 +11363,8 @@ static SEXP C_np_density_bw_common(SEXP myuno,
                                    SEXP penalty_mult,
                                    SEXP ckerlb,
                                    SEXP ckerub,
-                                   const int eval_only)
+                                   const int eval_only,
+                                   SEXP declared_support)
 {
   SEXP myuno_r=R_NilValue, myord_r=R_NilValue, mycon_r=R_NilValue, mysd_r=R_NilValue;
   SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
@@ -11266,6 +11394,14 @@ static SEXP C_np_density_bw_common(SEXP myuno,
     error("C_np_density_bw: myoptd is missing scale.factor.lower.bound");
   np_density_bw_integer_contract_or_error(myopti_i, "C_np_density_bw");
 
+  const int support_dimensions[4] = {
+    0, 0, INTEGER(myopti_i)[BW_NUNOI], INTEGER(myopti_i)[BW_NORDI]
+  };
+  const SEXP support_data[4] = {R_NilValue, R_NilValue, myuno_r, myord_r};
+  const NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[BW_NOBSI],
+    support_dimensions, support_data);
+
   ncon = (int)INTEGER(myopti_i)[BW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
@@ -11284,7 +11420,7 @@ static SEXP C_np_density_bw_common(SEXP myuno,
                 REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                 REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                 REAL(out_fast), REAL(out_guarded),
-                &pmode, &pmult, ckerlb_p, ckerub_p, eval_only);
+                &pmode, &pmult, ckerlb_p, ckerub_p, eval_only, &support);
   bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
   PROTECT(out = allocVector(VECSXP, 9));
@@ -11325,12 +11461,13 @@ SEXP C_np_density_bw(SEXP myuno,
                      SEXP penalty_mode,
                      SEXP penalty_mult,
                      SEXP ckerlb,
-                     SEXP ckerub)
+                     SEXP ckerub,
+                     SEXP declared_support)
 {
   np_reset_c_rng_for_bandwidth_search();
   return C_np_density_bw_common(myuno, myord, mycon, mysd, myopti, myoptd,
                                 bw, hist_len, penalty_mode, penalty_mult,
-                                ckerlb, ckerub, 0);
+                                ckerlb, ckerub, 0, declared_support);
 }
 
 SEXP C_np_density_bw_eval(SEXP myuno,
@@ -11344,11 +11481,12 @@ SEXP C_np_density_bw_eval(SEXP myuno,
                           SEXP penalty_mode,
                           SEXP penalty_mult,
                           SEXP ckerlb,
-                          SEXP ckerub)
+                          SEXP ckerub,
+                          SEXP declared_support)
 {
   return C_np_density_bw_common(myuno, myord, mycon, mysd, myopti, myoptd,
                                 bw, hist_len, penalty_mode, penalty_mult,
-                                ckerlb, ckerub, 1);
+                                ckerlb, ckerub, 1, declared_support);
 }
 
 typedef struct {
@@ -11506,7 +11644,8 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
                                       SEXP penalty_mode,
                                       SEXP penalty_mult,
                                       SEXP ckerlb,
-                                      SEXP ckerub)
+                                      SEXP ckerub,
+                                      SEXP declared_support)
 {
   SEXP myuno_r = R_NilValue, myord_r = R_NilValue, mycon_r = R_NilValue;
   SEXP mysd_r = R_NilValue, myopti_i = R_NilValue, myoptd_r = R_NilValue;
@@ -11543,6 +11682,14 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
 
   np_density_bw_integer_contract_or_error(
     myopti_i, "native npudens NOMAD search");
+
+  const int support_dimensions[4] = {
+    0, 0, INTEGER(myopti_i)[BW_NUNOI], INTEGER(myopti_i)[BW_NORDI]
+  };
+  const SEXP support_data[4] = {R_NilValue, R_NilValue, myuno_r, myord_r};
+  const NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[BW_NOBSI],
+    support_dimensions, support_data);
 
   n = (int) XLENGTH(x0_r);
   if (n <= 0 ||
@@ -11607,7 +11754,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
         &context.prepared, context.myuno, context.myord, context.mycon,
         context.mysd, context.myopti, context.myoptd, eval_start,
         context.penalty_mode, context.penalty_mult,
-        context.ckerlb, context.ckerub) != 0) {
+        context.ckerlb, context.ckerub, &support) != 0) {
     np_density_prepared_context_destroy(&context.prepared);
     UNPROTECT(14);
     error("native npudens NOMAD search failed to prepare objective state");
@@ -11779,7 +11926,8 @@ static SEXP C_np_distribution_bw_common(SEXP myuno,
                           SEXP penalty_mult,
                           SEXP ckerlb,
                           SEXP ckerub,
-                          const int eval_only)
+                                        const int eval_only,
+                                        SEXP declared_support)
 {
   SEXP myuno_r=R_NilValue, myord_r=R_NilValue, mycon_r=R_NilValue;
   SEXP myeuno_r=R_NilValue, myeord_r=R_NilValue, myecon_r=R_NilValue, mysd_r=R_NilValue;
@@ -11809,12 +11957,21 @@ static SEXP C_np_distribution_bw_common(SEXP myuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  if (XLENGTH(myopti_i) <= DBW_NCONI)
+    error("C_np_distribution_bw: integer option contract is incomplete");
   if (XLENGTH(myopti_i) <= DBW_CKORDERI &&
       INTEGER(myopti_i)[DBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
     error("C_np_distribution_bw: continuous-kernel descriptor is missing");
   if (INTEGER(myopti_i)[DBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE &&
       XLENGTH(myopti_i) <= DBW_CATCOMPI)
     error("C_np_distribution_bw: categorical-compression state is missing");
+
+  const int support_dimensions[4] = {
+    0, 0, INTEGER(myopti_i)[DBW_NUNOI], INTEGER(myopti_i)[DBW_NORDI]};
+  const SEXP support_data[4] = {R_NilValue, R_NilValue, myuno_r, myord_r};
+  const NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[DBW_NOBSI],
+    support_dimensions, support_data);
 
   ncon = (int)INTEGER(myopti_i)[DBW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
@@ -11834,7 +11991,7 @@ static SEXP C_np_distribution_bw_common(SEXP myuno,
                      INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                      REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                      REAL(out_fast),
-                     &pmode, &pmult, ckerlb_p, ckerub_p, eval_only);
+                     &pmode, &pmult, ckerlb_p, ckerub_p, eval_only, &support);
   bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
   PROTECT(out = allocVector(VECSXP, 8));
@@ -11876,12 +12033,14 @@ SEXP C_np_distribution_bw(SEXP myuno,
                           SEXP penalty_mode,
                           SEXP penalty_mult,
                           SEXP ckerlb,
-                          SEXP ckerub)
+                          SEXP ckerub,
+                          SEXP declared_support)
 {
   np_reset_c_rng_for_bandwidth_search();
   return C_np_distribution_bw_common(myuno, myord, mycon, myeuno, myeord, myecon,
                                      mysd, myopti, myoptd, bw, hist_len,
-                                     penalty_mode, penalty_mult, ckerlb, ckerub, 0);
+                                     penalty_mode, penalty_mult, ckerlb, ckerub, 0,
+                                     declared_support);
 }
 
 SEXP C_np_distribution_bw_eval(SEXP myuno,
@@ -11898,11 +12057,13 @@ SEXP C_np_distribution_bw_eval(SEXP myuno,
                                SEXP penalty_mode,
                                SEXP penalty_mult,
                                SEXP ckerlb,
-                               SEXP ckerub)
+                               SEXP ckerub,
+                               SEXP declared_support)
 {
   return C_np_distribution_bw_common(myuno, myord, mycon, myeuno, myeord, myecon,
                                      mysd, myopti, myoptd, bw, hist_len,
-                                     penalty_mode, penalty_mult, ckerlb, ckerub, 1);
+                                     penalty_mode, penalty_mult, ckerlb, ckerub, 1,
+                                     declared_support);
 }
 
 typedef struct {
@@ -12073,7 +12234,8 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
                                            SEXP penalty_mode,
                                            SEXP penalty_mult,
                                            SEXP ckerlb,
-                                           SEXP ckerub)
+                                           SEXP ckerub,
+                                           SEXP declared_support)
 {
   SEXP myuno_r = R_NilValue, myord_r = R_NilValue, mycon_r = R_NilValue;
   SEXP myeuno_r = R_NilValue, myeord_r = R_NilValue, myecon_r = R_NilValue;
@@ -12112,6 +12274,15 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   PROTECT(option_values_s = coerceVector(option_values, STRSXP));
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  if(XLENGTH(myopti_i) <= DBW_NCONI)
+    error("native npudist NOMAD search received incomplete myopti");
+  const int support_dimensions[4] = {
+    0, 0, INTEGER(myopti_i)[DBW_NUNOI], INTEGER(myopti_i)[DBW_NORDI]};
+  const SEXP support_data[4] = {R_NilValue, R_NilValue, myuno_r, myord_r};
+  const NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[DBW_NOBSI],
+    support_dimensions, support_data);
 
   n = (int) XLENGTH(x0_r);
   if (n <= 0 ||
@@ -12211,7 +12382,7 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
         context.myeuno, context.myeord, context.myecon, context.mysd,
         context.myopti, context.myoptd, eval_start,
         context.penalty_mode, context.penalty_mult,
-        context.ckerlb, context.ckerub) != 0) {
+        context.ckerlb, context.ckerub, &support) != 0) {
     np_distribution_prepared_context_destroy(&context.prepared);
     R_Free(solution);
     R_Free(best_point);
@@ -12362,7 +12533,8 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
                                                SEXP cxkerub,
                                                SEXP cykerlb,
                                                SEXP cykerub,
-                                               const int eval_only)
+                                               const int eval_only,
+                                               SEXP declared_support)
 {
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
   SEXP mysd_r=R_NilValue, myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue;
@@ -12408,6 +12580,14 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   if (XLENGTH(myoptd_r) <= CBW_QUAD_EXTD)
     error("C_np_density_conditional_bw: myoptd is missing cvls.quadrature.extend.factor");
 
+  const int support_dimensions[4] = {
+    INTEGER(myopti_i)[CBW_CNUNOI], INTEGER(myopti_i)[CBW_CNORDI],
+    INTEGER(myopti_i)[CBW_UNUNOI], INTEGER(myopti_i)[CBW_UNORDI]};
+  const SEXP support_data[4] = {c_uno_r, c_ord_r, u_uno_r, u_ord_r};
+  const NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[CBW_NOBSI],
+    support_dimensions, support_data);
+
   ncon_x = (int)INTEGER(myopti_i)[CBW_UNCONI];
   ncon_y = (int)INTEGER(myopti_i)[CBW_CNCONI];
   resolve_bounds_or_default(cxkerlb_r, cxkerub_r, ncon_x, &cxkerlb_p, &cxkerub_p);
@@ -12431,7 +12611,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
                             REAL(out_fast), REAL(out_guarded), &pmode, &pmult,
                             INTEGER(degree_i), &bern, &basis, &ll_mode,
                             cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
-                            eval_only);
+                            eval_only, &support);
   bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
   PROTECT(out = allocVector(VECSXP, 9));
@@ -12485,6 +12665,7 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
                                                     SEXP cxkerub,
                                                     SEXP cykerlb,
                                                     SEXP cykerub,
+                                                    SEXP declared_support,
                                                     const int eval_only)
 {
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
@@ -12531,6 +12712,14 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   if (XLENGTH(myopti_i) <= CDBW_CATCOMPI)
     error("C_np_distribution_conditional_bw: myopti is incomplete");
 
+  int support_dimensions[4] = {INTEGER(myopti_i)[CDBW_CNUNOI],
+    INTEGER(myopti_i)[CDBW_CNORDI], INTEGER(myopti_i)[CDBW_UNUNOI],
+    INTEGER(myopti_i)[CDBW_UNORDI]};
+  SEXP support_data[4] = {c_uno_r, c_ord_r, u_uno_r, u_ord_r};
+  NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[CDBW_NOBSI],
+    support_dimensions, support_data);
+
   ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
   ncon_y = (int)INTEGER(myopti_i)[CDBW_CNCONI];
   resolve_bounds_or_default(cxkerlb_r, cxkerub_r, ncon_x, &cxkerlb_p, &cxkerub_p);
@@ -12554,7 +12743,7 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
                                  REAL(out_fast), &pmode, &pmult,
                                  INTEGER(degree_i), &bern, &basis, &ll_mode,
                                  cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
-                                 eval_only);
+                                 eval_only, &support);
   bwm_nn_cache_write_stats(REAL(out_nn_cache));
 
   PROTECT(out = allocVector(VECSXP, 8));
@@ -12605,7 +12794,8 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
                                       SEXP cxkerlb,
                                       SEXP cxkerub,
                                       SEXP cykerlb,
-                                      SEXP cykerub)
+                                      SEXP cykerub,
+                                          SEXP declared_support)
 {
   np_reset_c_rng_for_bandwidth_search();
 
@@ -12613,7 +12803,7 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
                                                  cg_uno, cg_ord, cg_con, mysd, myopti, myoptd,
                                                  bw, hist_len, penalty_mode, penalty_mult,
                                                  glp_degree, glp_bernstein, glp_basis, regtype,
-                                                 cxkerlb, cxkerub, cykerlb, cykerub, 0);
+                                                 cxkerlb, cxkerub, cykerlb, cykerub, declared_support, 0);
 }
 
 SEXP C_np_distribution_conditional_bw_eval(SEXP c_uno,
@@ -12639,13 +12829,14 @@ SEXP C_np_distribution_conditional_bw_eval(SEXP c_uno,
                                            SEXP cxkerlb,
                                            SEXP cxkerub,
                                            SEXP cykerlb,
-                                           SEXP cykerub)
+                                           SEXP cykerub,
+                                          SEXP declared_support)
 {
   return C_np_distribution_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
                                                  cg_uno, cg_ord, cg_con, mysd, myopti, myoptd,
                                                  bw, hist_len, penalty_mode, penalty_mult,
                                                  glp_degree, glp_bernstein, glp_basis, regtype,
-                                                 cxkerlb, cxkerub, cykerlb, cykerub, 1);
+                                                 cxkerlb, cxkerub, cykerlb, cykerub, declared_support, 1);
 }
 
 SEXP C_np_density_conditional_bw(SEXP c_uno,
@@ -12668,7 +12859,8 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
                                  SEXP cxkerlb,
                                  SEXP cxkerub,
                                  SEXP cykerlb,
-                                 SEXP cykerub)
+                                 SEXP cykerub,
+                                 SEXP declared_support)
 {
   np_reset_c_rng_for_bandwidth_search();
 
@@ -12676,7 +12868,8 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
                                             mysd, myopti, myoptd, bw, hist_len,
                                             penalty_mode, penalty_mult,
                                             glp_degree, glp_bernstein, glp_basis, regtype,
-                                            cxkerlb, cxkerub, cykerlb, cykerub, 0);
+                                            cxkerlb, cxkerub, cykerlb, cykerub, 0,
+                                            declared_support);
 }
 
 SEXP C_np_density_conditional_bw_eval(SEXP c_uno,
@@ -12699,13 +12892,15 @@ SEXP C_np_density_conditional_bw_eval(SEXP c_uno,
                                       SEXP cxkerlb,
                                       SEXP cxkerub,
                                       SEXP cykerlb,
-                                      SEXP cykerub)
+                                      SEXP cykerub,
+                                      SEXP declared_support)
 {
   return C_np_density_conditional_bw_common(c_uno, c_ord, c_con, u_uno, u_ord, u_con,
                                             mysd, myopti, myoptd, bw, hist_len,
                                             penalty_mode, penalty_mult,
                                             glp_degree, glp_bernstein, glp_basis, regtype,
-                                            cxkerlb, cxkerub, cykerlb, cykerub, 1);
+                                            cxkerlb, cxkerub, cykerlb, cykerub, 1,
+                                            declared_support);
 }
 
 typedef struct {
@@ -12962,7 +13157,8 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
                                                        SEXP cxkerlb,
                                                        SEXP cxkerub,
                                                        SEXP cykerlb,
-                                                       SEXP cykerub)
+                                                       SEXP cykerub,
+                                                       SEXP declared_support)
 {
   SEXP c_uno_r = R_NilValue, c_ord_r = R_NilValue, c_con_r = R_NilValue;
   SEXP u_uno_r = R_NilValue, u_ord_r = R_NilValue, u_con_r = R_NilValue;
@@ -13053,6 +13249,14 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   n_options = (int) XLENGTH(option_names_s);
   objective_cache_enabled = bwm_objective_cache_read_user_enabled();
 
+  int support_dimensions[4] = {INTEGER(myopti_i)[CDBW_CNUNOI],
+    INTEGER(myopti_i)[CDBW_CNORDI], INTEGER(myopti_i)[CDBW_UNUNOI],
+    INTEGER(myopti_i)[CDBW_UNORDI]};
+  SEXP support_data[4] = {c_uno_r, c_ord_r, u_uno_r, u_ord_r};
+  NPCategoricalSupport support = np_categorical_support_parse(
+    declared_support, INTEGER(myopti_i)[CDBW_NOBSI],
+    support_dimensions, support_data);
+
   memset(&problem, 0, sizeof(problem));
   memset(&result, 0, sizeof(result));
   memset(&context, 0, sizeof(context));
@@ -13135,7 +13339,7 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
       fast_prepare, &penalty_mode_prepare, &penalty_mult_prepare,
       degree_start, &bernstein_prepare, &basis_prepare, &regtype_prepare,
       context.cxkerlb, context.cxkerub, context.cykerlb, context.cykerub,
-      1, &context.prepared, 1, ndegree > 0);
+      1, &context.prepared, 1, ndegree > 0, &support);
   }
 
   context.raw_point = R_Calloc(n, double);
@@ -14741,7 +14945,8 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
                                    double * ckerlb, double * ckerub,
                                    const int eval_only,
                                    NPDensityPreparedCtx *retained_context,
-                                   const int prepare_only){
+                                   const int prepare_only,
+                                   const NPCategoricalSupport *support){
   NPDensityPreparedCtx local_context = {0};
   NPDensityPreparedCtx *prepared_context =
     retained_context != NULL ? retained_context : &local_context;
@@ -14906,7 +15111,7 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
     vsfh = alloc_vecd(num_var + 1);
   }
 
-  matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+  matrix_categorical_vals_extern = alloc_matd(support->max_levels, num_reg_unordered_extern + num_reg_ordered_extern);
 
   prepared_context->matrix_x_unordered = matrix_X_unordered_train_extern;
   prepared_context->matrix_x_ordered = matrix_X_ordered_train_extern;
@@ -14976,18 +15181,17 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
   }
 
 
-  determine_categorical_vals(
-                             num_obs_train_extern,
-                             0,
-                             0,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             matrix_Y_unordered_train_extern,
-                             matrix_Y_ordered_train_extern,
-                             matrix_X_unordered_train_extern,
-                             matrix_X_ordered_train_extern,
-                             num_categories_extern,
-                             matrix_categorical_vals_extern);
+  /* Retain legacy verbose/debug diagnostics without paying for an observed
+   * support scan on the ordinary preparation path. Declared values own the
+   * computation independently of those observational diagnostics. */
+  if(int_VERBOSE == 1 || int_DEBUG == 1)
+    determine_categorical_vals(num_obs_train_extern, 0, 0,
+      num_reg_unordered_extern, num_reg_ordered_extern,
+      matrix_Y_unordered_train_extern, matrix_Y_ordered_train_extern,
+      matrix_X_unordered_train_extern, matrix_X_ordered_train_extern,
+      num_categories_extern, matrix_categorical_vals_extern);
+  np_categorical_support_copy(support, num_categories_extern,
+                              matrix_categorical_vals_extern);
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
   prepared_context->continuous_stddev = vector_continuous_stddev;
@@ -15609,7 +15813,7 @@ static int np_density_prepared_context_prepare(
   double *myuno, double *myord, double *mycon, double *mysd,
   int *myopti, double *myoptd, const double *bw,
   int penalty_mode, double penalty_mult,
-  double *ckerlb, double *ckerub)
+  double *ckerlb, double *ckerub, const NPCategoricalSupport *support)
 {
   double fval[2] = {R_NaN, R_NaN};
   double objective[1] = {R_NaN};
@@ -15627,7 +15831,7 @@ static int np_density_prepared_context_prepare(
   np_density_bw_internal(myuno, myord, mycon, mysd, myopti, myoptd,
                          (double *)bw, fval, objective, evaluations, invalid,
                          timing, fast, guarded, &pmode, &pmult,
-                         ckerlb, ckerub, 1, context, 1);
+                         ckerlb, ckerub, 1, context, 1, support);
   return context->active ? 0 : 1;
 }
 
@@ -15689,14 +15893,14 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * objective_function_guarded,
                    int * penalty_mode, double * penalty_mult,
                    double * ckerlb, double * ckerub,
-                   const int eval_only)
+                   const int eval_only, const NPCategoricalSupport *support)
 {
   np_density_bw_internal(myuno, myord, mycon, mysd, myopti, myoptd,
                          myans, fval, objective_function_values,
                          objective_function_evals, objective_function_invalid,
                          timing, objective_function_fast,
                          objective_function_guarded, penalty_mode, penalty_mult,
-                         ckerlb, ckerub, eval_only, NULL, 0);
+                         ckerlb, ckerub, eval_only, NULL, 0, support);
 }
 
  
@@ -15714,7 +15918,8 @@ static void np_distribution_bw_internal(
   double *ckerlb, double *ckerub,
   const int eval_only,
   NPDistributionPreparedCtx *retained_context,
-  const int prepare_only)
+  const int prepare_only,
+  const NPCategoricalSupport *support)
 {
   NPDistributionPreparedCtx local_context = {0};
   NPDistributionPreparedCtx *prepared_context =
@@ -15900,7 +16105,7 @@ static void np_distribution_bw_internal(
   vector_scale_factor_startbest = prepare_only ? NULL : alloc_vecd(num_var + 1);
   vsfh = prepare_only ? NULL : alloc_vecd(num_var + 1);
   // nb check vals
-  matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+  matrix_categorical_vals_extern = alloc_matd(support->max_levels, num_reg_unordered_extern + num_reg_ordered_extern);
 
   prepared_context->num_categories = num_categories_extern;
   prepared_context->powell_directions = matrix_y;
@@ -16020,18 +16225,14 @@ static void np_distribution_bw_internal(
 
   }
 
-  determine_categorical_vals(
-                             num_obs_train_extern,
-                             0,
-                             0,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             matrix_Y_unordered_train_extern,
-                             matrix_Y_ordered_train_extern,
-                             matrix_X_unordered_train_extern,
-                             matrix_X_ordered_train_extern,
-                             num_categories_extern,
-                             matrix_categorical_vals_extern);
+  if(int_VERBOSE == 1 || int_DEBUG == 1)
+    determine_categorical_vals(num_obs_train_extern, 0, 0,
+      num_reg_unordered_extern, num_reg_ordered_extern,
+      matrix_Y_unordered_train_extern, matrix_Y_ordered_train_extern,
+      matrix_X_unordered_train_extern, matrix_X_ordered_train_extern,
+      num_categories_extern, matrix_categorical_vals_extern);
+  np_categorical_support_copy(support, num_categories_extern,
+                              matrix_categorical_vals_extern);
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
   prepared_context->continuous_stddev = vector_continuous_stddev;
@@ -16648,7 +16849,7 @@ static int np_distribution_prepared_context_prepare(
   double *myeuno, double *myeord, double *myecon, double *mysd,
   int *myopti, double *myoptd, const double *bw,
   int penalty_mode, double penalty_mult,
-  double *ckerlb, double *ckerub)
+  double *ckerlb, double *ckerub, const NPCategoricalSupport *support)
 {
   double fval[3] = {R_NaN, R_NaN, R_NaN};
   double objective[1] = {R_NaN};
@@ -16667,7 +16868,7 @@ static int np_distribution_prepared_context_prepare(
     myopti, myoptd, (double *)bw, fval,
     objective, evaluations, invalid, timing, fast,
     &pmode, &pmult, ckerlb, ckerub,
-    1, context, 1);
+    1, context, 1, support);
   return context->active ? 0 : 1;
 }
 
@@ -16729,7 +16930,7 @@ void np_distribution_bw(double *myuno, double *myord, double *mycon,
                         double *objective_function_fast,
                         int *penalty_mode, double *penalty_mult,
                         double *ckerlb, double *ckerub,
-                        const int eval_only)
+                        const int eval_only, const NPCategoricalSupport *support)
 {
   np_distribution_bw_internal(
     myuno, myord, mycon, myeuno, myeord, myecon, mysd,
@@ -16737,11 +16938,11 @@ void np_distribution_bw(double *myuno, double *myord, double *mycon,
     objective_function_values, objective_function_evals,
     objective_function_invalid, timing, objective_function_fast,
     penalty_mode, penalty_mult, ckerlb, ckerub,
-    eval_only, NULL, 0);
+    eval_only, NULL, 0, support);
 }
 
 
-void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
+void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * u_uno, double * u_ord, double * u_con,
                                double * mysd,
                                int * myopti, double * myoptd, double * myans, double * fval,
@@ -16756,7 +16957,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                int * regtype,
                                double * cxkerlb, double * cxkerub,
                                double * cykerlb, double * cykerub,
-                               const int eval_only){
+                               const int eval_only, const NPCategoricalSupport *support){
   int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
@@ -16805,7 +17006,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
         penalty_mode, penalty_mult,
         glp_degree, glp_bernstein, glp_basis, regtype,
         cxkerlb, cxkerub, cykerlb, cykerub,
-        1, eval_only, NULL))
+        1, eval_only, NULL, support))
     error("C_np_density_conditional_bw: failed to prepare objective state");
 
   num_all_var = np_conditional_density_prepared_context.num_all_var;
@@ -17824,7 +18025,8 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
                                     const int eval_only,
                                     NPConditionalDistributionPreparedCtx *retained_context,
                                     const int prepare_only,
-                                    const int degree_search){
+                                    const int degree_search,
+                                    const NPCategoricalSupport *support){
   int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
@@ -18183,17 +18385,17 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
   }
   
   matrix_categorical_vals_extern = 
-    alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern + 
+    alloc_matd(support->max_levels, num_var_unordered_extern + num_var_ordered_extern +
                num_reg_unordered_extern + num_reg_ordered_extern);
 
   matrix_categorical_vals_extern_X = 
-    alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+    alloc_matd(support->max_levels, num_reg_unordered_extern + num_reg_ordered_extern);
 
   matrix_categorical_vals_extern_Y = 
-    alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern);
+    alloc_matd(support->max_levels, num_var_unordered_extern + num_var_ordered_extern);
 
   matrix_categorical_vals_extern_XY = 
-    alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern + 
+    alloc_matd(support->max_levels, num_var_unordered_extern + num_var_ordered_extern +
                num_reg_unordered_extern + num_reg_ordered_extern);
   prepared_context->matrix_categorical_vals = matrix_categorical_vals_extern;
   prepared_context->matrix_categorical_vals_x = matrix_categorical_vals_extern_X;
@@ -18538,18 +18740,21 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
     
   }
 
-  determine_categorical_vals(
-                             num_obs_train_extern,
-                             num_var_unordered_extern,
-                             num_var_ordered_extern,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             matrix_Y_unordered_train_extern,
-                             matrix_Y_ordered_train_extern,
-                             matrix_X_unordered_train_extern,
-                             matrix_X_ordered_train_extern,
-                             num_categories_extern,
-                             matrix_categorical_vals_extern);
+  if(int_VERBOSE == 1 || int_DEBUG == 1)
+    determine_categorical_vals(
+                               num_obs_train_extern,
+                               num_var_unordered_extern,
+                               num_var_ordered_extern,
+                               num_reg_unordered_extern,
+                               num_reg_ordered_extern,
+                               matrix_Y_unordered_train_extern,
+                               matrix_Y_ordered_train_extern,
+                               matrix_X_unordered_train_extern,
+                               matrix_X_ordered_train_extern,
+                               num_categories_extern,
+                               matrix_categorical_vals_extern);
+  np_categorical_support_copy(support, num_categories_extern,
+                              matrix_categorical_vals_extern);
 
   np_splitxy_vsf_mcv_nc(num_var_unordered_extern, num_var_ordered_extern, num_var_continuous_extern,
                         num_reg_unordered_extern, num_reg_ordered_extern, num_reg_continuous_extern,
@@ -19235,7 +19440,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     int * regtype,
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub,
-                                    const int eval_only)
+                                    const int eval_only,
+                                    const NPCategoricalSupport *support)
 {
   np_distribution_conditional_bw_mode(
     c_uno, c_ord, c_con, u_uno, u_ord, u_con,
@@ -19246,7 +19452,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     penalty_mode, penalty_mult,
     glp_degree, glp_bernstein, glp_basis, regtype,
     cxkerlb, cxkerub, cykerlb, cykerub,
-    eval_only, NULL, 0, 0);
+    eval_only, NULL, 0, 0, support);
 }
 
 /*
@@ -21029,7 +21235,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                   double * lsq_delta_out,
                                   NPRegressionPreparedCtx *retained_context,
                                   const int prepare_only,
-                                  const int degree_search){
+                                  const int degree_search,
+                                  const NPCategoricalSupport *support){
   NPRegressionPreparedCtx local_context = {0};
   NPRegressionPreparedCtx *prepared_context =
     retained_context != NULL ? retained_context : &local_context;
@@ -21265,7 +21472,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   vector_scale_factor_startbest = prepare_only ? NULL :
     alloc_vecd(num_search_var + 1);
   vsfh = prepare_only ? NULL : alloc_vecd(num_search_var + 1);
-  matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+  matrix_categorical_vals_extern = alloc_matd(support->max_levels, num_reg_unordered_extern + num_reg_ordered_extern);
   prepared_context->num_categories = num_categories_extern;
   prepared_context->powell_directions = matrix_y;
   prepared_context->scale_factor = vector_scale_factor;
@@ -21437,18 +21644,21 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     //boxSearch(kdt_extern, 0, tb, &nl);
   }
 
-  determine_categorical_vals(
-                             num_obs_train_extern,
-                             0,
-                             0,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             matrix_Y_unordered_train_extern,
-                             matrix_Y_ordered_train_extern,
-                             matrix_X_unordered_train_extern,
-                             matrix_X_ordered_train_extern,
-                             num_categories_extern,
-                             matrix_categorical_vals_extern);
+  if(int_VERBOSE == 1 || int_DEBUG == 1)
+    determine_categorical_vals(
+                               num_obs_train_extern,
+                               0,
+                               0,
+                               num_reg_unordered_extern,
+                               num_reg_ordered_extern,
+                               matrix_Y_unordered_train_extern,
+                               matrix_Y_ordered_train_extern,
+                               matrix_X_unordered_train_extern,
+                               matrix_X_ordered_train_extern,
+                               num_categories_extern,
+                               matrix_categorical_vals_extern);
+  np_categorical_support_copy(support, num_categories_extern,
+                              matrix_categorical_vals_extern);
 
   if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
      (!np_glp_cv_prepare_extern(np_lp_engine_extern,

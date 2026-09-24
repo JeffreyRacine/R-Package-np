@@ -1282,6 +1282,7 @@ npreghat <-
       as.integer(isTRUE(sigtest$pivotal)),
       as.double(sigtest$null.mean),
       as.double(sigtest$residual.pool),
+      .np_native_categorical_support(bws),
       PACKAGE = "npRmpi"
     ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]]))
   }
@@ -1314,6 +1315,7 @@ npreghat <-
     as.logical(no.ex),
     as.logical(leave.one.out),
     as.logical(allow.empty.rows),
+    .np_native_categorical_support(bws),
     PACKAGE = "npRmpi"
   ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 }

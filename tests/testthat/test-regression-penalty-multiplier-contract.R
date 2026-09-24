@@ -82,7 +82,7 @@ test_that("internal and native regression ingresses reject subunit multipliers",
     prep$runo, prep$rord, prep$rcon, prep$ydat, prep$mysd,
     prep$myopti, prep$myoptd, prep$rbw, 1L,
     prep$penalty_mode, multiplier, prep$degree, prep$bernstein, prep$basis,
-    prep$ckerlb, prep$ckerub, PACKAGE = "npRmpi"
+    prep$ckerlb, prep$ckerub, prep$declared.support, PACKAGE = "npRmpi"
   ))
   expect_error(
     native.eval(0.5),

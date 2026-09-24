@@ -3463,6 +3463,20 @@ subcol <- function(x, v, i){
   x
 }
 
+.np_native_categorical_support <- function(bws) {
+  info <- bws[["dati", exact = TRUE]]
+  if (!is.list(info) || is.null(info[["x", exact = TRUE]]))
+    stop("bandwidth object is missing declared training support")
+  role <- function(name) {
+    d <- info[[name, exact = TRUE]]
+    if (is.null(d)) return(list())
+    columns <- c(which(d[["iuno", exact = TRUE]]),
+                 which(d[["iord", exact = TRUE]]))
+    lapply(d[["all.dlev", exact = TRUE]][columns], as.double)
+  }
+  c(role("y"), role("x"))
+}
+
 mcvConstruct <- function(dati){
   nuno <- sum(dati$iuno)
   nord <- sum(dati$iord)

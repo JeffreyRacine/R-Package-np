@@ -731,6 +731,7 @@ npcdensbw.conbandwidth <-
                     as.double(cxker.bounds.c$ub),
                     as.double(cyker.bounds.c$lb),
                     as.double(cyker.bounds.c$ub),
+                    .np_native_categorical_support(bws),
                     PACKAGE="npRmpi")
             )
           } else {
@@ -753,6 +754,7 @@ npcdensbw.conbandwidth <-
                   as.double(cxker.bounds.c$ub),
                   as.double(cyker.bounds.c$lb),
                   as.double(cyker.bounds.c$ub),
+                  .np_native_categorical_support(bws),
                   PACKAGE="npRmpi")
           }
         total.time <- proc.time()[3] - elapsed.start
@@ -1338,6 +1340,7 @@ npcdensbw.conbandwidth <-
       as.double(cxker.bounds.c$ub),
       as.double(cyker.bounds.c$lb),
       as.double(cyker.bounds.c$ub),
+      .np_native_categorical_support(bws),
       PACKAGE = "npRmpi"
     )
   }
@@ -1386,7 +1389,8 @@ npRmpiPreparedObjectivePrepareConditionalDensity <- function(c.uno,
                                                        cxkerlb,
                                                        cxkerub,
                                                        cykerlb,
-                                                       cykerub) {
+                                                       cykerub,
+                                                       declared.support) {
   if (length(myoptd) <= 23L || length(myopti) <= 34L) {
     rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
     if (isTRUE(rank == 0L))
@@ -1416,6 +1420,7 @@ npRmpiPreparedObjectivePrepareConditionalDensity <- function(c.uno,
     cxkerub,
     cykerlb,
     cykerub,
+    declared.support,
     PACKAGE = "npRmpi"
   ))[1L]
 
@@ -1865,7 +1870,8 @@ npRmpiPreparedObjectiveDestroyConditionalDensity <- function() {
     cxkerlb = as.double(cxker.bounds.c$lb),
     cxkerub = as.double(cxker.bounds.c$ub),
     cykerlb = as.double(cyker.bounds.c$lb),
-    cykerub = as.double(cyker.bounds.c$ub)
+    cykerub = as.double(cyker.bounds.c$ub),
+    declared.support = .np_native_categorical_support(bws)
   )
 }
 
@@ -1970,7 +1976,8 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
     cxkerlb = prep$cxkerlb,
     cxkerub = prep$cxkerub,
     cykerlb = prep$cykerlb,
-    cykerub = prep$cykerub
+    cykerub = prep$cykerub,
+    declared.support = prep$declared.support
   )
   if (!isTRUE(prepared))
     return(list(
@@ -2834,7 +2841,8 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
         CXKERLB,
         CXKERUB,
         CYKERLB,
-        CYKERUB
+        CYKERUB,
+        DECLAREDSUPPORT
       ),
       list(
         CUNO = native.prep$c.uno,
@@ -2856,7 +2864,8 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
         CXKERLB = native.prep$cxkerlb,
         CXKERUB = native.prep$cxkerub,
         CYKERLB = native.prep$cykerlb,
-        CYKERUB = native.prep$cykerub
+        CYKERUB = native.prep$cykerub,
+        DECLAREDSUPPORT = native.prep$declared.support
       )
     )
     prepared <- if (active.pool && !called.from.bcast) {

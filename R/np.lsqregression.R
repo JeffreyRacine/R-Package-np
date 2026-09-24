@@ -809,6 +809,7 @@ nplsqregbw <-
       as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
       as.integer(npLpBasisCode(reg.spec$basis.engine)),
       as.double(cker.bounds.c$lb), as.double(cker.bounds.c$ub),
+      .np_native_categorical_support(bws),
       PACKAGE = "npRmpi"
     )
   } else {
@@ -825,6 +826,7 @@ nplsqregbw <-
       as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
       as.integer(npLpBasisCode(reg.spec$basis.engine)),
       as.double(cker.bounds.c$lb), as.double(cker.bounds.c$ub),
+      .np_native_categorical_support(bws),
       PACKAGE = "npRmpi"
     )
   }

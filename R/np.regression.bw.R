@@ -429,6 +429,7 @@ npregbw.rbandwidth <-
               as.integer(npLpBasisCode(reg.spec$basis.engine)),
               as.double(cker.bounds.c$lb),
               as.double(cker.bounds.c$ub),
+              .np_native_categorical_support(bws),
               PACKAGE = "npRmpi"))[1]
 
 
@@ -778,6 +779,7 @@ npregbw.rbandwidth <-
         as.integer(npLpBasisCode(reg.spec$basis.engine)),
         as.double(cker.bounds.c$lb),
         as.double(cker.bounds.c$ub),
+        .np_native_categorical_support(bws),
         PACKAGE = "npRmpi"
       )
     }
@@ -802,6 +804,7 @@ npregbw.rbandwidth <-
         as.integer(npLpBasisCode(reg.spec$basis.engine)),
         as.double(cker.bounds.c$lb),
         as.double(cker.bounds.c$ub),
+        .np_native_categorical_support(bws),
         PACKAGE = "npRmpi"
       )
     }
@@ -1020,7 +1023,8 @@ npRmpiPreparedObjectivePrepareRegression <- function(runo,
                                                       basis,
                                                       degree.search,
                                                       ckerlb,
-                                                      ckerub) {
+                                                      ckerub,
+                                                      declared.support) {
   if (length(myoptd) <= 18L) {
     rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
     if (isTRUE(rank == 0L))
@@ -1046,6 +1050,7 @@ npRmpiPreparedObjectivePrepareRegression <- function(runo,
     degree.search,
     ckerlb,
     ckerub,
+    declared.support,
     PACKAGE = "npRmpi"
   )
 
@@ -1235,7 +1240,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
                                           bernstein,
                                           basis,
                                           ckerlb,
-                                          ckerub) {
+                                          ckerub,
+                                          declared.support) {
   .Call(
     "C_np_regression_bw_eval",
     runo,
@@ -1254,6 +1260,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     basis,
     ckerlb,
     ckerub,
+    declared.support,
     PACKAGE = "npRmpi"
   )
 }
@@ -1408,7 +1415,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     bernstein = as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
     basis = as.integer(npLpBasisCode(reg.spec$basis.engine)),
     ckerlb = as.double(cker.bounds.c$lb),
-    ckerub = as.double(cker.bounds.c$ub)
+    ckerub = as.double(cker.bounds.c$ub),
+    declared.support = .np_native_categorical_support(bws)
   )
 }
 
@@ -1451,7 +1459,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       BASIS,
       DSEARCH,
       CKERLB,
-      CKERUB
+      CKERUB,
+      DECLAREDSUPPORT
     ),
     list(
       RUNO = prep$runo,
@@ -1469,7 +1478,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       BASIS = prep$basis,
       DSEARCH = FALSE,
       CKERLB = prep$ckerlb,
-      CKERUB = prep$ckerub
+      CKERUB = prep$ckerub,
+      DECLAREDSUPPORT = prep$declared.support
     )
   )
 
@@ -2280,7 +2290,8 @@ npRmpiNomadPreparedSearchRegression <- function(template,
     basis = prep$basis,
     degree.search = TRUE,
     ckerlb = prep$ckerlb,
-    ckerub = prep$ckerub
+    ckerub = prep$ckerub,
+    declared.support = prep$declared.support
   )
   if (!isTRUE(prepared))
     return(list(
@@ -3019,7 +3030,8 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       bernstein = prep$bernstein,
       basis = prep$basis,
       ckerlb = prep$ckerlb,
-      ckerub = prep$ckerub
+      ckerub = prep$ckerub,
+      declared.support = prep$declared.support
     )
     nomad.num.feval.total <<- nomad.num.feval.total + 1L
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$fast.history[1L])

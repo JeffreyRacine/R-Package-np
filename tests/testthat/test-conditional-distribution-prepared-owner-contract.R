@@ -68,7 +68,7 @@ test_that("native conditional-distribution search retains one prepared owner", {
   )
   expect_match(
     source,
-    "1, &context.prepared, 1, ndegree > 0);",
+    "1, &context.prepared, 1, ndegree > 0, &support);",
     fixed = TRUE
   )
   for (field in c(
