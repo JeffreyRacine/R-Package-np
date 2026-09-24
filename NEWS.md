@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Generalized-neighbor deleted objectives and native leave-one-out hats now
+  decode boundary counts on the deleted donor sample, retaining ordinary-fit
+  geometry and existing computational owners. Invalid beta density CVML
+  geometry fails closed rather than returning an objective of zero.
+
 * Conditional-quantile inversion accuracy scales with the observed response
   span rather than its absolute location, so translating the response no
   longer loosens the requested accuracy.

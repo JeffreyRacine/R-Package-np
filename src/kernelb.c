@@ -1107,15 +1107,31 @@ static int np_kernel_bandwidth_continuous_nn_into_ctx(
   int int_nn_k;
   double nn_scale;
   int nn_extended;
+  const int deleted_query = BANDWIDTH == BW_GEN_NN &&
+    geometry_context != NULL &&
+    (geometry_context->mode == NP_NN_QUERY_DELETE_ONE_IDENTITY ||
+     geometry_context->mode == NP_NN_QUERY_DELETE_ONE_MAP);
+  NPNNGeometryContext resolved_geometry;
+
+  if(deleted_query) {
+    resolved_geometry = *geometry_context;
+    resolved_geometry.mode =
+      geometry_context->mode == NP_NN_QUERY_DELETE_ONE_IDENTITY ?
+      NP_NN_QUERY_TRAINING_IDENTITY : NP_NN_QUERY_TRAINING_MAP;
+    geometry_context = &resolved_geometry;
+  }
 
   if(geometry_status != NULL)
     *geometry_status = NP_NN_GEOMETRY_OK;
 
   for(dimension = 0; dimension < num_cont; ++dimension) {
-    if(np_nn_lookup_from_scale(num_obs_train, 1,
+    if(np_nn_lookup_from_scale(num_obs_train - deleted_query, 1,
                                vector_scale_factor[dimension],
-                               &int_nn_k, &nn_scale, &nn_extended) == 1)
+                               &int_nn_k, &nn_scale, &nn_extended) == 1) {
+      if(deleted_query && geometry_status != NULL)
+        *geometry_status = NP_NN_GEOMETRY_INVALID_SCALE;
       return 1;
+    }
 
     if(BANDWIDTH == BW_GEN_NN) {
       NPNNGeometryStatus query_status = NP_NN_GEOMETRY_OK;
