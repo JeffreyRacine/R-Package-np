@@ -8,7 +8,7 @@ regression_declared_support_contract <- function(package) {
     u=factor(rep(c(1,2,4),4),levels=1:16),
     o=ordered(rep(c(.5,1.5,3.5),4),levels=seq(.5,15.5)))
   n<-nrow(x);y<-sin(4*x$x)+as.integer(x$u)/8+cos(seq_len(n))/9
-  for(type in c("fixed"))
+  for(type in c("fixed","generalized_nn","adaptive_nn"))
     for(degree in 0:2) {
       options(np.tree=FALSE)
       b<-bwfun(xdat=x,ydat=y,bws=c(if(type=="fixed").4 else 7,.65,.7),

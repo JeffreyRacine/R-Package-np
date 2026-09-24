@@ -74,7 +74,7 @@ test_that("density CVML and native MADS retain declared support", {
     codes<-if(is.ordered(dat$category))as.numeric(as.character(dat$category)) else as.integer(dat$category)
     support<-if(is.ordered(dat$category))as.numeric(levels(dat$category)) else seq_along(levels(dat$category))
     category<-declared_density_category(codes,codes,lambda,type,support)
-    for (bwtype in c("fixed")) {
+    for (bwtype in c("fixed","generalized_nn","adaptive_nn")) {
       args<-list(dat=dat,bws=c(if(bwtype=="fixed")h else 4,lambda),
                  bwmethod="cv.ml",bwtype=bwtype,bandwidth.compute=FALSE)
       if(type=="racineliyan")args$okertype<-type else args$ukertype<-type
