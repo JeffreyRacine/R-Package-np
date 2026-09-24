@@ -861,14 +861,14 @@ double np_ordered_rly_denom(const double train, const double lambda,
   if(cats == NULL || ncat <= 0)
     error("Racine-Li-Yan kernel requires retained ordered support");
   for(int i = 0; i < ncat; ++i)
-    den += np_ordered_metric_power(lambda, np_ordered_metric_distance(train,cats[i]));
+    den += np_ordered_metric_power_between(lambda,train,cats[i]);
   return den;
 }
 
 static double np_ordered_rly_normal(const double train, const double eval,
                                     const double lambda, const double denominator)
 {
-  return np_ordered_metric_power(lambda,np_ordered_metric_distance(train,eval))/denominator;
+  return np_ordered_metric_power_between(lambda,train,eval)/denominator;
 }
 
 static double np_ordered_rly_denom_score(const double train, const double lambda,
@@ -923,8 +923,8 @@ double np_ordered_rly(const int op, const double train, const double eval,
     double total = 0.0;
     if(!(den2 > 0.0)) return 0.0;
     for(int i = 0; i < ncat; ++i)
-      total += np_ordered_metric_power(lambda, np_ordered_metric_distance(train,cats[i])) *
-               np_ordered_metric_power(lambda, np_ordered_metric_distance(eval,cats[i]));
+      total += np_ordered_metric_power_between(lambda,train,cats[i]) *
+               np_ordered_metric_power_between(lambda,eval,cats[i]);
     return total/(den*den2);
   }
   if(op == 2) {
@@ -938,7 +938,7 @@ double np_ordered_rly(const int op, const double train, const double eval,
     double total = 0.0;
     for(int i = 0; i < ncat; ++i)
       if(cats[i] <= eval)
-        total += np_ordered_metric_power(lambda,np_ordered_metric_distance(train,cats[i]));
+        total += np_ordered_metric_power_between(lambda,train,cats[i]);
     return total/den;
   }
   /* Scores differentiate the requested retained-support operator, including
@@ -1062,7 +1062,7 @@ double kernel_ordered(int KERNEL, double x, double y, double lambda,
 			}
 			else
 			{
-				return_value = np_ordered_metric_power(lambda,np_ordered_metric_distance(x,y));
+				return_value = np_ordered_metric_power_between(lambda,x,y);
 			}
 
 			break;

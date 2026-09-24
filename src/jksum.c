@@ -1541,7 +1541,7 @@ double np_score_owang_van_ryzin(const double x, const double y, const double lam
 }
 
 double np_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  return np_ordered_metric_power(lambda, np_ordered_metric_distance(x,y));
+  return np_ordered_metric_power_between(lambda,x,y);
 }
 
 double np_score_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
@@ -7591,7 +7591,8 @@ void np_p_okernelv(const int KERNEL,
   
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
-  const int max_cxy = np_ordered_lattice_span(cats,ncat);
+  const int max_cxy = ((KERNEL & 3) == 3 && (!do_perm || (P_KERNEL & 3) == 3)) ?
+    -1 : np_ordered_lattice_span(cats,ncat);
   const int fast_kernel = (KERNEL >= 0 && KERNEL <= 3 && cats != NULL);
   const int fast_p_kernel = (P_KERNEL >= 0 && P_KERNEL <= 3 && cats != NULL);
   double *lpow = NULL;
@@ -7708,7 +7709,7 @@ void np_okernelv(const int KERNEL,
 
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
-  const int max_cxy = np_ordered_lattice_span(cats,ncat);
+  const int max_cxy = (KERNEL & 3) == 3 ? -1 : np_ordered_lattice_span(cats,ncat);
   const int fast_kernel = (KERNEL >= 0 && KERNEL <= 3 && cats != NULL);
 
   if(fast_kernel){
