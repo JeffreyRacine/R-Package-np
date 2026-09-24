@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Generalized-neighbor conditional-distribution cross-validation on external
+  grids now uses the deleted donor sample for both predictor and response
+  radii, retaining the empirical-grid convention, row/block work ownership
+  and existing tree-selection policy.
+
 * Automatic nearest-neighbor density, regression and conditional-density
   recovery now uses each criterion's deleted-sample count domain while
   retaining the full-sample CVAIC endpoint. Explicit and genuinely extended

@@ -27149,7 +27149,7 @@ double *cv){
   np_gate_ctx_clear(&gate_x_ctx);
   np_gate_ctx_clear(&gate_y_ctx);
 
-  if(BANDWIDTH_den == BW_GEN_NN && cdfontrain)
+  if(BANDWIDTH_den == BW_GEN_NN)
     return np_conditional_distribution_cvls_gnn_empirical_stream(
       vector_scale_factor, cv);
 
@@ -36752,6 +36752,7 @@ typedef struct {
   double *kw;
   double **matrix_bandwidth_y;
   double **matrix_bandwidth_y_successor;
+  double *base_exclusion_scale;
   double *adaptive_fold_scale_y;
   double **matrix_bandwidth_y_selected;
   double **matrix_bandwidth_eval_one;
@@ -36818,6 +36819,10 @@ static const NPNNGeometryContext np_conditional_training_identity_geometry = {
   .mode = NP_NN_QUERY_TRAINING_IDENTITY,
   .eval_to_train = NULL,
   .adaptive_successor = NULL
+};
+
+static const NPNNGeometryContext np_conditional_external_geometry = {
+  .mode = NP_NN_QUERY_EXTERNAL
 };
 
 static const NPNNGeometryContext np_conditional_deleted_identity_geometry = {
@@ -39183,6 +39188,7 @@ static void np_conditional_yrow_ctx_clear(NPConditionalYRowCtx *ctx){
   if(ctx->matrix_bandwidth_y != NULL) free_tmat(ctx->matrix_bandwidth_y);
   if(ctx->matrix_bandwidth_y_successor != NULL)
     free_tmat(ctx->matrix_bandwidth_y_successor);
+  free(ctx->base_exclusion_scale);
   free(ctx->adaptive_fold_scale_y);
   if(ctx->matrix_bandwidth_y_selected != NULL)
     free_tmat(ctx->matrix_bandwidth_y_selected);
@@ -39415,6 +39421,36 @@ static int np_conditional_yrow_eval_two_slot_ctx_prepare(
   if(successor_scale == NULL || successor_lambda == NULL ||
      ctx->matrix_bandwidth_y_successor == NULL)
     goto fail_two_slot_prepare;
+
+  /* External CDF queries have no training occurrence to exclude. Decode on
+   * the actual deleted sample, then prepare the adjacent full-sample ranks.
+   * Retain the unscaled geometry for deletion masks; the scale belongs only
+   * to the bandwidth passed to the canonical kernel owner. */
+  if(mapped_query_geometry->mode == NP_NN_QUERY_EXTERNAL){
+    ctx->base_exclusion_scale = alloc_vecd(num_var_continuous_extern);
+    if(ctx->base_exclusion_scale == NULL)
+      goto fail_two_slot_prepare;
+    for(l = 0; l < num_var_continuous_extern; ++l){
+      int k;
+      double scale;
+      if(np_nn_lookup_from_scale(num_train - 1, 1, ctx->vsfy[l],
+                                 &k, &scale, NULL) != 0 ||
+         compute_nn_distance_train_eval_ctx(num_train, num_eval, 1,
+           matrix_Y_continuous_train_extern[l], matrix_Y_continuous_eval[l],
+           k, mapped_query_geometry, ctx->matrix_bandwidth_y[l]) !=
+             NP_NN_GEOMETRY_OK ||
+         compute_nn_distance_train_eval_ctx(num_train, num_eval, 1,
+           matrix_Y_continuous_train_extern[l], matrix_Y_continuous_eval[l],
+           k + 1, mapped_query_geometry, ctx->matrix_bandwidth_y_successor[l]) !=
+             NP_NN_GEOMETRY_OK)
+        goto fail_two_slot_prepare;
+      ctx->base_exclusion_scale[l] = scale;
+    }
+    free(successor_scale);
+    free(successor_lambda);
+    ctx->base_exclusion_successor_ready = 1;
+    return 0;
+  }
 
   for(l = 0; l < num_var_tot; ++l)
     successor_scale[l] = ctx->vsfy[l];
@@ -39732,7 +39768,7 @@ static int np_conditional_y_eval_from_ctx_impl(NPConditionalYRowCtx *ctx,
 
   if(map_train_tree_index && (int_TREE_Y == NP_TREE_TRUE) && (ipt_lookup_extern_Y != NULL))
     eval_pos = ipt_lookup_extern_Y[eval_idx];
-  if(base_exclusion >= 0 && map_train_tree_index &&
+  if(base_exclusion >= 0 &&
      (int_TREE_Y == NP_TREE_TRUE) && (ipt_lookup_extern_Y != NULL))
     base_pos = ipt_lookup_extern_Y[base_exclusion];
 
@@ -39757,7 +39793,8 @@ static int np_conditional_y_eval_from_ctx_impl(NPConditionalYRowCtx *ctx,
           return 1;
         bandwidth = ctx->matrix_bandwidth_y_successor[l][eval_pos];
       }
-    } else if(base_exclusion >= 0 && base_pos != eval_pos){
+    } else if(base_exclusion >= 0 &&
+              (!map_train_tree_index || base_pos != eval_pos)){
       const double successor =
         ctx->base_exclusion_successor_ready &&
         ctx->matrix_bandwidth_y_successor != NULL ?
@@ -39773,7 +39810,8 @@ static int np_conditional_y_eval_from_ctx_impl(NPConditionalYRowCtx *ctx,
         return 1;
     }
     ctx->eval_ycon_one[l][0] = matrix_Y_continuous_eval[l][eval_pos];
-    ctx->matrix_bandwidth_eval_one[l][0] = bandwidth;
+    ctx->matrix_bandwidth_eval_one[l][0] = ctx->base_exclusion_scale != NULL ?
+      bandwidth*ctx->base_exclusion_scale[l] : bandwidth;
   }
 
   np_conditional_push_bounds(int_cyker_bound_extern,
@@ -39884,12 +39922,12 @@ static int np_conditional_y_base_exclusion_successor_mask(
      base_exclusion < 0 || base_exclusion >= num_obs_train_extern ||
      num_var_continuous_extern >= 64)
     return 1;
-  if(map_train_tree_index && int_TREE_Y == NP_TREE_TRUE &&
-     ipt_lookup_extern_Y != NULL){
-    eval_pos = ipt_lookup_extern_Y[eval_idx];
+  if(int_TREE_Y == NP_TREE_TRUE && ipt_lookup_extern_Y != NULL){
+    if(map_train_tree_index)
+      eval_pos = ipt_lookup_extern_Y[eval_idx];
     base_pos = ipt_lookup_extern_Y[base_exclusion];
   }
-  if(base_pos == eval_pos){
+  if(map_train_tree_index && base_pos == eval_pos){
     *successor_mask = mask;
     return 0;
   }
@@ -48412,7 +48450,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const double pair_count = np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, 1);
+    num_train, num_eval, cdfontrain_extern);
   const int use_parallel_rows = np_objective_outer_rows_enabled(
     int_conditional_prepared_context_extern);
   NPConditionalXRowCtx xctx = {0};
@@ -48428,7 +48466,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
 
   if(cv == NULL || vector_scale_factor == NULL ||
      BANDWIDTH_den_extern != BW_GEN_NN ||
-     !cdfontrain_extern || pair_count <= 0.0)
+     pair_count <= 0.0)
     return 1;
 
   xrow = alloc_vecd(MAX(1, num_train));
@@ -48442,7 +48480,8 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
   if(!local_fail &&
      np_conditional_xrow_ctx_prepare_ctx(
        vector_scale_factor,
-       &np_conditional_training_identity_geometry,
+       cdfontrain_extern ? &np_conditional_training_identity_geometry :
+         &np_conditional_deleted_identity_geometry,
        &xctx) != 0)
     local_fail = 1;
   if(!local_fail &&
@@ -48453,7 +48492,8 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
        matrix_Y_ordered_eval_extern,
        matrix_Y_continuous_eval_extern,
        num_eval,
-       &np_conditional_training_identity_geometry,
+       cdfontrain_extern ? &np_conditional_training_identity_geometry :
+         &np_conditional_external_geometry,
        &yctx) != 0)
     local_fail = 1;
   if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
@@ -48479,7 +48519,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
       double difference;
       int indicator;
 
-      if(i == j)
+      if(cdfontrain_extern && i == j)
         continue;
       if(np_conditional_y_eval_from_ctx_base_exclusion(
            &yctx,
@@ -48488,7 +48528,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
            matrix_Y_ordered_eval_extern,
            matrix_Y_continuous_eval_extern,
            num_eval,
-           1,
+           cdfontrain_extern,
            i,
            yint) != 0){
         local_fail = 1;
@@ -48518,7 +48558,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
     for(i = 0; i < num_train; ++i)
       *cv += contributions[i];
   if(np_distribution_cvls_finalize(
-       *cv, num_train, num_eval, 1, cv) !=
+       *cv, num_train, num_eval, cdfontrain_extern, cv) !=
      NP_DISTRIBUTION_CVLS_FINALIZE_OK)
     goto cleanup_gnn_empirical_cdist;
   status = 0;
@@ -48558,8 +48598,9 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
   const int nblocks =
     num_train/block_size + ((num_train % block_size) != 0);
   const int correction_tile = MIN(128, block_size);
+  const int use_intervals = variant_count == 2 && cdfontrain_extern;
   const double pair_count = np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, 1);
+    num_train, num_eval, cdfontrain_extern);
   const int use_parallel_blocks = np_objective_outer_rows_enabled(
     int_conditional_prepared_context_extern);
 #ifdef MPI2
@@ -48590,7 +48631,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
   NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if(cv == NULL || vector_scale_factor == NULL ||
-     BANDWIDTH_den_extern != BW_GEN_NN || !cdfontrain_extern ||
+     BANDWIDTH_den_extern != BW_GEN_NN ||
      pair_count <= 0.0 || block_size <= 0 || variant_count <= 0 ||
      variant_count > NP_CDIST_GNN_EMPIRICAL_MAX_MASKS)
     return 1;
@@ -48609,16 +48650,16 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
   if(workspace_status == NP_CVLS_WORKSPACE_OK)
     workspace_status =
       np_cvls_workspace_square_try(block_size, &fit_cross);
-  if(workspace_status == NP_CVLS_WORKSPACE_OK && variant_count > 2)
+  if(workspace_status == NP_CVLS_WORKSPACE_OK && !use_intervals)
     workspace_status = np_cvls_workspace_vector_try(
       (size_t)num_train, &yvariant);
   if(workspace_status == NP_CVLS_WORKSPACE_OK)
     workspace_status = np_cvls_workspace_vector_try(
       (size_t)num_train, &row_sum);
-  if(workspace_status == NP_CVLS_WORKSPACE_OK && variant_count == 2)
+  if(workspace_status == NP_CVLS_WORKSPACE_OK && use_intervals)
     workspace_status = np_cvls_workspace_matrix_try(
       num_train, block_size, &ysuccessor);
-  if(workspace_status == NP_CVLS_WORKSPACE_OK && variant_count == 2)
+  if(workspace_status == NP_CVLS_WORKSPACE_OK && use_intervals)
     workspace_status = np_cvls_workspace_square_try(
       correction_tile, &variant_cross);
   if(use_parallel_blocks)
@@ -48639,7 +48680,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
   if(workspace_status != NP_CVLS_WORKSPACE_OK)
     goto cleanup_gnn_empirical_block;
 
-  if(variant_count == 2){
+  if(use_intervals){
     tile_advances = (unsigned char *)calloc(
       (size_t)correction_tile*(size_t)correction_tile,
       sizeof(unsigned char));
@@ -48655,7 +48696,8 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
 
   if(!local_fail && np_conditional_xrow_ctx_prepare_ctx(
        vector_scale_factor,
-       &np_conditional_training_identity_geometry,
+       cdfontrain_extern ? &np_conditional_training_identity_geometry :
+         &np_conditional_deleted_identity_geometry,
        &xctx) != 0)
     local_fail = 1;
   if(!local_fail && np_conditional_yrow_eval_two_slot_ctx_prepare(
@@ -48665,7 +48707,8 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
        matrix_Y_ordered_eval_extern,
        matrix_Y_continuous_eval_extern,
        num_eval,
-       &np_conditional_training_identity_geometry,
+       cdfontrain_extern ? &np_conditional_training_identity_geometry :
+         &np_conditional_external_geometry,
        &yctx) != 0)
     local_fail = 1;
 
@@ -48673,7 +48716,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
    * query's half-open deletion interval. This permutation changes compute
    * locality, not objective order: row sums remain indexed and finished in
    * original occurrence order. */
-  if(!local_fail && variant_count == 2){
+  if(!local_fail && use_intervals){
     fold_order = (int *)malloc((size_t)num_train*sizeof(int));
     advance_start = (int *)malloc((size_t)num_train*sizeof(int));
     advance_end = (int *)malloc((size_t)num_train*sizeof(int));
@@ -48740,13 +48783,13 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
         int successor_status = 2;
         int pair_status = 2;
 
-        if(variant_count == 2){
+        if(use_intervals){
           pair_status = np_conditional_y_eval_univariate_pair_direct(
             &yctx,
             j,
             matrix_Y_continuous_eval_extern,
             num_eval,
-            1,
+            cdfontrain_extern,
             yprimary[jj],
             ysuccessor[jj]);
           if(pair_status == 1){
@@ -48774,17 +48817,17 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
              matrix_Y_ordered_eval_extern,
              matrix_Y_continuous_eval_extern,
              num_eval,
-             1,
+             cdfontrain_extern,
              UINT64_C(0),
              yprimary[jj]) != 0){
           local_fail = 1;
           goto finish_gnn_empirical_block;
         }
-        if(variant_count == 2 && pair_status != 0)
+        if(use_intervals && pair_status != 0)
           successor_status = np_conditional_y_eval_univariate_direct(
             &yctx, j, matrix_Y_continuous_eval_extern, num_eval, 1,
             1, ysuccessor[jj]);
-        if(variant_count == 2){
+        if(use_intervals){
           if(successor_status == 1){
             local_fail = 1;
             goto finish_gnn_empirical_block;
@@ -48797,7 +48840,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
                matrix_Y_ordered_eval_extern,
                matrix_Y_continuous_eval_extern,
                num_eval,
-               1,
+               cdfontrain_extern,
                UINT64_C(1),
                ysuccessor[jj]) != 0){
             local_fail = 1;
@@ -48831,12 +48874,12 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
             const double primary_difference =
               (double)indicator - primary_fit;
 
-            if(i != j)
+            if(!cdfontrain_extern || i != j)
               row_sum[i] += primary_difference*primary_difference;
           }
         }
 
-        if(variant_count == 2){
+        if(use_intervals){
           int ic0, jc0;
 
           for(ic0 = 0; ic0 < ib; ic0 += correction_tile){
@@ -48930,11 +48973,11 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
               const int i = block_start[g] + ii;
 
               selected_masks[ii] = UINT64_C(0);
-              if(i == j)
+              if(cdfontrain_extern && i == j)
                 continue;
               if(np_conditional_y_base_exclusion_successor_mask(
                    &yctx, j, matrix_Y_continuous_eval_extern, num_eval,
-                   1, i, &selected_masks[ii]) != 0 ||
+                   cdfontrain_extern, i, &selected_masks[ii]) != 0 ||
                  selected_masks[ii] >= (uint64_t)variant_count){
                 local_fail = 1;
                 goto finish_gnn_empirical_block;
@@ -48953,7 +48996,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
                    matrix_Y_ordered_eval_extern,
                    matrix_Y_continuous_eval_extern,
                    num_eval,
-                   1,
+                   cdfontrain_extern,
                    (uint64_t)mask,
                    yvariant) != 0){
                 local_fail = 1;
@@ -48998,7 +49041,7 @@ finish_gnn_empirical_block:
   for(ii = 0; ii < num_train; ++ii)
     *cv += row_sum[ii];
   if(np_distribution_cvls_finalize(
-       *cv, num_train, num_eval, 1, cv) !=
+       *cv, num_train, num_eval, cdfontrain_extern, cv) !=
      NP_DISTRIBUTION_CVLS_FINALIZE_OK)
     goto cleanup_gnn_empirical_block;
   status = 0;
