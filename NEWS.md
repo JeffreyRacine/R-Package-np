@@ -29,6 +29,13 @@
   existing context-aware distance owner directly; ordinary public kernel-sum
   conventions and existing computational ownership are unchanged.
 
+* Ordered Li-Racine weights and Racine-Li-Yan kernels accept finite fractional
+  numeric distances in their original units. Declared unused levels remain
+  part of RLY normalization; alphanumeric levels retain declared ranks.
+  Wang-van Ryzin and normalized Li-Racine retain their unit-lattice contract.
+  Singular elementwise bandwidth scores at zero smoothing report a precise
+  condition. RLY vector evaluation no longer allocates an unused power table.
+
 * Native bandwidth preparation and local-polynomial operators retain declared
   categorical training support, including unused levels. Density,
   distribution, conditional and regression/LSQ routes now use the same

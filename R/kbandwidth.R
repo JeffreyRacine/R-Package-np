@@ -152,6 +152,7 @@ kbandwidth.numeric <-
       xmcv = mcvConstruct(xdati))
 
     class(mybw) = "kbandwidth"
+    mybw <- .np_ordered_bandwidth_contract(mybw)
     mybw
     
   }

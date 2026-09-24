@@ -353,9 +353,14 @@
 
   Ordered-categorical kernels (called via \code{okertype}):
   Numeric ordered-factor levels retain their numeric distances, including
-  gaps. They must be finite and increasing, with integer distances and total
-  span less than \code{.Machine$integer.max}; fractional distances are rejected
-  rather than truncated. Nonnumeric ordered labels use their ordinal ranks.
+  gaps. They must be finite and increasing with a finite numeric span.
+  Li-Racine weights and Racine-Li-Yan kernels accept fractional distances in
+  the original units; there is no inferred lattice spacing, rescaling, or
+  arbitrary denominator cap. Wang-van Ryzin and normalized Li-Racine retain
+  unit-lattice definitions: they require integer distances and total span
+  less than \code{.Machine$integer.max}. Nonnumeric ordered labels use their
+  declared ordinal ranks: for \code{ordered(c("a","b","c","d","e"))}, the
+  distance from \code{a} to \code{e} is four, from \code{c} to \code{d} one.
   Use explicit nonnumeric labels when rank distance, not numeric distance,
   is intended.
   \deqn{L_{WvR}(x_i,x;\lambda)=
@@ -381,6 +386,18 @@
   by the training value \eqn{x_i}, so weights need not be symmetric in training
   and evaluation values. Cumulative kernels, overlap integrals, scores and
   paired regression computations use that same support and direction.
+
+  For density/distribution roles, the public spelling \code{"liracine"}
+  denotes normalized Li-Racine and therefore still requires a unit lattice;
+  select \code{"racineliyan"} for fractional response/density support.
+  Conditional explanatory roles and regression use raw Li-Racine weights.
+  On newly supported nonlattice data, the raw Li-Racine cumulative operator
+  sums these unnormalized weights over retained levels below the evaluation
+  point; it is not a probability CDF. Existing lattice cumulative conventions
+  remain unchanged. At \eqn{\lambda=0}, bandwidth scores with positive
+  distances below one have non-finite elementwise one-sided derivatives and
+  report a condition; use an interior bandwidth when requesting such scores.
+  Kernel values at zero and one remain supported.
 
   These univariate kernels are combined as generalized product kernels over
   mixed data types in the estimators and cross-validation criteria.

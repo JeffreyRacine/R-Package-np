@@ -292,6 +292,8 @@ npksum.default <-
       }
     }
 
+    bws <- .np_ordered_bandwidth_contract(bws)
+
     if (internal.power12.weighted &&
         (!identical(bws[["type", exact = TRUE]], "fixed") ||
          !is.matrix(tydat) || ncol(tydat) != 1L ||
@@ -456,6 +458,20 @@ npksum.default <-
     
     if (!miss.ex)
       exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+
+    # Reject singular new elementwise score endpoints before entering any MPI
+    # collective. Value operators still admit lambda=0; no bandwidth is moved.
+    if (compute.score && bws$okertype %in% c("liracine", "racineliyan")) {
+      for (j in which(bws$iord)) {
+        if (bws$bw[j] != 0) next
+        support <- sort(unique(c(bws$xdati$all.dlev[[j]], dlev(txdat[, j]),
+                                if (!miss.ex) dlev(exdat[, j]))))
+        gaps <- diff(support)
+        if (any(gaps > 0 & gaps < 1 - 8*.Machine$double.eps))
+          stop("ordered bandwidth score at lambda = 0 is not finite for distances below 1; use an interior bandwidth for scores",
+               call. = FALSE)
+      }
+    }
 
     if (!miss.ex)
       npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
