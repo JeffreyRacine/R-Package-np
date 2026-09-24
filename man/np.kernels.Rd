@@ -391,10 +391,12 @@
   denotes normalized Li-Racine and therefore still requires a unit lattice;
   select \code{"racineliyan"} for fractional response/density support.
   Conditional explanatory roles and regression use raw Li-Racine weights.
-  On newly supported nonlattice data, the raw Li-Racine cumulative operator
-  sums these unnormalized weights over retained levels below the evaluation
+  On nonlattice support, the raw Li-Racine cumulative operator sums these
+  unnormalized weights over retained levels at or below the evaluation
   point; it is not a probability CDF. Existing lattice cumulative conventions
-  remain unchanged. At \eqn{\lambda=0}, bandwidth scores with positive
+  remain unchanged, including at newly supported fractional evaluation
+  cutoffs: moving the cutoff does not change the integration support.
+  At \eqn{\lambda=0}, bandwidth scores with positive
   distances below one have non-finite elementwise one-sided derivatives and
   report a condition; use an interior bandwidth when requesting such scores.
   Kernel values at zero and one remain supported.

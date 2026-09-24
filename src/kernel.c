@@ -1119,10 +1119,15 @@ double cdf_kernel_ordered(int KERNEL, double x, double y, double lambda, int c, 
 /* Now going from -max to max in steps of 1 - Ahmad & Cerrito claim that this must */
 /* integrate to onc from -infty to infty - using sample analog */
 
-	if(KERNEL == 1 && (np_ordered_lattice_span(categorical_vals,c) < 0 ||
-	   !np_ordered_pair_on_lattice(y,x,categorical_vals[0])))
+	if(KERNEL == 1 && np_ordered_lattice_span(categorical_vals,c) < 0)
 	{
 		return_value = np_ordered_lr_finite_cumulative(0,y,x,lambda,categorical_vals,c);
+	}
+	else if(KERNEL == 1 && !np_ordered_pair_on_lattice(y,x,categorical_vals[0]))
+	{
+		/* Retain this scalar owner's incumbent interval, also off its lattice. */
+		const double lo = categorical_vals[0]-fabs(categorical_vals[0]-categorical_vals[c-1]);
+		return_value = np_ordered_lr_interval_cumulative(0,y,x,lambda,lo,categorical_vals[c-1]);
 	}
 	else if(KERNEL == 3)
 	{
