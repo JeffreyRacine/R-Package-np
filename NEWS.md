@@ -24,6 +24,11 @@
   kernel-weight exports. Fixed and generalized-neighbor weight units are
   unchanged. Separate nearest-neighbor fold-geometry limitations remain.
 
+* Private raw delete-one nearest-neighbor kernel geometry no longer consults
+  ambient bandwidth-scaling state. Cold beta folded-weight calls use the
+  existing context-aware distance owner directly; ordinary public kernel-sum
+  conventions and existing computational ownership are unchanged.
+
 * Conditional-quantile inversion accuracy scales with the observed response
   span rather than its absolute location, so translating the response no
   longer loosens the requested accuracy.
