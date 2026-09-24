@@ -13585,11 +13585,15 @@ static int np_kernelsum_fold_prepare(
     geometry.adaptive_successor = fold->successor;
     geometry.adaptive_fold_scale = fold->scale;
   }
-  if(kernel_bandwidth_mean_ctx(0, mode, nt, mode == BW_ADAP_NN ? nt : ne,
-       0, 0, 0, nc, nu, no, suppress_parallel, fold_scale_factor, NULL, NULL, train,
-       mode == BW_ADAP_NN ? train : evaluation, NULL, fold->primary, lambda,
-       &geometry, NULL, &status) != 0)
+  /* This ingress owns raw NN counts and physical categorical weights, not
+     scaled bandwidths. Do not consult another call's scaling globals. */
+  if(np_kernel_bandwidth_continuous_nn_ctx(mode, nt,
+       mode == BW_ADAP_NN ? nt : ne, nc, suppress_parallel, fold_scale_factor,
+       train, mode == BW_ADAP_NN ? train : evaluation, fold->primary,
+       &geometry, &status) != 0)
     return KWSNP_ERR_BADINVOC;
+  for(int d = 0; d < nu + no; ++d)
+    lambda[d] = fold_scale_factor[nc + d];
   if(mode == BW_GEN_NN)
     for(int d = 0; d < nc; ++d)
       for(int i = 0; i < ne; ++i) fold->primary[d][i] *= fold->scale[d];

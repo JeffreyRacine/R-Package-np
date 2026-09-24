@@ -1276,7 +1276,7 @@ static int np_kernel_bandwidth_continuous_nn_into_ctx(
   return 0;
 }
 
-int np_kernel_bandwidth_continuous_nn(
+int np_kernel_bandwidth_continuous_nn_ctx(
   int BANDWIDTH,
   int num_obs_train,
   int num_obs_eval,
@@ -1286,6 +1286,7 @@ int np_kernel_bandwidth_continuous_nn(
   double **matrix_train,
   double **matrix_eval,
   double **matrix_bandwidth,
+  const NPNNGeometryContext *geometry_context,
   NPNNGeometryStatus *geometry_status)
 {
   int dimension;
@@ -1322,9 +1323,27 @@ int np_kernel_bandwidth_continuous_nn(
   status = np_kernel_bandwidth_continuous_nn_into_ctx(
     BANDWIDTH, num_obs_train, num_obs_eval, num_cont, suppress_parallel,
     vector_scale_factor, matrix_train, matrix_eval, matrix_bandwidth,
-    nn_distance, NULL, geometry_status);
+    nn_distance, geometry_context, geometry_status);
   free(nn_distance);
   return status;
+}
+
+int np_kernel_bandwidth_continuous_nn(
+  int BANDWIDTH,
+  int num_obs_train,
+  int num_obs_eval,
+  int num_cont,
+  int suppress_parallel,
+  double *vector_scale_factor,
+  double **matrix_train,
+  double **matrix_eval,
+  double **matrix_bandwidth,
+  NPNNGeometryStatus *geometry_status)
+{
+  return np_kernel_bandwidth_continuous_nn_ctx(
+    BANDWIDTH, num_obs_train, num_obs_eval, num_cont, suppress_parallel,
+    vector_scale_factor, matrix_train, matrix_eval, matrix_bandwidth,
+    NULL, geometry_status);
 }
 
 
