@@ -14,6 +14,10 @@
   their prepared primary response radii instead of computing them twice;
   other response-context consumers and row/block selection are unchanged.
 
+* Generic nearest-neighbor leave-one-out hats now forward the canonical
+  deleted-sample geometry to their existing kernel-weight owner. Ordinary
+  kernel sums, native hat selection and rank-local ownership are unchanged.
+
 * Automatic nearest-neighbor density, regression and conditional-density
   recovery now uses each criterion's deleted-sample count domain while
   retaining the full-sample CVAIC endpoint. Explicit and genuinely extended

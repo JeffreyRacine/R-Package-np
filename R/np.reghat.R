@@ -2620,6 +2620,7 @@ npreghat.rbandwidth <-
       return.kernel.weights = TRUE,
       bandwidth.divide = TRUE,
       .np.internal.bandwidth.divide.weights = identical(bws$type, "adaptive_nn"),
+      .np.internal.fold.geometry = TRUE,
       leave.one.out = leave.one.out
     )
     if (!no.ex)
