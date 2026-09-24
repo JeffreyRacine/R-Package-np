@@ -1946,6 +1946,8 @@ npreghat.rbandwidth <-
 
     first.derivative.request <- (sum(s) == 1L) && all(s %in% c(0L, 1L))
     simple.operator.request <- (sum(s) == 0L) || first.derivative.request
+    beta.lp.first.empty <- beta.kernel && first.derivative.request &&
+      identical(reg.spec$regtype.engine, "lp") && !constant.basis
 
     lp.degree0.lc.derivative.route <- identical(reg.spec$regtype.engine, "lp") &&
       first.derivative.request &&
@@ -2108,7 +2110,8 @@ npreghat.rbandwidth <-
           degree = reg.spec$degree.engine,
           bernstein.basis = reg.spec$bernstein.basis.engine,
           s = s,
-          allow.empty.rows = allow.empty.rows && native.lp.mean.apply.route
+          allow.empty.rows = allow.empty.rows &&
+            (native.lp.mean.apply.route || beta.lp.first.empty)
         )
         empty.rows <- attr(out, ".np.empty.rows", exact = TRUE)
         if (!is.null(empty.rows))
@@ -2144,7 +2147,7 @@ npreghat.rbandwidth <-
         exdat = if (no.ex) NULL else exdat,
         gradients = any(s > 0L),
         gradient.order = 1L,
-        allow.empty.rows = allow.empty.rows && !beta.kernel &&
+        allow.empty.rows = allow.empty.rows && (!beta.kernel || beta.lp.first.empty) &&
           identical(reg.spec$regtype.engine, "lp")
       )
 
@@ -2176,7 +2179,8 @@ npreghat.rbandwidth <-
           bernstein.basis = reg.spec$bernstein.basis.engine,
           leave.one.out = native.loo.route,
           allow.empty.rows = allow.empty.rows &&
-            (native.lp.mean.matrix.route || (lc.derivative.exact.route && !beta.kernel))
+            (native.lp.mean.matrix.route || beta.lp.first.empty ||
+             (lc.derivative.exact.route && !beta.kernel))
         )
       } else if (lc.derivative.exact.route) {
         .npreghat_exact_lc_derivative_matrix_from_npksum_chunked(

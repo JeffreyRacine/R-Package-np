@@ -14,6 +14,11 @@
   a valid deleted-sample boundary when tied conditioning values invalidate the
   initial search points. Explicit starting bandwidths retain their behavior.
 
+* Beta-kernel local-polynomial derivative hats preserve supported external
+  rows when another query has all-zero kernel weights, returning undefined
+  rows as NA with the existing warning. Complete-operator requests remain
+  strict.
+
 * Conditional-quantile inversion accuracy scales with the observed response
   span rather than its absolute location, so translating the response no
   longer loosens the requested accuracy.

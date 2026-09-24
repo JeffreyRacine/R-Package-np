@@ -70,8 +70,8 @@ test_that("first hats preserve compact empty rows and strict internal helpers", 
   expect_error(get(".npreghat_solve_eval",ns)(
     cbind(1,x$x,x$x^2),c(0,1,.2),rep(Inf,nrow(x)),0,
     canonical.lp=TRUE,allow.empty.rows=TRUE),"non-finite system")
-  # Beta has a separate native partial-row policy: preserve its supported
-  # direct multiresponse path, without admitting partial results there.
+  # Beta's separate native first-derivative policy preserves the direct
+  # multiresponse owner, with strictness retained for complete operators.
   xx <- data.frame(x=seq(.1,.9,length.out=41),
                    f=factor(rep(c("a","b"),length.out=41),levels=c("a","b","c")))
   ee <- data.frame(x=c(.25,.25),f=factor(c("a","c"),levels=levels(xx$f)))
@@ -83,5 +83,6 @@ test_that("first hats preserve compact empty rows and strict internal helpers", 
   expect_length(out$warnings,0L)
   expect_equal(as.vector(out$value[1,]),c(.5,1),tolerance=1e-10)
   expect_error(npreghat(bb,txdat=xx,exdat=ee,s=1,
-                    y=cbind(xx$x^2,2*xx$x^2),output="apply"))
+                    y=cbind(xx$x^2,2*xx$x^2),output="apply",
+                    .np.require.finite=TRUE))
 })
