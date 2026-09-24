@@ -10,6 +10,10 @@
   geometry and existing computational owners. Invalid beta density CVML
   geometry fails closed rather than returning an objective of zero.
 
+* Automatic nearest-neighbor smooth-coefficient bandwidth searches can recover
+  a valid deleted-sample boundary when tied conditioning values invalidate the
+  initial search points. Explicit starting bandwidths retain their behavior.
+
 * Conditional-quantile inversion accuracy scales with the observed response
   span rather than its absolute location, so translating the response no
   longer loosens the requested accuracy.
