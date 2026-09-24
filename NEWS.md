@@ -29,6 +29,11 @@
   existing context-aware distance owner directly; ordinary public kernel-sum
   conventions and existing computational ownership are unchanged.
 
+* Native bandwidth preparation and local-polynomial operators retain declared
+  categorical training support, including unused levels. Density,
+  distribution, conditional and regression/LSQ routes now use the same
+  support metadata as public fits.
+
 * Conditional-quantile inversion accuracy scales with the observed response
   span rather than its absolute location, so translating the response no
   longer loosens the requested accuracy.

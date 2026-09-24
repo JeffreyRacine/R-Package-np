@@ -110,7 +110,7 @@ test_that("native regression search evaluates one retained prepared state", {
   expect_false(grepl("NP_NOMAD_CALLBACK_CALLOC", callback, fixed = TRUE))
   expect_match(
     search,
-    "&context.prepared, 1, ndegree > 0);",
+    "&context.prepared, 1, ndegree > 0, &support);",
     fixed = TRUE
   )
   expect_match(

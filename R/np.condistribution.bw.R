@@ -528,6 +528,7 @@ npcdistbw.condbandwidth <-
                 as.double(cxker.bounds.c$ub),
                 as.double(cyker.bounds.c$lb),
                 as.double(cyker.bounds.c$ub),
+                .np_native_categorical_support(bws),
                 PACKAGE="np")
         total.time <- proc.time()[3] - elapsed.start
       } else {
@@ -883,6 +884,7 @@ npcdistbw.condbandwidth <-
     as.double(cxker.bounds.c$ub),
     as.double(cyker.bounds.c$lb),
     as.double(cyker.bounds.c$ub),
+    .np_native_categorical_support(bws),
     PACKAGE = "np"
   )
 
@@ -1168,7 +1170,8 @@ npcdistbw.condbandwidth <-
     cxkerlb = as.double(cxker.bounds.c$lb),
     cxkerub = as.double(cxker.bounds.c$ub),
     cykerlb = as.double(cyker.bounds.c$lb),
-    cykerub = as.double(cyker.bounds.c$ub)
+    cykerub = as.double(cyker.bounds.c$ub),
+    declared.support = .np_native_categorical_support(bws)
   )
 }
 
@@ -1215,6 +1218,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     as.double(prep$cxkerub),
     as.double(prep$cykerlb),
     as.double(prep$cykerub),
+    prep$declared.support,
     PACKAGE = "np"
   ), capture.output = TRUE)
   .np_nomad_native_call_value(native.call)

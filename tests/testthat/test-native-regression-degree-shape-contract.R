@@ -53,7 +53,7 @@ test_that("native regression objectives reject malformed LP degree vectors", {
       1L,
       -Inf,
       Inf,
-      PACKAGE = "np"
+      list(), PACKAGE = "np"
     ),
     "glp_degree length mismatch",
     fixed = TRUE

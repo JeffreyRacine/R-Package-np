@@ -206,7 +206,8 @@ test_that("prepared scalar categorical CVML retains the canonical finite penalty
     penalty.multiplier = prep$penalty_multiplier, degree = prep$degree,
     bernstein = prep$bernstein, basis = prep$basis, regtype = prep$regtype,
     cxkerlb = prep$cxkerlb, cxkerub = prep$cxkerub,
-    cykerlb = prep$cykerlb, cykerub = prep$cykerub
+    cykerlb = prep$cykerlb, cykerub = prep$cykerub,
+    declared.support = prep$declared.support
   )
   on.exit(if (isTRUE(prepared)) destroy(), add = TRUE)
   first <- evaluate(bw = as.double(prep$rbw), degree = as.integer(prep$degree))

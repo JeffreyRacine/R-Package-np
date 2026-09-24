@@ -232,6 +232,7 @@ test_that("native density objective ingress requires compression state", {
       1L,
       prep$penalty_mode, prep$penalty_multiplier,
       prep$ckerlb, prep$ckerub,
+      prep$declared.support,
       PACKAGE = "np"
     )
   }
@@ -264,7 +265,7 @@ test_that("native distribution objective ingress requires compression state", {
       prep$guno, prep$gord, prep$gcon, prep$mysd,
       myopti, prep$myoptd, as.double(bw$bw), 1L,
       prep$penalty_mode, prep$penalty_multiplier,
-      prep$ckerlb, prep$ckerub,
+      prep$ckerlb, prep$ckerub, prep$declared.support,
       PACKAGE = "np"
     )
   }
@@ -299,7 +300,7 @@ test_that("native regression objective ingress requires complete control state",
       prep$penalty_mode, prep$penalty_multiplier,
       prep$degree, prep$bernstein, prep$basis,
       prep$ckerlb, prep$ckerub,
-      PACKAGE = "np"
+      prep$declared.support, PACKAGE = "np"
     )
   }
 

@@ -64,7 +64,8 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
       penalty.multiplier = prep$penalty_multiplier, degree = prep$degree,
       bernstein = prep$bernstein, basis = prep$basis, regtype = prep$regtype,
       cxkerlb = prep$cxkerlb, cxkerub = prep$cxkerub,
-      cykerlb = prep$cykerlb, cykerub = prep$cykerub
+      cykerlb = prep$cykerlb, cykerub = prep$cykerub,
+      declared.support = prep$declared.support
     ))
     on.exit(np:::npPreparedObjectiveDestroyConditionalDensity(), add = TRUE)
     vapply(seq_len(nrow(points)), function(i) {

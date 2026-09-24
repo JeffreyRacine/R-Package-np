@@ -709,6 +709,7 @@ npcdensbw.conbandwidth <-
                 as.double(cxker.bounds.c$ub),
                 as.double(cyker.bounds.c$lb),
                 as.double(cyker.bounds.c$ub),
+                .np_native_categorical_support(bws),
                 PACKAGE="np")
         total.time <- proc.time()[3] - elapsed.start
       } else {
@@ -1195,6 +1196,7 @@ npcdensbw.conbandwidth <-
     as.double(cxker.bounds.c$ub),
     as.double(cyker.bounds.c$lb),
     as.double(cyker.bounds.c$ub),
+    .np_native_categorical_support(bws),
     PACKAGE = "np"
   )
 
@@ -1236,7 +1238,8 @@ npPreparedObjectivePrepareConditionalDensity <- function(c.uno,
                                                        cxkerlb,
                                                        cxkerub,
                                                        cykerlb,
-                                                       cykerub) {
+                                                       cykerub,
+                                                       declared.support) {
   if (length(myoptd) <= 23L || length(myopti) <= 34L)
     stop("resident npcdens prepared objective options are missing canonical search controls", call. = FALSE)
 
@@ -1262,6 +1265,7 @@ npPreparedObjectivePrepareConditionalDensity <- function(c.uno,
     cxkerub,
     cykerlb,
     cykerub,
+    declared.support,
     PACKAGE = "np"
   )
 
@@ -1690,7 +1694,8 @@ npPreparedObjectiveDestroyConditionalDensity <- function() {
     cxkerlb = as.double(cxker.bounds.c$lb),
     cxkerub = as.double(cxker.bounds.c$ub),
     cykerlb = as.double(cyker.bounds.c$lb),
-    cykerub = as.double(cyker.bounds.c$ub)
+    cykerub = as.double(cyker.bounds.c$ub),
+    declared.support = .np_native_categorical_support(bws)
   )
 }
 
@@ -1787,7 +1792,8 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
     cxkerlb = prep$cxkerlb,
     cxkerub = prep$cxkerub,
     cykerlb = prep$cykerlb,
-    cykerub = prep$cykerub
+    cykerub = prep$cykerub,
+    declared.support = prep$declared.support
   )
   if (!isTRUE(prepared))
     return(list(
@@ -2675,7 +2681,8 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
       cxkerlb = native.prep$cxkerlb,
       cxkerub = native.prep$cxkerub,
       cykerlb = native.prep$cykerlb,
-      cykerub = native.prep$cykerub
+      cykerub = native.prep$cykerub,
+      declared.support = native.prep$declared.support
     )
     if (!isTRUE(prepared))
       stop("failed to prepare native npcdens fixed-degree route", call. = FALSE)

@@ -294,6 +294,7 @@ npudensbw.NULL <-
     mysd = as.double(mysd),
     myopti = as.integer(myopti),
     myoptd = as.double(myoptd),
+    declared.support = .np_native_categorical_support(bws),
     penalty_mode = as.integer(if (invalid.penalty == "baseline") 1L else 0L),
     penalty_multiplier = as.double(penalty.multiplier),
     ckerlb = as.double(cker.bounds$lb),
@@ -332,6 +333,7 @@ npNomadNativeSearchDensity <- function(prep,
     as.double(prep$penalty_multiplier),
     as.double(prep$ckerlb),
     as.double(prep$ckerub),
+    prep$declared.support,
     PACKAGE = "np"
   ), capture.output = TRUE)
   .np_nomad_native_call_value(native.call)
@@ -986,6 +988,7 @@ npudensbw.bandwidth <-
                   as.double(penalty.multiplier),
                   as.double(cker.bounds.c$lb),
                   as.double(cker.bounds.c$ub),
+                  .np_native_categorical_support(bws),
                   PACKAGE="np")
         } else {
           myout <-
@@ -999,6 +1002,7 @@ npudensbw.bandwidth <-
                 as.double(penalty.multiplier),
                 as.double(cker.bounds.c$lb),
                 as.double(cker.bounds.c$ub),
+                .np_native_categorical_support(bws),
                 PACKAGE="np")
         }
         total.time <- proc.time()[3] - elapsed.start

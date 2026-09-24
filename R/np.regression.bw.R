@@ -342,7 +342,8 @@ npregbw.NULL <-
     penalty_multiplier = as.double(penalty.multiplier),
     ckerlb = as.double(cker.bounds$lb),
     ckerub = as.double(cker.bounds$ub),
-    decode_scale = decode.scale
+    decode_scale = decode.scale,
+    declared.support = .np_native_categorical_support(bws)
   )
 }
 
@@ -382,6 +383,7 @@ npNomadNativeSearchRegression <- function(prep,
     as.double(prep$ckerlb),
     as.double(prep$ckerub),
     as.double(prep$decode_scale),
+    prep$declared.support,
     PACKAGE = "np"
   ), capture.output = TRUE)
   .np_nomad_native_call_value(native.call)
@@ -672,6 +674,7 @@ npregbw.rbandwidth <-
                 as.integer(npLpBasisCode(reg.spec$basis.engine)),
                 as.double(cker.bounds.c$lb),
                 as.double(cker.bounds.c$ub),
+                .np_native_categorical_support(bws),
                 PACKAGE = "np"))[1]
       
 
@@ -1039,6 +1042,7 @@ npregbw.rbandwidth <-
       as.integer(npLpBasisCode(reg.spec$basis.engine)),
       as.double(cker.bounds.c$lb),
       as.double(cker.bounds.c$ub),
+      .np_native_categorical_support(bws),
       PACKAGE = "np"
     )
   } else {
@@ -1060,6 +1064,7 @@ npregbw.rbandwidth <-
       as.integer(npLpBasisCode(reg.spec$basis.engine)),
       as.double(cker.bounds.c$lb),
       as.double(cker.bounds.c$ub),
+      .np_native_categorical_support(bws),
       PACKAGE = "np"
     )
   }

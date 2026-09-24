@@ -80,7 +80,7 @@ test_that("internal and native regression ingresses reject subunit multipliers",
       prep$runo, prep$rord, prep$rcon, prep$y, prep$mysd,
       prep$myopti, prep$myoptd, as.double(bw$bw), 1L,
       prep$penalty_mode, 0.5, prep$degree, prep$bernstein, prep$basis,
-      prep$ckerlb, prep$ckerub, PACKAGE = "np"
+      prep$ckerlb, prep$ckerub, prep$declared.support, PACKAGE = "np"
     ),
     paste0(
       "C_np_regression_bw: penalty.multiplier must be finite ",
@@ -95,7 +95,7 @@ test_that("internal and native regression ingresses reject subunit multipliers",
     prep$myopti, prep$myoptd, as.double(bw$bw), 1L,
     prep$penalty_mode, prep$penalty_multiplier,
     prep$degree, prep$bernstein, prep$basis, prep$ckerlb, prep$ckerub,
-    PACKAGE = "np"
+    prep$declared.support, PACKAGE = "np"
   )
   expect_true(is.finite(valid$fval[[1L]]))
 })
