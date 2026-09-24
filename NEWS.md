@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Automatic nearest-neighbor density, regression and conditional-density
+  recovery now uses each criterion's deleted-sample count domain while
+  retaining the full-sample CVAIC endpoint. Explicit and genuinely extended
+  starts, selected solvers and healthy search paths are unchanged.
+
 * Generalized-neighbor deleted objectives and native leave-one-out hats now
   decode boundary counts on the deleted donor sample, retaining ordinary-fit
   geometry and existing computational owners. Invalid beta density CVML

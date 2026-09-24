@@ -1456,12 +1456,14 @@ npregbw.rbandwidth <-
           native.num.feval.invalid.total <<- native.num.feval.invalid.total + as.numeric(out$num.feval[1L])
         value
       }
-      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn")) 2L else 1L
+      ordinary.cap <- setup$nobs -
+        if (identical(template$method, "cv.aic")) 1L else 2L
       recovery <- .np_nn_find_raw_valid_start(
         point = native.results[[incumbent.index]]$best_point,
         nn.indices = seq_along(setup$cont_idx),
         caps = rep.int(ordinary.cap, length(setup$cont_idx)),
-        raw.eval = recovery.raw.eval
+        raw.eval = recovery.raw.eval,
+        incumbent.caps = setup$nobs - 1L
       )
       if (isTRUE(recovery$found)) {
         recovery.index <- length(native.results) + 1L
@@ -2193,16 +2195,14 @@ npregbw.rbandwidth <-
         }
         raw.objective
       }
-      ordinary.cap <- if (identical(template$type, "adaptive_nn")) {
-        nrow(xdat) - 2L
-      } else {
-        nrow(xdat) - 1L
-      }
+      ordinary.cap <- nrow(xdat) -
+        if (identical(template$method, "cv.aic")) 1L else 2L
       recovery <- .np_nn_find_raw_valid_start(
         point = as.numeric(native.start.matrix[1L, ]),
         nn.indices = seq_len(ncon),
         caps = rep.int(ordinary.cap, ncon),
-        raw.eval = recovery.raw.eval
+        raw.eval = recovery.raw.eval,
+        incumbent.caps = nrow(xdat) - 1L
       )
       if (isTRUE(recovery$found)) {
         native.start.matrix <- rbind(native.start.matrix, recovery$point)
