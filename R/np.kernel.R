@@ -398,6 +398,22 @@ npksum.default <-
         support <- sort(unique(c(bws$xdati$all.dlev[[j]], dlev(txdat[, j]),
                                 if (!miss.ex) dlev(exdat[, j]))))
         gaps <- diff(support)
+        # A raw LR cumulative on incumbent lattice support integrates its
+        # unit interval, including gaps. New donors may be less than one unit
+        # from such an integration point even if retained levels are farther.
+        if (bws$okertype == "liracine" && operator[j] == "integral") {
+          retained <- bws$xdati$all.dlev[[j]]
+          offset <- retained-retained[1L]
+          lattice <- round(offset)
+          if (all(abs(offset-lattice) <=
+                  8*.Machine$double.eps*pmax(1,abs(offset))) &&
+              tail(lattice,1L) < .Machine$integer.max) {
+            donor <- dlev(txdat[,j])
+            nearest <- pmin(tail(retained,1L),pmax(retained[1L],
+              retained[1L]+round(donor-retained[1L])))
+            gaps <- c(gaps,abs(donor-nearest))
+          }
+        }
         if (any(gaps > 0 & gaps < 1 - 8*.Machine$double.eps))
           stop("ordered bandwidth score at lambda = 0 is not finite for distances below 1; use an interior bandwidth for scores",
                call. = FALSE)

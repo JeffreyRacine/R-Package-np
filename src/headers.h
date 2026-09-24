@@ -608,6 +608,8 @@ static inline double np_ordered_metric_score(const double lambda, const double d
   return d*np_ordered_metric_power(lambda,d-1.0);
 }
 
+double np_ordered_lr_interval_cumulative(int score, double train, double eval,
+    double lambda, double lower, double upper);
 double np_ordered_lr_finite_cumulative(int score, double train, double eval,
                                       double lambda, const double *cats, int ncat);
 

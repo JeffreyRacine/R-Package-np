@@ -4778,6 +4778,57 @@ static double np_geom_sum_score(const int n, const double lambda)
   return result;
 }
 
+/* Only new off-lattice LR queries use this bounded geometric accumulation.
+ * Keeping the integration measure fixed prevents decreases between integer
+ * and fractional cutoffs on a gapped incumbent lattice support. */
+static double np_lr_interval_tail(const int score, const double gap,
+    const uint64_t n, const double lambda)
+{
+  uint64_t remaining = n+1;
+  double power=lambda, power_score=1.0, sum=1.0, sum_score=0.0;
+  double prefix=1.0, prefix_score=0.0, value=0.0, derivative=0.0;
+  while(remaining) {
+    if(remaining & 1U) {
+      value += prefix*sum;
+      derivative += prefix_score*sum+prefix*sum_score;
+      prefix_score = prefix_score*power+prefix*power_score;
+      prefix *= power;
+    }
+    remaining >>= 1;
+    if(!remaining) break;
+    sum_score = sum_score*(1.0+power)+sum*power_score;
+    sum *= 1.0+power;
+    power_score *= 2.0*power;
+    power *= power;
+  }
+  const double weight=np_ordered_metric_power(lambda,gap);
+  return score ? np_ordered_metric_score(lambda,gap)*value+weight*derivative :
+    weight*value;
+}
+
+double np_ordered_lr_interval_cumulative(const int score, const double train,
+    const double eval, const double lambda, const double cl, const double ch)
+{
+  if(eval < cl) return 0.0;
+  const double last = eval >= ch ? ch :
+    cl+floor(np_ordered_metric_distance(eval,cl));
+  const double span=np_ordered_metric_distance(last,cl);
+  /* The retained lattice span is below INT_MAX; the legacy scalar lower
+   * extension can at most double it. Check before any integer conversion. */
+  if(!R_FINITE(span) || span > 2.0*INT_MAX)
+    error("invalid Li-Racine cumulative interval");
+  const uint64_t n=(uint64_t)round(span);
+  if(train <= cl)
+    return np_lr_interval_tail(score,np_ordered_metric_distance(train,cl),n,lambda);
+  if(train >= last)
+    return np_lr_interval_tail(score,np_ordered_metric_distance(train,last),n,lambda);
+  uint64_t left=(uint64_t)floor(train-cl);
+  if(left >= n) left=n-1; /* protect a rounded subtraction at the last point */
+  const double split=cl+(double)left;
+  return np_lr_interval_tail(score,np_ordered_metric_distance(train,split),left,lambda)+
+    np_lr_interval_tail(score,np_ordered_metric_distance(train,split+1.0),n-left-1,lambda);
+}
+
 static double NP_NOINLINE np_ordered_operator_score(const int kernel, const int op,
     const double train, const double eval, const double lambda,
     const double *cats, const int ncat, const double cl, const double ch)
@@ -4795,9 +4846,10 @@ static double NP_NOINLINE np_ordered_operator_score(const int kernel, const int 
                     np_score_oli_racine(eval,cats[i],lambda,cl,ch);
       return result;
     }
-    if(np_ordered_lattice_span(cats,ncat) < 0 ||
-       !np_ordered_pair_on_lattice(train,eval,cl))
+    if(np_ordered_lattice_span(cats,ncat) < 0)
       return np_ordered_lr_finite_cumulative(1,train,eval,lambda,cats,ncat);
+    if(!np_ordered_pair_on_lattice(train,eval,cl))
+      return np_ordered_lr_interval_cumulative(1,train,eval,lambda,cl,ch);
   }
   const int d = np_ordered_lattice_distance(train,eval);
   const double p = ipow(lambda,d);
@@ -4855,9 +4907,10 @@ static inline double np_ordered_kernel_eval(const int code,
     return kernel_ordered_convolution(1,train,eval,lambda,ncat,(double *)cats);
   if((code & 3) == 3)
     return np_ordered_rly(code/4,train,eval,lambda,cats,ncat);
-  if(code == 13 && (np_ordered_lattice_span(cats,ncat) < 0 ||
-                   !np_ordered_pair_on_lattice(train,eval,cl)))
+  if(code == 13 && np_ordered_lattice_span(cats,ncat) < 0)
     return np_ordered_lr_finite_cumulative(0,train,eval,lambda,cats,ncat);
+  if(code == 13 && !np_ordered_pair_on_lattice(train,eval,cl))
+    return np_ordered_lr_interval_cumulative(0,train,eval,lambda,cl,ch);
   return kernel[code](train,eval,lambda,cl,ch);
 }
 
@@ -7488,9 +7541,10 @@ void np_okernelv(const int KERNEL,
 #define NP_RLY_2(a,b,l,lo,hi) np_ordered_rly(2,a,b,l,cats,ncat)
 #define NP_RLY_3(a,b,l,lo,hi) np_ordered_rly(3,a,b,l,cats,ncat)
 #define NP_LR_CDF(a,b,l,lo,hi) \
-  ((max_cxy < 0 || !np_ordered_pair_on_lattice(a,b,lo)) ? \
-   np_ordered_lr_finite_cumulative(0,a,b,l,cats,ncat) : \
-   np_cdf_oli_racine(a,b,l,lo,hi))
+  (max_cxy < 0 ? np_ordered_lr_finite_cumulative(0,a,b,l,cats,ncat) : \
+   (!np_ordered_pair_on_lattice(a,b,lo) ? \
+    np_ordered_lr_interval_cumulative(0,a,b,l,lo,hi) : \
+    np_cdf_oli_racine(a,b,l,lo,hi)))
   switch(KERNEL){
     case 0: NP_OKERNELV_APPLY(np_owang_van_ryzin); break;
     case 1: NP_OKERNELV_APPLY(np_oli_racine); break;
