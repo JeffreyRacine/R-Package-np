@@ -47918,7 +47918,8 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                            nn_geometry_context,
                            NULL,
                            &nn_geometry_status)==1){
-    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS){
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ||
+       nn_geometry_status == NP_NN_GEOMETRY_INVALID_SCALE){
       ret = 1;
       goto cleanup_cvml_return;
     }
@@ -47945,7 +47946,8 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                            nn_geometry_context,
                            NULL,
                            &nn_geometry_status)==1){
-    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS){
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ||
+       nn_geometry_status == NP_NN_GEOMETRY_INVALID_SCALE){
       ret = 1;
       goto cleanup_cvml_return;
     }
