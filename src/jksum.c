@@ -27747,8 +27747,8 @@ double *cv){
                                0, // (do not) compute the leave-one-out marginals
                                0, // '' offset
                                1, // kernel power
-                               0, // bandwidth_divide
-                               0, // '' weights
+                               BANDWIDTH_den == BW_ADAP_NN, // absolute ANN sum
+                               BANDWIDTH_den == BW_ADAP_NN, // matching ANN weights
                                0, // symmetric
                                0, // gather_scatter sum
                                0, // drop train
@@ -28051,8 +28051,8 @@ double *cv){
                                0, // compute the leave-one-out marginals
                                0,
                                1,
-                               0,
-                               0, 
+                               BANDWIDTH_den == BW_ADAP_NN, // absolute ANN sum
+                               BANDWIDTH_den == BW_ADAP_NN, // matching ANN weights
                                0,
                                0,
                                0,

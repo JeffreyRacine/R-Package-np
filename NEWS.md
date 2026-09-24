@@ -19,6 +19,11 @@
   rows as NA with the existing warning. Complete-operator requests remain
   strict.
 
+* Local-constant conditional-distribution cross-validation uses absolute
+  adaptive-neighbor predictor weights consistently in its legacy sums and
+  kernel-weight exports. Fixed and generalized-neighbor weight units are
+  unchanged. Separate nearest-neighbor fold-geometry limitations remain.
+
 * Conditional-quantile inversion accuracy scales with the observed response
   span rather than its absolute location, so translating the response no
   longer loosens the requested accuracy.
