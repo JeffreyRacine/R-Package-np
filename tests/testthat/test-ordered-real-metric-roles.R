@@ -3,6 +3,9 @@ test_that("metric roles retain support and preserve lattice-only family definiti
   on.exit(options(old),add=TRUE)
   s <- c(0,.5,1.7,pi);ids <- rep(1:3,each=3L)
   d <- data.frame(o=ordered(s[ids],levels=s));y <- seq_along(ids)/length(ids)
+  # Numeric factor levels are stored as labels by R; use the declared label
+  # values, not unavailable extra digits of the original pre-factor double.
+  s <- as.numeric(levels(d$o))
   for (kernel in c("liracine","racineliyan")) {
     b <- npregbw(xdat=d,ydat=y,bws=.35,okertype=kernel,bandwidth.compute=FALSE)
     retained <- unserialize(serialize(b,NULL))
