@@ -36031,10 +36031,8 @@ static int np_lp_failed_system_is_finite(const NPLPSolveWorkspace *workspace,
   return 1;
 }
 
-static int np_lp_record_empty_row(const double *weights, int ntrain,
-                                  int row, int nrow, int ncol,
-                                  double *out, double *ridge,
-                                  NPRegressionLPEmptyRows *empty_rows)
+static int np_lp_mark_empty_row(const double *weights, int ntrain, int row,
+                                NPRegressionLPEmptyRows *empty_rows)
 {
   if(empty_rows == NULL)
     return 0;
@@ -36042,6 +36040,16 @@ static int np_lp_record_empty_row(const double *weights, int ntrain,
     return 0;
   empty_rows->flags[row] = 1;
   ++empty_rows->count;
+  return 1;
+}
+
+static int np_lp_record_empty_row(const double *weights, int ntrain,
+                                  int row, int nrow, int ncol,
+                                  double *out, double *ridge,
+                                  NPRegressionLPEmptyRows *empty_rows)
+{
+  if(!np_lp_mark_empty_row(weights, ntrain, row, empty_rows))
+    return 0;
   for(int i = 0; i < ncol; ++i)
     out[(size_t)row + (size_t)nrow*(size_t)i] = NA_REAL;
   if(ridge != NULL)
@@ -36468,13 +36476,20 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
 
     if(kernel_route != NULL) {
       if(np_beta_scaled_row_context_fill(
-           &beta_row_context, i, NULL, NULL) != NP_CONTINUOUS_ROW_OK ||
-         np_reghat_lp_workspace_influence_row_ranked(
+           &beta_row_context, i, NULL, NULL) != NP_CONTINUOUS_ROW_OK)
+        goto cleanup_lp_hat;
+      if(np_reghat_lp_workspace_influence_row_ranked(
            &reghat_workspace, kw, eval_basis, weights_out + i,
            (size_t)num_eval,
            np_lp_rank_upper_bound_from_design(
-             kw, num_train, np_glp_cv_cache.nterms, &design_support)) != NP_REGHAT_LP_ROW_OK)
+             kw, num_train, np_glp_cv_cache.nterms, &design_support)) != NP_REGHAT_LP_ROW_OK) {
+        if(np_lp_failed_system_is_finite(&reghat_workspace.solve_workspace,
+             np_glp_cv_cache.nterms, 1) &&
+           np_lp_record_empty_row(kw, num_train, i, num_eval, num_train,
+             weights_out, ridge_used_out, empty_rows))
+          continue;
         goto cleanup_lp_hat;
+      }
       continue;
     } else {
       np_conditional_push_bounds(int_cxker_bound_extern,
@@ -38863,13 +38878,22 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
       }
 
       if(np_beta_scaled_row_context_fill(
-           &beta_row_context, j, NULL, NULL) != NP_CONTINUOUS_ROW_OK ||
-         np_reghat_lp_workspace_influence_row_ranked(
+           &beta_row_context, j, NULL, NULL) != NP_CONTINUOUS_ROW_OK)
+        goto cleanup_lp_apply;
+      if(np_reghat_lp_workspace_influence_row_ranked(
            &reghat_workspace, kw, eval_basis, hat_block + block_count,
            (size_t)block_rows,
            np_lp_rank_upper_bound_from_design(
-             kw, num_train, np_glp_cv_cache.nterms, &design_support)) != NP_REGHAT_LP_ROW_OK)
-        goto cleanup_lp_apply;
+             kw, num_train, np_glp_cv_cache.nterms, &design_support)) != NP_REGHAT_LP_ROW_OK) {
+        if(!np_lp_failed_system_is_finite(&reghat_workspace.solve_workspace,
+             np_glp_cv_cache.nterms, 1) ||
+           !np_lp_mark_empty_row(kw, num_train, j, empty_rows))
+          goto cleanup_lp_apply;
+        /* The receipt uses the global query index; the output is block-local.
+           NA affects this DGEMM row only, never neighboring supported rows. */
+        for(int donor = 0; donor < num_train; ++donor)
+          hat_block[(size_t)block_count + (size_t)block_rows*donor] = NA_REAL;
+      }
       ++block_count;
 
       if(block_count == block_rows || j + 1 == num_eval) {

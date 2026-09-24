@@ -2322,6 +2322,8 @@ npreghat.rbandwidth <-
     direct.apply.compatible <- operator.spec$direct.apply.compatible
     lc.derivative.exact.route <- operator.spec$lc.derivative.exact.route
     beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
+    beta.lp.first.empty <- beta.kernel && first.derivative.request &&
+      identical(reg.spec$regtype.engine, "lp") && !constant.basis
 
     direct.apply <- identical(output, "apply") &&
       !is.null(y) &&
@@ -2461,7 +2463,8 @@ npreghat.rbandwidth <-
           degree = reg.spec$degree.engine,
           bernstein.basis = reg.spec$bernstein.basis.engine,
           s = s,
-          allow.empty.rows = allow.empty.rows && native.lp.mean.apply.route
+          allow.empty.rows = allow.empty.rows &&
+            (native.lp.mean.apply.route || beta.lp.first.empty)
         ))
         empty.rows <- attr(out, ".np.empty.rows", exact = TRUE)
         if (!is.null(empty.rows))
@@ -2483,7 +2486,7 @@ npreghat.rbandwidth <-
         exdat = if (no.ex) NULL else exdat,
         gradients = any(s > 0L),
         gradient.order = 1L,
-        allow.empty.rows = allow.empty.rows && !beta.kernel &&
+        allow.empty.rows = allow.empty.rows && (!beta.kernel || beta.lp.first.empty) &&
           identical(reg.spec$regtype.engine, "lp")
       )
       direct.out <- .npRmpi_with_local_regression(do.call(.np_regression_direct, direct.args))
@@ -2516,7 +2519,8 @@ npreghat.rbandwidth <-
           bernstein.basis = reg.spec$bernstein.basis.engine,
           leave.one.out = native.loo.route,
           allow.empty.rows = allow.empty.rows &&
-            (native.lp.mean.matrix.route || (lc.derivative.exact.route && !beta.kernel))
+            (native.lp.mean.matrix.route || beta.lp.first.empty ||
+             (lc.derivative.exact.route && !beta.kernel))
         ))
       } else if (lc.derivative.exact.route) {
         .npRmpi_with_local_regression(.npreghat_exact_lc_derivative_matrix_from_npksum_chunked(

@@ -10799,11 +10799,14 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   if(allow_empty_flag == NA_LOGICAL ||
      (allow_empty_flag && (!has_geometry_context || train_is_eval_flag ||
        leave_one_out_flag || sigtest_mode_flag != 0 ||
-       descriptor.family != NP_CKERNEL_FAMILY_LEGACY ||
-       !((lp_engine == NP_LP_ENGINE_GENERAL && derivative_order == 0 &&
-          asInteger(bwtype) != BW_ADAP_NN) ||
-         (return_hat_flag && lp_engine == NP_LP_ENGINE_SCALAR &&
-          derivative_order == 1 && derivative_variable > 0)))))
+       !((descriptor.family == NP_CKERNEL_FAMILY_LEGACY &&
+          ((lp_engine == NP_LP_ENGINE_GENERAL && derivative_order == 0 &&
+            asInteger(bwtype) != BW_ADAP_NN) ||
+           (return_hat_flag && lp_engine == NP_LP_ENGINE_SCALAR &&
+            derivative_order == 1 && derivative_variable > 0))) ||
+         (descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+          lp_engine == NP_LP_ENGINE_GENERAL && derivative_order == 1 &&
+          derivative_variable > 0)))))
     error("C_np_regression_lp_apply_conditional: invalid partial-row policy");
   if(allow_empty_flag) {
     empty_flags = PROTECT(allocVector(INTSXP, num_obs_eval));
