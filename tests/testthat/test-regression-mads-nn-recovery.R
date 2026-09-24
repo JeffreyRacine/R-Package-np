@@ -23,7 +23,7 @@ test_that("fixed-degree regression MADS resumes from an ordinary raw-valid NN st
       witness <- restarts[[2L]]$recovery_witness
       expect_true(isTRUE(witness$found))
       expect_identical(restarts[[2L]]$start, witness$point)
-      expect_true(all(witness$point <= if (type == "adaptive_nn") 22 else 23))
+      expect_true(all(witness$point <= 22))
       expect_gt(restarts[[2L]]$native$compiled_callback_calls, 0)
       if (solver == "mads") expect_identical(as.numeric(bw$fval),
         as.numeric(restarts[[bw$nomad.best.restart]]$native$objective))
