@@ -1,11 +1,14 @@
 qregression <- 
     function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, quantgerr = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
              timing = NA, total.time = NA, optim.time = NA, fit.time = NA, se = TRUE,
-             fit.controls = NULL){
+             fit.controls = NULL, train.rows.omit = NULL, eval.rows.omit = NULL){
 
         if (missing(bws) || missing(xeval) || missing(tau) || missing(quantile) || missing(ntrain))
             stop("improper invocation of qregression constructor")
 
+        train.rows.omit <- as.vector(train.rows.omit)
+        eval.rows.omit <- as.vector(eval.rows.omit)
+        rows.omit <- if (trainiseval) train.rows.omit else eval.rows.omit
         d <- list(
             xbw = bws$xbw,
             ybw = bws$ybw,
@@ -40,6 +43,12 @@ qregression <-
             gradients = gradients,
             se = se,
             fit.controls = fit.controls,
+            rows.omit = rows.omit,
+            nobs.omit = length(rows.omit),
+            train.rows.omit = train.rows.omit,
+            train.nobs.omit = length(train.rows.omit),
+            eval.rows.omit = eval.rows.omit,
+            eval.nobs.omit = length(eval.rows.omit),
             timing = timing, total.time = total.time,
             optim.time = optim.time, fit.time = fit.time)
 
