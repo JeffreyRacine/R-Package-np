@@ -13082,7 +13082,7 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
-  if(XLENGTH(myopti_i) <= KWS_BDIVWI)
+  if(XLENGTH(myopti_i) < KWS_OPTIONS_COUNT)
     error("C_np_kernelsum: invalid internal option vector");
   if(XLENGTH(kpow_r) != 1 || !R_FINITE(REAL(kpow_r)[0]) ||
      REAL(kpow_r)[0] != floor(REAL(kpow_r)[0]) ||
@@ -13586,11 +13586,10 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  if(XLENGTH(myopti_i) < KWS_OPTIONS_COUNT)
+    error("C_np_kernelsum_power12: invalid internal option vector");
   descriptor = np_kernelsum_descriptor_or_error(myopti_i,
                                                 "C_np_kernelsum_power12");
-
-  if(XLENGTH(myopti_i) <= KWS_BDIVWI)
-    error("C_np_kernelsum_power12: invalid internal option vector");
   if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
     error("C_np_kernelsum_power12: internal route requires kernel.pow = 1");
 

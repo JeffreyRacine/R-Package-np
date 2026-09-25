@@ -1235,6 +1235,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define KWS_BDIVWI 24
 #define KWS_CCOMPRESSI 25
 #define KWS_TREEBLASI 26
+#define KWS_OPTIONS_COUNT (KWS_TREEBLASI + 1)
 
 #define CQ_TNOBSI 0
 #define CQ_ENOBSI   1
