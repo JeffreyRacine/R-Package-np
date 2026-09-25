@@ -26,6 +26,14 @@ npreghat <-
     }
   }
 
+# Reuse fitted response coding at hat ingress; numeric payloads are untouched.
+.np_hat_response <- function(y, ydati) {
+  if (is.factor(y) && any(ydati[["iord", exact = TRUE]] |
+                          ydati[["iuno", exact = TRUE]]))
+    return(.np_plreg_numeric_response(y, ydati))
+  y
+}
+
 .np_hat_constraint_from_matrix <- function(H, y, where) {
   if (is.null(y))
     stop(sprintf("argument 'y' is required when output='constraint' in %s", where),
@@ -1968,7 +1976,6 @@ npreghat.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
     dots <- list(...)
-    implicit.response <- !("y" %in% names(dots))
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
@@ -1991,8 +1998,6 @@ npreghat.formula <-
     tt <- attr(mf, "terms")
 
     y <- model.response(mf)
-    if (implicit.response && is.factor(y))
-      y <- .np_plreg_numeric_response(y, bws$ydati)
     txdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
 
     has.eval <- is.null(dots[["exdat", exact = TRUE]]) && !is.null(newdata)
@@ -2016,8 +2021,6 @@ npreghat.call <-
     dots <- list(...)
     args <- .np_retained_training_args(
       bws, c(txdat = "xdat", y = "ydat"), dots)
-    if (!("y" %in% names(dots)) && is.factor(args$y))
-      args$y <- .np_plreg_numeric_response(args$y, bws$ydati)
     ev <- do.call(npreghat, args)
     attr(ev, "call") <- match.call(expand.dots = FALSE)
     ev
@@ -2033,8 +2036,6 @@ npreghat.npregression <-
 
     if (missing(y)) {
       y <- .np_eval_bws_call_arg(rbw, "ydat")
-      if (is.factor(y))
-        y <- .np_plreg_numeric_response(y, rbw$ydati)
     }
 
     npreghat(bws = rbw, txdat = txdat, y = y, ...)
@@ -2263,6 +2264,7 @@ npreghat.rbandwidth <-
       stop("supplied bandwidths do not match 'txdat' in type")
 
     if (!is.null(y)) {
+      y <- .np_hat_response(y, bws$ydati)
       if (is.factor(y) || is.vector(y)) {
         if (length(y) != nrow(txdat))
           stop("length of 'y' must match the number of training rows in 'txdat'")
@@ -2795,6 +2797,7 @@ predict.npreghat <-
       if (identical(output, "matrix"))
         return(object)
 
+      y <- .np_hat_response(y, bws$ydati)
       if (identical(output, "apply")) {
         if (is.null(y))
           stop("argument 'y' is required when output='apply'")

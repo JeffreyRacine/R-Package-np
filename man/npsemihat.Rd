@@ -66,7 +66,10 @@ These arguments control operator output, derivative selection, finite-difference
   \item{s}{For \code{npindexhat}, \code{s=0} returns fit operator and \code{s=1} returns index-derivative operator.}
 
 
-  \item{y}{Optional response vector or matrix for apply mode. For \code{output = "constraint"}, \code{y} is required and must be a vector or one-column object.}
+  \item{y}{Optional response vector or matrix for apply mode. For \code{output = "constraint"}, \code{y} is required and must be a vector or one-column object.
+    When the fitted response is a factor, factor payloads use its retained
+    numerical level coding, including numeric level labels; payload levels are
+    aligned to the fitted levels. Numeric vectors and matrices are used as supplied.}
 
 
 \subsection{Partially Linear And Smooth-Coefficient Data}{

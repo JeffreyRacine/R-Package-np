@@ -132,9 +132,9 @@ These arguments control whether the operator is returned as a matrix, applied di
 
 
   \item{y}{Optional response vector or matrix for apply mode. For \code{output = "constraint"}, \code{y} is required and must be a vector or one-column object.
-    When omitted and borrowed from a formula, bandwidth object or fitted model,
-    a factor response uses the fitted regression's numerical level coding,
-    including numeric level labels. Explicit numerical vectors or matrices are
+    When the fitted response is a factor, explicit or borrowed factor responses
+    use its retained numerical level coding, including numeric level labels.
+    Payload levels are aligned to the fitted levels. Explicit numerical vectors or matrices are
     applied as supplied, without recoding.}
 
 

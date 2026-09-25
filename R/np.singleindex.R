@@ -676,11 +676,12 @@ npindex.sibandwidth <-
       stop("'tydat' must be a vector or a factor")
     .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
-    tydat <-
-      if (is.factor(tydat))
-        as.numeric(levels(tydat))[as.integer(tydat)]
+    tydat <- if (is.factor(tydat)) {
+      if (any(bws$ydati$iord | bws$ydati$iuno))
+        .np_plreg_numeric_response(tydat, bws$ydati)
       else
-        as.double(tydat)
+        as.numeric(levels(tydat))[as.integer(tydat)]
+    } else as.double(tydat)
     if (!no.ex)
       exdat <- toFrame(exdat)
 
@@ -792,15 +793,8 @@ npindex.sibandwidth <-
         eydat <- eydat[keep.eval]
     }
 
-    ## convert tydat, eydat to numeric, from a factor with levels from the y-data
+    ## Convert eydat to numeric, from a factor with levels from the y-data
     ## used during bandwidth selection.
-
-    if (is.factor(tydat)){
-      tydat <- adjustLevels(data.frame(tydat), bws$ydati)[,1]
-      tydat <- (bws$ydati$all.dlev[[1]])[as.integer(tydat)]
-    }
-    else
-      tydat <- as.double(tydat)
 
     if (no.ey)
       eydat <- double()

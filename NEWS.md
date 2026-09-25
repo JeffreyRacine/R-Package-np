@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Hat apply/constraint methods and cached regression-hat prediction now use the
+  fitted factor-response coding for explicit factor payloads, as for fitting.
+  Single-index fitting also retains this coding for alphanumeric responses.
+
 * Direct regression consumers, including significance tests and bootstrap plots,
   now fit the retained physical bandwidth when bandwidth scaling is requested.
 
