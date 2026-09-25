@@ -56,6 +56,17 @@ extern MPI_Comm	*comm;
 #include "np_native_safety.h"
 #include "tree.h"
 
+/* Failure-only advice, after the existing cleanup. Do not infer the cause of
+ * every invalid candidate, or modify starts, objectives or successful paths. */
+static void np_bandwidth_candidate_error(const char *message, const int bwtype)
+{
+  if((bwtype == BW_GEN_NN || bwtype == BW_ADAP_NN) &&
+     strstr(message,"bandwidth candidate") != NULL)
+    error("%s. With nearest-neighbor bandwidths, repeated observations (including bootstrap duplicates) can give zero radii. Inspect ties and NN counts, or use fixed bandwidths (bwtype='fixed').",
+          message);
+  error("%s",message);
+}
+
 /* Declared categorical support is preparation metadata, never inferred from
  * the observed subset. The transient view is rooted by the .Call argument;
  * native contexts copy values before returning and own their usual matrices. */
@@ -15786,7 +15797,7 @@ cleanup_np_density_bw:
   np_density_prepared_context_destroy(prepared_context);
 
   if (bw_error_msg != NULL)
-    error("%s", bw_error_msg);
+    np_bandwidth_candidate_error(bw_error_msg, myopti[BW_DENI]);
 
   return ;
   
@@ -16821,7 +16832,7 @@ cleanup_np_distribution_bw:
   np_distribution_prepared_context_destroy(prepared_context);
 
   if (bw_error_msg != NULL)
-    error("%s", bw_error_msg);
+    np_bandwidth_candidate_error(bw_error_msg, myopti[DBW_DENI]);
 
   return ;
   
@@ -17567,7 +17578,7 @@ cleanup_np_density_conditional_bw:
 
   if (bw_error_msg != NULL) {
     np_bwm_clear_deferred_error();
-    error("%s", bw_error_msg);
+    np_bandwidth_candidate_error(bw_error_msg, myopti[CBW_DENI]);
   }
 
   return ;
@@ -19410,7 +19421,7 @@ cleanup_np_distribution_conditional_bw:
   np_conditional_distribution_prepared_context_destroy(prepared_context);
 
   if (bw_error_msg != NULL)
-    error("%s", bw_error_msg);
+    np_bandwidth_candidate_error(bw_error_msg, myopti[CDBW_DENI]);
 
   return ;
 }
@@ -22427,7 +22438,7 @@ cleanup_np_regression_bw_mode:
   np_regression_prepared_context_destroy(prepared_context);
 
   if (bw_error_msg != NULL)
-    error("%s", bw_error_msg);
+    np_bandwidth_candidate_error(bw_error_msg, myopti[RBW_REGI]);
 
   //fprintf(stderr,"\nNP TOASTY\n");
   return ;
