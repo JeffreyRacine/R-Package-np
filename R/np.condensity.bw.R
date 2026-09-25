@@ -2749,17 +2749,9 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
   if (.npcdensbw_fixed_native_target(template, reg.args, bwsolver)) {
     .npcdensbw_prepared_native_require_crs()
     npObjectiveCacheEnabled()
-    native.regtype.engine <- if (!is.null(reg.args$regtype.engine) && length(reg.args$regtype.engine)) {
-      as.character(reg.args$regtype.engine[1L])
-    } else if (!is.null(reg.args$regtype) && length(reg.args$regtype)) {
-      as.character(reg.args$regtype[1L])
-    } else {
-      "lc"
-    }
-    native.needs.broadcast <- !identical(as.character(template$type)[1L], "fixed") &&
-      !identical(native.regtype.engine, "lc")
-    active.pool <- isTRUE(native.needs.broadcast) &&
-      .npRmpi_has_active_slave_pool(comm = 1L) &&
+    ## Preparation, raw evaluation and destruction share the native comm1
+    ## lifecycle for every admitted degree and bandwidth type, including LC.
+    active.pool <- .npRmpi_has_active_slave_pool(comm = 1L) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))
     called.from.bcast <- isTRUE(.npRmpi_autodispatch_called_from_bcast())
     if (active.pool && !called.from.bcast)
