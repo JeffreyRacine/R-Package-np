@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+* Direct regression consumers, including significance tests and bootstrap plots,
+  now fit the retained physical bandwidth when bandwidth scaling is requested.
+
 * Kernel-weight and local-operator helpers now pass complete native options,
   avoiding an out-of-range option read in hat and bootstrap calculations.
 
