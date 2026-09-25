@@ -365,6 +365,11 @@
   distance from \code{a} to \code{e} is four, from \code{c} to \code{d} one.
   Use explicit nonnumeric labels when rank distance, not numeric distance,
   is intended.
+  Lattice admission is deliberately conservative: decimal labels at large
+  magnitudes can lose enough precision that integer distances cannot be
+  established reliably. Such lattice-dependent requests report an error;
+  they do not round the labels or substitute another kernel. Select
+  \code{okertype="racineliyan"} explicitly for retained-support smoothing.
   \deqn{L_{WvR}(x_i,x;\lambda)=
     \begin{cases}
       1-\lambda, & x_i=x\\
@@ -402,6 +407,11 @@
   gap-filled lattice interval. These are distinct incumbent operator
   conventions. A fractional evaluation cutoff does not change the retained
   integration support or turn a lattice cumulative into a nonlattice sum.
+  If a near-integer numeric support is ambiguous at its floating-point
+  precision, the raw Li-Racine cumulative operator reports an error rather
+  than silently selecting a different integration convention. Clearly
+  fractional support remains supported. Racine-Li-Yan provides an explicit
+  retained-support cumulative definition in either case.
   At \eqn{\lambda=0}, bandwidth scores with positive
   distances below one have non-finite elementwise one-sided derivatives and
   report a condition; use an interior bandwidth when requesting such scores.

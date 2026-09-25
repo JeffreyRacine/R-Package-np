@@ -1090,9 +1090,30 @@ double kernel_ordered(int KERNEL, double x, double y, double lambda,
 /* Cumulative version of Aitchenson and Aitken's beautiful categorical
 kernel. */
 
+/* This budget only detects ambiguous support, never admits/rounds a lattice.
+ * Normal weights, convolution and RLY do not call this guard. Vector cumulative
+ * owners validate once. A clearly fractional offset settles support immediately. */
+void np_ordered_lr_cumulative_contract(const double *cats, const int ncat)
+{
+  if(cats == NULL || ncat <= 0)
+    error("Li-Racine cumulative kernel requires retained ordered support");
+  int ambiguous = 0;
+  for(int i = 1; i < ncat; ++i) {
+    const double d = cats[i]-cats[0];
+    const double residual = fabs(d-round(d));
+    const double tolerance = 8.0*DBL_EPSILON*fmax(1.0,fabs(d));
+    const double uncertainty = DBL_EPSILON*fabs(cats[i]) +
+      DBL_EPSILON*fabs(cats[0]) + DBL_EPSILON*fabs(d);
+    if(residual > fmax(tolerance,uncertainty)) return;
+    if(residual > tolerance) ambiguous = 1;
+  }
+  if(ambiguous)
+    error("raw Li-Racine cumulative support is numerically ambiguous between a unit lattice and retained fractional levels; use Racine-Li-Yan (okertype='racineliyan') for an explicit retained-support cumulative operator");
+}
+
 /* Nonlattice LR has no intervening integer points: its unnormalized
  * cumulative operator sums the retained counting support, in original units. */
-double np_ordered_lr_finite_cumulative(const int score, const double train,
+double np_ordered_lr_finite_cumulative_prepared(const int score, const double train,
     const double eval, const double lambda, const double *cats, const int ncat)
 {
   double total = 0.0;
@@ -1105,6 +1126,14 @@ double np_ordered_lr_finite_cumulative(const int score, const double train,
       np_ordered_metric_power(lambda,d);
   }
   return total;
+}
+
+/* Scalar callers validate here; vector owners validate once before their loop. */
+double np_ordered_lr_finite_cumulative(const int score, const double train,
+    const double eval, const double lambda, const double *cats, const int ncat)
+{
+  np_ordered_lr_cumulative_contract(cats,ncat);
+  return np_ordered_lr_finite_cumulative_prepared(score,train,eval,lambda,cats,ncat);
 }
 
 double cdf_kernel_ordered(int KERNEL, double x, double y, double lambda, int c, double *categorical_vals)

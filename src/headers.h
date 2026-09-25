@@ -24,7 +24,7 @@ static inline int np_ordered_lattice_distance(const double x, const double y)
   if(distance == lattice && lattice < INT_MAX) return (int)lattice;
   if(!R_FINITE(distance) || lattice >= INT_MAX ||
      fabs(distance-lattice) > 8.0*DBL_EPSILON*fmax(1.0,distance))
-    Rf_error("ordered unit-lattice kernel requires integer distances within the native index range; use Li-Racine weights or Racine-Li-Yan for fractional distances");
+    Rf_error("ordered unit-lattice kernel requires integer distances within the native index range; a unit lattice cannot be established reliably from these numeric levels. Decimal labels at large magnitudes can lose precision; use Racine-Li-Yan (okertype='racineliyan') for retained-support smoothing");
   return (int)lattice;
 }
 
@@ -607,6 +607,9 @@ static inline double np_ordered_metric_score(const double lambda, const double d
   return d*np_ordered_metric_power(lambda,d-1.0);
 }
 
+void np_ordered_lr_cumulative_contract(const double *cats, int ncat);
+double np_ordered_lr_finite_cumulative_prepared(int score, double train,
+  double eval, double lambda, const double *cats, int ncat);
 double np_ordered_lr_interval_cumulative(int score, double train, double eval,
     double lambda, double lower, double upper);
 double np_ordered_lr_finite_cumulative(int score, double train, double eval,

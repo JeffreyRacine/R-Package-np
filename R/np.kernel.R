@@ -459,6 +459,13 @@ npksum.default <-
     if (!miss.ex)
       exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
 
+    # A near-integer retained support must not silently change the raw LR
+    # integration measure. Check before native allocations/MPI collectives.
+    if (bws$okertype == "liracine") {
+      for (j in which(bws$iord & operator == "integral"))
+        .np_ordered_lr_cumulative_contract(bws$xdati$all.dlev[[j]])
+    }
+
     # Reject singular new elementwise score endpoints before entering any MPI
     # collective. Value operators still admit lambda=0; no bandwidth is moved.
     if (compute.score && bws$okertype %in% c("liracine", "racineliyan")) {

@@ -2078,8 +2078,28 @@ dlev <- function(x){
     if (any(diff(lattice) <= 0) || any(abs(offset-lattice) > tolerance) ||
         tail(lattice, 1L) >= .Machine$integer.max)
       stop(paste0("ordered ", kernel, " role requires integer distances within the native index range; ",
-                  "use Li-Racine weights or Racine-Li-Yan for fractional distances"), call. = FALSE)
+                  "a unit lattice cannot be established reliably from these numeric levels. ",
+                  "Decimal labels at large magnitudes can lose precision; ",
+                  "use Racine-Li-Yan (okertype='racineliyan') for retained-support smoothing"),
+           call. = FALSE)
   }
+  invisible(TRUE)
+}
+
+# Refuse ambiguity; never use magnitude-dependent tolerance to admit a lattice
+# or round genuine fractional distances. Match the native cumulative guard.
+.np_ordered_lr_cumulative_contract <- function(levels) {
+  if (length(levels) < 2L) return(invisible(TRUE))
+  offset <- levels - levels[1L]
+  residual <- abs(offset - round(offset))
+  tolerance <- 8 * .Machine$double.eps * pmax(1, abs(offset))
+  uncertainty <- .Machine$double.eps * abs(levels) +
+    .Machine$double.eps * abs(levels[1L]) +
+    .Machine$double.eps * abs(offset)
+  if (any(residual > tolerance) &&
+      all(residual <= pmax(tolerance, uncertainty)))
+    stop("raw Li-Racine cumulative support is numerically ambiguous between a unit lattice and retained fractional levels; use Racine-Li-Yan (okertype='racineliyan') for an explicit retained-support cumulative operator",
+         call. = FALSE)
   invisible(TRUE)
 }
 
