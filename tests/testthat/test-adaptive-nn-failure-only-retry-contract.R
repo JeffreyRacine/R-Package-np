@@ -40,7 +40,7 @@ test_that("failure-only retry never rewrites explicit adaptive-NN starts", {
       bwtype = "adaptive_nn", regtype = "ll",
       nmulti = 1L, itmax = 120L, powell.remin = FALSE
     ),
-    "optimizer returned a fixed-bandwidth candidate with invalid raw objective",
+    "optimizer returned a bandwidth candidate with invalid raw objective",
     fixed = TRUE
   )
 })

@@ -14926,7 +14926,7 @@ density_powell_attempt:
   if (enforce_fixed_feasibility) {
     double final_raw;
     if (!have_start_best) {
-      bw_error_msg = "C_np_density_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_density_bw: optimizer failed to produce a feasible bandwidth candidate";
       goto cleanup_np_density_bw;
     }
     if (!np_bw_candidate_is_admissible(
@@ -14947,7 +14947,7 @@ density_powell_attempt:
           num_reg_ordered_extern,
           num_categories_extern,
           vector_scale_factor)) {
-      bw_error_msg = "C_np_density_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_density_bw: optimizer returned an infeasible bandwidth candidate";
       goto cleanup_np_density_bw;
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
@@ -15007,7 +15007,7 @@ density_powell_attempt:
           goto density_powell_attempt;
         }
       }
-      bw_error_msg = "C_np_density_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      bw_error_msg = "C_np_density_bw: optimizer returned a bandwidth candidate with invalid raw objective";
       goto cleanup_np_density_bw;
     }
     fret = final_raw;
@@ -15964,7 +15964,7 @@ distribution_powell_attempt:
   if (enforce_fixed_feasibility) {
     double final_raw;
     if (!have_start_best) {
-      bw_error_msg = "C_np_distribution_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_distribution_bw: optimizer failed to produce a feasible bandwidth candidate";
       goto cleanup_np_distribution_bw;
     }
     if (!np_bw_candidate_is_admissible(
@@ -15985,7 +15985,7 @@ distribution_powell_attempt:
           num_reg_ordered_extern,
           num_categories_extern,
           vector_scale_factor)) {
-      bw_error_msg = "C_np_distribution_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_distribution_bw: optimizer returned an infeasible bandwidth candidate";
       goto cleanup_np_distribution_bw;
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
@@ -16045,7 +16045,7 @@ distribution_powell_attempt:
           goto distribution_powell_attempt;
         }
       }
-      bw_error_msg = "C_np_distribution_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      bw_error_msg = "C_np_distribution_bw: optimizer returned a bandwidth candidate with invalid raw objective";
       goto cleanup_np_distribution_bw;
     }
     fret = final_raw;
@@ -16699,7 +16699,7 @@ conditional_density_powell_attempt:
   if (enforce_fixed_feasibility) {
     double final_raw;
     if (!have_start_best) {
-      bw_error_msg = "C_np_density_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_density_conditional_bw: optimizer failed to produce a feasible bandwidth candidate";
       goto cleanup_np_density_conditional_bw;
     }
     if (!np_bw_candidate_is_admissible_with_floor(
@@ -16721,7 +16721,7 @@ conditional_density_powell_attempt:
           num_categories_extern,
           vector_scale_factor,
           scale_factor_lower_bound)) {
-      bw_error_msg = "C_np_density_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_density_conditional_bw: optimizer returned an infeasible bandwidth candidate";
       goto cleanup_np_density_conditional_bw;
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
@@ -16787,7 +16787,7 @@ conditional_density_powell_attempt:
           goto conditional_density_powell_attempt;
         }
       }
-      bw_error_msg = "C_np_density_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      bw_error_msg = "C_np_density_conditional_bw: optimizer returned a bandwidth candidate with invalid raw objective";
       goto cleanup_np_density_conditional_bw;
     }
     fret = final_raw;
@@ -18542,7 +18542,7 @@ conditional_distribution_powell_attempt:
   if (enforce_fixed_feasibility) {
     double final_raw;
     if (!have_start_best) {
-      bw_error_msg = "C_np_distribution_conditional_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_distribution_conditional_bw: optimizer failed to produce a feasible bandwidth candidate";
       goto cleanup_np_distribution_conditional_bw;
     }
     if (!np_bw_candidate_is_admissible(
@@ -18563,7 +18563,7 @@ conditional_distribution_powell_attempt:
           num_reg_ordered_extern,
           num_categories_extern,
           vector_scale_factor)) {
-      bw_error_msg = "C_np_distribution_conditional_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_distribution_conditional_bw: optimizer returned an infeasible bandwidth candidate";
       goto cleanup_np_distribution_conditional_bw;
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
@@ -18634,7 +18634,7 @@ conditional_distribution_powell_attempt:
           goto conditional_distribution_powell_attempt;
         }
       }
-      bw_error_msg = "C_np_distribution_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      bw_error_msg = "C_np_distribution_conditional_bw: optimizer returned a bandwidth candidate with invalid raw objective";
       goto cleanup_np_distribution_conditional_bw;
     }
     fret = final_raw;
@@ -21354,7 +21354,7 @@ regression_powell_attempt:
   if (enforce_fixed_feasibility) {
     double final_raw;
     if (!have_start_best) {
-      bw_error_msg = "C_np_regression_bw: optimizer failed to produce a feasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_regression_bw: optimizer failed to produce a feasible bandwidth candidate";
       goto cleanup_np_regression_bw_mode;
     }
     if (!np_bw_candidate_is_admissible(
@@ -21375,7 +21375,7 @@ regression_powell_attempt:
           num_reg_ordered_extern,
           num_categories_extern,
           vector_scale_factor)) {
-      bw_error_msg = "C_np_regression_bw: optimizer returned an infeasible fixed-bandwidth candidate";
+      bw_error_msg = "C_np_regression_bw: optimizer returned an infeasible bandwidth candidate";
       goto cleanup_np_regression_bw_mode;
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
@@ -21506,7 +21506,7 @@ regression_powell_attempt:
           goto regression_powell_attempt;
         }
       }
-      bw_error_msg = "C_np_regression_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
+      bw_error_msg = "C_np_regression_bw: optimizer returned a bandwidth candidate with invalid raw objective";
       goto cleanup_np_regression_bw_mode;
     }
     fret = final_raw;
