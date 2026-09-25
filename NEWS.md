@@ -41,6 +41,10 @@
 * Kernel-weight and local-operator helpers now pass complete native options,
   avoiding an out-of-range option read in hat and bootstrap calculations.
 
+* Conditional-distribution prepared bandwidth searches now include all response
+  and predictor bandwidths and searched degrees in their objective-cache keys,
+  preventing stale objectives when a candidate changes.
+
 * Mixed continuous/categorical generalized-neighbor density least-squares
   cross-validation now integrates the query-radius density over its full
   support and uses deleted-sample radii in the cross term. Correct integration

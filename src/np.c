@@ -17523,9 +17523,9 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
       BANDWIDTH_den_extern,
       0,
       degree_key_len,
-      num_reg_continuous_extern,
-      num_reg_unordered_extern,
-      num_reg_ordered_extern);
+      num_var_continuous_extern + num_reg_continuous_extern,
+      num_var_unordered_extern + num_reg_unordered_extern,
+      num_var_ordered_extern + num_reg_ordered_extern);
   } else {
     bwm_nn_cache_configure_for_powell(
       BANDWIDTH_den_extern,
