@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Regression bandwidth selection and local-polynomial operators again support
+  categorical responses, including ordered linear predictors in partially
+  linear models. Predictor support still includes declared unused levels.
+
 * Generalized-neighbor conditional-distribution cross-validation on external
   grids now uses the deleted donor sample for both predictor and response
   radii, retaining the empirical-grid convention, row/block work ownership
