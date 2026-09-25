@@ -41,6 +41,11 @@
 * Kernel-weight and local-operator helpers now pass complete native options,
   avoiding an out-of-range option read in hat and bootstrap calculations.
 
+* Conditional-distribution generalized-neighbor bandwidth searches now honor
+  explicit tree requests for second-order Epanechnikov and uniform kernels
+  without boundary normalization. Fitting, automatic tree selection and other
+  kernel/bandwidth routes retain their existing policies and owners.
+
 * Conditional-distribution prepared bandwidth searches now include all response
   and predictor bandwidths and searched degrees in their objective-cache keys,
   preventing stale objectives when a candidate changes.
