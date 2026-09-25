@@ -50,11 +50,15 @@ test_that("shared bandwidth owners clean ordinary NN failures", {
   }
 
   owner <- npRmpi_test_extract_c_function(
-    source, "np_kernel_bandwidth_continuous_nn"
+    source, "np_kernel_bandwidth_continuous_nn_ctx"
   )
   expect_match(owner, "nn_distance = alloc_vecd", fixed = TRUE)
   expect_match(owner, "free(nn_distance);", fixed = TRUE)
   expect_match(owner, "return status;", fixed = TRUE)
+  wrapper <- npRmpi_test_extract_c_function(
+    source, "np_kernel_bandwidth_continuous_nn"
+  )
+  expect_match(wrapper, "np_kernel_bandwidth_continuous_nn_ctx(", fixed = TRUE)
 })
 
 test_that("failed beta NN preparation is followed by an exact valid call", {

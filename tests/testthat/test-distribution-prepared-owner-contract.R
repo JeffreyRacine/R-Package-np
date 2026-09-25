@@ -91,7 +91,7 @@ test_that("distribution bandwidth state has one typed cleanup owner", {
     fixed = TRUE
   )
   expect_match(public, "np_distribution_bw_internal(", fixed = TRUE)
-  expect_match(public, "eval_only, NULL, 0);", fixed = TRUE)
+  expect_match(public, "eval_only, NULL, 0, support);", fixed = TRUE)
 })
 
 test_that("native distribution search evaluates one retained prepared state", {

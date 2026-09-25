@@ -15,7 +15,8 @@ test_that("RLY profile matrices use the same native kernel owner", {
   }
   bridge<-function(t,e,h,s).Call("C_np_ordered_rly_matrix",t,e,h,s,PACKAGE="npRmpi")
   expect_error(bridge(1,1,NA_real_,1),"bandwidth")
-  expect_error(bridge(1,1,.4,c(1,1.5)),"integer distances")
+  expect_equal(bridge(1,1,.4,c(1,1.5)),
+               matrix(1/(1+sqrt(.4)),1,1),tolerance=2e-14)
   expect_error(bridge(NA_real_,1,.4,1),"outside retained support")
   expect_error(bridge(1,1,.4,c(1,Inf)),"finite")
   oldgc<-gctorture(TRUE);on.exit(gctorture(oldgc),add=TRUE)

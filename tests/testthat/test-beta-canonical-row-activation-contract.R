@@ -1108,7 +1108,7 @@ test_that("beta density CVML enters the canonical scaled-row owner", {
   expect_match(owner, "np_density_cvml_beta_route(", fixed = TRUE)
   expect_match(
     owner,
-    "if(exact_beta_route)\n      goto cleanup_density_leave_one_out_cv;",
+    "if(exact_beta_route) {\n      status = 1;\n      goto cleanup_density_leave_one_out_cv;",
     fixed = TRUE
   )
   expect_match(owner, "goto cleanup_density_leave_one_out_cv;",
@@ -1879,7 +1879,10 @@ test_that("beta direct kernel-weight owner transports validated compression stat
   )
   expect_match(
     compact,
-    "categorical.compress = npStrictLogicalOption(\"np.categorical.compress\", ",
+    paste0("categorical.compress = identical(bws$ckertype, \"beta\") && ",
+           "bws$nuno + bws$nord > 0L && ",
+           "npStrictLogicalOption(\"np.categorical.compress\", TRUE), ",
+           "tree.outer.blas = FALSE"),
     fixed = TRUE
   )
   expect_false(grepl("tryCatch", owner, fixed = TRUE))

@@ -68,7 +68,7 @@ test_that("all copula renderers and uncertainty layers share the coordinate map"
     expect_identical(captured$frames[[1L]]$x, sort(u$u1))
     expect_identical(captured$frames[[1L]]$y, sort(u$u2))
   }
-  for (renderer in c("base", "rgl")) {
+  check.renderer <- function(renderer) {
     captured$frames <- list(); captured$errors <- NULL
     out <- plot(fit, view = "fixed", renderer = renderer, output = "plot-data",
       errors = "asymptotic", band = "all", legend = FALSE)
@@ -83,6 +83,7 @@ test_that("all copula renderers and uncertainty layers share the coordinate map"
         matrix(out[[paste0(name, ".upper")]][permutation], 3L, 3L))
     }
   }
+  check.renderer("base")
   captured$frames <- list()
   out <- plot(fit, view = "all", output = "plot-data")
   expect_identical(out$copula, original)
@@ -102,4 +103,7 @@ test_that("all copula renderers and uncertainty layers share the coordinate map"
   same <- plot(fit, output = "data", errors = "bootstrap", B = 3L, band = "pmzsd")
   expect_identical(same, out)
   expect_identical(.Random.seed, seed)
+  # Run every base/coordinate/bootstrap assertion even without optional rgl.
+  skip_if_not_installed("rgl")
+  check.renderer("rgl")
 })
