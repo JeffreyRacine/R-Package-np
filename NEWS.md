@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+* Kernel-weight and local-operator helpers now pass complete native options,
+  avoiding an out-of-range option read in hat and bootstrap calculations.
+
 * Mixed continuous/categorical generalized-neighbor density least-squares
   cross-validation now integrates the query-radius density over its full
   support and uses deleted-sample radii in the cross term. Correct integration

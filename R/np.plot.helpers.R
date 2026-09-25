@@ -7935,7 +7935,9 @@
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
   myopti <- c(myopti, list(divide.returned.kernel.weights =
-                           identical(bws$type, "adaptive_nn")))
+                           identical(bws$type, "adaptive_nn"),
+                         categorical.compress = FALSE,
+                         tree.outer.blas = FALSE))
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
   asDouble <- function(data) if (is.null(data)) as.double(0.0) else as.double(data)

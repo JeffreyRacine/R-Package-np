@@ -594,7 +594,8 @@
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
   myopti <- c(myopti, list(
     divide.returned.kernel.weights = identical(bws$type, "adaptive_nn"),
-    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE),
+    tree.outer.blas = FALSE
   ))
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])

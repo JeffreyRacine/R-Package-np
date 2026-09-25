@@ -13864,6 +13864,8 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  if(XLENGTH(myopti_i) < KWS_OPTIONS_COUNT)
+    error("C_np_kernelsum: invalid internal option vector");
   if(XLENGTH(kpow_r) != 1 || !R_FINITE(REAL(kpow_r)[0]) ||
      REAL(kpow_r)[0] != floor(REAL(kpow_r)[0]) ||
      fabs(REAL(kpow_r)[0]) > INT_MAX)
@@ -13881,15 +13883,6 @@ SEXP C_np_kernelsum(SEXP tuno,
   p_nvar = ((p_operator != OP_NOOP) ? ncon : 0) + ((do_score || do_ocg) ? (nuno + nord) : 0);
   n_pkw = (return_kernel_weights && (p_nvar > 0)) ? ((R_xlen_t)n_kw * (R_xlen_t)p_nvar) : 0;
   myopti_p = INTEGER(myopti_i);
-  if(XLENGTH(myopti_i) <= KWS_BDIVWI){
-    int i;
-    int * myopti_tmp = (int *)R_alloc((size_t)(KWS_BDIVWI + 1), sizeof(int));
-    for(i = 0; i <= KWS_BDIVWI; i++)
-      myopti_tmp[i] = 0;
-    for(i = 0; i < XLENGTH(myopti_i); i++)
-      myopti_tmp[i] = myopti_p[i];
-    myopti_p = myopti_tmp;
-  }
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
   const int fold_requested =
@@ -14381,23 +14374,14 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  if(XLENGTH(myopti_i) < KWS_OPTIONS_COUNT)
+    error("C_np_kernelsum_power12: invalid internal option vector");
   descriptor = np_kernelsum_descriptor_or_error(myopti_i,
                                                 "C_np_kernelsum_power12");
-
-  if(XLENGTH(myopti_i) <= KWS_CKORDERI)
-    error("C_np_kernelsum_power12: invalid internal option vector");
   if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
     error("C_np_kernelsum_power12: internal route requires kernel.pow = 1");
 
   myopti_p = INTEGER(myopti_i);
-  if(XLENGTH(myopti_i) <= KWS_BDIVWI){
-    int * myopti_tmp = (int *)R_alloc((size_t)(KWS_BDIVWI + 1), sizeof(int));
-    for(i = 0; i <= KWS_BDIVWI; i++)
-      myopti_tmp[i] = 0;
-    for(i = 0; i < XLENGTH(myopti_i); i++)
-      myopti_tmp[i] = myopti_p[i];
-    myopti_p = myopti_tmp;
-  }
 
   ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
   nuno = (int)INTEGER(myopti_i)[KWS_NUNOI];
