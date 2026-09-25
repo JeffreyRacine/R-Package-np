@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Regression conditioning diagnostics now distinguish numerical rank loss and
+  explain raw-basis scaling and the explicit Bernstein option. Help pages clarify
+  raw-polynomial instability; thresholds, defaults and computations are unchanged.
+
 * Converting retained bandwidth metadata no longer reports an ignored uniform
   order as though the user had just supplied it. Explicit order requests still
   receive the advisory; kernel choices and stored orders are unchanged.
