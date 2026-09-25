@@ -1,5 +1,8 @@
 # np 0.80-1
 
+* Kernel documentation now states the unordered Li-Racine normalization and
+  distinguishes raw ordered Li-Racine cumulative and convolution support.
+
 * Failed nearest-neighbor regression refits and leave-one-out hat calls now
   explain when the count exceeds the effective training-sample limit.
   Admissibility and successful computations are unchanged.

@@ -346,9 +346,11 @@
   (Aitchison-Aitken)
   via \code{ukertype="aitchisonaitken"}.
 
-  \deqn{L_{LR,u}(x_i,x;\lambda)=\mathbf{1}(x_i=x)+\mathbf{1}(x_i\neq x)\lambda}
-  (Li-Racine unordered kernel)
+  \deqn{L_{LR,u}(x_i,x;\lambda)=\frac{\mathbf{1}(x_i=x)+\mathbf{1}(x_i\neq x)\lambda}{1+(c-1)\lambda}}
+  (normalized Li-Racine unordered kernel returned by \code{npksum})
   via \code{ukertype="liracine"}.
+  Ratio estimators may equivalently use the proportional unnormalized weights,
+  since this common factor cancels in their numerator and denominator.
 
   Ordered-categorical kernels (called via \code{okertype}):
   Numeric ordered-factor levels retain their numeric distances, including
@@ -392,9 +394,13 @@
   Conditional explanatory roles and regression use raw Li-Racine weights.
   On nonlattice support, the raw Li-Racine cumulative operator sums these
   unnormalized weights over retained levels at or below the evaluation
-  point; it is not a probability CDF. Existing lattice cumulative conventions
-  remain unchanged, including at newly supported fractional evaluation
-  cutoffs: moving the cutoff does not change the integration support.
+  point; it is not a probability CDF. On a unit lattice, its cumulative
+  operator instead sums over every lattice point between the smallest and
+  largest retained levels up to the evaluation cutoff, including points in
+  gaps. Its convolution sums products over the retained levels, not the
+  gap-filled lattice interval. These are distinct incumbent operator
+  conventions. A fractional evaluation cutoff does not change the retained
+  integration support or turn a lattice cumulative into a nonlattice sum.
   At \eqn{\lambda=0}, bandwidth scores with positive
   distances below one have non-finite elementwise one-sided derivatives and
   report a condition; use an interior bandwidth when requesting such scores.
