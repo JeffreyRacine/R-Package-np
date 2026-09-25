@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+* Terminal bandwidth-search failures no longer mislabel nearest-neighbor
+  candidates as fixed bandwidths. Search and failure policies are unchanged.
+
 * Kernel documentation now states the unordered Li-Racine normalization and
   distinguishes raw ordered Li-Racine cumulative and convolution support.
 
