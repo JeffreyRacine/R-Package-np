@@ -73,5 +73,5 @@ test_that("compact NN uncertainty preserves observation permutation identities",
     expect_equal(gradients(a,se=TRUE),gradients(t,se=TRUE),tolerance=1e-10)
     expect_equal(se(a),se(v)[order(ie)],tolerance=1e-10)
   }
-  expect_identical(uniform.advisories,3L)
+  expect_identical(uniform.advisories,0L)
 })

@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Converting retained bandwidth metadata no longer reports an ignored uniform
+  order as though the user had just supplied it. Explicit order requests still
+  receive the advisory; kernel choices and stored orders are unchanged.
+
 * Terminal bandwidth-search failures no longer mislabel nearest-neighbor
   candidates as fixed bandwidths. Search and failure policies are unchanged.
 
