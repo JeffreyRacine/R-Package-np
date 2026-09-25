@@ -479,7 +479,15 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   contains \eqn{x_1^2x_2}{x1^2*x2}.
 
   The optional flag \code{bernstein.basis} controls basis construction:
-  \code{FALSE} (default) uses raw local-polynomial powers. For
+  \code{FALSE} (default) uses raw local-polynomial powers. These can be
+  numerically unstable, particularly above degree one or when predictor
+  offsets are large relative to their spread. The option
+  \code{bernstein.basis=TRUE} is provided to improve numerical conditioning;
+  it does not remedy genuine collinearity. Centring/scaling continuous
+  predictors is another explicit user choice. Existing conditioning warnings
+  and errors assess the selected basis; numerical rank deficiency need not
+  imply genuinely redundant predictors. No automatic basis switch is made.
+  For
   \code{basis="glp"}, the historical selector \code{TRUE} uses a
   degree-graded, orthonormal shifted-Legendre representation. On the unit-scaled support
   \eqn{u\in[0,1]}{u in [0,1]}, its order-\eqn{k}{k} factor is

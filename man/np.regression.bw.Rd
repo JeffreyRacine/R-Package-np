@@ -189,7 +189,15 @@ These arguments control regression type, local-polynomial specification, and opt
   \item{bernstein.basis}{
     logical flag relevant only when \code{regtype="lp"}. If
     \code{FALSE} (default), the GLP basis uses raw local-polynomial
-    powers (stable for extrapolation). For \code{basis="glp"}, the historical
+    powers (allowing extrapolation). Raw powers can be numerically unstable,
+    particularly above degree one or when predictor offsets are large relative
+    to their spread. The option \code{bernstein.basis=TRUE} is provided to
+    improve numerical conditioning; it does not remedy genuine collinearity.
+    Centring/scaling continuous predictors is another explicit user choice.
+    The conditioning diagnostic assesses the selected basis, so numerical rank
+    deficiency need not imply genuinely redundant predictors. The package does
+    not silently switch the selected basis.
+    For \code{basis="glp"}, the historical
     selector \code{TRUE} uses the degree-graded, orthonormal shifted-Legendre
     construction described in
     \code{\link{npreg}}; it has exactly the same complete, coordinate-capped

@@ -1672,7 +1672,7 @@ npCheckRegressionDesignCondition <- function(reg.code,
   tol.rank <- max(dim(B)) * max(sv) * .Machine$double.eps
   r <- sum(sv > tol.rank)
   if (r < p) {
-    stop(sprintf("%s: regression design matrix is rank deficient (rank=%d < p=%d). Reduce polynomial degree or remove collinear continuous predictors.",
+    stop(sprintf("%s: regression design matrix is numerically rank deficient in the selected basis (rank=%d < p=%d). For a raw basis, consider centring/scaling continuous predictors or using regtype='lp' with bernstein.basis=TRUE. Reduce polynomial degree or remove genuinely redundant predictors if needed.",
                  where, r, p))
   }
 
@@ -1681,12 +1681,12 @@ npCheckRegressionDesignCondition <- function(reg.code,
     kB <- Inf
 
   if (kB > kappa.stop) {
-    stop(sprintf("%s: regression design matrix is severely ill-conditioned (kappa(B)=%.3e > %.1e). Reduce polynomial degree or remove collinear continuous predictors.",
+    stop(sprintf("%s: regression design matrix is severely ill-conditioned (kappa(B)=%.3e > %.1e). For a raw basis, consider centring/scaling continuous predictors or using regtype='lp' with bernstein.basis=TRUE. Reduce polynomial degree or remove genuinely redundant predictors if needed.",
                  where, kB, kappa.stop))
   }
 
   if (kB > kappa.warn) {
-    .np_warning(sprintf("%s: regression design matrix is ill-conditioned (kappa(B)=%.3e > %.1e). Estimation may rely heavily on ridging; consider lower degree or less collinear predictors.",
+    .np_warning(sprintf("%s: regression design matrix is ill-conditioned (kappa(B)=%.3e > %.1e). Estimation may rely heavily on ridging. For a raw basis, consider centring/scaling continuous predictors or using regtype='lp' with bernstein.basis=TRUE; otherwise consider lower degree or less collinear predictors.",
                     where, kB, kappa.warn),
             call. = FALSE, immediate. = TRUE)
   }
