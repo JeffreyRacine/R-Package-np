@@ -1292,7 +1292,8 @@ npreghat <-
       as.double(sigtest$residual.pool),
       .np_native_categorical_support(bws),
       PACKAGE = "npRmpi"
-    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]]))
+    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]],
+       bws = bws, ntrain = nrow(txdat)))
   }
 
   .np_with_nn_radius_context(.Call(
@@ -1325,7 +1326,8 @@ npreghat <-
     as.logical(allow.empty.rows),
     .np_native_categorical_support(bws),
     PACKAGE = "npRmpi"
-  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
+  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]],
+     bws = bws, ntrain = nrow(txdat), leave.one.out = leave.one.out)
 }
 
 .npreghat_exact_lp_matrix_from_regression_core <- function(bws,
@@ -1904,7 +1906,8 @@ npreghat <-
     as.double(cker.bounds.c$lb),
     as.double(cker.bounds.c$ub),
     PACKAGE = "npRmpi"
-  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
+  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]],
+     bws = bws, ntrain = tnrow)
 
   mean.out <- as.double(myout$mean)
   if (mean.override) {

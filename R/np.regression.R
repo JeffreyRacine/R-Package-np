@@ -1056,7 +1056,8 @@ npreg.rbandwidth <-
       } else {
         call_regression()
       }
-    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
+    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]],
+       bws = bws, ntrain = tnrow)
 
     invalid.rows <- integer()
     if (mean.override) {
