@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Mixed continuous/categorical generalized-neighbor density least-squares
+  cross-validation now integrates the query-radius density over its full
+  support and uses deleted-sample radii in the cross term. Correct integration
+  can take longer than the previous convolution approximation.
+
 * Regression bandwidth selection and local-polynomial operators again support
   categorical responses, including ordered linear predictors in partially
   linear models. Predictor support still includes declared unused levels.

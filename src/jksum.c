@@ -38539,12 +38539,14 @@ cleanup:
 }
 
 typedef double (*NPGNNIntegralCategoryOverlap)(void *context,int first,int second);
+typedef int (*NPGNNIntegralCategoryProfiles)(void *context,int **ids,int **reps,int *count);
 
 typedef struct {
   int n,dimensions,folded,kernel,has_categories,status,representation;
   double **data,*counts,*values,*bounds;
   NPGNNIntegralWeightRow row;
   NPGNNIntegralCategoryOverlap category_overlap;
+  NPGNNIntegralCategoryProfiles category_profiles;
   void *context;
   size_t budget;
   NPGNNIntegralGeometry *geometry;
@@ -38553,6 +38555,13 @@ typedef struct {
   NPGNNIntegralGramWorkspace gram_workspace[2];
   NPGNNIntegralContractWorkspace contract_workspace;
   double *left,*right,*weight_row,*changes,*overlap,*products;
+  /* Mixed unconditional integrals retain complete pair rows. Conditional
+   * representation contractions own fold ranges; exact overlaps own pairs. */
+  double *pair_rows;
+  int pair_rank,pair_ranks;
+  int first_fold,end_fold;
+  int *profile_id,*profile_rep,nprofiles;
+  double *profile_moments,*profile_left,*profile_right;
 } NPGNNIntegralOwner;
 
 static const double np_gnn_integral_nodes4[4]={
@@ -38587,6 +38596,11 @@ static void np_gnn_integral_owner_cleanup(void *raw,Rboolean jump)
   np_gnn_integral_contract_workspace_clear(&c->contract_workspace);
   free(c->left);free(c->right);free(c->weight_row);
   free(c->changes);free(c->overlap);free(c->products);
+  free(c->pair_rows);c->pair_rows=NULL;
+  free(c->profile_id);free(c->profile_rep);free(c->profile_moments);
+  free(c->profile_left);free(c->profile_right);
+  c->profile_id=c->profile_rep=NULL;
+  c->profile_moments=c->profile_left=c->profile_right=NULL;
   c->left=c->right=c->weight_row=c->changes=c->overlap=c->products=NULL;
 }
 
@@ -38606,6 +38620,8 @@ static int np_gnn_integral_representation_storage(NPGNNIntegralOwner *c,
   size_t total=0,peak=0,cells;
   const size_t n=(size_t)c->n,folds=c->folded?n:1;
   int maximum=0;
+  if(c->has_categories &&
+     np_gnn_integral_size_add(&total,n,2*sizeof(int)))return 1;
   for(int d=0;d<c->dimensions;++d) {
     if(!np_size_mul_checked(n,(size_t)m[d],&cells) ||
        np_gnn_integral_size_add(&total,cells,sizeof(double)) ||
@@ -38646,20 +38662,21 @@ static int np_gnn_integral_exact_contract(NPGNNIntegralOwner *c)
   for(int first=0;first<n;first+=tile) {
     const int ni=n-first<tile?n-first:tile;
     np_progress_bandwidth_loop_step();
-    for(int f=0;f<folds;++f) {
+    for(int f=c->first_fold;f<c->end_fold;++f) {
       if(c->row(c->context,f,c->weight_row))return 1;
       for(int i=0;i<ni;++i)c->left[(size_t)i*folds+f]=c->weight_row[first+i];
     }
     for(int second=0;second<=first;second+=tile) {
       const int nj=n-second<tile?n-second:tile;
-      if(second!=first)for(int f=0;f<folds;++f) {
+      if(second!=first)for(int f=c->first_fold;f<c->end_fold;++f) {
         if(c->row(c->context,f,c->weight_row))return 1;
         for(int j=0;j<nj;++j)c->right[(size_t)j*folds+f]=c->weight_row[second+j];
       }
       const double *right=second==first?c->left:c->right;
       for(int i=0;i<ni;++i)for(int j=0;j<nj && second+j<=first+i;++j) {
-        np_progress_bandwidth_loop_step();
         const int ii=first+i,jj=second+j;
+        if(ii%c->pair_ranks!=c->pair_rank)continue;
+        np_progress_bandwidth_loop_step();
         const double categorical=c->category_overlap?
           c->category_overlap(c->context,ii,jj):1.0;
         if(!R_FINITE(categorical))return 1;
@@ -38672,10 +38689,11 @@ static int np_gnn_integral_exact_contract(NPGNNIntegralOwner *c)
           if(status)return status;
           for(int f=0;f<folds;++f)c->products[f]*=c->overlap[f];
         }
-        for(int f=0;f<folds;++f) {
+        for(int f=c->first_fold;f<c->end_fold;++f) {
           const double value=(ii==jj?1.0:2.0)*c->left[(size_t)i*folds+f]*
             right[(size_t)j*folds+f]*c->products[f];
-          c->values[f]+=value;
+          if(c->pair_rows)c->pair_rows[ii]+=value;
+          else c->values[f]+=value;
         }
       }
     }
@@ -38683,24 +38701,146 @@ static int np_gnn_integral_exact_contract(NPGNNIntegralOwner *c)
   return 0;
 }
 
-static SEXP np_gnn_integral_owner_execute(void *raw)
+/* Profiles merge identical donor vectors, not integration support. The latter
+ * stays inside the canonical overlap callback. Never form the full tensor
+ * Gram or a donor-by-donor integral matrix. */
+static int np_gnn_integral_profile_storage(const NPGNNIntegralOwner *c,
+                                          const int *width,size_t *bytes)
+{
+  size_t features,cells,total=0;
+  if(c->nprofiles<1 || c->dimensions>2 ||
+     !np_size_mul_checked((size_t)width[0],
+       c->dimensions==2?(size_t)width[1]:1,&features) ||
+     !np_size_mul_checked(features,(size_t)c->nprofiles+2,&cells) ||
+     np_gnn_integral_size_add(&total,cells,sizeof(double)) ||
+     np_gnn_integral_size_add(&total,(size_t)c->n,3*sizeof(int)+2*sizeof(double)))
+    return 1;
+  *bytes=total;return 0;
+}
+
+static int np_gnn_integral_profile_contract(NPGNNIntegralOwner *c)
+{
+  const int n=c->n,p=c->dimensions,groups=c->nprofiles;
+  const int r1=c->basis[0].rank,r2=p==2?c->basis[1].rank:1;
+  const int features=r1*r2;
+  const int widths[2]={r1,r2};
+  size_t bytes;
+  if(np_gnn_integral_profile_storage(c,widths,&bytes) || bytes>c->budget)return 1;
+  c->profile_moments=(double *)calloc((size_t)groups*features,sizeof(double));
+  c->profile_left=(double *)malloc((size_t)features*sizeof(double));
+  c->profile_right=(double *)malloc((size_t)features*sizeof(double));
+  c->weight_row=(double *)malloc((size_t)n*sizeof(double));
+  if(!c->profile_moments || !c->profile_left || !c->profile_right || !c->weight_row)
+    return 1;
+  for(int fold=c->first_fold;fold<c->end_fold;++fold) {
+  if(c->row(c->context,fold,c->weight_row))return 1;
+  memset(c->profile_moments,0,(size_t)groups*features*sizeof(double));
+  const double *g1=c->gram[0].values+
+    (size_t)c->gram[0].position[fold]*c->gram[0].stride;
+  const double *g2=p==2?c->gram[1].values+
+    (size_t)c->gram[1].position[fold]*c->gram[1].stride:NULL;
+  long double norm=0;
+  for(int i=0;i<n;++i) {
+    if(!R_FINITE(c->weight_row[i]))return 1;
+    norm+=fabs(c->weight_row[i]);
+  }
+  for(int k=0;k<r2;++k)for(int j=0;j<r1;++j) {
+    const int feature=j+k*r1;
+    np_progress_bandwidth_loop_step();
+    for(int i=0;i<n;++i)
+      c->profile_moments[(size_t)c->profile_id[i]*features+feature]+=
+        c->weight_row[i]*c->basis[0].basis[(size_t)j*n+i]*
+        (p==2?c->basis[1].basis[(size_t)k*n+i]:1.0);
+  }
+  const double one=1,zero=0;
+  double amplification=0;
+  /* Canonical overlaps are a Gram of category-kernel functions. Cauchy-
+   * Schwarz bounds every absolute entry by the largest diagonal, including
+   * rows owned by another rank. No eigenvalue truncation is used. */
+  for(int g=0;g<groups;++g) {
+    const double diagonal=c->category_overlap(c->context,c->profile_rep[g],c->profile_rep[g]);
+    if(!R_FINITE(diagonal) || diagonal<0)return 1;
+    amplification=fmax(amplification,diagonal);
+  }
+  for(int g=0;g<groups;++g) {
+    if(!c->folded && g%c->pair_ranks!=c->pair_rank)continue;
+    np_progress_bandwidth_loop_step();
+    const double *m=c->profile_moments+(size_t)g*features;
+    F77_CALL(dgemm)("N","N",&r1,&r2,&r1,&one,g1,&r1,
+      m,&r1,&zero,c->profile_left,&r1 FCONE FCONE);
+    const double *transformed=c->profile_left;
+    if(p==2) {
+      F77_CALL(dgemm)("N","N",&r1,&r2,&r2,&one,c->profile_left,&r1,
+        g2,&r2,&zero,c->profile_right,&r1 FCONE FCONE);
+      transformed=c->profile_right;
+    }
+    long double result=0;
+    for(int h=0;h<=g;++h) {
+      const double category=c->category_overlap(c->context,c->profile_rep[g],c->profile_rep[h]);
+      if(!R_FINITE(category))return 1;
+      amplification=fmax(amplification,fabs(category));
+      const double *other=c->profile_moments+(size_t)h*features;
+      long double integral=0;
+      for(int j=0;j<features;++j)integral+=(long double)transformed[j]*other[j];
+      result+=(g==h?1:2)*category*integral;
+    }
+    if(!R_FINITE((double)result))return 1;
+    if(c->folded)c->values[fold]+=(double)result;
+    else c->pair_rows[c->profile_rep[g]]=(double)result;
+  }
+  /* The same continuous representation bound, amplified by the categorical
+   * bilinear form's largest absolute entry. No positivity assumption or
+   * factorization/truncation of the categorical Gram is needed. */
+  double error=0,magnitude=1;
+  for(int d=0;d<p;++d) {
+    const int r=c->basis[d].rank;
+    const double *g=c->gram[d].values+
+      (size_t)c->gram[d].position[fold]*c->gram[d].stride;
+    if(!(g[r*r+1]>0) || g[r*r]<-2.5e-26)return 1;
+    const double scale=sqrt(g[r*r+1]);
+    const double discarded=r==c->basis[d].m?0:
+      sqrt(c->basis[d].chebyshev_norm*(fabs(g[r*r])*1.001+2.5e-26));
+    const double current_error=discarded+c->basis[d].delta*scale;
+    const double current_magnitude=.4*scale;
+    error=error*current_magnitude+(magnitude+error)*current_error;
+    magnitude*=current_magnitude;
+  }
+  c->bounds[fold]=amplification*(double)(norm*norm)*(2*magnitude*error+error*error);
+  }
+  return 0;
+}
+
+static SEXP np_gnn_integral_owner_body(void *raw)
 {
   NPGNNIntegralOwner *c=(NPGNNIntegralOwner *)raw;
   const int n=c->n,p=c->dimensions,folds=c->folded?n:1;
   int m[2]={0,0};double delta[2]={0,0};size_t retained=0;
   c->status=1;
+  if(c->has_categories && !c->folded) {
+    c->pair_rows=(double *)calloc((size_t)n,sizeof(double));
+    if(!c->pair_rows)return R_NilValue;
+  }
   c->geometry=(NPGNNIntegralGeometry *)calloc(p,sizeof(*c->geometry));
   if(!c->geometry)return R_NilValue;
   for(int d=0;d<p;++d)
     if(np_gnn_integral_geometry_prepare(c->geometry+d,c->data[d],n,c->counts[d],c->folded))
       return R_NilValue;
-  c->representation=c->kernel==0 && p<=2 && !c->has_categories;
+  c->representation=c->kernel==0 && p<=2 &&
+    (!c->has_categories || c->category_profiles!=NULL);
+  if(c->representation && c->has_categories &&
+     !c->category_profiles(c->context,&c->profile_id,&c->profile_rep,&c->nprofiles))
+    return R_NilValue;
   if(c->representation)for(int d=0;d<p;++d) {
     m[d]=np_gnn_integral_basis_size(c->geometry+d,delta+d);
     if(!m[d])c->representation=0;
   }
   if(c->representation && np_gnn_integral_representation_storage(c,m,&retained))
     c->representation=0;
+  if(c->representation && c->has_categories) {
+    size_t extra;
+    if(np_gnn_integral_profile_storage(c,m,&extra) || extra>c->budget-retained)
+      c->representation=0;
+  }
   if(c->representation) {
     for(int d=0;d<p;++d)
       if(np_gnn_integral_basis_prepare(c->basis+d,c->geometry+d,c->data[d],m[d],delta[d],
@@ -38720,15 +38860,34 @@ static SEXP np_gnn_integral_owner_execute(void *raw)
         return R_NilValue;
     }
     if(actual>=c->budget)return R_NilValue;
-    c->status=np_gnn_integral_basis_contract(&c->contract_workspace,c->basis,c->gram,p,
-      0,folds,c->row,c->context,c->budget-actual,c->values,c->bounds);
+    if(c->has_categories)c->status=np_gnn_integral_profile_contract(c);
+    else if(c->first_fold<c->end_fold)
+      c->status=np_gnn_integral_basis_contract(&c->contract_workspace,c->basis,c->gram,p,
+        c->first_fold,c->end_fold,c->row,c->context,c->budget-actual,c->values,c->bounds);
+    else c->status=0;
   } else c->status=np_gnn_integral_exact_contract(c);
+  return R_NilValue;
+}
+
+static SEXP np_gnn_integral_owner_execute(void *raw)
+{
+  NPGNNIntegralOwner *c=(NPGNNIntegralOwner *)raw;
+  const int mixed_unconditional=c->has_categories && !c->folded;
+  c->pair_rank=0;c->pair_ranks=1;
+  c->first_fold=0;c->end_fold=c->folded?c->n:1;
+  np_gnn_integral_owner_body(raw);
+  if(mixed_unconditional) {
+    if(c->status)return R_NilValue;
+    c->values[0]=0.0;
+    for(int i=0;i<c->n;++i)c->values[0]+=c->pair_rows[i];
+  }
   return R_NilValue;
 }
 
 static int np_gnn_density_integral(int n,int dimensions,int folded,int kernel,
   double **data,double *counts,NPGNNIntegralWeightRow row,
-  NPGNNIntegralCategoryOverlap categories,void *context,int has_categories,
+  NPGNNIntegralCategoryOverlap categories,NPGNNIntegralCategoryProfiles profiles,
+  void *context,int has_categories,
   size_t budget,double *values,double *bounds)
 {
   if(n<2 || dimensions<1 || data==NULL || counts==NULL || row==NULL ||
@@ -38738,15 +38897,47 @@ static int np_gnn_density_integral(int n,int dimensions,int folded,int kernel,
   memset(values,0,(size_t)folds*sizeof(double));
   memset(bounds,0,(size_t)folds*sizeof(double));
   NPGNNIntegralOwner call={.n=n,.dimensions=dimensions,.folded=folded,.kernel=kernel,
-    .data=data,.counts=counts,.row=row,.category_overlap=categories,.context=context,
+    .data=data,.counts=counts,.row=row,.category_overlap=categories,
+    .category_profiles=profiles,.context=context,
     .has_categories=has_categories,.budget=budget,.values=values,.bounds=bounds,.status=1};
   R_UnwindProtect(np_gnn_integral_owner_execute,&call,np_gnn_integral_owner_cleanup,&call,NULL);
   return call.status;
 }
 
 typedef struct {
-  int n;
+  int n,nuno,nord,kernel_u,kernel_o;
+  double **unordered,**ordered,**categories;
+  const double *lambda;
+  const int *num_categories;
 } NPGNNIntegralUniformContext;
+
+static int np_gnn_integral_category_profiles(void *raw,int **ids,int **reps,int *count)
+{
+  const NPGNNIntegralUniformContext *c=(const NPGNNIntegralUniformContext *)raw;
+  return np_build_discrete_profile_index(c->n,c->nuno,c->nord,
+                                         c->unordered,c->ordered,ids,reps,count);
+}
+
+static double np_gnn_integral_category_overlap(void *raw,int first,int second)
+{
+  const NPGNNIntegralUniformContext *c=(const NPGNNIntegralUniformContext *)raw;
+  double value=1.0;
+  for(int d=0;d<c->nuno;++d) {
+    const int same=c->unordered[d][first]==c->unordered[d][second];
+    value*=c->kernel_u==0 ?
+      np_econvol_uaa(same,c->lambda[d],c->num_categories[d]) :
+      np_econvol_unli_racine(same,c->lambda[d],c->num_categories[d]);
+  }
+  for(int d=0;d<c->nord;++d) {
+    const int index=c->nuno+d,count=c->num_categories[index];
+    const double *support=c->categories[index];
+    if(count<1 || support==NULL)return R_NaN;
+    value*=np_ordered_kernel_eval(c->kernel_o+4,
+      c->ordered[d][first],c->ordered[d][second],c->lambda[index],
+      support,count,support[0],support[count-1]);
+  }
+  return value;
+}
 
 static int np_gnn_integral_uniform_row(void *raw,int evaluation,double *row)
 {
@@ -38758,6 +38949,9 @@ static int np_gnn_integral_uniform_row(void *raw,int evaluation,double *row)
 
 static int np_gnn_density_integral_unconditional(
   const int n,const int dimensions,const int kernel,double **data,const double *request,
+  const int nuno,const int nord,const int kernel_u,const int kernel_o,
+  double **unordered,double **ordered,const double *lambda,
+  const int *num_categories,double **categories,
   double *value)
 {
   NPGNNIntegralUniformContext context;
@@ -38769,10 +38963,16 @@ static int np_gnn_density_integral_unconditional(
   for(int d=0;d<dimensions;++d)counts[d]=request[d];
   memset(&context,0,sizeof(context));
   context.n=n;
+  context.nuno=nuno;context.nord=nord;
+  context.kernel_u=kernel_u;context.kernel_o=kernel_o;
+  context.unordered=unordered;context.ordered=ordered;
+  context.lambda=lambda;context.num_categories=num_categories;context.categories=categories;
   {
     const int status=np_gnn_density_integral(
       n,dimensions,0,kernel,data,counts,
-      np_gnn_integral_uniform_row,NULL,&context,0,
+      np_gnn_integral_uniform_row,nuno+nord ? np_gnn_integral_category_overlap : NULL,
+      nuno+nord ? np_gnn_integral_category_profiles : NULL,
+      &context,nuno+nord>0,
       NP_CONDITIONAL_LP_TILE_BUDGET_BYTES,values,bounds);
     if(status!=0)return status;
     *value=values[0];
@@ -46997,11 +47197,13 @@ double *cv){
    * query-dependent GNN radii; tree selection must not change this objective.
    * The cross term below retains the canonical tree-capable row engine. */
   if(!exact_beta_route && BANDWIDTH_den == BW_GEN_NN &&
-     int_cker_bound_extern == 0 && num_reg_continuous > 0 &&
-     num_reg_unordered == 0 && num_reg_ordered == 0) {
+     int_cker_bound_extern == 0 && num_reg_continuous > 0) {
     if(np_gnn_density_integral_unconditional(
            num_obs,num_reg_continuous,KERNEL_den,matrix_X_continuous,
-           vector_scale_factor,&cv1) != 0)
+           vector_scale_factor,num_reg_unordered,num_reg_ordered,
+           KERNEL_unordered_den,KERNEL_ordered_den,
+           matrix_X_unordered,matrix_X_ordered,lambda,
+           num_categories,matrix_categorical_vals,&cv1) != 0)
       goto cleanup_density_convolution_cv;
   } else if(bounded_scalar_quadrature && !exact_beta_route){
     if(np_density_cvls_bounded_i1_quadrature(KERNEL_den,
@@ -47146,8 +47348,7 @@ double *cv){
    * row engine.  This keeps the canonical kernel arithmetic and normalization
    * while correcting only the radius contract. */
   if(BANDWIDTH_den == BW_GEN_NN && int_cker_bound_extern == 0 &&
-     num_reg_continuous > 0 && num_reg_unordered == 0 &&
-     num_reg_ordered == 0){
+     num_reg_continuous > 0){
     if(np_density_gnn_deleteone_bandwidth(
          num_obs, num_reg_continuous, matrix_X_continuous,
          vector_scale_factor, &deleteone_bandwidth) != 0)
