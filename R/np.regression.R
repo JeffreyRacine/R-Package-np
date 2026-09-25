@@ -820,7 +820,8 @@ npreg.rbandwidth <-
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
             PACKAGE = "np")
-    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
+    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]],
+       bws = bws, ntrain = tnrow)
 
     empty.rows <- attr(myout, ".np.empty.rows", exact = TRUE)
     .npreg_report_variance_unavailable(myout)

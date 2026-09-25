@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Failed nearest-neighbor regression refits and leave-one-out hat calls now
+  explain when the count exceeds the effective training-sample limit.
+  Admissibility and successful computations are unchanged.
+
 * Quantile fits and their plot helper now retain separate training and evaluation
   omission indices; `rows.omit` describes the fitted output domain. Numerical
   values and NA restoration are unchanged.

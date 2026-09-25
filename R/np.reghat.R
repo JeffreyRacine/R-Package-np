@@ -1184,7 +1184,8 @@ npreghat <-
       as.double(sigtest$residual.pool),
       .np_native_categorical_support(bws),
       PACKAGE = "np"
-    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]]))
+    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]],
+       bws = bws, ntrain = nrow(txdat)))
   }
 
   .np_with_nn_radius_context(.Call(
@@ -1217,7 +1218,8 @@ npreghat <-
     as.logical(allow.empty.rows),
     .np_native_categorical_support(bws),
     PACKAGE = "np"
-  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
+  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]],
+     bws = bws, ntrain = nrow(txdat), leave.one.out = leave.one.out)
 }
 
 .npreghat_exact_lp_matrix_from_regression_core <- function(bws,
@@ -1692,7 +1694,8 @@ npreghat <-
     as.double(cker.bounds.c$lb),
     as.double(cker.bounds.c$ub),
     PACKAGE = "np"
-  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
+  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]],
+     bws = bws, ntrain = tnrow)
 
   .npreg_report_variance_unavailable(myout)
   out <- list(mean = as.double(myout$mean))
