@@ -3336,6 +3336,9 @@ subcol <- function(x, v, i){
                  which(d[["iord", exact = TRUE]]))
     lapply(d[["all.dlev", exact = TRUE]][columns], as.double)
   }
+  # Regression responses are not kernel coordinates, even when categorical.
+  # Regression, LSQ and X-only conditional adapters share rbandwidth objects.
+  if (inherits(bws, "rbandwidth")) return(c(role("x")))
   c(role("y"), role("x"))
 }
 
