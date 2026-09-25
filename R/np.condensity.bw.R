@@ -326,6 +326,7 @@ npcdensbw.conbandwidth <-
            transform.bounds = FALSE,
            ...,
            nomad.opts = list()){
+    .np_density_bw_progress(bandwidth.compute, bwsolver, FALSE, {
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npcdensbw")
     dot.args <- list(...)
@@ -828,6 +829,7 @@ npcdensbw.conbandwidth <-
     tbw <- .npcdensbw_restore_explicit_fixed_y_bounds(tbw, bws)
 
     tbw
+    })
   }
 
 .npcdensbw_build_conbandwidth <- function(xdat,

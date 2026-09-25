@@ -5,6 +5,10 @@
   support and uses deleted-sample radii in the cross term. Correct integration
   can take longer than the previous convolution approximation.
 
+* Density and conditional density/distribution MADS bandwidth-object searches
+  now enter the existing bandwidth-progress lifecycle, matching their default
+  interfaces without adding nested progress owners or changing search results.
+
 * Regression bandwidth selection and local-polynomial operators again support
   categorical responses, including ordered linear predictors in partially
   linear models. Predictor support still includes declared unused levels.

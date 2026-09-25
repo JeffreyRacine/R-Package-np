@@ -787,6 +787,7 @@ npudensbw.bandwidth <-
            eval.only = FALSE,
            ...,
            nomad.opts = list()){
+    .np_density_bw_progress(bandwidth.compute, bwsolver, eval.only, {
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudensbw")
     dot.args <- list(...)
@@ -1110,6 +1111,7 @@ npudensbw.bandwidth <-
       )
     }
     tbw
+    })
   }
 
 npudensbw.default <-

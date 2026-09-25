@@ -166,6 +166,7 @@ npcdistbw.condbandwidth <-
            transform.bounds = FALSE,
            ...,
            nomad.opts = list()){
+    .np_density_bw_progress(bandwidth.compute, bwsolver, FALSE, {
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npcdistbw")
     dot.args <- list(...)
@@ -643,6 +644,7 @@ npcdistbw.condbandwidth <-
     tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
     tbw
+    })
   }
 
 .npcdistbw_build_condbandwidth <- function(xdat,
