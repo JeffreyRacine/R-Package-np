@@ -37,7 +37,9 @@ kbandwidth.integer <-
 }
 
 kbandwidth.default <- function(bw, ...){
-  kbandwidth.numeric(bw = unlist(bw$bandwidth),
+  # Stored metadata is not a fresh user request for a uniform-kernel order.
+  # Keep the order itself and every other constructor condition unchanged.
+  withCallingHandlers(kbandwidth.numeric(bw = unlist(bw$bandwidth),
                      bwscaling = FALSE,
                      bwtype = bw$type,
                      ckertype = bw$ckertype,
@@ -52,7 +54,13 @@ kbandwidth.default <- function(bw, ...){
                      ydati = bw$ydati,
                      xnames = if(is.null(bw$zdati)) bw$xnames else bw$znames,
                      ynames = bw$ynames,
-                     ...)
+                     ...),
+    warning = function(w) {
+      if (identical(bw$ckertype, "uniform") &&
+          identical(conditionMessage(w), unname(.np_io_prefix_text(
+            "ignoring kernel order specified with uniform kernel type"))))
+        invokeRestart("muffleWarning")
+    })
 }
 
 kbandwidth.numeric <-

@@ -11,10 +11,7 @@ test_that("reference adjustment retains compact symmetric kernel choices", {
   adjust <- getFromNamespace(".npdeneq_reference_bandwidth", "np")
   for (kernel in c("gaussian", "epanechnikov", "uniform")) {
     bw <- npudensbw(dat = d, bws = .2, bandwidth.compute = FALSE, ckertype = kernel)
-    if (kernel == "uniform")
-      expect_warning(actual <- adjust(bw, 10, 20), "ignoring kernel order")
-    else
-      expect_warning(actual <- adjust(bw, 10, 20), NA)
+    expect_warning(actual <- adjust(bw, 10, 20), NA)
     expect_identical(actual$ckertype, kernel)
     expect_equal(unname(actual$bw), .2*(30/(2*10*20/30))^.2, tolerance = 1e-14)
   }

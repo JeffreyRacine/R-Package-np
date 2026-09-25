@@ -45,9 +45,7 @@ test_that("density equality rejects nonsymmetric kernels without disabling densi
       warnings <<- c(warnings, conditionMessage(w))
       invokeRestart("muffleWarning")
     })
-    expect_gt(length(warnings), 0L)
-    expect_true(all(grepl("ignoring kernel order specified with uniform kernel type",
-                          warnings, fixed = TRUE)))
+    expect_identical(warnings, character())
     value
   }
   for (kernel in c("gaussian", "epanechnikov", "uniform")) {
@@ -55,7 +53,7 @@ test_that("density equality rejects nonsymmetric kernels without disabling densi
                    ckertype = kernel)
     expect_identical(validate(bw), bw)
     if (kernel == "uniform") {
-      # Existing kernel-sum conversion reports an ignored uniform order.
+      # Retained metadata is not a fresh explicit uniform-order request.
       fit <- uniform.call(npdeneqtest(x, y, bw.x = bw, B = 9))
       reverse <- uniform.call(npdeneqtest(y, x, bw.x = bw, B = 9))
     } else {
