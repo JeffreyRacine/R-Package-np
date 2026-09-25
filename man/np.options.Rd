@@ -49,6 +49,10 @@
       routes on, \code{FALSE} disables them, and \code{"auto"} enables trees
       only when active continuous kernels are bounded support
       (\code{"epanechnikov"} or \code{"uniform"}). Default is \code{"auto"}.
+      Conditional-distribution generalized-neighbor bandwidth selection admits
+      explicit \code{TRUE} for second-order Epanechnikov and uniform kernels
+      without boundary normalization; its fitting and automatic-selection
+      policies are unchanged.
 
       \item \code{np.categorical.compress} (logical): enables exact
       unique-profile compression for eligible all-categorical routes. This is

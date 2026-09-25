@@ -122,7 +122,7 @@ npcdistbw.formula <-
   )
 }
 
-.npcdistbw_tree_code <- function(bws, ncon, ncat) {
+.npcdistbw_tree_code <- function(bws, ncon, ncat, cv.context = FALSE) {
   code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bws)
 
   if (!identical(code, DO_TREE_YES))
@@ -138,6 +138,14 @@ npcdistbw.formula <-
   if (ncon > 0L &&
       identical(method, "cv.ls") &&
       identical(bwtype, "generalized_nn")) {
+    # Opt in only the qualified search owner; fitting retains its policy.
+    if (isTRUE(cv.context) && identical(npTreeMode(), "on") &&
+        npTreeAutoKernelEligible(bws = bws) &&
+        identical(as.integer(bws[["cxkerorder", exact = TRUE]]), 2L) &&
+        identical(as.integer(bws[["cykerorder", exact = TRUE]]), 2L) &&
+        identical(bws[["cxkerbound", exact = TRUE]], "none") &&
+        identical(bws[["cykerbound", exact = TRUE]], "none"))
+      return(code)
     return(DO_TREE_NO)
   }
 
@@ -513,6 +521,7 @@ npcdistbw.condbandwidth <-
         cdf_on_train = cdf_on_train,
         int_do_tree = .npcdistbw_tree_code(
           bws = bws,
+          cv.context = TRUE,
           ncon = dim(ycon)[2] + dim(xcon)[2],
           ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
         scale.init.categorical.sample=scale.init.categorical.sample,
@@ -944,6 +953,7 @@ npcdistbw.condbandwidth <-
     cdf_on_train = cdf_on_train,
     int_do_tree = .npcdistbw_tree_code(
       bws = bws,
+      cv.context = TRUE,
       ncon = dim(ycon)[2] + dim(xcon)[2],
       ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = FALSE,
@@ -1248,6 +1258,7 @@ npcdistbw.condbandwidth <-
     cdf_on_train = cdf_on_train,
     int_do_tree = .npcdistbw_tree_code(
       bws = bws,
+      cv.context = TRUE,
       ncon = dim(ycon)[2] + dim(xcon)[2],
       ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = scale.init.categorical.sample,
