@@ -384,6 +384,13 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   \code{saveRDS()} and \code{readRDS()}. Custom formula transformations used
   on new evaluation data must still be available.
 
+  Resampling can repeat continuous observations. With nearest-neighbor
+  bandwidths, an inherited count can then give a zero literal radius, even
+  when it was feasible in the preceding sample. Such a candidate is refused;
+  the resulting error is propagated, not converted to a successful replicate
+  or a different bootstrap method. Inspect ties and nearest-neighbor counts, or
+  explicitly select fixed bandwidths (\code{bwtype="fixed"}) when this occurs.
+
   Caution: bootstrap methods are, by their nature, \emph{computationally
   intensive}. This can be frustrating for users possessing large
   datasets. For exploratory purposes, you may wish to override the

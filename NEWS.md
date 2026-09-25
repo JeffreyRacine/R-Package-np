@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Terminal nearest-neighbor bandwidth-candidate failures now suggest inspecting
+  ties/counts or explicitly selecting fixed bandwidths. Bootstrap refusal and
+  warm-start policies are unchanged; no retry or method substitution is added.
+
 * Ambiguous near-integer ordered support no longer silently changes the raw
   Li-Racine cumulative integration convention. Lattice-dependent refusals
   explain numeric precision and the explicit Racine-Li-Yan alternative.
