@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Ambiguous near-integer ordered support no longer silently changes the raw
+  Li-Racine cumulative integration convention. Lattice-dependent refusals
+  explain numeric precision and the explicit Racine-Li-Yan alternative.
+  Defaults, normal weights, convolution and genuine fractional support are unchanged.
+
 * Regression conditioning diagnostics now distinguish numerical rank loss and
   explain raw-basis scaling and the explicit Bernstein option. Help pages clarify
   raw-polynomial instability; thresholds, defaults and computations are unchanged.

@@ -4831,7 +4831,8 @@ double np_ordered_lr_interval_cumulative(const int score, const double train,
 
 static double NP_NOINLINE np_ordered_operator_score(const int kernel, const int op,
     const double train, const double eval, const double lambda,
-    const double *cats, const int ncat, const double cl, const double ch)
+    const double *cats, const int ncat, const double cl, const double ch,
+    const int support_checked)
 {
   if(kernel == 3)
     return np_ordered_rly(op == OP_CONVOLUTION ? 4 : 5,
@@ -4847,7 +4848,9 @@ static double NP_NOINLINE np_ordered_operator_score(const int kernel, const int 
       return result;
     }
     if(np_ordered_lattice_span(cats,ncat) < 0)
-      return np_ordered_lr_finite_cumulative(1,train,eval,lambda,cats,ncat);
+      return support_checked ?
+        np_ordered_lr_finite_cumulative_prepared(1,train,eval,lambda,cats,ncat) :
+        np_ordered_lr_finite_cumulative(1,train,eval,lambda,cats,ncat);
     if(!np_ordered_pair_on_lattice(train,eval,cl))
       return np_ordered_lr_interval_cumulative(1,train,eval,lambda,cl,ch);
   }
@@ -4889,9 +4892,10 @@ static double NP_NOINLINE np_ordered_operator_score(const int kernel, const int 
          np_geom_sum_score(np_ordered_lattice_distance(capped,train),lambda);
 }
 
-static inline double np_ordered_kernel_eval(const int code,
+static inline double np_ordered_kernel_eval_impl(const int code,
     const double train, const double eval, const double lambda,
-    const double *cats, const int ncat, const double cl, const double ch)
+    const double *cats, const int ncat, const double cl, const double ch,
+    const int support_checked)
 {
   static double (* const kernel[])(double,double,double,double,double) = {
     np_owang_van_ryzin, np_oli_racine, np_onli_racine, NULL,
@@ -4902,16 +4906,26 @@ static inline double np_ordered_kernel_eval(const int code,
   if(code < 0 || code >= 24) error("unsupported ordered kernel code");
   if(code >= 16)
     return np_ordered_operator_score(code & 3,
-      code < 20 ? OP_CONVOLUTION : OP_INTEGRAL,train,eval,lambda,cats,ncat,cl,ch);
+      code < 20 ? OP_CONVOLUTION : OP_INTEGRAL,train,eval,lambda,cats,ncat,cl,ch,
+      support_checked);
   if(code == 5)
     return kernel_ordered_convolution(1,train,eval,lambda,ncat,(double *)cats);
   if((code & 3) == 3)
     return np_ordered_rly(code/4,train,eval,lambda,cats,ncat);
   if(code == 13 && np_ordered_lattice_span(cats,ncat) < 0)
-    return np_ordered_lr_finite_cumulative(0,train,eval,lambda,cats,ncat);
+    return support_checked ?
+      np_ordered_lr_finite_cumulative_prepared(0,train,eval,lambda,cats,ncat) :
+      np_ordered_lr_finite_cumulative(0,train,eval,lambda,cats,ncat);
   if(code == 13 && !np_ordered_pair_on_lattice(train,eval,cl))
     return np_ordered_lr_interval_cumulative(0,train,eval,lambda,cl,ch);
   return kernel[code](train,eval,lambda,cl,ch);
+}
+
+static inline double np_ordered_kernel_eval(const int code,
+    const double train, const double eval, const double lambda,
+    const double *cats, const int ncat, const double cl, const double ch)
+{
+  return np_ordered_kernel_eval_impl(code,train,eval,lambda,cats,ncat,cl,ch,0);
 }
 
 /* A scalar replacement must cover every retained input/output category.
@@ -7273,6 +7287,10 @@ void np_p_okernelv(const int KERNEL,
 
   double * const pxw = (bin_do_xw ? p_result : &unit_weight);
 
+  if(KERNEL == 13 || KERNEL == 21 ||
+     (do_perm && (P_KERNEL == 13 || P_KERNEL == 21)))
+    np_ordered_lr_cumulative_contract(cats,ncat);
+
   double *kbuf = scratch_kbuf;
   const int own_kbuf = (kbuf == NULL);
   if(own_kbuf){
@@ -7312,7 +7330,7 @@ void np_p_okernelv(const int KERNEL,
 
         const double kn = fast_kernel
           ? np_ordered_eval_kernel(KERNEL, c1, c2, lambda, max_cxy, lpow, cats, ncat, cl, ch)
-          : np_ordered_kernel_eval(KERNEL,c1,c2,lambda,cats,ncat,cl,ch);
+          : np_ordered_kernel_eval_impl(KERNEL,c1,c2,lambda,cats,ncat,cl,ch,1);
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
@@ -7321,7 +7339,7 @@ void np_p_okernelv(const int KERNEL,
           p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
             (fast_p_kernel
               ? np_ordered_eval_kernel(P_KERNEL, c1, c3, lambda, max_cxy, lpow, cats, ncat, cl, ch)
-              : np_ordered_kernel_eval(P_KERNEL,c1,c3,lambda,cats,ncat,cl,ch));
+              : np_ordered_kernel_eval_impl(P_KERNEL,c1,c3,lambda,cats,ncat,cl,ch,1));
         }
       }
 
@@ -7342,7 +7360,7 @@ void np_p_okernelv(const int KERNEL,
 
           const double kn = fast_kernel
             ? np_ordered_eval_kernel(KERNEL, c1, c2, lambda, max_cxy, lpow, cats, ncat, cl, ch)
-            : np_ordered_kernel_eval(KERNEL,c1,c2,lambda,cats,ncat,cl,ch);
+            : np_ordered_kernel_eval_impl(KERNEL,c1,c2,lambda,cats,ncat,cl,ch,1);
 
           result[i] = xw[j]*kn;
           kbuf[i] = kn;
@@ -7361,7 +7379,7 @@ void np_p_okernelv(const int KERNEL,
             p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
               (fast_p_kernel
                 ? np_ordered_eval_kernel(P_KERNEL, c1, c3, lambda, max_cxy, lpow, cats, ncat, cl, ch)
-                : np_ordered_kernel_eval(P_KERNEL,c1,c3,lambda,cats,ncat,cl,ch));
+                : np_ordered_kernel_eval_impl(P_KERNEL,c1,c3,lambda,cats,ncat,cl,ch,1));
           }
         }
       }
@@ -7541,7 +7559,7 @@ void np_okernelv(const int KERNEL,
 #define NP_RLY_2(a,b,l,lo,hi) np_ordered_rly(2,a,b,l,cats,ncat)
 #define NP_RLY_3(a,b,l,lo,hi) np_ordered_rly(3,a,b,l,cats,ncat)
 #define NP_LR_CDF(a,b,l,lo,hi) \
-  (max_cxy < 0 ? np_ordered_lr_finite_cumulative(0,a,b,l,cats,ncat) : \
+  (max_cxy < 0 ? np_ordered_lr_finite_cumulative_prepared(0,a,b,l,cats,ncat) : \
    (!np_ordered_pair_on_lattice(a,b,lo) ? \
     np_ordered_lr_interval_cumulative(0,a,b,l,lo,hi) : \
     np_cdf_oli_racine(a,b,l,lo,hi)))
@@ -7559,7 +7577,9 @@ void np_okernelv(const int KERNEL,
     case 10: NP_OKERNELV_APPLY(np_score_onli_racine); break;
     case 11: NP_OKERNELV_APPLY(NP_RLY_2); break;
     case 12: NP_OKERNELV_APPLY(np_cdf_owang_van_ryzin); break;
-    case 13: NP_OKERNELV_APPLY(NP_LR_CDF); break;
+    case 13:
+      if(max_cxy < 0) np_ordered_lr_cumulative_contract(cats,ncat);
+      NP_OKERNELV_APPLY(NP_LR_CDF); break;
     case 14: NP_OKERNELV_APPLY(np_cdf_onli_racine); break;
     case 15: NP_OKERNELV_APPLY(NP_RLY_3); break;
     default:
