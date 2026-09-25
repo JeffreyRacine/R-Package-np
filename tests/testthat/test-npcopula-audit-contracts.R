@@ -131,8 +131,8 @@ test_that("npcopula marginal helper keeps continuous bounds off ordered margins"
     ckertype = "gaussian",
     okertype = "liracine",
     ckerbound = "fixed",
-    ckerlb = -0.2,
-    ckerub = 1.2
+    ckerlb = c(NA_real_, -0.2),
+    ckerub = c(NA_real_, 1.2)
   )
   marginal.args <- getFromNamespace(".npcopula_marginal_bw_args", "np")
 
@@ -142,8 +142,8 @@ test_that("npcopula marginal helper keeps continuous bounds off ordered margins"
   expect_null(ordered.margin$ckerbound)
   expect_null(ordered.margin$ckerlb)
   expect_null(ordered.margin$ckerub)
-  expect_equal(continuous.margin$ckerlb, bw$ckerlb[1L])
-  expect_equal(continuous.margin$ckerub, bw$ckerub[1L])
+  expect_equal(continuous.margin$ckerlb, bw$ckerlb[2L])
+  expect_equal(continuous.margin$ckerub, bw$ckerub[2L])
 })
 
 test_that("npcopula bounded density sample path uses canonical marginal denominators", {

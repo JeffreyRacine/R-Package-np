@@ -139,6 +139,10 @@ test_that("Type II zero effects preserve later draws and reselection hot starts"
         calls[[k]] <<- args
         selected <- args$bws
         selected$bw[2L] <- .55 + .01 * k
+        selected$bandwidth$x[2L] <- selected$bw[2L]
+        selected$sfactor$x[2L] <- selected$bw[2L] /
+          (selected$sdev[1L] * selected$nconfac)
+        selected$sumNum$x[2L] <- selected$sfactor$x[2L]
         results[[k]] <<- selected
         selected
       },
@@ -168,5 +172,9 @@ test_that("Type II zero effects preserve later draws and reselection hot starts"
   expect_identical(both$value$P[[2L]], later$value$P[[1L]])
   expected.bw <- bw
   expected.bw$bw[2L] <- both$selected[[9L]]$bw[2L]
+  expected.bw$bandwidth$x[2L] <- expected.bw$bw[2L]
+  expected.bw$sfactor$x[2L] <- expected.bw$bw[2L] /
+    (expected.bw$sdev[1L] * expected.bw$nconfac)
+  expected.bw$sumNum$x[2L] <- expected.bw$sfactor$x[2L]
   expect_identical(both$value$bws, expected.bw)
 })
