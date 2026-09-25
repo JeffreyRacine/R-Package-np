@@ -842,8 +842,18 @@ npqreg.formula <-
     tbw <- do.call(npqreg, c(q.args, .npqreg_fit_dots(dots)))
 
     tbw$omit <- .np_formula_output_action(tbw, umf, has.eval, native.restored = TRUE)
-    tbw$rows.omit <- as.vector(tbw$omit)
+    train.omit <- attr(tmf, "na.action")
+    if (length(train.omit)) {
+      tbw$train.rows.omit <- as.vector(train.omit)
+      tbw$train.nobs.omit <- length(train.omit)
+    }
+    tbw$rows.omit <- if (!has.eval && !isTRUE(tbw$trainiseval))
+      as.vector(tbw$eval.rows.omit) else as.vector(tbw$omit)
     tbw$nobs.omit <- length(tbw$rows.omit)
+    if (has.eval) {
+      tbw$eval.rows.omit <- as.vector(attr(umf, "na.action"))
+      tbw$eval.nobs.omit <- length(tbw$eval.rows.omit)
+    }
 
     tbw$quantile <- .npqreg_napredict_eval(tbw$omit, tbw$quantile)
     tbw$quanterr <- .npqreg_napredict_eval(tbw$omit, tbw$quanterr)
@@ -1100,9 +1110,9 @@ npqreg.condbandwidth <-
                 se = se,
                 timing = bws$timing, total.time = total.time,
                 optim.time = optim.time, fit.time = fit.elapsed,
-                fit.controls = list(tol = tol, small = small, itmax = itmax))
-    fit$eval.rows.omit <- if (no.ex) integer(0) else as.vector(eval.omit)
-    fit$eval.nobs.omit <- length(fit$eval.rows.omit)
+                fit.controls = list(tol = tol, small = small, itmax = itmax),
+                train.rows.omit = rows.omit,
+                eval.rows.omit = if (no.ex) integer(0) else eval.omit)
     .npreg_finish_empty_rows(fit, empty.flags, omitted = eval.omit,
                              row.labels = empty.row.labels, owner = "npqreg")
   }

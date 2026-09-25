@@ -9765,7 +9765,9 @@ plotFactor <- function(f, y, ...){
         total.time = total.time,
         optim.time = optim.time,
         fit.time = fit.elapsed,
-        fit.controls = list(tol = tol, small = small, itmax = itmax)
+        fit.controls = list(tol = tol, small = small, itmax = itmax),
+        train.rows.omit = rows.omit,
+        eval.rows.omit = if (no.ex) integer(0) else eval.omit
       )
       .npreg_publish_plot_rows(fit, empty.flags, report = .np.empty.report,
         omitted = eval.omit, row.labels = empty.row.labels, owner = "plot(npqreg)")

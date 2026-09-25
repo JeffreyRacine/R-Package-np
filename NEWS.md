@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Quantile fits and their plot helper now retain separate training and evaluation
+  omission indices; `rows.omit` describes the fitted output domain. Numerical
+  values and NA restoration are unchanged.
+
 * Hat apply/constraint methods and cached regression-hat prediction now use the
   fitted factor-response coding for explicit factor payloads, as for fitting.
   Single-index fitting also retains this coding for alphanumeric responses.
