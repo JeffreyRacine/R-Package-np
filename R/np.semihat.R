@@ -1055,6 +1055,8 @@ npindexhat <-
     constraint.output <- identical(output, "constraint")
     operator.output <- if (constraint.output) "matrix" else output
     .np_semihat_require_class(bws, "sibandwidth", "npindexhat")
+    if (!identical(output, "matrix"))
+      y <- .np_hat_response(y, bws$ydati)
     if (is.null(y) && constraint.output)
       stop("argument 'y' is required when output='constraint'")
     if (!is.numeric(s) || length(s) != 1L || is.na(s) || !(s %in% c(0L, 1L)))
@@ -1228,6 +1230,8 @@ npplreghat <-
     constraint.output <- identical(output, "constraint")
     matrix.output <- identical(output, "matrix") || constraint.output
     .np_semihat_require_class(bws, "plbandwidth", "npplreghat")
+    if (!identical(output, "matrix"))
+      y <- .np_hat_response(y, bws$ydati)
     txdat <- toFrame(txdat)
     tzdat <- toFrame(tzdat)
     exdat <- toFrame(exdat)
@@ -1389,6 +1393,8 @@ npscoefhat <-
     output <- match.arg(output)
     constraint.output <- identical(output, "constraint")
     .np_semihat_require_class(bws, "scbandwidth", "npscoefhat")
+    if (!identical(output, "matrix"))
+      y <- .np_hat_response(y, bws$ydati)
     iterate <- npValidateScalarLogical(iterate, "iterate")
     leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
     ridge <- as.double(ridge)
