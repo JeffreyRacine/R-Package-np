@@ -53,6 +53,19 @@ test_that("conditional-distribution bandwidth state has one typed owner", {
   )
 })
 
+test_that("prepared CDF cache identity includes response and predictor dimensions", {
+  source <- np_conditional_distribution_owner_source()
+  owner <- np_conditional_distribution_owner_function(
+    source, "np_distribution_conditional_bw_mode")
+  call <- regmatches(owner, regexpr(
+    "bwm_nn_cache_configure_for_degree_search\\([^;]+;", owner, perl = TRUE))
+  expect_length(call, 1L)
+  expect_match(call, "degree_key_len", fixed = TRUE)
+  for (kind in c("continuous", "unordered", "ordered"))
+    expect_match(call, paste0("num_var_", kind, "_extern + num_reg_", kind,
+                             "_extern"), fixed = TRUE)
+})
+
 test_that("native conditional-distribution search retains one prepared owner", {
   source <- np_conditional_distribution_owner_source()
 
