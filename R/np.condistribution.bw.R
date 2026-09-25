@@ -181,6 +181,7 @@ npcdistbw.condbandwidth <-
            transform.bounds = FALSE,
            ...,
            nomad.opts = list()){
+    .np_density_bw_progress(bandwidth.compute, bwsolver, FALSE, {
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npcdistbw")
     dot.args <- list(...)
     if (length(nomad.opts))
@@ -715,6 +716,7 @@ npcdistbw.condbandwidth <-
     tbw$initial.fval <- if (!is.null(initial.fval)) initial.fval else NA_real_
 
     tbw
+    })
   }
 
 .npcdistbw_build_condbandwidth <- function(xdat,

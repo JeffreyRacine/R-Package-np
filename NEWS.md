@@ -5,6 +5,10 @@
   support and uses deleted-sample radii in the cross term. Correct integration
   can take longer than the previous convolution approximation.
 
+* Density and conditional density/distribution MADS bandwidth-object searches
+  now enter the existing bandwidth-progress lifecycle, matching their default
+  interfaces without adding nested progress owners or changing search results.
+
 * Conditional-density fixed-degree NOMAD bandwidth searches synchronize
   native preparation across the worker pool for local-constant and fixed-
   bandwidth models, avoiding a stalled search at preparation.
