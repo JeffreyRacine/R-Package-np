@@ -1596,13 +1596,15 @@ npreghat <-
   enrow <- if (no.ex) tnrow else nrow(exdat)
   ncol.x <- ncol(txdat)
 
+  # Match public npreg: fit the retained bandwidth, not a legacy reconstruction.
+  physical.bw <- .np_physical_bandwidth(bws)
   myopti <- list(
     num_obs_train = tnrow,
     num_obs_eval = enrow,
     num_uno = bws$nuno,
     num_ord = bws$nord,
     num_con = bws$ncon,
-    int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
+    int_LARGE_SF = SF_ARB,
     BANDWIDTH_reg_extern = switch(bws$type,
       fixed = BW_FIXED,
       generalized_nn = BW_GEN_NN,
@@ -1668,7 +1670,7 @@ npreghat <-
     "C_np_regression",
     asDouble(tuno), asDouble(tord), asDouble(tcon), as.double(tydat),
     asDouble(euno), asDouble(eord), asDouble(econ), as.double(double()),
-    asDouble(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+    asDouble(c(physical.bw[bws$icon], physical.bw[bws$iuno], physical.bw[bws$iord])),
     asDouble(bws$xmcv), asDouble(attr(bws$xmcv, "pad.num")),
     asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
     as.integer(myopti),
