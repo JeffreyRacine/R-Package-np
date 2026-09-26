@@ -441,7 +441,8 @@ npcdist.condbandwidth <-
         int_do_tree = if (beta.kernel) DO_TREE_NO else .npcdistbw_tree_code(
           bws = bws,
           ncon = bws$yncon + bws$xncon,
-          ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord))
+          ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord,
+          fit.context = TRUE))
     myopti <- c(myopti, npConditionalKernelDescriptorOptions(bws))
 
     cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])

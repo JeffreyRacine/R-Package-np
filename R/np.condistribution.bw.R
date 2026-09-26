@@ -107,7 +107,8 @@ npcdistbw.formula <-
   )
 }
 
-.npcdistbw_tree_code <- function(bws, ncon, ncat, cv.context = FALSE) {
+.npcdistbw_tree_code <- function(bws, ncon, ncat, cv.context = FALSE,
+                                fit.context = FALSE) {
   code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bws)
 
   if (!identical(code, DO_TREE_YES))
@@ -123,7 +124,9 @@ npcdistbw.formula <-
   if (ncon > 0L &&
       identical(method, "cv.ls") &&
       identical(bwtype, "generalized_nn")) {
-    # Opt in only the qualified search owner; fitting retains its policy.
+    if (isTRUE(fit.context) && .np_conditional_gnn_lc_fit_tree_eligible(bws))
+      return(code)
+    # Search admission is independent of the LC-only fitting context.
     if (isTRUE(cv.context) && identical(npTreeMode(), "on") &&
         npTreeAutoKernelEligible(bws = bws) &&
         identical(as.integer(bws[["cxkerorder", exact = TRUE]]), 2L) &&

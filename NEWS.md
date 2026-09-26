@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Local-constant conditional density/distribution fitting now honors explicit
+  compact-kernel tree requests for generalized-neighbor bandwidths retained
+  from CVLS objects. Admission is limited to second-order Epanechnikov/uniform
+  kernels without boundary normalization. Search, LP fitting and automatic
+  selection retain their independent policies and native arithmetic.
+
 * Explicit tree selection now reaches LL/local-polynomial generalized- and
   adaptive-neighbor CVLS/CVAIC search owners with second-order Epanechnikov
   and uniform kernels without boundary normalization. Adaptive searches reuse
@@ -50,7 +56,7 @@
 
 * Conditional-distribution generalized-neighbor bandwidth searches now honor
   explicit tree requests for second-order Epanechnikov and uniform kernels
-  without boundary normalization. Fitting, automatic tree selection and other
+  without boundary normalization. Automatic selection and other search
   kernel/bandwidth routes retain their existing policies and owners.
 
 * Conditional-distribution prepared bandwidth searches now include all response

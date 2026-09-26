@@ -48,8 +48,10 @@
       (\code{"epanechnikov"} or \code{"uniform"}). Default is \code{"auto"}.
       Conditional-distribution generalized-neighbor bandwidth selection admits
       explicit \code{TRUE} for second-order Epanechnikov and uniform kernels
-      without boundary normalization; its fitting and automatic-selection
-      policies are unchanged.
+      without boundary normalization. The same explicit selection is available
+      for local-constant conditional density/distribution fitting from
+      generalized-neighbor CVLS bandwidth objects. Conditional LP fitting and
+      automatic-selection policies are unchanged.
       The same explicit compact-kernel selection is available for linear and
       polynomial regression generalized- and adaptive-neighbor
       \code{cv.ls}/\code{cv.aic} bandwidth selection. Regression fitting,
