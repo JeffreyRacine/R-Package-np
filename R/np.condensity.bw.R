@@ -102,7 +102,17 @@ npcdensbw.formula <-
   invisible(TRUE)
 }
 
-.npcdensbw_tree_code <- function(bws, ncon, ncat) {
+.np_conditional_gnn_lc_fit_tree_eligible <- function(bws) {
+  identical(npTreeMode(), "on") &&
+    identical(bws[["regtype.engine", exact = TRUE]], "lc") &&
+    npTreeAutoKernelEligible(bws = bws) &&
+    identical(as.integer(bws[["cxkerorder", exact = TRUE]]), 2L) &&
+    identical(as.integer(bws[["cykerorder", exact = TRUE]]), 2L) &&
+    identical(bws[["cxkerbound", exact = TRUE]], "none") &&
+    identical(bws[["cykerbound", exact = TRUE]], "none")
+}
+
+.npcdensbw_tree_code <- function(bws, ncon, ncat, fit.context = FALSE) {
   code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bws)
 
   if (!identical(code, DO_TREE_YES))
@@ -122,6 +132,8 @@ npcdensbw.formula <-
   if (ncon > 0L &&
       identical(method, "cv.ls") &&
       identical(bwtype, "generalized_nn")) {
+    if (isTRUE(fit.context) && .np_conditional_gnn_lc_fit_tree_eligible(bws))
+      return(code)
     return(DO_TREE_NO)
   }
 
