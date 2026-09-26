@@ -17872,6 +17872,48 @@ static int np_reg_fixed_tree_dense_full_support_admitted(
     matrix_bandwidth) == NP_TREE_CANNOT_PRUNE;
 }
 
+/*
+ * Generalized-NN bandwidths belong to queries. The existing exact support
+ * certificate can therefore be applied to each query/radius against the
+ * prepared donor envelope. Unknown or boundary geometry retains traversal.
+ * This selects dense arithmetic, never constant/global kernel weights.
+ */
+static int np_reg_gnn_tree_cannot_prune(const int num_obs,
+                                       const int ncon,
+                                       const KDT *tree,
+                                       const int *kernel_c,
+                                       const int *operator,
+                                       double * const *x,
+                                       double * const *bandwidth)
+{
+  int l, j;
+  if(num_obs <= 0 || ncon <= 0 || tree == NULL || tree->kdn == NULL ||
+     tree->numnode <= 0 || tree->kdn[0].bb == NULL || tree->ndim < ncon ||
+     kernel_c == NULL || operator == NULL || x == NULL || bandwidth == NULL)
+    return 0;
+  for(l = 0; l < ncon; ++l) {
+    NPPruneSupportDescriptor support;
+    NPTreeCoordinateEnvelope envelope;
+    const int kernel = kernel_c[l];
+    if(operator[l] != OP_NORMAL || kernel < 0 || kernel >= OP_NCFUN ||
+       x[l] == NULL || bandwidth[l] == NULL)
+      return 0;
+    support = np_prune_support_descriptor(kernel, cksup[kernel][0],
+                                          cksup[kernel][1]);
+    if(support.kind != NP_PRUNE_SUPPORT_COMPACT_ZERO)
+      return 0;
+    envelope.train_min = tree->kdn[0].bb[2*l];
+    envelope.train_max = tree->kdn[0].bb[2*l+1];
+    for(j = 0; j < num_obs; ++j) {
+      envelope.eval_min = envelope.eval_max = x[l][j];
+      if(np_tree_fixed_coordinate_capability(support, bandwidth[l][j],
+                                             envelope) != NP_TREE_CANNOT_PRUNE)
+        return 0;
+    }
+  }
+  return 1;
+}
+
 static inline double np_lp_sparse_okernel_noop(const int kernel,
                                                 const double x,
                                                 const double y,
@@ -20721,6 +20763,60 @@ cleanup_adaptive_exact_scalar:
   return result;
 }
 
+/* ANN traverses evaluation points for each donor, not a donor tree for one
+ * query. Reuse the existing fold-aware bulk owner on the resident identity
+ * geometry; the caller retains all LP solving, diagonal and loss semantics.
+ * Storage is the existing O(n*q^2) moment buffer plus transient O(n) identity
+ * and fold-range scratch. No n-by-n weight matrix or per-query tree is built. */
+static int np_regression_cv_ann_tree_moments(
+  int bwm, int n, int nu, int no, int nc, int width,
+  double **xu, double **xo, double **xc, double **design,
+  double *scale_factor, int *num_categories,
+  int *kernel_c, int *kernel_u, int *kernel_o, int *operator,
+  double *lambda, double **primary, double **successor,
+  const double *fold_scale, double *moments)
+{
+  size_t plane = 0, count = 0;
+  const int deleted = bwm == RBWM_CVLS;
+  int parallel = 0;
+  int status;
+  void *marker;
+  NPNNKernelFold fold = {0};
+
+  if((bwm != RBWM_CVLS && bwm != RBWM_CVAIC) || n <= 0 || nc <= 0 ||
+     width <= 0 || kdt_extern_X == NULL ||
+     (deleted && (successor == NULL || fold_scale == NULL)) ||
+     !np_size_mul_checked((size_t)width, (size_t)width, &plane) ||
+     !np_size_mul_checked((size_t)n, plane, &count) || count > INT_MAX)
+    return KWSNP_ERR_BADINVOC;
+#ifdef MPI2
+  parallel = iNum_Processors > 1 && !np_mpi_local_regression_active();
+#endif
+  marker = vmaxget();
+  if(deleted) {
+    int *identity = (int *)R_alloc((size_t)n, sizeof(int));
+    for(int i = 0; i < n; ++i) identity[i] = i;
+    fold.num_train = fold.num_eval = n;
+    fold.num_continuous = nc;
+    fold.eval_to_train = identity;
+    fold.train = xc;
+    fold.primary = primary;
+    fold.successor = successor;
+    fold.scale = (double *)fold_scale; /* borrowed, read-only in fold owner */
+  }
+  status = kernel_weighted_sum_np_fold_route(
+    kernel_c, kernel_u, kernel_o, BW_ADAP_NN, n, n, nu, no, nc,
+    !deleted, 0, 1, 1, 0, 0, 0, 0, 0,
+    operator, OP_NOOP, 0, 0, NULL, !parallel, width, width,
+    NP_TREE_TRUE, 0, kdt_extern_X, NULL, NULL, NULL,
+    xu, xo, xc, xu, xo, xc, design, design, NULL, scale_factor,
+    1, primary, primary, lambda, num_categories,
+    matrix_categorical_vals_extern, NULL, moments, NULL, NULL, NULL,
+    0, NULL, NULL, deleted ? &fold : NULL);
+  vmaxset(marker);
+  return status;
+}
+
 // Regression CV objective for the canonical local-polynomial engine.
 // Public lc maps to degree zero and public ll maps to raw GLP degree one;
 // positive-degree rows share the general LP solve and bounded ridge policy.
@@ -20952,6 +21048,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
   if(lp_engine == NP_LP_ENGINE_GENERAL){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
+    const int adaptive_tree = BANDWIDTH_reg == BW_ADAP_NN && ks_tree_use &&
+      (bwm == RBWM_CVLS || bwm == RBWM_CVAIC);
     const int *glp_terms = NULL;
     int glp_nterms = 0;
     double **basis = NULL;
@@ -21010,6 +21108,12 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         matrix_bandwidth,
         glp_terms,
         basis);
+    if((BANDWIDTH_reg == BW_GEN_NN) && ks_tree_use &&
+       ((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)) &&
+       np_reg_gnn_tree_cannot_prune(num_obs, num_reg_continuous, kdt_extern_X,
+                                    kernel_c, operator, matrix_X_continuous,
+                                    matrix_bandwidth))
+      ks_tree_use = 0;
     if(dense_high_occupancy_admitted)
       ks_tree_use = 0;
     else if(ks_tree_use &&
@@ -21273,7 +21377,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         }
       }
 
-      if(BANDWIDTH_reg == BW_ADAP_NN &&
+      if(BANDWIDTH_reg == BW_ADAP_NN && !adaptive_tree &&
          (glp_nterms >= 4 || adaptive_successor_bandwidth != NULL)){
         NPRegCvLpResult adaptive_result =
           np_regression_cv_lp_basis_adaptive_blas(
@@ -21324,6 +21428,11 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     NP_OuterPackCtx objective_pack_ctx = {
       .runtime_options_frozen = 1
     };
+
+    /* Reuse the existing sparse moment sibling only in GNN search rows. */
+    if((BANDWIDTH_reg == BW_GEN_NN) && ks_tree_use &&
+       ((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)))
+      objective_pack_ctx.tree_outer_blas = 1;
 
     if(!np_size_add_checked((size_t)nrc1, 1U, &nrc2_size) ||
        !np_size_mul_checked(nrc2_size, nrc2_size, &nrcc22_size) ||
@@ -21522,7 +21631,15 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       }
 
       const double epsilon = 1.0/(double)MAX(1, num_obs);
+      if(adaptive_tree && np_regression_cv_ann_tree_moments(
+           bwm, num_obs, num_reg_unordered, num_reg_ordered,
+           num_reg_continuous, nrc2, matrix_X_unordered, matrix_X_ordered,
+           matrix_X_continuous, XTKX, vsf, num_categories,
+           kernel_c, kernel_u, kernel_o, operator, lambda, matrix_bandwidth,
+           adaptive_successor_bandwidth, adaptive_fold_scale, kwm) != 0)
+        glp_ok = 0;
       for(j = 0; j < num_obs; j++){
+        if(!glp_ok) break;
         double pnh = 1.0;
         double * const row_kwm = kwm + (size_t)j*(size_t)nrcc22;
         double **row_bandwidth = matrix_bandwidth;
@@ -21531,7 +21648,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
          * used by the adaptive owner, including a rejected donor radius.
          * Agree before row arithmetic/Allgather so no rank can continue on
          * full-sample radii when another rank has rejected its fold. */
-        if(adaptive_successor_bandwidth != NULL){
+        if(adaptive_successor_bandwidth != NULL && !adaptive_tree){
           int row = j;
           int prepare_row = 1;
           int local_geometry_failed = 0;
@@ -21556,7 +21673,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         }
 
 #ifdef MPI2
-        if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
+        if(adaptive_tree){
+          /* Bulk ANN moments have already been reduced across donor owners. */
+        } else if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
           if((j % iNum_Processors) == 0){
             if((j+my_rank) < (num_obs)){
               for(l = 0; l < num_reg_continuous; l++){
@@ -21602,7 +21721,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                           !ks_tree_use) ?
                                            NP_TREE_FALSE : int_TREE_X,
 #else
-                                         (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
+                                         ((BANDWIDTH_reg == BW_ADAP_NN) ||
+                                          (BANDWIDTH_reg == BW_GEN_NN && !ks_tree_use)) ?
+                                           NP_TREE_FALSE : int_TREE_X,
 #endif
                                          0,
 #if NP_ACCEL_GAUSS_COMPILED
@@ -21610,7 +21731,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                           !ks_tree_use) ?
                                            NULL : kdt_extern_X,
 #else
-                                         (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
+                                         ((BANDWIDTH_reg == BW_ADAP_NN) ||
+                                          (BANDWIDTH_reg == BW_GEN_NN && !ks_tree_use)) ?
+                                           NULL : kdt_extern_X,
 #endif
                                          NULL, NULL, NULL,
                                          PXU,
@@ -21737,7 +21860,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           }
         }
 #else
-        if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
+        if(adaptive_tree){
+          /* Serial build of the same bulk ANN owner. */
+        } else if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
           for(l = 0; l < num_reg_continuous; l++){
             TCON[l][0] = matrix_X_continuous[l][j];
             if(BANDWIDTH_reg == BW_GEN_NN)
@@ -21781,7 +21906,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                       !ks_tree_use) ?
                                        NP_TREE_FALSE : int_TREE_X,
 #else
-                                     (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
+                                     ((BANDWIDTH_reg == BW_ADAP_NN) ||
+                                      (BANDWIDTH_reg == BW_GEN_NN && !ks_tree_use)) ?
+                                       NP_TREE_FALSE : int_TREE_X,
 #endif
                                      0,
 #if NP_ACCEL_GAUSS_COMPILED
@@ -21789,7 +21916,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                       !ks_tree_use) ?
                                        NULL : kdt_extern_X,
 #else
-                                     (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
+                                     ((BANDWIDTH_reg == BW_ADAP_NN) ||
+                                      (BANDWIDTH_reg == BW_GEN_NN && !ks_tree_use)) ?
+                                       NULL : kdt_extern_X,
 #endif
                                      NULL, NULL, NULL,
                                      PXU,

@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Explicit tree selection now reaches LL/local-polynomial generalized- and
+  adaptive-neighbor CVLS/CVAIC search owners with second-order Epanechnikov
+  and uniform kernels without boundary normalization. Adaptive searches reuse
+  fold-aware bulk moments; generalized searches reuse sparse BLAS and an exact
+  nonpruning certificate. Fixed-bandwidth, fitting, scalar adaptive delete-one
+  and automatic-selection policies are unchanged.
+
 * Terminal nearest-neighbor bandwidth-candidate failures now suggest inspecting
   ties/counts or explicitly selecting fixed bandwidths. Bootstrap refusal and
   warm-start policies are unchanged; no retry or method substitution is added.
