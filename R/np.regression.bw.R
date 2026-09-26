@@ -273,7 +273,8 @@ npregbw.NULL <-
       bws,
       ncon = bws$ncon,
       ncat = bws$nuno + bws$nord,
-      regtype.engine = reg.spec$regtype.engine
+      regtype.engine = reg.spec$regtype.engine,
+      cv.context = TRUE
     ),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = 3L,
@@ -638,7 +639,8 @@ npregbw.rbandwidth <-
           bws,
           ncon = bws$ncon,
           ncat = bws$nuno + bws$nord,
-          regtype.engine = reg.spec$regtype.engine
+          regtype.engine = reg.spec$regtype.engine,
+          cv.context = TRUE
         ),
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
@@ -795,7 +797,8 @@ npregbw.rbandwidth <-
   out
 }
 
-.npregbw_tree_code <- function(bws, ncon, ncat, regtype.engine) {
+.npregbw_tree_code <- function(bws, ncon, ncat, regtype.engine,
+                               cv.context = FALSE) {
   if (!is.character(regtype.engine) ||
       length(regtype.engine) != 1L ||
       is.na(regtype.engine) ||
@@ -821,6 +824,15 @@ npregbw.rbandwidth <-
   if (ncon > 0L &&
       bwtype %in% c("generalized_nn", "adaptive_nn") &&
       !identical(regtype.engine, "lc")) {
+    # Admit only compact NN search owners. Fitting, automatic
+    # selection and other objectives retain their independent policies.
+    if (isTRUE(cv.context) && bwtype %in% c("generalized_nn", "adaptive_nn") &&
+        method %in% c("cv.ls", "cv.aic") &&
+        identical(npTreeMode(), "on") &&
+        npTreeAutoKernelEligible(bws = bws) &&
+        identical(as.integer(bws[["ckerorder", exact = TRUE]]), 2L) &&
+        identical(bws[["ckerbound", exact = TRUE]], "none"))
+      return(code)
     return(DO_TREE_NO)
   }
 
@@ -986,7 +998,8 @@ npregbw.rbandwidth <-
       bws,
       ncon = bws$ncon,
       ncat = bws$nuno + bws$nord,
-      regtype.engine = reg.spec$regtype.engine
+      regtype.engine = reg.spec$regtype.engine,
+      cv.context = identical(objective, "ls")
     ),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = dfc.dir,

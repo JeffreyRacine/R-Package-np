@@ -50,6 +50,13 @@
       explicit \code{TRUE} for second-order Epanechnikov and uniform kernels
       without boundary normalization; its fitting and automatic-selection
       policies are unchanged.
+      The same explicit compact-kernel selection is available for linear and
+      polynomial regression generalized- and adaptive-neighbor
+      \code{cv.ls}/\code{cv.aic} bandwidth selection. Regression fitting,
+      scalar adaptive delete-one and regression automatic-selection policies
+      are unchanged. Tree and dense accumulation can differ numerically on
+      nearly singular local-polynomial designs; enabling trees does not change
+      the basis, ridge or rank policies.
 
       \item \code{np.categorical.compress} (logical): enables exact
       unique-profile compression for eligible all-categorical routes. This is
