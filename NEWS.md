@@ -18,15 +18,15 @@
 * Local-constant conditional density/distribution fitting now honors explicit
   compact-kernel tree requests for generalized-neighbor bandwidths retained
   from CVLS objects. Admission is limited to second-order Epanechnikov/uniform
-  kernels without boundary normalization. Search, LP fitting and automatic
-  selection retain their independent policies and native arithmetic.
+  kernels without boundary normalization. Search and automatic selection retain
+  their independent policies; the additional LP fitting changes are listed above.
 
 * Explicit tree selection now reaches LL/local-polynomial generalized- and
   adaptive-neighbor CVLS/CVAIC search owners with second-order Epanechnikov
   and uniform kernels without boundary normalization. Adaptive searches reuse
   fold-aware bulk moments; generalized searches reuse sparse BLAS and an exact
-  nonpruning certificate. Fixed-bandwidth, fitting, scalar adaptive delete-one
-  and automatic-selection policies are unchanged.
+  nonpruning certificate. Fixed-bandwidth search and regression automatic
+  selection are unchanged; fitting and scalar adaptive changes are listed above.
 
 * Terminal nearest-neighbor bandwidth-candidate failures now suggest inspecting
   ties/counts or explicitly selecting fixed bandwidths. Bootstrap refusal and
