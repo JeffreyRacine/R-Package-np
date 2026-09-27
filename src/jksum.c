@@ -20223,6 +20223,19 @@ np_conditional_count_legacy_row(
   double *common_log_scale,
   int *bad_dimension);
 
+static NPContinuousKernelRowStatus
+np_conditional_count_legacy_row_support(
+  const NPConditionalCountPlan *plan,
+  int is_x_side,
+  int evaluation,
+  const NPBetaScaledRowCategoricalContext *categorical_context,
+  double *log_absolute,
+  signed char *sign,
+  signed char *categorical_sign,
+  double *row,
+  double *common_log_scale,
+  int *bad_dimension, const uint64_t *support, uint64_t support_bit);
+
 static int np_objective_outer_rows_enabled(int route_ready);
 static void np_objective_outer_owned_rows(int start,
                                           int rows,
@@ -20267,6 +20280,11 @@ typedef struct {
   signed char *sign;
   signed char *categorical_sign;
   int categorical_context_initialized;
+  uint64_t *support;
+  double *support_box;
+  NL support_nodes;
+  NL support_tile;
+  int support_first, support_end;
   int ready;
 } NPAdaptiveFoldRowContext;
 
@@ -20291,6 +20309,10 @@ static void np_adaptive_fold_row_context_clear(
   free(context->numeric);
   free(context->sign);
   free(context->categorical_sign);
+  free(context->support);
+  free(context->support_box);
+  free(context->support_nodes.node);
+  free(context->support_tile.node);
   np_adaptive_fold_row_context_init(context);
 }
 
@@ -20450,6 +20472,94 @@ fail_adaptive_fold_row_prepare:
   return 0;
 }
 
+/* Cover one contiguous query tile using the prepared tree's existing node
+ * spans. Boundary leaves are retained conservatively; no geometry or weight
+ * arithmetic is duplicated here. */
+static void np_adaptive_fold_tree_tile(
+  const KDT *tree, int index, int first, int end, NL *cover)
+{
+  const KDN *node=tree->kdn+index;
+  if(node->istart >= end || node->istart+node->nlev <= first)return;
+  if((node->istart >= first && node->istart+node->nlev <= end) ||
+     node->childl == KD_NOCHILD){
+    cover->node[cover->n++]=index;
+    return;
+  }
+  np_adaptive_fold_tree_tile(tree,node->childl,first,end,cover);
+  np_adaptive_fold_tree_tile(tree,node->childu,first,end,cover);
+}
+
+/* ANN-only support traversal. The prepared tree and these coordinates share
+ * leaf order. A donor's successor radius encloses either deleted radius;
+ * retain whole intersecting leaves, then let the canonical scalar kernel
+ * decide exact zeros. Tiling bounds scratch; it never changes the owner. */
+static int np_adaptive_fold_row_support(
+  NPAdaptiveFoldRowContext *context, double **train,
+  double **successor, int evaluation)
+{
+  const int n=context->plan.num_train,p=context->plan.num_x_continuous;
+  const int capacity=64;
+  if(int_TREE_X != NP_TREE_TRUE)return 0;
+  if(context->plan.do_distribution || kdt_extern_X == NULL ||
+     kdt_extern_X->ndim != p || kdt_extern_X->numnode <= 0)
+    return 1;
+  if(context->support == NULL){
+    size_t cells;
+    if(!np_size_mul_checked((size_t)n,1U,&cells) ||
+       np_native_malloc_array((void **)&context->support,cells,
+          sizeof(*context->support)) != NP_NATIVE_ALLOC_OK ||
+       np_native_malloc_array((void **)&context->support_box,(size_t)p*2,
+          sizeof(*context->support_box)) != NP_NATIVE_ALLOC_OK ||
+       np_native_malloc_array((void **)&context->support_nodes.node,
+          (size_t)kdt_extern_X->numnode,sizeof(int)) != NP_NATIVE_ALLOC_OK ||
+       np_native_malloc_array((void **)&context->support_tile.node,
+          (size_t)kdt_extern_X->numnode,sizeof(int)) != NP_NATIVE_ALLOC_OK)
+      return 1;
+    context->support_nodes.nalloc=kdt_extern_X->numnode;
+    context->support_tile.nalloc=kdt_extern_X->numnode;
+  }
+  if(evaluation >= context->support_first && evaluation < context->support_end)
+    return 0;
+  context->support_first=evaluation;
+  context->support_end=n-evaluation < capacity ? n : evaluation+capacity;
+  memset(context->support,0,(size_t)n*sizeof(*context->support));
+  context->support_tile.n=0;
+  np_adaptive_fold_tree_tile(kdt_extern_X,0,context->support_first,
+                             context->support_end,&context->support_tile);
+  const int kernel=context->plan.descriptor_x.legacy_code;
+  for(int donor=0;donor<n;++donor){
+    if((donor & 31)==0)np_progress_bandwidth_loop_step();
+    for(int d=0;d<p;++d){
+      const double radius=successor[d][donor];
+      if(!(radius > 0.0) || !R_FINITE(radius))return 1;
+      for(int side=0;side<2;++side){
+        const double edge=cksup[kernel][side];
+        context->support_box[2*d+side]=fabs(edge)==DBL_MAX ? edge :
+          train[d][donor]+edge*radius;
+      }
+      np_nn_rect_box(kernel,1,&context->support_box[2*d],
+                              &context->support_box[2*d+1]);
+    }
+    context->support_nodes.n=0;
+    for(int r=0;r<context->support_tile.n;++r)
+      boxSearch(kdt_extern_X,context->support_tile.node[r],
+                 context->support_box,&context->support_nodes);
+    for(int r=0;r<context->support_nodes.n;++r){
+      const KDN *node=kdt_extern_X->kdn+context->support_nodes.node[r];
+      const int first=MAX(node->istart,context->support_first);
+      const int end=MIN(node->istart+node->nlev,context->support_end);
+      if(first<end){
+        const int lo=first-context->support_first;
+        const int hi=end-context->support_first;
+        const uint64_t below=lo==0 ? 0 : (UINT64_C(1)<<lo)-1;
+        const uint64_t through=hi==64 ? UINT64_MAX : (UINT64_C(1)<<hi)-1;
+        context->support[donor]|=through & ~below;
+      }
+    }
+  }
+  return 0;
+}
+
 static NPContinuousKernelRowStatus
 np_adaptive_fold_row_context_fill_selected(
   NPAdaptiveFoldRowContext * const context,
@@ -20459,6 +20569,14 @@ np_adaptive_fold_row_context_fill_selected(
   if(context == NULL || !context->ready || common_log_scale == NULL ||
      evaluation < 0 || evaluation >= context->plan.num_eval)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(context->support != NULL)
+    return np_conditional_count_legacy_row_support(
+      &context->plan, 1, evaluation,
+      context->categorical_context_initialized ?
+        &context->categorical_context : NULL,
+      context->log_absolute, context->sign, context->categorical_sign,
+      context->row, common_log_scale, NULL,
+      context->support,UINT64_C(1)<<(evaluation-context->support_first));
   return np_conditional_count_legacy_row(
     &context->plan, context->plan.do_distribution ? 0 : 1, evaluation,
     context->categorical_context_initialized ?
@@ -20484,6 +20602,9 @@ static NPContinuousKernelRowStatus np_adaptive_fold_row_context_fill(
          context->plan.num_y_continuous : context->plan.num_x_continuous,
        matrix_X_continuous, primary_bandwidth, successor_bandwidth,
        fold_scale, held_out, selected_bandwidth) != NP_NN_GEOMETRY_OK)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(np_adaptive_fold_row_support(context,matrix_X_continuous,
+                                  successor_bandwidth,held_out))
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   return np_adaptive_fold_row_context_fill_selected(
     context, held_out, common_log_scale);
@@ -29781,8 +29902,8 @@ NPContinuousKernelRowStatus np_beta_scaled_row_context_fill(
  * migration and will remain the sole bounded legacy/beta scalar dispatcher
  * after that sidecar is removed.
  */
-static NPContinuousKernelRowStatus
-np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
+static NP_ALWAYS_INLINE NPContinuousKernelRowStatus
+np_conditional_count_legacy_row_impl(const NPConditionalCountPlan * const plan,
                                 const int is_x_side,
                                 const int evaluation,
                                 const NPBetaScaledRowCategoricalContext * const
@@ -29792,7 +29913,9 @@ np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
                                 signed char * const categorical_sign,
                                 double * const row,
                                 double * const common_log_scale,
-                                int * const bad_dimension)
+                                int * const bad_dimension,
+                                const uint64_t * const support,
+                                const uint64_t support_bit)
 {
   const int dimensions = is_x_side ? plan->num_x_continuous :
     plan->num_y_continuous;
@@ -29832,6 +29955,12 @@ np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
     double product_log = 0.0;
     int product_sign = 1;
     int dimension;
+
+    if(support != NULL && !(support[observation] & support_bit)){
+      log_absolute[observation]=-INFINITY;
+      sign[observation]=0;
+      continue;
+    }
 
     for(dimension = 0; dimension < dimensions; ++dimension) {
       const double bandwidth = bandwidth_mode == BW_FIXED ?
@@ -29919,6 +30048,44 @@ np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
   }
   *common_log_scale = maximum;
   return NP_CONTINUOUS_ROW_OK;
+}
+
+static NPContinuousKernelRowStatus
+np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
+                                const int is_x_side,
+                                const int evaluation,
+                                const NPBetaScaledRowCategoricalContext * const
+                                  categorical_context,
+                                double * const log_absolute,
+                                signed char * const sign,
+                                signed char * const categorical_sign,
+                                double * const row,
+                                double * const common_log_scale,
+                                int * const bad_dimension)
+{
+  return np_conditional_count_legacy_row_impl(
+    plan,is_x_side,evaluation,categorical_context,log_absolute,sign,
+    categorical_sign,row,common_log_scale,bad_dimension,NULL,0);
+}
+
+static NPContinuousKernelRowStatus
+np_conditional_count_legacy_row_support(const NPConditionalCountPlan * const plan,
+                                const int is_x_side,
+                                const int evaluation,
+                                const NPBetaScaledRowCategoricalContext * const
+                                  categorical_context,
+                                double * const log_absolute,
+                                signed char * const sign,
+                                signed char * const categorical_sign,
+                                double * const row,
+                                double * const common_log_scale,
+                                int * const bad_dimension,
+                                const uint64_t * const support,
+                                const uint64_t support_bit)
+{
+  return np_conditional_count_legacy_row_impl(
+    plan,is_x_side,evaluation,categorical_context,log_absolute,sign,
+    categorical_sign,row,common_log_scale,bad_dimension,support,support_bit);
 }
 
 int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
