@@ -761,7 +761,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     }
 
     moment_npksum <- function(args) {
-      do.call(if (identical(reg.engine, "lc")) .np_estimator_loo_ksum else .npscoef_npksum,
+      .npscoefbw_search_ksum(if (identical(reg.engine, "lc")) .np_estimator_loo_ksum else .npscoef_npksum,
               args)
     }
     lp1_moment_npksum <- function(...) {
@@ -1124,13 +1124,13 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
               nobs = nrow(txdat)
             )
 
-          twww <- .np_estimator_loo_ksum(
+          twww <- .npscoefbw_search_ksum(.np_estimator_loo_ksum, list(
             txdat=tzdat,
             tydat=cbind(partial * W[,j],W[,j]^2),
             weights=cbind(partial * W[,j],1),
             bws=partial.bws,
             leave.one.out=leave.one.out
-          )$ksum
+          ))$ksum
 
           coef.mat[j,] <- twww[2,1,]/NZD(twww[2,2,])
           resid <- partial - W[,j] * coef.mat[j,]

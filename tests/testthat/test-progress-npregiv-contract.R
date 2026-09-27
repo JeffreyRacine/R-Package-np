@@ -1,3 +1,50 @@
+test_that("IV kernel activity preserves its stage, iteration and numerical call", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old <- options(np.messages = TRUE)
+  on.exit(options(old), add = TRUE)
+  x <- data.frame(x = seq(-1, 1, length.out = 96L))
+  previous <- .np_progress_runtime$fit_forward
+  previous.active <- .np_progress_runtime$iv_kernel_activity
+  clock <- new.env(parent = emptyenv())
+  clock$now <- 0
+  now <- function() { clock$now <- clock$now + 2.1; clock$now }
+  result <- capture_progress_shadow_trace(
+    .np_progress_select_iv(expr = {
+      .np_progress_iv_set_object("E[y|w]", iteration = 7L)
+      value <- .np_iv_kernel_activity(nrow(x),
+        .np_iv_kernel_activity(nrow(x),
+          npksum(txdat = x, bws = .4, leave.one.out = TRUE)$ksum))
+      expect_identical(.np_progress_runtime$fit_forward, previous)
+      expect_identical(.np_progress_runtime$iv_kernel_activity, previous.active)
+      expect_error(.np_iv_kernel_activity(nrow(x), stop("IV scope sentinel")),
+                   "IV scope sentinel")
+      expect_identical(.np_progress_runtime$fit_forward, previous)
+      expect_identical(.np_progress_runtime$iv_kernel_activity, previous.active)
+      value
+    }), force_renderer = "single_line", now = now
+  )
+  lines <- vapply(result$trace, `[[`, character(1L), "line")
+  events <- vapply(result$trace, `[[`, character(1L), "event")
+  iv <- lines[events == "render" & grepl("IV regression (E[y|w]", lines, fixed = TRUE)]
+  expect_gt(length(iv), 1L)
+  expect_true(all(grepl("iteration 7", iv, fixed = TRUE)))
+  expect_false(any(grepl("Fitting", lines, fixed = TRUE)))
+  options(np.messages = FALSE)
+  expect_identical(result$value,
+                   npksum(txdat = x, bws = .4, leave.one.out = TRUE)$ksum)
+})
+
+test_that("IV activity is inert without an enabled owner", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  previous <- .np_progress_runtime$fit_forward
+  expect_identical(.np_iv_kernel_activity(96L, 17L), 17L)
+  expect_identical(.np_iv_kernel_activity(0L, 18L), 18L)
+  expect_false(withVisible(.np_iv_kernel_activity(96L, invisible(17L)))$visible)
+  expect_identical(.np_progress_runtime$fit_forward, previous)
+})
+
 capture_progress_shadow_with_conditions <- function(expr, force_renderer = NULL, now = function() 0) {
   messages <- character()
   warnings <- character()

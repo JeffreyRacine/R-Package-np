@@ -82,7 +82,8 @@ test_that("npscoefbw adopts the generic bandwidth selection line", {
         optim.maxit = 3,
         cv.iterate = FALSE
       ),
-      force_renderer = "single_line"
+      force_renderer = "single_line",
+      now = progress_time_counter()
     )
   )
 
@@ -138,4 +139,111 @@ test_that("npscoefbw cv.iterate path retains backfitting progress hooks", {
   expect_true(grepl("Optimizing partial residual bandwidth", src, fixed = TRUE))
   expect_true(grepl("\\.np_progress_begin\\(\"Backfitting smooth coefficient bandwidth\"", src))
   expect_true(grepl("\\.np_progress_begin\\(\"Optimizing partial residual bandwidth\"", src))
+})
+
+test_that("smooth-coefficient search forwards kernel activity without row counters", {
+  skip_live_route_slice()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  x <- data.frame(z = seq(-1, 1, length.out = 96))
+  bw <- npscoefbw(xdat = x, zdat = x, ydat = sin(x$z), bws = 0.4,
+                  bandwidth.compute = FALSE)
+  old <- options(np.messages = TRUE)
+  on.exit(options(old), add = TRUE)
+  previous <- .np_progress_runtime$fit_forward
+  previous.active <- .np_progress_runtime$scoef_search_activity
+  result <- capture_progress_shadow_trace(
+    .np_progress_select_bandwidth_enhanced("Bandwidth selection", {
+      .np_progress_bandwidth_activity_step(done = 7L, force = TRUE)
+      value <- .npscoefbw_search_activity(nrow(x), {
+        .npscoefbw_search_activity(nrow(x),
+          .np_estimator_loo_ksum(txdat = x, tydat = x$z,
+                                bws = bw, leave.one.out = TRUE)$ksum)
+      })
+      expect_identical(.np_progress_runtime$bandwidth_state$last_done, 7L)
+      expect_identical(.np_progress_runtime$fit_forward, previous)
+      expect_identical(.np_progress_runtime$scoef_search_activity, previous.active)
+      expect_error(.npscoefbw_search_activity(nrow(x), stop("scope sentinel")),
+                   "scope sentinel", fixed = TRUE)
+      expect_identical(.np_progress_runtime$fit_forward, previous)
+      expect_identical(.np_progress_runtime$scoef_search_activity, previous.active)
+      value
+    }),
+    force_renderer = "single_line", now = progress_time_counter()
+  )
+  lines <- shadow_lines(result)
+  expect_gte(sum(grepl("iteration 7", lines, fixed = TRUE)), 2L)
+  expect_false(any(grepl("Fitting", lines, fixed = TRUE)))
+  options(np.messages = FALSE)
+  expected <- .np_estimator_loo_ksum(txdat = x, tydat = x$z,
+                                     bws = bw, leave.one.out = TRUE)$ksum
+  expect_identical(result$value, expected)
+})
+
+test_that("smooth-coefficient activity has a quiet no-owner path", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  sentinel <- function() invisible(NULL)
+  previous <- .np_progress_runtime$fit_forward
+  on.exit(.np_progress_runtime$fit_forward <- previous, add = TRUE)
+  .np_progress_runtime$fit_forward <- sentinel
+  expect_identical(.npscoefbw_search_activity(96L, 17L), 17L)
+  expect_identical(.npscoefbw_search_activity(0L, 18L), 18L)
+  expect_identical(.np_progress_runtime$fit_forward, sentinel)
+  expect_false(withVisible(.npscoefbw_search_activity(96L, invisible(17L)))$visible)
+})
+
+test_that("ordinary search renews native activity for successive objectives", {
+  skip_live_route_slice()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  set.seed(42)
+  x <- data.frame(x = runif(96))
+  y <- x$x + rnorm(96)
+  calls <- 0L
+  original <- .np_with_compiled_fit_progress
+  old <- options(np.messages = TRUE)
+  on.exit(options(old), add = TRUE)
+  with_nprmpi_progress_bindings(list(.np_with_compiled_fit_progress = function(...) {
+    calls <<- calls + 1L
+    original(...)
+  }), capture_progress_shadow_trace(
+    npscoefbw(xdat = x, zdat = x, ydat = y, bws = .4,
+                nmulti = 1L, optim.maxit = 1L),
+    force_renderer = "single_line", now = progress_time_counter()
+  ))
+  expect_gt(calls, 1L)
+})
+
+test_that("fits nested in search renew activity at each kernel block", {
+  skip_live_route_slice()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  x <- data.frame(x = seq(-1, 1, length.out = 96))
+  y <- sin(x$x)
+  bw <- npscoefbw(xdat = x, zdat = x, ydat = y, bws = .4,
+                  bandwidth.compute = FALSE)
+  calls <- 0L
+  original <- .np_with_compiled_fit_progress
+  old <- options(np.messages = TRUE)
+  on.exit(options(old), add = TRUE)
+  result <- with_nprmpi_progress_bindings(list(.np_with_compiled_fit_progress = function(...) {
+    calls <<- calls + 1L
+    original(...)
+  }), capture_progress_shadow_trace(
+    .np_progress_select_bandwidth_enhanced("Bandwidth selection", {
+      .np_progress_bandwidth_activity_step(done = 7L, force = TRUE)
+      value <- npscoef(bws = bw, txdat = x, tzdat = x, tydat = y,
+                        se = TRUE, .np_fit_progress_allow = FALSE)
+      expect_identical(.np_progress_runtime$bandwidth_state$last_done, 7L)
+      value
+    }),
+    force_renderer = "single_line", now = progress_time_counter()
+  ))
+  expect_gte(calls, 2L)
+  expect_false(any(grepl("Fitting", shadow_lines(result), fixed = TRUE)))
+  options(np.messages = FALSE)
+  control <- npscoef(bws = bw, txdat = x, tzdat = x, tydat = y, se = TRUE)
+  expect_identical(fitted(result$value), fitted(control))
+  expect_identical(se(result$value), se(control))
 })
