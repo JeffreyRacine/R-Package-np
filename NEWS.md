@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Scalar adaptive-neighbor objective rows now reuse bounded tree-support
+  masks for compact kernels. Explicit tree-OFF and noncompact-kernel rows
+  retain their dense arithmetic; no statistical options are changed.
+
 * Local-constant conditional density/distribution fitting now honors explicit
   compact-kernel tree requests for generalized-neighbor bandwidths retained
   from CVLS objects. Admission is limited to second-order Epanechnikov/uniform
