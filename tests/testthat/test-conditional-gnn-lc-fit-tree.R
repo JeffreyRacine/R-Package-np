@@ -99,4 +99,3 @@ test_that("mixed conditional GNN LC fits and formula predictions keep support an
     }
   }
 })
-
