@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Conditional adaptive-NN likelihood and CDF objectives share the qualified
+  fold-aware X-tree batches with density CVLS. External CDF grids now retain
+  literal deleted-donor radii and duplicate-grid loss normalization. Existing
+  tree selection, fixed/GNN owners and fast density CVLS overlap reuse remain.
+
 * NN linear/local-polynomial fitting retains full-sample prepared radii and
   uses bounded query-tree tiles for adaptive compact-kernel tree requests.
   Generalized-NN fits and batched apply align every response with tree-ordered
