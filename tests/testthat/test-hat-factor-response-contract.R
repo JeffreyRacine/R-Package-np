@@ -17,7 +17,7 @@ test_that("hat factor payloads use retained response levels without recoding num
 })
 
 test_that("explicit and cached hat factor application matches its numeric operator", {
-  
+
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
   x <- data.frame(x = seq(.05, .95, length.out = 24))
@@ -32,7 +32,7 @@ test_that("explicit and cached hat factor application matches its numeric operat
 
 
 test_that("single-index fitting retains alphanumeric response coding", {
-  
+
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
   x <- data.frame(x = seq(.05, .95, length.out = 24), z = sin(seq_len(24)))

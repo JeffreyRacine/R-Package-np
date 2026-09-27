@@ -48,4 +48,3 @@ test_that("ANN LP tree moments preserve ordinary CVLS and CVAIC objectives", {
       }
     }
 })
-

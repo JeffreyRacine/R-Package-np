@@ -1,5 +1,5 @@
 test_that("direct regression fits the retained physical bandwidth", {
-  
+
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
   set.seed(2201)
