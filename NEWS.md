@@ -3,6 +3,9 @@
 * Instrumental-variable regression refreshes its existing progress line during
   long kernel evaluations within bandwidth selection and fitting.
 
+* Instrumental-variable `cv.aic` bandwidth searches retain the polynomial
+  degree when retrying optimization, avoiding a missing-degree error.
+
 * Smooth-coefficient bandwidth searches now refresh their progress heartbeat
   during long kernel-sum evaluations, without waiting for the next optimizer
   iteration or displaying internal kernel-row counts.
