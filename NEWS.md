@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* NN linear/local-polynomial fitting retains full-sample prepared radii and
+  uses bounded query-tree tiles for adaptive compact-kernel tree requests.
+  Generalized-NN fits and batched apply align every response with tree-ordered
+  donors. Exact full-support certificates retain varying-weight dense moments
+  when no donor can be pruned. Fixed, tree-OFF and solver policies are unchanged.
+
 * Scalar adaptive-neighbor objective rows now reuse bounded tree-support
   masks for compact kernels. Explicit tree-OFF and noncompact-kernel rows
   retain their dense arithmetic; no statistical options are changed.

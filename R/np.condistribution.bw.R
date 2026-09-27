@@ -124,7 +124,9 @@ npcdistbw.formula <-
   if (ncon > 0L &&
       identical(method, "cv.ls") &&
       identical(bwtype, "generalized_nn")) {
-    if (isTRUE(fit.context) && .np_conditional_gnn_lc_fit_tree_eligible(bws))
+    if (isTRUE(fit.context) &&
+        (.np_conditional_gnn_lc_fit_tree_eligible(bws) ||
+         .np_conditional_gnn_lp_fit_tree_eligible(bws)))
       return(code)
     # Search admission is independent of the LC-only fitting context.
     if (isTRUE(cv.context) && identical(npTreeMode(), "on") &&

@@ -26998,6 +26998,28 @@ static SEXP np_regression_fit_bandwidth_execute(void *data)
       call->lambda,
       call->prepared_bandwidth,
       &call->nn_geometry_status);
+  } else if((call->bandwidth_mode == BW_GEN_NN ||
+             call->bandwidth_mode == BW_ADAP_NN) &&
+            call->prepared_bandwidth != NULL) {
+    /* Ordinary NN uses the same point and derivative radii. The conditional
+       caller prepared the full occurrence-aware X geometry once; categorical
+       bandwidths still pass through their canonical preparation. */
+    call->status = np_regression_prepared_bandwidth_copy(
+      call->prepared_bandwidth, call->bandwidth_mode,
+      call->num_obs_train, call->num_obs_eval, call->num_reg_continuous,
+      call->matrix_bandwidth) == 1 ? 0 : 1;
+    if(call->status == 0) {
+      call->status = kernel_bandwidth_mean(
+        call->kernel, BW_FIXED, call->num_obs_train, call->num_obs_eval,
+        0, 0, 0, 0, call->num_reg_unordered, call->num_reg_ordered,
+        0, call->vector_scale_factor + call->num_reg_continuous,
+        NULL, NULL, NULL, NULL, NULL, NULL, call->lambda);
+      for(int coordinate = 0; coordinate < call->num_reg_continuous; ++coordinate)
+        memcpy(call->matrix_bandwidth_deriv[coordinate],
+               call->matrix_bandwidth[coordinate],
+               (size_t)(call->bandwidth_mode == BW_GEN_NN ?
+                 call->num_obs_eval : call->num_obs_train)*sizeof(double));
+    }
   } else {
     call->status = kernel_bandwidth_ctx(
       call->kernel,
@@ -28727,7 +28749,94 @@ static int np_regression_lp_categorical_contrast(
   return 1;
 }
 
+/* Fitting counterpart of the ANN search query tile. Donors and their full
+ * sample radii never move; only queries are tree ordered within this tile. */
+struct NPANNFitBatch {
+  int n, m, p, capacity, start, count, stride, status;
+  int *kernel, *op, *order, *inverse;
+  double **train, **evaluation, **radius, **tile;
+  double *weights, *row;
+  KDT *tree;
+};
+
+NPANNFitBatch *np_ann_fit_batch_create(
+  int kernel, int n, int m, int p,
+  double **train, double **evaluation, double **radius)
+{
+  size_t cells;
+  if(n < 1 || m < 1 || p < 1 || train == NULL || evaluation == NULL ||
+     radius == NULL || (kernel != 4 && kernel != 8) ||
+     !np_size_mul_checked((size_t)n, (size_t)MIN(m,64), &cells) ||
+     cells > INT_MAX)
+    error("invalid adaptive LP fitting tile");
+  NPANNFitBatch *b = (NPANNFitBatch *)R_alloc(1, sizeof(*b));
+  *b = (NPANNFitBatch){.n=n, .m=m, .p=p, .capacity=MIN(m,64),
+    .start=-1, .train=train, .evaluation=evaluation, .radius=radius};
+  b->kernel=(int *)R_alloc((size_t)p,sizeof(int));
+  b->op=(int *)R_alloc((size_t)p,sizeof(int));
+  b->order=(int *)R_alloc((size_t)b->capacity,sizeof(int));
+  b->inverse=(int *)R_alloc((size_t)b->capacity,sizeof(int));
+  b->weights=(double *)R_alloc(cells,sizeof(double));
+  b->row=(double *)R_alloc((size_t)n,sizeof(double));
+  b->tile=(double **)R_alloc((size_t)p,sizeof(double *));
+  for(int d=0;d<p;++d) {
+    b->kernel[d]=kernel; b->op[d]=OP_NORMAL;
+    b->tile[d]=(double *)R_alloc((size_t)b->capacity,sizeof(double));
+  }
+  return b;
+}
+
+static void np_ann_fit_batch_cleanup(void *raw, Rboolean jump)
+{
+  NPANNFitBatch *b=(NPANNFitBatch *)raw;
+  (void)jump;
+  if(b->tree != NULL) free_kdtree(&b->tree);
+}
+
+static SEXP np_ann_fit_batch_execute(void *raw)
+{
+  NPANNFitBatch *b=(NPANNFitBatch *)raw;
+  double temporary[64];
+  for(int j=0;j<b->count;++j) b->order[j]=j;
+  for(int d=0;d<b->p;++d)
+    for(int j=0;j<b->count;++j)
+      b->tile[d][j]=b->evaluation[d][b->start+j*b->stride];
+  build_kdtree(b->tile,b->count,b->p,4*b->p,b->order,&b->tree);
+  for(int j=0;j<b->count;++j) b->inverse[b->order[j]]=j;
+  for(int d=0;d<b->p;++d) {
+    for(int j=0;j<b->count;++j) temporary[j]=b->tile[d][b->order[j]];
+    memcpy(b->tile[d],temporary,(size_t)b->count*sizeof(double));
+  }
+  b->status=kernel_weighted_sum_np_fold_route(
+    b->kernel,NULL,NULL,BW_ADAP_NN,b->n,b->count,0,0,b->p,
+    0,0,1,1,1,0,0,0,0,b->op,OP_NOOP,0,0,NULL,1,0,0,
+    NP_TREE_TRUE,0,b->tree,NULL,NULL,NULL,
+    NULL,NULL,b->train,NULL,NULL,b->tile,NULL,NULL,NULL,NULL,1,
+    b->radius,b->radius,NULL,NULL,NULL,NULL,NULL,NULL,b->weights,
+    NULL,0,NULL,NULL,NULL);
+  return R_NilValue;
+}
+
+const double *np_ann_fit_batch_row(NPANNFitBatch *b, int row, int stop, int stride)
+{
+  if(b == NULL || row < 0 || stop > b->m || row >= stop || stride < 1)
+    error("invalid adaptive LP fitting query");
+  if(stride != b->stride || row < b->start ||
+     (row-b->start)/stride >= b->count || (row-b->start)%stride != 0) {
+    b->start=row; b->stride=stride;
+    b->count=MIN(b->capacity,1+(stop-row-1)/stride); b->status=1;
+    const void *scratch=vmaxget();
+    R_UnwindProtect(np_ann_fit_batch_execute,b,np_ann_fit_batch_cleanup,b,NULL);
+    vmaxset(scratch);
+    if(b->status != 0) error("adaptive LP fitting tree tile failed");
+  }
+  const int position=b->inverse[(row-b->start)/stride];
+  for(int donor=0;donor<b->n;++donor)
+    b->row[donor]=b->weights[(size_t)donor*b->count+position];
+  return b->row;
+}
 typedef struct {
+  const double *prepared_ann_row;
   int *kernel_c;
   int *kernel_u;
   int *kernel_o;
@@ -28812,6 +28921,11 @@ typedef struct {
   NPLPDesignSupport design_support;
   NPLPDesignSupport *active_design;
   NPInferenceReuse inference_reuse;
+  double *ann_kernel_row;
+  const double *ann_current_row;
+  NPANNFitBatch *ann_batch;
+  NP_TreeOuterBlasWorkspace ann_outer;
+  XL ann_active;
 #ifdef MPI2
   NPRegMpiOwnerChunk mpi_owner_chunk;
   double *mpi_kernel_row;
@@ -28853,6 +28967,8 @@ static void np_regression_general_lp_fit_owner_init(
   memset(&owner->design_support, 0, sizeof(owner->design_support));
   owner->active_design = &owner->design_support;
   memset(&owner->inference_reuse, 0, sizeof(owner->inference_reuse));
+  owner->ann_kernel_row = NULL;
+  memset(&owner->ann_active, 0, sizeof(owner->ann_active));
 #ifdef MPI2
   owner->mpi_owner_chunk.recvcounts = NULL;
   owner->mpi_owner_chunk.displs = NULL;
@@ -28896,6 +29012,10 @@ static void np_regression_general_lp_fit_owner_cleanup(
   free(owner->categorical_stderr);
   free(owner->categorical_base_kernel_row);
   free(owner->categorical_alternate_kernel_row);
+  if(owner->ann_kernel_row != NULL) free(owner->ann_outer.scratch);
+  free(owner->ann_kernel_row);
+  free(owner->ann_active.istart);
+  free(owner->ann_active.nlev);
   if(owner->basis_context != NULL) {
     for(coordinate = 0; coordinate < call->num_reg_continuous; ++coordinate)
       np_glp_basis_ctx_free(&owner->basis_context[coordinate]);
@@ -28912,11 +29032,65 @@ static void np_regression_general_lp_fit_owner_cleanup(
     np_regression_fit_owner_clear(call->enclosing_owner);
 }
 
+/* Fit-only transport: categorical frames share the same continuous ANN row.
+ * Keep absolute kernel scale for both first and squared moments. */
+static int np_ann_fit_moment_row(
+  const NPRegressionGeneralLPFitCall *call, NPRegressionGeneralLPFitOwner *owner,
+  int stride, double *moments, double *power2, double *retained,
+  NPLPSupportRankContext *rank)
+{
+  const int n=call->num_obs_train;
+  double *weights=owner->ann_kernel_row;
+  XL *active=&owner->ann_active;
+  if(call->bandwidth_mode != BW_ADAP_NN || owner->ann_current_row == NULL ||
+     weights == NULL)
+    return 1;
+  memcpy(weights,owner->ann_current_row,(size_t)n*sizeof(double));
+  active->n=0;
+  for(int i=0;i<n;) {
+    if(weights[i]==0.0){++i;continue;}
+    const int start=i;
+    while(i<n && weights[i]!=0.0)++i;
+    active->istart[active->n]=start;
+    active->nlev[active->n++]=i-start;
+  }
+  for(int d=0;d<call->num_reg_unordered;++d)
+    np_ukernelv(call->kernel_u[d],call->matrix_X_unordered_train[d],n,1,
+      owner->eval_unordered[d][0],call->lambda[d],call->num_categories[d],
+      weights,active,1);
+  for(int d=0;d<call->num_reg_ordered;++d) {
+    const int category=call->num_reg_unordered+d;
+    np_okernelv(call->kernel_o[d],call->matrix_X_ordered_train[d],n,1,
+      owner->eval_ordered[d][0],call->lambda[category],
+      call->matrix_categorical_vals[category],call->num_categories[category],
+      weights,active,0);
+  }
+  if(rank != NULL) {
+    rank->count=0; np_lp_design_support_begin(rank->design);
+    for(int r=0;r<active->n && rank->count<rank->cap;++r)
+      for(int i=active->istart[r];i<active->istart[r]+active->nlev[r] &&
+          rank->count<rank->cap;++i)
+        if(weights[i]!=0.0)
+          rank->count+=np_lp_design_support_add(rank->design,i);
+  }
+  memset(moments,0,(size_t)stride*owner->nterms*sizeof(double));
+  np_outer_weighted_sum(owner->basis_columns,NULL,owner->nterms,
+    owner->response_columns,stride,weights,n,0,0,1,0,0,0,0,1,1.0,
+    moments,active,1,NULL,&owner->ann_outer);
+  if(power2 != NULL) {
+    memset(power2,0,(size_t)owner->nterms*owner->nterms*sizeof(double));
+    np_outer_weighted_sum(owner->basis,NULL,owner->nterms,owner->basis,
+      owner->nterms,weights,n,0,0,2,0,0,0,0,1,1.0,power2,active,0,NULL,NULL);
+  }
+  if(retained != NULL) memcpy(retained,weights,(size_t)n*sizeof(double));
+  return 0;
+}
 /* T4 and fitted rows use the same exact complete-row fact. */
 static int np_lp_failed_system_is_finite(const NPLPSolveWorkspace *, int, int);
 
 /* Only called after the incumbent solve fails, never on a successful row. */
-static int np_regression_general_lp_empty_row(
+static NP_ALWAYS_INLINE int np_regression_general_lp_empty_row(
+  const int prepared_ann,
   const NPRegressionGeneralLPFitCall *call,
   NPRegressionGeneralLPFitOwner *owner,
   int row, int categorical, int moment_stride, int divide_weights,
@@ -28935,7 +29109,10 @@ static int np_regression_general_lp_empty_row(
         (size_t)call->num_obs_train*sizeof(double));
     if(owner->retained_kernel_row == NULL)
       return 0;
-    if(call->kernel_route != NULL) {
+    if(prepared_ann) {
+      status = np_ann_fit_moment_row(call, owner, moment_stride, owner->moments,
+        NULL, owner->retained_kernel_row, NULL);
+    } else if(call->kernel_route != NULL) {
       /* Preserve the canonical response/basis scale used by the failed row. */
       status = np_beta_regression_lp_moment_row_canonical(
         call->bandwidth_mode, call->num_obs_train, call->num_reg_unordered,
@@ -28987,7 +29164,8 @@ static int np_regression_general_lp_empty_row(
  * general-LP moment and solve policy.  This point-only adapter deliberately
  * requests neither a kernel row nor a power-two meat.  Its solve workspace is
  * reused after the current-frame point/derivative/SE consumers are complete. */
-static int np_regression_general_lp_point_at_frame(
+static NP_ALWAYS_INLINE int np_regression_general_lp_point_at_frame(
+  const int prepared_ann,
   const NPRegressionGeneralLPFitCall *call,
   NPRegressionGeneralLPFitOwner *owner,
   const int moment_stride,
@@ -29010,7 +29188,10 @@ static int np_regression_general_lp_point_at_frame(
      owner->eval_basis == NULL)
     return 0;
 
-  if(call->kernel_route != NULL) {
+  if(prepared_ann) {
+    if(np_ann_fit_moment_row(call, owner, moment_stride, owner->moments,
+         NULL, kernel_row, &support_rank) != 0) return 0;
+  } else if(call->kernel_route != NULL) {
     if(np_beta_regression_lp_moment_row_canonical(
          call->bandwidth_mode,
          call->num_obs_train,
@@ -29119,7 +29300,7 @@ static int np_regression_general_lp_point_at_frame(
        epsilon,
        support_rank.count,
        &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK) {
-    if(np_regression_general_lp_empty_row(call, owner, row, 1,
+    if(np_regression_general_lp_empty_row(prepared_ann, call, owner, row, 1,
          moment_stride, kernel_row != NULL, kernel_row)) {
       if(empty_component >= 0 && call->empty_rows->component_flags != NULL)
         call->empty_rows->component_flags[empty_component] = 1;
@@ -29156,7 +29337,8 @@ static int np_regression_general_lp_point_at_frame(
  * regression retains the fitted row's NN identity at both endpoints.
  * Conditional kernel-response targets retain their external-query convention;
  * any required current-endpoint refit is shared by categorical coordinates. */
-static int np_regression_general_lp_categorical_points(
+static NP_ALWAYS_INLINE int np_regression_general_lp_categorical_points(
+  const int prepared_ann,
   const NPRegressionGeneralLPFitCall *call,
   NPRegressionGeneralLPFitOwner *owner,
   const int moment_stride,
@@ -29184,7 +29366,7 @@ static int np_regression_general_lp_categorical_points(
 
   if(call->categorical_base_requires_refit &&
      !np_regression_general_lp_point_at_frame(
-       call, owner, moment_stride, response_y_offset,
+       prepared_ann, call, owner, moment_stride, response_y_offset,
        response_basis_offset, epsilon, row, -1, &base_point,
        compute_pair ? owner->categorical_base_kernel_row : NULL,
        compute_pair ? owner->power2_projection : NULL))
@@ -29209,7 +29391,7 @@ static int np_regression_general_lp_categorical_points(
     }
     owner->eval_unordered[coordinate][0] = alternate;
     if(!np_regression_general_lp_point_at_frame(
-         call, owner, moment_stride, response_y_offset,
+         prepared_ann, call, owner, moment_stride, response_y_offset,
          response_basis_offset, epsilon, row,
          call->num_reg_continuous + coordinate, &alternate_point,
          compute_pair ? owner->categorical_alternate_kernel_row : NULL,
@@ -29282,7 +29464,7 @@ static int np_regression_general_lp_categorical_points(
     }
     owner->eval_ordered[coordinate][0] = alternate;
     if(!np_regression_general_lp_point_at_frame(
-         call, owner, moment_stride, response_y_offset,
+         prepared_ann, call, owner, moment_stride, response_y_offset,
          response_basis_offset, epsilon, row,
          call->num_reg_continuous + category, &alternate_point,
          compute_pair ? owner->categorical_alternate_kernel_row : NULL,
@@ -29321,7 +29503,8 @@ static int np_regression_general_lp_categorical_points(
   return 1;
 }
 
-static SEXP np_regression_general_lp_fit_execute(void *data)
+static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
+  void *data, const int prepared_ann)
 {
   NPRegressionGeneralLPFitExecution * const execution =
     (NPRegressionGeneralLPFitExecution *)data;
@@ -29442,6 +29625,22 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     (size_t)moment_stride*sizeof(double *));
   owner->basis_columns = (double **)malloc(
     (size_t)owner->nterms*sizeof(double *));
+  if(prepared_ann) {
+    owner->ann_outer = (NP_TreeOuterBlasWorkspace){0};
+    owner->ann_current_row = call->prepared_ann_row;
+    owner->ann_batch = call->prepared_ann_row == NULL ?
+      np_ann_fit_batch_create(call->kernel_c[0],num_obs_train,num_obs_eval,
+        num_reg_continuous,call->matrix_X_continuous_train,
+        call->matrix_X_continuous_eval,call->matrix_bandwidth) : NULL;
+    owner->ann_kernel_row = (double *)malloc((size_t)num_obs_train*sizeof(double));
+    owner->ann_active.istart = (int *)malloc((size_t)num_obs_train*sizeof(int));
+    owner->ann_active.nlev = (int *)malloc((size_t)num_obs_train*sizeof(int));
+    if(owner->ann_kernel_row == NULL || owner->ann_active.istart == NULL ||
+       owner->ann_active.nlev == NULL) {
+      execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC;
+      return R_NilValue;
+    }
+  }
   if(include_response_square)
     owner->squared_response = (double *)malloc(
       (size_t)num_obs_train*sizeof(double));
@@ -30097,7 +30296,16 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
       owner->basis_columns[l] = owner->basis[l];
     }
 
-    if(NP_UNLIKELY(call->kernel_route != NULL)) {
+    if(prepared_ann) {
+      if(owner->ann_batch != NULL)
+        owner->ann_current_row=np_ann_fit_batch_row(owner->ann_batch,j,num_obs_eval,1);
+      if(np_ann_fit_moment_row(call, owner, moment_stride, owner->moments,
+           moment_errors ? owner->power2_moments : NULL,
+           hc0_kernel_row, &support_rank) != 0) {
+        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE;
+        return R_NilValue;
+      }
+    } else if(NP_UNLIKELY(call->kernel_route != NULL)) {
       if(np_beta_regression_lp_moment_row_canonical(
            BANDWIDTH_reg,
            num_obs_train,
@@ -30211,7 +30419,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
          support_rank.count,
          &solve_diagnostics) !=
        NP_LP_SOLVE_POLICY_OK) {
-      if(np_regression_general_lp_empty_row(call, owner, j, 0,
+      if(np_regression_general_lp_empty_row(prepared_ann, call, owner, j, 0,
            moment_stride, divide_retained_weights,
            hc0_kernel_row != NULL ? hc0_kernel_row :
              ((moment_errors && reuse_fit_kernel_row) ? owner->retained_kernel_row : NULL))) {
@@ -30567,6 +30775,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
             owner->matrix_bandwidth_eval[l][0] =
               call->categorical_matrix_bandwidth[l][j];
         if(!np_regression_general_lp_categorical_points(
+             prepared_ann,
              call,
              owner,
              moment_stride,
@@ -30609,6 +30818,18 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   return R_NilValue;
 }
 
+/* One statistical body; constant transport specialization keeps ANN policy
+ * and workspace allocation out of incumbent fixed-bandwidth row loops. */
+static SEXP np_regression_general_lp_fit_execute(void *data)
+{
+  return np_regression_general_lp_fit_body(data, 0);
+}
+
+static SEXP np_regression_general_lp_fit_ann_execute(void *data)
+{
+  return np_regression_general_lp_fit_body(data, 1);
+}
+
 static int np_regression_general_lp_fit(
   const NPRegressionGeneralLPFitCall *call)
 {
@@ -30618,7 +30839,13 @@ static int np_regression_general_lp_fit(
   execution.status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC;
   np_regression_general_lp_fit_owner_init(&execution.owner);
   R_UnwindProtect(
-    np_regression_general_lp_fit_execute, &execution,
+    (call->prepared_ann_row != NULL ||
+     (call->bandwidth_mode == BW_ADAP_NN && call->ordinary_response &&
+      call->tree_enabled == NP_TREE_TRUE && call->kernel_route == NULL &&
+      !int_cker_bound_extern && call->num_reg_continuous > 0 &&
+      (call->kernel_c[0] == 4 || call->kernel_c[0] == 8))) ?
+      np_regression_general_lp_fit_ann_execute :
+      np_regression_general_lp_fit_execute, &execution,
     np_regression_general_lp_fit_owner_cleanup, &execution, NULL);
   return execution.status;
 }
@@ -30853,7 +31080,8 @@ NPRegressionLPEmptyRows *empty_rows,
 const NPConditionalLPFirstSERequest *first_se_request,
 double *conditional_variance,
 NPRegressionFailure *failure,
-NPLPDesignSupport *prepared_design){
+NPLPDesignSupport *prepared_design,
+const double *prepared_ann_row){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -30990,8 +31218,9 @@ NPLPDesignSupport *prepared_design){
      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE &&
      num_obs_eval != 1)
     NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 13, "legacy conditional influence standard errors require one evaluation row");
-  if(prepared_bandwidth != NULL && kernel_route == NULL)
-    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 14, "prepared regression bandwidths require a canonical kernel route");
+  if(prepared_bandwidth != NULL && kernel_route == NULL &&
+     BANDWIDTH_reg != BW_GEN_NN && BANDWIDTH_reg != BW_ADAP_NN)
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 14, "ordinary prepared regression bandwidths require NN");
   if(NP_UNLIKELY(kernel_route != NULL) &&
      lp_engine_est == NP_LP_ENGINE_SCALAR) {
     const int beta_status = np_beta_scalar_regression_fit_canonical(
@@ -32133,7 +32362,19 @@ NPLPDesignSupport *prepared_design){
     if(scalar_fit_status != NP_REGRESSION_SCALAR_FIT_OK)
       goto finish_regression_estimation;
   } else if(lp_engine_est == NP_LP_ENGINE_GENERAL) { // local polynomial (regtype = "lp")
+    /* Reuse the NN search certificate for ordinary and conditional GNN fitting.
+       Full support proves traversal cannot discard a donor; dense moments
+       still evaluate the varying kernel weights. Fixed owners are untouched. */
+    const int fit_tree_enabled =
+      BANDWIDTH_reg == BW_GEN_NN &&
+      int_TREE_X == NP_TREE_TRUE && kernel_route == NULL &&
+      !int_cker_bound_extern &&
+      np_reg_gnn_tree_cannot_prune(num_obs_eval, num_reg_continuous,
+                                   kdt_extern_X, kernel_c, operator,
+                                   matrix_X_continuous_eval, matrix_bandwidth) ?
+        NP_TREE_FALSE : int_TREE_X;
     const NPRegressionGeneralLPFitCall general_lp_call = {
+      .prepared_ann_row = prepared_ann_row,
       .kernel_c = kernel_c,
       .kernel_u = kernel_u,
       .kernel_o = kernel_o,
@@ -32166,7 +32407,7 @@ NPLPDesignSupport *prepared_design){
       .gradient = gradient,
       .mean_stderr = mean_stderr,
       .gradient_stderr = gradient_stderr,
-      .tree_enabled = int_TREE_X,
+      .tree_enabled = fit_tree_enabled,
       .do_merr = do_merr,
       .do_grad = do_grad,
       .do_gerr = do_gerr,

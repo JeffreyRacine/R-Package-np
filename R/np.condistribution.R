@@ -443,7 +443,9 @@ npcdist.condbandwidth <-
           ncon = bws$yncon + bws$xncon,
           ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord,
           fit.context = TRUE))
-    myopti <- c(myopti, npConditionalKernelDescriptorOptions(bws))
+    myopti <- c(myopti, npConditionalKernelDescriptorOptions(bws),
+                list(gnn.lp.fit.tree = .np_conditional_gnn_lp_fit_tree_eligible(bws) &&
+                       identical(reg.c$code, REGTYPE_LP)))
 
     cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
     cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])

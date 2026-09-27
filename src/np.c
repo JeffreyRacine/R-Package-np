@@ -7440,7 +7440,8 @@ void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             const NPConditionalLPFirstSERequest *first_se_request,
                             const int *cat_se_mask,
                             double *variance_metadata,
-                            NPRegressionLPEmptyRows *empty_rows);
+                            NPRegressionLPEmptyRows *empty_rows,
+                            int gnn_lp_fit_tree);
 void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
@@ -9639,6 +9640,7 @@ static SEXP np_density_conditional_call(SEXP tyuno,
   int has_kernel_descriptors = 0;
   int categorical_compress = 0;
   R_xlen_t gsize;
+  int gnn_lp_fit_tree = 0;
   NPConditionalLPFirstSERequest first_se_request = {0, NULL, NULL};
   const NPConditionalLPFirstSERequest *first_se_request_ptr = NULL;
   int first_se_protected = 0;
@@ -9706,6 +9708,10 @@ static SEXP np_density_conditional_call(SEXP tyuno,
   }
   if(XLENGTH(myopti_i) > CD_CATCOMPI)
     categorical_compress = INTEGER(myopti_i)[CD_CATCOMPI];
+  if(XLENGTH(myopti_i) > CD_GNNLPFIT_TREEI)
+    gnn_lp_fit_tree = INTEGER(myopti_i)[CD_GNNLPFIT_TREEI];
+  if(gnn_lp_fit_tree != 0 && gnn_lp_fit_tree != 1)
+    error("C_np_density_conditional: invalid GNN LP fitting-tree request");
   if(categorical_compress != 0 && categorical_compress != 1)
     error("C_np_density_conditional: categorical compression must be TRUE or FALSE");
 
@@ -9758,6 +9764,19 @@ static SEXP np_density_conditional_call(SEXP tyuno,
     int_glp_bernstein_extern = 0;
     int_glp_basis_extern = 1;
   }
+
+  if(gnn_lp_fit_tree &&
+     (INTEGER(myopti_i)[CD_DENI] != BW_GEN_NN ||
+      INTEGER(myopti_i)[CD_TREEI] != NP_TREE_TRUE ||
+      np_lp_engine_extern != NP_LP_ENGINE_GENERAL || ncon_x <= 0 ||
+      active_x_route != NULL || active_y_route != NULL ||
+      (INTEGER(myopti_i)[CD_CXKRNEVI] != CK_EPAN2 &&
+       INTEGER(myopti_i)[CD_CXKRNEVI] != CK_UNIF) ||
+      (ncon_y > 0 && INTEGER(myopti_i)[CD_CYKRNEVI] != CK_EPAN2 &&
+       INTEGER(myopti_i)[CD_CYKRNEVI] != CK_UNIF) ||
+      np_has_finite_cker_bounds(cxkerlb_p, cxkerub_p, ncon_x) ||
+      np_has_finite_cker_bounds(cykerlb_p, cykerub_p, ncon_y)))
+    error("C_np_density_conditional: incoherent GNN LP fitting-tree request");
 
   if(first_se != R_NilValue) {
     SEXP names = getAttrib(first_se, R_NamesSymbol);
@@ -9854,7 +9873,8 @@ static SEXP np_density_conditional_call(SEXP tyuno,
                            categorical_compress, first_se_request_ptr,
                            cat_se_mask,
                            export_variance ? REAL(out_variance) : NULL,
-                           allow_empty ? &external_rows : NULL);
+                           allow_empty ? &external_rows : NULL,
+                           gnn_lp_fit_tree);
 
   PROTECT(out = allocVector(VECSXP, export_variance ? 6 : 5));
   SET_VECTOR_ELT(out, 0, out_cond);
@@ -10331,6 +10351,19 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
       for(int j = 0; j < num_reg_continuous_extern; j++)
         for(i = 0; i < num_obs_train; i++)
           matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[j*num_obs_train + ipt_extern_X[i]];
+      if(BANDWIDTH_den_extern == BW_GEN_NN &&
+         lp_engine == NP_LP_ENGINE_GENERAL &&
+         !return_hat_flag && !leave_one_out_flag) {
+        /* The GNN apply owner accumulates in tree donor order. Hat and LOO
+           owners map donor identities themselves and retain the original RHS. */
+        SEXP ordered_rhs = PROTECT(allocMatrix(REALSXP, num_obs_train, ncol_rhs));
+        nprotect++;
+        for(int j = 0; j < ncol_rhs; j++)
+          for(i = 0; i < num_obs_train; i++)
+            REAL(ordered_rhs)[(size_t)j*num_obs_train + i] =
+              REAL(rhs_r)[(size_t)j*num_obs_train + ipt_extern_X[i]];
+        rhs_r = ordered_rhs;
+      }
     } else {
       ipt_extern_X = NULL;
       ipt_lookup_extern_X = NULL;
@@ -18822,7 +18855,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             const NPConditionalLPFirstSERequest *first_se_request,
                             const int *cat_se_mask,
                             double *variance_metadata,
-                            NPRegressionLPEmptyRows *empty_rows){
+                            NPRegressionLPEmptyRows *empty_rows,
+                            int gnn_lp_fit_tree){
   /* Likelihood bandwidth selection for density estimation */
   int cat_se_status = 0;
   NPRegressionFailure row_failure = {0};
@@ -19126,8 +19160,17 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
   if(int_TREE_XY == NP_TREE_TRUE){
     if((BANDWIDTH_den_extern != BW_ADAP_NN) || ((BANDWIDTH_den_extern == BW_ADAP_NN) && train_is_eval)){
-      build_kdtree(matrix_XY_continuous_train_extern, num_obs_train_extern, num_all_cvar, 
-                   4*num_all_cvar, ipt_XY, &kdt_extern_XY);
+      /* X moments require an X-dimensional tree. Keep all X/Y donor payloads
+       * in its common order below, with one owning tree pointer. */
+      const int tree_dimensions = gnn_lp_fit_tree ?
+        num_reg_continuous_extern : num_all_cvar;
+      if(gnn_lp_fit_tree) {
+        int_TREE_X = NP_TREE_TRUE;
+        int_TREE_XY = NP_TREE_FALSE;
+      }
+      build_kdtree(matrix_XY_continuous_train_extern, num_obs_train_extern,
+                   tree_dimensions, 4*tree_dimensions, ipt_XY,
+                   gnn_lp_fit_tree ? &kdt_extern_X : &kdt_extern_XY);
 
       // x
       for(j = 0; j < num_reg_unordered_extern; j++)
@@ -19251,6 +19294,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     const int ordinary_y_gnn =
       (!beta_y_active) && (BANDWIDTH_den_extern == BW_GEN_NN) &&
       (num_var_continuous_extern > 0);
+    const int ordinary_y_ann =
+      (!beta_y_active) && (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+      (num_var_continuous_extern > 0);
+    const int ordinary_y_nn = ordinary_y_gnn || ordinary_y_ann;
     const int beta_y_bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
       ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_obs_eval_extern :
        num_obs_train_extern);
@@ -19260,6 +19307,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     /* The X design/order is fixed across kernel-response rows. Borrow one
      * invocation-local identity map instead of allocating one per response. */
     NPLPDesignSupport conditional_design = {0};
+    NPANNFitBatch *ann_fit_batch = NULL;
 
     np_beta_scaled_row_context_init(&beta_y_row_context);
 
@@ -19276,7 +19324,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     y_eval_one = alloc_vecd(1);
     mean_one = alloc_vecd(1);
     stderr_one = cderr != NULL ? alloc_vecd(1) : NULL;
-    if(beta_y_active || ordinary_y_gnn) {
+    if(beta_y_active || ordinary_y_nn) {
       lambda_y = alloc_vecd(MAX(
         1, num_var_unordered_extern + num_var_ordered_extern));
       matrix_bandwidth_y = alloc_tmatd(
@@ -19311,7 +19359,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
        (cderr != NULL && stderr_one == NULL) ||
        (kernel_cy == NULL) || (kernel_uy == NULL) || (kernel_oy == NULL) ||
        (operator_y == NULL) ||
-       ((beta_y_active || ordinary_y_gnn) &&
+       ((beta_y_active || ordinary_y_nn) &&
         (lambda_y == NULL || matrix_bandwidth_y == NULL)) ||
        (ordinary_y_gnn && y_bandwidth_eval_one == NULL) ||
        ((num_reg_unordered_extern > 0) && (xuno_eval_one == NULL)) ||
@@ -19424,7 +19472,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         error("np_density_conditional: canonical beta response-row preparation failed: %s",
               np_continuous_kernel_row_status_message(row_status));
       }
-    } else if(ordinary_y_gnn) {
+    } else if(ordinary_y_nn) {
       NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 
       /* The Y-only response row uses the bandwidth helper's X slots. */
@@ -19458,7 +19506,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
             vsf_y, full_fit_nn_geometry_context_ptr, num_reg_continuous_extern);
           np_nn_zero_radius_error(&info);
         }
-        error("np_density_conditional: invalid generalized-NN response bandwidth");
+        error("np_density_conditional: invalid NN response bandwidth");
       }
     }
 
@@ -19473,6 +19521,72 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
          num_obs_eval_extern,
          num_reg_continuous_extern))
       prepared_x_bandwidth_ptr = &prepared_x_bandwidth;
+
+    if(kernel_route == NULL &&
+       (BANDWIDTH_den_extern == BW_GEN_NN ||
+        BANDWIDTH_den_extern == BW_ADAP_NN) &&
+       num_reg_continuous_extern > 0) {
+      const int radius_count = BANDWIDTH_den_extern == BW_GEN_NN ?
+        num_obs_eval_extern : num_obs_train_extern;
+      size_t count, bytes;
+      NPNNGeometryStatus geometry_status = NP_NN_GEOMETRY_OK;
+      if(!np_size_mul_checked((size_t)num_reg_continuous_extern,
+                              (size_t)radius_count, &count) ||
+         !np_size_array_bytes_checked(count, sizeof(double), &bytes))
+        error("np_density_conditional: invalid prepared NN bandwidth layout");
+      double **columns = (double **)R_alloc(
+        (size_t)num_reg_continuous_extern, sizeof(double *));
+      double *storage = (double *)R_alloc(count, sizeof(double));
+      double *lambda_x = (double *)R_alloc(
+        (size_t)MAX(1, num_reg_unordered_extern + num_reg_ordered_extern),
+        sizeof(double));
+      for(i = 0; i < num_reg_continuous_extern; ++i)
+        columns[i] = storage + (size_t)i*radius_count;
+      if(kernel_bandwidth_mean_ctx(
+           KERNEL_reg_extern, BANDWIDTH_den_extern,
+           num_obs_train_extern, num_obs_eval_extern, 0, 0, 0,
+           num_reg_continuous_extern, num_reg_unordered_extern,
+           num_reg_ordered_extern, 0, vsf_x, NULL, NULL,
+           matrix_XY_continuous_train_extern,
+           matrix_XY_continuous_eval_extern, NULL, columns, lambda_x,
+           full_fit_nn_geometry_context_ptr, NULL, &geometry_status) != 0) {
+        if(geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+          const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+            BANDWIDTH_den_extern, num_obs_train_extern, num_obs_eval_extern,
+            num_reg_continuous_extern, matrix_XY_continuous_train_extern,
+            matrix_XY_continuous_eval_extern, vsf_x,
+            full_fit_nn_geometry_context_ptr, 0);
+          np_nn_zero_radius_error(&info);
+        }
+        error("np_density_conditional: invalid NN explanatory bandwidth");
+      }
+      prepared_x_bandwidth = (NPContinuousPreparedBandwidthView) {
+        .bandwidth_mode = BANDWIDTH_den_extern,
+        .num_train = num_obs_train_extern,
+        .num_eval_total = num_obs_eval_extern,
+        .num_continuous = num_reg_continuous_extern,
+        .evaluation_offset = 0,
+        .evaluation_count = 1,
+        .bandwidth_eval = BANDWIDTH_den_extern == BW_GEN_NN ? columns : NULL,
+        .bandwidth_train = BANDWIDTH_den_extern == BW_ADAP_NN ? columns : NULL
+      };
+      prepared_x_bandwidth_ptr = &prepared_x_bandwidth;
+      (void)bytes;
+    }
+
+    if(BANDWIDTH_den_extern == BW_ADAP_NN &&
+       lp_engine_eff == NP_LP_ENGINE_GENERAL &&
+       int_TREE_XY == NP_TREE_TRUE && num_reg_continuous_extern > 0 &&
+       !int_cxker_bound_extern &&
+       (KERNEL_reg_extern == 4 || KERNEL_reg_extern == 8) &&
+       kernel_route == NULL) {
+      if(prepared_x_bandwidth_ptr == NULL)
+        error("adaptive LP fitting tree requires prepared donor radii");
+      ann_fit_batch = np_ann_fit_batch_create(KERNEL_reg_extern,
+        num_obs_train_extern, num_obs_eval_extern, num_reg_continuous_extern,
+        matrix_XY_continuous_train_extern, matrix_XY_continuous_eval_extern,
+        prepared_x_bandwidth.bandwidth_train);
+    }
 
     saved_cker_bound = int_cker_bound_extern;
     saved_ckerlb = vector_ckerlb_extern;
@@ -19588,10 +19702,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                       NULL,
                                       NULL,
                                       vsf_y,
-                                      ordinary_y_gnn,
-                                      NULL,
+                                      ordinary_y_nn,
+                                      ordinary_y_ann ? matrix_bandwidth_y : NULL,
                                       ordinary_y_gnn ? y_bandwidth_eval_one : NULL,
-                                      ordinary_y_gnn ? lambda_y : NULL,
+                                      ordinary_y_nn ? lambda_y : NULL,
                                       num_categories_extern + ycat_offset,
                                       matrix_categorical_vals_extern + ycat_offset,
                                       NULL,
@@ -19672,7 +19786,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                row_nn_geometry_context_ptr,
                                                                NULL, empty_rows != NULL ? &row_empty : NULL, first_se_request,
                                                                variance_metadata != NULL ? &variance_one : NULL,
-                                                                 &row_failure, &conditional_design);
+                                                                 &row_failure, &conditional_design,
+                                                                 ann_fit_batch == NULL ? NULL :
+                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1));
 
       if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
         do {
@@ -22089,7 +22205,7 @@ static SEXP np_regression_fitted_execute(void *data)
       1, /* ordinary regression response, including SE preparation */
       NULL,
       &training_geometry_context,
-      &residual_preparation_context, NULL, NULL, NULL, NULL, NULL);
+      &residual_preparation_context, NULL, NULL, NULL, NULL, NULL, NULL);
 
     if(temporary_training_tree) {
       kdt_extern_X = outer_evaluation_kdt;
@@ -22275,7 +22391,7 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
                                                      &ordinary_hc0_context : NULL,
-                                                   call->empty_rows, NULL, NULL, NULL, NULL);
+                                                   call->empty_rows, NULL, NULL, NULL, NULL, NULL);
 
 
   if(ordinary_hc0_active && ordinary_hc0_context.unknown_count > 0) {
