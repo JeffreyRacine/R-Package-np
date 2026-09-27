@@ -63,6 +63,18 @@
   and predictor bandwidths and searched degrees in their objective-cache keys,
   preventing stale objectives when a candidate changes.
 
+* Adaptive-neighbor conditional-density least-squares cross-validation reuses
+  analytical response overlaps in bounded blocks for one unbounded continuous
+  response, including signed local-polynomial influence weights. Explicit tree
+  requests use compact Epanechnikov/uniform predictor evaluation trees in
+  original donor order. Fixed bandwidths and likelihood objectives are unchanged.
+
+* Univariate continuous generalized-neighbor density least-squares
+  cross-validation contracts the response mean before whole-support integration.
+  Gaussian integration uses reciprocal-coordinate quadrature; second-order
+  Epanechnikov integration is polynomial-exact between support crossings.
+  Workspace is linear in sample size, without a resident donor-pair matrix.
+
 * Mixed continuous/categorical generalized-neighbor density least-squares
   cross-validation now integrates the query-radius density over its full
   support and uses deleted-sample radii in the cross term. Correct integration

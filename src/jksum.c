@@ -39087,6 +39087,216 @@ static int np_gnn_integral_uniform_row(void *raw,int evaluation,double *row)
   return 0;
 }
 
+/* Scalar full-sample GNN I1. Contract the response mean before squaring;
+ * query-dependent widths do not admit the fixed-bandwidth convolution.
+ * Reciprocal coordinates cover the complete real line, without a tail cut. */
+typedef struct {
+  int n, status, kernel_code;
+  const double *data;
+  double request, anchor, inverse_scale;
+  double *argument, *kernel, *contribution, *crossings;
+  double value;
+  NPGNNIntegralGeometry geometry;
+} NPGNNScalarIntegral;
+
+static void np_gnn_scalar_compensated(double value, double *sum, double *error)
+{
+  const double next = *sum + value;
+  *error += fabs(*sum) >= fabs(value) ? (*sum-next)+value : (value-next)+*sum;
+  *sum = next;
+}
+
+static double np_gnn_scalar_rule(NPGNNScalarIntegral *c,
+                                  double lo, double hi, int high)
+{
+  const int q = high ? 8 : 4;
+  const double *nodes = high ? np_gnn_integral_nodes8 : np_gnn_integral_nodes4;
+  const double *weights = high ? np_gnn_integral_weights8 : np_gnn_integral_weights4;
+  const double midpoint = .5*lo+.5*hi, half = .5*hi-.5*lo;
+  double value = 0.0;
+  for(int j = 0; j < c->n; ++j)
+    for(int z = 0; z < q; ++z)
+      c->argument[j*q+z] = (1.0+(c->anchor-c->data[j])*
+        (midpoint+half*nodes[z]))*c->inverse_scale;
+  np_ckernelv(0,c->argument,c->n*q,0,0.0,1.0,c->kernel,NULL,
+               0,0,1,1.0,0,0.0,0.0,NULL,NULL);
+  for(int z = 0; z < q; ++z) {
+    double sum = 0.0, error = 0.0;
+    for(int j = 0; j < c->n; ++j)
+      np_gnn_scalar_compensated(c->kernel[j*q+z]/c->n,&sum,&error);
+    value += weights[z]*(sum+error)*(sum+error);
+  }
+  return half*c->inverse_scale*c->inverse_scale*value;
+}
+
+static double np_gnn_scalar_peak_bound(const NPGNNScalarIntegral *c,
+                                        double lo, double hi)
+{
+  const double width = hi-lo;
+  const double variation = fmax(fabs(c->anchor-c->geometry.sorted[0]),
+    fabs(c->anchor-c->geometry.sorted[c->n-1]))*c->inverse_scale;
+  double log_max = R_NegInf;
+  if(variation*width <= 4.0) return 0.0;
+  const double log_full = log(allck[0](0.0));
+  for(int j = 0; j < c->n; ++j) {
+    const double slope = (c->anchor-c->data[j])*c->inverse_scale;
+    if(fabs(slope)*width <= 4.0) continue;
+    const double a = c->inverse_scale+slope*lo;
+    const double b = c->inverse_scale+slope*hi;
+    const double nearest = ((a<=0.0 && b>=0.0) || (b<=0.0 && a>=0.0)) ?
+      0.0 : fmin(fabs(a),fabs(b));
+    log_max = fmax(log_max,log_full-.5*nearest*nearest);
+  }
+  if(log_max == R_NegInf) return 0.0;
+  const double bound = log(width)+log(4.0)+2.0*log(c->inverse_scale)+
+    log_full+log_max+log1p(.5*exp(log_max-log_full));
+  return bound < log(DBL_MIN) ? DBL_MIN : exp(bound);
+}
+
+static int np_gnn_scalar_interval(NPGNNScalarIntegral *c,
+                                  double lo, double hi, int depth, double *out)
+{
+  const double low = np_gnn_scalar_rule(c,lo,hi,0);
+  const double high = np_gnn_scalar_rule(c,lo,hi,1);
+  const double unseen = np_gnn_scalar_peak_bound(c,lo,hi);
+  const double budget = ldexp(1e-12/(4.0*c->geometry.count),-depth);
+  if(!R_FINITE(low) || !R_FINITE(high) || !R_FINITE(unseen)) return 1;
+  if(unseen <= budget/4.0 && fabs(low-high)+unseen <= budget+1e-10*fabs(high)) {
+    *out = high;
+    return 0;
+  }
+  const double mid = .5*lo+.5*hi;
+  double left, right;
+  if(depth >= 20 || !(lo < mid && mid < hi)) return 1;
+  if(np_gnn_scalar_interval(c,lo,mid,depth+1,&left) ||
+     np_gnn_scalar_interval(c,mid,hi,depth+1,&right)) return 1;
+  *out = left+right;
+  return !R_FINITE(*out);
+}
+
+/* Canonical Epanechnikov2 is quadratic between response-support crossings.
+ * Squaring the sample mean gives degree four: the existing four-node rule
+ * is exact on every such interval, including the reciprocal Jacobian. */
+static int np_gnn_scalar_epan_interval(NPGNNScalarIntegral *c,
+                                       double lo,double hi,double *out)
+{
+  int count = 0;
+  c->crossings[count++] = lo;
+  c->crossings[count++] = hi;
+  const double edge = sqrt(5.0)*c->geometry.scale;
+  for(int j = 0; j < c->n; ++j) {
+    const double slope = c->anchor-c->data[j];
+    if(slope == 0.0) continue;
+    const double a = (edge-1.0)/slope, b = (-edge-1.0)/slope;
+    if(a > lo && a < hi) c->crossings[count++] = a;
+    if(b > lo && b < hi) c->crossings[count++] = b;
+  }
+  R_rsort(c->crossings,count);
+  double total = 0.0, correction = 0.0;
+  for(int interval = 1; interval < count; ++interval) {
+    const double left = c->crossings[interval-1], right = c->crossings[interval];
+    if(!(left < right)) continue;
+    const double midpoint = .5*left+.5*right, half = .5*right-.5*left;
+    for(int j = 0; j < c->n; ++j)
+      for(int z = 0; z < 4; ++z)
+        c->argument[4*j+z] = (1.0+(c->anchor-c->data[j])*
+          (midpoint+half*np_gnn_integral_nodes4[z]))*c->inverse_scale;
+    np_ckernelv(4,c->argument,4*c->n,0,0.0,1.0,c->kernel,NULL,
+                 0,0,1,1.0,0,0.0,0.0,NULL,NULL);
+    double value = 0.0;
+    for(int z = 0; z < 4; ++z) {
+      double sum = 0.0, error = 0.0;
+      for(int j = 0; j < c->n; ++j)
+        np_gnn_scalar_compensated(c->kernel[4*j+z]/c->n,&sum,&error);
+      value += np_gnn_integral_weights4[z]*(sum+error)*(sum+error);
+    }
+    value *= half*c->inverse_scale*c->inverse_scale;
+    if(!R_FINITE(value)) return 1;
+    np_gnn_scalar_compensated(value,&total,&correction);
+  }
+  *out = total+correction;
+  return !R_FINITE(*out);
+}
+
+static void np_gnn_scalar_cleanup(void *raw, Rboolean jump)
+{
+  NPGNNScalarIntegral *c = (NPGNNScalarIntegral *)raw;
+  (void)jump;
+  np_gnn_integral_geometry_clear(&c->geometry);
+  free(c->argument); free(c->kernel); free(c->contribution); free(c->crossings);
+}
+
+static SEXP np_gnn_scalar_body(void *raw)
+{
+  NPGNNScalarIntegral *c = (NPGNNScalarIntegral *)raw;
+  int fail = 0, start = 0, count = 0;
+  size_t cells = 0, bytes = 0;
+#ifdef MPI2
+  const int parallel = np_objective_outer_rows_enabled(1);
+#endif
+  c->status = 1;
+  fail = np_gnn_integral_geometry_prepare(&c->geometry,c->data,c->n,c->request,0);
+  if(!fail) {
+    c->inverse_scale = 1.0/c->geometry.scale;
+    fail = !R_FINITE(c->inverse_scale) || !(c->inverse_scale > 0.0) ||
+      c->n > INT_MAX/8 ||
+      !np_size_mul_checked((size_t)c->n,8U,&cells) ||
+      !np_size_mul_checked(cells,sizeof(double),&bytes);
+  }
+  if(!fail) {
+    c->argument = (double *)malloc(bytes);
+    c->kernel = (double *)malloc(bytes);
+    c->contribution = (double *)calloc((size_t)c->geometry.count,sizeof(double));
+    if(c->kernel_code == 4)
+      c->crossings = (double *)malloc(((size_t)2*c->n+2)*sizeof(double));
+    fail = !c->argument || !c->kernel || !c->contribution ||
+      (c->kernel_code == 4 && !c->crossings);
+  }
+#ifdef MPI2
+  if(np_objective_outer_preflight_failed(parallel,fail)) return R_NilValue;
+  np_objective_outer_owned_rows(0,c->geometry.count,parallel,&start,&count);
+#else
+  if(fail) return R_NilValue;
+  count = c->geometry.count;
+#endif
+  (void)np_mseries_accelerate_enabled();
+  for(int interval = start; interval < start+count; ++interval) {
+    const NPGNNIntegralInterval t = c->geometry.intervals[interval];
+    np_progress_bandwidth_loop_step();
+    c->anchor = t.primary_anchor;
+    if(t.lo == c->anchor || t.hi == c->anchor) { fail=1; break; }
+    const double a = 1.0/(t.lo-c->anchor), b = 1.0/(t.hi-c->anchor);
+    const double lo = fmin(a,b), hi = fmax(a,b);
+    if(!R_FINITE(lo) || !R_FINITE(hi) || !(lo < hi) ||
+       (c->kernel_code == 4 ?
+        np_gnn_scalar_epan_interval(c,lo,hi,c->contribution+interval) :
+        np_gnn_scalar_interval(c,lo,hi,0,c->contribution+interval))) {
+      fail=1; break;
+    }
+  }
+#ifdef MPI2
+  if(np_objective_outer_buffer_finish(parallel,c->geometry.count,fail,c->contribution,
+       "NP_RMPI_INJECT_UDEN_GNN_I1_FAIL_RANK",
+       "unconditional GNN scalar I1 intervals MPI_Allreduce")) return R_NilValue;
+#else
+  if(fail) return R_NilValue;
+#endif
+  double sum = 0.0, error = 0.0;
+  for(int i = 0; i < c->geometry.count; ++i)
+    np_gnn_scalar_compensated(c->contribution[i],&sum,&error);
+  c->value = sum+error;
+  c->status = !R_FINITE(c->value);
+  return R_NilValue;
+}
+
+static int np_gnn_scalar_integral(int n,const double *data,double request,int kernel,double *out)
+{
+  NPGNNScalarIntegral context = {.n=n,.status=1,.data=data,.request=request,.kernel_code=kernel};
+  R_UnwindProtect(np_gnn_scalar_body,&context,np_gnn_scalar_cleanup,&context,NULL);
+  if(!context.status) *out = context.value;
+  return context.status;
+}
+
 static int np_gnn_density_integral_unconditional(
   const int n,const int dimensions,const int kernel,double **data,const double *request,
   const int nuno,const int nord,const int kernel_u,const int kernel_o,
@@ -39100,6 +39310,8 @@ static int np_gnn_density_integral_unconditional(
   double *counts=(double *)R_alloc((size_t)dimensions,sizeof(double));
   if(n<2 || dimensions<1 || data==NULL || request==NULL || value==NULL)
     return 1;
+  if(dimensions==1 && (kernel==0 || kernel==4) && nuno==0 && nord==0)
+    return np_gnn_scalar_integral(n,data[0],request[0],kernel,value);
   for(int d=0;d<dimensions;++d)counts[d]=request[d];
   memset(&context,0,sizeof(context));
   context.n=n;
@@ -42154,6 +42366,351 @@ cleanup_adaptive_cvml:
  * row per continuous coordinate, so auxiliary storage is O(p*n + n) rather
  * than an n-by-n pair cache.
  */
+/* Conditional ANN batches retain original donor order. Only the evaluation
+ * block is tree-permuted; the unchanged influence owner supplies the full
+ * smoother and leverage deletion after its kernel row is restored. */
+typedef struct {
+  NPConditionalXRowCtx *x;
+  int start, count;
+  const int *evaluation_ids;
+  double *weights;
+  int *inverse;
+  KDT *tree;
+  NPConditionalBoundState bounds;
+  int bounds_pushed;
+  int status;
+} NPConditionalANNTreeBlock;
+
+static int np_conditional_ann_tree_x_admitted(const NPConditionalXRowCtx *x)
+{
+  return BANDWIDTH_den_extern == BW_ADAP_NN &&
+    int_TREE_PROFILE_X == NP_TREE_TRUE && int_TREE_X != NP_TREE_TRUE &&
+    num_reg_continuous_extern > 0 && !int_cxker_bound_extern &&
+    (KERNEL_reg_extern == 4 || KERNEL_reg_extern == 8) &&
+    x != NULL && x->ready && x->adaptive_fold &&
+    (x->lp_engine == NP_LP_ENGINE_SCALAR ||
+     (x->lp_engine == NP_LP_ENGINE_GENERAL &&
+      np_glp_cv_cache.ready && np_glp_cv_cache.nterms >= 1));
+}
+
+static void np_conditional_ann_tree_block_cleanup(void *raw, Rboolean jump)
+{
+  NPConditionalANNTreeBlock *b = (NPConditionalANNTreeBlock *)raw;
+  (void)jump;
+  if(b->tree != NULL) free_kdtree(&b->tree);
+  if(b->bounds_pushed) {
+    np_conditional_pop_bounds(&b->bounds);
+    b->bounds_pushed = 0;
+  }
+}
+
+/* Group nearby held-out rows for exact donor-union compaction. The tree
+ * permutes only this private schedule, never any training or response array. */
+static SEXP np_conditional_ann_tree_order_body(void *raw)
+{
+  NPConditionalANNTreeBlock *b = (NPConditionalANNTreeBlock *)raw;
+  const int n = num_obs_train_extern, p = num_reg_continuous_extern;
+  b->inverse = (int *)R_alloc((size_t)n, sizeof(int));
+  for(int i = 0; i < n; ++i) b->inverse[i] = i;
+  build_kdtree(matrix_X_continuous_train_extern, n, p, 4*p,
+               b->inverse, &b->tree);
+  return R_NilValue;
+}
+
+static int *np_conditional_ann_tree_order(void)
+{
+  NPConditionalANNTreeBlock b = {0};
+  R_UnwindProtect(np_conditional_ann_tree_order_body, &b,
+                  np_conditional_ann_tree_block_cleanup, &b, NULL);
+  return b.inverse;
+}
+
+static SEXP np_conditional_ann_tree_block_body(void *raw)
+{
+  NPConditionalANNTreeBlock *b = (NPConditionalANNTreeBlock *)raw;
+  NPConditionalXRowCtx *x = b->x;
+  const int n = num_obs_train_extern, m = b->count;
+  const int dims[3] = {num_reg_unordered_extern, num_reg_ordered_extern,
+                       num_reg_continuous_extern};
+  double **train[3] = {matrix_X_unordered_train_extern,
+                       matrix_X_ordered_train_extern,
+                       matrix_X_continuous_train_extern};
+  double **evaluation[3] = {NULL, NULL, NULL};
+  double **one[3] = {NULL, NULL, NULL};
+  int *order = (int *)R_alloc((size_t)m, sizeof(int));
+  int *identity = (int *)R_alloc((size_t)m, sizeof(int));
+  double temporary[64];
+  double unit_radius = 1.0;
+  double **unit = (double **)R_alloc((size_t)dims[2], sizeof(double *));
+  size_t cells;
+
+  b->status = 1;
+  if(m < 1 || m > 64 || b->start < 0 || b->start > n-m ||
+     !np_size_mul_checked((size_t)n, (size_t)m, &cells) || cells > INT_MAX)
+    return R_NilValue;
+  b->weights = (double *)R_alloc(cells, sizeof(double));
+  b->inverse = (int *)R_alloc((size_t)m, sizeof(int));
+  for(int side = 0; side < 3; ++side) {
+    evaluation[side] = (double **)R_alloc((size_t)dims[side], sizeof(double *));
+    one[side] = (double **)R_alloc((size_t)dims[side], sizeof(double *));
+    for(int d = 0; d < dims[side]; ++d) {
+      evaluation[side][d] = (double *)R_alloc((size_t)m, sizeof(double));
+      for(int j = 0; j < m; ++j)
+        evaluation[side][d][j] = train[side][d][b->evaluation_ids[j]];
+    }
+  }
+  for(int j = 0; j < m; ++j) order[j] = j;
+  build_kdtree(evaluation[2], m, dims[2], 4*dims[2], order, &b->tree);
+  for(int j = 0; j < m; ++j) {
+    identity[j] = b->evaluation_ids[order[j]];
+    b->inverse[order[j]] = j;
+  }
+  for(int side = 0; side < 3; ++side)
+    for(int d = 0; d < dims[side]; ++d) {
+      for(int j = 0; j < m; ++j)
+        temporary[j] = evaluation[side][d][order[j]];
+      memcpy(evaluation[side][d], temporary, (size_t)m*sizeof(double));
+    }
+
+  const NPNNKernelFold fold = {
+    .num_train = n, .num_eval = m, .num_continuous = dims[2],
+    .eval_to_train = identity, .train = train[2],
+    .primary = x->matrix_bandwidth_x,
+    .successor = x->matrix_bandwidth_x_successor,
+    .scale = x->adaptive_fold_scale_x
+  };
+  np_conditional_push_bounds(int_cxker_bound_extern,
+    vector_cxkerlb_extern, vector_cxkerub_extern, &b->bounds);
+  b->bounds_pushed = 1;
+  if(kernel_weighted_sum_np_fold_route(
+       x->kernel_cx, x->kernel_ux, x->kernel_ox, BW_ADAP_NN,
+       n, m, dims[0], dims[1], dims[2],
+       0, 0, 1, 1, 1, 0, 0, 0, 0,
+       x->x_operator, OP_NOOP, 0, 0, NULL, 1, 0, 0,
+       NP_TREE_TRUE, 0, b->tree, NULL, NULL, NULL,
+       train[0], train[1], train[2],
+       evaluation[0], evaluation[1], evaluation[2],
+       NULL, NULL, NULL, x->vsfx, 1,
+       x->matrix_bandwidth_x, x->matrix_bandwidth_x,
+       x->lambdax, num_categories_extern_X, matrix_categorical_vals_extern_X,
+       NULL, NULL, NULL, b->weights, NULL, 0, NULL, NULL, &fold) != 0)
+    return R_NilValue;
+
+  /* The conditional fold uses radius one on its self placeholder before
+   * leverage deletion. Reuse canonical kernel arithmetic for this O(n)
+   * diagonal work; do not change the regression fold's zero-self contract. */
+  for(int d = 0; d < dims[2]; ++d) unit[d] = &unit_radius;
+  for(int j = 0; j < m; ++j) {
+    double self_weight = 0.0;
+    for(int side = 0; side < 3; ++side)
+      for(int d = 0; d < dims[side]; ++d)
+        one[side][d] = evaluation[side][d] + j;
+    if(np_conditional_kernel_row(
+         x->kernel_cx, x->kernel_ux, x->kernel_ox, x->x_operator,
+         BW_ADAP_NN, 1, dims[0], dims[1], dims[2],
+         one[0], one[1], one[2], one[0], one[1], one[2],
+         x->vsfx, 1, unit, unit, x->lambdax,
+         num_categories_extern_X, matrix_categorical_vals_extern_X,
+         NP_TREE_FALSE, NULL, &self_weight, NULL) != 0)
+      return R_NilValue;
+    b->weights[(size_t)identity[j]*m+j] = self_weight;
+  }
+  b->status = 0;
+  return R_NilValue;
+}
+
+static int np_conditional_ann_tree_xblock(NPConditionalANNTreeBlock *b,
+                                          NPConditionalXRowCtx *x,
+                                          int start, int count,
+                                          const int *evaluation_ids)
+{
+  *b = (NPConditionalANNTreeBlock){.x=x, .start=start, .count=count,
+    .evaluation_ids=evaluation_ids, .status=1};
+  R_UnwindProtect(np_conditional_ann_tree_block_body, b,
+                  np_conditional_ann_tree_block_cleanup, b, NULL);
+  return b->status;
+}
+
+static int np_conditional_ann_tree_xrow(NPConditionalANNTreeBlock *b,
+                                        int offset, double *row)
+{
+  const int position = b->inverse[offset];
+  const int evaluation = b->evaluation_ids[offset];
+  const int n = num_obs_train_extern;
+  int effective = 0;
+  for(int donor = 0; donor < n; ++donor) {
+    const double weight = b->weights[(size_t)donor*b->count+position];
+    if(!R_FINITE(weight)) return 1;
+    b->x->kw[donor] = weight;
+    effective |= weight != 0.0;
+  }
+  if(!effective) return NP_REGRESSION_LP_MATRIX_ZERO_MASS;
+  if(b->x->lp_engine == NP_LP_ENGINE_SCALAR ||
+     (b->x->lp_engine == NP_LP_ENGINE_GENERAL &&
+      np_glp_cv_cache.ready && np_glp_cv_cache.nterms == 1)) {
+    b->x->kw[evaluation] = 0.0;
+    /* Same ordered scalar rule as the incumbent conditional X-row owner.
+     * Do not extract through fixed/GNN shared owners in this ANN-only unit. */
+    double sum = 0.0;
+    for(int j = 0; j < n; ++j) sum += b->x->kw[j];
+    if(!(fabs(sum) > DBL_MIN)) return NP_REGRESSION_LP_MATRIX_ZERO_MASS;
+    for(int j = 0; j < n; ++j) row[j] = b->x->kw[j]/sum;
+    return 0;
+  }
+  return np_conditional_xrow_influence(b->x, evaluation, evaluation, 1, row);
+}
+
+/* Scalar-response ANN CVLS: primary/successor overlap states.
+ * This owner changes I1 accumulation only. Canonical X rows (including signed
+ * LP influence) and ordinary Y/I2 rows are prepared once per held-out row.
+ * Workspace is O(n * block), never a resident n-by-n overlap matrix. */
+typedef struct {
+  int n, capacity, rows, first;
+  double scale;
+  double *p, *s, *c00, *c10, *c11, *product;
+  double *linear, *quadratic, *y, *h0, *h1;
+  int *active;
+  int active_count;
+} NPConditionalANNOverlapBlock;
+
+static void np_conditional_ann_overlap_clear(NPConditionalANNOverlapBlock *b)
+{
+  free(b->p); free(b->s); free(b->c00); free(b->c10); free(b->c11);
+  free(b->product); free(b->linear); free(b->quadratic);
+  free(b->y); free(b->h0); free(b->h1);
+  free(b->active);
+  memset(b, 0, sizeof(*b));
+}
+
+static int np_conditional_ann_overlap_prepare(
+  NPConditionalANNOverlapBlock *b, const NPConditionalYRowCtx *ctx)
+{
+  size_t elements, bytes, square, square_bytes, vector_bytes, row_bytes, index_bytes;
+  const int n = num_obs_train_extern;
+  b->n = n;
+  b->capacity = MIN(128, np_conditional_lp_cvls_block_size(n, 6U, 0U));
+  if(b->capacity < 1 ||
+     !np_size_mul_checked((size_t)n, (size_t)b->capacity, &elements) ||
+     !np_size_mul_checked(elements, sizeof(double), &bytes) ||
+     !np_size_mul_checked((size_t)b->capacity, (size_t)b->capacity, &square) ||
+     !np_size_mul_checked(square, sizeof(double), &square_bytes) ||
+     !np_size_mul_checked((size_t)n, sizeof(double), &vector_bytes) ||
+     !np_size_mul_checked((size_t)b->capacity, sizeof(double), &row_bytes) ||
+     !np_size_mul_checked((size_t)n, sizeof(int), &index_bytes))
+    return 1;
+  b->p = (double *)malloc(bytes); b->s = (double *)malloc(bytes);
+  b->c00 = (double *)malloc(bytes); b->c10 = (double *)malloc(bytes);
+  b->c11 = (double *)malloc(bytes); b->product = (double *)malloc(square_bytes);
+  /* Return allocation failure through the owner's cleanup/collective path;
+   * alloc_vecd can longjmp past buffers already allocated above. */
+  b->linear = (double *)malloc(row_bytes);
+  b->quadratic = (double *)malloc(row_bytes);
+  b->y = (double *)malloc(vector_bytes);
+  b->h0 = (double *)malloc(vector_bytes);
+  b->h1 = (double *)malloc(vector_bytes);
+  b->active = (int *)malloc(index_bytes);
+  if(!b->p || !b->s || !b->c00 || !b->c10 || !b->c11 || !b->product ||
+     !b->linear || !b->quadratic || !b->y || !b->h0 || !b->h1 || !b->active)
+    return 1;
+  b->scale = ctx->adaptive_fold_scale_y[0];
+  for(int j = 0; j < n; ++j) {
+    const int pos = int_TREE_Y == NP_TREE_TRUE ? ipt_lookup_extern_Y[j] : j;
+    b->y[j] = matrix_Y_continuous_train_extern[0][pos];
+    b->h0[j] = ctx->matrix_bandwidth_y[0][pos];
+    b->h1[j] = ctx->matrix_bandwidth_y_successor[0][pos];
+    /* A zero primary radius makes at least one retained fold invalid under
+     * the existing literal-radius contract; never fabricate a positive width. */
+    if(!(b->h0[j] > 0.0) || !(b->h1[j] > 0.0))
+      return 1;
+  }
+  return 0;
+}
+
+static void np_conditional_ann_overlap_append(
+  NPConditionalANNOverlapBlock *b, int held_out,
+  const double *xrow, double linear)
+{
+  const int r = b->rows++;
+  if(r == 0) b->first = held_out;
+  b->linear[r] = linear; b->quadratic[r] = 0.0;
+  for(int j = 0; j < b->n; ++j) {
+    const int successor = fabs(b->y[held_out]-b->y[j])*b->scale <= b->h0[j];
+    b->p[(size_t)r*b->n+j] = successor ? 0.0 : xrow[j];
+    b->s[(size_t)r*b->n+j] = successor ? xrow[j] : 0.0;
+  }
+}
+
+static int np_conditional_ann_overlap_contract(NPConditionalANNOverlapBlock *b)
+{
+  const int n = b->n, rows = b->rows;
+  const int kernel = KERNEL_den_extern;
+  static double (* const overlap[])(double,double,double,double) = {
+    np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
+    np_aconvol_epan2, np_aconvol_epan4, np_aconvol_epan6, np_aconvol_epan8,
+    np_aconvol_rect
+  };
+  int active_count = 0;
+  /* Exact zero columns contribute nothing to any held-out quadratic form.
+   * Keep the union in original donor order; in-place packing is then safe
+   * because every destination precedes or equals its corresponding source. */
+  for(int j = 0; j < n; ++j)
+    for(int r = 0; r < rows; ++r)
+      if(b->p[(size_t)r*n+j] != 0.0 || b->s[(size_t)r*n+j] != 0.0) {
+        b->active[active_count++] = j;
+        break;
+      }
+  b->active_count = active_count;
+  for(int r = 0; r < rows; ++r)
+    for(int a = 0; a < active_count; ++a) {
+      b->p[(size_t)r*active_count+a] = b->p[(size_t)r*n+b->active[a]];
+      b->s[(size_t)r*active_count+a] = b->s[(size_t)r*n+b->active[a]];
+    }
+  for(int j0 = 0; j0 < active_count; j0 += b->capacity) {
+    const int width = MIN(b->capacity, active_count-j0);
+    np_progress_bandwidth_loop_step();
+    for(int j = 0; j < width; ++j) {
+      const int jj = b->active[j0+j];
+      if(kernel == 0) for(int l = 0; l < active_count; ++l) {
+        const int ll = b->active[l];
+        const size_t at = (size_t)j*active_count+l;
+        /* Reuse the canonical overlap primitive, including its incumbent
+         * floating-point constants. No shared kernel arithmetic is changed. */
+        b->c00[at] = np_aconvol_gauss2(b->y[jj], b->y[ll], b->h0[jj], b->h0[ll])/
+          (b->h0[jj]*b->h0[ll]);
+        b->c10[at] = np_aconvol_gauss2(b->y[jj], b->y[ll], b->h1[jj], b->h0[ll])/
+          (b->h1[jj]*b->h0[ll]);
+        b->c11[at] = np_aconvol_gauss2(b->y[jj], b->y[ll], b->h1[jj], b->h1[ll])/
+          (b->h1[jj]*b->h1[ll]);
+      } else for(int l = 0; l < active_count; ++l) {
+        const int ll = b->active[l];
+        const size_t at = (size_t)j*active_count+l;
+        b->c00[at] = overlap[kernel](b->y[jj],b->y[ll],b->h0[jj],b->h0[ll])/
+          (b->h0[jj]*b->h0[ll]);
+        b->c10[at] = overlap[kernel](b->y[jj],b->y[ll],b->h1[jj],b->h0[ll])/
+          (b->h1[jj]*b->h0[ll]);
+        b->c11[at] = overlap[kernel](b->y[jj],b->y[ll],b->h1[jj],b->h1[ll])/
+          (b->h1[jj]*b->h1[ll]);
+      }
+    }
+    /* C01=C10^T: cross-state scalar contributions are equal even for signed
+     * LP weights, so accumulate the C10 contraction twice. */
+    for(int state = 0; state < 3; ++state) {
+      const double *left = state == 2 ? b->s : b->p;
+      const double *right = state == 0 ? b->p : b->s;
+      const double *overlap = state == 0 ? b->c00 : state == 1 ? b->c10 : b->c11;
+      const double factor = state == 1 ? 2.0 : 1.0;
+      np_blas_dgemm_tn_int(rows, width, active_count, left, overlap, b->product);
+      for(int r = 0; r < rows; ++r)
+        for(int j = 0; j < width; ++j)
+          b->quadratic[r] += factor*right[(size_t)r*active_count+j0+j]*
+            b->product[r+(size_t)rows*j];
+    }
+  }
+  for(int r = 0; r < rows; ++r)
+    if(!R_FINITE(b->quadratic[r])) return 1;
+  return 0;
+}
+
 static NPConditionalAdaptiveExactStatus
 np_conditional_density_cvls_adaptive_exact(
   double *vector_scale_factor,
@@ -42162,6 +42719,15 @@ np_conditional_density_cvls_adaptive_exact(
   double *cv)
 {
   const int num_obs = num_obs_train_extern;
+  const int scalar_overlap = num_var_continuous_extern == 1 &&
+    num_var_unordered_extern == 0 && num_var_ordered_extern == 0 &&
+    KERNEL_den_extern >= 0 && KERNEL_den_extern <= 8 && int_cyker_bound_extern == 0;
+  NPConditionalANNOverlapBlock overlap_block = {0};
+  NPConditionalANNTreeBlock tree_block = {0};
+  const void *tree_scratch = NULL;
+  int tree_x = 0;
+  int *tree_order = NULL;
+  int iteration;
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
   NPConditionalYRowCtx yconvctx = {0};
@@ -42200,22 +42766,51 @@ np_conditional_density_cvls_adaptive_exact(
        num_categories_y, matrix_categorical_vals_y, &yconvctx) != 0)
     goto fail_adaptive_cvls;
 
+  if(scalar_overlap &&
+     np_conditional_ann_overlap_prepare(&overlap_block, &yconvctx) != 0)
+    goto fail_adaptive_cvls;
+
+  tree_x = np_conditional_ann_tree_x_admitted(&xctx);
+  if(tree_x) tree_order = np_conditional_ann_tree_order();
   *cv = 0.0;
-  for(i = 0; i < num_obs; ++i){
+  for(iteration = 0; iteration < num_obs; ++iteration){
     double linear;
     double quadratic = 0.0;
+    i = tree_x ? tree_order[iteration] : iteration;
 
-    if(np_conditional_xrow_ctx_select_adaptive_fold(&xctx, i) != 0 ||
+    if(tree_x && iteration % 64 == 0) {
+      if(tree_scratch != NULL) vmaxset(tree_scratch);
+      tree_scratch = vmaxget();
+      if(np_conditional_ann_tree_xblock(&tree_block, &xctx, iteration,
+                                        MIN(64, num_obs-iteration),
+                                        tree_order+iteration) != 0) {
+        goto fail_adaptive_cvls;
+      }
+    }
+    if((!tree_x && np_conditional_xrow_ctx_select_adaptive_fold(&xctx, i) != 0) ||
        np_conditional_yrow_ctx_select_adaptive_fold(&yctx, i) != 0 ||
        np_conditional_yrow_ctx_select_adaptive_fold(&yconvctx, i) != 0)
       goto fail_adaptive_cvls;
-    if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0 ||
+    if((tree_x ? np_conditional_ann_tree_xrow(&tree_block, iteration-tree_block.start, xrow) :
+                  np_conditional_xrow_from_ctx(&xctx, i, xrow)) != 0 ||
        np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
       goto fail_adaptive_cvls;
 
     linear = np_blas_ddot_int(num_obs, xrow, yrow);
     if(!R_FINITE(linear))
       goto fail_adaptive_cvls;
+
+    if(scalar_overlap) {
+      np_conditional_ann_overlap_append(&overlap_block, i, xrow, linear);
+      if(overlap_block.rows == overlap_block.capacity || iteration == num_obs-1) {
+        if(np_conditional_ann_overlap_contract(&overlap_block) != 0)
+          goto fail_adaptive_cvls;
+        for(int r = 0; r < overlap_block.rows; ++r)
+          *cv += overlap_block.quadratic[r] - 2.0*overlap_block.linear[r];
+        overlap_block.rows = 0;
+      }
+      continue;
+    }
 
     for(j = 0; j < num_obs; ++j){
       double inner;
@@ -42242,6 +42837,8 @@ fail_adaptive_cvls:
   status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
 
 cleanup_adaptive_cvls:
+  if(tree_scratch != NULL) vmaxset(tree_scratch);
+  np_conditional_ann_overlap_clear(&overlap_block);
   np_conditional_xrow_ctx_clear(&xctx);
   np_conditional_yrow_ctx_clear(&yctx);
   np_conditional_yrow_ctx_clear(&yconvctx);
