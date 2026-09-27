@@ -27477,7 +27477,7 @@ double *cv){
     return np_conditional_distribution_cvls_gnn_empirical_stream(
       vector_scale_factor, cv);
 
-  if(BANDWIDTH_den == BW_ADAP_NN && cdfontrain){
+  if(BANDWIDTH_den == BW_ADAP_NN){
     const NPConditionalAdaptiveExactStatus adaptive_status =
       np_conditional_distribution_cvls_adaptive_exact(
         vector_scale_factor, num_categories,
@@ -47309,112 +47309,6 @@ cleanup_adaptive_scale_status:
 /* Exact ordinary adaptive-NN conditional-density CVML. Complete held-out
  * rows are rank-owned; fold construction has no collective and the O(n)
  * contribution buffer is reduced once in canonical row order. */
-static NPConditionalAdaptiveExactStatus
-np_conditional_density_cvml_adaptive_exact(
-  double *vector_scale_factor,
-  int *num_categories_y,
-  double **matrix_categorical_vals_y,
-  double *cv)
-{
-  const int num_obs = num_obs_train_extern;
-  const int use_parallel_rows = np_objective_outer_rows_enabled(1);
-  NPConditionalXRowCtx xctx = {0};
-  NPConditionalYRowCtx yctx = {0};
-  double *xrow = NULL;
-  double *yrow = NULL;
-  double *contributions = NULL;
-  double local_cv = 0.0;
-  int owned_start = 0;
-  int owned_rows = num_obs;
-  int local_fail = 0;
-  int i;
-  NPConditionalAdaptiveExactStatus status;
-
-  if(cv == NULL || vector_scale_factor == NULL || num_obs < 3)
-    return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
-
-  status = np_conditional_adaptive_exact_scale_status(vector_scale_factor);
-  if(np_objective_outer_preflight_failed(
-       use_parallel_rows,
-       status == NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE))
-    return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
-  if(status != NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS)
-    return status;
-
-  xrow = alloc_vecd(MAX(1, num_obs));
-  yrow = alloc_vecd(MAX(1, num_obs));
-  if(xrow == NULL || yrow == NULL ||
-     np_conditional_xrow_ctx_prepare_adaptive_fold(
-       vector_scale_factor, &xctx) != 0 ||
-     np_conditional_yrow_ctx_prepare_adaptive_fold(
-       vector_scale_factor, OP_NORMAL,
-       num_categories_y, matrix_categorical_vals_y, &yctx) != 0)
-    local_fail = 1;
-  if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
-    goto fail_adaptive_cvml;
-  if(np_objective_outer_buffer_prepare(
-       use_parallel_rows, (size_t)num_obs, &contributions) != 0)
-    goto fail_adaptive_cvml;
-
-  np_objective_outer_owned_rows(
-    0, num_obs, use_parallel_rows, &owned_start, &owned_rows);
-  for(i = owned_start;
-      i < owned_start + owned_rows && !local_fail;
-      ++i){
-    double fit;
-    double contribution;
-
-    if((i & 31) == 0)
-      np_progress_bandwidth_loop_step();
-    if(np_conditional_xrow_ctx_select_adaptive_fold(&xctx, i) != 0 ||
-       np_conditional_yrow_ctx_select_adaptive_fold(&yctx, i) != 0 ||
-       np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0 ||
-       np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0){
-      local_fail = 1;
-      break;
-    }
-    fit = np_blas_ddot_int(num_obs, xrow, yrow);
-    if(!R_FINITE(fit)){
-      local_fail = 1;
-      break;
-    }
-    contribution = np_guarded_cvml_contribution(fit);
-    if(use_parallel_rows)
-      contributions[i] = contribution;
-    else
-      local_cv += contribution;
-  }
-
-  if(np_objective_outer_buffer_finish(
-       use_parallel_rows, num_obs, local_fail, contributions,
-       "NP_RMPI_INJECT_CDEN_ADAPTIVE_CVML_FAIL_RANK",
-       "conditional density exact adaptive CVML rows MPI_Allreduce") != 0)
-    goto fail_adaptive_cvml;
-  if(use_parallel_rows)
-    for(i = 0; i < num_obs; ++i)
-      local_cv += contributions[i];
-  if(!R_FINITE(local_cv))
-    goto fail_adaptive_cvml;
-  *cv = local_cv;
-  status = NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS;
-  goto cleanup_adaptive_cvml;
-
-fail_adaptive_cvml:
-  status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
-
-cleanup_adaptive_cvml:
-  np_conditional_xrow_ctx_clear(&xctx);
-  np_conditional_yrow_ctx_clear(&yctx);
-  np_glp_cv_clear_extern();
-  free(xrow);
-  free(yrow);
-  free(contributions);
-  return status;
-}
-
-/* Exact ordinary adaptive-NN conditional-density CVLS. X, ordinary Y, and
- * convolution Y rows share the same held-out fold. Rank ownership remains at
- * complete held-out rows and auxiliary storage remains O(p*n + n). */
 /* Conditional ANN batches retain original donor order. Only the evaluation
  * block is tree-permuted; the unchanged influence owner supplies the full
  * smoother and leverage deletion after its kernel row is restored. */
@@ -47608,6 +47502,131 @@ static int np_conditional_ann_tree_xrow(NPConditionalANNTreeBlock *b,
   }
   return np_conditional_xrow_influence(b->x, evaluation, evaluation, 1, row);
 }
+
+static NPConditionalAdaptiveExactStatus
+np_conditional_density_cvml_adaptive_exact(
+  double *vector_scale_factor,
+  int *num_categories_y,
+  double **matrix_categorical_vals_y,
+  double *cv)
+{
+  const int num_obs = num_obs_train_extern;
+  const int use_parallel_rows = np_objective_outer_rows_enabled(1);
+  NPConditionalANNTreeBlock tree_block = {0};
+  int tree_ids[64];
+  const void *tree_scratch = NULL;
+  int tree_x = 0;
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0};
+  double *xrow = NULL;
+  double *yrow = NULL;
+  double *contributions = NULL;
+  double local_cv = 0.0;
+  int owned_start = 0;
+  int owned_rows = num_obs;
+  int local_fail = 0;
+  int i;
+  NPConditionalAdaptiveExactStatus status;
+
+  if(cv == NULL || vector_scale_factor == NULL || num_obs < 3)
+    return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+
+  status = np_conditional_adaptive_exact_scale_status(vector_scale_factor);
+  if(np_objective_outer_preflight_failed(
+       use_parallel_rows,
+       status == NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE))
+    return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+  if(status != NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS)
+    return status;
+
+  xrow = alloc_vecd(MAX(1, num_obs));
+  yrow = alloc_vecd(MAX(1, num_obs));
+  if(xrow == NULL || yrow == NULL ||
+     np_conditional_xrow_ctx_prepare_adaptive_fold(
+       vector_scale_factor, &xctx) != 0 ||
+     np_conditional_yrow_ctx_prepare_adaptive_fold(
+       vector_scale_factor, OP_NORMAL,
+       num_categories_y, matrix_categorical_vals_y, &yctx) != 0)
+    local_fail = 1;
+  if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
+    goto fail_adaptive_cvml;
+  if(np_objective_outer_buffer_prepare(
+       use_parallel_rows, (size_t)num_obs, &contributions) != 0)
+    goto fail_adaptive_cvml;
+
+  tree_x = np_conditional_ann_tree_x_admitted(&xctx);
+  np_objective_outer_owned_rows(
+    0, num_obs, use_parallel_rows, &owned_start, &owned_rows);
+  for(i = owned_start;
+      i < owned_start + owned_rows && !local_fail;
+      ++i){
+    double fit;
+    double contribution;
+
+    if((i & 31) == 0)
+      np_progress_bandwidth_loop_step();
+    if(tree_x && (i-owned_start) % 64 == 0) {
+      if(tree_scratch != NULL) vmaxset(tree_scratch);
+      tree_scratch = vmaxget();
+      const int tree_count = MIN(64, owned_start+owned_rows-i);
+      for(int b = 0; b < tree_count; ++b) tree_ids[b] = i+b;
+      if(np_conditional_ann_tree_xblock(&tree_block, &xctx, i,
+            tree_count, tree_ids) != 0) {
+        local_fail = 1;
+        break;
+      }
+    }
+    if((!tree_x && np_conditional_xrow_ctx_select_adaptive_fold(&xctx, i) != 0) ||
+       np_conditional_yrow_ctx_select_adaptive_fold(&yctx, i) != 0 ||
+       (tree_x ? np_conditional_ann_tree_xrow(&tree_block, i-tree_block.start, xrow) :
+                 np_conditional_xrow_from_ctx(&xctx, i, xrow)) != 0 ||
+       np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0){
+      local_fail = 1;
+      break;
+    }
+    fit = np_blas_ddot_int(num_obs, xrow, yrow);
+    if(!R_FINITE(fit)){
+      local_fail = 1;
+      break;
+    }
+    contribution = np_guarded_cvml_contribution(fit);
+    if(use_parallel_rows)
+      contributions[i] = contribution;
+    else
+      local_cv += contribution;
+  }
+
+  if(np_objective_outer_buffer_finish(
+       use_parallel_rows, num_obs, local_fail, contributions,
+       "NP_RMPI_INJECT_CDEN_ADAPTIVE_CVML_FAIL_RANK",
+       "conditional density exact adaptive CVML rows MPI_Allreduce") != 0)
+    goto fail_adaptive_cvml;
+  if(use_parallel_rows)
+    for(i = 0; i < num_obs; ++i)
+      local_cv += contributions[i];
+  if(!R_FINITE(local_cv))
+    goto fail_adaptive_cvml;
+  *cv = local_cv;
+  status = NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS;
+  goto cleanup_adaptive_cvml;
+
+fail_adaptive_cvml:
+  status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+
+cleanup_adaptive_cvml:
+  if(tree_scratch != NULL) vmaxset(tree_scratch);
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  np_glp_cv_clear_extern();
+  free(xrow);
+  free(yrow);
+  free(contributions);
+  return status;
+}
+
+/* Exact ordinary adaptive-NN conditional-density CVLS. X, ordinary Y, and
+ * convolution Y rows share the same held-out fold. Rank ownership remains at
+ * complete held-out rows and auxiliary storage remains O(p*n + n). */
 
 /* Scalar-response ANN CVLS: primary/successor overlap states.
  * This owner changes I1 accumulation only. Canonical X rows (including signed
@@ -49773,6 +49792,139 @@ cleanup_cvls_lp_block:
  * all mapped response queries in that fold reuse those donor radii. Complete
  * held-out rows are rank-owned and one O(n) contribution vector restores the
  * canonical finishing order. */
+/* ANN-only exact reuse: each observed fold/donor radius mask selects one
+ * primary/successor CDF plane. Fixed and GNN owners never call this helper.
+ * The 64-row tiles bound storage, not basis/dimension eligibility. */
+typedef struct {
+  NPConditionalXRowCtx *x;
+  NPConditionalYRowCtx *y;
+  int first, end, tree_x, status;
+  double *loss;
+  double **xrows, **masked, **yrows, **bits, **active;
+  double *partial, *fits;
+  int *ids, *reps;
+  int tree_ids[64];
+  const void *scratch;
+  NPConditionalANNTreeBlock tree;
+} NPConditionalANNLossBlock;
+
+static void np_conditional_ann_loss_blocks_clear(void *raw, Rboolean jump)
+{
+  NPConditionalANNLossBlock *c = (NPConditionalANNLossBlock *)raw;
+  if(c->scratch != NULL && !jump) vmaxset(c->scratch);
+  if(c->xrows != NULL) free_tmat(c->xrows);
+  if(c->masked != NULL) free_tmat(c->masked);
+  if(c->yrows != NULL) free_tmat(c->yrows);
+  if(c->bits != NULL) free_tmat(c->bits);
+  free(c->active); free(c->partial); free(c->fits);
+  free(c->ids); free(c->reps);
+}
+
+static SEXP np_conditional_ann_loss_blocks_body(void *raw)
+{
+  NPConditionalANNLossBlock *c = (NPConditionalANNLossBlock *)raw;
+  const int n = num_obs_train_extern, m = num_obs_eval_extern;
+  const int d = num_var_continuous_extern;
+  const int block = MIN(64, c->end-c->first), tile = MIN(64, m);
+  size_t cells;
+  if(c->first == c->end) { c->status = 0; return R_NilValue; }
+  if(c->first < 0 || c->end > n || block < 1 || tile < 1 ||
+     !np_size_mul_checked((size_t)n, (size_t)block, &cells) || cells > INT_MAX)
+    return R_NilValue;
+  c->xrows = alloc_tmatd(n, block);
+  c->masked = alloc_tmatd(n, block);
+  c->yrows = alloc_tmatd(n, tile);
+  if(d > 0) c->bits = alloc_tmatd((int)cells, d);
+  c->active = (double **)calloc((size_t)MAX(1,d), sizeof(double *));
+  c->partial = alloc_vecd(block*tile);
+  c->fits = alloc_vecd(block*tile);
+  if(c->xrows == NULL || c->masked == NULL || c->yrows == NULL ||
+     (d > 0 && c->bits == NULL) || c->active == NULL ||
+     c->partial == NULL || c->fits == NULL) return R_NilValue;
+
+  for(int first = c->first; first < c->end; first += block) {
+    const int ib = MIN(block, c->end-first);
+    int profiles = 1;
+    np_progress_bandwidth_loop_step();
+    if(c->tree_x) {
+      if(c->scratch != NULL) vmaxset(c->scratch);
+      c->scratch = vmaxget();
+      for(int b = 0; b < ib; ++b) c->tree_ids[b] = first+b;
+      if(np_conditional_ann_tree_xblock(&c->tree, c->x, first, ib, c->tree_ids) != 0)
+        return R_NilValue;
+    }
+    for(int b = 0; b < ib; ++b) {
+      const int held = first+b;
+      if((!c->tree_x && np_conditional_xrow_ctx_select_adaptive_fold(c->x, held) != 0) ||
+         np_conditional_yrow_ctx_select_adaptive_fold(c->y, held) != 0 ||
+         (c->tree_x ? np_conditional_ann_tree_xrow(&c->tree, b, c->xrows[b]) :
+                      np_conditional_xrow_from_ctx(c->x, held, c->xrows[b])) != 0)
+        return R_NilValue;
+      for(int donor = 0; donor < n; ++donor) {
+        const int position = int_TREE_Y == NP_TREE_TRUE ? ipt_lookup_extern_Y[donor] : donor;
+        for(int l = 0; l < d; ++l) {
+          const double selected = c->y->matrix_bandwidth_y_selected[l][position];
+          const double primary = c->y->matrix_bandwidth_y[l][position];
+          if(donor != held && selected != primary &&
+             selected != c->y->matrix_bandwidth_y_successor[l][position])
+            return R_NilValue;
+          c->bits[l][b*n+donor] = donor != held && selected != primary;
+        }
+      }
+    }
+    free(c->ids); free(c->reps); c->ids = c->reps = NULL;
+    if(d > 0) {
+      if(!np_build_discrete_profile_index(ib*n,d,0,c->bits,NULL,
+                                           &c->ids,&c->reps,&profiles)) return R_NilValue;
+    } else {
+      c->ids = (int *)calloc((size_t)ib*n, sizeof(int));
+      c->reps = (int *)calloc(1, sizeof(int));
+      if(c->ids == NULL || c->reps == NULL) return R_NilValue;
+    }
+    for(int first_query = 0; first_query < m; first_query += tile) {
+      const int jb = MIN(tile, m-first_query);
+      memset(c->fits, 0, (size_t)ib*jb*sizeof(double));
+      for(int v = 0; v < profiles; ++v) {
+        NPConditionalYRowCtx view = *c->y;
+        np_progress_bandwidth_loop_step();
+        for(int l = 0; l < d; ++l)
+          c->active[l] = c->bits[l][c->reps[v]] ?
+            c->y->matrix_bandwidth_y_successor[l] : c->y->matrix_bandwidth_y[l];
+        view.matrix_bandwidth_y = c->active;
+        for(int j = 0; j < jb; ++j)
+          if(np_conditional_y_eval_from_ctx(&view, first_query+j,
+               matrix_Y_unordered_eval_extern, matrix_Y_ordered_eval_extern,
+               matrix_Y_continuous_eval_extern, m, cdfontrain_extern,
+               c->yrows[j]) != 0) return R_NilValue;
+        for(int b = 0; b < ib; ++b) for(int donor = 0; donor < n; ++donor)
+          c->masked[b][donor] = c->ids[b*n+donor] == v ? c->xrows[b][donor] : 0.0;
+        np_blas_dgemm_tn_int(jb,ib,n,c->yrows[0],c->masked[0],c->partial);
+        for(int t = 0; t < ib*jb; ++t) c->fits[t] += c->partial[t];
+      }
+      for(int b = 0; b < ib; ++b) for(int j = 0; j < jb; ++j) {
+        const int i = first+b, q = first_query+j;
+        if(cdfontrain_extern && i == q) continue;
+        const double difference = np_conditional_indicator_original_order(i,q)-c->fits[b*jb+j];
+        if(!R_FINITE(difference)) return R_NilValue;
+        c->loss[i] += difference*difference;
+        if(!R_FINITE(c->loss[i])) return R_NilValue;
+      }
+    }
+  }
+  c->status = 0;
+  return R_NilValue;
+}
+
+static int np_conditional_ann_loss_blocks(NPConditionalXRowCtx *x,
+  NPConditionalYRowCtx *y, int tree_x, int first, int end, double *loss)
+{
+  NPConditionalANNLossBlock call = {.x=x,.y=y,.tree_x=tree_x,
+    .first=first,.end=end,.loss=loss,.status=1};
+  R_UnwindProtect(np_conditional_ann_loss_blocks_body,&call,
+                  np_conditional_ann_loss_blocks_clear,&call,NULL);
+  return call.status;
+}
+
 static NPConditionalAdaptiveExactStatus
 np_conditional_distribution_cvls_adaptive_exact(
   double *vector_scale_factor,
@@ -49783,22 +49935,21 @@ np_conditional_distribution_cvls_adaptive_exact(
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const double pair_count = np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, 1);
+    num_train, num_eval, cdfontrain_extern);
   const int use_parallel_rows = np_objective_outer_rows_enabled(1);
+  int tree_x = 0;
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
-  double *xrow = NULL;
-  double *yint = NULL;
   double *contributions = NULL;
   double local_cv = 0.0;
   int owned_start = 0;
   int owned_rows = num_train;
   int local_fail = 0;
-  int i, j;
+  int i;
   NPConditionalAdaptiveExactStatus status;
 
   if(cv == NULL || vector_scale_factor == NULL || num_train < 3 ||
-     num_eval != num_train || !cdfontrain_extern || pair_count <= 0.0)
+     num_eval < 1 || (cdfontrain_extern && num_eval != num_train) || pair_count <= 0.0)
     return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
 
   status = np_conditional_adaptive_exact_scale_status(vector_scale_factor);
@@ -49809,10 +49960,8 @@ np_conditional_distribution_cvls_adaptive_exact(
   if(status != NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS)
     return status;
 
-  xrow = alloc_vecd(MAX(1, num_train));
-  yint = alloc_vecd(MAX(1, num_train));
-  if(xrow == NULL || yint == NULL ||
-     np_conditional_xrow_ctx_prepare_adaptive_fold(
+  contributions = (double *)calloc((size_t)num_train, sizeof(double));
+  if(contributions == NULL || np_conditional_xrow_ctx_prepare_adaptive_fold(
        vector_scale_factor, &xctx) != 0 ||
      np_conditional_yrow_ctx_prepare_adaptive_fold(
        vector_scale_factor, OP_INTEGRAL,
@@ -49820,68 +49969,21 @@ np_conditional_distribution_cvls_adaptive_exact(
     local_fail = 1;
   if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
     goto fail_adaptive_cdist;
-  if(np_objective_outer_buffer_prepare(
-       use_parallel_rows, (size_t)num_train, &contributions) != 0)
-    goto fail_adaptive_cdist;
-
+  tree_x = np_conditional_ann_tree_x_admitted(&xctx);
   np_objective_outer_owned_rows(
     0, num_train, use_parallel_rows, &owned_start, &owned_rows);
-  for(i = owned_start;
-      i < owned_start + owned_rows && !local_fail;
-      ++i){
-    double row_contribution = 0.0;
-
-    if((i & 15) == 0)
-      np_progress_bandwidth_loop_step();
-    if(np_conditional_xrow_ctx_select_adaptive_fold(&xctx, i) != 0 ||
-       np_conditional_yrow_ctx_select_adaptive_fold(&yctx, i) != 0 ||
-       np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0){
-      local_fail = 1;
-      break;
-    }
-
-    for(j = 0; j < num_eval; ++j){
-      double fit;
-      double difference;
-      int indicator;
-
-      if(i == j)
-        continue;
-      if(np_conditional_yrow_from_ctx(&yctx, j, yint) != 0){
-        local_fail = 1;
-        break;
-      }
-      fit = np_blas_ddot_int(num_train, xrow, yint);
-      if(!R_FINITE(fit)){
-        local_fail = 1;
-        break;
-      }
-      indicator = np_conditional_indicator_original_order(i, j);
-      difference = (double)indicator - fit;
-      row_contribution += difference*difference;
-      if(!R_FINITE(row_contribution)){
-        local_fail = 1;
-        break;
-      }
-    }
-    if(local_fail)
-      break;
-    if(use_parallel_rows)
-      contributions[i] = row_contribution;
-    else
-      local_cv += row_contribution;
-  }
+  local_fail = np_conditional_ann_loss_blocks(&xctx, &yctx, tree_x,
+    owned_start, owned_start+owned_rows, contributions);
 
   if(np_objective_outer_buffer_finish(
        use_parallel_rows, num_train, local_fail, contributions,
        "NP_RMPI_INJECT_CDIST_ADAPTIVE_EXACT_FAIL_RANK",
        "conditional distribution exact adaptive rows MPI_Allreduce") != 0)
     goto fail_adaptive_cdist;
-  if(use_parallel_rows)
-    for(i = 0; i < num_train; ++i)
-      local_cv += contributions[i];
+  for(i = 0; i < num_train; ++i)
+    local_cv += contributions[i];
   if(np_distribution_cvls_finalize(
-       local_cv, num_train, num_eval, 1, &local_cv) !=
+       local_cv, num_train, num_eval, cdfontrain_extern, &local_cv) !=
      NP_DISTRIBUTION_CVLS_FINALIZE_OK)
     goto fail_adaptive_cdist;
   *cv = local_cv;
@@ -49895,8 +49997,6 @@ cleanup_adaptive_cdist:
   np_conditional_xrow_ctx_clear(&xctx);
   np_conditional_yrow_ctx_clear(&yctx);
   np_glp_cv_clear_extern();
-  free(xrow);
-  free(yint);
   free(contributions);
   return status;
 }
