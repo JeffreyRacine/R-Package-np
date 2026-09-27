@@ -52,14 +52,21 @@
       Conditional-distribution generalized-neighbor bandwidth selection admits
       explicit \code{TRUE} for second-order Epanechnikov and uniform kernels
       without boundary normalization. The same explicit selection is available
-      for local-constant conditional density/distribution fitting from
-      generalized-neighbor CVLS bandwidth objects. Conditional LP fitting and
-      automatic-selection policies are unchanged.
+      for local-constant and linear/polynomial conditional density/distribution
+      fitting from generalized-neighbor CVLS bandwidth objects. Linear/polynomial
+      adaptive-neighbor fitting reuses bounded evaluation-tree batches.
+      Automatic-selection policies are unchanged.
       The same explicit compact-kernel selection is available for linear and
       polynomial regression generalized- and adaptive-neighbor
-      \code{cv.ls}/\code{cv.aic} bandwidth selection. Regression fitting,
-      scalar adaptive delete-one and regression automatic-selection policies
-      are unchanged. Tree and dense accumulation can differ numerically on
+      \code{cv.ls}/\code{cv.aic} bandwidth selection, and for generalized-neighbor
+      linear/polynomial regression fitting and its hat/apply operators.
+      Adaptive-neighbor linear/polynomial regression fitting also supports
+      this explicit selection, using donor-radius evaluation-tree batches.
+      GNN fitting may use dense accumulation when an exact support certificate
+      proves that tree traversal cannot prune any donor; kernel weights remain
+      varying, and no occupancy or conditioning threshold is used.
+      Fixed-bandwidth regression fitting and regression automatic-selection
+      policies are unchanged. Tree and dense accumulation can differ numerically on
       nearly singular local-polynomial designs; enabling trees does not change
       the basis, ridge or rank policies.
 

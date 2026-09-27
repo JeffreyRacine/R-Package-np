@@ -151,8 +151,15 @@ npreg <-
   if (!identical(code, DO_TREE_YES))
     return(code)
 
-  if (!identical(reg.spec$regtype.engine, "lc"))
+  if (!identical(reg.spec$regtype.engine, "lc")) {
+    if (bws[["type", exact = TRUE]] %in% c("generalized_nn", "adaptive_nn") &&
+        identical(npTreeMode(), "on") &&
+        npTreeAutoKernelEligible(bws = bws) &&
+        identical(as.integer(bws[["ckerorder", exact = TRUE]]), 2L) &&
+        identical(bws[["ckerbound", exact = TRUE]], "none"))
+      return(code)
     return(DO_TREE_NO)
+  }
 
   code
 }

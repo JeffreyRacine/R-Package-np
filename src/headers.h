@@ -568,7 +568,12 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,int RANDOM,int seed,int int
 
 int check_valid_scale_factor_cv(int KERNEL, int KERNEL_var_unordered_liracine, int KERNEL_reg_unordered_liracine, int BANDWIDTH, int BANDWIDTH_den_ml, int REGRESSION_ML, int num_obs, int num_var_continuous, int num_var_unordered, int num_var_ordered, int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, int *num_categories, double *vector_scale_factor);
 
-int kernel_estimate_regression_categorical_tree_np(int lp_engine,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_Y_eval,double *vector_scale_factor,int *num_categories, double ** matrix_categorical_vals, double *mean,double **gradient,double *mean_stderr,double **gradient_stderr,double *R_squared,double *MSE,double *MAE,double *MAPE,double *CORR,double *SIGN,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,NPRegressionStandardErrorMode standard_error_mode,int ordinary_response,const NPContinuousPreparedBandwidthView *prepared_bandwidth,const NPNNGeometryContext *nn_geometry_context,const NPRegressionHC0Context *hc0_context, NPRegressionLPEmptyRows *empty_rows, const NPConditionalLPFirstSERequest *first_se_request, double *conditional_variance,NPRegressionFailure *failure,NPLPDesignSupport *prepared_design);
+typedef struct NPANNFitBatch NPANNFitBatch;
+NPANNFitBatch *np_ann_fit_batch_create(int kernel, int n, int m, int p,
+  double **train, double **evaluation, double **radius);
+const double *np_ann_fit_batch_row(NPANNFitBatch *batch, int row, int stop, int stride);
+
+int kernel_estimate_regression_categorical_tree_np(int lp_engine,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_Y_eval,double *vector_scale_factor,int *num_categories, double ** matrix_categorical_vals, double *mean,double **gradient,double *mean_stderr,double **gradient_stderr,double *R_squared,double *MSE,double *MAE,double *MAPE,double *CORR,double *SIGN,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,NPRegressionStandardErrorMode standard_error_mode,int ordinary_response,const NPContinuousPreparedBandwidthView *prepared_bandwidth,const NPNNGeometryContext *nn_geometry_context,const NPRegressionHC0Context *hc0_context, NPRegressionLPEmptyRows *empty_rows, const NPConditionalLPFirstSERequest *first_se_request, double *conditional_variance,NPRegressionFailure *failure,NPLPDesignSupport *prepared_design, const double *prepared_ann_row);
 
 double func_con_density_quantile(double *quantile);
 
@@ -1170,6 +1175,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CD_CYFAMILYI 25
 #define CD_CYORDERI 26
 #define CD_CATCOMPI 27
+#define CD_GNNLPFIT_TREEI 28
 
 #define DEN_TNOBSI   0
 #define DEN_ENOBSI   1
