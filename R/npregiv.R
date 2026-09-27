@@ -1277,6 +1277,7 @@ npregiv.default <- function(y,
                                                  fn = sum.aicc,
                                                  method=optim.method,
                                                  control = optim.control,
+                                                 degree=degree,
                                                  W=W,
                                                  ...))
         }
