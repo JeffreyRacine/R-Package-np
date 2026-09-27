@@ -824,7 +824,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       )
       if (!leave.one.out.eval && !is.null(z.eval))
         ksum.args$exdat <- z.eval
-      main.ks <- do.call(.np_estimator_loo_ksum, ksum.args)$ksum
+      main.ks <- .npscoefbw_search_ksum(.np_estimator_loo_ksum, ksum.args)$ksum
       tyw.out <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw.out)) == 3L)
         dim(tyw.out) <- c(dim(tyw.out)[1L], dim(tyw.out)[3L])
@@ -843,7 +843,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         )
         if (!leave.one.out.eval && !is.null(z.eval))
           cov.args$exdat <- z.eval
-        s.out <- do.call(.np_estimator_loo_ksum, cov.args)$ksum
+        s.out <- .npscoefbw_search_ksum(.np_estimator_loo_ksum, cov.args)$ksum
       }
 
       list(tyw = tyw.out, tww = tww.out, s = s.out)
@@ -882,7 +882,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         bws = bws,
         bandwidth.divide = TRUE
       )
-      main.ks <- do.call(.np_estimator_loo_ksum, ksum.args)$ksum
+      main.ks <- .npscoefbw_search_ksum(.np_estimator_loo_ksum, ksum.args)$ksum
       out <- list(
         tyw = as.double(main.ks[-1L, 1L, 1L]),
         tww = main.ks[-1L, -1L, 1L, drop = TRUE]
@@ -898,7 +898,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
           bandwidth.divide = TRUE,
           kernel.pow = 2
         )
-        out$s <- do.call(.np_estimator_loo_ksum, cov.args)$ksum[, , 1L, drop = TRUE]
+        out$s <- .npscoefbw_search_ksum(.np_estimator_loo_ksum, cov.args)$ksum[, , 1L, drop = TRUE]
       } else {
         out$s <- NULL
       }
@@ -931,7 +931,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       )
       if (!state$leave.one.out)
         ksum.args$exdat <- state$z.eval
-      main.ks <- do.call(.npscoef_npksum, ksum.args)$ksum
+      main.ks <- .npscoefbw_search_ksum(.npscoef_npksum, ksum.args)$ksum
       tyw.out <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw.out)) == 3L)
         dim(tyw.out) <- c(dim(tyw.out)[1L], dim(tyw.out)[3L])
@@ -950,7 +950,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         )
         if (!state$leave.one.out)
           cov.args$exdat <- state$z.eval
-        s.out <- do.call(.npscoef_npksum, cov.args)$ksum
+        s.out <- .npscoefbw_search_ksum(.npscoef_npksum, cov.args)$ksum
       }
 
       list(tyw = tyw.out, tww = tww.out, s = s.out)
@@ -1084,11 +1084,11 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
               nobs = nrow(txdat)
             )
 
-          twww <- .np_estimator_loo_ksum(txdat=tzdat,
+          twww <- .npscoefbw_search_ksum(.np_estimator_loo_ksum, list(txdat=tzdat,
                          tydat=cbind(partial * W[,j],W[,j]^2),
                          weights=cbind(partial * W[,j],1),
                          bws=partial.bws,
-                         leave.one.out=leave.one.out)$ksum
+                         leave.one.out=leave.one.out))$ksum
 
           coef.mat[j,] <- twww[2,1,]/NZD(twww[2,2,])
 

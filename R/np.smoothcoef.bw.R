@@ -1,3 +1,34 @@
+.npscoefbw_search_activity <- function(total, expr) {
+  if (total < 1L || !.np_progress_bandwidth_active() ||
+      !isTRUE(.np_progress_enabled(domain = "bandwidth")) ||
+      isTRUE(.np_progress_runtime$scoef_search_activity))
+    return(force(expr))
+
+  previous <- .np_progress_runtime$fit_forward
+  previous.active <- .np_progress_runtime$scoef_search_activity
+  on.exit({
+    .np_progress_runtime$fit_forward <- previous
+    .np_progress_runtime$scoef_search_activity <- previous.active
+  }, add = TRUE)
+  .np_progress_runtime$scoef_search_activity <- TRUE
+  # Kernel rows are activity within this R-owned objective, not completed
+  # optimizer evaluations. Borrow the existing native callbacks and renderer.
+  .np_progress_runtime$fit_forward <- function() {
+    .np_progress_bandwidth_activity_step()
+  }
+  .np_with_compiled_fit_progress(
+    label = .np_progress_bandwidth_title(), total = total, expr = expr
+  )
+}
+
+.npscoefbw_search_ksum <- function(fun, args) {
+  if (!.np_progress_bandwidth_active())
+    return(do.call(fun, args))
+  .npscoefbw_search_activity(
+    max(NROW(args$txdat), NROW(args$exdat)), do.call(fun, args)
+  )
+}
+
 npscoefbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
@@ -1069,7 +1100,7 @@ npscoefbw.scbandwidth <-
         leave.one.out = leave.one.out.eval,
         bandwidth.divide = TRUE
       )
-      main.ks <- do.call(.npscoef_npksum, ksum.args)$ksum
+      main.ks <- .npscoefbw_search_ksum(.npscoef_npksum, ksum.args)$ksum
       tyw <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw)) == 3L)
         dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
@@ -1101,7 +1132,7 @@ npscoefbw.scbandwidth <-
         leave.one.out = leave.one.out.eval,
         bandwidth.divide = TRUE
       )
-      main.ks <- do.call(.npscoef_npksum, ksum.args)$ksum
+      main.ks <- .npscoefbw_search_ksum(.npscoef_npksum, ksum.args)$ksum
       tyw <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw)) == 3L)
         dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
@@ -1255,8 +1286,9 @@ npscoefbw.scbandwidth <-
               if (use_cat_profile_cv_lc(sbw)) {
                 mean.loo <- lc_cat_profile_loo_mean(sbw)
               } else {
-                tww <- .np_estimator_loo_ksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
-                              leave.one.out = TRUE)$ksum
+                tww <- .npscoefbw_search_activity(n,
+                  .np_estimator_loo_ksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
+                              leave.one.out = TRUE))$ksum
 
                 mean.loo <- rep(maxPenalty,n)
                 ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
@@ -1401,11 +1433,11 @@ npscoefbw.scbandwidth <-
                     profile.sums = current.partial.profile
                   )
                 } else {
-                  tww <- .np_estimator_loo_ksum(txdat=zdat,
+                  tww <- .npscoefbw_search_activity(n, .np_estimator_loo_ksum(txdat=zdat,
                                 tydat=cbind(partial.orig * wj, wj * wj),
                                 weights=cbind(partial.orig * wj, 1),
                                 bws=sbw,
-                                leave.one.out=TRUE)$ksum
+                                leave.one.out=TRUE))$ksum
 
                   partial.loo <- wj * tww[2,1,]/NZD(tww[2,2,])
                 }
@@ -1779,10 +1811,10 @@ npscoefbw.scbandwidth <-
 
                   if (identical(reg.engine, "lc")) {
                     wj <- W[,j]
-                    tww <- .np_estimator_loo_ksum(txdat=zdat,
+                    tww <- .npscoefbw_search_activity(n, .np_estimator_loo_ksum(txdat=zdat,
                                   tydat=cbind(partial.orig * wj, wj * wj),
                                   weights=cbind(partial.orig * wj, 1),
-                                  bws=bws)$ksum
+                                  bws=bws))$ksum
                     scoef$beta[,j] <- tww[2,1,]/NZD(tww[2,2,])
                   } else {
                     wj <- W[,j]
@@ -2290,14 +2322,14 @@ npscoefbw.scbandwidth <-
       bws = bws,
       leave.one.out = TRUE
     )
-    main.ks <- .npscoef_npksum(
+    main.ks <- .npscoefbw_search_activity(ctx$n, .npscoef_npksum(
       txdat = moment.state$z.train,
       tydat = moment.state$ytensor,
       weights = moment.state$ytensor,
       bws = moment.state$kernel.bws,
       leave.one.out = TRUE,
       bandwidth.divide = moment.state$bandwidth.divide
-    )$ksum
+    ))$ksum
     tyw <- main.ks[-1L, 1L, , drop = FALSE]
     if (length(dim(tyw)) == 3L)
       dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])

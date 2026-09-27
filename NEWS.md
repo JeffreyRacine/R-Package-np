@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Instrumental-variable regression refreshes its existing progress line during
+  long kernel evaluations within bandwidth selection and fitting.
+
+* Smooth-coefficient bandwidth searches now refresh their progress heartbeat
+  during long kernel-sum evaluations, without waiting for the next optimizer
+  iteration or displaying internal kernel-row counts.
+
 * Conditional adaptive-NN likelihood and CDF objectives share the qualified
   fold-aware X-tree batches with density CVLS. External CDF grids now retain
   literal deleted-donor radii and duplicate-grid loss normalization. Existing

@@ -1,3 +1,24 @@
+.np_iv_kernel_activity <- function(total, expr) {
+  if (total < 1L || !.np_progress_iv_active() ||
+      !isTRUE(.np_progress_enabled(domain = "bandwidth")) ||
+      isTRUE(.np_progress_runtime$iv_kernel_activity))
+    return(force(expr))
+
+  previous <- .np_progress_runtime$fit_forward
+  previous.active <- .np_progress_runtime$iv_kernel_activity
+  on.exit({
+    .np_progress_runtime$fit_forward <- previous
+    .np_progress_runtime$iv_kernel_activity <- previous.active
+  }, add = TRUE)
+  .np_progress_runtime$iv_kernel_activity <- TRUE
+  # Report kernel activity on the IV owner's line, without advancing its
+  # outer iteration or changing the numerical call and MPI owner below.
+  .np_progress_runtime$fit_forward <- function() .np_progress_iv_activity_step()
+  .np_with_compiled_fit_progress(
+    label = .np_progress_iv_title(), total = total, expr = expr
+  )
+}
+
 ## This functions accepts the following arguments:
 
 ## y: univariate outcome
@@ -354,11 +375,11 @@ npregiv.default <- function(y,
       if(p < 0)
           stop(paste("Error: p (order of polynomial) must be a non-negative integer\np is (", p, ")\n",sep=""))
 
-      K.x <- npksum(txdat=X.train,
+      K.x <- .np_iv_kernel_activity(max(NROW(X.train), NROW(X.eval)), npksum(txdat=X.train,
                     exdat=X.eval,
                     bws=bws,
                     return.kernel.weights=TRUE,
-                    ...)$kw
+                    ...))$kw
 
       if(p==0) {
 
@@ -373,12 +394,12 @@ npregiv.default <- function(y,
               derivative.operator <- rep.int("normal", ncol(X.train))
               target.column <- which(X.col.numeric)[as.integer(deriv.index)]
               derivative.operator[target.column] <- "derivative"
-              K.x.deriv <- npksum(txdat=X.train,
+              K.x.deriv <- .np_iv_kernel_activity(max(NROW(X.train), NROW(X.eval)), npksum(txdat=X.train,
                                   exdat=X.eval,
                                   bws=bws,
                                   return.kernel.weights=TRUE,
                                   operator=derivative.operator,
-                                  ...)$kw/NZD(bws[target.column])
+                                  ...))$kw/NZD(bws[target.column])
 
               rSk <- NZD(rowSums(t(K.x)))
 
@@ -608,7 +629,7 @@ npregiv.default <- function(y,
         ## exdat not supported with leave.one.out, but this is only used
         ## for cross-validation hence no exdat
 
-        tww <- npksum(txdat = txdat,
+        tww <- .np_iv_kernel_activity(NROW(txdat), npksum(txdat = txdat,
                       weights = as.matrix(data.frame(1,tydat)),
                       tydat = rep(1,length(tydat)),
                       bws = bws,
@@ -616,11 +637,11 @@ npregiv.default <- function(y,
                       leave.one.out = leave.one.out,
                       ukertype=ukertype,
                       okertype=okertype,
-                      ...)$ksum
+                      ...))$ksum
 
       } else {
 
-        tww <- npksum(txdat = txdat,
+        tww <- .np_iv_kernel_activity(max(NROW(txdat), NROW(exdat)), npksum(txdat = txdat,
                       exdat = exdat,
                       weights = as.matrix(data.frame(1,tydat)),
                       tydat = rep(1,length(tydat)),
@@ -629,7 +650,7 @@ npregiv.default <- function(y,
                       leave.one.out = leave.one.out,
                       ukertype=ukertype,
                       okertype=okertype,
-                      ...)$ksum
+                      ...))$ksum
       }
 
       ## Note that as bandwidth approaches zero the local constant
@@ -678,7 +699,7 @@ npregiv.default <- function(y,
         ## exdat not supported with leave.one.out, but this is only used
         ## for cross-validation hence no exdat
 
-        tww <- npksum(txdat = txdat,
+        tww <- .np_iv_kernel_activity(NROW(txdat), npksum(txdat = txdat,
                       tydat = as.matrix(cbind(tydat,W)),
                       weights = W,
                       bws = bws,
@@ -686,11 +707,11 @@ npregiv.default <- function(y,
                       leave.one.out = leave.one.out,
                       ukertype=ukertype,
                       okertype=okertype,
-                      ...)$ksum
+                      ...))$ksum
 
       } else {
 
-        tww <- npksum(txdat = txdat,
+        tww <- .np_iv_kernel_activity(max(NROW(txdat), NROW(exdat)), npksum(txdat = txdat,
                       exdat = exdat,
                       tydat = as.matrix(cbind(tydat,W)),
                       weights = W,
@@ -699,7 +720,7 @@ npregiv.default <- function(y,
                       leave.one.out = leave.one.out,
                       ukertype=ukertype,
                       okertype=okertype,
-                      ...)$ksum
+                      ...))$ksum
 
       }
 
@@ -793,7 +814,7 @@ npregiv.default <- function(y,
 
         ## Local constant via one call to npksum
 
-        tww <- npksum(txdat = xdat,
+        tww <- .np_iv_kernel_activity(NROW(xdat), npksum(txdat = xdat,
                       weights = as.matrix(data.frame(1,ydat)),
                       tydat = rep(1,n),
                       bws = bws,
@@ -801,7 +822,7 @@ npregiv.default <- function(y,
                       bandwidth.divide=bandwidth.divide,
                       ukertype=ukertype,
                       okertype=okertype,
-                      ...)$ksum
+                      ...))$ksum
 
         mean.loo <- tww[2,]/NZD(tww[1,])
 
@@ -818,7 +839,7 @@ npregiv.default <- function(y,
         ## Generalized local polynomial via smooth coefficient
         ## formulation and one call to npksum
 
-        tww <- npksum(txdat = xdat,
+        tww <- .np_iv_kernel_activity(NROW(xdat), npksum(txdat = xdat,
                       tydat = as.matrix(cbind(ydat,W)),
                       weights = W,
                       bws = bws,
@@ -826,7 +847,7 @@ npregiv.default <- function(y,
                       bandwidth.divide=bandwidth.divide,
                       ukertype=ukertype,
                       okertype=okertype,
-                      ...)$ksum
+                      ...))$ksum
 
         tyw <- matrix(tww[,1,,drop=FALSE], nrow=ncol(W), ncol=n)
         tww <- tww[,-1,,drop=FALSE]
@@ -908,27 +929,27 @@ npregiv.default <- function(y,
 
       ## This computes the kernel function when i=j (i.e., K(0))
 
-      kernel.i.eq.j <- npksum(txdat = xdat[1,],
+      kernel.i.eq.j <- .np_iv_kernel_activity(NROW(xdat[1,]), npksum(txdat = xdat[1,],
                               weights = as.matrix(data.frame(1,ydat)[1,]),
                               tydat = 1,
                               bws = bws,
                               bandwidth.divide=bandwidth.divide,
                               ukertype=ukertype,
                               okertype=okertype,
-                              ...)$ksum[1,1]
+                              ...))$ksum[1,1]
 
       if(all(degree == 0)) {
 
         ## Local constant via one call to npksum
 
-        tww <- npksum(txdat = xdat,
+        tww <- .np_iv_kernel_activity(NROW(xdat), npksum(txdat = xdat,
                       weights = as.matrix(data.frame(1,ydat)),
                       tydat = rep(1,n),
                       bws = bws,
                       bandwidth.divide=bandwidth.divide,
                       ukertype=ukertype,
                       okertype=okertype,
-                      ...)$ksum
+                      ...))$ksum
 
         ghat <- tww[2,]/NZD(tww[1,])
 
@@ -949,14 +970,14 @@ npregiv.default <- function(y,
         ## Generalized local polynomial via smooth coefficient
         ## formulation and one call to npksum
 
-        tww <- npksum(txdat = xdat,
+        tww <- .np_iv_kernel_activity(NROW(xdat), npksum(txdat = xdat,
                       tydat = as.matrix(cbind(ydat,W)),
                       weights = W,
                       bws = bws,
                       bandwidth.divide=bandwidth.divide,
                       ukertype=ukertype,
                       okertype=okertype,
-                      ...)$ksum
+                      ...))$ksum
 
         tyw <- matrix(tww[,1,,drop=FALSE], nrow=ncol(W), ncol=n)
         tww <- tww[,-1,,drop=FALSE]
