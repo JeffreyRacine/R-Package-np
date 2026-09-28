@@ -20383,8 +20383,13 @@ typedef struct {
   NL support_nodes;
   NL support_tile;
   int support_first, support_end;
+  double *donor_mass;
+  double **donor_primary_bandwidth;
   int ready;
 } NPAdaptiveFoldRowContext;
+
+static NPContinuousKernelRowStatus np_regression_ann_bounded_row(
+  NPAdaptiveFoldRowContext *context, int evaluation, double *common_log_scale);
 
 static void np_adaptive_fold_row_context_init(
   NPAdaptiveFoldRowContext * const context)
@@ -20411,6 +20416,8 @@ static void np_adaptive_fold_row_context_clear(
   free(context->support_box);
   free(context->support_nodes.node);
   free(context->support_tile.node);
+  if(context->donor_mass != NULL)
+    free(context->donor_mass);
   np_adaptive_fold_row_context_init(context);
 }
 
@@ -20667,6 +20674,8 @@ np_adaptive_fold_row_context_fill_selected(
   if(context == NULL || !context->ready || common_log_scale == NULL ||
      evaluation < 0 || evaluation >= context->plan.num_eval)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(context->donor_mass != NULL)
+    return np_regression_ann_bounded_row(context, evaluation, common_log_scale);
   if(context->support != NULL)
     return np_conditional_count_legacy_row_support(
       &context->plan, 1, evaluation,
@@ -20857,6 +20866,35 @@ cleanup_adaptive_density_term:
  * pair-local bandwidths into caller-owned O(p*n) workspace and delegates all
  * kernel/categorical arithmetic to the canonical weighted-sum engine.
  */
+/* Only bounded scalar ANN regression prepares these two invariant masses.
+ * Fold selection still owns radii; ties, support masks and row scaling retain
+ * their existing owners. No state survives this objective invocation. */
+static int np_regression_ann_bounded_prepare(NPAdaptiveFoldRowContext *context,
+                                            double **primary,
+                                            double **successor)
+{
+  const int n = context->plan.num_train;
+  const int p = context->plan.num_x_continuous;
+  size_t count;
+  if(!np_size_mul_checked((size_t)n, (size_t)p, &count) ||
+     !np_size_mul_checked(count, 2U, &count) ||
+     np_native_malloc_array((void **)&context->donor_mass, count,
+                            sizeof(*context->donor_mass)) != NP_NATIVE_ALLOC_OK)
+    return 0;
+  context->donor_primary_bandwidth = primary;
+  for(int d = 0; d < p; ++d)
+    for(int j = 0; j < n; ++j) {
+      const size_t slot = 2U*((size_t)d*(size_t)n + (size_t)j);
+      context->donor_mass[slot] = np_continuous_kernel_legacy_pdf_mass(
+        context->plan.descriptor_x.legacy_code, context->plan.train_x[d][j],
+        primary[d][j], context->plan.lower_x[d], context->plan.upper_x[d]);
+      context->donor_mass[slot+1U] = np_continuous_kernel_legacy_pdf_mass(
+        context->plan.descriptor_x.legacy_code, context->plan.train_x[d][j],
+        successor[d][j], context->plan.lower_x[d], context->plan.upper_x[d]);
+    }
+  return 1;
+}
+
 static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
   const int bwm,
   const int num_obs,
@@ -20904,6 +20942,10 @@ static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
        num_categories, matrix_categorical_vals_extern,
        kernel_c, kernel_u, kernel_o, operator, lambda,
        selected_bandwidth))
+    local_fail = 1;
+  if(!local_fail && int_cker_bound_extern &&
+     !np_regression_ann_bounded_prepare(&row_context,
+                                        primary_bandwidth, successor_bandwidth))
     local_fail = 1;
   if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
     goto cleanup_adaptive_exact_scalar;
@@ -30002,7 +30044,9 @@ np_conditional_count_legacy_row_impl(const NPConditionalCountPlan * const plan,
                                 double * const common_log_scale,
                                 int * const bad_dimension,
                                 const uint64_t * const support,
-                                const uint64_t support_bit)
+                                const uint64_t support_bit,
+                                const double * const donor_mass,
+                                double ** const donor_primary_bandwidth)
 {
   const int dimensions = is_x_side ? plan->num_x_continuous :
     plan->num_y_continuous;
@@ -30043,7 +30087,8 @@ np_conditional_count_legacy_row_impl(const NPConditionalCountPlan * const plan,
     int product_sign = 1;
     int dimension;
 
-    if(support != NULL && !(support[observation] & support_bit)){
+    if((donor_mass != NULL && observation == evaluation) ||
+       (support != NULL && !(support[observation] & support_bit))){
       log_absolute[observation]=-INFINITY;
       sign[observation]=0;
       continue;
@@ -30058,6 +30103,14 @@ np_conditional_count_legacy_row_impl(const NPConditionalCountPlan * const plan,
       double scalar_log = -INFINITY;
       int scalar_sign = 0;
       const NPContinuousKernelScalarStatus scalar_status =
+        donor_mass != NULL ?
+        np_continuous_kernel_legacy_pdf_log_mass(
+          descriptor.legacy_code, train[dimension][observation],
+          eval[dimension][evaluation], bandwidth,
+          donor_mass[2U*((size_t)dimension*(size_t)num_train +
+                         (size_t)observation) +
+                     (bandwidth != donor_primary_bandwidth[dimension][observation])],
+          &scalar_log, &scalar_sign) :
         np_continuous_kernel_scalar_log(
           descriptor.family, descriptor.legacy_code, descriptor.order,
           do_cdf, eval[dimension][evaluation], train[dimension][observation],
@@ -30152,7 +30205,7 @@ np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
 {
   return np_conditional_count_legacy_row_impl(
     plan,is_x_side,evaluation,categorical_context,log_absolute,sign,
-    categorical_sign,row,common_log_scale,bad_dimension,NULL,0);
+    categorical_sign,row,common_log_scale,bad_dimension,NULL,0,NULL,NULL);
 }
 
 static NPContinuousKernelRowStatus
@@ -30172,7 +30225,21 @@ np_conditional_count_legacy_row_support(const NPConditionalCountPlan * const pla
 {
   return np_conditional_count_legacy_row_impl(
     plan,is_x_side,evaluation,categorical_context,log_absolute,sign,
-    categorical_sign,row,common_log_scale,bad_dimension,support,support_bit);
+    categorical_sign,row,common_log_scale,bad_dimension,support,support_bit,NULL,NULL);
+}
+
+/* The prepared scalar consumes the same PDF arithmetic as the registry;
+ * only the donor-owned invariant mass is supplied by this invocation. */
+static NPContinuousKernelRowStatus np_regression_ann_bounded_row(
+  NPAdaptiveFoldRowContext *context, int evaluation, double *common_log_scale)
+{
+  return np_conditional_count_legacy_row_impl(
+    &context->plan,1,evaluation,
+    context->categorical_context_initialized ? &context->categorical_context : NULL,
+    context->log_absolute,context->sign,context->categorical_sign,context->row,
+    common_log_scale,NULL,context->support,
+    context->support == NULL ? 0 : UINT64_C(1)<<(evaluation-context->support_first),
+    context->donor_mass,context->donor_primary_bandwidth);
 }
 
 int np_conditional_count_levels(const NPConditionalCountPlan * const plan,

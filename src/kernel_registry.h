@@ -64,6 +64,16 @@ np_continuous_kernel_descriptor_init(int family,
                                      int order,
                                      np_continuous_kernel_descriptor *descriptor);
 
+/* Private prepared-mass interface for donor-centred ANN PDF rows. */
+double np_continuous_kernel_legacy_pdf_mass(int kernel_code,
+                                           double centre, double bandwidth,
+                                           double lower, double upper);
+NPContinuousKernelScalarStatus
+np_continuous_kernel_legacy_pdf_log_mass(int kernel_code,
+                                        double evaluation, double observation,
+                                        double bandwidth, double mass,
+                                        double *log_absolute, int *sign);
+
 NPContinuousKernelScalarStatus
 np_continuous_kernel_scalar_log(np_continuous_kernel_family family,
                                 int kernel_code,

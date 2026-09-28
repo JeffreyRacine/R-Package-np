@@ -290,7 +290,15 @@
   selected continuous kernel and renormalizes it on the declared support.
   For a base kernel \eqn{K} and support \eqn{[a,b]}, the bounded kernel is
   \deqn{K_{[a,b]}(u;x,h)=\frac{K(u)}{\int_{(a-x)/h}^{(b-x)/h}K(t)dt}}
-  with \eqn{u=(x_i-x)/h}. Option \code{ckerbound="range"} uses
+  with \eqn{u=(x_i-x)/h}. For bounded adaptive-nearest-neighbor
+  regression, each donor \eqn{x_j} carries its own radius \eqn{h_j} and
+  normalization mass \eqn{D(x_j,h_j)}. Its weight at evaluation point
+  \eqn{x} is \eqn{K((x-x_j)/h_j)/(h_jD(x_j,h_j))}.
+  Regression fitting and bandwidth objectives use this donor-centred
+  convention; delete-one objectives use radii from the corresponding
+  deleted sample. Fixed and generalized-neighbor regression use the
+  query-centred mass associated with their query bandwidth.
+  Option \code{ckerbound="range"} uses
   sample bounds for \eqn{a,b}; \code{ckerbound="fixed"} uses user-supplied
   bounds via \code{ckerlb}/\code{ckerub} (or the corresponding
   \code{cx*}/\code{cy*} arguments). Infinite bounds recover the unbounded
