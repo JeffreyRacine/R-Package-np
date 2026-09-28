@@ -9227,7 +9227,7 @@ typedef struct {
   NPCategoricalLeadingMomentCtx *categorical_leading_moments;
   NPConditionalLeadingRatioCtx *conditional_leading_ratio;
   NPConditionalANNDirectCtx *conditional_ann_direct;
-  int fixed_cvls_cancel_row_mass;
+  int fixed_cv_cancel_row_mass;
 } NP_OuterPackCtx;
 
 /* Keep means as anchor + offset: near-constant contributions must not lose
@@ -14449,10 +14449,10 @@ NPPermutationWeightOutput * const pkw_output,
           (operator[l] == OP_INTEGRAL);
         const int p_bounded_integral = use_p_bounds_i && do_perm &&
           (permutation_operator == OP_INTEGRAL);
-        /* Fixed CVLS may omit the common continuous row mass before
+        /* Fixed CVLS/AIC may omit the common continuous row mass before
          * symmetric pair reuse. Keep bounded support and owner selection. */
         const double invnorm = (use_bounds_i && !bounded_integral &&
-          !(outer_pack_ctx != NULL && outer_pack_ctx->fixed_cvls_cancel_row_mass)) ?
+          !(outer_pack_ctx != NULL && outer_pack_ctx->fixed_cv_cancel_row_mass)) ?
           np_cker_bounded_norm(KERNEL_reg_np[i], xc[i][j], m[i][jbw],
                                vector_ckerlb_extern[i],
                                vector_ckerub_extern[i]).inverse_mass : 1.0;
@@ -19130,6 +19130,26 @@ static int np_lp_rly_log_normalizers(const int n, const int nu, const int no,
   return 1;
 }
 
+/* Match each AIC diagonal to the continuous normalization of its row.
+ * The fixed resident owner cancels this factor; other dense and NN rows retain
+ * it. This helper is called only for explicitly bounded AIC objectives. */
+static double np_reg_cv_bounded_self_scale(const int bandwidth_type,
+    const int row, const int nc, const int *kernel_c,
+    double **continuous, double **bandwidth)
+{
+  double scale = 1.0;
+  const int bw_row = bandwidth_type == BW_FIXED ? 0 : row;
+  for(int k = 0; k < nc; ++k) {
+    const double lower = vector_ckerlb_extern[k];
+    const double upper = vector_ckerub_extern[k];
+    if((isfinite(lower) && fabs(lower) < 0.5*DBL_MAX) ||
+       (isfinite(upper) && fabs(upper) < 0.5*DBL_MAX))
+      scale *= np_cker_bounded_norm(kernel_c[k], continuous[k][row],
+        bandwidth[k][bw_row], lower, upper).inverse_mass;
+  }
+  return scale;
+}
+
 /* AIC restores the diagonal after deleted-row accumulation. RLY diagonals
  * depend on the donor category; a scalar computed at observation zero cannot
  * be reused unchanged at every observation. */
@@ -19205,10 +19225,12 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   int tsf = 0;
   const NP_OuterPackCtx frozen_runtime_options = {
     .runtime_options_frozen = 1,
-    .fixed_cvls_cancel_row_mass = (bwm == RBWM_CVLS)
+    .fixed_cv_cancel_row_mass = (bwm == RBWM_CVAIC) ||
+      ((bwm == RBWM_CVLS)
 #ifdef MPI2
-      && (iNum_Processors <= 1)
+       && (iNum_Processors <= 1)
 #endif
+      )
   };
   const int track_lowsupport_requested =
     (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) || (bwm == RBWM_CVKS);
@@ -21113,6 +21135,7 @@ int *num_categories){
   double **adaptive_selected_bandwidth = NULL;
 
   double aicc = 0.0;
+  double bounded_first_self_scale = 1.0;
   double traceH = 0.0;
   NPNNGeometryContext nn_geometry_context = {
     .mode = NP_NN_QUERY_TRAINING_IDENTITY,
@@ -21889,6 +21912,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    NULL,
                                    NULL);
         int_LARGE_SF = tsf;
+        if(int_cker_bound_extern)
+          bounded_first_self_scale = np_reg_cv_bounded_self_scale(
+            BANDWIDTH_reg, 0, num_reg_continuous, kernel_c,
+            matrix_X_continuous, matrix_bandwidth);
       }
 
       const double epsilon = 1.0/(double)MAX(1, num_obs);
@@ -22304,9 +22331,13 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         for(i = 0; i < nrc1; i++)
           evalv[i] = basis[i][j];
 
-        const double row_aicc = bwm == RBWM_CVAIC ?
+        double row_aicc = bwm == RBWM_CVAIC ?
           np_rly_cv_diagonal(aicc,j,num_reg_unordered,num_reg_ordered,
             kernel_o,lambda,matrix_X_ordered,num_categories,matrix_categorical_vals_extern,0) : 0.0;
+        if(bwm == RBWM_CVAIC && int_cker_bound_extern)
+          row_aicc *= np_reg_cv_bounded_self_scale(
+            BANDWIDTH_reg, j, num_reg_continuous, kernel_c,
+            matrix_X_continuous, matrix_bandwidth) / bounded_first_self_scale;
         if(bwm == RBWM_CVAIC){
           const double self_weight = pnh*row_aicc;
           for(i = 0; i < nrc1; i++){
@@ -22577,6 +22608,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                            NULL,
                            NULL);
     int_LARGE_SF = tsf;
+    if(int_cker_bound_extern)
+      bounded_first_self_scale = np_reg_cv_bounded_self_scale(
+        BANDWIDTH_reg, 0, num_reg_continuous, kernel_c,
+        matrix_X_continuous, matrix_bandwidth);
 
     //fprintf(stderr,"\n%e\n",aicc);
   }
@@ -22713,9 +22748,13 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         vector_Y[ii];
       cv += np_regression_cv_loss_value(bwm, mean[ii2]/sk, loss_y);
       if(bwm == RBWM_CVAIC){
-        const double row_aicc = np_rly_cv_diagonal(aicc,ii,
+        double row_aicc = np_rly_cv_diagonal(aicc,ii,
           num_reg_unordered,num_reg_ordered,kernel_o,lambda,matrix_X_ordered,
           num_categories,matrix_categorical_vals_extern,0);
+        if(int_cker_bound_extern)
+          row_aicc *= np_reg_cv_bounded_self_scale(
+            BANDWIDTH_reg, ii, num_reg_continuous, kernel_c,
+            matrix_X_continuous, matrix_bandwidth) / bounded_first_self_scale;
         if(BANDWIDTH_reg != BW_ADAP_NN){
           traceH += row_aicc/sk;
         }else{
