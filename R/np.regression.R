@@ -128,10 +128,19 @@ npreg <-
     }
   }
 
-.np_regression_output_request <- function(se, gradients) {
+.np_regression_output_request <- function(se, gradients, gradient.errors = NULL) {
   se <- npValidateScalarLogical(se, "se")
   gradients <- npValidateScalarLogical(gradients, "gradients")
-  as.integer(se) + 2L * as.integer(gradients)
+  if (is.null(gradient.errors))
+    gradient.errors <- se && gradients
+  else
+    gradient.errors <- npValidateScalarLogical(gradient.errors, ".np.gradient.errors")
+  if (gradient.errors && !(se && gradients))
+    stop("gradient errors require both se=TRUE and gradients=TRUE", call. = FALSE)
+  # Masks 0--3 retain their existing meaning. Bit 4 omits only derivative
+  # errors for an internal consumer that still needs mean SE and derivatives.
+  as.integer(se) + 2L * as.integer(gradients) +
+    if (se && gradients && !gradient.errors) 4L else 0L
 }
 
 .npreg_fit_tree_code <- function(bws, ncon, ncat) {
@@ -398,6 +407,9 @@ npreg.rbandwidth <-
 
     dots <- list(...)
     native.newdata <- dots[["newdata", exact = TRUE]]
+    output.request <- .np_regression_output_request(
+      se, gradients, dots[[".np.gradient.errors", exact = TRUE]])
+    gradient.errors <- identical(output.request, 3L)
     if (missing(exdat) && !is.null(native.newdata)) {
       native.eval <- .np_native_newdata_parts(
         native.newdata, list(exdat = bws$xnames), "npreg")
@@ -819,10 +831,7 @@ npreg.rbandwidth <-
             as.integer(npLpBasisCode(reg.spec$basis.engine)),
             as.integer(enrow),
             as.integer(ncol),
-            c(.np_regression_output_request(
-              se = se,
-              gradients = do.compiled.gradients
-            ), as.integer(!no.ex && !isTRUE(dots[[".np.require.complete", exact = TRUE]]) &&
+            c(output.request, as.integer(!no.ex && !isTRUE(dots[[".np.require.complete", exact = TRUE]]) &&
                            reg.spec$regtype.engine %in% c("ll", "lp"))),
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
@@ -840,7 +849,7 @@ npreg.rbandwidth <-
       rorder[c(ord_idx[bws$icon], ord_idx[bws$iuno], ord_idx[bws$iord])] <- ord_idx
       myout$g = as.matrix(myout$g[,rorder, drop = FALSE])
 
-      if (se) {
+      if (gradient.errors) {
         myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE)
         myout$gerr = as.matrix(myout$gerr[,rorder, drop = FALSE])
       }
@@ -848,7 +857,7 @@ npreg.rbandwidth <-
       if (glp.gradient.partial) {
         unavailable <- which(bws$icon)[!glp.gradient.available]
         myout$g[, unavailable] <- NA_real_
-        if (se)
+        if (gradient.errors)
           myout$gerr[, unavailable] <- NA_real_
       }
     }
@@ -881,7 +890,7 @@ npreg.rbandwidth <-
     )
     if (gradients) {
       ev.args$grad <- myout$g
-      if (se)
+      if (gradient.errors)
         ev.args$gerr <- myout$gerr
     }
     if (residuals)
@@ -890,7 +899,7 @@ npreg.rbandwidth <-
       ev.args$gradient.order <- glp.gradient.order
     ev <- do.call(npregression, ev.args)
     certificate <- attr(myout, ".np.gradient.structural.zero", exact = TRUE)
-    if (gradients && se && !is.null(certificate))
+    if (gradient.errors && !is.null(certificate))
       attr(ev, ".np.gradient.structural.zero") <-
         matrix(certificate, enrow, ncol)[, rorder, drop = FALSE]
     ev$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_

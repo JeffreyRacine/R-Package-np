@@ -92,13 +92,16 @@ typedef enum {
   NP_REGRESSION_OUTPUT_MEAN_ONLY = 0,
   NP_REGRESSION_OUTPUT_MEAN_AND_SE = 1,
   NP_REGRESSION_OUTPUT_MEAN_AND_GRADIENT = 2,
-  NP_REGRESSION_OUTPUT_FULL = 3
+  NP_REGRESSION_OUTPUT_FULL = 3,
+  /* Existing low bits retained; private bit 4 omits derivative uncertainty. */
+  NP_REGRESSION_OUTPUT_MEAN_SE_AND_GRADIENT = 7
 } NPRegressionOutputRequest;
 
 static inline int np_regression_output_request_valid(const int request)
 {
-  return request >= NP_REGRESSION_OUTPUT_MEAN_ONLY &&
-    request <= NP_REGRESSION_OUTPUT_FULL;
+  return (request >= NP_REGRESSION_OUTPUT_MEAN_ONLY &&
+          request <= NP_REGRESSION_OUTPUT_FULL) ||
+    request == NP_REGRESSION_OUTPUT_MEAN_SE_AND_GRADIENT;
 }
 
 static inline int np_regression_output_requests_errors(const int request)
@@ -109,6 +112,11 @@ static inline int np_regression_output_requests_errors(const int request)
 static inline int np_regression_output_requests_gradients(const int request)
 {
   return (request & NP_REGRESSION_OUTPUT_MEAN_AND_GRADIENT) != 0;
+}
+
+static inline int np_regression_output_requests_gradient_errors(const int request)
+{
+  return request == NP_REGRESSION_OUTPUT_FULL;
 }
 
 /*

@@ -674,7 +674,8 @@ npindex.sibandwidth <-
         allow.empty.rows = identical(args$.np.require.complete, FALSE))
       record_empty_rows(fit, bootstrap)
     }
-    next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE, se = FALSE) {
+    next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE, se = FALSE,
+                                   gradient.errors = NULL) {
       require.complete <- no.ex || is.null(exdat)
       # GNN training statistics must use the same evaluation-row convention
       # whether or not the public call also requests external predictions.
@@ -703,6 +704,8 @@ npindex.sibandwidth <-
         fit.progress.handoff <<- FALSE
       }
       args$se <- se
+      if (!is.null(gradient.errors))
+        args[[".np.gradient.errors"]] <- gradient.errors
       args$.np.require.complete <- require.complete
       args$.np.defer.empty.rows <- TRUE
       args
@@ -765,7 +768,8 @@ npindex.sibandwidth <-
     if (asymptotic.se) {
       model <- run_npreg_fit(next_npreg_fit_args(
         exdat = index.eval.df,
-        gradients = gradients || (no.ex && ncol(txdat) > 1L), se = TRUE
+        gradients = gradients || (no.ex && ncol(txdat) > 1L), se = TRUE,
+        gradient.errors = gradients
       ))
       index.mean <- model$mean
       uncertainty <- .np_index_asymptotic_outputs(model, bws$beta, gradients)
