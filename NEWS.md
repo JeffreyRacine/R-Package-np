@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Single-index asymptotic fitting omits unrequested internal derivative
+  standard errors while retaining derivative values, mean uncertainty, and
+  default coefficient covariance. Requested public gradient errors are unchanged.
+
 * Bounded regression AIC objectives use self weights consistent with their
   fitted smoothing rows for fixed and nearest-neighbor bandwidths.
 

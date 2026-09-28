@@ -10851,14 +10851,22 @@ static int np_beta_absolute_route_body(
     *regression_moment_context->status = row_status;
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
-    if(regression_moment_context->compute_gradient) {
+    if(regression_moment_context->compute_gradient &&
+       (!regression_moment_context->preserve_mean ||
+        regression_moment_context->gradient_stderr != NULL)) {
       int infinite_count = 0;
       int undefined_count = 0;
+      /* Mean uncertainty can retain HC0 residuals independently of gradient
+       * uncertainty. The gradient primitives require this channel only when
+       * their uncertainty output is requested. */
+      const double * const gradient_residual =
+        regression_moment_context->gradient_stderr != NULL ?
+        regression_moment_context->hc0_scaled_residual : NULL;
 
       row_status = np_beta_regression_gradient_rows_validated(
         &plan, has_categories ? &categorical_provider : NULL,
         regression_moment_context->response,
-        regression_moment_context->hc0_scaled_residual,
+        gradient_residual,
         regression_moment_context->hc0_residual_scale,
         regression_moment_context->preserve_mean,
         regression_moment_context->standard_error_mode,
@@ -10880,7 +10888,7 @@ static int np_beta_absolute_route_body(
             &plan, leave_one_out, leave_one_out_offset,
             num_reg_unordered, num_reg_ordered,
             categorical_context, regression_moment_context->response,
-            regression_moment_context->hc0_scaled_residual,
+            gradient_residual,
             regression_moment_context->hc0_residual_scale,
             regression_moment_context->positive_weights,
             regression_moment_context->preserve_mean,

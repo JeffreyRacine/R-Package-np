@@ -9314,7 +9314,7 @@ SEXP C_np_regression(SEXP tuno,
     error("C_np_regression: invalid output request");
   do_merr = np_regression_output_requests_errors(request);
   do_grad = np_regression_output_requests_gradients(request);
-  do_gerr = do_merr && do_grad;
+  do_gerr = np_regression_output_requests_gradient_errors(request);
   gsize = do_grad ? (R_xlen_t)en * (R_xlen_t)nc : 1;
 
   PROTECT(tuno_r = coerceVector(tuno, REALSXP));

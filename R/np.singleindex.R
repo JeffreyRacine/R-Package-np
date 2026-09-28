@@ -900,7 +900,7 @@ npindex.sibandwidth <-
       out
     }
     next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE, se = FALSE,
-                                    allow.empty.rows = FALSE) {
+                                    allow.empty.rows = FALSE, gradient.errors = NULL) {
       args <- if (identical(regtype, "lp") || lc.fixed.progress.route) {
         c(
           list(
@@ -924,6 +924,8 @@ npindex.sibandwidth <-
         fit.progress.handoff <<- FALSE
       }
       args$se <- se
+      if (!is.null(gradient.errors))
+        args[[".np.gradient.errors"]] <- gradient.errors
       args$.np.require.complete <- !isTRUE(allow.empty.rows)
       args$.np.defer.empty.rows <- TRUE
       args
@@ -998,10 +1000,11 @@ npindex.sibandwidth <-
     }
 
     eval_npreg_scalar <- function(eval.df, gradients.flag, label, se.flag = FALSE,
-                                    allow.empty.rows = FALSE) {
+                                    allow.empty.rows = FALSE,
+                                    gradient.errors = se.flag && gradients.flag) {
       gradients.flag <- isTRUE(gradients.flag)
       ncol.base <- if (gradients.flag) 2L else 1L
-      ncol.out <- ncol.base * if (se.flag) 2L else 1L
+      ncol.out <- ncol.base + as.integer(se.flag) + as.integer(gradient.errors)
       out <- .npindex_spmd_eval_rows(
         neval = nrow(eval.df),
         ncol.out = ncol.out,
@@ -1011,7 +1014,8 @@ npindex.sibandwidth <-
             return(matrix(numeric(0L), nrow = 0L, ncol = ncol.out))
           model <- run_npreg_fit(next_npreg_fit_args(
             exdat = eval.df[rows, , drop = FALSE],
-            gradients = gradients.flag, se = se.flag, allow.empty.rows = allow.empty.rows
+            gradients = gradients.flag, se = se.flag, allow.empty.rows = allow.empty.rows,
+            gradient.errors = gradient.errors
           ))
           values <- if (gradients.flag) {
             cbind(as.numeric(model$mean), as.numeric(as.matrix(model$grad)[, 1L]))
@@ -1020,7 +1024,7 @@ npindex.sibandwidth <-
           }
           if (se.flag) {
             values <- cbind(values, as.numeric(model$merr))
-            if (gradients.flag)
+            if (gradient.errors)
               values <- cbind(values, as.numeric(as.matrix(model$gerr)[, 1L]))
           }
           flags <- attr(model, ".np.empty.rows", exact = TRUE)
@@ -1034,7 +1038,7 @@ npindex.sibandwidth <-
         mean = as.vector(out[, 1L]),
         grad = if (gradients.flag) matrix(out[, 2L], ncol = 1L) else NULL,
         merr = if (se.flag) as.vector(out[, ncol.base + 1L]) else NULL,
-        gerr = if (se.flag && gradients.flag) matrix(out[, 4L], ncol = 1L) else NULL
+        gerr = if (gradient.errors) matrix(out[, 4L], ncol = 1L) else NULL
       )
     }
 
@@ -1128,7 +1132,8 @@ npindex.sibandwidth <-
       model <- eval_npreg_scalar(
         eval.df = index.eval.df,
         gradients.flag = gradients || (no.ex && ncol(txdat) > 1L),
-        label = "npindex asymptotic evaluation", se.flag = TRUE, allow.empty.rows = !no.ex
+        label = "npindex asymptotic evaluation", se.flag = TRUE, allow.empty.rows = !no.ex,
+        gradient.errors = gradients
       )
       index.mean <- model$mean
       uncertainty <- .np_index_asymptotic_outputs(model, bws$beta, gradients)
