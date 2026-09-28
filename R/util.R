@@ -3570,6 +3570,15 @@ mcvConstruct <- function(dati){
 ## if an ordered, but scaleless variable contains a new category, error
 ## if an ordered, scale-possessing variable contains a new category lacking scale, error
 
+.np_regression_response_levels <- function(data, dati, allowNewCells = FALSE) {
+  coding <- dati[["all.dlev", exact = TRUE]]
+  if (!(isTRUE(dati[["iord", exact = TRUE]][1L]) ||
+        isTRUE(dati[["iuno", exact = TRUE]][1L])) ||
+      length(coding) != 1L || length(coding[[1L]]) == 0L)
+    stop("factor response requires bandwidths fitted to a factor response")
+  adjustLevels(data, dati, allowNewCells = allowNewCells)
+}
+
 adjustLevels <- function(data, dati, allowNewCells = FALSE){
   for (i in which(dati$iord | dati$iuno)){
     if (allowNewCells){

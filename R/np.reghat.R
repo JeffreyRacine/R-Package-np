@@ -1569,7 +1569,7 @@ npreghat <-
     stop("number of explanatory data 'txdat' and dependent data 'tydat' do not match")
 
   if (is.factor(tydat)) {
-    tydat <- adjustLevels(data.frame(tydat), bws$ydati)[, 1L]
+    tydat <- .np_regression_response_levels(data.frame(tydat), bws$ydati)[, 1L]
     tydat <- (bws$ydati$all.dlev[[1L]])[as.integer(tydat)]
   } else {
     tydat <- as.double(tydat)
@@ -1763,7 +1763,7 @@ npreghat <-
     stop("number of explanatory data 'txdat' and dependent data 'tydat' do not match")
 
   if (is.factor(tydat)) {
-    tydat <- adjustLevels(data.frame(tydat), bws$ydati)[, 1L]
+    tydat <- .np_regression_response_levels(data.frame(tydat), bws$ydati)[, 1L]
     tydat <- (bws$ydati$all.dlev[[1L]])[as.integer(tydat)]
   } else {
     tydat <- as.double(tydat)

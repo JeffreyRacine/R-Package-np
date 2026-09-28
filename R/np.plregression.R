@@ -115,7 +115,7 @@ npplreg.call <-
 
 .np_plreg_numeric_response <- function(y, ydati) {
   if (is.factor(y)) {
-    yy <- adjustLevels(data.frame(y), ydati)
+    yy <- .np_regression_response_levels(data.frame(y), ydati)
     return(ydati$all.dlev[[1L]][as.integer(yy[, 1L])])
   }
 
@@ -334,7 +334,7 @@ npplreg.call <-
       }
 
       if (is.factor(ytrain)) {
-        ytrain <- adjustLevels(data.frame(ytrain), regbw$ydati)[, 1L]
+        ytrain <- .np_regression_response_levels(data.frame(ytrain), regbw$ydati)[, 1L]
         ytrain <- (regbw$ydati$all.dlev[[1L]])[as.integer(ytrain)]
       } else {
         ytrain <- as.double(ytrain)
@@ -417,7 +417,7 @@ npplreg.call <-
       xhat.train <- reg_mean(regbw = bws$bw[[j + 1L]], ytrain = xdat[, j])
 
       if (is.factor(xdat[1L, j])) {
-        tmp.dat <- adjustLevels(xdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati)
+        tmp.dat <- .np_regression_response_levels(xdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati)
         x.num.train <- (bws$bw[[j + 1L]]$ydati$all.dlev[[1L]])[as.integer(tmp.dat[, 1L])]
       } else {
         x.num.train <- as.double(xdat[, j])
@@ -429,7 +429,7 @@ npplreg.call <-
       if (!no.exz) {
         xhat.eval <- reg_mean(regbw = bws$bw[[j + 1L]], ytrain = xdat[, j], zeval = ezdat)
         if (is.factor(xdat[1L, j])) {
-          tmp.dat <- adjustLevels(exdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati, allowNewCells = TRUE)
+          tmp.dat <- .np_regression_response_levels(exdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati, allowNewCells = TRUE)
           x.num.eval <- (bws$bw[[j + 1L]]$ydati$all.dlev[[1L]])[as.integer(tmp.dat[, 1L])]
         } else {
           x.num.eval <- as.double(exdat[, j])
@@ -652,7 +652,7 @@ npplreg.plbandwidth <-
       xhat.train <- reg_mean(regbw = bws$bw[[i+1]], ytrain = txdat[, i])
 
       if (is.factor(txdat[1,i])){
-        tmp.dat <- adjustLevels(txdat[,i, drop=FALSE], bws$bw[[i+1]]$ydati)
+        tmp.dat <- .np_regression_response_levels(txdat[,i, drop=FALSE], bws$bw[[i+1]]$ydati)
         x.num.train <- (bws$bw[[i+1]]$ydati$all.dlev[[1]])[as.integer(tmp.dat[,1])]
         resx[,i] <- x.num.train - xhat.train
       } else {
@@ -666,7 +666,7 @@ npplreg.plbandwidth <-
         xhat.eval <- reg_mean(regbw = bws$bw[[i+1]], ytrain = txdat[, i], zeval = ezdat)
 
         if (is.factor(txdat[1,i])){
-          tmp.dat <- adjustLevels(exdat[,i, drop=FALSE], bws$bw[[i+1]]$ydati)
+          tmp.dat <- .np_regression_response_levels(exdat[,i, drop=FALSE], bws$bw[[i+1]]$ydati)
           resx.eval[,i] <- (bws$bw[[i+1]]$ydati$all.dlev[[1]])[as.integer(tmp.dat[,1])] - xhat.eval
         } else {
           resx.eval[,i] <- exdat[,i] - xhat.eval
