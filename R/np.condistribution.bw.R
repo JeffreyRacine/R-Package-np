@@ -1420,6 +1420,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
       hot.payload$num.feval <- direct.payload$num.feval
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+      # Report the executed Powell phase even when its endpoint is not retained.
+      direct.payload$nn.cache <- hot.payload$nn.cache
       hot.objective <- .npcdistbw_certify_raw_bandwidth(
         bws = hot.payload, xdat = xdat, ydat = ydat, opt.args = opt.args,
         owner = "npcdist MADS+Powell handoff"
@@ -2086,6 +2088,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
       hot.payload$num.feval <- direct.payload$num.feval
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+      # Report the executed Powell phase even when its endpoint is not retained.
+      direct.payload$nn.cache <- hot.payload$nn.cache
       if (!is.null(hot.payload$method) && length(hot.payload$method))
         hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
       hot.objective <- .npcdistbw_certify_raw_bandwidth(
