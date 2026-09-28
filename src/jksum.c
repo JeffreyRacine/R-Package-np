@@ -9227,6 +9227,7 @@ typedef struct {
   NPCategoricalLeadingMomentCtx *categorical_leading_moments;
   NPConditionalLeadingRatioCtx *conditional_leading_ratio;
   NPConditionalANNDirectCtx *conditional_ann_direct;
+  int fixed_cvls_cancel_row_mass;
 } NP_OuterPackCtx;
 
 /* Keep means as anchor + offset: near-constant contributions must not lose
@@ -14448,7 +14449,10 @@ NPPermutationWeightOutput * const pkw_output,
           (operator[l] == OP_INTEGRAL);
         const int p_bounded_integral = use_p_bounds_i && do_perm &&
           (permutation_operator == OP_INTEGRAL);
-        const double invnorm = (use_bounds_i && !bounded_integral) ?
+        /* Fixed CVLS may omit the common continuous row mass before
+         * symmetric pair reuse. Keep bounded support and owner selection. */
+        const double invnorm = (use_bounds_i && !bounded_integral &&
+          !(outer_pack_ctx != NULL && outer_pack_ctx->fixed_cvls_cancel_row_mass)) ?
           np_cker_bounded_norm(KERNEL_reg_np[i], xc[i][j], m[i][jbw],
                                vector_ckerlb_extern[i],
                                vector_ckerub_extern[i]).inverse_mass : 1.0;
@@ -19200,7 +19204,11 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   int use_sparse_tree = 0;
   int tsf = 0;
   const NP_OuterPackCtx frozen_runtime_options = {
-    .runtime_options_frozen = 1
+    .runtime_options_frozen = 1,
+    .fixed_cvls_cancel_row_mass = (bwm == RBWM_CVLS)
+#ifdef MPI2
+      && (iNum_Processors <= 1)
+#endif
   };
   const int track_lowsupport_requested =
     (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) || (bwm == RBWM_CVKS);
