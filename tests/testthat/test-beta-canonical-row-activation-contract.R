@@ -703,7 +703,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
       "                                                   &nn_geometry_context,\n",
       "                                                   ordinary_hc0_active ?\n",
       "                                                     &ordinary_hc0_context : NULL,\n",
-      "                                                   call->empty_rows, NULL, NULL, NULL, NULL);"
+      "                                                   call->empty_rows, NULL, NULL, NULL, NULL, NULL);"
     ),
     fixed = TRUE
   )
@@ -1509,7 +1509,9 @@ test_that("every beta side enters the common conditional regression owner", {
       "                                                               row_nn_geometry_context_ptr,\n",
       "                                                               NULL, empty_rows != NULL ? &row_empty : NULL, first_se_request,\n",
       "                                                               variance_metadata != NULL ? &variance_one : NULL,\n",
-      "                                                                 &row_failure, &conditional_design);"
+      "                                                                 &row_failure, &conditional_design,\n",
+      "                                                                 ann_fit_batch == NULL ? NULL :\n",
+      "                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1));"
     ),
     fixed = TRUE
   )

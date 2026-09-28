@@ -315,7 +315,7 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
   expect_false(grepl("MATRIX XtX", shortcut_body, fixed = TRUE))
 
   helper_start <- grep(
-    "^static SEXP np_regression_general_lp_fit_execute\\(void \\*data\\)$",
+    "^static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body\\($",
     lines
   )
   helper_stop <- grep("^static int np_regression_general_lp_fit\\($", lines)

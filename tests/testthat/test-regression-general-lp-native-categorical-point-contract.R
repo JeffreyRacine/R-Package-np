@@ -188,12 +188,12 @@ test_that("H7A remains a point-only bounded-work adapter", {
     collapse = "\n"
   )
   start <- regexpr(
-    "static int np_regression_general_lp_point_at_frame(",
+    "static NP_ALWAYS_INLINE int np_regression_general_lp_point_at_frame(",
     source,
     fixed = TRUE
   )[[1L]]
   finish <- regexpr(
-    "static SEXP np_regression_general_lp_fit_execute(void *data)",
+    "static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(",
     source,
     fixed = TRUE
   )[[1L]]

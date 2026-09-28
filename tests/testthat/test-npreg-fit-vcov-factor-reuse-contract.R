@@ -39,7 +39,7 @@ test_that("response and adjoint LP owners retain validated factorizations", {
   adjoint.name <- "np_lp_solve_workspace_solve_adjoint_factored("
   owner.names <- c("np_conditional_lp_project_accepted",
                    "np_regression_general_lp_point_at_frame",
-                   "np_regression_general_lp_fit_execute")
+                   "np_regression_general_lp_fit_body")
   owner.bodies <- lapply(owner.names, function(name)
     np_test_extract_c_function(jksum_lines, name))
   names(owner.bodies) <- owner.names
@@ -55,6 +55,15 @@ test_that("response and adjoint LP owners retain validated factorizations", {
   conditional <- owner.bodies[[1L]]
   frame <- owner.bodies[[2L]]
   fit <- owner.bodies[[3L]]
+  # Both transport wrappers must enter this same arithmetic/factor owner.
+  for (ann in c(FALSE, TRUE)) {
+    wrapper <- np_test_extract_c_function(jksum_lines,
+      if (ann) "np_regression_general_lp_fit_ann_execute"
+      else "np_regression_general_lp_fit_execute")
+    expect_match(wrapper,
+      paste0("return np_regression_general_lp_fit_body(data, ",
+             as.integer(ann), ");"), fixed = TRUE)
+  }
   expect_match(conditional, "if(diagnostics->ridge_total > 0.0)", fixed = TRUE)
   expect_match(conditional, "np_lp_solve_workspace_solve_factored(", fixed = TRUE)
   expect_match(frame, "if(projection != NULL)", fixed = TRUE)

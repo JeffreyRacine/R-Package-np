@@ -1,6 +1,6 @@
 h6_extract_lp_owner <- function(source) {
   start <- gregexpr(
-    "static SEXP np_regression_general_lp_fit_execute(void *data)",
+    "static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(",
     source, fixed = TRUE
   )[[1L]]
   finish <- gregexpr(

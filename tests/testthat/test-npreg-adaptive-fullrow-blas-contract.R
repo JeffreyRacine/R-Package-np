@@ -123,7 +123,7 @@ test_that("adaptive regression BLAS allocation and solve failures fall back", {
   )
   expect_match(
     owner_compact,
-    "(BANDWIDTH_reg == BW_ADAP_NN) && (glp_nterms >= 4)",
+    "(BANDWIDTH_reg == BW_ADAP_NN) && !adaptive_tree && (glp_nterms >= 4)",
     fixed = TRUE
   )
   expect_match(

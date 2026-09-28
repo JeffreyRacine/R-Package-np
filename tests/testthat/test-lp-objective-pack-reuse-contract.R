@@ -27,7 +27,7 @@ test_that("generic LP objectives reuse only a matching immutable outer pack", {
   expect_match(source, "if\\(blas_Apack_owned != NULL\\) free\\(blas_Apack_owned\\)")
 })
 
-test_that("objective pack reuse is scoped away from adaptive, live-tree, and reduced rows", {
+test_that("objective pack reuse requires non-adaptive full rows and certified dense geometry", {
   src_file <- locate_objective_pack_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   source <- paste(readLines(src_file, warn = FALSE), collapse = "\n")
@@ -36,11 +36,15 @@ test_that("objective pack reuse is scoped away from adaptive, live-tree, and red
     source,
     paste0(
       "if\\(\\(BANDWIDTH_reg != BW_ADAP_NN\\) &&\\s*",
-      "\\(\\(!ks_tree_use\\) \\|\\| dense_high_occupancy_admitted\\) &&\\s*",
+      "\\(\\(!ks_tree_use\\) \\|\\| dense_high_occupancy_admitted \\|\\| gnn_full_support\\) &&\\s*",
       "np_reg_cv_use_symmetric_dropone_path\\(bwm,\\s*",
       "ks_tree_use_active,"
     )
   )
+  expect_match(source,
+    "const int gnn_full_support = (BANDWIDTH_reg == BW_GEN_NN) &&",
+    fixed = TRUE)
+  expect_match(source, "np_reg_gnn_tree_cannot_prune(", fixed = TRUE)
   expect_match(
     source,
     "Pack it once at objective scope;\\s*reduced triangular rows advance the source pointers and cannot reuse it"
