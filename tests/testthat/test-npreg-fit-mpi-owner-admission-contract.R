@@ -14,20 +14,17 @@ npreg_fit_owner_source <- function() {
 }
 
 npreg_fit_owner_body <- function(source) {
-  start <- regexpr(
-    "static SEXP np_regression_general_lp_fit_execute(void *data)",
-    source,
-    fixed = TRUE
-  )[[1L]]
-  expect_gt(start, 0L)
-  remainder <- substr(source, start, nchar(source))
-  stop <- regexpr(
-    "static int np_regression_general_lp_fit(",
-    remainder,
-    fixed = TRUE
-  )[[1L]]
-  expect_gt(stop, 0L)
-  substr(source, start, start + stop - 2L)
+  lines <- strsplit(source, "\n", fixed = TRUE)[[1L]]
+  # Both transport wrappers enter the same arithmetic and variance owner.
+  for (ann in c(FALSE, TRUE)) {
+    wrapper <- npRmpi_test_extract_c_function(lines,
+      if (ann) "np_regression_general_lp_fit_ann_execute"
+      else "np_regression_general_lp_fit_execute")
+    expect_match(wrapper,
+      paste0("return np_regression_general_lp_fit_body(data, ",
+             as.integer(ann), ");"), fixed = TRUE)
+  }
+  npRmpi_test_extract_c_function(lines, "np_regression_general_lp_fit_body")
 }
 
 test_that("general LP fit owner admits fixed, generalized NN, and adaptive NN", {

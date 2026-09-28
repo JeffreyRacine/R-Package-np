@@ -187,7 +187,8 @@ test_that("exact adaptive conditional owners share rank-symmetric bounded finish
     )
   )
 
-  for (owner in owners) {
+  for (name in names(owners)) {
+    owner <- owners[[name]]
     body <- owner$body
     expect_match(
       body,
@@ -195,7 +196,30 @@ test_that("exact adaptive conditional owners share rank-symmetric bounded finish
       fixed = TRUE
     )
     expect_match(body, "np_objective_outer_preflight_failed(", fixed = TRUE)
-    expect_match(body, "np_objective_outer_buffer_prepare(", fixed = TRUE)
+    if (identical(name, "cdist")) {
+      # ANN loss blocks consume the vector in both local and parallel modes.
+      # Assert the explicit allocation's safety contract, not the old helper.
+      expect_match(body,
+        "contributions = (double *)calloc((size_t)num_train, sizeof(double));",
+        fixed = TRUE)
+      expect_match(body,
+        "if(contributions == NULL || np_conditional_xrow_ctx_prepare_adaptive_fold(",
+        fixed = TRUE)
+      expect_match(body, "np_conditional_yrow_ctx_prepare_adaptive_fold(",
+                   fixed = TRUE)
+      preflight <- regexpr(
+        "if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))",
+        body, fixed = TRUE)[[1L]]
+      ownership <- regexpr("np_objective_outer_owned_rows(", body,
+                           fixed = TRUE)[[1L]]
+      expect_gt(preflight, 0L)
+      expect_gt(ownership, preflight)
+      expect_match(body,
+        "owned_start, owned_start+owned_rows, contributions);", fixed = TRUE)
+      expect_match(body, "free(contributions);", fixed = TRUE)
+    } else {
+      expect_match(body, "np_objective_outer_buffer_prepare(", fixed = TRUE)
+    }
     expect_match(body, "np_objective_outer_owned_rows(", fixed = TRUE)
     expect_match(body, "np_objective_outer_buffer_finish(", fixed = TRUE)
     expect_match(body, owner$hook, fixed = TRUE)
@@ -223,7 +247,34 @@ test_that("adaptive geometry preparation fails rank-symmetrically", {
   calls <- gregexpr(
     "np_adaptive_geometry_preflight_failed(", source, fixed = TRUE
   )[[1L]]
-  # One helper definition plus five audited call sites: two regression,
-  # one conditional-distribution, and two conditional-density owners.
-  expect_identical(length(calls[calls > 0L]), 6L)
+  # One definition plus four retained call sites: two regression and two
+  # unconditional-density owners. The migrated unconditional CDF owner below
+  # performs the same failure reduction directly at its common finish label.
+  expect_identical(length(calls[calls > 0L]), 5L)
+  distribution <- conditional_adaptive_cvls_body(
+    source, "static SEXP np_distribution_nn_cv_execute(void *data)",
+    "static int np_distribution_gnn_group("
+  )
+  expect_match(distribution, "geometry.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;",
+               fixed = TRUE)
+  expect_match(distribution, "failure = kernel_bandwidth_mean_ctx(", fixed = TRUE)
+  expect_match(distribution, "if(failure)\n    goto finish_distribution_nn_grid;",
+               fixed = TRUE)
+  expect_match(distribution,
+    "np_objective_outer_owned_rows(0,m,parallel,&owned_start,&owned_rows);",
+    fixed = TRUE)
+  finish <- regexpr("finish_distribution_nn_grid:", distribution,
+                    fixed = TRUE)[[1L]]
+  preflight <- regexpr("np_objective_outer_preflight_failed(parallel,failure)",
+                       distribution, fixed = TRUE)[[1L]]
+  reduction <- regexpr("np_objective_outer_buffer_finish(parallel,m,0,contributions,",
+                       distribution, fixed = TRUE)[[1L]]
+  expect_gt(finish, 0L)
+  expect_gt(preflight, finish)
+  expect_gt(reduction, preflight)
+  expect_match(distribution, "NP_RMPI_INJECT_UDIST_ADAPTIVE_EXACT_FAIL_RANK",
+               fixed = TRUE)
+  expect_match(source,
+    paste0("if\\(\\(BANDWIDTH_den == BW_ADAP_NN \\|\\| BANDWIDTH_den == BW_GEN_NN\\) &&",
+           "\\s+num_reg_continuous > 0\\)\\s+return np_distribution_nn_exact_grid\\("))
 })

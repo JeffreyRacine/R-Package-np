@@ -33,7 +33,8 @@ test_that("conditional GNN fitting admission leaves search and other routes inta
           z <- b;z$regtype.engine <- engine
           z$cxkertype <- z$cykertype <- kernel;z$cxkerorder <- z$cykerorder <- order
           z$cxkerbound <- z$cykerbound <- bound;options(np.tree=mode)
-          expected <- if(isTRUE(mode)&&fit&&engine=="lc"&&kernel!="gaussian"&&
+          # LC and LP share the qualified explicit fitting admission.
+          expected <- if(isTRUE(mode)&&fit&&engine%in%c("lc","lp")&&kernel!="gaussian"&&
             order==2L&&bound=="none")yes else no
           expect_identical(choose(z,2L,0L,fit.context=fit),expected)
         }

@@ -39,10 +39,20 @@ test_that("main general-LP fit branch has one complete unwind owner", {
   region <- general_lp_owner_region(source)
   callsite <- general_lp_callsite_region(source)
 
-  expect_equal(
-    sum(gregexpr("R_UnwindProtect(", region, fixed = TRUE)[[1L]] > 0L),
-    1L
-  )
+  # The fitting owner and the new ANN tile owner each have one unwind scope.
+  # Counting the entire region would mistake a nested independent owner for
+  # a duplicated fitting cleanup.
+  for (name in c("np_regression_general_lp_fit", "np_ann_fit_batch_row")) {
+    body <- npRmpi_test_extract_c_function(source, name)
+    expect_equal(
+      sum(gregexpr("R_UnwindProtect(", body, fixed = TRUE)[[1L]] > 0L),
+      1L, info = name
+    )
+  }
+  batch <- npRmpi_test_extract_c_function(source, "np_ann_fit_batch_row")
+  expect_match(batch,
+    "R_UnwindProtect(np_ann_fit_batch_execute,b,np_ann_fit_batch_cleanup,b,NULL)",
+    fixed = TRUE)
   expect_match(region, "NPLPSolveWorkspace solve_workspace;", fixed = TRUE)
   expect_match(
     region,
