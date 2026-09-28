@@ -675,6 +675,11 @@ npindex.sibandwidth <-
     if (!(is.vector(tydat) || is.factor(tydat)))
       stop("'tydat' must be a vector or a factor")
     .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
+    if (bws$method == "kleinspady") {
+      .npindex_check_binary_response(tydat, "npindex() 'tydat'")
+      if (!no.ey)
+        .npindex_check_binary_response(eydat, "npindex() 'eydat'")
+    }
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
     tydat <- if (is.factor(tydat)) {
       if (any(bws$ydati$iord | bws$ydati$iuno))

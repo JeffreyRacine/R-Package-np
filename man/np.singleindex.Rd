@@ -87,6 +87,10 @@ These arguments identify the bandwidth specification, formula/data interface, an
     \code{txdat}. Defaults to the corresponding
     training data recoverable from the bandwidth object in the current
     session.
+    For \code{method="kleinspady"}, response values must be numeric 0 or 1.
+    Factor responses are rejected rather than converted to internal category
+    codes; explanatory variables may still be factors. The same response
+    restriction applies to supplied evaluation outcomes.
   }
 
 
