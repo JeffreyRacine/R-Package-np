@@ -2687,7 +2687,7 @@ test_that("session conditional density fixed ll cv.ls uses MPI autodispatch rout
       "stopifnot(is.finite(bw$fval))",
       "stopifnot(is.null(attr(bw, 'npRmpi.autodispatch.remote', exact=TRUE)))",
       "stopifnot(is.list(bw$timing.profile))",
-      "stopifnot(identical(bw$timing.profile$where, 'autodispatch-call'))",
+      "stopifnot(identical(bw$timing.profile$where, 'npcdensbw'))",
       "stopifnot(any(grepl('mpi.bcast.cmd.execute', bw$timing.profile$comm_notes, fixed=TRUE)))",
       "cat('SESSION_NPCDENS_LL_CVLS_AUTODISPATCH_OK\\n')"
     ),
@@ -2721,7 +2721,7 @@ test_that("session conditional distribution fixed ll cv.ls uses MPI autodispatch
       "stopifnot(is.finite(bw$fval))",
       "stopifnot(is.null(attr(bw, 'npRmpi.autodispatch.remote', exact=TRUE)))",
       "stopifnot(is.list(bw$timing.profile))",
-      "stopifnot(identical(bw$timing.profile$where, 'autodispatch-call'))",
+      "stopifnot(identical(bw$timing.profile$where, 'npcdistbw'))",
       "stopifnot(any(grepl('mpi.bcast.cmd.execute', bw$timing.profile$comm_notes, fixed=TRUE)))",
       "cat('SESSION_NPCDIST_LL_CVLS_AUTODISPATCH_OK\\n')"
     ),
