@@ -8005,18 +8005,47 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
   if(use_wpow){
     wbuf = (double *)malloc((size_t)num_weights*sizeof(double));
     if(wbuf == NULL) error("memory allocation failed");
-    if(kpow == 2){
-      for(k = 0; k < num_weights; k++){
-        const double wk = weights[k]/db;
-        wbuf[k] = (weights[k] == 0.0) ? 0.0 : wk*wk;
+    if(xl == NULL){
+      if(kpow == 2){
+        for(k = 0; k < num_weights; k++){
+          const double wk = weights[k]/db;
+          wbuf[k] = (weights[k] == 0.0) ? 0.0 : wk*wk;
+        }
+      } else {
+        for(k = 0; k < num_weights; k++)
+          wbuf[k] = (weights[k] == 0.0) ? 0.0 : ipow(weights[k]/db, kpow);
       }
     } else {
-      for(k = 0; k < num_weights; k++)
-        wbuf[k] = (weights[k] == 0.0) ? 0.0 : ipow(weights[k]/db, kpow);
+      /* Sparse producers define only the ranges consumed below. */
+      for(int m = 0; m < xl->n; ++m){
+        const int begin = xl->istart[m];
+        const int end = begin + xl->nlev[m];
+        if(kpow == 2){
+          for(k = begin; k < end; ++k){
+            const double wk = weights[k]/db;
+            wbuf[k] = (weights[k] == 0.0) ? 0.0 : wk*wk;
+          }
+        } else {
+          for(k = begin; k < end; ++k)
+            wbuf[k] = (weights[k] == 0.0) ? 0.0 : ipow(weights[k]/db, kpow);
+        }
+      }
     }
   }
 
-  if (do_leave_one_out) {
+  int restore_weight = do_leave_one_out;
+  if(do_leave_one_out && xl != NULL){
+    restore_weight = 0;
+    for(int m = 0; m < xl->n; ++m){
+      if(which_k >= xl->istart[m] &&
+         which_k < xl->istart[m] + xl->nlev[m]){
+        restore_weight = 1;
+        break;
+      }
+    }
+  }
+
+  if (restore_weight) {
     temp = weights[which_k];
     weights[which_k] = 0.0;
     if(use_wpow)
@@ -8081,7 +8110,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     }
 
     if(accel_ok){
-      if(do_leave_one_out)
+      if(restore_weight)
         weights[which_k] = temp;
       safe_free(wbuf);
       return;
@@ -8140,7 +8169,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     }
 
     if(blas_ok){
-      if(do_leave_one_out)
+      if(restore_weight)
         weights[which_k] = temp;
 
       safe_free(wbuf);
@@ -8156,7 +8185,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
            !gather_scatter &&
            np_outer_weighted_sum_accel_try(pmat_A, have_A, pmat_B, have_B,
                                            weights, num_weights, db, result)){
-          if(do_leave_one_out)
+          if(restore_weight)
             weights[which_k] = temp;
 
           return;
@@ -8208,7 +8237,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
       }
     }
 
-    if(do_leave_one_out)
+    if(restore_weight)
       weights[which_k] = temp;
 
     return;
@@ -8223,7 +8252,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
      np_outer_weighted_sum_tree_blas(
        pmat_A, have_A, max_A, pmat_B, have_B, max_B,
        weights, num_weights, symmetric, db, result, xl, tree_workspace)){
-    if(do_leave_one_out)
+    if(restore_weight)
       weights[which_k] = temp;
     return;
   }
@@ -8236,7 +8265,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
                                     use_wpow ? wbuf : weights, num_weights,
                                     symmetric, use_wpow ? unit_weight : db, result,
                                     Apack_pre)){
-        if(do_leave_one_out)
+        if(restore_weight)
           weights[which_k] = temp;
 
         safe_free(wbuf);
@@ -8487,7 +8516,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     }
   }
 
-  if (do_leave_one_out)
+  if (restore_weight)
     weights[which_k] = temp;
 
   safe_free(wbuf);
