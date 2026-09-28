@@ -545,6 +545,67 @@ extern double *vector_T_extern;
 extern double *vector_Y_eval_extern;
 extern double *vector_continuous_stddev_extern;
 
+typedef struct {
+  int offset, kernel, bandwidth_mode, num_train, num_eval;
+  int ncon, nuno, nord, suppress_parallel;
+  double *scale_factor;
+  double **train, **eval, **bandwidth;
+  double *lambda;
+  const NPNNGeometryContext *geometry;
+  NPNNGeometryStatus *geometry_status;
+  double *saved_spread;
+  int status;
+} NPConditionalYBandwidthPreparation;
+
+static SEXP np_conditional_y_bandwidth_execute(void *data)
+{
+  NPConditionalYBandwidthPreparation *call = data;
+  if(call->saved_spread != NULL)
+    vector_continuous_stddev_extern = call->saved_spread + call->offset;
+  call->status = kernel_bandwidth_mean_ctx(
+    call->kernel, call->bandwidth_mode, call->num_train, call->num_eval,
+    0, 0, 0, call->ncon, call->nuno, call->nord, call->suppress_parallel,
+    call->scale_factor, NULL, NULL, call->train, call->eval, NULL,
+    call->bandwidth, call->lambda, call->geometry, NULL, call->geometry_status);
+  return R_NilValue;
+}
+
+static void np_conditional_y_bandwidth_cleanup(void *data, Rboolean jump)
+{
+  NPConditionalYBandwidthPreparation *call = data;
+  (void)jump;
+  vector_continuous_stddev_extern = call->saved_spread;
+}
+
+/* Y-only preparation uses the canonical helper's X slots. Give those slots
+ * their own spread view, and restore the X-then-Y owner even on an R error. */
+static int np_conditional_y_bandwidth_prepare(
+  const int offset, const int kernel, const int bandwidth_mode,
+  const int num_train, const int num_eval,
+  const int ncon, const int nuno, const int nord, const int suppress_parallel,
+  double *scale_factor, double **train, double **eval,
+  double **bandwidth, double *lambda,
+  const NPNNGeometryContext *geometry, NPNNGeometryStatus *geometry_status)
+{
+  if(int_LARGE_SF != 0 || ncon == 0 || offset == 0)
+    return kernel_bandwidth_mean_ctx(
+      kernel, bandwidth_mode, num_train, num_eval,
+      0, 0, 0, ncon, nuno, nord, suppress_parallel,
+      scale_factor, NULL, NULL, train, eval, NULL, bandwidth, lambda,
+      geometry, NULL, geometry_status);
+
+  NPConditionalYBandwidthPreparation call = {
+    offset, kernel, bandwidth_mode, num_train, num_eval,
+    ncon, nuno, nord, suppress_parallel,
+    scale_factor, train, eval, bandwidth, lambda, geometry, geometry_status,
+    vector_continuous_stddev_extern, 1
+  };
+  R_UnwindProtect(np_conditional_y_bandwidth_execute, &call,
+                  np_conditional_y_bandwidth_cleanup, &call, NULL);
+  return call.status;
+}
+
+
 /* Quantile - no Y ordered or unordered used, but defined anyways */
 
 extern double **matrix_Y_continuous_quantile_extern;
@@ -27760,25 +27821,14 @@ double *cv){
                         lambdax) != 0)
     goto cleanup_cdist_loo;
 
-  if(kernel_bandwidth_mean(KERNEL_reg,
-                        BANDWIDTH_den,
-                        num_obs_train,
-                        nbwmy,
-                        0,
-                        0,
-                        0,
-                        num_var_continuous,
-                        num_var_unordered,
-                        num_var_ordered,
-                        0, // do not suppress_parallel
-                        vsfy,
-                        NULL,
-                        NULL,
-                        matrix_Y_continuous_train,
-                        matrix_Y_continuous_eval,
-                        NULL,					 // Not used 
-                        matrix_bandwidth_y,
-                        lambday) != 0)
+  if(np_conditional_y_bandwidth_prepare(
+    num_reg_continuous, KERNEL_reg, BANDWIDTH_den,
+    num_obs_train, nbwmy,
+    num_var_continuous, num_var_unordered, num_var_ordered, 0,
+    vsfy,
+    matrix_Y_continuous_train, matrix_Y_continuous_eval,
+    matrix_bandwidth_y, lambday,
+    NULL, NULL) != 0)
     goto cleanup_cdist_loo;
 
   if(num_reg_continuous > 0 || num_reg_unordered > 0 || num_reg_ordered > 0){
@@ -39968,28 +40018,14 @@ static int np_conditional_yrow_eval_ctx_prepare_impl(
   }
 
   /* This Y-only owner marshals its coordinates through the helper's X slots. */
-  if(kernel_bandwidth_mean_ctx(KERNEL_den_extern,
-                           BANDWIDTH_den_extern,
-                           num_train,
-                           num_eval,
-                           0,
-                           0,
-                           0,
-                           num_var_continuous_extern,
-                           num_var_unordered_extern,
-                           num_var_ordered_extern,
-                           1,
-                           ctx->vsfy,
-                           NULL,
-                           NULL,
-                           matrix_Y_continuous_train_extern,
-                           matrix_Y_continuous_eval,
-                           NULL,
-                           ctx->matrix_bandwidth_y,
-                           ctx->lambday,
-                           bandwidth_geometry,
-                           NULL,
-                           NULL) == 1)
+  if(np_conditional_y_bandwidth_prepare(
+    num_reg_continuous_extern, KERNEL_den_extern, BANDWIDTH_den_extern,
+    num_train, num_eval,
+    num_var_continuous_extern, num_var_unordered_extern, num_var_ordered_extern, 1,
+    ctx->vsfy,
+    matrix_Y_continuous_train_extern, matrix_Y_continuous_eval,
+    ctx->matrix_bandwidth_y, ctx->lambday,
+    bandwidth_geometry, NULL) == 1)
     goto fail_yrow_ctx_prepare;
 
   ctx->ready = 1;
@@ -40139,25 +40175,14 @@ static int np_conditional_yrow_eval_two_slot_ctx_prepare(
   }
 
   /* This Y-only owner marshals its coordinates through the helper's X slots. */
-  if(kernel_bandwidth_mean_ctx(KERNEL_den_extern,
-                               BANDWIDTH_den_extern,
-                               num_train,
-                               num_eval,
-                               0, 0, 0,
-                               num_var_continuous_extern,
-                               num_var_unordered_extern,
-                               num_var_ordered_extern,
-                               0,
-                               successor_scale,
-                               NULL, NULL,
-                               matrix_Y_continuous_train_extern,
-                               matrix_Y_continuous_eval,
-                               NULL,
-                               ctx->matrix_bandwidth_y_successor,
-                               successor_lambda,
-                               mapped_query_geometry,
-                               NULL,
-                               NULL) == 1)
+  if(np_conditional_y_bandwidth_prepare(
+    num_reg_continuous_extern, KERNEL_den_extern, BANDWIDTH_den_extern,
+    num_train, num_eval,
+    num_var_continuous_extern, num_var_unordered_extern, num_var_ordered_extern, 0,
+    successor_scale,
+    matrix_Y_continuous_train_extern, matrix_Y_continuous_eval,
+    ctx->matrix_bandwidth_y_successor, successor_lambda,
+    mapped_query_geometry, NULL) == 1)
     goto fail_two_slot_prepare;
 
   free(successor_scale);
@@ -41281,25 +41306,14 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
   for(i = 0; i < num_var_ordered_extern; i++) kernel_oy[i] = KERNEL_den_ordered_extern;
   for(i = 0; i < num_var_tot; i++) operator_y[i] = operator_code;
 
-  if(kernel_bandwidth_mean(KERNEL_den_extern,
-                           BANDWIDTH_den_extern,
-                           num_train,
-                           num_eval,
-                           0,
-                           0,
-                           0,
-                           num_var_continuous_extern,
-                           num_var_unordered_extern,
-                           num_var_ordered_extern,
-                           suppress_nn_parallel,
-                           vsfy,
-                           NULL,
-                           NULL,
-                           matrix_Y_continuous_train_extern,
-                           matrix_Y_continuous_eval,
-                           NULL,
-                           matrix_bandwidth_y,
-                           lambday) == 1)
+  if(np_conditional_y_bandwidth_prepare(
+    num_reg_continuous_extern, KERNEL_den_extern, BANDWIDTH_den_extern,
+    num_train, num_eval,
+    num_var_continuous_extern, num_var_unordered_extern, num_var_ordered_extern, suppress_nn_parallel,
+    vsfy,
+    matrix_Y_continuous_train_extern, matrix_Y_continuous_eval,
+    matrix_bandwidth_y, lambday,
+    NULL, NULL) == 1)
     goto cleanup_yweight_row;
 
   for(l = 0; l < num_var_unordered_extern; l++)
@@ -42136,28 +42150,14 @@ static int np_conditional_y_block_stream_op_core_ctx(
   for(i = 0; i < num_var_tot; i++) operator_y[i] = operator_code;
 
   /* This Y-only owner marshals its coordinates through the helper's X slots. */
-  if(kernel_bandwidth_mean_ctx(KERNEL_den_extern,
-                           BANDWIDTH_den_extern,
-                           num_train,
-                           block_rows,
-                           0,
-                           0,
-                           0,
-                           num_var_continuous_extern,
-                           num_var_unordered_extern,
-                           num_var_ordered_extern,
-                           suppress_nn_parallel,
-                           vsfy,
-                           NULL,
-                           NULL,
-                           matrix_Y_continuous_train_extern,
-                           matrix_Y_continuous_eval_block,
-                           NULL,
-                           matrix_bandwidth_y,
-                           lambday,
-                           nn_geometry_context,
-                           NULL,
-                           NULL) == 1)
+  if(np_conditional_y_bandwidth_prepare(
+    num_reg_continuous_extern, KERNEL_den_extern, BANDWIDTH_den_extern,
+    num_train, block_rows,
+    num_var_continuous_extern, num_var_unordered_extern, num_var_ordered_extern, suppress_nn_parallel,
+    vsfy,
+    matrix_Y_continuous_train_extern, matrix_Y_continuous_eval_block,
+    matrix_bandwidth_y, lambday,
+    nn_geometry_context, NULL) == 1)
     goto cleanup_yweight_block;
 
   for(i = 0; i < block_rows; i++){
@@ -42340,25 +42340,14 @@ static int np_conditional_y_eval_block_stream_op_core(double *vector_scale_facto
   for(i = 0; i < num_var_ordered_extern; i++) kernel_oy[i] = KERNEL_den_ordered_extern;
   for(i = 0; i < num_var_tot; i++) operator_y[i] = operator_code;
 
-  if(kernel_bandwidth_mean(KERNEL_den_extern,
-                           BANDWIDTH_den_extern,
-                           num_train,
-                           block_rows,
-                           0,
-                           0,
-                           0,
-                           num_var_continuous_extern,
-                           num_var_unordered_extern,
-                           num_var_ordered_extern,
-                           suppress_nn_parallel,
-                           vsfy,
-                           NULL,
-                           NULL,
-                           matrix_Y_continuous_train_extern,
-                           matrix_Y_continuous_eval_block,
-                           NULL,
-                           matrix_bandwidth_y,
-                           lambday) == 1)
+  if(np_conditional_y_bandwidth_prepare(
+    num_reg_continuous_extern, KERNEL_den_extern, BANDWIDTH_den_extern,
+    num_train, block_rows,
+    num_var_continuous_extern, num_var_unordered_extern, num_var_ordered_extern, suppress_nn_parallel,
+    vsfy,
+    matrix_Y_continuous_train_extern, matrix_Y_continuous_eval_block,
+    matrix_bandwidth_y, lambday,
+    NULL, NULL) == 1)
     goto cleanup_yweight_eval_block;
 
   for(i = 0; i < block_rows; i++){
@@ -57070,22 +57059,14 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                               NULL, NULL, NULL,
                               NULL, NULL, NULL);
 
-        if(kernel_bandwidth_mean(KERNEL_den,
-                                 BANDWIDTH_den,
-                                 num_obs,
-                                 num_obs,
-                                 0, 0, 0,
-                                 num_var_continuous,
-                                 num_var_unordered,
-                                 num_var_ordered,
-                                 0,
-                                 vsf_y,
-                                 NULL, NULL,
-                                 matrix_Y_continuous,
-                                 matrix_Y_continuous,
-                                 NULL,
-                                 matrix_bandwidth_y,
-                                 lambda_y) == 1){
+        if(np_conditional_y_bandwidth_prepare(
+    num_reg_continuous, KERNEL_den, BANDWIDTH_den,
+    num_obs, num_obs,
+    num_var_continuous, num_var_unordered, num_var_ordered, 0,
+    vsf_y,
+    matrix_Y_continuous, matrix_Y_continuous,
+    matrix_bandwidth_y, lambda_y,
+    NULL, NULL) == 1){
           fast_failed = 1;
         }
       }
