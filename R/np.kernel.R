@@ -66,6 +66,17 @@ npksum.numeric <-
     dots <- list(...)
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
     dots$return.derivative.kernel.weights <- NULL
+    # Computation controls must survive numeric-bandwidth redispatch, not be
+    # consumed as bandwidth-constructor options. Preserve their exact values.
+    power.args <- NULL
+    if (length(dots)) {
+      power.names <- names(dots) %in%
+        c(".np.internal.power12", ".np.internal.power12.weighted")
+      if (any(power.names)) {
+        power.args <- dots[power.names]
+        dots <- dots[!power.names]
+      }
+    }
 
     txdat <- toFrame(txdat)
     if (!missing(exdat)) {
@@ -115,6 +126,8 @@ npksum.numeric <-
       call_args$return.kernel.weights <- return.kernel.weights
     if (return.derivative.kernel.weights)
       call_args$return.derivative.kernel.weights <- return.derivative.kernel.weights
+    if (length(power.args))
+      call_args <- c(call_args, power.args)
 
     do.call(npksum.default, call_args)
   }
