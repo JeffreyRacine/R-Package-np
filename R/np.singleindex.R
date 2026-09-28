@@ -577,7 +577,7 @@ npindex.sibandwidth <-
       eydat <- double()
     else {
       if (is.factor(eydat)){
-        eydat <- adjustLevels(data.frame(eydat), bws$ydati)[,1]
+        eydat <- .np_regression_response_levels(data.frame(eydat), bws$ydati)[,1]
         eydat <- (bws$ydati$all.dlev[[1]])[as.integer(eydat)]
       }
       else

@@ -663,7 +663,7 @@ npreg.rbandwidth <-
     ## used during bandwidth selection.
     
     if (is.factor(tydat)){
-      tydat <- adjustLevels(data.frame(tydat), bws$ydati)[,1]
+      tydat <- .np_regression_response_levels(data.frame(tydat), bws$ydati)[,1]
       tydat <- (bws$ydati$all.dlev[[1]])[as.integer(tydat)]
     }
     else
@@ -674,7 +674,7 @@ npreg.rbandwidth <-
       eydat <- double()
     else {
       if (is.factor(eydat)){
-        eydat <- adjustLevels(data.frame(eydat), bws$ydati, allowNewCells = TRUE)
+        eydat <- .np_regression_response_levels(data.frame(eydat), bws$ydati, allowNewCells = TRUE)
         eydat <- toMatrix(eydat)[,1]
       }
       else

@@ -1262,8 +1262,8 @@ npplreghat <-
     for (j in seq_len(ncol(txdat))) {
       bw.xj <- bws$bw[[j + 1L]]
       if (is.factor(txdat[[j]])) {
-        trj <- adjustLevels(txdat[, j, drop = FALSE], bw.xj$ydati)
-        evj <- adjustLevels(exdat[, j, drop = FALSE], bw.xj$ydati, allowNewCells = TRUE)
+        trj <- .np_regression_response_levels(txdat[, j, drop = FALSE], bw.xj$ydati)
+        evj <- .np_regression_response_levels(exdat[, j, drop = FALSE], bw.xj$ydati, allowNewCells = TRUE)
         lev <- bws$bw[[j + 1L]]$ydati$all.dlev[[1L]]
         x.train.num[, j] <- lev[as.integer(trj[, 1L])]
         x.eval.num[, j] <- lev[as.integer(evj[, 1L])]

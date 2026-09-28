@@ -8655,6 +8655,12 @@ SEXP C_np_regression(SEXP tuno,
   num_eval = (int)INTEGER(myopti_i)[REG_ENOBSI];
   train_is_eval = (int)INTEGER(myopti_i)[REG_TISEI];
   ey_is_ty = (int)INTEGER(myopti_i)[REG_EY];
+  if(XLENGTH(ty_r) < num_train)
+    error("C_np_regression: training-response buffer is too short");
+  /* An absent evaluation response aliases training y only at training
+   * locations; external prediction legitimately supplies no response. */
+  if(!ey_is_ty && XLENGTH(ey_r) < num_eval)
+    error("C_np_regression: evaluation-response buffer is too short");
   categorical_compress = INTEGER(myopti_i)[REG_CATCOMPI];
   if(categorical_compress != 0 && categorical_compress != 1)
     error("C_np_regression: categorical compression must be TRUE or FALSE");
@@ -8718,7 +8724,6 @@ SEXP C_np_regression(SEXP tuno,
        (!train_is_eval &&
         (!np_real_buffer_has_matrix(euno_r, num_eval, nunordered) ||
          !np_real_buffer_has_matrix(eord_r, num_eval, nordered))) ||
-       XLENGTH(ty_r) < num_train ||
        XLENGTH(rbw_r) < num_predictors ||
        XLENGTH(padnum_r) < 1 || XLENGTH(nconfac_r) < 1 ||
        XLENGTH(ncatfac_r) < 1 || XLENGTH(mysd_r) < ncon ||
@@ -8726,8 +8731,6 @@ SEXP C_np_regression(SEXP tuno,
       error("C_np_regression: beta regression input buffer is too short");
     if(train_is_eval && num_eval != num_train)
       error("C_np_regression: beta train/evaluation dimensions are inconsistent");
-    if(!ey_is_ty && XLENGTH(ey_r) < num_eval)
-      error("C_np_regression: beta evaluation-response buffer is too short");
 
     beta_route.segment_count = 1;
     beta_route.segment[0].descriptor = descriptor;
