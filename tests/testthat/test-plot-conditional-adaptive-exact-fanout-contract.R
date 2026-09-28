@@ -10,6 +10,10 @@ test_that("conditional adaptive-NN exact bootstrap partitions replications acros
   bws <- list(
     type = "adaptive_nn",
     xncon = 1L,
+    regtype = "lc",
+    basis = "glp",
+    degree = 0L,
+    bernstein.basis = FALSE,
     regtype.engine = "lc",
     basis.engine = "glp",
     degree.engine = 0L,

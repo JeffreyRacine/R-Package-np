@@ -118,7 +118,13 @@ test_that("quantile gradient bootstrap uses fanout with fixed counts", {
                                                          counts = NULL,
                                                          counts.drawer = NULL,
                                                          progress.label = NULL,
-                                                         center = NULL) {
+                                                         center = NULL,
+                                                         tol,
+                                                         small,
+                                                         itmax) {
+      expect_identical(tol, 1.490116e-04)
+      expect_identical(small, 1.490116e-05)
+      expect_identical(itmax, 10000)
       expect_identical(center, c(1.25, 1.75))
       list(
         t = matrix(rep(colSums(counts), each = 2L), nrow = B, ncol = 2L, byrow = TRUE),
@@ -190,7 +196,13 @@ test_that("quantile level bootstrap uses fanout with fixed counts", {
                                                        counts = NULL,
                                                        counts.drawer = NULL,
                                                        progress.label = NULL,
-                                                       center = NULL) {
+                                                       center = NULL,
+                                                       tol,
+                                                       small,
+                                                       itmax) {
+      expect_identical(tol, 1.490116e-04)
+      expect_identical(small, 1.490116e-05)
+      expect_identical(itmax, 10000)
       expect_identical(center, c(2.25, 2.75))
       list(
         t = matrix(rep(colSums(counts), each = 2L), nrow = B, ncol = 2L, byrow = TRUE),

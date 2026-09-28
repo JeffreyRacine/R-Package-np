@@ -8,7 +8,8 @@ test_that("partial-linear default dispatch pins the validated uncertainty reques
   private$.npRmpi_autodispatch_active <- function() TRUE
   private$.npRmpi_autodispatch_called_from_bcast <- function() FALSE
   dispatched <- 0L
-  private$.npRmpi_autodispatch_call <- function(mc, caller_env) {
+  private$.npRmpi_autodispatch_call <- function(mc, caller_env, owner.name) {
+    expect_identical(owner.name, "npplreg.default")
     dispatched <<- dispatched + 1L
     list(call = mc,
          request = resolve.arg(mc[["se"]], "se", caller_env, character(0)))

@@ -30,7 +30,9 @@
     suppress.parallel = 0L,
     continuous.kernel.family = constant("CKER_FAMILY_BETA"),
     continuous.kernel.order = 2L,
-    divide.returned.kernel.weights = 0L
+    divide.returned.kernel.weights = 0L,
+    categorical.compress = 0L,
+    tree.outer.blas = 0L
   )
 
   .Call(
