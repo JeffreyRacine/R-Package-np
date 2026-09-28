@@ -13,6 +13,40 @@ phase1_npcdist_cvls_gnn_fixture <- function() {
   list(x = x, y = y)
 }
 
+# Independent literal deleted-sample external-grid reference for LC/raw degree1.
+phase1_npcdist_cvls_gnn_oracle <- function(dat, bw, degree) {
+  x <- as.matrix(dat$x)
+  y <- dat$y$y1
+  n <- nrow(x)
+  grid <- as.numeric(stats::quantile(y, probs = seq(0, 1, length.out = 100L)))
+  stopifnot(degree %in% 0:1, length(bw$xbw) == ncol(x),
+            all(bw$xbw == floor(bw$xbw)), all(bw$xbw >= 1),
+            all(bw$xbw <= n - 1), bw$ybw == floor(bw$ybw),
+            bw$ybw >= 1, bw$ybw <= n - 1)
+  basis <- if (degree == 0L) matrix(1, n, 1L) else cbind(1, x)
+  loss <- 0
+  for (i in seq_len(n)) {
+    keep <- setdiff(seq_len(n), i)
+    weight <- rep(1, n - 1L)
+    for (d in seq_len(ncol(x))) {
+      radius <- sort(abs(x[keep, d] - x[i, d]))[[bw$xbw[[d]]]]
+      stopifnot(is.finite(radius), radius > 0)
+      weight <- weight * stats::dnorm((x[keep, d] - x[i, d]) / radius)
+    }
+    decomposition <- qr(sqrt(weight) * basis[keep, , drop = FALSE])
+    stopifnot(decomposition$rank == ncol(basis))
+    for (z in grid) {
+      radius <- sort(abs(y[keep] - z))[[bw$ybw]]
+      stopifnot(is.finite(radius), radius > 0)
+      response <- stats::pnorm((z - y[keep]) / radius)
+      coefficients <- qr.coef(decomposition, sqrt(weight) * response)
+      prediction <- sum(basis[i, ] * coefficients)
+      loss <- loss + (as.numeric(y[i] <= z) - prediction)^2
+    }
+  }
+  loss / (n * length(grid))
+}
+
 phase1_npcdist_cvls_gnn_cases <- local({
   cache <- NULL
 
@@ -85,13 +119,14 @@ phase1_npcdist_cvls_gnn_cases <- local({
   }
 })
 
-test_that("phase1 npcdistbw cv.ls generalized-nn lc matches the frozen public baseline", {
+test_that("phase1 npcdistbw cv.ls generalized-nn lc matches literal external-grid CV", {
   cases <- phase1_npcdist_cvls_gnn_cases()
   bw.lc <- cases$bw.lc
   bw.lp0 <- cases$bw.lp0
 
   expect_true(is.finite(bw.lc$fval))
-  expect_equal(bw.lc$fval, 0.109084469813932, tolerance = 1e-10)
+  expect_equal(bw.lc$fval, phase1_npcdist_cvls_gnn_oracle(cases$dat, bw.lc, 0L),
+               tolerance = 1e-10)
   expect_identical(bw.lc[["fval"]], bw.lp0[["fval"]])
   expect_identical(bw.lc[["xbw"]], bw.lp0[["xbw"]])
   expect_identical(bw.lc[["ybw"]], bw.lp0[["ybw"]])
@@ -108,8 +143,10 @@ test_that("phase1 npcdistbw cv.ls generalized-nn keeps ll on canonical lp degree
   expect_identical(as.integer(bw.ll$degree.engine), degree)
   expect_true(is.finite(bw.ll$fval))
   expect_true(is.finite(bw.lp$fval))
-  expect_equal(bw.ll$fval, 0.102101939110705, tolerance = 1e-10)
-  expect_equal(bw.lp$fval, 0.102101939110705, tolerance = 1e-10)
+  expect_equal(bw.ll$fval, phase1_npcdist_cvls_gnn_oracle(cases$dat, bw.ll, 1L),
+               tolerance = 1e-10)
+  expect_equal(bw.lp$fval, phase1_npcdist_cvls_gnn_oracle(cases$dat, bw.lp, 1L),
+               tolerance = 1e-10)
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
 })
 
