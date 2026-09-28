@@ -1,5 +1,8 @@
 # np 0.80-1
 
+* Bounded regression AIC objectives use self weights consistent with their
+  fitted smoothing rows for fixed and nearest-neighbor bandwidths.
+
 * Bounded adaptive-neighbor scalar regression objectives use the same
   donor-centred normalization as regression fitting, with delete-one radii.
 
