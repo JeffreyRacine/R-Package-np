@@ -696,10 +696,6 @@ npreghat <-
       }
     }
 
-    if (uniform.kernel) {
-      for (j in seq_len(ceiling(ntrain / min(512L, ntrain))))
-        .np_warning("ignoring kernel order specified with uniform kernel type")
-    }
     if (beta.kernel && any(undefined.rows)) {
       H[undefined.rows, ] <- NA_real_
       warning(sprintf(
@@ -2511,10 +2507,6 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      if (lc.derivative.exact.route && !beta.kernel &&
-          identical(bws[["ckertype", exact = TRUE]], "uniform")) {
-        .np_warning("ignoring kernel order specified with uniform kernel type")
-      }
       H <- if (exact.beta.native.route || native.lp.mean.matrix.route ||
                    native.loo.route ||
                    (lc.derivative.exact.route && !beta.kernel)) {

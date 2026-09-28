@@ -140,7 +140,7 @@ test_that("legacy scalar derivative SEs equal explicit HC0 derivative hats", {
       ),
       character()
     )
-    expect.uniform.warning <- identical(case$kernel, "uniform")
+    expect.uniform.warning <- FALSE
     h3_expect_fit_matches_oracle(
       bw, xdat, ydat,
       expect.uniform.warning = expect.uniform.warning

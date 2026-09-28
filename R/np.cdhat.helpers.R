@@ -11,8 +11,6 @@
   # Keep the canonical metadata builder and finalizer, without re-entering the
   # public search/argument/progress setup for every conditional bootstrap fit.
   # Rebuild from this draw's actual X data; NN geometry is not cached or frozen.
-  if (identical(bws$cxkertype, "uniform"))
-    .np_warning("ignoring kernel order specified with uniform kernel type")
   ydat <- rep.int(0.0, nrow(txdat))
   reg.args <- list(
     regtype = spec$reg.engine,
@@ -38,8 +36,19 @@
   )
 }
 
+.npcdhat_retained_kbandwidth <- function(ckertype, ...) {
+  # The supplied order is retained metadata, not a fresh explicit request.
+  withCallingHandlers(kbandwidth.numeric(ckertype = ckertype, ...),
+    warning = function(w) {
+      if (identical(ckertype, "uniform") &&
+          identical(conditionMessage(w), unname(.np_io_prefix_text(
+            "ignoring kernel order specified with uniform kernel type"))))
+        invokeRestart("muffleWarning")
+    })
+}
+
 .npcdhat_make_xkbw <- function(bws, txdat) {
-  kbandwidth.numeric(
+  .npcdhat_retained_kbandwidth(
     bw = .npcdhat_physical_bandwidth(bws, "x"),
     bwscaling = FALSE,
     bwtype = bws$type,
@@ -59,7 +68,7 @@
 }
 
 .npcdhat_make_ybw <- function(bws, tydat) {
-  kbandwidth.numeric(
+  .npcdhat_retained_kbandwidth(
     bw = .npcdhat_physical_bandwidth(bws, "y"),
     bwscaling = FALSE,
     bwtype = bws$type,
@@ -161,8 +170,6 @@
       )) {
     if (.npcdhat_has_x_derivative(s)) {
       if (!identical(xbw[["ckertype", exact = TRUE]], "beta")) {
-        if (identical(xbw[["ckertype", exact = TRUE]], "uniform"))
-          .np_warning("ignoring kernel order specified with uniform kernel type")
         return(.npreghat_exact_lp_matrix_from_regression_core(
           bws = xbw,
           txdat = txdat,
