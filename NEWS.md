@@ -1,5 +1,15 @@
 # npRmpi 0.80-1
 
+* Conditional bandwidth scaling now uses response spreads when preparing
+  response bandwidths, including conditional objectives and evaluation helpers.
+
+* Powered kernel weights respect the ranges initialized by sparse tree
+  traversal, preventing reads of uninitialized weights while retaining trees.
+
+* Conditional-distribution hybrid bandwidth searches retain nearest-neighbor
+  cache statistics from the completed Powell phase even when it does not
+  improve the selected objective. Search results and cache computation are unchanged.
+
 * Klein-Spady single-index search and fitting now reject factor or non-binary
   responses with an early numeric-0/1 error. This prevents category codes from
   entering the binary likelihood or producing invalid fitted probabilities.
@@ -56,9 +66,10 @@
   explain raw-basis scaling and the explicit Bernstein option. Help pages clarify
   raw-polynomial instability; thresholds, defaults and computations are unchanged.
 
-* Converting retained bandwidth metadata no longer reports an ignored uniform
-  order as though the user had just supplied it. Explicit order requests still
-  receive the advisory; kernel choices and stored orders are unchanged.
+* Converting retained bandwidth metadata, including regression and conditional
+  hat routes, no longer reports an ignored uniform order as though the user
+  had just supplied it. Explicit order requests still receive the advisory;
+  kernel choices and stored orders are unchanged.
 
 * Terminal bandwidth-search failures no longer mislabel nearest-neighbor
   candidates as fixed bandwidths. Search and failure policies are unchanged.
@@ -77,6 +88,9 @@
 * Hat apply/constraint methods and cached regression-hat prediction now use the
   fitted factor-response coding for explicit factor payloads, as for fitting.
   Single-index fitting also retains this coding for alphanumeric responses.
+  Reusing a numeric-response bandwidth object with a factor response now fails
+  explicitly when fitted factor coding is absent. Native regression also checks
+  response-buffer extents before reading them; factor-fitted workflows remain supported.
 
 * Direct regression consumers, including significance tests and bootstrap plots,
   now fit the retained physical bandwidth when bandwidth scaling is requested.
