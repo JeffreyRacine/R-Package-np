@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Bounded fixed-bandwidth regression CVLS objectives cancel their common
+  continuous row normalization before kernel-pair reuse, agreeing with
+  delete-one fits without per-pair continuous normalization corrections.
+
 * Conditional bandwidth scaling now uses response spreads when preparing
   response bandwidths, including conditional objectives and evaluation helpers.
 
