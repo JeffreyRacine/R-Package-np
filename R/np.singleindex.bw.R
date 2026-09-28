@@ -11,6 +11,23 @@ npindexbw <-
     UseMethod("npindexbw", target)
   }
 
+# Validate the response before factor/numeric coercion or objective evaluation.
+# Bandwidth construction retains its existing both-class requirement; held fits
+# and evaluation samples may contain one class and retain their NA omission.
+.npindex_check_binary_response <- function(y, where, require.both = FALSE) {
+  valid <- is.numeric(y) && !is.complex(y) && is.null(dim(y)) &&
+    all(y == 0 | y == 1, na.rm = TRUE)
+  if (valid && require.both)
+    valid <- setequal(y, c(0, 1))
+  if (!valid)
+    stop(paste0(where, ": Klein and Spady's estimator requires a numeric ",
+                "(integer or double) response coded 0/1; factors and other ",
+                "response values are not accepted.",
+                if (require.both) " Bandwidth selection requires both 0 and 1." else ""),
+         call. = FALSE)
+  invisible(NULL)
+}
+
 npindexbw.formula <-
   function(formula, data, subset, na.action, call, ...){
     mf <- match.call(expand.dots = FALSE)
@@ -1998,6 +2015,10 @@ npindexbw.default <-
         )
       }
     }
+    if (!is.null(dots[["method", exact = TRUE]]) &&
+        match.arg(dots[["method", exact = TRUE]], c("ichimura", "kleinspady")) == "kleinspady")
+      .npindex_check_binary_response(ydat, "npindexbw()", require.both = TRUE)
+
     tbw <- sibandwidth(beta = bws[seq_len(p)],
                        h = bws[p+1L], ...,
                        regtype = spec$regtype,
@@ -2012,9 +2033,6 @@ npindexbw.default <-
                        bandwidth = bws[p+1L],
                        bandwidth.compute = bandwidth.compute)
     tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
-
-    if (tbw$method == "kleinspady" && !setequal(ydat,c(0,1)))
-      stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("nmulti", "nomad.remin", "powell.remin", "random.seed", "optim.method", "optim.maxattempts",
@@ -2199,8 +2217,8 @@ npindexbw.sibandwidth <-
       where = "npindexbw"
     )
 
-    if (bws$method == "kleinspady" && !setequal(ydat,c(0,1)))
-      stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
+    if (bws$method == "kleinspady")
+      .npindex_check_binary_response(ydat, "npindexbw()", require.both = TRUE)
 
     if (ncol(xdat) < 2) {
       if (coarseclass(xdat[,1]) != "numeric")

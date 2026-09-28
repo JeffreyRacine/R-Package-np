@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Klein-Spady single-index search and fitting now reject factor or non-binary
+  responses with an early numeric-0/1 error. This prevents category codes from
+  entering the binary likelihood or producing invalid fitted probabilities.
+  Valid numeric responses, factor predictors and Ichimura behavior are unchanged.
+
 * Instrumental-variable regression refreshes its existing progress line during
   long kernel evaluations within bandwidth selection and fitting.
 

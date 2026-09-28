@@ -178,7 +178,10 @@ These arguments identify the data, formula interface, method label, and whether 
   \item{ydat}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{xdat}. 
+    \code{xdat}.
+    For \code{method="kleinspady"}, the response must be numeric 0/1 with both
+    values present. Factor responses are rejected rather than converted to
+    internal category codes; explanatory variables may still be factors.
   }
 
 
