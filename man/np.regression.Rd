@@ -82,7 +82,10 @@ These arguments identify the bandwidth specification, formula/data interface, an
   \item{tydat}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{txdat}. Defaults to the corresponding
+    \code{txdat}. A factor response is also supported when the bandwidth
+    object retains the fitted factor-response coding. A bandwidth object
+    fitted to a numeric response cannot supply that coding and is rejected
+    when reused with a factor response. Defaults to the corresponding
     training data recoverable from the bandwidth object in the current
     session.
   }
