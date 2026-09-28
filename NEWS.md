@@ -1,5 +1,8 @@
 # np 0.80-1
 
+* Bounded adaptive-neighbor scalar regression objectives use the same
+  donor-centred normalization as regression fitting, with delete-one radii.
+
 * Bounded fixed-bandwidth regression CVLS objectives cancel their common
   continuous row normalization before kernel-pair reuse, agreeing with
   delete-one fits without per-pair continuous normalization corrections.

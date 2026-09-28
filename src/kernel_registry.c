@@ -22,32 +22,85 @@ static int np_continuous_kernel_finite_bound(double value)
   return R_FINITE(value) && fabs(value) < 0.5 * DBL_MAX;
 }
 
-static double np_continuous_kernel_legacy_pdf(int kernel_code,
+/* Callers validate centre and bandwidth before this pure mass arithmetic. */
+static double np_continuous_kernel_legacy_pdf_mass_unchecked(
+  int kernel_code, double centre, double bandwidth, double lower, double upper)
+{
+  const int finite_lower = np_continuous_kernel_finite_bound(lower);
+  const int finite_upper = np_continuous_kernel_finite_bound(upper);
+  double denominator = 1.0;
+  if(finite_lower || finite_upper) {
+    const double lower_mass = finite_lower ?
+      cdf_kernel(kernel_code, (lower - centre) / bandwidth) : 0.0;
+    const double upper_mass = finite_upper ?
+      cdf_kernel(kernel_code, (upper - centre) / bandwidth) : 1.0;
+    denominator = upper_mass - lower_mass;
+  }
+  return denominator;
+}
+
+/* Invalid unused radii remain NAN; only consumption can refuse them. */
+double np_continuous_kernel_legacy_pdf_mass(int kernel_code,
+                                           double centre, double bandwidth,
+                                           double lower, double upper)
+{
+  if(!R_FINITE(centre) || !R_FINITE(bandwidth) || bandwidth <= 0.0)
+    return NAN;
+  return np_continuous_kernel_legacy_pdf_mass_unchecked(
+    kernel_code, centre, bandwidth, lower, upper);
+}
+
+/* NULL retains the ordinary scalar's single validation pass. */
+static inline double np_continuous_kernel_legacy_pdf(int kernel_code,
                                               double evaluation,
                                               double observation,
                                               double bandwidth,
                                               double lower,
-                                              double upper)
+                                              double upper,
+                                              const double *prepared_mass)
 {
-  const int finite_lower = np_continuous_kernel_finite_bound(lower);
-  const int finite_upper = np_continuous_kernel_finite_bound(upper);
   const double base = kernel(kernel_code,
                              (evaluation - observation) / bandwidth);
-  double denominator = 1.0;
-
+  double denominator;
   if(!R_FINITE(evaluation) || !R_FINITE(observation) ||
      !R_FINITE(bandwidth) || bandwidth <= 0.0 || !R_FINITE(base))
     return NAN;
-  if(finite_lower || finite_upper) {
-    const double lower_mass = finite_lower ?
-      cdf_kernel(kernel_code, (lower - evaluation) / bandwidth) : 0.0;
-    const double upper_mass = finite_upper ?
-      cdf_kernel(kernel_code, (upper - evaluation) / bandwidth) : 1.0;
-    denominator = upper_mass - lower_mass;
-  }
+  denominator = prepared_mass != NULL ? *prepared_mass :
+    np_continuous_kernel_legacy_pdf_mass_unchecked(
+      kernel_code, evaluation, bandwidth, lower, upper);
   if(!R_FINITE(denominator) || denominator <= 0.0)
     return NAN;
   return base / (bandwidth * denominator);
+}
+
+static NPContinuousKernelScalarStatus
+np_continuous_kernel_legacy_log_value(double value,
+                                     double *log_absolute, int *sign)
+{
+  if(!R_FINITE(value))
+    return NP_CONTINUOUS_KERNEL_SCALAR_ERR_KERNEL;
+  if(value != 0.0) {
+    *log_absolute = log(fabs(value));
+    *sign = (value > 0.0) ? 1 : -1;
+  }
+  if(ISNAN(*log_absolute) || *log_absolute == INFINITY)
+    return NP_CONTINUOUS_KERNEL_SCALAR_ERR_NUMERIC;
+  return NP_CONTINUOUS_KERNEL_SCALAR_OK;
+}
+
+NPContinuousKernelScalarStatus
+np_continuous_kernel_legacy_pdf_log_mass(int kernel_code,
+                                        double evaluation, double observation,
+                                        double bandwidth, double mass,
+                                        double *log_absolute, int *sign)
+{
+  if(log_absolute == NULL || sign == NULL)
+    return NP_CONTINUOUS_KERNEL_SCALAR_ERR_LAYOUT;
+  *log_absolute = -INFINITY;
+  *sign = 0;
+  return np_continuous_kernel_legacy_log_value(
+    np_continuous_kernel_legacy_pdf(kernel_code,
+      evaluation, observation, bandwidth, 0.0, 0.0, &mass), log_absolute, sign);
 }
 
 static double np_continuous_kernel_legacy_cdf(int kernel_code,
@@ -128,13 +181,8 @@ np_continuous_kernel_scalar_log(np_continuous_kernel_family family,
       np_continuous_kernel_legacy_cdf(kernel_code, evaluation, observation,
                                       bandwidth, lower, upper) :
       np_continuous_kernel_legacy_pdf(kernel_code, evaluation, observation,
-                                      bandwidth, lower, upper);
-    if(!R_FINITE(value))
-      return NP_CONTINUOUS_KERNEL_SCALAR_ERR_KERNEL;
-    if(value != 0.0) {
-      *log_absolute = log(fabs(value));
-      *sign = (value > 0.0) ? 1 : -1;
-    }
+                                      bandwidth, lower, upper, NULL);
+    return np_continuous_kernel_legacy_log_value(value, log_absolute, sign);
   } else {
     return NP_CONTINUOUS_KERNEL_SCALAR_ERR_LAYOUT;
   }
