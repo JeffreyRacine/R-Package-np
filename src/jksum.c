@@ -43353,6 +43353,21 @@ static int np_gnn_integral_clip(double delta, double radius,
   return *lo < *hi;
 }
 
+/* Distinct q endpoints can round to the same reciprocal. Retain the
+ * interval width separately and evaluate its affine kernel arguments on
+ * [0,1], so a representable response interval is not rejected as empty. */
+typedef struct {
+  double first, second, first_step, second_step, jacobian;
+  int kernel;
+} NPGNNIntegralNarrowPair;
+static void np_gnn_integral_narrow_pair_values(double *t,int count,void *raw)
+{
+  const NPGNNIntegralNarrowPair *p=raw;
+  for(int i=0;i<count;++i)
+    t[i]=allck[p->kernel](fma(p->first_step,t[i],p->first))*
+         allck[p->kernel](fma(p->second_step,t[i],p->second))*p->jacobian;
+}
+
 /* Return 0 for a finite integral, 1 for numerical failure, and 2 for a
  * divergent constant transformed integrand. No R longjmp originates here. */
 static int np_gnn_integral_pair_interval(
@@ -43367,7 +43382,24 @@ static int np_gnn_integral_pair_interval(
   const double u1 = qhi == anchor ? R_NegInf : 1.0/(qhi-anchor);
   double lo = fmin(u0,u1), hi = fmax(u0,u1);
   *result = *abserr = 0.0;
-  if(kernel < 0 || kernel > 8 || !(lo < hi)) return 1;
+  if(kernel < 0 || kernel > 8 || !(lo <= hi)) return 1;
+  if(lo == hi) {
+    if(!R_FINITE(qlo) || !R_FINITE(qhi) || !(qlo < qhi) ||
+       qlo == anchor || qhi == anchor) return 1;
+    const double width=fabs((qhi-qlo)/(qlo-anchor)/(qhi-anchor));
+    if(!(width > 0.0) || !R_FINITE(width)) return 1;
+    NPGNNIntegralNarrowPair narrow={
+      (qlo-first)/(qlo-anchor)/g->scale,
+      (qlo-second)/(qlo-anchor)/g->scale,
+      -(anchor-first)*width/g->scale,
+      -(anchor-second)*width/g->scale,
+      width/(g->scale*g->scale),kernel};
+    double left=0.0,right=1.0,epsabs=1e-12/(4*g->n),epsrel=1e-10;
+    int limit=200,lenw=800,neval,ier,last;
+    Rdqags(np_gnn_integral_narrow_pair_values,&narrow,&left,&right,
+      &epsabs,&epsrel,result,abserr,&neval,&ier,&limit,&lenw,&last,iwork,work);
+    return ier == 0 && R_FINITE(*result) ? 0 : 1;
+  }
   if(kernel >= 4) {
     const double support = kernel == 8 ? 1.0 : sqrt(5.0);
     if(!np_gnn_integral_clip(p.first,g->scale*support,&lo,&hi) ||
