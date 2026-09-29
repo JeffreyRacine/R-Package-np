@@ -534,6 +534,8 @@ void np_bounded_cvls_conditional_effective_integration_bounds_extern(
   double *quadrature_upper);
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);
+void np_conditional_gnn_notice_reset(void);
+void np_conditional_gnn_notice_emit(void);
 int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_lp_stream_engine_supported(void);
 int np_conditional_density_cvml_stream_engine_supported(void);

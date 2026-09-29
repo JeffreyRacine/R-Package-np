@@ -143,6 +143,29 @@ npcdensbw.formula <-
   if (ncon > 0L &&
       identical(method, "cv.ls") &&
       identical(bwtype, "generalized_nn")) {
+    ## Same whole-support GNN criterion; canonical X trees remain available.
+    if (!isTRUE(fit.context) && bws$yncon == 1L &&
+        bws$ynuno + bws$ynord == 0L &&
+        identical(bws$cykertype, "gaussian") && bws$cykerorder == 2L &&
+        ((bws$cxkertype %in% c("gaussian", "epanechnikov") &&
+          bws$cxkerorder %in% c(2L, 4L, 6L, 8L)) ||
+         (identical(bws$cxkertype, "uniform") && bws$cxkerorder == 2L)) &&
+        identical(bws$cxkerbound, "none") && identical(bws$cykerbound, "none"))
+      return(code)
+    ## The compact-X prefix owner uses the canonical solve at every degree.
+    ## Fit routing and AUTO kernel eligibility retain their existing policy.
+    if (!isTRUE(fit.context) &&
+        bws$xncon == 1L && bws$yncon == 1L &&
+        bws$xnuno + bws$xnord + bws$ynuno + bws$ynord == 0L &&
+        ((identical(bws$cxkertype, "epanechnikov") &&
+          bws$cxkerorder %in% c(2L, 4L, 6L, 8L)) ||
+         (identical(bws$cxkertype, "uniform") && bws$cxkerorder == 2L)) &&
+        ((bws$cykertype %in% c("gaussian", "epanechnikov") &&
+          bws$cykerorder %in% c(2L, 4L, 6L, 8L)) ||
+         (identical(bws$cykertype, "uniform") && bws$cykerorder == 2L)) &&
+        identical(bws$cxkerbound, "none") &&
+        identical(bws$cykerbound, "none"))
+      return(code)
     if (isTRUE(fit.context) &&
         (.np_conditional_gnn_lc_fit_tree_eligible(bws) ||
          .np_conditional_gnn_lp_fit_tree_eligible(bws)))
