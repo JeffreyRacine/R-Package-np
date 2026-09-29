@@ -204,3 +204,25 @@ test_that('conditional GNN handles product response integrals and finite categor
     expect_true(abs(observed-ref['score']) <= 1e-9,info=name)
   }
 })
+
+
+test_that('projected higher Gaussian orders retain extended and affine contracts', {
+  old <- options(np.messages=FALSE,np.tree=FALSE,np.extendednn=TRUE)
+  on.exit(options(old),add=TRUE)
+
+  x <- c(-.83,.66,-.21,.32,-.49,.93,.09)
+  y <- c(-1.4,.2,.95,-.71,1.73,-.1,.57)
+  permutation <- c(4L,1L,7L,3L,6L,2L,5L)
+  for(order in c(4L,6L,8L))for(ky in c(2L,8L))for(degree in c(0L,2L)) {
+    reference <- cgnn_general_reference(x,y,4L,ky,degree,'gaussian',order)
+    expect_lt(reference['error'],2.5e-10)
+    ctl <- if(degree==0L)list(regtype='lc')else list(regtype='lp',degree=degree)
+    xx <- data.frame(x=x[permutation]); yy <- .5+2*y[permutation]
+    b <- do.call(npcdensbw,c(list(xdat=xx,ydat=yy,bws=c(ky,4),
+      bwtype='generalized_nn',bwmethod='cv.ls',bandwidth.compute=FALSE,
+      cykerorder=order),ctl))
+    value <- cgnn_general_evaluate(xx,yy,b)
+    expect_true(abs(value-reference['score']/2)<=1e-9,
+      info=paste(order,ky,degree))
+  }
+})

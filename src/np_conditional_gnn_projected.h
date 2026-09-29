@@ -3,7 +3,8 @@
  * The unconditional owner and compact-X prefix implementation are untouched. */
 typedef int (*NPGNNIntegralFilledRow)(void *,int,double *,double *);
 typedef struct {
-  int n,folded,has_categories,nprofiles,first_fold,end_fold,pair_rank,pair_ranks;
+  int n,folded,has_categories,nprofiles,first_fold,end_fold,pair_rank,pair_ranks,kernel;
+  double logG[17];
   double **data,*values,*bounds,*weight_row,*left,*right,*overlap,*products;
   double *profile_moments,*profile_left,*profile_right,*pair_rows;
   int *profile_id,*profile_rep;
@@ -218,14 +219,16 @@ static int np_gnn_projected_factor(NPGNNProjectedIntegral *q)
       fmin(fmin(fabs(t.lo-t.primary_anchor),fabs(t.hi-t.primary_anchor)),
            fmin(fabs(t.lo-t.successor_anchor),fabs(t.hi-t.successor_anchor))));
   }
-  const long double height=allck[0](0)/c->geometry->scale;
+  const long double height=(c->kernel==0 ? allck[0](0) : exp(c->logG[0]))/c->geometry->scale;
   /* For any h(q)>=hmin, K_h(q-y)^2 is bounded by its pointwise
    * supremum over h>=hmin. Integrating that envelope over the whole line
    * gives [integral(-1,1) phi(t)^2 dt + 2 phi(1)^2]/hmin. */
   const double envelope_constant=allck[0](0)/sqrt(2.0)*
     (1-2*pnorm5(-sqrt(2.0),0,1,1,0))+2*allck[0](1)*allck[0](1);
-  const long double integral_bound=fminl(reciprocal_width*height*height,
-    nextafter(envelope_constant/minimum_bandwidth,R_PosInf));
+  const long double integral_bound=c->kernel==0 ?
+    fminl(reciprocal_width*height*height,
+      nextafter(envelope_constant/minimum_bandwidth,R_PosInf)) :
+    reciprocal_width*height*height;
   const double one=1,zero=0,minus=-1;
   for(int first=0;first<folds;first+=512) {
     np_progress_bandwidth_loop_step();
@@ -312,6 +315,14 @@ static double np_gnn_projected_guard(NPGNNProjectedIntegral *q,
   double lo,double hi)
 {
   const NPGNNIntegralGeometry *g=q->owner->geometry;
+  if(q->owner->kernel!=0) {
+    /* Same signed-kernel Gauss8 remainder bound as the prefix owner.
+     * L1 bounds include any certified compression residual. */
+    NPGNNConditionalPrefix bound={.n=q->owner->n,.y=q->owner->data[0],
+      .yscale=g->scale,.anchor=q->anchor,.maxL1=q->norm_max};
+    memcpy(bound.logG,q->owner->logG,sizeof(bound.logG));
+    return np_cgnn_gaussian_interval_bound(&bound,lo,hi);
+  }
   const double width=hi-lo,scale=g->scale;
   const double variation=fmax(fabs(q->anchor-g->sorted[0]),
                               fabs(q->anchor-g->sorted[g->n-1]));
@@ -344,7 +355,7 @@ static void np_gnn_projected_rule(NPGNNProjectedIntegral *q,
   for(int i=0;i<n;++i)for(int z=0;z<nq;++z)
     c->left[i*nq+z]=(1+(q->anchor-c->data[0][c->projected_order[i]])*(mid+half*nodes[z]))/scale;
 
-  np_ckernelv(0,c->left,n*nq,0,0,1,c->overlap,NULL,0,0,1,1/scale,
+  np_ckernelv(c->kernel,c->left,n*nq,0,0,1,c->overlap,NULL,0,0,1,1/scale,
     0,0,0,NULL,NULL);
 
   const int output_stride=nq*q->groups;
@@ -375,12 +386,12 @@ static int np_gnn_projected_integrate(NPGNNProjectedIntegral *q,
   const size_t capacity=(size_t)q->owner->projected_rows;
   double *low=q->owner->projected_recursive+3*(size_t)depth*capacity;
   double *high=low+capacity,*other=high+capacity;int pass=1;
-  const int certificate_domain=q->groups==1 && q->owner->filled_row != NULL &&
+  const int certificate_domain=q->owner->kernel==0 && q->groups==1 && q->owner->filled_row != NULL &&
     q->owner->geometry->scale==1;
   const double analytic=certificate_domain ? np_cgnn_gauss4_log_bound(lo,hi,
     q->anchor-q->owner->geometry->sorted[q->owner->n-1],
     q->anchor-q->owner->geometry->sorted[0],q->norm_max*q->norm_max) : R_PosInf;
-  if(q->groups==1 && q->owner->filled_row != NULL && q->owner->geometry->scale==1 &&
+  if(certificate_domain &&
      analytic<=log(ldexp(q->absolute_scale*1e-12/(8*q->owner->n),-depth))){
     np_gnn_projected_rule(q,lo,hi,0,out);
     for(int f=0;f<q->rows;++f)if(q->selected[f]){
@@ -529,10 +540,10 @@ static int np_gnn_projected_contract(NPGNNConditionalProjectionOwner *c)
           interval_width[records]=width;
           interval[records]=z;alternate[records]=successor;
           const double mid=.5*left[records]+.5*right[records],half=.5*width;
-          const int certificate_domain=q.groups==1 && c->filled_row != NULL && g->scale==1;
+          const int certificate_domain=c->kernel==0 && q.groups==1 && c->filled_row != NULL && g->scale==1;
           analytic[records]=certificate_domain ? np_cgnn_gauss4_log_bound(left[records],right[records],
              anchor[records]-g->sorted[n-1],anchor[records]-g->sorted[0],q.norm_max*q.norm_max) : R_PosInf;
-          const int certified=q.groups==1 && c->filled_row != NULL && g->scale==1 &&
+          const int certified=certificate_domain &&
             analytic[records]<=log(q.absolute_scale*1e-12/(8*n));
           offset[records]=packed;points[records]=certified?4:12;
           for(int zq=0;zq<points[records];++zq) {
@@ -555,7 +566,7 @@ static int np_gnn_projected_contract(NPGNNConditionalProjectionOwner *c)
       for(int i=0;i<n;++i)for(int zq=0;zq<nq;++zq)
         c->left[i*nq+zq]=(1+(node_anchor[zq]-c->data[0][c->projected_order[i]])*node[zq])/g->scale;
 
-      np_ckernelv(0,c->left,n*nq,0,0,1,c->overlap,NULL,0,0,1,1/g->scale,
+      np_ckernelv(c->kernel,c->left,n*nq,0,0,1,c->overlap,NULL,0,0,1,1/g->scale,
         0,0,0,NULL,NULL);
 
       const double one=1,zero=0;
@@ -732,12 +743,13 @@ static int np_cgnn_projected_local(NPGNNConditionalProjectedCall *a)
   NPGNNConditionalProjectionOwner *c=&a->integral;
   NPGNNConditionalIntegralContext *b=&a->adapter;
   const int n=num_obs_train_extern;
-  *c=(NPGNNConditionalProjectionOwner){.n=n,.folded=1,.first_fold=0,
+  *c=(NPGNNConditionalProjectionOwner){.n=n,.folded=1,.first_fold=0,.kernel=KERNEL_den_extern,
     .end_fold=n,.pair_ranks=1,.data=matrix_Y_continuous_train_extern,
     .row=np_gnn_conditional_integral_weight,
     .filled_row=np_lp_engine_extern==NP_LP_ENGINE_SCALAR ?
       np_gnn_conditional_integral_filled_weight:NULL,
     .geometry=&a->geometry,.context=b,.budget=NP_CONDITIONAL_LP_TILE_BUDGET_BYTES};
+  if(c->kernel!=0)np_cgnn_gaussian_derivative_constants(c->kernel,c->logG);
   c->values=np_cgnn_calloc(n,sizeof(double));
   c->bounds=np_cgnn_calloc(n,sizeof(double));
   b->xrow=np_cgnn_calloc(n,sizeof(double));
