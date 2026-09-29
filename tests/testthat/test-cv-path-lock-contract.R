@@ -56,8 +56,40 @@ test_that("canonical LP CV route predicates remain centralized", {
   expect_equal(sum(grepl("np_glp_fill_basis_eval_deriv_raw_centered", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("LL_LL", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("const int lp_engine_est = lp_engine;", lines, fixed = TRUE)), 1L)
-  expect_equal(sum(grepl("if(kpow == 2)", lines, fixed = TRUE)), 1L)
-  expect_equal(sum(grepl("wbuf[k] = (weights[k] == 0.0) ? 0.0 : wk*wk;", lines, fixed = TRUE)), 1L)
+  # CF196 gives dense and sparse producers distinct initialized domains.
+  # Each domain retains the same multiplication fast path; neither may read
+  # sparse weights outside the XL ranges consumed by this owner.
+  weighted_owner <- grep("^void np_outer_weighted_sum\\(", lines)
+  power_start <- grep("  if(use_wpow){", lines, fixed = TRUE)
+  power_stop <- grep("  int restore_weight = do_leave_one_out;", lines,
+                     fixed = TRUE)
+  sparse_start <- grep(
+    "/* Sparse producers define only the ranges consumed below. */",
+    lines, fixed = TRUE
+  )
+  expect_length(weighted_owner, 1L)
+  expect_length(power_start, 1L)
+  expect_length(power_stop, 1L)
+  expect_length(sparse_start, 1L)
+  expect_lt(weighted_owner, power_start)
+  expect_lt(power_start, sparse_start)
+  expect_lt(sparse_start, power_stop)
+  dense_power <- lines[power_start:(sparse_start - 1L)]
+  sparse_power <- lines[sparse_start:(power_stop - 1L)]
+  for (domain in list(dense_power, sparse_power)) {
+    expect_equal(sum(grepl("if(kpow == 2)", domain, fixed = TRUE)), 1L)
+    expect_equal(sum(grepl(
+      "wbuf[k] = (weights[k] == 0.0) ? 0.0 : wk*wk;",
+      domain, fixed = TRUE
+    )), 1L)
+  }
+  expect_true(any(grepl("if(xl == NULL){", dense_power, fixed = TRUE)))
+  expect_true(any(grepl("for(k = 0; k < num_weights; k++){",
+                        dense_power, fixed = TRUE)))
+  for (token in c("m < xl->n", "begin = xl->istart[m]",
+                  "end = begin + xl->nlev[m]", "k = begin; k < end"))
+    expect_true(any(grepl(token, sparse_power, fixed = TRUE)), info = token)
+  expect_false(any(grepl("k = 0;", sparse_power, fixed = TRUE)))
 
   helper_start <- grep("^static inline int np_reg_cv_use_symmetric_dropone_path\\(", lines)
   helper_stop <- grep("^static int np_lp_fixed_tree_sparse_supported\\(", lines)
