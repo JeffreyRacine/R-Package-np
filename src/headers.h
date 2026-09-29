@@ -533,6 +533,8 @@ int np_regression_lp_leave_one_out_influence(
   double *weights_out, double *fitted_out, double *ridge_used_out);
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);
+void np_conditional_gnn_notice_reset(void);
+void np_conditional_gnn_notice_emit(void);
 int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_lp_stream_engine_supported(void);
 int np_conditional_density_cvml_stream_engine_supported(void);

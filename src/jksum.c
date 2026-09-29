@@ -44323,11 +44323,35 @@ cleanup_cvls_lp_supertile2:
 
 #undef NP_CDENS_SUPERTILE_ALIGN
 
+#include "np_conditional_gnn_prefix.h"
+
+/* Ordinary unbounded conditional GNN has one whole-support contract. */
+static int np_cgnn_unbounded_admitted(void) {
+  return BANDWIDTH_den_extern == BW_GEN_NN && num_var_continuous_extern > 0 &&
+    KERNEL_den_extern >= 0 && KERNEL_den_extern <= 8 &&
+    KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= 8 &&
+    int_cxker_bound_extern == 0 && int_cyker_bound_extern == 0;
+}
+
+/* Upfront representation admission; no recovery or timing-driven dispatch. */
+static int np_cgnn_projected_admitted(void) {
+  return BANDWIDTH_den_extern == BW_GEN_NN &&
+    num_var_continuous_extern == 1 && num_var_unordered_extern == 0 &&
+    num_var_ordered_extern == 0 && KERNEL_den_extern == 0 &&
+    KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= 8 &&
+    int_cxker_bound_extern == 0 && int_cyker_bound_extern == 0 &&
+    !np_cgnn_prefix_admitted();
+}
+
 static int np_conditional_density_cvls_lp_stream_impl(
   double *vector_scale_factor,
   int *num_categories_y,
   double **matrix_categorical_vals_y,
   double *cv){
+  if(np_cgnn_prefix_admitted())
+    return np_cgnn_prefix_cvls(vector_scale_factor, cv);
+  if(np_cgnn_unbounded_admitted())
+    return np_conditional_density_cvls_lp_stream_ctx(vector_scale_factor, NULL, cv);
   const int num_obs = num_obs_train_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
                              MAX(1, num_obs));
@@ -53854,10 +53878,12 @@ static int np_conditional_cvls_route_context_prepare(
       np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
     return 1;
 
+  const int projected = execution_context == NULL &&
+    response_operator == OP_NORMAL && np_cgnn_unbounded_admitted();
   context->beta_x = execution_context != NULL && execution_context->x_route != NULL;
   context->beta_y = execution_context != NULL && execution_context->y_route != NULL;
   context->fold_geometry = response_operator == OP_NORMAL &&
-    int_cyker_bound_extern != 0 && num_var_continuous_extern > 0 &&
+    (int_cyker_bound_extern != 0 || projected) && num_var_continuous_extern > 0 &&
     (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN);
   context->vector_scale_factor = vector_scale_factor;
   context->execution_context = execution_context;
@@ -53919,7 +53945,7 @@ static int np_conditional_cvls_route_context_prepare(
        np_conditional_yrow_ctx_prepare_ctx(vector_scale_factor, OP_NORMAL,
          context->fold_geometry ? &training_geometry : NULL, &context->legacy_y) != 0)
       goto fail_prepare;
-    if(int_cyker_bound_extern == 0 &&
+    if(int_cyker_bound_extern == 0 && !projected &&
        np_conditional_yrow_ctx_prepare(
          vector_scale_factor, OP_CONVOLUTION,
          &context->legacy_y_convolution) != 0)
@@ -54644,6 +54670,9 @@ cleanup_provider_supertile:
  * which share the fold provider with beta routes. Once selected, provider
  * failure is terminal: there is no legacy or sidecar fallback.
  */
+#include "np_conditional_gnn_projected.h"
+#include "np_conditional_gnn_general.h"
+
 int np_conditional_density_cvls_lp_stream_ctx(
   double *vector_scale_factor,
   const NPConditionalKernelExecutionContext * const execution_context,
@@ -54653,7 +54682,7 @@ int np_conditional_density_cvls_lp_stream_ctx(
   NPConditionalCVLSRowProvider provider;
   int status = 1;
 
-  if(execution_context == NULL &&
+  if(execution_context == NULL && !np_cgnn_unbounded_admitted() &&
      !(int_cyker_bound_extern != 0 && num_var_continuous_extern > 0 &&
        (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN)))
     return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
@@ -54678,7 +54707,11 @@ int np_conditional_density_cvls_lp_stream_ctx(
   provider.fold_fit_block = route_context.fold_geometry ?
     np_conditional_cvls_fold_fit_block : NULL;
 
-  if(route_context.fold_geometry &&
+  if(execution_context == NULL && np_cgnn_projected_admitted()) {
+    status = np_cgnn_projected_cvls(&route_context, cv);
+  } else if(execution_context == NULL && np_cgnn_unbounded_admitted()) {
+    status = np_cgnn_general_cvls(&route_context, cv);
+  } else if(route_context.fold_geometry &&
      (np_conditional_density_cvls_bounded_scalar_route_ok() ||
       np_conditional_density_cvls_bounded_general_route_ok())) {
     /* Reuse scalar nodes, but bound all NN variant and masked-X planes with

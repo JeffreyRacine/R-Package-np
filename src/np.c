@@ -6203,6 +6203,7 @@ SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno,
                                                    SEXP cykerub,
                                                    SEXP declared_support)
 {
+  np_conditional_gnn_notice_reset();
   SEXP c_uno_r = R_NilValue, c_ord_r = R_NilValue, c_con_r = R_NilValue;
   SEXP u_uno_r = R_NilValue, u_ord_r = R_NilValue, u_con_r = R_NilValue;
   SEXP mysd_r = R_NilValue, myopti_i = R_NilValue, myoptd_r = R_NilValue, rbw_r = R_NilValue;
@@ -7114,6 +7115,9 @@ SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP x0,
 SEXP C_np_density_conditional_prepared_destroy(void)
 {
   np_conditional_density_prepared_context_clear_internal();
+  /* A prepared search owns one notice scope, including preparation probes.
+     Emit only after rank-local work and cleanup, never in callbacks. */
+  np_conditional_gnn_notice_emit();
   return R_NilValue;
 }
 
@@ -11866,6 +11870,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
                                                const int eval_only,
                                                SEXP declared_support)
 {
+  np_conditional_gnn_notice_reset();
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
   SEXP mysd_r=R_NilValue, myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue;
   SEXP degree_i=R_NilValue;
@@ -11967,6 +11972,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   SET_STRING_ELT(out_names, 8, mkChar("nn.cache"));
   setAttrib(out, R_NamesSymbol, out_names);
 
+  np_conditional_gnn_notice_emit();
   UNPROTECT(26);
   return out;
 }
