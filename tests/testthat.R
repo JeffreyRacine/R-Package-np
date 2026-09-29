@@ -1,6 +1,7 @@
 library(testthat)
 library(npRmpi)
 source(file.path("validation", "full_mpi_test_plan.R"), local = TRUE)
+source(file.path("validation", "full_mpi_test_status.R"), local = TRUE)
 
 np_check_filter <- Sys.getenv("NP_CHECK_FILTER", unset = "check-minimal")
 np_check_full <- identical(Sys.getenv("NP_CHECK_FULL", unset = ""), "1")
@@ -65,6 +66,10 @@ local({
             sprintf("shard-%03d-of-%03d.ok", shard, shard_count)
           )
           if (file.exists(witness)) unlink(witness)
+          raw_receipt <- paste0(witness, ".raw-status")
+          if (file.exists(raw_receipt)) unlink(raw_receipt)
+          if (file.exists(paste0(raw_receipt, ".tmp")))
+            unlink(paste0(raw_receipt, ".tmp"))
 
           env <- c(
             paste0("R_LIBS=", paste(.libPaths(), collapse = .Platform$path.sep)),
@@ -83,6 +88,9 @@ local({
             args = shard_args,
             stdout = "", stderr = "", env = env,
             timeout = np_full_shard_timeout
+          )
+          npRmpi_full_test_record_status(
+            witness, shard, shard_count, statuses[[shard]]
           )
 
           expected <- sprintf(
