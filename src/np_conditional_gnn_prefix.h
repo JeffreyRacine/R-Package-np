@@ -414,23 +414,44 @@ static void np_cgnn_integrate(NPGNNConditionalPrefix *c, double lo, double hi, i
     return;
   const int nf = c->folds;
   double *low = c->recursive + (size_t)depth * 3 * nf, *high = low + nf, *other = high + nf;
-  /* The retained certificate is admitted only for its qualified positive
-   * scalar Epan2-X / Gaussian2-Y, scale-one domain. Other rows keep 4/8. */
-  if(c->ykernel == 0 && c->yscale == 1.0 &&
-     np_lp_engine_extern == NP_LP_ENGINE_SCALAR && KERNEL_reg_extern == 4) {
-    const double bound = np_cgnn_gauss4_log_bound(lo,hi,c->anchor-c->maxY,
+  /* A certified local remainder may spend the existing relative budget
+   * only against a lower bound on this piece's true mean-fold integral. */
+  const int certificate_domain=c->ykernel == 0 && c->yscale == 1.0 &&
+    np_lp_engine_extern == NP_LP_ENGINE_SCALAR && KERNEL_reg_extern == 4;
+  double bound=R_PosInf;
+  if(certificate_domain) {
+    const double log_bound=np_cgnn_gauss4_log_bound(lo,hi,c->anchor-c->maxY,
       c->anchor-c->minY,(double)c->activeCount/nf*c->maxL1*c->maxL1);
-    if(bound <= log(ldexp(1e-12/(8*c->n),-depth))) {
+    bound=exp(log_bound);
+    /* Preserve the established absolute-only shortcut without extra work. */
+    if(log_bound <= log(ldexp(1e-12/(8*c->n),-depth))) {
 #ifdef NP_CF167_TRACE
       ++np_cgnn_trace_certificates;
 #endif
       np_cgnn_rule(c,lo,hi,0,out);
       for(int i=0;i<nf;++i)if(!R_FINITE(out[i])){c->failed=1;return;}
-      c->acceptedError += exp(bound);
+      c->acceptedError+=bound;
       return;
     }
   }
   np_cgnn_rule(c, lo, hi, 0, low);
+  if(certificate_domain) {
+    long double sum=0;
+    for(int i=0;i<nf;++i) {
+      if(!R_FINITE(low[i])){c->failed=1;return;}
+      sum+=(long double)low[i]/nf;
+    }
+    const double accumulation=(2.0*nf+8.0)*DBL_EPSILON;
+    const double lower=fmax(0.0,nextafter((double)sum/(1.0+accumulation),0.0)-bound);
+    if(bound <= ldexp(1e-12/(8*c->n),-depth)+1e-10*lower) {
+#ifdef NP_CF167_TRACE
+      ++np_cgnn_trace_certificates;
+#endif
+      memcpy(out,low,(size_t)nf*sizeof(double));
+      c->acceptedError+=bound;
+      return;
+    }
+  }
   np_cgnn_rule(c, lo, hi, 1, high);
 
   const double budget = ldexp(1e-12 / (8 * c->n), -depth),
