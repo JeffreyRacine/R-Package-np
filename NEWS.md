@@ -1,5 +1,16 @@
 # npRmpi 0.80-1
 
+* Corrected unbounded conditional-density least-squares cross-validation with
+  generalized nearest-neighbor bandwidths to integrate the squared leave-one-out
+  fit using response bandwidths that vary over the full response support.
+  This covers Gaussian and Epanechnikov kernels of orders 2, 4, 6, and 8,
+  uniform kernels, and local-polynomial and mixed-response models. Selected
+  bandwidths can change. These objectives can cost more than analytical
+  fixed/adaptive-neighbor objectives; see `npcdensbw` for the distinction.
+
+* Generalized-neighbor density cross-validation preserves very narrow
+  integration intervals that could previously be lost through rounding.
+
 * Single-index asymptotic fitting omits unrequested internal derivative
   standard errors while retaining derivative values, mean uncertainty, and
   default coefficient covariance. Requested public gradient errors are unchanged.
