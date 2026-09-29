@@ -198,7 +198,8 @@ test_that("fixed and geometric pilots retain paired targets and compact kernel r
           invokeRestart("muffleWarning")
         }
       })
-      expect_identical(known.warnings>0L,kernel=="uniform")
+      # This route inherits kernel metadata, not a fresh explicit order.
+      expect_identical(known.warnings,0L)
       expect_identical(dim(out$t),c(3L,6L))
       expect_true(all(is.finite(out$t)))
       expect_true(all(is.finite(out$center)))

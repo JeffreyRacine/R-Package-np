@@ -55,7 +55,13 @@ test_that("conditional X metadata adapter retains canonical finalized fields", {
         a <- capture(incumbent(b,x)); z <- capture(adapter(b,x))
         expect_identical(clean(z$value),clean(a$value),
           info=paste(bt,ker,rt,bern))
-        expect_identical(z$warnings,a$warnings,info=paste(bt,ker,rt,bern))
+        # The constructor explicitly supplies ckerorder; the adapter inherits
+        # retained metadata. They share values, not the fresh-request advisory.
+        expected <- if (ker == "uniform")
+          "[npRmpi] ignoring kernel order specified with uniform kernel type"
+        else character()
+        expect_identical(a$warnings,expected,info=paste(bt,ker,rt,bern))
+        expect_identical(z$warnings,character(),info=paste(bt,ker,rt,bern))
       }
     }
   }
