@@ -21,7 +21,7 @@ test_that("H6 source extraction is complete and fails closed beyond one million"
   extract <- np_source_tail_test_function(
     "test-regression-hc0-general-lp-derivative-contract.R", "h6_extract_lp_owner"
   )
-  start <- "static SEXP np_regression_general_lp_fit_execute(void *data)"
+  start <- "static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(void *data)"
   finish <- "static int np_regression_general_lp_fit(\n"
   target <- paste0(start, " {\n  required_covariance_owner();\n}\n")
   padding <- paste0(strrep(" ", 1000001L), "\n")
