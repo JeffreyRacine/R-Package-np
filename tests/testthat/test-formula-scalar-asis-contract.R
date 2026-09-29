@@ -10,8 +10,22 @@ test_that("scalar numeric AsIs formula terms match ordinary numeric transforms",
     f <- if (family %in% c("npudens", "npudist")) ~I(x^2) else y ~ I(x^2)
     g <- if (family %in% c("npudens", "npudist")) ~square(x) else y ~ square(x)
     constructor <- get(paste0(family, "bw"))
-    a <- constructor(formula = f, data = d, bws = h, bandwidth.compute = FALSE)
-    b <- constructor(formula = g, data = d, bws = h, bandwidth.compute = FALSE)
+    warnings <- character()
+    pair <- withCallingHandlers(
+      list(a = constructor(formula = f, data = d, bws = h, bandwidth.compute = FALSE),
+           b = constructor(formula = g, data = d, bws = h, bandwidth.compute = FALSE)),
+      warning = function(w) {
+        warnings <<- c(warnings, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    )
+    expected <- if (family == "npindex") rep(paste(
+      "[npRmpi] xdat has one dimension. Using a single index model to reduce",
+      "dimensionality is unnecessary."
+    ), 2L) else character()
+    expect_identical(warnings, expected, info = family)
+    a <- pair$a
+    b <- pair$b
     af <- get(family)(a, se = FALSE)
     bf <- get(family)(b, se = FALSE)
     expect_equal(fitted(af), fitted(bf), tolerance = 1e-12)
