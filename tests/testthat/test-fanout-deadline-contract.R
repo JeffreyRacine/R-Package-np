@@ -38,17 +38,31 @@ test_that("terminal expiry quarantines without stacking a cleanup budget", {
   make <- getFromNamespace(".npRmpi_fanout_metadata", "npRmpi")
   boundary <- getFromNamespace(".npRmpi_fanout_terminal_boundary", "npRmpi")
   cleanup <- getFromNamespace(".npRmpi_fanout_cleanup_attempt", "npRmpi")
+  lease <- getFromNamespace(".npRmpi_lease_state", "npRmpi")
+  lease.status <- lease$status
+  notification <- new.env(parent = emptyenv())
+  notification$count <- 0L
   tx <- make(101L, 1L, 1L, "scatter", NULL, "session", "operation", 18432L)
   tx$phase <- "active"; tx$owner.active <- TRUE
   tx$terminal.started <- -100
   tx$terminal.deadline[] <- -70
   expect_error(boundary(tx), class = "npRmpi_cleanup_pending")
   local_mocked_bindings(.npRmpi_fanout_notice = function(...) NULL,
-    .npRmpi_fanout_drain = function(...) stop("must not drain"), .package = "npRmpi")
+    .npRmpi_fanout_drain = function(...) stop("must not drain"),
+    .npRmpi_lease_poison = function() {
+      notification$count <- notification$count + 1L
+      invisible(FALSE)
+    }, .package = "npRmpi")
   expect_s3_class(cleanup(tx), "npRmpi_cleanup_pending")
   expect_identical(tx$phase, "quarantined")
+  expect_identical(notification$count, 0L)
+  expect_identical(lease$status, lease.status)
   tx$owner.active <- FALSE
-  expect_match(conditionMessage(cleanup(tx)), "must not drain")
+  failure <- cleanup(tx)
+  expect_match(conditionMessage(failure), "must not drain")
+  expect_identical(tx$phase, "uncertain")
+  expect_identical(notification$count, 1L)
+  expect_identical(lease$status, lease.status)
 })
 
 test_that("terminal stage budgets are per rank and do not clock numerical work", {
