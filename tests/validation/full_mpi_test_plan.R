@@ -1,5 +1,13 @@
 npRmpi_full_test_singleton_files <- function() {
   c(
+    "test-beta-density-cv-occurrence-geometry-contract.R",
+    "test-generalized-cdf-fold-grid-contract.R",
+    "test-gnn-deleted-query-count-beta-off.R",
+    "test-gnn-deleted-query-count-beta-on.R",
+    "test-gnn-deleted-query-count-epanechnikov-off.R",
+    "test-gnn-deleted-query-count-epanechnikov-on.R",
+    "test-gnn-deleted-query-count-gaussian-off.R",
+    "test-gnn-deleted-query-count-gaussian-on.R",
     "test-regression-hc0-general-lp-derivative-contract.R",
     "test-regression-hc0-scalar-categorical-contract.R",
     "test-session-routing-subprocess-contract.R"
