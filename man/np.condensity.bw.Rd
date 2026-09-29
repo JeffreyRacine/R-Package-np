@@ -899,6 +899,23 @@ or standard-deviation factors.
   bandwidths change with the point at which the density is estimated,
   \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
+  \subsection{Computational cost of generalized nearest-neighbor CVLS}{
+  For unbounded Gaussian, Epanechnikov, and uniform kernels,
+  \code{bwmethod="cv.ls"} with \code{bwtype="generalized_nn"} integrates
+  the squared leave-one-out conditional density over the full response
+  support, allowing response bandwidths to vary with the response evaluation
+  point. This requires additional integration work compared with the
+  analytical convolutions available for fixed and adaptive nearest-neighbor
+  bandwidths.
+
+  Computation time depends on the kernels, nearest-neighbor counts, predictor
+  and response dimensions, and local-polynomial specification. Some
+  configurations can be substantially more expensive. Second-order kernels
+  are the usual practical choice; higher-order kernels remain supported.
+  The \code{cvls.quadrature.*} controls described above apply to bounded
+  response integration, not this unbounded generalized-neighbor calculation.
+  }
+
   Exact ties can make the literal \eqn{k}th continuous nearest-neighbor
   radius zero. Such a bandwidth is undefined and is rejected; see
   \code{\link{np.kernels}} for the precise contract and remedies.
