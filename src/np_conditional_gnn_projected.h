@@ -1,4 +1,4 @@
-/* Bounded conditional Gaussian-response GNN contraction, extracted from the
+/* Bounded conditional scalar-response GNN contraction, extracted from the
  * preserved qualified C167 computation. Included after canonical row providers.
  * The unconditional owner and compact-X prefix implementation are untouched. */
 typedef int (*NPGNNIntegralFilledRow)(void *,int,double *,double *);
@@ -18,6 +18,8 @@ typedef struct {
   int *projected_order,*projected_start;
   double *projected_factor,*projected_diagonal,*projected_residual;
   double *projected_recursive,*projected_estimates;
+  double *compact_cuts;
+  int compact_pair_geometry;
   int *projected_selected;
   int projected_rows,projected_intervals,projected_shared;
   size_t projected_bytes;
@@ -41,10 +43,11 @@ static int np_gnn_integral_reciprocal_interval(double qlo, double qhi, double an
 static int np_gnn_projected_storage(NPGNNConditionalProjectionOwner *c)
 {
   const size_t n=(size_t)c->n;
+  const size_t compact_bytes=c->kernel>=4 ? (2*n+2)*sizeof(double) : 0;
   /* Shared-basis storage is linear in n with at most 512 seed columns. */
   if(c->folded && !c->has_categories && c->filled_row!=NULL &&
      c->first_fold==0 && c->end_fold==c->n) {
-    size_t bytes=sizeof(*c)+sizeof(NPGNNIntegralGeometry),cells;
+    size_t bytes=sizeof(*c)+sizeof(NPGNNIntegralGeometry)+compact_bytes,cells;
     int invalid=n>(size_t)INT_MAX/192 ||
        np_gnn_integral_size_add(&bytes,n,4*sizeof(NPGNNIntegralInterval)+
          4*sizeof(NPGNNIntegralPiece)+12*sizeof(double)+4*sizeof(int)) ||
@@ -65,7 +68,7 @@ static int np_gnn_projected_storage(NPGNNConditionalProjectionOwner *c)
   }
   const size_t groups=c->has_categories?(size_t)c->nprofiles:1;
   int rows=MIN(512,c->folded?c->n:1),intervals=8;
-  size_t fixed=0,cells;
+  size_t fixed=compact_bytes,cells;
   if(groups<1 ||
      np_gnn_integral_size_add(&fixed,1,sizeof(*c)+sizeof(NPGNNIntegralGeometry)) ||
      np_gnn_integral_size_add(&fixed,n,4*sizeof(NPGNNIntegralInterval)+
@@ -105,6 +108,19 @@ typedef struct {
   int rows,groups,rank,first,*selected;
   double anchor,norm_max,category_max,absolute_scale,compression_bound;
 } NPGNNProjectedIntegral;
+
+/* Convex-hull bounds of the canonical polynomials in Bernstein form on
+ * z^2 in [0,5]. Maximal absolute coefficients before the kernel multiplier
+ * are 1, 75, 175/48 and 3675/512, respectively. The slack covers the small
+ * fixed polynomial evaluation, not quadrature error or a changed tolerance. */
+static double np_gnn_projected_compact_height(int kernel)
+{
+  const double base=.33541019662496845446;
+  const double height=kernel==8 ? .5 : kernel==4 ? base :
+    kernel==5 ? .008385254916*75 : kernel==6 ? base*(175.0/48) :
+    base*(3675.0/512);
+  return nextafter(height*(1+256*DBL_EPSILON),R_PosInf);
+}
 
 /* Fill exactly one bounded slab in the same Y-sorted fold order. The
  * ordinary deleted row is never overwritten outside this private slab. */
@@ -219,7 +235,8 @@ static int np_gnn_projected_factor(NPGNNProjectedIntegral *q)
       fmin(fmin(fabs(t.lo-t.primary_anchor),fabs(t.hi-t.primary_anchor)),
            fmin(fabs(t.lo-t.successor_anchor),fabs(t.hi-t.successor_anchor))));
   }
-  const long double height=(c->kernel==0 ? allck[0](0) : exp(c->logG[0]))/c->geometry->scale;
+  const long double height=(c->kernel==0 ? allck[0](0) : c->kernel<4 ?
+    exp(c->logG[0]) : np_gnn_projected_compact_height(c->kernel))/c->geometry->scale;
   /* For any h(q)>=hmin, K_h(q-y)^2 is bounded by its pointwise
    * supremum over h>=hmin. Integrating that envelope over the whole line
    * gives [integral(-1,1) phi(t)^2 dt + 2 phi(1)^2]/hmin. */
@@ -432,6 +449,123 @@ static int np_gnn_projected_integrate(NPGNNProjectedIntegral *q,
   return 0;
 }
 
+typedef struct {
+  int count;
+  double origin[192],offset[192],anchor[192],weight[192];
+  int first_deleted[192],end_deleted[192],successor[192];
+} NPGNNProjectedCompactBatch;
+
+/* Shared response nodes, then canonical influence contraction, then square.
+ * Computing a full bounded BLAS slab also permits one batch to span geometry
+ * intervals. The exact deleted-radius mask is applied only at accumulation. */
+static int np_gnn_projected_compact_batch(NPGNNProjectedIntegral *q,
+  NPGNNProjectedCompactBatch *b)
+{
+  NPGNNConditionalProjectionOwner *c=q->owner;
+  const int nq=b->count,n=c->n;
+  if(!nq)return 0;
+  for(int i=0;i<n;++i)for(int z=0;z<nq;++z) {
+    const double slope=b->anchor[z]-c->data[0][c->projected_order[i]];
+    c->left[(size_t)i*nq+z]=
+      fma(slope,b->offset[z],fma(slope,b->origin[z],1))/c->geometry->scale;
+  }
+  np_ckernelv(c->kernel,c->left,n*nq,0,0,1,c->overlap,NULL,0,0,1,
+    1/c->geometry->scale,0,0,0,NULL,NULL);
+  const double one=1,zero=0;
+  if(q->rank)
+    F77_CALL(dgemm)("N","N",&nq,&q->rank,&n,&one,c->overlap,&nq,
+      c->projected_factor,&n,&zero,c->profile_right,&nq FCONE FCONE);
+  np_gnn_projected_multiply(q,nq,nq,0,0,q->rows);
+  for(int f=0;f<q->rows;++f) {
+    const int position=q->first+f,fold=c->geometry->order[position];
+    for(int z=0;z<nq;++z) {
+      const int deleted=position>=b->first_deleted[z] && position<b->end_deleted[z];
+      if(deleted!=b->successor[z])continue;
+      const double fit=c->products[(size_t)f*nq+z];
+      const double contribution=b->weight[z]*fit*fit;
+      if(!R_FINITE(contribution))return 1;
+      np_cgnn_compensated(contribution,c->values+fold,c->projected_recursive+f);
+    }
+  }
+#ifdef NP_CF167_TRACE
+  np_cgnn_trace_projected_nodes+=(unsigned long)nq;
+#endif
+  b->count=0;
+  return 0;
+}
+
+/* Compact kernels have degree d on each support piece. Their squared fit
+ * needs d+1 Gauss nodes, with no adaptive error decision. Support cuts are
+ * shared by all folds using the same primary/successor radius. */
+static int np_gnn_projected_compact(NPGNNProjectedIntegral *q)
+{
+  NPGNNConditionalProjectionOwner *c=q->owner;
+  const NPGNNIntegralGeometry *g=c->geometry;
+  const int rule=c->kernel==8 ? 1 : 2*(c->kernel-3)+1;
+  const double *nodes=rule==1 ? np_cgnn_nodes1 : rule==3 ? np_cgnn_nodes3 :
+    rule==5 ? np_cgnn_nodes5 : rule==7 ? np_cgnn_nodes7 : np_cgnn_nodes9;
+  const double *weights=rule==1 ? np_cgnn_weights1 : rule==3 ? np_cgnn_weights3 :
+    rule==5 ? np_cgnn_weights5 : rule==7 ? np_cgnn_weights7 : np_cgnn_weights9;
+  const double support=c->kernel==8 ? 1 : sqrt(5.0);
+  NPGNNProjectedCompactBatch batch={0};
+  if(q->groups!=1 || c->has_categories || !c->folded)return 1;
+  memset(c->projected_recursive,0,(size_t)q->rows*sizeof(double));
+  for(int at=0;at<g->count;++at) {
+    np_progress_bandwidth_loop_step();
+    const NPGNNIntegralInterval t=g->intervals[at];
+    const int begin=MAX(q->first,t.first_deleted);
+    const int end=MIN(q->first+q->rows,t.end_deleted);
+    const int deleted=MAX(0,end-begin);
+    for(int successor=0;successor<2;++successor) {
+      if((successor && !deleted) || (!successor && deleted==q->rows))continue;
+      const double anchor=successor ? t.successor_anchor : t.primary_anchor;
+      double lo,hi,width;
+      if(np_gnn_integral_reciprocal_interval(t.lo,t.hi,anchor,&lo,&hi,&width) ||
+         !R_FINITE(lo) || !R_FINITE(hi))return 1;
+      if(width==0)continue;
+      int cuts=0;
+      c->compact_cuts[cuts++]=0;
+      c->compact_cuts[cuts++]=width;
+      for(int i=0;i<c->n;++i) {
+        const double slope=anchor-c->data[0][i];
+        if(slope==0)continue;
+        for(int sign=-1;sign<=1;sign+=2) {
+          /* Store an offset from lo. This also retains intervals whose
+           * separately rounded reciprocals coincide but width is positive. */
+          const double offset=fma(-slope,lo,sign*support*g->scale-1)/slope;
+          if(0<offset && offset<width)c->compact_cuts[cuts++]=offset;
+        }
+      }
+      qsort(c->compact_cuts,cuts,sizeof(double),np_cgnn_compare_cut);
+      for(int piece=1;piece<cuts;++piece) {
+        const double left=c->compact_cuts[piece-1],right=c->compact_cuts[piece];
+        if(!(left<right))continue;
+        if(batch.count+rule>192 && np_gnn_projected_compact_batch(q,&batch))return 1;
+        const double mid=.5*left+.5*right,half=.5*(right-left);
+        for(int z=0;z<rule;++z) {
+          const int slot=batch.count++;
+          batch.origin[slot]=lo;batch.offset[slot]=fma(half,nodes[z],mid);
+          batch.anchor[slot]=anchor;batch.weight[slot]=half*weights[z];
+          batch.first_deleted[slot]=t.first_deleted;
+          batch.end_deleted[slot]=t.end_deleted;
+          batch.successor[slot]=successor;
+        }
+      }
+    }
+  }
+  if(np_gnn_projected_compact_batch(q,&batch))return 1;
+  for(int f=0;f<q->rows;++f) {
+    const int fold=g->order[q->first+f];
+    c->values[fold]+=c->projected_recursive[f];
+    if(!R_FINITE(c->values[fold]))return 1;
+  }
+#ifdef NP_CF167_TRACE
+  REprintf("CF167 compact projected rank=%d first_fold=%d end_fold=%d kernel=%d compression_rank=%d\n",
+    np_cgnn_trace_rank(),q->first,q->first+q->rows,c->kernel,q->rank);
+#endif
+  return 0;
+}
+
 static int np_gnn_projected_contract(NPGNNConditionalProjectionOwner *c)
 {
   const int n=c->n,folds=c->folded?n:1;
@@ -451,6 +585,10 @@ static int np_gnn_projected_contract(NPGNNConditionalProjectionOwner *c)
   c->projected_selected=(int *)calloc((size_t)block,sizeof(int));
   c->projected_recursive=(double *)malloc((size_t)block*3*21*sizeof(double));
   c->projected_estimates=(double *)malloc((size_t)block*2*16*sizeof(double));
+  if(c->kernel>=4) {
+    c->compact_cuts=(double *)malloc((2*(size_t)n+2)*sizeof(double));
+    if(!c->compact_cuts)return 1;
+  }
   if(c->projected_shared) {
     c->projected_factor=(double *)malloc((size_t)n*512*sizeof(double));
     c->projected_diagonal=(double *)calloc(n,sizeof(double));
@@ -513,6 +651,10 @@ static int np_gnn_projected_contract(NPGNNConditionalProjectionOwner *c)
       q.norm_max=fmax(q.norm_max,norm);
     }
 
+    if(c->kernel>=4) {
+      if(np_gnn_projected_compact(&q))return 1;
+      continue;
+    }
     for(int start=0;start<g->count;start+=batch) {
       np_progress_bandwidth_loop_step();
       double left[16],right[16],anchor[16],interval_width[16],node[192],node_anchor[192];
@@ -736,6 +878,7 @@ static void np_cgnn_projected_cleanup(void *raw,Rboolean jump)
   free(c->projected_selected);free(c->projected_recursive);
   free(c->projected_estimates);free(c->projected_factor);
   free(c->projected_diagonal);free(c->projected_residual);
+  free(c->compact_cuts);
 }
 
 static int np_cgnn_projected_local(NPGNNConditionalProjectedCall *a)
@@ -749,7 +892,7 @@ static int np_cgnn_projected_local(NPGNNConditionalProjectedCall *a)
     .filled_row=np_lp_engine_extern==NP_LP_ENGINE_SCALAR ?
       np_gnn_conditional_integral_filled_weight:NULL,
     .geometry=&a->geometry,.context=b,.budget=NP_CONDITIONAL_LP_TILE_BUDGET_BYTES};
-  if(c->kernel!=0)np_cgnn_gaussian_derivative_constants(c->kernel,c->logG);
+  if(c->kernel>0 && c->kernel<4)np_cgnn_gaussian_derivative_constants(c->kernel,c->logG);
   c->values=np_cgnn_calloc(n,sizeof(double));
   c->bounds=np_cgnn_calloc(n,sizeof(double));
   b->xrow=np_cgnn_calloc(n,sizeof(double));
@@ -758,11 +901,20 @@ static int np_cgnn_projected_local(NPGNNConditionalProjectedCall *a)
   if(!c->values || !c->bounds || !b->xrow || !b->yrow || !a->cross)return 1;
   if(np_gnn_integral_geometry_prepare(&a->geometry,c->data[0],n,
        b->route->legacy_y.vsfy[0],1))return 1;
-  /* Literal zero radii are invalid, not a request for another criterion. */
+  /* Finite reciprocal panels admit the projected representation. Compact
+   * kernels can have finite integrals even with zero-radius endpoints
+   * (notably uniform k=1/ties); retain their existing whole-support pair
+   * owner before any projected row or integral is computed. */
   for(int z=0;z<a->geometry.count;++z) {
     const NPGNNIntegralInterval t=a->geometry.intervals[z];
     if(t.lo==t.primary_anchor || t.hi==t.primary_anchor ||
-       t.lo==t.successor_anchor || t.hi==t.successor_anchor)return 1;
+       t.lo==t.successor_anchor || t.hi==t.successor_anchor) {
+      if(c->kernel>=4) {
+        c->compact_pair_geometry=1;
+        return 0;
+      }
+      return 1;
+    }
   }
   if(!np_gnn_projected_storage(c))return 1;
 #ifdef MPI2
@@ -777,6 +929,8 @@ static int np_cgnn_projected_local(NPGNNConditionalProjectedCall *a)
 #endif
   return np_gnn_projected_contract(c);
 }
+
+static int np_cgnn_general_cvls(NPConditionalCVLSRouteContext *route,double *cv);
 
 static SEXP np_cgnn_projected_body(void *raw)
 {
@@ -799,6 +953,10 @@ static SEXP np_cgnn_projected_body(void *raw)
 #else
   if(fail)return R_NilValue;
 #endif
+  if(c->compact_pair_geometry) {
+    a->status=np_cgnn_general_cvls(b->route,&a->score);
+    return R_NilValue;
+  }
   /* I2 remains the canonical deleted X/Y row dot product. */
   for(int i=first;i<first+count && !fail;++i) {
     np_progress_bandwidth_loop_step();
