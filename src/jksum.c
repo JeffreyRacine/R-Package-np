@@ -49658,7 +49658,7 @@ static int np_cgnn_unbounded_admitted(void) {
 static int np_cgnn_projected_admitted(void) {
   return BANDWIDTH_den_extern == BW_GEN_NN &&
     num_var_continuous_extern == 1 && num_var_unordered_extern == 0 &&
-    num_var_ordered_extern == 0 && KERNEL_den_extern >= 0 && KERNEL_den_extern <= 3 &&
+    num_var_ordered_extern == 0 && KERNEL_den_extern >= 0 && KERNEL_den_extern <= 8 &&
     KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= 8 &&
     int_cxker_bound_extern == 0 && int_cyker_bound_extern == 0 &&
     !np_cgnn_prefix_admitted();

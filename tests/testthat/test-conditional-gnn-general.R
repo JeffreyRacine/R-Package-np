@@ -26,7 +26,19 @@ cgnn_compact_integral <- function(values,k,family,order,weights=NULL,pair=NULL) 
     mid <- if(!is.finite(lo))hi-max(1,abs(hi))else
       if(!is.finite(hi))lo+max(1,abs(lo))else lo/2+hi/2
     anchor <- values[order(abs(mid-values))[index]]
-    ends <- sort(c(1/(lo-anchor),1/(hi-anchor)))
+    ends <- sort(c(if(lo==anchor)Inf else 1/(lo-anchor),
+                   if(hi==anchor)-Inf else 1/(hi-anchor)))
+    if(any(!is.finite(ends)) && family=='uniform') {
+      # All support crossings already partition q. A uniform factor is
+      # constant on the corresponding reciprocal panel. In these admitted
+      # infinite panels every active weighted factor is exactly zero.
+      u <- if(is.finite(ends[1]))ends[1]+max(1,abs(ends[1]))else
+        if(is.finite(ends[2]))ends[2]-max(1,abs(ends[2]))else 0
+      z <- cgnn_general_kernel((1+(anchor-values)*u)/scale,family,order)
+      value <- if(is.null(pair))sum(weights*z)^2 else prod(z[pair])
+      stopifnot(value==0)
+      next
+    }
     half <- (ends[2]-ends[1])/2;center <- ends[1]/2+ends[2]/2
     stopifnot(is.finite(half),is.finite(center),half>=0)
     for(r in 1:2) {
@@ -103,6 +115,118 @@ cgnn_general_reference <- function(x, y, kx, ky, degree=0L,
   z <- colMeans(result)
   c(I1=z[1],I2=z[2],score=2*z[2]-z[1],error=z[3])
 }
+
+test_that('scalar compact GNN contraction retains deleted fit and extended counts', {
+  old <- options(np.messages=FALSE,np.tree=FALSE,np.extendednn=TRUE)
+  on.exit(options(old),add=TRUE)
+  x <- c(-.83,.66,-.21,.32,-.49,.93,.09)
+  y <- c(-1.4,.2,.95,-.71,1.73,-.1,.57)
+  permutation <- c(4L,1L,7L,3L,6L,2L,5L)
+  for(order in c(2L,4L,6L,8L,0L))for(ky in c(2L,8L))for(degree in 0:2) {
+    family <- if(order==0L)'uniform'else 'epanechnikov'
+    reference <- cgnn_general_reference(x,y,4L,ky,degree,family,max(2L,order))
+    expect_lt(reference['error'],2.5e-10)
+    for(tree in c(FALSE,TRUE)) {
+      options(np.tree=tree)
+      xx <- data.frame(x=x[permutation]); yy <- .5+2*y[permutation]
+      ctl <- if(degree==0L)list(regtype='lc')else if(degree==1L)list(regtype='ll')else
+        list(regtype='lp',degree=2L,bernstein.basis=tree)
+      b <- do.call(npcdensbw,c(list(xdat=xx,ydat=yy,bws=c(ky,4),
+        bandwidth.compute=FALSE,bwtype='generalized_nn',bwmethod='cv.ls',
+        cxkertype='gaussian',cykertype=family),ctl,
+        if(order==0L)list()else list(cykerorder=order)))
+      observed <- cgnn_general_evaluate(xx,yy,b)
+      expect_true(abs(observed-reference['score']/2)<=1e-9,
+        info=paste(family,order,ky,degree,tree))
+    }
+  }
+})
+
+test_that('scalar compact GNN retains positive-radius ties and narrow intervals', {
+  old <- options(np.messages=FALSE,np.tree=TRUE)
+  on.exit(options(old),add=TRUE)
+  x <- c(-.8,.6,-.2,.3,-.5,.9,.1,.45)
+  fixtures <- list(tied=c(-1.4,.2,.2,-.71,1.73,-.1,.57,.57),
+    narrow=c(-1.4,.11499999999999999,.115,.27,1.73,-.1,.57,.93))
+  for(y in fixtures)for(family in c('epanechnikov','uniform')) {
+    reference <- cgnn_general_reference(x,y,4L,3L,0L,family,2L)
+    expect_lt(reference['error'],2.5e-10)
+    b <- npcdensbw(xdat=data.frame(x=x),ydat=y,bws=c(3,4),
+      bandwidth.compute=FALSE,bwtype='generalized_nn',bwmethod='cv.ls',
+      cxkertype='gaussian',cykertype=family)
+    observed <- cgnn_general_evaluate(data.frame(x=x),y,b)
+    expect_true(abs(observed-reference['score'])<=1e-9,info=family)
+  }
+})
+
+
+test_that('compact response contraction retains mixed and signed predictor rows', {
+  old <- options(np.messages=FALSE,np.tree=FALSE)
+  on.exit(options(old),add=TRUE)
+  x <- c(-.83,.66,-.21,.32,-.49,.93,.09)
+  y <- c(-1.4,.2,.95,-.71,1.73,-.1,.57)
+  for(case in c('gaussian4','gaussian8','mixed','compactMixed'))
+    for(family in c('epanechnikov','uniform')) {
+      xx <- data.frame(x=x); counts <- c(3,4)
+      order <- if(case=='gaussian4')4L else if(case=='gaussian8')8L else 2L
+      xf <- if(case=='compactMixed')'epanechnikov'else 'gaussian'
+      mixed <- case %in% c('mixed','compactMixed')
+      if(mixed) {
+        xx$x2 <- .2*x+cos(seq_along(x));xx$u <- factor(c('a','b','a','a','b','b','a'))
+        counts <- c(3,4,4,.2)
+      }
+      scores <- numeric(length(x))
+      for(i in seq_along(x)) {
+        keep <- seq_along(x)!=i; yy <- y[keep]
+        h <- cgnn_general_radius(x[i],x[keep],4)
+        w <- cgnn_general_kernel((x[i]-x[keep])/h,xf,order)
+        if(mixed) {
+          h2 <- cgnn_general_radius(xx$x2[i],xx$x2[keep],4)
+          w <- w*cgnn_general_kernel((xx$x2[i]-xx$x2[keep])/h2,xf,order)*
+            ifelse(xx$u[i]==xx$u[keep],.8,.2)
+        }
+        w <- w/sum(w)
+        integral <- cgnn_compact_integral(yy,3,family,2L,w)
+        expect_lt(integral['error'],2.5e-10)
+        hy <- cgnn_general_radius(y[i],yy,3)
+        scores[i] <- 2*sum(w*cgnn_general_kernel((y[i]-yy)/hy,family)/hy)-
+          integral['value']
+      }
+      for(tree in c(FALSE,TRUE)) {
+        options(np.tree=tree)
+        b <- npcdensbw(xdat=xx,ydat=y,bws=counts,bandwidth.compute=FALSE,
+          bwtype='generalized_nn',bwmethod='cv.ls',regtype='lc',
+          cxkertype=xf,cxkerorder=order,cykertype=family,uxkertype='aitchisonaitken')
+        observed <- cgnn_general_evaluate(xx,y,b)
+        expect_true(abs(observed-mean(scores))<=1e-9,info=paste(case,family,tree))
+      }
+    }
+})
+test_that('compact geometry admission preserves finite uniform zero-radius panels', {
+  old <- options(np.messages=FALSE,np.tree=FALSE)
+  on.exit(options(old),add=TRUE)
+  x <- c(-.83,.66,-.21,.32,-.49,.93,.09)
+  fixtures <- list(list(y=c(-1.4,.2,.95,-.71,1.73,-.1,.57),k=1L),
+                   list(y=c(-1.4,.2,.2,.2,1.73,-.1,.57),k=3L))
+  for(z in fixtures) {
+    ref <- cgnn_general_reference(x,z$y,4L,z$k,0L,'uniform',2L)
+    expect_lt(ref['error'],2.5e-10)
+    b <- npcdensbw(xdat=data.frame(x=x),ydat=z$y,bws=c(z$k,4),
+      bandwidth.compute=FALSE,bwtype='generalized_nn',bwmethod='cv.ls',
+      cykertype='uniform')
+    expect_true(abs(cgnn_general_evaluate(data.frame(x=x),z$y,b)-ref['score'])<=1e-9)
+  }
+  y <- fixtures[[1]]$y
+  bad <- npcdensbw(xdat=data.frame(x=x),ydat=y,bws=c(1,4),
+    bandwidth.compute=FALSE,bwtype='generalized_nn',bwmethod='cv.ls',
+    cykertype='epanechnikov')
+  expect_gte(abs(cgnn_general_evaluate(data.frame(x=x),y,bad)),.Machine$double.xmax/2)
+  good <- npcdensbw(xdat=data.frame(x=x),ydat=y,bws=c(3,4),
+    bandwidth.compute=FALSE,bwtype='generalized_nn',bwmethod='cv.ls',
+    cykertype='epanechnikov')
+  ref <- cgnn_general_reference(x,y,4L,3L,0L,'epanechnikov',2L)
+  expect_true(abs(cgnn_general_evaluate(data.frame(x=x),y,good)-ref['score'])<=1e-9)
+})
 
 test_that('general conditional GNN kernels use the literal deleted fit', {
   old <- options(np.messages=FALSE,np.tree=FALSE)
