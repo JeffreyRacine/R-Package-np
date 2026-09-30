@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Conditional-density generalized-neighbor least-squares cross-validation
+  now preserves local predictor differences in tightly clustered samples
+  with Epanechnikov predictor kernels, avoiding cancellation across orders
+  2, 4, 6, and 8. The more stable calculation can cost more; default Gaussian
+  predictor kernels are unaffected. Valid narrow response intervals are also
+  retained instead of being rejected by the integration path.
+
 * Corrected unbounded conditional-density least-squares cross-validation with
   generalized nearest-neighbor bandwidths to integrate the squared leave-one-out
   fit using response bandwidths that vary over the full response support.
