@@ -954,7 +954,7 @@ npindex.sibandwidth <-
         worker = function(rows) {
           if (!length(rows))
             return(matrix(numeric(0L), nrow = 0L, ncol = 1L))
-          tww <- .npRmpi_with_local_regression(.np_index_kernel_sum(
+          tww <- .npRmpi_with_local_regression(.np_retained_uniform_constructor(.np_index_kernel_sum,
             txdat = index.df,
             tydat = as.matrix(data.frame(tydat, 1)),
             weights = as.matrix(data.frame(tydat, 1)),
@@ -1087,7 +1087,7 @@ npindex.sibandwidth <-
       )
       if (fast.largeh) {
         fast.largeh.eval.mean <- {
-          tww.fast <- .np_index_kernel_sum(
+          tww.fast <- .np_retained_uniform_constructor(.np_index_kernel_sum,
             txdat = as.matrix(txdat) %*% as.matrix(bws$beta),
             tydat = as.matrix(data.frame(tydat, 1)),
             weights = as.matrix(data.frame(tydat, 1)),
@@ -1106,7 +1106,7 @@ npindex.sibandwidth <-
 
         if (!no.ex && (no.ey || residuals)) {
           fast.largeh.train.mean <- {
-            tww.fast <- .np_index_kernel_sum(
+            tww.fast <- .np_retained_uniform_constructor(.np_index_kernel_sum,
               txdat = as.matrix(txdat) %*% as.matrix(bws$beta),
               tydat = as.matrix(data.frame(tydat, 1)),
               weights = as.matrix(data.frame(tydat, 1)),
@@ -1292,7 +1292,7 @@ npindex.sibandwidth <-
           worker = function(rows) {
             if (!length(rows))
               return(matrix(numeric(0L), nrow = 0L, ncol = n.w + 1L))
-            moments <- .npRmpi_with_local_regression(.np_index_kernel_moments(
+            moments <- .npRmpi_with_local_regression(.np_retained_uniform_constructor(.np_index_kernel_moments,
               y = W,
               txdat = index.df,
               exdat = eval.df[rows, , drop = FALSE],
@@ -1406,7 +1406,7 @@ npindex.sibandwidth <-
       boofun = function(data, indices){
         rindex <- index[indices]
         if (identical(regtype, "lc")) {
-          tww <- .np_index_kernel_sum(txdat = rindex,
+          tww <- .np_retained_uniform_constructor(.np_index_kernel_sum,txdat = rindex,
                         tydat = cbind(tydat[indices],1),
                         weights = cbind(tydat[indices],1),
                         exdat = index.eval,
@@ -1530,7 +1530,7 @@ npindex.sibandwidth <-
             worker = function(rows) {
               if (!length(rows))
                 return(matrix(numeric(0L), nrow = 0L, ncol = 1L))
-              tww <- .npRmpi_with_local_regression(.np_index_kernel_sum(
+              tww <- .npRmpi_with_local_regression(.np_retained_uniform_constructor(.np_index_kernel_sum,
                 txdat = rindex.df,
                 tydat = cbind(tydat[indices], 1),
                 weights = cbind(tydat[indices], 1),
