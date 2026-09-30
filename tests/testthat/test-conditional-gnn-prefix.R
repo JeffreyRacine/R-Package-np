@@ -70,6 +70,31 @@ cgnn_literal <- function(x,y,kx,ky,degree,xkernel='epanechnikov',xorder=2L,yorde
   c(I1=I1,I2=I2,score=2*I2-I1)
 }
 
+test_that('conditional GNN local moments preserve small within-cluster distances', {
+  old <- options(np.messages=FALSE,np.tree=FALSE);on.exit(options(old),add=TRUE)
+  skip_if_not(spawn_mpi_slaves(1L), 'MPI session unavailable')
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
+  # Unique cancellation sentinel: ordinary globally scaled fixtures cannot
+  # detect the loss of local X differences before compensated summation.
+  # Larger n, all kernel orders and timing belong to the forensic campaign.
+  x <- c(0,1e-8,2e-8,3e-8,1);y <- c(2,-1,1,0,-2)
+  expected <- cgnn_literal(x,y,2L,3L,0L,ykernel='uniform')['score']
+  for(tree in c(FALSE,TRUE)) {
+    options(np.tree=tree)
+    b <- npcdensbw(xdat=data.frame(x=x),ydat=y,bws=c(3,2),
+      bwtype='generalized_nn',bwmethod='cv.ls',regtype='lc',
+      cxkertype='epanechnikov',cykertype='uniform',bandwidth.compute=FALSE)
+    command <- substitute({
+      options(np.tree=TREE,np.messages=FALSE)
+      get('.npcdensbw_eval_only',asNamespace('npRmpi'))(
+        data.frame(x=X),Y,B,invalid.penalty='dbmax',force.local=FALSE)
+    },list(TREE=tree,X=x,Y=y,B=b))
+    observed <- get('.npRmpi_bcast_cmd_expr',asNamespace('npRmpi'))(
+      command,comm=1L,caller.execute=TRUE)$objective
+    expect_lte(abs(observed-expected),1e-9)
+  }
+})
+
 test_that('conditional GNN prefix uses the literal whole-support criterion', {
   old <- options(np.messages=FALSE,np.largeh=TRUE,np.largelambda=TRUE)
   on.exit(options(old),add=TRUE)

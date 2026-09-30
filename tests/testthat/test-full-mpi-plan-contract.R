@@ -19,6 +19,34 @@ test_that("the bounded MPI plan preserves every sorted test and heavy singleton"
                "singleton registry is invalid")
 })
 
+test_that("expensive conditional GNN oracles have independent MPI budgets", {
+  helper <- testthat::test_path("..", "validation", "full_mpi_test_plan.R")
+  skip_if_not(file.exists(helper), "source plan helper unavailable")
+  scope <- new.env(parent = globalenv())
+  sys.source(helper, envir = scope)
+  # Deliberately independent of the registry: removing an entry must fail.
+  required <- c("test-conditional-gnn-general.R",
+                "test-conditional-gnn-prefix.R",
+                "test-conditional-gnn-projected.R")
+  files <- sort(list.files(testthat::test_path(), "^test-.*\\.[rR]$"))
+  expect_true(all(required %in% files))
+  expect_true(all(required %in% scope$npRmpi_full_test_singleton_files()))
+  # Include ordinary neighbors to test both pending-group flush boundaries.
+  synthetic <- sort(unique(c(scope$npRmpi_full_test_singleton_files(), required,
+    "test-conditional-gnn-general-before.R", "test-conditional-gnn-general0.R",
+    "test-conditional-gnn-prefix-before.R", "test-conditional-gnn-prefix0.R",
+    "test-conditional-gnn-projected-before.R", "test-conditional-gnn-projected0.R")))
+  for (inventory in list(files, synthetic)) {
+    for (size in c(1L, 3L, 10L, length(inventory) + 1L)) {
+      plan <- scope$npRmpi_full_test_plan(inventory, size)
+      expect_identical(unlist(plan, use.names = FALSE), inventory)
+      expect_true(all(lengths(plan) >= 1L & lengths(plan) <= size))
+      for (file in required)
+        expect_equal(sum(vapply(plan, identical, TRUE, file)), 1L, info = file)
+    }
+  }
+})
+
 test_that("the GNN singleton wrappers cover every explicit tree and kernel", {
   expected <- expand.grid(kernel = c("gaussian", "epanechnikov", "beta"),
                           mode = c("off", "on"), stringsAsFactors = FALSE)

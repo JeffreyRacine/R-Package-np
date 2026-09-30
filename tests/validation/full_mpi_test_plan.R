@@ -1,6 +1,10 @@
 npRmpi_full_test_singleton_files <- function() {
   c(
     "test-beta-density-cv-occurrence-geometry-contract.R",
+    # Independent conditional-GNN quadrature oracles need their own budget.
+    "test-conditional-gnn-general.R",
+    "test-conditional-gnn-prefix.R",
+    "test-conditional-gnn-projected.R",
     "test-generalized-cdf-fold-grid-contract.R",
     "test-gnn-deleted-query-count-beta-off.R",
     "test-gnn-deleted-query-count-beta-on.R",

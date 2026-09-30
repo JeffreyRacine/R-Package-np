@@ -1,7 +1,8 @@
 #include "np_conditional_gnn_gauss4.h"
 /* Whole-support conditional GNN I1. Included only by jksum.c after the
- * canonical X/Y contexts. Prefixes retain the actual conditioned basis;
- * there is no independent solver, polynomial-basis conversion or tail cut. */
+ * canonical X/Y contexts. Local moments retain the conditioned LP basis;
+ * uniform X keeps constant prefixes. Neither owner introduces a solver,
+ * LP-basis conversion or response-tail cut. */
 typedef struct {
   double x;
   int id;
@@ -15,10 +16,11 @@ static void np_cgnn_compensated(double v, double *s, double *e) {
   *e += fabs(*s) >= fabs(v) ? (*s - t) + v : (v - t) + *s;
   *s = t;
 }
+#include "np_conditional_gnn_local.h"
 typedef struct {
-  int n, folds, moments, failed, twofold, ykernel, *active, *first, *end, *orderRank;
+  int n, folds, moments, failed, ykernel, *active, *first, *end, *orderRank;
   const double *y;
-  double *x, *coef, *self, *powers, *coefLow, *powersLow;
+  double *x, *coef, *self, *powers;
   double maxL1, logG[17];
   NPGNNConditionalOrder *order;
   double *args, *factors, *prefix, *correction, *recursive;
@@ -26,137 +28,25 @@ typedef struct {
   int tree, selectedCount, activeCount, *coverage, *selected, *factorIndex, *activeIDs;
   int *responseRank, *responseActive, *responseSlots;
   double *cuts;
+  int narrow;
+  double qleft, du;
+  NPGNNLocalMoments local;
 } NPGNNConditionalPrefix;
-/* Higher-order compact polynomials require retaining product residuals as
- * well as sum residuals: global-coordinate expansion otherwise magnifies
- * roundoff by h^-order. This is an upfront kernel representation, never a
- * conditioning/failure fallback; the canonical LP basis/solve is unchanged. */
-typedef struct { double hi, lo; } NPGNNConditionalDD;
-static NPGNNConditionalDD np_cgnn_dd(double x) {
-  return (NPGNNConditionalDD){x, 0.0};
-}
-static NPGNNConditionalDD np_cgnn_dd_add(NPGNNConditionalDD a, NPGNNConditionalDD b) {
-  const double s = a.hi + b.hi, v = s - a.hi;
-  const double e = (a.hi - (s - v)) + (b.hi - v) + a.lo + b.lo, h = s + e;
-  return (NPGNNConditionalDD){h, e - (h - s)};
-}
-static NPGNNConditionalDD np_cgnn_dd_neg(NPGNNConditionalDD a) {
-  return (NPGNNConditionalDD){-a.hi, -a.lo};
-}
-static NPGNNConditionalDD np_cgnn_dd_mul(NPGNNConditionalDD a, NPGNNConditionalDD b) {
-  const double p = a.hi * b.hi;
-  const double e = fma(a.hi, b.hi, -p) + a.hi * b.lo + a.lo * b.hi + a.lo * b.lo;
-  const double h = p + e;
-  return (NPGNNConditionalDD){h, e - (h - p)};
-}
-/* Compensated dot accumulation retains both product and sum residuals without
- * normalizing after every donor. Prefix differences still use dd_add; the
- * completed contraction is rounded only once. This is the same higher-order
- * representation in both tree modes, not a precision/failure fallback. */
-static void np_cgnn_dd_accumulate(NPGNNConditionalDD *sum,
-                                   NPGNNConditionalDD a, NPGNNConditionalDD b) {
-  const double p = a.hi * b.hi;
-  const double pe = fma(a.hi, b.hi, -p) + a.hi * b.lo + a.lo * b.hi + a.lo * b.lo;
-  const double t = sum->hi + p, v = t - sum->hi;
-  sum->lo += ((sum->hi - (t - v)) + (p - v)) + pe;
-  sum->hi = t;
-}
-static NPGNNConditionalDD np_cgnn_dd_inverse(double x) {
-  const double q = 1.0 / x;
-  return np_cgnn_dd_add(np_cgnn_dd(q), np_cgnn_dd(fma(-q, x, 1.0) / x));
-}
-static NPGNNConditionalDD np_cgnn_dd_power(NPGNNConditionalDD x, int degree) {
-  NPGNNConditionalDD r = np_cgnn_dd(1.0);
-  for (int p = 0; p < degree; ++p)
-    r = np_cgnn_dd_mul(r, x);
-  return r;
-}
-static void np_cgnn_dd_polynomial(int kernel, double xi, double h, NPGNNConditionalDD *poly) {
-  const int planes = 2 * (kernel - 3) + 1;
-  /* Retain the native kernel's factored constants; do not fit coefficients
-   * from sampled kernel values or change the statistical normalization. */
-  const double core4[2] = {-15.0, 7.0},
-               core6[3] = {2.734375, -3.28125, .721875},
-               core8[4] = {3.5888671875, -7.8955078125, 4.1056640625, -.5865234375};
-  const double *core = kernel == 5 ? core4 : kernel == 6 ? core6 : core8;
-  const double k = kernel == 5 ? .008385254916 : .33541019662496845446,
-               f0 = kernel == 5 ? -5.0 : 1.0, f2 = kernel == 5 ? 1.0 : -.2;
-  NPGNNConditionalDD a[9] = {{0.0, 0.0}}, inverse = np_cgnn_dd_inverse(h);
-  for (int p = 0; p < kernel - 3; ++p) {
-    const NPGNNConditionalDD v = np_cgnn_dd_mul(np_cgnn_dd(k), np_cgnn_dd(core[p]));
-    a[2 * p] = np_cgnn_dd_add(a[2 * p], np_cgnn_dd_mul(v, np_cgnn_dd(f0)));
-    a[2 * p + 2] = np_cgnn_dd_add(a[2 * p + 2], np_cgnn_dd_mul(v, np_cgnn_dd(f2)));
-  }
-  for (int q = 0; q < planes; ++q) {
-    poly[q] = np_cgnn_dd(0.0);
-    for (int p = q; p < planes; ++p) {
-      double choose = 1.0;
-      for (int j = 1; j <= q; ++j)
-        choose *= (double)(p + 1 - j) / j;
-      NPGNNConditionalDD v = np_cgnn_dd_mul(a[p], np_cgnn_dd(choose));
-      v = np_cgnn_dd_mul(v, np_cgnn_dd_power(np_cgnn_dd(-xi), p - q));
-      poly[q] = np_cgnn_dd_add(poly[q],
-          np_cgnn_dd_mul(v, np_cgnn_dd_power(inverse, p)));
-    }
-  }
-}
-static void np_cgnn_twofold_rule(NPGNNConditionalPrefix *c, double lo, double hi,
-                                int high, double *out) {
-  const int nq = high ? 8 : 4, n = c->n;
-  const int pruned = c->tree && c->selectedCount != n;
-  const int m = pruned ? c->selectedCount : n;
-  const double *nodes = high ? np_gnn_integral_nodes8 : np_gnn_integral_nodes4,
-               *weights = high ? np_gnn_integral_weights8 : np_gnn_integral_weights4;
-  const double mid = .5 * lo + .5 * hi, half = .5 * hi - .5 * lo;
+static void np_cgnn_local_rule(NPGNNConditionalPrefix *c, double lo, double hi,
+                                int high, int compact, double *out);
+
+/* A collapsed reciprocal panel is parameterized by t in [0,1]. Retain
+ * its width separately instead of perturbing endpoints or dropping it.
+ * The original q-space ratio avoids cancellation in 1+(anchor-y)*u. */
+static void np_cgnn_narrow_args(NPGNNConditionalPrefix *c, int m, int nq,
+                                int ordered, int pruned, double mid, double half,
+                                const double *nodes) {
   for (int r = 0; r < m; ++r) {
-    const int j = c->order[pruned ? c->selected[r] : r].id;
+    const int j = ordered ? c->order[pruned ? c->selected[r] : r].id : r;
+    const double base = (c->qleft - c->y[j]) / (c->qleft - c->anchor) / c->yscale,
+                 step = -(c->anchor - c->y[j]) * c->du / c->yscale;
     for (int z = 0; z < nq; ++z)
-      c->args[r * nq + z] = (1 + (c->anchor - c->y[j]) * (mid + half * nodes[z])) / c->yscale;
-  }
-  np_ckernelv(c->ykernel, c->args, m * nq, 0, 0, 1, c->factors, NULL, 0, 0, 1, 1, 0, 0, 0, NULL, NULL);
-  for (int r = 0; r < m * nq; ++r)
-    c->factors[r] /= c->yscale;
-  for (int p = 0; p < c->moments; ++p) {
-    NPGNNConditionalDD sum[8] = {{0.0, 0.0}};
-    double *v = c->prefix + (size_t)p * (m + 1) * nq,
-           *e = c->correction + (size_t)p * (m + 1) * nq;
-    for (int z = 0; z < nq; ++z)
-      v[z] = e[z] = 0.0;
-    for (int r = 0; r < m; ++r) {
-      const int j = c->order[pruned ? c->selected[r] : r].id;
-      const size_t at = (size_t)p * n + j;
-      const NPGNNConditionalDD power = {c->powers[at], c->powersLow[at]};
-      for (int z = 0; z < nq; ++z) {
-        np_cgnn_dd_accumulate(&sum[z], power, np_cgnn_dd(c->factors[r * nq + z]));
-        v[(r + 1) * nq + z] = sum[z].hi;
-        e[(r + 1) * nq + z] = sum[z].lo;
-      }
-    }
-  }
-  memset(out, 0, (size_t)n * sizeof(double));
-  for (int i = 0; i < n; ++i) {
-    if (!c->active[i])
-      continue;
-    const int first = pruned ? c->coverage[c->first[i]] : c->first[i],
-              end = pruned ? c->coverage[c->end[i]] : c->end[i],
-              self = pruned ? c->factorIndex[i] : c->orderRank[i];
-    for (int z = 0; z < nq; ++z) {
-      NPGNNConditionalDD fit = np_cgnn_dd(0.0);
-      for (int p = 0; p < c->moments; ++p) {
-        const size_t stride = (size_t)p * (m + 1) * nq, at = (size_t)c->moments * i + p;
-        const NPGNNConditionalDD left = {c->prefix[stride + first * nq + z],
-                                         c->correction[stride + first * nq + z]},
-                                right = {c->prefix[stride + end * nq + z],
-                                          c->correction[stride + end * nq + z]},
-                                coef = {c->coef[at], c->coefLow[at]};
-        np_cgnn_dd_accumulate(&fit, coef,
-            np_cgnn_dd_add(right, np_cgnn_dd_neg(left)));
-      }
-      np_cgnn_dd_accumulate(&fit, np_cgnn_dd(-c->self[i]),
-                           np_cgnn_dd(c->factors[self * nq + z]));
-      const double value = fit.hi + fit.lo;
-      out[i] += half * weights[z] * value * value;
-    }
+      c->args[r * nq + z] = fma(step, mid + half * nodes[z], base);
   }
 }
 /* Implicit balanced range tree over sorted X ranks. Membership is the union
@@ -218,6 +108,9 @@ static void np_cgnn_tree_rule(NPGNNConditionalPrefix *c, double lo, double hi, i
   const double *nodes = high ? np_gnn_integral_nodes8 : np_gnn_integral_nodes4,
                *w = high ? np_gnn_integral_weights8 : np_gnn_integral_weights4;
   const double mid = .5 * lo + .5 * hi, half = .5 * hi - .5 * lo;
+  if (c->narrow)
+    np_cgnn_narrow_args(c, m, nq, 1, 1, mid, half, nodes);
+  else
   for (int r = 0; r < m; ++r) {
     const int j = c->order[c->selected[r]].id;
     for (int z = 0; z < nq; ++z)
@@ -262,8 +155,8 @@ static double np_cgnn_prefixgap(NPGNNConditionalPrefix *c, int p, int lo, int hi
   return (v[hi * nq + z] - v[lo * nq + z]) + (e[hi * nq + z] - e[lo * nq + z]);
 }
 static void np_cgnn_rule(NPGNNConditionalPrefix *c, double lo, double hi, int high, double *out) {
-  if (c->twofold) {
-    np_cgnn_twofold_rule(c, lo, hi, high, out);
+  if (c->local.degree) {
+    np_cgnn_local_rule(c, lo, hi, high, 0, out);
     return;
   }
   /* Exact root certificate, not a density/cost heuristic: if the support union
@@ -278,6 +171,9 @@ static void np_cgnn_rule(NPGNNConditionalPrefix *c, double lo, double hi, int hi
   const double *nodes = high ? np_gnn_integral_nodes8 : np_gnn_integral_nodes4;
   const double *w = high ? np_gnn_integral_weights8 : np_gnn_integral_weights4;
   const double mid = .5 * lo + .5 * hi, half = .5 * hi - .5 * lo;
+  if (c->narrow)
+    np_cgnn_narrow_args(c, n, nq, 0, 0, mid, half, nodes);
+  else
   for (int j = 0; j < n; ++j)
     for (int z = 0; z < nq; ++z)
       c->args[j * nq + z] = (1 + (c->anchor - c->y[j]) * (mid + half * nodes[z])) / c->yscale;
@@ -358,9 +254,16 @@ static double np_cgnn_gaussian_interval_bound(NPGNNConditionalPrefix *c,
  for(int j=0;j<n;++j){
   const double slope=anchor-y[j];
   const double magnitude=fabs(anchor)+fabs(y[j]);
-  const double slopeUpper=nextafter((fabs(slope)+DBL_EPSILON*magnitude)/c->yscale,INFINITY);
-  const double a=fma(slope,lo,1)/c->yscale,b=fma(slope,hi,1)/c->yscale;
-  const double roundoff=8*DBL_EPSILON*(1+magnitude*maxU)/c->yscale;
+  double slopeUpper=nextafter((fabs(slope)+DBL_EPSILON*magnitude)/c->yscale,INFINITY);
+  double a=fma(slope,lo,1)/c->yscale,b=fma(slope,hi,1)/c->yscale;
+  double roundoff=8*DBL_EPSILON*(1+magnitude*maxU)/c->yscale;
+  if(c->narrow) {
+    const double base=(c->qleft-y[j])/(c->qleft-anchor)/c->yscale,
+                 step=-slope*c->du/c->yscale;
+    slopeUpper=nextafter((fabs(slope)+DBL_EPSILON*magnitude)*c->du/c->yscale,INFINITY);
+    a=fma(step,lo,base);b=fma(step,hi,base);
+    roundoff=16*DBL_EPSILON*(fabs(base)+slopeUpper*maxU);
+  }
   const double nearest=(a<=0&&b>=0)||(a>=0&&b<=0)?0:
    fmax(0,fmin(fabs(a),fabs(b))-roundoff);
   const double decay=-.25*nearest*nearest;
@@ -385,7 +288,7 @@ static double np_cgnn_gaussian_interval_bound(NPGNNConditionalPrefix *c,
 }
 
 static double np_cgnn_missed_peak_bound(NPGNNConditionalPrefix *c, double lo, double hi) {
-  if (c->ykernel != 0)
+  if (c->ykernel != 0 || c->narrow)
     return np_cgnn_gaussian_interval_bound(c, lo, hi);
   const double width = hi - lo,
                variation = fmax(fabs(c->anchor - c->minY), fabs(c->anchor - c->maxY)) / c->yscale;
@@ -416,7 +319,7 @@ static void np_cgnn_integrate(NPGNNConditionalPrefix *c, double lo, double hi, i
   double *low = c->recursive + (size_t)depth * 3 * nf, *high = low + nf, *other = high + nf;
   /* A certified local remainder may spend the existing relative budget
    * only against a lower bound on this piece's true mean-fold integral. */
-  const int certificate_domain=c->ykernel == 0 && c->yscale == 1.0 &&
+  const int certificate_domain=!c->narrow && c->ykernel == 0 && c->yscale == 1.0 &&
     np_lp_engine_extern == NP_LP_ENGINE_SCALAR && KERNEL_reg_extern == 4;
   double bound=R_PosInf;
   if(certificate_domain) {
@@ -454,7 +357,7 @@ static void np_cgnn_integrate(NPGNNConditionalPrefix *c, double lo, double hi, i
   }
   np_cgnn_rule(c, lo, hi, 1, high);
 
-  const double budget = ldexp(1e-12 / (8 * c->n), -depth),
+  const double budget = ldexp(1e-12 / (8 * c->n), -depth) / (c->narrow ? c->du : 1.0),
                unseen = np_cgnn_missed_peak_bound(c, lo, hi);
   int pass = R_FINITE(unseen) && unseen <= budget / 4;
   double err = 0, value = 0;
@@ -520,7 +423,58 @@ static const double np_cgnn_weights7[] = {.1294849661688696933,.2797053914892766
 static const double np_cgnn_nodes9[] = {-.9681602395076260898,-.8360311073266357943,-.6133714327005903973,-.3242534234038089290,0,.3242534234038089290,.6133714327005903973,.8360311073266357943,.9681602395076260898};
 static const double np_cgnn_weights9[] = {.08127438836157441197,.1806481606948574041,.2606106964029354623,.3123470770400028401,.3302393550012597632,.3123470770400028401,.2606106964029354623,.1806481606948574041,.08127438836157441197};
 
+static void np_cgnn_local_rule(NPGNNConditionalPrefix *c, double lo, double hi,
+                                int high, int compact, double *out) {
+  const int nq = compact ? (c->ykernel == 8 ? 1 : 2*(c->ykernel-3)+1) : (high ? 8 : 4);
+  const int pruned = c->tree && c->selectedCount != c->n;
+  const int m = pruned ? c->selectedCount : c->n;
+  const double *nodes = compact ? (nq == 1 ? np_cgnn_nodes1 : nq == 3 ? np_cgnn_nodes3 :
+    nq == 5 ? np_cgnn_nodes5 : nq == 7 ? np_cgnn_nodes7 : np_cgnn_nodes9) :
+    (high ? np_gnn_integral_nodes8 : np_gnn_integral_nodes4);
+  const double *weights = compact ? (nq == 1 ? np_cgnn_weights1 : nq == 3 ? np_cgnn_weights3 :
+    nq == 5 ? np_cgnn_weights5 : nq == 7 ? np_cgnn_weights7 : np_cgnn_weights9) :
+    (high ? np_gnn_integral_weights8 : np_gnn_integral_weights4);
+  const double mid = .5*lo+.5*hi, half = .5*hi-.5*lo;
+  if (c->narrow)
+    np_cgnn_narrow_args(c, m, nq, 1, pruned, mid, half, nodes);
+  else
+    for (int r = 0; r < m; ++r) {
+      const int j = c->order[pruned ? c->selected[r] : r].id;
+      for (int z = 0; z < nq; ++z)
+        c->args[r*nq+z] = (1+(c->anchor-c->y[j])*(mid+half*nodes[z]))/c->yscale;
+    }
+  np_ckernelv(c->ykernel,c->args,m*nq,0,0,1,c->factors,NULL,0,0,1,1,0,0,0,NULL,NULL);
+  int retained = 0;
+  for (int r = 0; r < m; ++r) {
+    int nonzero = 0;
+    for (int z = 0; z < nq; ++z) {
+      c->factors[r*nq+z] /= c->yscale;
+      nonzero |= c->factors[r*nq+z] != 0.0;
+    }
+    if (nonzero) {
+      c->local.ranks[retained] = pruned ? c->selected[r] : r;
+      c->local.slots[retained++] = r;
+    }
+  }
+#ifdef NP_CF167_TRACE
+  np_cgnn_trace_tree_nodes += (unsigned long)m*nq;
+  np_cgnn_trace_pruned_nodes += (unsigned long)(c->n-m)*nq;
+#endif
+  np_cgnn_local_evaluate(&c->local,c->moments,c->powers,c->coef,c->factors,
+                          nq,retained,c->active);
+  memset(out,0,(size_t)c->n*sizeof(double));
+  for (int i = 0; i < c->n; ++i) if (c->active[i])
+    for (int z = 0; z < nq; ++z) {
+      const double value = c->local.fit[(size_t)i*nq+z];
+      out[i] += half*weights[z]*value*value;
+    }
+}
+
 static void np_cgnn_compact_rule(NPGNNConditionalPrefix *c, double lo, double hi, double *out) {
+  if (c->local.degree) {
+    np_cgnn_local_rule(c, lo, hi, 1, 1, out);
+    return;
+  }
   const int nq = c->ykernel == 8 ? 1 : 2 * (c->ykernel - 3) + 1, n = c->n;
   const int pruned = c->tree && c->selectedCount != n;
   const int m = pruned ? c->selectedCount : n;
@@ -529,6 +483,9 @@ static void np_cgnn_compact_rule(NPGNNConditionalPrefix *c, double lo, double hi
   const double *weights = nq == 1 ? np_cgnn_weights1 : nq == 3 ? np_cgnn_weights3 :
       nq == 5 ? np_cgnn_weights5 : nq == 7 ? np_cgnn_weights7 : np_cgnn_weights9;
   const double mid = .5 * lo + .5 * hi, half = .5 * hi - .5 * lo;
+  if (c->narrow)
+    np_cgnn_narrow_args(c, m, nq, 1, pruned, mid, half, nodes);
+  else
   for (int r = 0; r < m; ++r) {
     const int j = c->order[pruned ? c->selected[r] : r].id;
     for (int z = 0; z < nq; ++z)
@@ -555,30 +512,15 @@ static void np_cgnn_compact_rule(NPGNNConditionalPrefix *c, double lo, double hi
     double *v = c->prefix + p * stride, *e = c->correction + p * stride;
     for (int z = 0; z < nq; ++z)
       v[z] = e[z] = 0.0;
-    if (c->twofold) {
-      NPGNNConditionalDD sum[9] = {{0.0, 0.0}};
-      for (int r = 0; r < retained; ++r) {
-        const int slot = c->responseSlots[r];
-        const int j = c->order[pruned ? c->selected[slot] : slot].id;
-        const size_t at = (size_t)p * n + j;
-        const NPGNNConditionalDD power = {c->powers[at], c->powersLow[at]};
-        for (int z = 0; z < nq; ++z) {
-          np_cgnn_dd_accumulate(&sum[z], power, np_cgnn_dd(c->factors[slot * nq + z]));
-          v[(r + 1) * nq + z] = sum[z].hi;
-          e[(r + 1) * nq + z] = sum[z].lo;
-        }
-      }
-    } else {
-      double sum[9] = {0}, error[9] = {0};
-      for (int r = 0; r < retained; ++r) {
-        const int slot = c->responseSlots[r];
-        const int j = c->order[pruned ? c->selected[slot] : slot].id;
-        const double power = c->powers[(size_t)p * n + j];
-        for (int z = 0; z < nq; ++z) {
-          np_cgnn_compensated(power * c->factors[slot * nq + z], sum + z, error + z);
-          v[(r + 1) * nq + z] = sum[z];
-          e[(r + 1) * nq + z] = error[z];
-        }
+    double sum[9] = {0}, error[9] = {0};
+    for (int r = 0; r < retained; ++r) {
+      const int slot = c->responseSlots[r];
+      const int j = c->order[pruned ? c->selected[slot] : slot].id;
+      const double power = c->powers[(size_t)p * n + j];
+      for (int z = 0; z < nq; ++z) {
+        np_cgnn_compensated(power * c->factors[slot * nq + z], sum + z, error + z);
+        v[(r + 1) * nq + z] = sum[z];
+        e[(r + 1) * nq + z] = error[z];
       }
     }
   }
@@ -594,28 +536,13 @@ static void np_cgnn_compact_rule(NPGNNConditionalPrefix *c, double lo, double hi
       continue; /* All contributing computed factors are exactly zero. */
     for (int z = 0; z < nq; ++z) {
       double value = 0.0;
-      if (c->twofold) {
-        NPGNNConditionalDD fit = np_cgnn_dd(0.0);
-        for (int p = 0; p < c->moments; ++p) {
-          const size_t at = (size_t)c->moments * i + p, base = p * stride;
-          const NPGNNConditionalDD left = {c->prefix[base + first * nq + z],
-                                           c->correction[base + first * nq + z]},
-                                  right = {c->prefix[base + end * nq + z],
-                                            c->correction[base + end * nq + z]},
-                                  coef = {c->coef[at], c->coefLow[at]};
-          np_cgnn_dd_accumulate(&fit, coef, np_cgnn_dd_add(right, np_cgnn_dd_neg(left)));
-        }
-        np_cgnn_dd_accumulate(&fit, np_cgnn_dd(-c->self[i]), np_cgnn_dd(c->factors[self * nq + z]));
-        value = fit.hi + fit.lo;
-      } else {
-        for (int p = 0; p < c->moments; ++p) {
-          const double *v = c->prefix + p * stride, *e = c->correction + p * stride;
-          const double gap = (v[end * nq + z] - v[first * nq + z]) +
-                             (e[end * nq + z] - e[first * nq + z]);
-          value = fma(c->coef[(size_t)c->moments * i + p], gap, value);
-        }
-        value -= c->self[i] * c->factors[self * nq + z];
+      for (int p = 0; p < c->moments; ++p) {
+        const double *v = c->prefix + p * stride, *e = c->correction + p * stride;
+        const double gap = (v[end * nq + z] - v[first * nq + z]) +
+                           (e[end * nq + z] - e[first * nq + z]);
+        value = fma(c->coef[(size_t)c->moments * i + p], gap, value);
       }
+      value -= c->self[i] * c->factors[self * nq + z];
       out[i] += half * weights[z] * value * value;
     }
   }
@@ -638,7 +565,12 @@ static void np_cgnn_compact_integrate(NPGNNConditionalPrefix *c, double lo, doub
     if (slope == 0.0)
       continue;
     for (int side = -1; side <= 1; side += 2) {
-      const double u = (side * support * c->yscale - 1.0) / slope;
+      double u = (side * support * c->yscale - 1.0) / slope;
+      if (c->narrow) {
+        const double base = (c->qleft - c->y[j]) / (c->qleft - c->anchor),
+                     step = -slope * c->du;
+        u = (side * support * c->yscale - base) / step;
+      }
       if (lo < u && u < hi)
         c->cuts[count++] = u;
     }
@@ -660,6 +592,32 @@ static void np_cgnn_compact_integrate(NPGNNConditionalPrefix *c, double lo, doub
     if (!R_FINITE(out[i]))
       c->failed = 1;
   }
+}
+
+/* For unit-scale uniform Y, the anchor donor is identically zero at the
+ * kernel's open support boundary. Every other donor has bounded reciprocal
+ * support between 0 and -2/(anchor-y). Their union is an exact finite domain,
+ * even when a response endpoint has zero radius. This is not a tail cutoff. */
+static int np_cgnn_uniform_finite_panel(NPGNNConditionalPrefix *c, double *lo, double *hi) {
+  if (c->ykernel != 8 || c->yscale != 1.0)
+    return -1;
+  double left = 0.0, right = 0.0;
+  const int pruned = c->tree && c->selectedCount != c->n;
+  const int m = pruned ? c->selectedCount : c->n;
+  for (int r = 0; r < m; ++r) {
+    const int j = c->order[pruned ? c->selected[r] : r].id;
+    const double slope = c->anchor - c->y[j];
+    if (slope == 0.0)
+      continue;
+    const double edge = -2.0 / slope;
+    if (!R_FINITE(edge))
+      return -1;
+    left = fmin(left, edge);
+    right = fmax(right, edge);
+  }
+  *lo = fmax(*lo, left);
+  *hi = fmin(*hi, right);
+  return *lo < *hi;
 }
 
 /* A mathematically exact representation boundary, not a failure fallback. */
@@ -747,6 +705,7 @@ static void np_cgnn_cleanup(void *raw, Rboolean jump) {
   free(c->responseActive);
   free(c->responseSlots);
   free(c->cuts);
+  np_cgnn_local_clear(&c->local);
   np_glp_cv_clear_extern();
 }
 
@@ -764,9 +723,7 @@ static SEXP np_cgnn_body(void *raw) {
   const int compact = KERNEL_den_extern >= 4;
   const int maxnq = compact ? 9 : 8;
   const int uniform = KERNEL_reg_extern == 8;
-  const int twofold = KERNEL_reg_extern >= 5 && KERNEL_reg_extern <= 7;
-  const int planes = uniform ? 1 : 2 * (KERNEL_reg_extern - 3) + 1,
-            foldPlanes = uniform ? 4 : 2, words = twofold ? 2 : 1;
+  const int foldPlanes = uniform ? 4 : 2;
   int fail = 0, first = 0, count = n;
 #ifdef MPI2
   const int parallel = np_objective_outer_rows_enabled(1);
@@ -780,12 +737,10 @@ static SEXP np_cgnn_body(void *raw) {
                                                &np_conditional_deleted_identity_geometry, &a->yctx);
   const int scalar = np_lp_engine_extern == NP_LP_ENGINE_SCALAR;
   const int terms = scalar ? 1 : np_glp_cv_cache.nterms;
-  if (terms < 1 || terms > INT_MAX / planes ||
-      (size_t)terms * planes * words > INT_MAX / (size_t)n)
+  if (terms < 1 || (size_t)terms > INT_MAX / (size_t)n)
     fail = 1;
   c->n = c->folds = n;
-  c->moments = fail ? 0 : planes * terms;
-  c->twofold = twofold;
+  c->moments = fail ? 0 : terms;
   c->ykernel = KERNEL_den_extern;
   if (c->ykernel > 0 && c->ykernel < 4)
     np_cgnn_gaussian_derivative_constants(c->ykernel, c->logG);
@@ -815,12 +770,12 @@ static SEXP np_cgnn_body(void *raw) {
   NP_CGNN_ALLOC(c->end, n);
   NP_CGNN_ALLOC(c->x, n);
   NP_CGNN_ALLOC(c->order, n);
-  if (uniform || twofold || compact) {
+  if (uniform || compact) {
     NP_CGNN_ALLOC(c->orderRank, n);
   }
-  NP_CGNN_ALLOC(c->coef, (size_t)words * c->moments * n);
+  NP_CGNN_ALLOC(c->coef, (size_t)c->moments * n);
   NP_CGNN_ALLOC(c->self, n);
-  NP_CGNN_ALLOC(c->powers, (size_t)words * c->moments * n);
+  NP_CGNN_ALLOC(c->powers, (size_t)c->moments * n);
   NP_CGNN_ALLOC(c->args, (size_t)maxnq * n);
   NP_CGNN_ALLOC(c->factors, (size_t)maxnq * n);
   NP_CGNN_ALLOC(c->prefix, prefix_count);
@@ -848,10 +803,6 @@ static SEXP np_cgnn_body(void *raw) {
     fail = 1;
   NP_CGNN_ALLOC(a->pieces, (size_t)3 * g->count);
 #undef NP_CGNN_ALLOC
-  if (!fail && twofold) {
-    c->coefLow = c->coef + (size_t)c->moments * n;
-    c->powersLow = c->powers + (size_t)c->moments * n;
-  }
 #ifdef MPI2
   if (np_objective_outer_preflight_failed(parallel, fail))
     return R_NilValue;
@@ -875,33 +826,19 @@ static SEXP np_cgnn_body(void *raw) {
   for (int j = 0; j < n && !fail; ++j) {
     const int id = int_TREE_X == NP_TREE_TRUE ? ipt_extern_X[j] : j;
     const double z = (matrix_X_continuous_train_extern[0][j] - center) / scale;
-    c->x[id] = z;
+    c->x[id] = uniform ? z : matrix_X_continuous_train_extern[0][j];
     c->order[j] = (NPGNNConditionalOrder){
-        uniform ? matrix_X_continuous_train_extern[0][j] : z, id};
+        matrix_X_continuous_train_extern[0][j], id};
     for (int t = 0; t < terms; ++t) {
       const double b = scalar ? 1.0 : x->basis[t][j];
-      c->powers[(size_t)(planes * t) * n + id] = b;
-      if (twofold) {
-        NPGNNConditionalDD power = np_cgnn_dd(1.0);
-        for (int p = 0; p < planes; ++p) {
-          const size_t at = (size_t)(planes * t + p) * n + id;
-          const NPGNNConditionalDD v = np_cgnn_dd_mul(np_cgnn_dd(b), power);
-          c->powers[at] = v.hi;
-          c->powersLow[at] = v.lo;
-          power = np_cgnn_dd_mul(power, np_cgnn_dd(z));
-        }
-      } else if (!uniform) {
-        c->powers[(size_t)(3 * t + 1) * n + id] = b * z;
-        c->powers[(size_t)(3 * t + 2) * n + id] = b * z * z;
-      }
+      c->powers[(size_t)t * n + id] = b;
     }
   }
   qsort(c->order, n, sizeof(*c->order), np_cgnn_compare);
-  if (uniform || twofold || compact)
+  if (uniform || compact)
     for (int r = 0; r < n; ++r)
       c->orderRank[c->order[r].id] = r;
-  const double k0 = allck[KERNEL_reg_extern](0.0),
-               k2 = uniform ? 0.0 : allck[4](1.0) - k0;
+  const double k0 = allck[KERNEL_reg_extern](0.0);
   for (int i = first; i < first + count && !fail; ++i) {
     np_progress_bandwidth_loop_step();
     if (np_conditional_xrow_from_ctx(x, i, a->row) ||
@@ -910,16 +847,8 @@ static SEXP np_cgnn_body(void *raw) {
       break;
     }
     const int pos = int_TREE_X == NP_TREE_TRUE ? ipt_lookup_extern_X[i] : i;
-    const double h = x->matrix_bandwidth_eval_one[0][0] / scale, xi = c->x[i];
-    double polynomial[3] = {k0, 0.0, 0.0};
-    NPGNNConditionalDD higher[9];
-    if (twofold) {
-      np_cgnn_dd_polynomial(KERNEL_reg_extern, xi, h, higher);
-    } else if (!uniform) {
-      polynomial[0] = k0 + k2 * xi * xi / (h * h);
-      polynomial[1] = -2 * k2 * xi / (h * h);
-      polynomial[2] = k2 / (h * h);
-    } else {
+    const double h = x->matrix_bandwidth_eval_one[0][0];
+    if (uniform) {
       /* Reuse the canonical strict-distance weight mask. Transformed endpoint
        * comparisons can change membership at the uniform kernel's jump.
        * Include the query here: its contribution is subtracted explicitly.
@@ -961,25 +890,13 @@ static SEXP np_cgnn_body(void *raw) {
       fail = 1;
       break;
     }
-    if (twofold) {
-      const NPGNNConditionalDD inverse = np_cgnn_dd_inverse(denominator);
-      for (int t = 0; t < terms; ++t)
-        for (int q = 0; q < planes; ++q) {
-          const size_t at = (size_t)c->moments * i + planes * t + q;
-          const NPGNNConditionalDD v = np_cgnn_dd_mul(np_cgnn_dd_mul(
-              np_cgnn_dd(scalar ? 1.0 : x->regression_solve_workspace.rhs_work[t]),
-              higher[q]), inverse);
-          c->coef[at] = v.hi;
-          c->coefLow[at] = v.lo;
-        }
-    } else {
-      for (int t = 0; t < terms; ++t)
-        for (int q = 0; q < planes; ++q)
-          c->coef[(size_t)c->moments * i + planes * t + q] =
-              (scalar ? 1.0 : x->regression_solve_workspace.rhs_work[t]) * polynomial[q] /
-              denominator;
-    }
-    c->self[i] = (scalar ? k0 : self) / denominator;
+    for (int t = 0; t < terms; ++t)
+      c->coef[(size_t)terms*i+t] =
+        (scalar ? 1.0 : x->regression_solve_workspace.rhs_work[t]) *
+        (uniform ? k0 : 1.0) / denominator;
+    /* Same one-owner transport: Epan-X now transports its canonical radius;
+     * deletion is by disjoint ranges, not subtraction of the self term. */
+    c->self[i] = uniform ? (scalar ? k0 : self) / denominator : h;
     for (int j = 0; j < n; ++j) {
       a->folds[n + i] += fabs(a->row[j]);
       np_cgnn_compensated(a->row[j] * a->yrow[j] / n, &sum, &error);
@@ -987,7 +904,7 @@ static SEXP np_cgnn_body(void *raw) {
     a->folds[i] = sum + error;
   }
 #ifdef MPI2
-  if (np_objective_outer_buffer_finish(parallel, words * c->moments * n, fail, c->coef, NULL,
+  if (np_objective_outer_buffer_finish(parallel, c->moments * n, fail, c->coef, NULL,
                                        "conditional GNN coefficients"))
     return R_NilValue;
   if (np_objective_outer_buffer_finish(parallel, n, 0, c->self, NULL,
@@ -1006,21 +923,33 @@ static SEXP np_cgnn_body(void *raw) {
       c->first[i] = (int)a->folds[2 * n + i];
       c->end[i] = (int)a->folds[3 * n + i];
     } else {
-      /* Use canonical prepared radii in original query order, including ties. */
-      const int pos = int_TREE_X == NP_TREE_TRUE ? ipt_lookup_extern_X[i] : i;
-      const double h = x->matrix_bandwidth_x[0][pos] / scale, xi = c->x[i];
-      c->first[i] = 0;
-      while (c->first[i] < n && c->order[c->first[i]].x <= xi - sqrt(5.0) * h)
-        ++c->first[i];
-      c->end[i] = c->first[i];
-      while (c->end[i] < n && c->order[c->end[i]].x < xi + sqrt(5.0) * h)
-        ++c->end[i];
+      /* Raw distance/radius arithmetic matches the native support test and
+       * does not collapse nearby observations in global normalized units. */
+      const double h = c->self[i], xi = c->x[i];
+      int left = 0, right = n;
+      while (left < right) {
+        const int mid = left+(right-left)/2;
+        const double u = (c->order[mid].x-xi)/h;
+        if (c->order[mid].x < xi && !(u*u < 5.0)) left = mid+1;
+        else right = mid;
+      }
+      c->first[i] = left;
+      right = n;
+      while (left < right) {
+        const int mid = left+(right-left)/2;
+        const double u = (c->order[mid].x-xi)/h;
+        if (u*u < 5.0) left = mid+1; else right = mid;
+      }
+      c->end[i] = left;
     }
     c->maxL1 = fmax(c->maxL1, a->folds[n + i]);
     np_cgnn_compensated(a->folds[i], &cross, &cross_error);
   }
   np_conditional_xrow_ctx_clear(x);
   np_conditional_yrow_ctx_clear(&a->yctx);
+  if (!uniform)
+    fail = np_cgnn_local_prepare(&c->local, n, 2*(KERNEL_reg_extern-3),
+                                  c->order, c->self, c->first, c->end);
   first = 0;
   count = g->count;
 #ifdef MPI2
@@ -1031,6 +960,7 @@ static SEXP np_cgnn_body(void *raw) {
   REprintf("CF167 prefix rank=%d interval_first=%d interval_count=%d total=%d\n",
     np_cgnn_trace_rank(),first,count,g->count);
 #endif
+  int narrow_constants_ready = c->ykernel != 0;
   for (int at = first; at < first + count && !fail; ++at) {
     const NPGNNIntegralInterval interval = g->intervals[at];
     np_progress_bandwidth_loop_step();
@@ -1038,16 +968,7 @@ static SEXP np_cgnn_body(void *raw) {
     c->acceptedError = c->capped = 0.0;
     for (int slot = 0; slot < 2 && !fail; ++slot) {
       c->anchor = slot ? interval.successor_anchor : interval.primary_anchor;
-      if (interval.lo == c->anchor || interval.hi == c->anchor) {
-        fail = 1;
-        break;
-      }
-      const double u0 = 1.0 / (interval.lo - c->anchor), u1 = 1.0 / (interval.hi - c->anchor);
-      const double lo = fmin(u0, u1), hi = fmax(u0, u1);
-      if (!R_FINITE(lo) || !R_FINITE(hi) || !(lo < hi)) {
-        fail = 1;
-        break;
-      }
+      c->narrow = 0;
       int any = 0;
       for (int r = 0; r < n; ++r) {
         const int i = g->order[r];
@@ -1059,6 +980,41 @@ static SEXP np_cgnn_body(void *raw) {
       c->activeCount = any;
       if (c->tree)
         np_cgnn_prepare_tree(c);
+      /* The two zero-radius endpoint limits have opposite signs. */
+      const double u0 = interval.lo == c->anchor ? R_PosInf : 1.0 / (interval.lo - c->anchor),
+                   u1 = interval.hi == c->anchor ? R_NegInf : 1.0 / (interval.hi - c->anchor);
+      double lo = fmin(u0, u1), hi = fmax(u0, u1);
+      if (lo == hi && R_FINITE(interval.lo) && R_FINITE(interval.hi) &&
+          interval.lo < interval.hi && interval.lo != c->anchor && interval.hi != c->anchor) {
+        c->du = fabs((interval.hi - interval.lo) / (interval.lo - c->anchor) /
+                     (interval.hi - c->anchor));
+        if (!(c->du > 0.0) || !R_FINITE(c->du)) {
+          fail = 1;
+          break;
+        }
+        c->narrow = 1;
+        c->qleft = interval.lo;
+        lo = 0.0;
+        hi = 1.0;
+        if (!compact && !narrow_constants_ready) {
+          np_cgnn_gaussian_derivative_constants(c->ykernel, c->logG);
+          narrow_constants_ready = 1;
+        }
+      }
+      if (!R_FINITE(lo) || !R_FINITE(hi)) {
+        const int finite = np_cgnn_uniform_finite_panel(c, &lo, &hi);
+        if (finite == 0)
+          continue;
+        if (finite < 0) {
+          fail = 1;
+          break;
+        }
+      }
+      if (!(lo < hi)) {
+        fail = 1;
+        break;
+      }
+      const double before_error = c->acceptedError;
       if (compact)
         np_cgnn_compact_integrate(c, lo, hi, a->out);
       else
@@ -1066,6 +1022,11 @@ static SEXP np_cgnn_body(void *raw) {
       if (c->failed) {
         fail = 1;
         break;
+      }
+      if (c->narrow) {
+        for (int i = 0; i < n; ++i)
+          a->out[i] *= c->du;
+        c->acceptedError = before_error + (c->acceptedError - before_error) * c->du;
       }
       for (int i = 0; i < n; ++i)
         np_cgnn_compensated(a->out[i] / n, &sum, &error);
