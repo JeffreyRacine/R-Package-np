@@ -1,3 +1,28 @@
+# Full-sample beta regression uses training occurrence identity for GNN
+# radii, but retains that occurrence in the fitted kernel sum. Equal-valued
+# other observations remain eligible neighbours. Fixtures use bounds [0, 1].
+workhorse_nn_training_beta_weights <- function(training, bandwidth, bwtype,
+                                               order=2L) {
+  n <- nrow(training)
+  result <- matrix(1,n,n)
+  for(d in seq_len(ncol(training))) {
+    x <- training[[d]]
+    k <- round(bandwidth[d])
+    h <- vapply(seq_len(n),function(i)
+      sort(abs(x[-i]-x[i]))[min(k,n-1L)] *
+        if(k > n-1L) k/(n-1L) else 1, numeric(1))
+    for(i in seq_len(n)) {
+      radius <- if(bwtype=="generalized_nn") h[i] else h
+      value <- rep(0,n)
+      for(s in seq_len(order/2L))
+        value <- value+(-1)^(s+1)*choose(order/2L,s)*
+          dbeta(x,1+x[i]/(s*radius^2),1+(1-x[i])/(s*radius^2))
+      result[,i] <- result[,i]*value
+    }
+  }
+  result
+}
+
 # Test-only arithmetic: independently reconstruct each admitted NN sample.
 # Columns are held-out occurrences; rows are donors. No package kernel/NN
 # builder or leave-one-out implementation participates in this oracle.

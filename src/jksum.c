@@ -21753,11 +21753,13 @@ static int np_regression_cv_scalar_continuous_route_body(
        &owner->loo_geometry, BANDWIDTH_reg, num_obs,
        num_reg_continuous, num_reg_unordered, num_reg_ordered,
        matrix_X_continuous, vector_scale_factor, matrix_bandwidth, lambda) :
-     np_beta_continuous_bandwidth_prepare_canonical(
+     np_beta_continuous_bandwidth_prepare_canonical_ctx(
        BANDWIDTH_reg, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        matrix_X_continuous, matrix_X_continuous,
-       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL))
+       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL,
+       &(const NPNNGeometryContext){.mode = NP_NN_QUERY_TRAINING_IDENTITY},
+       NULL))
     goto cleanup_route;
 
   row_status = np_beta_scaled_row_context_prepare(
@@ -22071,11 +22073,13 @@ static int np_regression_cv_lp_continuous_route_body(
        &owner->loo_geometry, BANDWIDTH_reg, num_obs,
        num_reg_continuous, num_reg_unordered, num_reg_ordered,
        matrix_X_continuous, vector_scale_factor, matrix_bandwidth, lambda) :
-     np_beta_continuous_bandwidth_prepare_canonical(
+     np_beta_continuous_bandwidth_prepare_canonical_ctx(
        BANDWIDTH_reg, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        matrix_X_continuous, matrix_X_continuous,
-       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL))
+       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL,
+       &(const NPNNGeometryContext){.mode = NP_NN_QUERY_TRAINING_IDENTITY},
+       NULL))
     goto cleanup_lp_route;
 
   row_status = np_beta_scaled_row_context_prepare(
@@ -25841,6 +25845,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
   const NPRegressionStandardErrorMode standard_error_mode,
   const int ordinary_response,
   const NPContinuousPreparedBandwidthView *prepared_bandwidth,
+  const NPNNGeometryContext *nn_geometry_context,
   const NPRegressionHC0Context *hc0_context,
   NPRegressionFailure *failure,
   NPRegressionLPEmptyRows *empty_rows)
@@ -25928,7 +25933,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
     }
     if(prepared_status == 0) {
       const np_beta_bandwidth_prepare_status bandwidth_status =
-        np_beta_bandwidth_prepare_matrix(
+        np_beta_bandwidth_prepare_matrix_ctx(
           BANDWIDTH_reg == BW_GEN_NN ?
             NP_BETA_BANDWIDTH_GENERALIZED_NN :
             NP_BETA_BANDWIDTH_ADAPTIVE_NN,
@@ -25937,7 +25942,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
           num_obs_train, num_obs_eval, num_reg_continuous,
           matrix_X_continuous_train == matrix_X_continuous_eval,
           BANDWIDTH_reg == BW_GEN_NN, BANDWIDTH_reg == BW_ADAP_NN,
-          0, matrix_bandwidth, matrix_bandwidth);
+          0, matrix_bandwidth, matrix_bandwidth, nn_geometry_context);
 
       if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK) {
         free_tmat(matrix_bandwidth);
@@ -25945,7 +25950,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
           const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
             BANDWIDTH_reg, num_obs_train, num_obs_eval, num_reg_continuous,
             matrix_X_continuous_train, matrix_X_continuous_eval,
-            vector_scale_factor, NULL, 0);
+            vector_scale_factor, nn_geometry_context, 0);
           if(failure != NULL) {
             np_regression_failure_zero_radius(failure, &info);
             return NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS;
@@ -26057,7 +26062,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
  * shared.  Keeping this helper out of line prevents beta activation from
  * changing register allocation in the large legacy/general fit owner.
  */
-NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(
+NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical_ctx(
   const int bandwidth_mode,
   const int num_obs_train,
   const int num_obs_eval,
@@ -26071,6 +26076,7 @@ NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(
   double **matrix_bandwidth_deriv,
   double *lambda,
   const NPContinuousPreparedBandwidthView *prepared_bandwidth,
+  const NPNNGeometryContext *nn_geometry_context,
   NPNNGeometryStatus *geometry_status)
 {
   int coordinate;
@@ -26102,7 +26108,7 @@ NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(
       return 1;
     if(prepared_status == 0) {
       const np_beta_bandwidth_prepare_status status =
-        np_beta_bandwidth_prepare_matrix(
+        np_beta_bandwidth_prepare_matrix_ctx(
           bandwidth_mode == BW_GEN_NN ?
             NP_BETA_BANDWIDTH_GENERALIZED_NN :
             NP_BETA_BANDWIDTH_ADAPTIVE_NN,
@@ -26112,7 +26118,7 @@ NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(
           matrix_X_continuous_train == matrix_X_continuous_eval,
           bandwidth_mode == BW_GEN_NN,
           bandwidth_mode == BW_ADAP_NN,
-          0, matrix_bandwidth, matrix_bandwidth);
+          0, matrix_bandwidth, matrix_bandwidth, nn_geometry_context);
 
       if(status != NP_BETA_BANDWIDTH_PREPARE_OK) {
         if(geometry_status != NULL &&
@@ -26132,6 +26138,24 @@ NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(
                        num_obs_eval : num_obs_train))*sizeof(double));
 
   return 0;
+}
+
+/* Preserve the existing contract for non-regression row consumers. */
+NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(
+  const int bandwidth_mode, const int num_obs_train, const int num_obs_eval,
+  const int num_reg_unordered, const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_continuous_train, double **matrix_X_continuous_eval,
+  double *vector_scale_factor, double **matrix_bandwidth,
+  double **matrix_bandwidth_deriv, double *lambda,
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth,
+  NPNNGeometryStatus *geometry_status)
+{
+  return np_beta_continuous_bandwidth_prepare_canonical_ctx(
+    bandwidth_mode, num_obs_train, num_obs_eval, num_reg_unordered,
+    num_reg_ordered, num_reg_continuous, matrix_X_continuous_train,
+    matrix_X_continuous_eval, vector_scale_factor, matrix_bandwidth,
+    matrix_bandwidth_deriv, lambda, prepared_bandwidth, NULL, geometry_status);
 }
 
 /*
@@ -27181,7 +27205,7 @@ static SEXP np_regression_fit_bandwidth_execute(void *data)
     (NPRegressionFitBandwidthCall *)data;
 
   if(call->use_canonical_beta) {
-    call->status = np_beta_continuous_bandwidth_prepare_canonical(
+    call->status = np_beta_continuous_bandwidth_prepare_canonical_ctx(
       call->bandwidth_mode,
       call->num_obs_train,
       call->num_obs_eval,
@@ -27195,6 +27219,7 @@ static SEXP np_regression_fit_bandwidth_execute(void *data)
       call->matrix_bandwidth_deriv,
       call->lambda,
       call->prepared_bandwidth,
+      call->nn_geometry_context,
       &call->nn_geometry_status);
   } else if((call->bandwidth_mode == BW_GEN_NN ||
              call->bandwidth_mode == BW_ADAP_NN) &&
@@ -31433,7 +31458,8 @@ const double *prepared_ann_row){
       num_categories, matrix_categorical_vals,
       mean, gradient, mean_stderr, gradient_stderr,
       kernel_route, kernel_route_diagnostics, categorical_compress,
-      standard_error_mode, ordinary_response, prepared_bandwidth, hc0_context, failure,
+      standard_error_mode, ordinary_response, prepared_bandwidth,
+      nn_geometry_context, hc0_context, failure,
       failure != NULL ? empty_rows : NULL);
     if(beta_status != 0)
       return beta_status;
@@ -33198,7 +33224,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
 
   if(kernel_route != NULL) {
-    if(np_beta_continuous_bandwidth_prepare_canonical(
+    if(np_beta_continuous_bandwidth_prepare_canonical_ctx(
         BANDWIDTH_den_extern,
         num_train,
         num_eval,
@@ -33212,6 +33238,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
         NULL,
         lambdax,
         NULL,
+        nn_geometry_context,
         &nn_geometry_status) == 1) {
       if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
         status = NP_REGRESSION_LP_MATRIX_ZERO_RADIUS;
@@ -35662,7 +35689,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
 
   if(kernel_route != NULL) {
-    if(np_beta_continuous_bandwidth_prepare_canonical(
+    if(np_beta_continuous_bandwidth_prepare_canonical_ctx(
         BANDWIDTH_den_extern,
         num_train,
         num_eval,
@@ -35676,6 +35703,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         NULL,
         lambdax,
         NULL,
+        nn_geometry_context,
         &nn_geometry_status) == 1) {
       if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
         status = NP_REGRESSION_LP_MATRIX_ZERO_RADIUS;

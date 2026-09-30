@@ -84,7 +84,7 @@ test_that("the canonical beta row route has one unwind owner", {
     fixed = TRUE
   )[[1L]]
   fit_end <- regexpr(
-    "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(",
+    "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical_ctx(",
     engine,
     fixed = TRUE
   )[[1L]]

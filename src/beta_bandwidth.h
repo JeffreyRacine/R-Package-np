@@ -17,6 +17,17 @@ typedef enum {
 } np_beta_bandwidth_prepare_status;
 
 np_beta_bandwidth_prepare_status
+np_beta_bandwidth_prepare_matrix_ctx(
+  np_beta_bandwidth_mode bandwidth_mode,
+  double * const *train_continuous,
+  double * const *eval_continuous,
+  const double *nearest_neighbor,
+  int num_train, int num_eval, int num_continuous,
+  int train_is_eval, int need_eval, int need_train, int suppress_parallel,
+  double **bandwidth_eval, double **bandwidth_train,
+  const NPNNGeometryContext *geometry_context);
+
+np_beta_bandwidth_prepare_status
 np_beta_bandwidth_prepare_matrix(
   np_beta_bandwidth_mode bandwidth_mode,
   double * const *train_continuous,
@@ -61,6 +72,16 @@ const char *np_beta_bandwidth_prepare_status_message(
 
 /* Fill a bounded dimension-major continuous-bandwidth layout and matching
  * categorical lambda vector for any canonical beta row consumer. */
+int np_beta_continuous_bandwidth_prepare_canonical_ctx(
+  int bandwidth_mode, int num_obs_train, int num_obs_eval,
+  int num_unordered, int num_ordered, int num_continuous,
+  double **matrix_continuous_train, double **matrix_continuous_eval,
+  double *vector_scale_factor, double **matrix_bandwidth,
+  double **matrix_bandwidth_deriv, double *lambda,
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth,
+  const NPNNGeometryContext *geometry_context,
+  NPNNGeometryStatus *geometry_status);
+
 int np_beta_continuous_bandwidth_prepare_canonical(
   int bandwidth_mode,
   int num_obs_train,
