@@ -29,6 +29,9 @@ beta_regression_objective_oracle <- function(training,
     return(mean((response - fitted)^2))
   }
 
+  if (!identical(bwtype, "fixed"))
+    weights <- workhorse_nn_training_beta_weights(
+      training, bandwidth, bwtype, order)
   denominator <- colSums(weights)
   fitted <- colSums(weights * response) / denominator
   loss <- mean((response - fitted)^2)
@@ -70,6 +73,9 @@ beta_regression_lp_objective_oracle <- function(training,
   n <- nrow(training)
   if (identical(method,"cv.ls") && !identical(bwtype,"fixed"))
     weights <- workhorse_nn_loo_weights(training,bandwidth,bwtype,order=order)
+  if (identical(method,"cv.aic") && !identical(bwtype,"fixed"))
+    weights <- workhorse_nn_training_beta_weights(
+      training, bandwidth, bwtype, order)
   loss <- 0
   trace_hat <- 0
 

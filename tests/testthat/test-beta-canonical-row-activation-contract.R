@@ -746,7 +746,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
     fixed = TRUE
   )
   expect_match(
-    regression_sibling, "np_beta_bandwidth_prepare_matrix(", fixed = TRUE
+    regression_sibling, "np_beta_bandwidth_prepare_matrix_ctx(", fixed = TRUE
   )
   expect_match(scalar_family, "NPBetaRegressionMomentCtx", fixed = TRUE)
   expect_match(

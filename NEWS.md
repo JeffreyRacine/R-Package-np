@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Beta-kernel generalized-neighbor regression now excludes a training
+  observation from its own neighbor search while retaining its contribution
+  to the fitted sum. Training fits, hats and AIC use that same identity;
+  explicit external queries keep their separate neighborhood contract.
+
 * Conditional-density generalized-neighbor least-squares cross-validation
   now preserves local predictor differences in tightly clustered samples
   with Epanechnikov predictor kernels, avoiding cancellation across orders

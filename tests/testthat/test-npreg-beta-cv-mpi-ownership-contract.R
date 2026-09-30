@@ -405,7 +405,7 @@ test_that("wider LP NN objectives share one topology-neutral MPI owner", {
   )
   expect_match(
     body,
-    "np_beta_continuous_bandwidth_prepare_canonical(\n       call->bandwidth_mode",
+    "np_beta_continuous_bandwidth_prepare_canonical_ctx(\n       call->bandwidth_mode",
     fixed = TRUE
   )
   expect_match(body, "np_beta_scaled_row_context_fill_omitting(", fixed = TRUE)

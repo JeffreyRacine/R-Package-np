@@ -32,7 +32,12 @@ test_that("beta NN bandwidth preparation uses the state-free metric owner", {
   owner_calls <- gregexpr(
     "np_kernel_bandwidth_continuous_nn(", beta_source, fixed = TRUE
   )[[1L]]
-  expect_equal(sum(owner_calls > 0L), 2L)
+  expect_equal(sum(owner_calls > 0L), 1L)
+  contextual_calls <- gregexpr(
+    "np_kernel_bandwidth_continuous_nn_ctx(", beta_source, fixed = TRUE
+  )[[1L]]
+  expect_equal(sum(contextual_calls > 0L), 1L)
+  expect_match(beta_source, "geometry_context,", fixed = TRUE)
   expect_false(grepl("kernel_bandwidth_mean(", beta_source, fixed = TRUE))
 
   for (token in c("int_LARGE_SF", "nconfac_extern", "ncatfac_extern")) {

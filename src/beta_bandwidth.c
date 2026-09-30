@@ -24,7 +24,7 @@ const char *np_beta_bandwidth_prepare_status_message(
 }
 
 np_beta_bandwidth_prepare_status
-np_beta_bandwidth_prepare_matrix(
+np_beta_bandwidth_prepare_matrix_ctx(
   np_beta_bandwidth_mode bandwidth_mode,
   double * const *train_continuous,
   double * const *eval_continuous,
@@ -37,7 +37,8 @@ np_beta_bandwidth_prepare_matrix(
   int need_train,
   int suppress_parallel,
   double **bandwidth_eval,
-  double **bandwidth_train)
+  double **bandwidth_train,
+  const NPNNGeometryContext *geometry_context)
 {
   int status = 0;
   int dimension;
@@ -79,11 +80,11 @@ np_beta_bandwidth_prepare_matrix(
                  (size_t)num_train * sizeof(double));
       }
     } else {
-      status = np_kernel_bandwidth_continuous_nn(
+      status = np_kernel_bandwidth_continuous_nn_ctx(
         BW_GEN_NN, num_train, num_eval, num_continuous, suppress_parallel,
         (double *)nearest_neighbor,
         (double **)train_continuous, (double **)eval_continuous,
-        bandwidth_eval, &geometry_status);
+        bandwidth_eval, geometry_context, &geometry_status);
     }
   }
 
@@ -92,6 +93,23 @@ np_beta_bandwidth_prepare_matrix(
   return geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ?
     NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS :
     NP_BETA_BANDWIDTH_PREPARE_ERR_DISTANCE;
+}
+
+/* Legacy row consumers retain their original external-query interpretation.
+ * Regression owners pass identity explicitly, never infer it from values. */
+np_beta_bandwidth_prepare_status
+np_beta_bandwidth_prepare_matrix(
+  np_beta_bandwidth_mode bandwidth_mode,
+  double * const *train_continuous, double * const *eval_continuous,
+  const double *nearest_neighbor,
+  int num_train, int num_eval, int num_continuous,
+  int train_is_eval, int need_eval, int need_train, int suppress_parallel,
+  double **bandwidth_eval, double **bandwidth_train)
+{
+  return np_beta_bandwidth_prepare_matrix_ctx(
+    bandwidth_mode, train_continuous, eval_continuous, nearest_neighbor,
+    num_train, num_eval, num_continuous, train_is_eval, need_eval, need_train,
+    suppress_parallel, bandwidth_eval, bandwidth_train, NULL);
 }
 
 np_beta_bandwidth_prepare_status

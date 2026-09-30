@@ -44,7 +44,7 @@ test_that("scalar beta fit owner partitions only complete evaluation rows", {
   owner <- npreg_beta_scalar_fit_owner_region(
     source,
     "static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(",
-    "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical("
+    "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical_ctx("
   )
 
   expect_match(
@@ -68,11 +68,11 @@ test_that("nearest-neighbor realization is hoisted before rank slicing", {
   owner <- npreg_beta_scalar_fit_owner_region(
     source,
     "static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(",
-    "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical("
+    "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical_ctx("
   )
 
   prepare <- regexpr(
-    "bandwidth_status = np_beta_bandwidth_prepare_matrix(",
+    "bandwidth_status = np_beta_bandwidth_prepare_matrix_ctx(",
     owner,
     fixed = TRUE
   )[[1L]]
@@ -102,7 +102,7 @@ test_that("scalar beta fit rendezvous precedes column-wise transport", {
   owner <- npreg_beta_scalar_fit_owner_region(
     source,
     "static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(",
-    "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical("
+    "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical_ctx("
   )
 
   rendezvous <- regexpr(
