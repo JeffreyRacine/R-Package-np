@@ -268,7 +268,7 @@
     list(ckerlb = NULL, ckerub = NULL)
   }
 
-  kbandwidth.numeric(
+  .np_retained_uniform_constructor(kbandwidth.numeric,
     bw = c(bws$bw),
     bwtype = bwtype,
     bwscaling = FALSE,
@@ -439,7 +439,8 @@
   args <- .np_indexhat_lc_kernel_args(bws, idx.train, idx.eval)
   args$.np.internal.bandwidth.divide.weights <- identical(bws$type, "adaptive_nn")
   args$return.kernel.weights <- TRUE
-  kw <- do.call(.np_index_kernel_sum, args)$kw
+  kw <- do.call(.np_retained_uniform_constructor,
+    c(list(constructor = .np_index_kernel_sum), args))$kw
 
   if (!is.matrix(kw))
     kw <- matrix(kw, nrow = nrow(idx.train))
@@ -478,7 +479,8 @@
 }
 
 .np_indexhat_lc_moment_apply <- function(y, args, allow.empty.rows = FALSE) {
-  moments <- do.call(.np_index_kernel_moments, c(list(y = y), args))
+  moments <- do.call(.np_retained_uniform_constructor,
+    c(list(constructor = .np_index_kernel_moments, y = y), args))
   den <- .np_normalization_denominator(
     moments$denominator, "single-index hat", allow.empty.rows = allow.empty.rows,
     zero.rows = .np_indexhat_zero_moment_rows(args, moments$denominator))

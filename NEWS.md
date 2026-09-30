@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Single-index fits and hats no longer warn about a uniform-kernel order
+  merely retained from their bandwidth object. Explicit fresh user requests
+  for an ignored order still produce the advisory.
+
 * Beta-kernel generalized-neighbor regression now excludes a training
   observation from its own neighbor search while retaining its contribution
   to the fitted sum. Training fits, hats and AIC use that same identity;

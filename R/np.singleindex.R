@@ -724,7 +724,7 @@ npindex.sibandwidth <-
       )
       if (fast.largeh) {
         fast.largeh.eval.mean <- {
-          tww.fast <- .np_index_kernel_sum(
+          tww.fast <- .np_retained_uniform_constructor(.np_index_kernel_sum,
             txdat = index.df,
             tydat = as.matrix(data.frame(tydat, 1)),
             weights = as.matrix(data.frame(tydat, 1)),
@@ -743,7 +743,7 @@ npindex.sibandwidth <-
 
         if (!no.ex && (no.ey || residuals)) {
           fast.largeh.train.mean <- {
-            tww.fast <- .np_index_kernel_sum(
+            tww.fast <- .np_retained_uniform_constructor(.np_index_kernel_sum,
               txdat = index.df,
               tydat = as.matrix(data.frame(tydat, 1)),
               weights = as.matrix(data.frame(tydat, 1)),
@@ -792,7 +792,7 @@ npindex.sibandwidth <-
         if (fast.largeh) {
           index.mean <- rep.int(fast.largeh.eval.mean, length(index.eval))
         } else {
-          tww <- .np_index_kernel_sum(txdat=index.df,
+          tww <- .np_retained_uniform_constructor(.np_index_kernel_sum,txdat=index.df,
                         tydat=as.matrix(data.frame(tydat,1)),
                         weights=as.matrix(data.frame(tydat,1)),
                         exdat=index.eval.df,
@@ -817,7 +817,7 @@ npindex.sibandwidth <-
           if (fast.largeh) {
             index.tmean <- rep.int(fast.largeh.train.mean, length(tydat))
           } else {
-            tww <- .np_index_kernel_sum(txdat=index.df,
+            tww <- .np_retained_uniform_constructor(.np_index_kernel_sum,txdat=index.df,
                           tydat=as.matrix(data.frame(tydat,1)),
                           weights=as.matrix(data.frame(tydat,1)),
                           exdat=index.df,
@@ -924,7 +924,7 @@ npindex.sibandwidth <-
 
       W <- txdat[,-1,drop=FALSE]
 
-      moments <- .np_index_kernel_moments(y = W, txdat = index.df,
+      moments <- .np_retained_uniform_constructor(.np_index_kernel_moments,y = W, txdat = index.df,
                         bws = bws$bw,
                         bwtype = bws$type,
                         ckertype = bws$ckertype,
@@ -1022,7 +1022,7 @@ npindex.sibandwidth <-
         rindex <- index[indices]
         if (identical(regtype, "lc")) {
           rindex.df <- data.frame(index = as.vector(rindex))
-          tww <- .np_index_kernel_sum(txdat = rindex.df,
+          tww <- .np_retained_uniform_constructor(.np_index_kernel_sum,txdat = rindex.df,
                         tydat = cbind(tydat[indices],1),
                         weights = cbind(tydat[indices],1),
                         exdat = index.eval.df,

@@ -715,10 +715,6 @@ npreghat <-
       }
     }
 
-    if (uniform.kernel) {
-      for (j in seq_len(ceiling(ntrain / min(512L, ntrain))))
-        .np_warning("ignoring kernel order specified with uniform kernel type")
-    }
     if (beta.kernel && any(undefined.rows)) {
       H[undefined.rows, ] <- NA_real_
       warning(sprintf(
