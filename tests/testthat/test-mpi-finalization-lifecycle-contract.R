@@ -30,7 +30,7 @@ rg0_run_profile <- function(lines, n = 2L, timeout = 45L, iface = "en0") {
   if (is.null(env))
     return(NULL)
 
-  output <- suppressWarnings(system2(
+  output <- suppressWarnings(npRmpi_test_system2(
     mpiexec,
     c("-n", as.character(as.integer(n)), file.path(R.home("bin"), "Rscript"),
       "--no-save", script),

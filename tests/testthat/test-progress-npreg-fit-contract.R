@@ -79,7 +79,7 @@ ensure_npreg_subprocess_nprmpi_lib <- local({
     dir.create(lib.path.cache, recursive = TRUE, showWarnings = FALSE)
 
     cmd <- file.path(R.home("bin"), "R")
-    out <- suppressWarnings(system2(
+    out <- suppressWarnings(npRmpi_test_system2(
       cmd,
       c("CMD", "INSTALL", "--no-test-load", "-l", lib.path.cache, pkg.root),
       stdout = TRUE,
@@ -127,7 +127,7 @@ npreg_subprocess_lib <- function(env) {
 }
 
 run_npreg_cmd_subprocess <- function(cmd, args = character(), timeout = 60L, env = character()) {
-  out <- suppressWarnings(system2(
+  out <- suppressWarnings(npRmpi_test_system2(
     cmd,
     args,
     stdout = TRUE,

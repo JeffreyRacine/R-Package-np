@@ -47,7 +47,7 @@ test_that("the full-suite parent records direct exits before aggregate coercion"
   parent <- testthat::test_path("..", "testthat.R")
   skip_if_not(file.exists(parent), "source parent unavailable")
   lines <- readLines(parent, warn = FALSE)
-  launch <- grep("statuses[[shard]] <- system2(", lines, fixed = TRUE)
+  launch <- grep("statuses[[shard]] <- npRmpi_test_system2(", lines, fixed = TRUE)
   record <- grep("npRmpi_full_test_record_status(", lines, fixed = TRUE)
   aggregate <- grep("if (!witnessed || statuses[[shard]] != 0L)", lines, fixed = TRUE)
   clear <- grep("if (file.exists(raw_receipt)) unlink(raw_receipt)", lines, fixed = TRUE)

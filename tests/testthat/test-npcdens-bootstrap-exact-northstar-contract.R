@@ -9,7 +9,7 @@ local_npRmpi_fresh_subprocess_env <- function(extra = character()) {
   lib.path <- tempfile("npRmpi-northstar-lib-")
   dir.create(lib.path, recursive = TRUE, showWarnings = FALSE)
 
-  out <- suppressWarnings(system2(
+  out <- suppressWarnings(npRmpi_test_system2(
     file.path(R.home("bin"), "R"),
     c("CMD", "INSTALL", "--no-test-load", "-l", lib.path, pkg.root),
     stdout = TRUE,

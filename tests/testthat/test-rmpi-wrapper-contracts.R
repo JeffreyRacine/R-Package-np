@@ -1,5 +1,5 @@
 run_wrapper_cmd_subprocess <- function(cmd, args = character(), timeout = 60L, env = character()) {
-  out <- suppressWarnings(system2(cmd,
+  out <- suppressWarnings(npRmpi_test_system2(cmd,
                                   args,
                                   stdout = TRUE,
                                   stderr = TRUE,

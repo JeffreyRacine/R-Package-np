@@ -1,6 +1,6 @@
 run_attach_cmd_subprocess <- function(cmd, args = character(), timeout = 20L,
                                       env = character()) {
-  out <- suppressWarnings(system2(
+  out <- suppressWarnings(npRmpi_test_system2(
     cmd, args, stdout = TRUE, stderr = TRUE, timeout = timeout, env = env
   ))
   status <- attr(out, "status")

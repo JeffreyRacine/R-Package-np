@@ -2,6 +2,7 @@ library(testthat)
 library(npRmpi)
 source(file.path("validation", "full_mpi_test_plan.R"), local = TRUE)
 source(file.path("validation", "full_mpi_test_status.R"), local = TRUE)
+source(file.path("validation", "mpi_test_launch.R"), local = TRUE)
 
 np_check_filter <- Sys.getenv("NP_CHECK_FILTER", unset = "check-minimal")
 np_check_full <- identical(Sys.getenv("NP_CHECK_FULL", unset = ""), "1")
@@ -83,7 +84,7 @@ local({
             as.character(np_full_shard_size), as.character(np_full_nslaves),
             shQuote(witness), shQuote(test_dir)
           )
-          statuses[[shard]] <- system2(
+          statuses[[shard]] <- npRmpi_test_system2(
             rscript,
             args = shard_args,
             stdout = "", stderr = "", env = env,

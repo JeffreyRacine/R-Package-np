@@ -92,7 +92,7 @@ npRmpi_run_rscript_subprocess <- function(lines,
   on.exit(unlink(script), add = TRUE)
 
   cmd <- file.path(R.home("bin"), "Rscript")
-  out <- suppressWarnings(system2(
+  out <- suppressWarnings(npRmpi_test_system2(
     cmd,
     c("--no-save", script),
     stdout = TRUE,
@@ -165,7 +165,7 @@ npRmpi_subprocess_env <- local({
       dir.create(lib.path.cache, recursive = TRUE, showWarnings = FALSE)
 
       cmd <- file.path(R.home("bin"), "R")
-      out <- suppressWarnings(system2(
+      out <- suppressWarnings(npRmpi_test_system2(
         cmd,
         c("CMD", "INSTALL", "--no-test-load", "-l", lib.path.cache, pkg.root),
         stdout = TRUE,

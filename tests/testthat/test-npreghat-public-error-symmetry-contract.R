@@ -2,7 +2,7 @@ run_npreghat_error_symmetry_subprocess <- function(cmd,
                                                    args = character(),
                                                    timeout = 90L,
                                                    env = character()) {
-  out <- suppressWarnings(system2(cmd,
+  out <- suppressWarnings(npRmpi_test_system2(cmd,
                                   args,
                                   stdout = TRUE,
                                   stderr = TRUE,
@@ -31,7 +31,7 @@ ensure_npreghat_error_symmetry_npRmpi_lib <- local({
     lib.path.cache <<- tempfile("npRmpi-npreghat-error-symmetry-lib-")
     dir.create(lib.path.cache, recursive = TRUE, showWarnings = FALSE)
 
-    out <- suppressWarnings(system2(
+    out <- suppressWarnings(npRmpi_test_system2(
       file.path(R.home("bin"), "R"),
       c("CMD", "INSTALL", "--no-test-load", "-l", lib.path.cache, pkg.root),
       stdout = TRUE,

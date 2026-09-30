@@ -50,7 +50,7 @@ write_demo_fixture <- function(root, case, descriptors = "", offset = 0) {
 run_demo_parser <- function(root, output) {
   parser <- locate_demo_parser()
   if (!nzchar(parser)) return(list(status = NA_integer_, output = ""))
-  result <- suppressWarnings(system2(
+  result <- suppressWarnings(npRmpi_test_system2(
     file.path(R.home("bin"), "Rscript"),
     c("--vanilla", parser, root, output),
     stdout = TRUE,

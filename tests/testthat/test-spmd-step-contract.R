@@ -4,7 +4,7 @@ run_spmd_subprocess <- function(lines, timeout = 60L, env = character()) {
   on.exit(unlink(script), add = TRUE)
 
   cmd <- file.path(R.home("bin"), "Rscript")
-  out <- suppressWarnings(system2(
+  out <- suppressWarnings(npRmpi_test_system2(
     cmd,
     c("--no-save", script),
     stdout = TRUE,
