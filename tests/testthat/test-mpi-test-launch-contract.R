@@ -14,9 +14,25 @@ test_that("test launch opt-in preserves MPI ownership and independent bootstrap"
   for(command in c(launcher,"/path/R","/bin/echo"))
     expect_identical(spec(command,c("-n","3"),launcher,inherited=character())$args,
                      c(shQuote(command),"-n","3"))
-  for(key in c("PMI_UNKNOWN","PMIX_RANK","OMPI_COMM_WORLD_RANK"))
+  for(key in c("PMI_UNKNOWN","PMIX_RANK","OMPI_COMM_WORLD_RANK",
+               "OMPI_MCA_ess_base_jobid","OMPI_MCA_orte_hnp_uri",
+               "MPI_LOCAL_UNKNOWN")) {
     expect_error(spec("Rscript","body",launcher,inherited=key),
                  "unqualified inherited MPI bootstrap",fixed=TRUE)
+    expect_error(spec("Rscript","body",launcher,inherited=character(),
+                      env=paste0(key,"=17")),
+                 "cannot override MPI bootstrap",fixed=TRUE)
+  }
   expect_error(spec("Rscript","body",launcher,inherited=character(),
                     env="PMI_FD=6"),"cannot override MPI bootstrap",fixed=TRUE)
+  harmless <- c("R_LIBS=/private/library","OMP_NUM_THREADS=1",
+                "OMPI_MCA_btl=self,tcp")
+  expect_identical(spec("/path/Rscript","body",launcher,
+                        inherited=harmless,env=harmless),
+                   spec("/path/Rscript","body",launcher,
+                        inherited=character()))
+  expect_identical(spec("Rscript","body",launcher="",
+                        inherited="OMPI_MCA_ess_base_jobid",
+                        env="OMPI_MCA_ess_base_jobid=17"),
+                   list(command="Rscript",args="body"))
 })
