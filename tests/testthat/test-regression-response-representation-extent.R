@@ -73,10 +73,39 @@ test_that("native regression response extents are checked independently of R cod
   }
   expect_error(fn(b, txdat = x, tydat = y, eydat = y, se = FALSE), class = "response_capture")
   expect_length(captured, 26L)
-  short.train <- captured; short.train[[5L]] <- double()
-  expect_error(do.call(base::.Call, short.train), "training-response buffer is too short")
-  short.eval <- captured; short.eval[[9L]] <- double()
-  expect_error(do.call(base::.Call, short.eval), "evaluation-response buffer is too short")
+  # Never pass a short buffer to a live communicator on the master alone.
+  # REG_CATCOMPI (C index 17) is an independent pre-computation fence after
+  # the two extent checks. If either extent guard regresses, this invalid
+  # flag raises the wrong *named* condition, without entering arithmetic.
+  # Prove the fence first with valid buffers, in an MPI-uninitialized child;
+  # a missing fence prevents either malformed-buffer probe from running.
+  captured[[16L]][[18L]] <- 2L
+  input <- tempfile("npRmpi-response-extents-", fileext = ".rds")
+  saveRDS(captured, input)
+  on.exit(unlink(input), add = TRUE)
+  result <- npRmpi_run_isolated_contract(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "stopifnot(!isTRUE(getOption('npRmpi.mpi.initialized', FALSE)))",
+      sprintf("args <- readRDS(%s)", deparse(input)),
+      "condition <- function(x) tryCatch({do.call(base::.Call, x); 'NO ERROR'}, error = conditionMessage)",
+      "fence <- 'C_np_regression: categorical compression must be TRUE or FALSE'",
+      "if (!identical(condition(args), fence)) stop('RM07: pre-computation fence unavailable')",
+      "train <- args; train[[5L]] <- double()",
+      "evaluation <- args; evaluation[[9L]] <- double()",
+      "expected <- c('C_np_regression: training-response buffer is too short', 'C_np_regression: evaluation-response buffer is too short')",
+      "observed <- c(condition(train), condition(evaluation))",
+      "if (!identical(observed, expected)) stop('RM07: response extent guard regression: ', paste(observed, collapse = '; '))",
+      "cat('RM07_NATIVE_EXTENTS_AND_FENCE_OK\\n')"
+    ),
+    marker = "RM07_NATIVE_EXTENTS_AND_FENCE_OK",
+    timeout = 20L,
+    extra.env = "NP_RMPI_SKIP_INIT=1"
+  )
+  expect_false(is.null(result))
+  if (is.null(result)) stop("RM07: isolated native proof unavailable")
+  expect_identical(result$status, 0L, info = paste(result$output, collapse = "\n"))
+  expect_true(result$witnessed)
   # Public valid calls test native recovery and legitimate absent ey.
   expect_true(all(is.finite(fitted(npreg(b, txdat = x, tydat = y, se = FALSE)))))
 })
