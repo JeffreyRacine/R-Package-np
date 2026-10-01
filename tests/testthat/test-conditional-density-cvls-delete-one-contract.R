@@ -292,7 +292,13 @@ test_that("beta-X conditional LP CVLS matches independent signed WLS", {
       cykerorder = 2L
     )
     native <- np:::.npcdensbw_eval_only(xdat, ydat, bw)$objective
-    oracle <- conditional_cvls_delete_one_oracle(xdat, ydat, bw)
+    # Whole-support query-radius integration, independently converged at
+    # 20 and 32 Gauss nodes plus both infinite tails; see fixtures reference.
+    oracle <- if (identical(case$type, "generalized_nn")) {
+      0.54294422783929308
+    } else {
+      conditional_cvls_delete_one_oracle(xdat, ydat, bw)
+    }
 
     expect_equal(
       as.numeric(native), oracle, tolerance = 5e-8,
