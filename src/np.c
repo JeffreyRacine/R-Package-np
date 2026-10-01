@@ -13167,8 +13167,7 @@ SEXP C_np_kernelsum(SEXP tuno,
       const int ne = INTEGER(myopti_i)[KWS_ENOBSI];
       if(TYPEOF(map) != INTSXP || nt <= 0 || ne <= 0 ||
          XLENGTH(map) != ne || ncon <= 0 ||
-         (!fold_requested && (descriptor.family == NP_CKERNEL_FAMILY_BETA ||
-                               INTEGER(myopti_i)[KWS_TISEI])) ||
+         (!fold_requested && INTEGER(myopti_i)[KWS_TISEI]) ||
          INTEGER(myopti_i)[KWS_LOOI] ||
          (fold_requested && INTEGER(myopti_i)[KWS_BWI] != BW_GEN_NN &&
           INTEGER(myopti_i)[KWS_BWI] != BW_ADAP_NN) ||
@@ -13305,16 +13304,48 @@ SEXP C_np_kernelsum(SEXP tuno,
 
       beta_bandwidth_mode = (beta_bandwidth_code == BW_GEN_NN) ?
         NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
-      bandwidth_status = np_beta_bandwidth_prepare(
-        beta_bandwidth_mode,
-        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(bw_r),
-        num_train, num_eval, ncon, train_is_eval,
-        need_eval, need_train, 0,
-        bandwidth_eval_storage, bandwidth_train_storage);
+      if(eval_to_train != NULL) {
+        if(need_train || beta_bandwidth_code != BW_GEN_NN)
+          error("C_np_kernelsum: mapped beta queries require ordinary GNN rows");
+        /* Private beta GNN hat queries retain observation identity through
+         * evaluation chunks. Public kernel sums keep their external-query
+         * radius contract; fixed and ANN owners never enter this branch. */
+        NPNNGeometryContext geometry = {
+          .mode = NP_NN_QUERY_TRAINING_MAP,
+          .eval_to_train = eval_to_train,
+          .adaptive_successor = NULL
+        };
+        double **train_columns = (double **)R_alloc((size_t)ncon, sizeof(double *));
+        double **eval_columns = (double **)R_alloc((size_t)ncon, sizeof(double *));
+        double **bandwidth_columns = (double **)R_alloc((size_t)ncon, sizeof(double *));
+        for(int d = 0; d < ncon; ++d) {
+          train_columns[d] = REAL(tcon_r) + (size_t)d*num_train;
+          eval_columns[d] = (train_is_eval ? REAL(tcon_r) : REAL(econ_r)) +
+            (size_t)d*num_eval;
+          bandwidth_columns[d] = bandwidth_eval_storage + (size_t)d*num_eval;
+        }
+        bandwidth_status = np_beta_bandwidth_prepare_matrix_ctx(
+          beta_bandwidth_mode, train_columns, eval_columns, REAL(bw_r),
+          num_train, num_eval, ncon, 0, 1, 0, 0,
+          bandwidth_columns, NULL, &geometry);
+      } else {
+        bandwidth_status = np_beta_bandwidth_prepare(
+          beta_bandwidth_mode,
+          REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(bw_r),
+          num_train, num_eval, ncon, train_is_eval,
+          need_eval, need_train, 0,
+          bandwidth_eval_storage, bandwidth_train_storage);
+      }
       if(bandwidth_status == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS) {
+        const NPNNGeometryContext failure_geometry = {
+          .mode = NP_NN_QUERY_TRAINING_MAP,
+          .eval_to_train = eval_to_train,
+          .adaptive_successor = NULL
+        };
         const NPNNZeroRadiusInfo info = np_nn_zero_radius_info_flat(
           beta_bandwidth_code, num_train, num_eval, ncon,
-          REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(bw_r), NULL, 0);
+          REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(bw_r),
+          eval_to_train != NULL ? &failure_geometry : NULL, 0);
         np_nn_zero_radius_error(&info);
       }
       if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)

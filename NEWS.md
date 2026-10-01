@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Beta generalized-neighbor local-constant derivative hats now retain
+  observation identity for implicit training queries, including repeated values
+  and chunked evaluation. Matrix/apply derivatives agree with the fitted
+  gradients and their HC0 normalization. Explicit external queries retain their
+  existing radius contract.
+
 * Bandwidth progress retains iterations and the actual multistart counter while
   search work continues after the requested starts. Completion and zero ETA are
   no longer displayed prematurely; failed searches clear the existing progress

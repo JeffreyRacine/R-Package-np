@@ -28,3 +28,40 @@ test_that("beta GNN fits and hats exclude only training neighbour identity", {
     expect_gt(max(abs(fitted(fit)-fitted(external))),1e-5)
   }
 })
+
+test_that("beta GNN LC derivative hats retain implicit observation identity", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  x <- c(.03, .10, .10, .24, .43, .67, .67, .82, .96)
+  X <- data.frame(x = x)
+  y <- sin(2*x) + x
+  for (order in c(2L, 4L, 6L, 8L)) {
+    bw <- npregbw(xdat = X, ydat = y, bws = 3,
+      bandwidth.compute = FALSE, bwtype = "generalized_nn", regtype = "lc",
+      ckertype = "beta", ckerorder = order,
+      ckerbound = "fixed", ckerlb = 0, ckerub = 1)
+    for (external in c(FALSE, TRUE)) {
+      expected <- t(vapply(seq_along(x), function(i) {
+        # Holding this radius fixed defines the documented kernel derivative.
+        donors <- if (external) x else x[-i]
+        h <- sort(abs(donors-x[i]))[3L]
+        w <- dw <- numeric(length(x))
+        for (scale in seq_len(order/2L)) {
+          tau <- 1/(scale*h*h)
+          a <- 1+x[i]*tau; b <- 1+(1-x[i])*tau
+          v <- dbeta(x, a, b)
+          coefficient <- (-1)^(scale+1L)*choose(order/2L, scale)
+          w <- w+coefficient*v
+          dw <- dw+coefficient*v*tau*(log(x)-log1p(-x)-digamma(a)+digamma(b))
+        }
+        (dw*sum(w)-w*sum(dw))/sum(w)^2
+      }, numeric(length(x))))
+      args <- list(bws = bw, txdat = X, s = 1L)
+      if (external) args$exdat <- X
+      H <- do.call(npreghat, args)
+      applied <- do.call(npreghat, c(args, list(output = "apply", y = y)))
+      expect_equal(as.vector(H), as.vector(expected), tolerance = 8e-13)
+      expect_equal(as.vector(applied), drop(expected %*% y), tolerance = 8e-13)
+    }
+  }
+})
