@@ -18,6 +18,8 @@ nn_notice_scope <- function() {
 }
 
 test_that("NN recovery is an immediate one-time notice without search state changes", {
+  old_messages <- options(np.messages = TRUE)
+  on.exit(options(old_messages), add = TRUE)
   s <- nn_notice_scope()
   events <- list(); clock <- 0
   s$.np_progress_now <- function() clock
@@ -58,6 +60,8 @@ test_that("NN recovery is an immediate one-time notice without search state chan
 })
 
 test_that("NN recovery notice is silent without a visible nonworker owner", {
+  old_messages <- options(np.messages = TRUE)
+  on.exit(options(old_messages), add = TRUE)
   s <- nn_notice_scope(); events <- list()
   s$.np_progress_render_single_line <- function(snapshot,event)
     events[[length(events)+1L]] <<- snapshot
@@ -76,6 +80,8 @@ test_that("NN recovery notice is silent without a visible nonworker owner", {
 })
 
 test_that("nested recovery retains the canonical owner and its refinement provider", {
+  old_messages <- options(np.messages = TRUE)
+  on.exit(options(old_messages), add = TRUE)
   s <- nn_notice_scope(); events <- list()
   s$.np_progress_render_single_line <- function(snapshot,event)
     events[[length(events)+1L]] <<- list(snapshot=snapshot,event=event)
@@ -112,6 +118,8 @@ test_that("nested recovery retains the canonical owner and its refinement provid
 })
 
 test_that("recovery obeys ordinary message suppression and noninteractive policy", {
+  old_messages <- options(np.messages = TRUE)
+  on.exit(options(old_messages), add = TRUE)
   for(kind in c("option-off","noninteractive","muffled")) {
     s <- nn_notice_scope(); events <- list()
     old <- options(np.messages=kind!="option-off")
@@ -133,6 +141,8 @@ test_that("recovery obeys ordinary message suppression and noninteractive policy
 })
 
 test_that("recovery notices fit narrow consoles without claiming restoration", {
+  old_messages <- options(np.messages = TRUE)
+  on.exit(options(old_messages), add = TRUE)
   for (prefix in c("[np]","[npRmpi]")) for (width in c(20L,40L,80L,180L)) {
     line <- .np_progress_bandwidth_notice_line(
       paste(prefix,"Bandwidth selection (multistart 10/10, iteration 640, elapsed 15.0s)"),
@@ -145,6 +155,8 @@ test_that("recovery notices fit narrow consoles without claiming restoration", {
 })
 
 test_that("R recovery notice neither changes probes nor labels skipped recovery", {
+  old_messages <- options(np.messages = TRUE)
+  on.exit(options(old_messages), add = TRUE)
   s <- nn_notice_scope(); notices <- 0L; visited <- list()
   s$.np_progress_bandwidth_nn_recovery <- function() {notices <<- notices+1L; invisible(NULL)}
   result <- s$.np_nn_find_raw_valid_start(c(2,.3),1L,8L,function(p) {

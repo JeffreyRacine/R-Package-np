@@ -61,18 +61,20 @@ test_that("adaptive Gaussian row fusion is narrow and memory bounded", {
   expect_false(grepl("malloc|calloc|realloc", body))
 })
 
-test_that("adaptive Gaussian row fusion has exactly three hot-row consumers", {
+test_that("adaptive Gaussian row fusion preserves guarded hot-row consumers", {
   src_file <- locate_adaptive_gaussian_row_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
   text <- paste(lines, collapse = "\n")
-  calls <- gregexpr(
-    "np_accel_gauss_adaptive_row_try\\(",
-    text,
-    perl = TRUE
-  )[[1L]]
-
-  expect_length(calls[calls > 0L], 4L)
+  # Conditional deleted rows retain the same guarded acceleration and fallback.
+  deleted <- np_test_extract_c_function(lines, "np_conditional_deleted_from_ctx_core")
+  for (guard in c("BANDWIDTH_den_extern == BW_ADAP_NN",
+                  "num_reg_unordered_extern == 0", "num_reg_ordered_extern == 0",
+                  "!int_cxker_bound_extern", "int_TREE_X != NP_TREE_TRUE"))
+    expect_match(deleted, guard, fixed = TRUE)
+  expect_match(deleted, "np_accel_gauss_adaptive_row_try(", fixed = TRUE)
+  expect_match(deleted, "if(!adaptive_gaussian_row)", fixed = TRUE)
+  expect_match(deleted, "np_conditional_kernel_row_raw(", fixed = TRUE)
 
   regression <- adaptive_gaussian_row_source_body(
     lines,

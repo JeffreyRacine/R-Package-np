@@ -576,10 +576,16 @@ test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
     source,
     fixed = TRUE
   ))
-  expect_equal(
-    sum(grepl("fabs\\(row_sum\\) > DBL_MIN", lines)),
-    3L
-  )
+  for (owner in c("np_conditional_xrow_from_ctx_impl",
+                  "np_conditional_deleted_from_ctx_core",
+                  "np_conditional_x_weight_row_stream_core_impl",
+                  "np_conditional_x_weight_block_stream_core_impl",
+                  "np_conditional_deleted_block")) {
+    body <- np_test_extract_c_function(lines, owner)
+    expect_match(body, "if(!(fabs(row_sum) > DBL_MIN))", fixed = TRUE)
+    expect_match(body, "kw[j]/row_sum", fixed = TRUE)
+  }
+
   expect_false(grepl("np_conditional_x_weight_block_pair", source,
                      fixed = TRUE))
   expect_true(grepl(

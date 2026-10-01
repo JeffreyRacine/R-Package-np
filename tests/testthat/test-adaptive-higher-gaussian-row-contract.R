@@ -57,10 +57,15 @@ test_that("adaptive higher-order Gaussian row fusion is narrow and bounded", {
   expect_false(grepl("n\\s*\\*\\s*n", body))
   expect_false(grepl("malloc|calloc|realloc", body))
 
-  calls <- gregexpr(
-    "np_accel_gauss_adaptive_higher_row_try\\(", text, perl = TRUE
-  )[[1L]]
-  expect_length(calls[calls > 0L], 3L)
+  # Conditional deleted rows retain the same guarded acceleration and fallback.
+  deleted <- np_test_extract_c_function(lines, "np_conditional_deleted_from_ctx_core")
+  for (guard in c("BANDWIDTH_den_extern == BW_ADAP_NN",
+                  "num_reg_unordered_extern == 0", "num_reg_ordered_extern == 0",
+                  "!int_cxker_bound_extern", "int_TREE_X != NP_TREE_TRUE"))
+    expect_match(deleted, guard, fixed = TRUE)
+  expect_match(deleted, "np_accel_gauss_adaptive_higher_row_try(", fixed = TRUE)
+  expect_match(deleted, "if(!adaptive_gaussian_row)", fixed = TRUE)
+  expect_match(deleted, "np_conditional_kernel_row_raw(", fixed = TRUE)
 
   regression <- adaptive_higher_gaussian_body(
     lines,
