@@ -4187,6 +4187,8 @@ static int np_ordinary_nn_find_finite_raw_seed_domain(
       num_obs < 3 || maximum_k < 1 || num_raw_var < num_continuous)
     return 0;
 
+  np_progress_signal("bandwidth_nn_recovery", "bandwidth", 0, 0);
+
   for (i = 1; i <= num_continuous; ++i) {
     int lookup_k = 0;
     int is_extended = 0;
