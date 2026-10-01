@@ -62,10 +62,15 @@ test_that("empirical CDF-CV normalization has one checked finalizer", {
     "static NPDistributionCvlsFinalizeStatus np_distribution_cvls_finalize(",
     fixed = TRUE
   )
-  calls <- gregexpr(
-    "np_distribution_cvls_finalize(", source, fixed = TRUE
-  )[[1L]]
-  expect_length(calls[calls > 0L], 19L)
+  all_large <- np_test_extract_c_function(
+    readLines(path, warn = FALSE),
+    "np_conditional_distribution_cvls_lp_all_large_stream"
+  )
+  # Stable global-QR and incumbent all-large owners both finalize before commit.
+  expect_match(all_large, "if(ctx.stable)", fixed = TRUE)
+  expect_match(all_large, "failed=np_distribution_cvls_finalize(cv_accumulator", fixed = TRUE)
+  expect_match(all_large, "if(np_distribution_cvls_finalize(\n       cv_accumulator", fixed = TRUE)
+  expect_match(all_large, "if(cv_started && status == 0)\n    *cv = cv_accumulator;", fixed = TRUE)
   # The GNN deleted-fit grid now shares the same checked normalization.
   start <- regexpr("static SEXP np_distribution_gnn_cv_execute(", source,
                    fixed = TRUE)[[1L]]

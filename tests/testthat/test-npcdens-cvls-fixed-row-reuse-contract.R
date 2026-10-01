@@ -30,11 +30,13 @@ test_that("fixed and generalized-NN CVLS share one canonical LOO block engine", 
   lines <- readLines(src_file, warn = FALSE)
   source <- paste(lines, collapse = "\n")
 
-  body <- cvls_source_body(
-    lines,
-    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
-    "^static int np_conditional_x_weight_block_stream_core\\("
+  body <- np_test_extract_c_function(
+    lines, "np_conditional_x_weight_block_stream_core_impl"
   )
+  deleted <- np_test_extract_c_function(lines, "np_conditional_deleted_block")
+  expect_match(deleted, "if(!np_conditional_deleted_admitted())", fixed = TRUE)
+  expect_match(deleted, "return np_conditional_x_weight_block_stream_core_impl(", fixed = TRUE)
+  expect_match(deleted, "np_conditional_deleted_influence(", fixed = TRUE)
 
   expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
   expect_match(body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
@@ -87,7 +89,7 @@ test_that("conditional CVLS dispatch reaches only the canonical block owner", {
   )), 2L)
   expect_equal(lengths(regmatches(
     density_body,
-    gregexpr("np_conditional_x_weight_block_stream_core_impl\\(", density_body, perl = TRUE)
+    gregexpr("np_conditional_deleted_block\\(", density_body, perl = TRUE)
   )), 1L)
   expect_match(
     density_body,
