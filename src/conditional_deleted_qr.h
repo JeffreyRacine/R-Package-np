@@ -1,7 +1,8 @@
 #ifndef NP_CONDITIONAL_DELETED_QR_H
 #define NP_CONDITIONAL_DELETED_QR_H
-/* Candidate component: invocation-owned storage, policy supplied by caller. */
-/* Diagnostic-only alternate reconstruction from the SAME deleted QR. */
+/* Production deleted-row QR component with invocation-owned storage. */
+/* Compensated reconstruction is selected by np_cqr_deleted_row; lambda and
+ * the pristine deleted Gram intercept remain caller-owned policy. */
 #include <R.h>
 #include <Rinternals.h>
 #include <R_ext/Lapack.h>

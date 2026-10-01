@@ -1,7 +1,7 @@
 #ifndef NP_CONDITIONAL_DELETED_QR_FAST_H
 #define NP_CONDITIONAL_DELETED_QR_FAST_H
-/* Candidate helper, not yet wired to a package. Canonical policy supplies
- * lambda and the pristine deleted Gram intercept; no rank rule lives here. */
+/* Production deleted-row QR helper. Caller-owned policy supplies lambda
+ * and the pristine deleted Gram intercept; no rank rule lives here. */
 typedef struct {
   int n,k,capacity,lwork;
   double *a,*scale,*tau,*v,*sqrtw,*work;
