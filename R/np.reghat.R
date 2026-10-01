@@ -786,6 +786,8 @@ npreghat <-
           return.kernel.weights = TRUE,
           return.derivative.kernel.weights = TRUE,
           .np.internal.bandwidth.divide.weights = !beta.kernel,
+          .np.internal.eval.train.index =
+            if (beta.kernel && no.ex) as.integer(rows) else NULL,
           permutation.operator = "derivative"
         )
         out <- if (beta.kernel) {

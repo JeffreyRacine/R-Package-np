@@ -429,7 +429,7 @@ npksum.default <-
                           any(operator != "normal") || !kernel.pow %in% c(1, 2)))
       stop("invalid internal raw delete-one kernel-sum request")
     if (!is.null(internal.eval.train.index)) {
-      if (miss.ex || leave.one.out || internal.power12 || beta.kernel ||
+      if (miss.ex || leave.one.out || internal.power12 ||
           bws$type != "generalized_nn" || bws$ncon < 1L ||
           length(rows.omit) || length(attr(exdat, "na.action")) ||
           !is.integer(internal.eval.train.index) ||

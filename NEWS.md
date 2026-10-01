@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Beta generalized-neighbor local-constant derivative hats now retain
+  observation identity for implicit training queries, including repeated values
+  and chunked evaluation. Matrix/apply derivatives agree with the fitted
+  gradients and their HC0 normalization. Explicit external queries retain their
+  existing radius contract.
+
 * Conditional likelihood cross-validation reports a guarded evaluation on the
   coordinator whenever any computing rank used the existing nonpositive-fit
   rule. The counter still counts evaluations, not observations or MPI ranks;
