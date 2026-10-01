@@ -50481,19 +50481,6 @@ static int np_cgnn_unbounded_admitted(void) {
     int_cxker_bound_extern == 0 && int_cyker_bound_extern == 0;
 }
 
-/* Bounded explanatory rows use the same whole-response GNN criterion.
- * Admit only Gaussian truncation or an X-only beta route. Bounded/associated
- * response kernels retain their existing support-specific owners. */
-static int np_cgnn_bounded_x_admitted(
-  const NPConditionalKernelExecutionContext *execution_context) {
-  if(BANDWIDTH_den_extern != BW_GEN_NN || num_var_continuous_extern <= 0 ||
-     int_cyker_bound_extern != 0 || KERNEL_den_extern < 0 || KERNEL_den_extern > 8)
-    return 0;
-  if(execution_context != NULL)
-    return execution_context->x_route != NULL && execution_context->y_route == NULL;
-  return int_cxker_bound_extern != 0 && KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= 3;
-}
-
 /* Upfront representation admission; no recovery or timing-driven dispatch. */
 static int np_cgnn_projected_admitted(void) {
   return BANDWIDTH_den_extern == BW_GEN_NN &&
@@ -50511,7 +50498,7 @@ static int np_conditional_density_cvls_lp_stream_impl(
   double *cv){
   if(np_cgnn_prefix_admitted())
     return np_cgnn_prefix_cvls(vector_scale_factor, cv);
-  if(np_cgnn_unbounded_admitted() || np_cgnn_bounded_x_admitted(NULL))
+  if(np_cgnn_unbounded_admitted())
     return np_conditional_density_cvls_lp_stream_ctx(vector_scale_factor, NULL, cv);
   const int num_obs = num_obs_train_extern;
   const int block_size =
@@ -62204,9 +62191,8 @@ static int np_conditional_cvls_route_context_prepare(
       np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
     return 1;
 
-  const int projected = response_operator == OP_NORMAL &&
-    ((execution_context == NULL && np_cgnn_unbounded_admitted()) ||
-     np_cgnn_bounded_x_admitted(execution_context));
+  const int projected = execution_context == NULL &&
+    response_operator == OP_NORMAL && np_cgnn_unbounded_admitted();
   context->beta_x = execution_context != NULL && execution_context->x_route != NULL;
   context->beta_y = execution_context != NULL && execution_context->y_route != NULL;
   context->fold_geometry = response_operator == OP_NORMAL &&
@@ -63010,7 +62996,6 @@ int np_conditional_density_cvls_lp_stream_ctx(
   int status = 1;
 
   if(execution_context == NULL && !np_cgnn_unbounded_admitted() &&
-     !np_cgnn_bounded_x_admitted(NULL) &&
      !(int_cyker_bound_extern != 0 && num_var_continuous_extern > 0 &&
        (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN)))
     return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
@@ -63035,12 +63020,9 @@ int np_conditional_density_cvls_lp_stream_ctx(
   provider.fold_fit_block = route_context.fold_geometry ?
     np_conditional_cvls_fold_fit_block : NULL;
 
-  const int bounded_x = np_cgnn_bounded_x_admitted(execution_context);
-  if((execution_context == NULL && np_cgnn_projected_admitted()) ||
-     (bounded_x && num_var_continuous_extern == 1 &&
-      num_var_unordered_extern == 0 && num_var_ordered_extern == 0)) {
+  if(execution_context == NULL && np_cgnn_projected_admitted()) {
     status = np_cgnn_projected_cvls(&route_context, cv);
-  } else if((execution_context == NULL && np_cgnn_unbounded_admitted()) || bounded_x) {
+  } else if(execution_context == NULL && np_cgnn_unbounded_admitted()) {
     status = np_cgnn_general_cvls(&route_context, cv);
   } else if(route_context.fold_geometry &&
      (np_conditional_density_cvls_bounded_scalar_route_ok() ||
