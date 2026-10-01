@@ -62,7 +62,7 @@ test_that("empirical CDF-CV normalization has one checked finalizer", {
     "static NPDistributionCvlsFinalizeStatus np_distribution_cvls_finalize(",
     fixed = TRUE
   )
-  all_large <- np_test_extract_c_function(
+  all_large <- npRmpi_test_extract_c_function(
     readLines(path, warn = FALSE),
     "np_conditional_distribution_cvls_lp_all_large_stream"
   )

@@ -67,7 +67,7 @@ test_that("adaptive Gaussian row fusion preserves guarded hot-row consumers", {
   lines <- readLines(src_file, warn = FALSE)
   text <- paste(lines, collapse = "\n")
   # Conditional deleted rows retain the same guarded acceleration and fallback.
-  deleted <- np_test_extract_c_function(lines, "np_conditional_deleted_from_ctx_core")
+  deleted <- npRmpi_test_extract_c_function(lines, "np_conditional_deleted_from_ctx_core")
   for (guard in c("BANDWIDTH_den_extern == BW_ADAP_NN",
                   "num_reg_unordered_extern == 0", "num_reg_ordered_extern == 0",
                   "!int_cxker_bound_extern", "int_TREE_X != NP_TREE_TRUE"))

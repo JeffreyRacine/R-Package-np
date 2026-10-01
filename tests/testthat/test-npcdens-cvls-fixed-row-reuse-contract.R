@@ -46,10 +46,10 @@ test_that("fixed and generalized-NN CVLS share one canonical LOO block engine", 
   lines <- readLines(src_file, warn = FALSE)
   source <- paste(lines, collapse = "\n")
 
-  body <- np_test_extract_c_function(
+  body <- npRmpi_test_extract_c_function(
     lines, "np_conditional_x_weight_block_stream_core_impl"
   )
-  deleted <- np_test_extract_c_function(lines, "np_conditional_deleted_block")
+  deleted <- npRmpi_test_extract_c_function(lines, "np_conditional_deleted_block")
   expect_match(deleted, "if(!np_conditional_deleted_admitted())", fixed = TRUE)
   expect_match(deleted, "return np_conditional_x_weight_block_stream_core_impl(", fixed = TRUE)
   expect_match(deleted, "np_conditional_deleted_influence(", fixed = TRUE)

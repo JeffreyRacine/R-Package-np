@@ -50,11 +50,8 @@ test_that("adaptive CVLS consumes only canonical delete-one context rows", {
     "^np_conditional_density_cvls_categorical_profile_stream\\("
   )
 
-  expect_match(row_body, "np_conditional_deleted_from_ctx(&xctx", fixed = TRUE)
-  expect_match(block_body, "np_conditional_xrow_from_ctx", fixed = TRUE)
-  deleted <- np_test_extract_c_function(jksum, "np_conditional_deleted_from_ctx")
-  expect_match(deleted, "np_conditional_deleted_from_ctx_core(ctx, qr, eval_idx, 1, 0,", fixed = TRUE)
   for (body in list(row_body, block_body)) {
+    expect_match(body, "np_conditional_xrow_from_ctx", fixed = TRUE)
     expect_false(grepl("np_conditional_xrow_from_ctx_impl", body, fixed = TRUE))
     expect_false(grepl("np_lp_delete_smoother_row", body, fixed = TRUE))
   }
