@@ -889,7 +889,7 @@ static int np_cgnn_projected_local(NPGNNConditionalProjectedCall *a)
   *c=(NPGNNConditionalProjectionOwner){.n=n,.folded=1,.first_fold=0,.kernel=KERNEL_den_extern,
     .end_fold=n,.pair_ranks=1,.data=matrix_Y_continuous_train_extern,
     .row=np_gnn_conditional_integral_weight,
-    .filled_row=np_lp_engine_extern==NP_LP_ENGINE_SCALAR ?
+    .filled_row=!b->route->beta_x && np_lp_engine_extern==NP_LP_ENGINE_SCALAR ?
       np_gnn_conditional_integral_filled_weight:NULL,
     .geometry=&a->geometry,.context=b,.budget=NP_CONDITIONAL_LP_TILE_BUDGET_BYTES};
   if(c->kernel>0 && c->kernel<4)np_cgnn_gaussian_derivative_constants(c->kernel,c->logG);

@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Conditional-density generalized-neighbor CVLS with bounded Gaussian
+  or beta explanatory kernels now uses the whole-response, query-radius
+  criterion. Bounded response kernels keep their existing support-specific
+  computation. This correction does not resolve the separately tracked
+  conditional polynomial rank and extreme-cluster refinement limitations.
+
 * Beta generalized-neighbor local-constant derivative hats now retain
   observation identity for implicit training queries, including repeated values
   and chunked evaluation. Matrix/apply derivatives agree with the fitted
