@@ -164,6 +164,8 @@
     stop("internal NN recovery adapter requires a raw evaluator", call. = FALSE)
 
   schedule <- .np_nn_ordinary_schedule(point, nn.indices, caps, incumbent.caps)
+  if (length(schedule))
+    .np_progress_bandwidth_nn_recovery()
   for (i in seq_along(schedule)) {
     candidate <- schedule[[i]]
     value <- tryCatch(

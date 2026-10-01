@@ -171,13 +171,43 @@
   invisible(NULL)
 }
 
-.np_progress_bandwidth_notice_line <- function(line, prefix, labels, width) {
+.np_progress_bandwidth_notice_line <- function(line, prefix, labels, width,
+                                                fallback = "restored") {
   candidates <- c(paste0(line, "; ", labels[1L]),
                   paste0(prefix, " Bandwidth selection (", labels, ")"),
                   paste0(prefix, " BW search (", utils::tail(labels, 1L), ")"),
-                  paste(prefix, "restored"))
+                  paste(prefix, fallback))
   fits <- nchar(candidates, type = "width") <= width
   candidates[which(fits)[1L]]
+}
+
+.np_progress_bandwidth_nn_recovery <- function() {
+  forwarding <- isTRUE(.np_progress_runtime$bandwidth_forward_active)
+  slot <- if (forwarding) "bandwidth_forward_state" else "bandwidth_state"
+  state <- .np_progress_runtime[[slot]]
+  if (!isTRUE(state$enabled) || !isTRUE(state$visible) ||
+      !identical(.np_progress_registry$active_id, state$id) ||
+      .np_progress_bandwidth_worker_silent())
+    return(invisible(NULL))
+
+  # A one-time stage notice, not a new search mode or a successful recovery.
+  # Preserve an unrelated pending notice and all objective/start counters.
+  pending <- state$bandwidth_notice
+  state$bandwidth_notice <- NULL
+  now <- .np_progress_now()
+  line <- .np_progress_bandwidth_notice_line(
+    .np_progress_format_line(state, done = state$last_done, now = now),
+    state$pkg_prefix,
+    c("NN bandwidth infeasible; attempting recovery", "NN recovery"),
+    if (identical(state$renderer, "single_line")) .np_progress_output_width() else Inf,
+    fallback = "recovering")
+  state$start_note_pending <- FALSE
+  state <- .np_progress_render(state, line, event = "update", now = now,
+                               done = state$last_done)
+  state$bandwidth_notice <- pending
+  state$last_emit <- now
+  .np_progress_runtime[[slot]] <- state
+  invisible(NULL)
 }
 
 .np_progress_bandwidth_enter_provider_stage <- function(state,
@@ -1135,7 +1165,7 @@
   }
 
   if (.np_progress_bandwidth_starts_complete(state)) {
-    fields <- c(fields, "starts complete; finishing")
+    fields <- c(fields, "starts complete; continuing search")
   }
 
   if (!is.null(done)) {
@@ -2194,6 +2224,11 @@
 
   if (is.na(event) || is.na(surface)) {
     return(invisible(FALSE))
+  }
+
+  if (identical(event, "bandwidth_nn_recovery") && identical(surface, "bandwidth")) {
+    .np_progress_bandwidth_nn_recovery()
+    return(invisible(TRUE))
   }
 
   if (identical(event, "bandwidth_multistart_step") && identical(surface, "bandwidth")) {

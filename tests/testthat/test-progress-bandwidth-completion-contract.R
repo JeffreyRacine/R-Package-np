@@ -16,7 +16,7 @@ test_that("completed starts retain activity until the bandwidth operation return
   active <- Filter(function(x) x$event == "render", shadow$trace)
   lines <- vapply(active, `[[`, "", "line")
   expect_false(any(grepl("100[.]0%|eta 0[.]0s", lines)))
-  expect_true(any(grepl("multistart 2/2, starts complete; finishing, iteration 128", lines)))
+  expect_true(any(grepl("multistart 2/2, starts complete; continuing search, iteration 128", lines)))
   expect_match(shadow$final_line, "100[.]0%.*eta 0[.]0s")
 })
 
@@ -49,6 +49,6 @@ test_that("elapsed estimates and completed coordinator groups are not false ETAs
   state$bandwidth_coordinator_local_current <- 2L
   state$bandwidth_coordinator_group_label <- "first component"
   state$bandwidth_multistart_completed <- 2L
-  expect_match(fmt(state, now=11), "first component.*starts complete; finishing.*iteration 64")
+  expect_match(fmt(state, now=11), "first component.*starts complete; continuing search.*iteration 64")
   expect_false(grepl("%|eta", fmt(state, now=11)))
 })
