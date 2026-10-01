@@ -165,8 +165,12 @@ test_that("npcdens fit route uses the bandwidth tree predicate", {
   on.exit(options(old_opts), add = TRUE)
 
   expect_identical(
-    np:::.npcdensbw_tree_code(bw, ncon = ncon, ncat = ncat),
-    np:::DO_TREE_NO
+    np:::.npcdensbw_tree_code(bw, ncon = ncon, ncat = ncat, fit.context = FALSE),
+    np:::DO_TREE_YES
+  )
+  expect_identical(
+    np:::.npcdensbw_tree_code(bw, ncon = ncon, ncat = ncat, fit.context = TRUE),
+    np:::DO_TREE_YES
   )
   expect_false(identical(
     np:::npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bw),

@@ -105,7 +105,9 @@ test_that("higher-order fixed and generalized-NN CVLS retain qualified transcrip
       bwtype = "generalized_nn", kernel = "gaussian", order = 8L,
       bernstein = TRUE, degree = c(2L, 2L),
       bws = c(31L, 34L, 29L),
-      oracle = 0.79852466654749321
+      # Independent deleted-WLS / whole-line quadrature, not a transcript.
+      # See fixtures/cgnn-cvls-reference.md; fixed-route entries are unchanged.
+      oracle = -30.148105184524063
     )
   )
 

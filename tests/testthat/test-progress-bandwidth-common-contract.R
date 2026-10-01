@@ -361,7 +361,7 @@ test_that("dark-launched bandwidth engine switches from iteration to estimate mo
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/2, iteration 28, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, 50\\.0%, elapsed 4\\.0s, eta 4\\.0s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 56, 87\\.5%, elapsed 7\\.0s, eta 1\\.0s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 84, 99\\.9%, elapsed 10\\.0s, eta 0\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 84, 99\\.9%, elapsed 10\\.0s, eta estimating\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, 100\\.0%, elapsed 12\\.0s, eta 0\\.0s\\)$", lines)))
 })
 

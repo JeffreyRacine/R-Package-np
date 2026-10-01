@@ -37,6 +37,7 @@
 #include "jksum_lp_basis.h"
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
+#include "conditional_global_qr.h"
 #include "jksum_block_plan.h"
 #include "kernel_registry.h"
 #include "np_native_safety.h"
@@ -34615,6 +34616,352 @@ static int np_conditional_xrow_from_ctx(NPConditionalXRowCtx *ctx,
     ctx, eval_idx, 1, 0, row_out, NULL);
 }
 
+/* Exclusive fixed positive-LP conditional deleted evaluation. Shared
+ * regression helpers and their context layout are intentionally untouched. */
+static int np_conditional_deleted_admitted(void)
+{
+  return BANDWIDTH_den_extern == BW_FIXED &&
+    np_lp_engine_extern == NP_LP_ENGINE_GENERAL &&
+    (KERNEL_reg_extern == CK_GAUSS2 || KERNEL_reg_extern == CK_EPAN2 ||
+     KERNEL_reg_extern == CK_UNIF);
+}
+
+static int np_conditional_deleted_influence(
+  double **basis, double *kw, double *weighted_design, double *mean_row,
+  NPLPSolveWorkspace *work, NPConditionalQRDeleted *qr,
+  int eval_pos, double *row_out)
+{
+  const int num_train = num_obs_train_extern;
+  const int k = np_glp_cv_cache.nterms;
+  NPLPSolvePolicyDiagnostics diagnostics = {0, 0.0};
+  int j, l;
+  if(!basis || !kw || !mean_row || !work || !qr || !row_out ||
+     k <= 0 || eval_pos < 0 || eval_pos >= num_train) return 1;
+  kw[eval_pos] = 0.0;
+  for(l = 0; l < k; l++)
+    work->rhs_source[l] =
+      basis[l][eval_pos];
+
+  if(weighted_design != NULL){
+    const char trans_t = 'T';
+    const char trans_n = 'N';
+    const double alpha = 1.0;
+    const double beta = 0.0;
+    const int basis_stride = np_glp_cv_cache.basis_stride;
+
+    for(l = 0; l < k; l++){
+      const double * const basis_row = basis[l];
+      double * const weighted_row =
+        weighted_design + (size_t)l*(size_t)basis_stride;
+
+      for(j = 0; j < num_train; j++)
+        weighted_row[j] = basis_row[j]*kw[j];
+    }
+
+    F77_CALL(dgemm)(&trans_t,
+                    &trans_n,
+                    &k,
+                    &k,
+                    &num_train,
+                    &alpha,
+                    basis[0],
+                    &basis_stride,
+                    weighted_design,
+                    &basis_stride,
+                    &beta,
+                    work->gram_source,
+                    &k
+                    FCONE FCONE);
+  } else {
+    for(l = 0; l < k; l++)
+      for(j = 0; j < k; j++)
+        work->gram_source[l + j*k] = 0.0;
+
+    for(j = 0; j < num_train; j++){
+      const double wj = kw[j];
+      if(wj == 0.0)
+        continue;
+      for(int a = 0; a < k; a++){
+        const double za = basis[a][j];
+        for(int b = a; b < k; b++){
+          const double zb = basis[b][j];
+          work->gram_source[a + b*k] += wj*za*zb;
+          if(b != a)
+            work->gram_source[b + a*k] += wj*za*zb;
+        }
+      }
+    }
+  }
+
+
+  const double anchor = work->gram_source[0];
+  if(np_conditional_solve_adjoint_ranked(work, k, 1,
+       1.0/(double)MAX(1, num_train),
+       np_lp_rank_upper_bound_from_weights(kw, num_train, k),
+       &diagnostics) != NP_LP_SOLVE_POLICY_OK) return 1;
+  if(np_cqr_deleted_row(qr, num_train, k, kw, basis, eval_pos,
+       diagnostics.ridge_total, anchor, mean_row, NULL, NULL)) return 1;
+  for(j = 0; j < num_train; ++j)
+    row_out[int_TREE_X == NP_TREE_TRUE ? ipt_extern_X[j] : j] = mean_row[j];
+  return 0;
+}
+
+static int np_conditional_deleted_from_ctx_core(NPConditionalXRowCtx *ctx,
+                                             NPConditionalQRDeleted *qr,
+                                             int eval_idx,
+                                             int drop_eval_self,
+                                             int direct_delete_solve,
+                                             double *row_out,
+                                             NPLPSolvePolicyDiagnostics *diagnostics){
+  const int num_train = num_obs_train_extern;
+  int eval_pos = eval_idx;
+  NPConditionalBoundState bounds_state;
+  double **matrix_bandwidth_active;
+  int j, l;
+  int status = 1;
+  int adaptive_gaussian_row = 0;
+
+  if((ctx == NULL) || (!ctx->ready) || (row_out == NULL))
+    return 1;
+  if((eval_idx < 0) || (eval_idx >= num_train))
+    return 1;
+  if(ctx->adaptive_fold && !ctx->adaptive_fold_selected)
+    return 1;
+  matrix_bandwidth_active = ctx->adaptive_fold ?
+    ctx->matrix_bandwidth_x_selected : ctx->matrix_bandwidth_x;
+  if(diagnostics != NULL){
+    diagnostics->ridge_steps = 0;
+    diagnostics->ridge_total = 0.0;
+  }
+
+  /*
+   * Every admitted objective begins its row traversal at zero.  Prepare the
+   * optional sidecar lazily here so the shared context constructor and all
+   * earlier fixed/generalized-NN owners retain their exact machine layout.
+   * A nonzero first row simply keeps the incumbent division path.
+   */
+  if((eval_idx == 0) &&
+     (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     (!ctx->adaptive_fold) &&
+     (ctx->reciprocal_cache == NULL))
+    (void)np_conditional_xrow_reciprocal_cache_try(ctx);
+
+  memset(row_out, 0, (size_t)num_train*sizeof(double));
+
+  if((int_TREE_X == NP_TREE_TRUE) && (ipt_lookup_extern_X != NULL))
+    eval_pos = ipt_lookup_extern_X[eval_idx];
+
+  if(ctx->num_reg_tot <= 0){
+    const double denom = drop_eval_self ? ((double)(num_train - 1)) : ((double)num_train);
+    const double w = (denom > 0.0) ? 1.0/denom : 0.0;
+    for(j = 0; j < num_train; j++)
+      if((!drop_eval_self) || (j != eval_idx))
+        row_out[j] = w;
+    return 0;
+  }
+
+  for(l = 0; l < num_reg_unordered_extern; l++)
+    ctx->eval_xuno_one[l][0] = matrix_X_unordered_train_extern[l][eval_pos];
+  for(l = 0; l < num_reg_ordered_extern; l++)
+    ctx->eval_xord_one[l][0] = matrix_X_ordered_train_extern[l][eval_pos];
+  for(l = 0; l < num_reg_continuous_extern; l++){
+    ctx->eval_xcon_one[l][0] = matrix_X_continuous_train_extern[l][eval_pos];
+    ctx->matrix_bandwidth_eval_one[l][0] =
+      (BANDWIDTH_den_extern == BW_FIXED) ?
+      ctx->matrix_bandwidth_x[l][0] : matrix_bandwidth_active[l][eval_pos];
+  }
+
+  np_conditional_push_bounds(int_cxker_bound_extern,
+                             vector_cxkerlb_extern,
+                             vector_cxkerub_extern,
+                             &bounds_state);
+
+#if NP_ACCEL_GAUSS_COMPILED
+  adaptive_gaussian_row =
+    (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+    (num_reg_unordered_extern == 0) &&
+    (num_reg_ordered_extern == 0) &&
+    (!int_cxker_bound_extern) &&
+    (int_TREE_X != NP_TREE_TRUE) &&
+    np_accel_gauss_adaptive_row_try(ctx->kernel_cx,
+                                    ctx->x_operator,
+                                    matrix_X_continuous_train_extern,
+                                    ctx->eval_xcon_one,
+                                    matrix_bandwidth_active,
+                                    num_reg_continuous_extern,
+                                    num_train,
+                                    1,
+                                    ctx->kw);
+  if(!adaptive_gaussian_row &&
+     (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     (num_reg_unordered_extern == 0) &&
+     (num_reg_ordered_extern == 0) &&
+     (!int_cxker_bound_extern) &&
+     (int_TREE_X != NP_TREE_TRUE))
+    adaptive_gaussian_row =
+      np_accel_gauss_adaptive_higher_row_try(
+        ctx->kernel_cx,
+        ctx->x_operator,
+        matrix_X_continuous_train_extern,
+        ctx->eval_xcon_one,
+        matrix_bandwidth_active,
+        (ctx->reciprocal_cache != NULL) &&
+          ctx->reciprocal_cache->workspace.ready ?
+          ctx->reciprocal_cache->workspace.reciprocal_storage :
+          NULL,
+        NULL,
+        num_reg_continuous_extern,
+        num_train,
+        1,
+        ctx->kw);
+#endif
+  if(!adaptive_gaussian_row){
+    int row_status;
+
+    /*
+     * Keep bandwidth division a route-level choice.  Passing the runtime
+     * bandwidth type into the inner kernel prevents the raw fixed/generalized
+     * sibling from retaining its compile-time zero division contract.
+     */
+    if(BANDWIDTH_den_extern == BW_ADAP_NN)
+      row_status = np_conditional_kernel_row(
+        ctx->kernel_cx,
+        ctx->kernel_ux,
+        ctx->kernel_ox,
+        ctx->x_operator,
+        BANDWIDTH_den_extern,
+        num_train,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_reg_continuous_extern,
+        matrix_X_unordered_train_extern,
+        matrix_X_ordered_train_extern,
+        matrix_X_continuous_train_extern,
+        ctx->eval_xuno_one,
+        ctx->eval_xord_one,
+        ctx->eval_xcon_one,
+        ctx->vsfx,
+        1,
+        matrix_bandwidth_active,
+        ctx->matrix_bandwidth_eval_one,
+        ctx->lambdax,
+        num_categories_extern_X,
+        matrix_categorical_vals_extern_X,
+        int_TREE_X,
+        kdt_extern_X,
+        ctx->kw,
+        ctx->mean_row);
+    else
+      row_status = np_conditional_kernel_row_raw(
+        ctx->kernel_cx,
+        ctx->kernel_ux,
+        ctx->kernel_ox,
+        ctx->x_operator,
+        BANDWIDTH_den_extern,
+        num_train,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_reg_continuous_extern,
+        matrix_X_unordered_train_extern,
+        matrix_X_ordered_train_extern,
+        matrix_X_continuous_train_extern,
+        ctx->eval_xuno_one,
+        ctx->eval_xord_one,
+        ctx->eval_xcon_one,
+        ctx->vsfx,
+        1,
+        ctx->matrix_bandwidth_x,
+        ctx->matrix_bandwidth_eval_one,
+        ctx->lambdax,
+        num_categories_extern_X,
+        matrix_categorical_vals_extern_X,
+        int_TREE_X,
+        kdt_extern_X,
+        ctx->kw,
+        ctx->mean_row);
+    if(row_status != 0){
+      np_conditional_pop_bounds(&bounds_state);
+      goto cleanup_xrow_from_ctx;
+    }
+  }
+  np_conditional_pop_bounds(&bounds_state);
+
+  {
+    int has_effective_weight = 0;
+
+    for(j = 0; j < num_train; j++){
+      if(!R_FINITE(ctx->kw[j]))
+        goto cleanup_xrow_from_ctx;
+      if(ctx->kw[j] != 0.0)
+        has_effective_weight = 1;
+    }
+    if(!has_effective_weight){
+      status = NP_REGRESSION_LP_MATRIX_ZERO_MASS;
+      goto cleanup_xrow_from_ctx;
+    }
+  }
+
+  {
+    const int scalar_row =
+      (ctx->lp_engine == NP_LP_ENGINE_SCALAR) ||
+      ((BANDWIDTH_den_extern == BW_ADAP_NN) &&
+       (ctx->lp_engine == NP_LP_ENGINE_GENERAL) &&
+       np_glp_cv_cache.ready &&
+       (np_glp_cv_cache.nterms == 1));
+
+    if(drop_eval_self && (scalar_row || direct_delete_solve))
+      ctx->kw[eval_pos] = 0.0;
+
+    if(scalar_row){
+      double row_sum = 0.0;
+      for(j = 0; j < num_train; j++)
+        row_sum += ctx->kw[j];
+      if(!(fabs(row_sum) > DBL_MIN)){
+        status = NP_REGRESSION_LP_MATRIX_ZERO_MASS;
+        goto cleanup_xrow_from_ctx;
+      }
+      for(j = 0; j < num_train; j++){
+        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+        row_out[orig_j] = ctx->kw[j]/row_sum;
+      }
+    } else {
+      const int k = np_glp_cv_cache.nterms;
+
+      if((k <= 0) || (ctx->basis == NULL))
+        goto cleanup_xrow_from_ctx;
+
+      if(direct_delete_solve){
+        if(np_regression_xrow_canonical_influence(
+             ctx, eval_pos, row_out, diagnostics) != 0)
+          goto cleanup_xrow_from_ctx;
+        goto complete_xrow_influence;
+      }
+
+      if(np_conditional_deleted_influence(
+           ctx->basis, ctx->kw, ctx->weighted_design, ctx->mean_row,
+           &ctx->regression_solve_workspace, qr, eval_pos, row_out) != 0)
+        goto cleanup_xrow_from_ctx;
+complete_xrow_influence:
+      ;
+    }
+  }
+
+  status = 0;
+
+cleanup_xrow_from_ctx:
+  return status;
+}
+
+static int np_conditional_deleted_from_ctx(NPConditionalXRowCtx *ctx,
+  NPConditionalQRDeleted *qr, int eval_idx, double *row_out)
+{
+  if(!np_conditional_deleted_admitted())
+    return np_conditional_xrow_from_ctx(ctx, eval_idx, row_out);
+  return np_conditional_deleted_from_ctx_core(ctx, qr, eval_idx, 1, 0,
+                                             row_out, NULL);
+}
+
+
 static int np_conditional_xrow_from_ctx_diagnostics(
   NPConditionalXRowCtx *ctx,
   int eval_idx,
@@ -37177,6 +37524,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   NPLPSolveWorkspace solve_workspace;
+  NPConditionalQRDeleted deleted_qr = {0};
   NPConditionalBoundState bounds_state;
   int eval_pos = eval_idx;
   int i, j, l;
@@ -37354,6 +37702,10 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
       const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
       row_out[orig_j] = kw[j]/row_sum;
     }
+   } else if(drop_eval_self && np_conditional_deleted_admitted()) {
+    if(np_conditional_deleted_influence(np_glp_cv_cache.basis, kw, NULL,
+         mean_row, &solve_workspace, &deleted_qr, eval_pos, row_out))
+      goto cleanup_xweight_row;
   } else {
     const int k = np_glp_cv_cache.nterms;
 
@@ -37415,6 +37767,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
   status = 0;
 
 cleanup_xweight_row:
+  np_cqr_deleted_clear(&deleted_qr);
   np_lp_solve_workspace_clear(&solve_workspace);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
@@ -40049,6 +40402,7 @@ typedef struct {
 
 static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_scale_factor,
                                                                NPConditionalXRowCtx *xctx,
+                                                               NPConditionalQRDeleted *deleted_qr,
                                                                NPConditionalYRowCtx *yctx,
                                                                const NPConditionalCVLSRowProvider *provider,
                                                                const double *grid,
@@ -40116,7 +40470,7 @@ static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_sc
                                  &y_log_scale) != 0)
           return 1;
       } else {
-        if(np_conditional_xrow_from_ctx(xctx, i, xblock[b]) != 0)
+        if(np_conditional_deleted_from_ctx(xctx, deleted_qr, i, xblock[b]) != 0)
           return 1;
         if(np_conditional_yrow_from_ctx(yctx, i, yrow) != 0)
           return 1;
@@ -40641,6 +40995,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   double quad_lb[2] = {0.0, 0.0};
   double quad_ub[2] = {0.0, 0.0};
   NPConditionalXRowCtx xctx = {0};
+  NPConditionalQRDeleted deleted_qr = {0};
   NPConditionalYRowCtx yctx = {0};
   double *yrow = NULL, *fit_block = NULL, *lin_block = NULL;
   double *ygrid_log_scale = NULL;
@@ -40740,7 +41095,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
     q = q_actual;
   }
   if(np_conditional_density_cvls_bounded_i1_eval_on_grid(vector_scale_factor,
-                                                         &xctx,
+                                                         &xctx, &deleted_qr,
                                                          &yctx,
                                                          provider,
                                                          base_grid,
@@ -40760,6 +41115,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   status = 0;
 
 cleanup_bounded_cvls_quad:
+  np_cqr_deleted_clear(&deleted_qr);
   np_conditional_xrow_ctx_clear(&xctx);
   np_conditional_yrow_ctx_clear(&yctx);
   np_glp_cv_clear_extern();
@@ -41609,11 +41965,312 @@ cleanup_xweight_block:
   return status;
 }
 
+static int np_conditional_deleted_block(double *vector_scale_factor,
+                                                          int eval_start,
+                                                          int block_rows,
+                                                          int drop_eval_self,
+                                                          const NPConditionalXBlockBwCtx *bwctx,
+                                                          const NPNNGeometryContext *nn_geometry_context,
+                                                          double **rows_out,
+                                                          NPLPDesignSupport *design_support){
+  if(!np_conditional_deleted_admitted())
+    return np_conditional_x_weight_block_stream_core_impl(vector_scale_factor,
+      eval_start, block_rows, drop_eval_self,  bwctx,
+      nn_geometry_context, rows_out, design_support);
+  if(!drop_eval_self || design_support != NULL) return 1;
+  NPConditionalQRDeleted deleted_qr = {0};
+
+  const int num_train = num_obs_train_extern;
+  const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+  const int lp_engine = np_lp_engine_extern;
+  const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : block_rows;
+  int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
+  double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
+  double *weighted_design = NULL;
+  double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
+  double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
+  double **matrix_X_continuous_eval_block = NULL;
+  NPLPSolveWorkspace solve_workspace;
+  NPConditionalBoundState bounds_state;
+  int i, j, l;
+  int use_weighted_blas = 0;
+  int status = 1;
+  const int use_bwctx = (bwctx != NULL) && bwctx->ready &&
+    (bwctx->eval_start == eval_start) &&
+    (bwctx->block_rows == block_rows);
+
+  np_lp_solve_workspace_init(&solve_workspace);
+  if((rows_out == NULL) || (vector_scale_factor == NULL))
+    return 1;
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
+    return 1;
+  if((int_TREE_X == NP_TREE_TRUE) && (BANDWIDTH_den_extern != BW_FIXED))
+    return 1;
+  if((int_TREE_X == NP_TREE_TRUE) &&
+     ((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL)))
+    return 1;
+  if((eval_start < 0) || (block_rows <= 0) || ((eval_start + block_rows) > num_train))
+    return 1;
+
+  if(num_reg_tot <= 0){
+    const double denom = drop_eval_self ? ((double)(num_train - 1)) : ((double)num_train);
+    const double w = (denom > 0.0) ? 1.0/denom : 0.0;
+    for(i = 0; i < block_rows; i++){
+      const int eval_pos = eval_start + i;
+      memset(rows_out[i], 0, (size_t)num_train*sizeof(double));
+      for(j = 0; j < num_train; j++)
+        if((!drop_eval_self) || (j != eval_pos))
+          rows_out[i][j] = w;
+    }
+    return 0;
+  }
+
+  vsfx = alloc_vecd(MAX(1, num_reg_tot));
+  lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
+  matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
+  if((!use_bwctx) && (num_reg_continuous_extern > 0))
+    matrix_X_continuous_eval_block = (double **)calloc((size_t)num_reg_continuous_extern, sizeof(double *));
+  kw = alloc_vecd(MAX(1, num_train));
+  mean_row = alloc_vecd(MAX(1, num_train));
+  matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
+  if(num_reg_unordered_extern > 0) eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
+  if(num_reg_ordered_extern > 0) eval_xord_one = alloc_matd(1, num_reg_ordered_extern);
+  if(num_reg_continuous_extern > 0) eval_xcon_one = alloc_matd(1, num_reg_continuous_extern);
+
+  kernel_cx = (int *)calloc((size_t)MAX(1, num_reg_continuous_extern), sizeof(int));
+  kernel_ux = (int *)calloc((size_t)MAX(1, num_reg_unordered_extern), sizeof(int));
+  kernel_ox = (int *)calloc((size_t)MAX(1, num_reg_ordered_extern), sizeof(int));
+  x_operator = (int *)calloc((size_t)MAX(1, num_reg_tot), sizeof(int));
+
+  if((vsfx == NULL) || (lambdax == NULL) || (kw == NULL) || (mean_row == NULL) ||
+     ((num_reg_continuous_extern > 0) && (matrix_bandwidth_x == NULL)) ||
+     ((num_reg_continuous_extern > 0) && (matrix_bandwidth_eval_one == NULL)) ||
+     ((num_reg_unordered_extern > 0) && (eval_xuno_one == NULL)) ||
+     ((num_reg_ordered_extern > 0) && (eval_xord_one == NULL)) ||
+     ((num_reg_continuous_extern > 0) && (eval_xcon_one == NULL)) ||
+     ((!use_bwctx) && (num_reg_continuous_extern > 0) && (matrix_X_continuous_eval_block == NULL)) ||
+     (kernel_cx == NULL) || (kernel_ux == NULL) || (kernel_ox == NULL) || (x_operator == NULL))
+    goto cleanup_xweight_block;
+
+  if(use_bwctx){
+    for(i = 0; i < num_reg_tot; i++)
+      vsfx[i] = bwctx->vsfx[i];
+    for(i = 0; i < (num_reg_unordered_extern + num_reg_ordered_extern); i++)
+      lambdax[i] = bwctx->lambdax[i];
+    for(l = 0; l < num_reg_continuous_extern; l++)
+      for(i = 0; i < bw_rows; i++)
+        matrix_bandwidth_x[l][i] = bwctx->matrix_bandwidth_x[l][i];
+  } else {
+    np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
+                          num_var_ordered_extern,
+                          num_var_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          num_reg_continuous_extern,
+                          vector_scale_factor,
+                          NULL,
+                          NULL,
+                          vsfx,
+                          NULL,
+                          NULL,
+                          NULL, NULL, NULL,
+                          NULL, NULL, NULL);
+  }
+
+  for(i = 0; i < num_reg_continuous_extern; i++){
+    kernel_cx[i] = KERNEL_reg_extern;
+    if(!use_bwctx)
+      matrix_X_continuous_eval_block[i] = matrix_X_continuous_train_extern[i] + eval_start;
+  }
+  for(i = 0; i < num_reg_unordered_extern; i++) kernel_ux[i] = KERNEL_reg_unordered_extern;
+  for(i = 0; i < num_reg_ordered_extern; i++) kernel_ox[i] = KERNEL_reg_ordered_extern;
+  for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
+
+  if(!use_bwctx){
+    if(kernel_bandwidth_mean_ctx(KERNEL_reg_extern,
+                             BANDWIDTH_den_extern,
+                             num_train,
+                             block_rows,
+                             0,
+                             0,
+                             0,
+                             num_reg_continuous_extern,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             0,
+                             vsfx,
+                             NULL,
+                             NULL,
+                             matrix_X_continuous_train_extern,
+                             matrix_X_continuous_eval_block,
+                             NULL,
+                             matrix_bandwidth_x,
+                             lambdax,
+                             nn_geometry_context,
+                             NULL,
+                             NULL) == 1)
+      goto cleanup_xweight_block;
+  }
+
+  if(lp_engine == NP_LP_ENGINE_GENERAL){
+    const int use_bernstein = (int_glp_bernstein_extern != 0);
+
+    if((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0))
+      goto cleanup_xweight_block;
+    if(!np_glp_cv_cache.ready ||
+       (np_glp_cv_cache.use_bernstein != use_bernstein) ||
+       (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
+       (np_glp_cv_cache.num_obs != num_train) ||
+       (np_glp_cv_cache.ncon != num_reg_continuous_extern) ||
+       (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous_train_extern)){
+      if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL,
+                                  num_train,
+                                  num_reg_continuous_extern,
+                                  matrix_X_continuous_train_extern))
+        goto cleanup_xweight_block;
+    }
+    if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL) ||
+       !np_glp_cv_cache_prepare_influence_basis())
+      goto cleanup_xweight_block;
+
+    /* Only the regression full-block fitting caller opts in. Objective
+     * consumers pass NULL and retain their existing rank policy and cost. */
+    if(design_support != NULL) {
+      if(design_support->n == 0)
+        np_lp_design_support_prepare(design_support, np_glp_cv_cache.basis,
+                                      num_train, np_glp_cv_cache.nterms);
+      else if(design_support->n != num_train ||
+              design_support->p != np_glp_cv_cache.nterms)
+        error("LP block design identity shape changed within an invocation");
+    }
+
+    if(!np_lp_solve_workspace_reserve(&solve_workspace,
+                                      np_glp_cv_cache.nterms,
+                                      1))
+      goto cleanup_xweight_block;
+
+    /*
+     * The shared conditional-row engine already qualifies this signed
+     * weighted-design algebra. Reuse it for full and delete-one consumers
+     * without changing the scalar solver or deletion contract.
+     */
+    if(np_apple_conditional_x_block_weighted_blas_profitable(
+         num_train,
+         np_glp_cv_cache.nterms,
+         np_glp_cv_cache.basis_stride)){
+      const size_t weighted_count =
+        (size_t)np_glp_cv_cache.basis_stride*
+        (size_t)np_glp_cv_cache.nterms;
+
+      weighted_design =
+        (double *)malloc(weighted_count*sizeof(double));
+      use_weighted_blas = (weighted_design != NULL);
+    }
+  }
+
+  for(i = 0; i < block_rows; i++){
+    const int eval_idx = eval_start + i;
+    int eval_pos = eval_idx;
+
+    if((int_TREE_X == NP_TREE_TRUE) && (ipt_lookup_extern_X != NULL))
+      eval_pos = ipt_lookup_extern_X[eval_idx];
+
+    memset(rows_out[i], 0, (size_t)num_train*sizeof(double));
+    for(l = 0; l < num_reg_unordered_extern; l++)
+      eval_xuno_one[l][0] = matrix_X_unordered_train_extern[l][eval_pos];
+    for(l = 0; l < num_reg_ordered_extern; l++)
+      eval_xord_one[l][0] = matrix_X_ordered_train_extern[l][eval_pos];
+    for(l = 0; l < num_reg_continuous_extern; l++){
+      eval_xcon_one[l][0] = matrix_X_continuous_train_extern[l][eval_pos];
+      matrix_bandwidth_eval_one[l][0] =
+        (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_x[l][i] : matrix_bandwidth_x[l][0];
+    }
+
+    np_conditional_push_bounds(int_cxker_bound_extern,
+                               vector_cxkerlb_extern,
+                               vector_cxkerub_extern,
+                               &bounds_state);
+    if(np_conditional_kernel_row_raw(kernel_cx,
+                                            kernel_ux,
+                                            kernel_ox,
+                                            x_operator,
+                                            BANDWIDTH_den_extern,
+                                            num_train,
+                                            num_reg_unordered_extern,
+                                            num_reg_ordered_extern,
+                                            num_reg_continuous_extern,
+                                            matrix_X_unordered_train_extern,
+                                            matrix_X_ordered_train_extern,
+                                            matrix_X_continuous_train_extern,
+                                            eval_xuno_one,
+                                            eval_xord_one,
+                                            eval_xcon_one,
+                                            vsfx,
+                                            1,
+                                            matrix_bandwidth_x,
+                                            matrix_bandwidth_eval_one,
+                                            lambdax,
+                                            num_categories_extern_X,
+                                            matrix_categorical_vals_extern_X,
+                                            int_TREE_X,
+                                            kdt_extern_X,
+                                            kw,
+                                            mean_row) != 0){
+      np_conditional_pop_bounds(&bounds_state);
+      goto cleanup_xweight_block;
+    }
+    np_conditional_pop_bounds(&bounds_state);
+
+    if(drop_eval_self && (lp_engine == NP_LP_ENGINE_SCALAR))
+      kw[eval_pos] = 0.0;
+
+    if(lp_engine == NP_LP_ENGINE_SCALAR){
+      double row_sum = 0.0;
+      for(j = 0; j < num_train; j++)
+        row_sum += kw[j];
+      if(!(fabs(row_sum) > DBL_MIN))
+        goto cleanup_xweight_block;
+      for(j = 0; j < num_train; j++){
+        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+        rows_out[i][orig_j] = kw[j]/row_sum;
+      }
+    } else {
+      if(np_conditional_deleted_influence(np_glp_cv_cache.basis, kw,
+           use_weighted_blas ? weighted_design : NULL, mean_row,
+           &solve_workspace, &deleted_qr, eval_pos, rows_out[i]))
+        goto cleanup_xweight_block;
+    }
+  }
+
+  status = 0;
+
+cleanup_xweight_block:
+  np_cqr_deleted_clear(&deleted_qr);
+  np_lp_solve_workspace_clear(&solve_workspace);
+  if(vsfx != NULL) free(vsfx);
+  if(lambdax != NULL) free(lambdax);
+  if(kw != NULL) free(kw);
+  if(mean_row != NULL) free(mean_row);
+  if(weighted_design != NULL) free(weighted_design);
+  if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
+  if(matrix_bandwidth_eval_one != NULL) free_tmat(matrix_bandwidth_eval_one);
+  if(eval_xuno_one != NULL) free_mat(eval_xuno_one, num_reg_unordered_extern);
+  if(eval_xord_one != NULL) free_mat(eval_xord_one, num_reg_ordered_extern);
+  if(eval_xcon_one != NULL) free_mat(eval_xcon_one, num_reg_continuous_extern);
+  if((!use_bwctx) && (matrix_X_continuous_eval_block != NULL)) free(matrix_X_continuous_eval_block);
+  if(kernel_cx != NULL) free(kernel_cx);
+  if(kernel_ux != NULL) free(kernel_ux);
+  if(kernel_ox != NULL) free(kernel_ox);
+  if(x_operator != NULL) free(x_operator);
+  return status;
+}
+
 static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor,
                                                      int eval_start,
                                                      int block_rows,
                                                      double **rows_out){
-  return np_conditional_x_weight_block_stream_core_impl(vector_scale_factor,
+  return np_conditional_deleted_block(vector_scale_factor,
                                                         eval_start,
                                                         block_rows,
                                                         1,
@@ -41628,7 +42285,7 @@ static int np_conditional_x_weight_block_stream_core_ctx(
   int block_rows,
   const NPNNGeometryContext *nn_geometry_context,
   double **rows_out){
-  return np_conditional_x_weight_block_stream_core_impl(
+  return np_conditional_deleted_block(
     vector_scale_factor, eval_start, block_rows, 1, NULL,
     nn_geometry_context, rows_out, NULL);
 }
@@ -41850,6 +42507,9 @@ typedef struct {
   double **basis_original_order;
   int basis_original_stride;
   double *hdiag_original_order;
+  NPConditionalQRGlobal *stable;
+  NPConditionalQRGlobal *stable_original;
+  double *stable_quadratic;
 } NPConditionalLpAllLargeCtx;
 
 static void np_conditional_lp_all_large_ctx_clear(NPConditionalLpAllLargeCtx *ctx){
@@ -41860,6 +42520,9 @@ static void np_conditional_lp_all_large_ctx_clear(NPConditionalLpAllLargeCtx *ct
   if(ctx->hdiag != NULL) free(ctx->hdiag);
   np_lp_full_row_workspace_clear(&ctx->inverse_original_workspace);
   if(ctx->hdiag_original_order != NULL) free(ctx->hdiag_original_order);
+  if(ctx->stable) { np_cqr_clear(ctx->stable); free(ctx->stable); }
+  if(ctx->stable_original) { np_cqr_clear(ctx->stable_original); free(ctx->stable_original); }
+  free(ctx->stable_quadratic);
   memset(ctx, 0, sizeof(*ctx));
 }
 
@@ -42130,6 +42793,20 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
 finalize_all_large_context:
   ctx->use_apple_dgemv =
     np_apple_glp_dgemv_profitable(ctx->num_train, ctx->nterms);
+  /* Preserve the incumbent full-design admission above, including scalar
+     and tree/original-order branches. New arithmetic owns only admitted LP. */
+  if(ctx->nterms > 1) {
+    ctx->stable=calloc(1,sizeof(*ctx->stable));
+    if(!ctx->stable || np_cqr_prepare(ctx->stable,ctx->num_train,ctx->nterms,
+                                    ctx->basis,ctx->use_apple_dgemv))
+      goto cleanup_all_large_prepare;
+    if(ctx->basis_original_order) {
+      ctx->stable_original=calloc(1,sizeof(*ctx->stable_original));
+      if(!ctx->stable_original || np_cqr_prepare(ctx->stable_original,
+           ctx->num_train,ctx->nterms,ctx->basis_original_order,ctx->use_apple_dgemv))
+        goto cleanup_all_large_prepare;
+    }
+  }
   ctx->ready = 1;
   status = 0;
 
@@ -42215,6 +42892,14 @@ static int np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeCtx 
                                                double *beta,
                                                const int leave_one_out,
                                                double *fit_out){
+  if(ctx->stable) {
+    NPConditionalQRGlobal *g=ctx->stable;
+    if(!g || np_cqr_cross(g,rhs_row,cross_terms)) return 1;
+    if(leave_one_out) return np_cqr_linear(g,eval_pos,rhs_row,cross_terms,fit_out);
+    *fit_out=np_cqr_dot4(g->q+eval_pos,g->n,cross_terms,1,g->k);
+    return !isfinite(*fit_out);
+  }
+
   if(!ctx->use_apple_dgemv)
     return np_conditional_lp_all_large_row_fit_basis(ctx,
                                                      ctx->inverse_workspace.matrix_copy,
@@ -42257,6 +42942,14 @@ static int np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLar
                                                      double *beta,
                                                      const int leave_one_out,
                                                      double *fit_out){
+  if(ctx->stable) {
+    NPConditionalQRGlobal *g=(basis==ctx->basis) ? ctx->stable : ctx->stable_original;
+    if(!g || np_cqr_cross(g,rhs_row,cross_terms)) return 1;
+    if(leave_one_out) return np_cqr_linear(g,eval_pos,rhs_row,cross_terms,fit_out);
+    *fit_out=np_cqr_dot4(g->q+eval_pos,g->n,cross_terms,1,g->k);
+    return !isfinite(*fit_out);
+  }
+
   int a;
 
   for(a = 0; a < ctx->nterms; a++)
@@ -42286,6 +42979,14 @@ static int np_conditional_lp_all_large_row_fit_basis_dgemv(
   double *beta,
   const int leave_one_out,
   double *fit_out){
+  if(ctx->stable) {
+    NPConditionalQRGlobal *g=(basis==ctx->basis) ? ctx->stable : ctx->stable_original;
+    if(!g || np_cqr_cross(g,rhs_row,cross_terms)) return 1;
+    if(leave_one_out) return np_cqr_linear(g,eval_pos,rhs_row,cross_terms,fit_out);
+    *fit_out=np_cqr_dot4(g->q+eval_pos,g->n,cross_terms,1,g->k);
+    return !isfinite(*fit_out);
+  }
+
   /*
    * Contiguous-basis sibling only.  Keep the established DDOT and primary
    * cached-basis routes unchanged so tree-CVML activation has no adjacent
@@ -42411,11 +43112,70 @@ static int np_conditional_lp_all_large_moment_dgemv(
   return 0;
 }
 
+/* Exclusive conditional all-large adapters. No local X weights are built. */
+typedef struct {
+  const NPConditionalLpAllLargeCtx *ctx;
+  double *scale;
+  double *scratch;
+  int suppress_parallel;
+} NPConditionalLpGlobalResponse;
+
+static int np_conditional_lp_global_convolution(void *opaque, int j, double *row) {
+  NPConditionalLpGlobalResponse *s=opaque;
+  const int original=s->ctx->use_x_tree_order ? ipt_extern_X[j] : j;
+  if(np_conditional_y_row_stream_op_core(s->scale,original,OP_CONVOLUTION,s->scratch)) return 1;
+  for(int i=0;i<s->ctx->num_train;i++)
+    row[i]=s->scratch[s->ctx->use_x_tree_order ? ipt_extern_X[i] : i];
+  return 0;
+}
+
+static int np_conditional_lp_global_integral(void *opaque, int j, double *row) {
+  NPConditionalLpGlobalResponse *s=opaque;
+  if((j & 15)==0) np_progress_bandwidth_loop_step();
+  if(np_conditional_y_eval_row_stream_op_core(s->scale,j,OP_INTEGRAL,
+       matrix_Y_unordered_eval_extern,matrix_Y_ordered_eval_extern,
+       matrix_Y_continuous_eval_extern,num_obs_eval_extern,
+       cdfontrain_extern && num_obs_eval_extern==s->ctx->num_train,
+        s->scratch)) return 1;
+  for(int i=0;i<s->ctx->num_train;i++)
+    row[i]=s->scratch[s->ctx->use_x_tree_order ? ipt_extern_X[i] : i];
+  return 0;
+}
+
+static int np_conditional_lp_global_indicator(void *opaque,int i,int j) {
+  NPConditionalLpGlobalResponse *s=opaque;
+  const int original=s->ctx->use_x_tree_order ? ipt_extern_X[i] : i;
+  if(cdfontrain_extern && original==j) return -1;
+  return np_conditional_indicator_original_order(original,j);
+}
+
+static int np_conditional_lp_global_grid(NPConditionalLpAllLargeCtx *ctx,
+     double *scale,int start,int count,int suppress_parallel,double *loss) {
+  if(ctx->use_x_tree_order && (!ipt_extern_X || !ipt_lookup_extern_X)) return 1;
+  double *scratch=calloc(ctx->num_train,sizeof(double));
+  if(!scratch) return 1;
+  NPConditionalLpGlobalResponse s={ctx,scale,scratch,suppress_parallel};
+  int status=np_cqr_grid_loss(ctx->stable,np_conditional_lp_global_integral,
+       np_conditional_lp_global_indicator,&s,start,count,loss,0,NULL);
+  free(scratch);return status;
+}
+
 static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_factor,
-                                                       const NPConditionalLpAllLargeCtx *ctx,
+                                                       NPConditionalLpAllLargeCtx *ctx,
                                                        double *quad_mat,
                                                        double *conv_cross,
                                                        double *conv_diag){
+  if(ctx && ctx->stable) {
+    if(ctx->use_x_tree_order && (!ipt_extern_X || !ipt_lookup_extern_X)) return 1;
+    double *scratch=calloc(ctx->num_train,sizeof(double));
+    ctx->stable_quadratic=calloc(ctx->num_train,sizeof(double));
+    if(!scratch || !ctx->stable_quadratic) { free(scratch); return 1; }
+    NPConditionalLpGlobalResponse response={ctx,vector_scale_factor,scratch,0};
+    int result=np_cqr_quadratic(ctx->stable,np_conditional_lp_global_convolution,
+                  &response,ctx->stable_quadratic,0,NULL);
+    free(scratch);return result;
+  }
+
   double *moment = NULL, *temp = NULL;
   double *yconv = NULL, *yconv_xorder = NULL, *cross_terms = NULL;
   int a, b, c;
@@ -42653,7 +43413,8 @@ static int np_conditional_density_cvls_lp_all_large_stream(double *vector_scale_
     if(np_conditional_lp_all_large_row_fit(
          &ctx, rhs_row, eval_pos, cross_terms, beta, 1, &lin) != 0)
       goto cleanup_cvls_all_large;
-    {
+    if(ctx.stable) quad=ctx.stable_quadratic[eval_pos];
+    else {
       double den;
       const double h = ctx.hdiag[eval_pos];
       const double quad_full =
@@ -42710,6 +43471,18 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
   cv_accumulator = 0.0;
   *cv = 0.0;
   cv_started = 1;
+  if(ctx.stable) {
+    double *loss=calloc(MAX(1,num_eval),sizeof(double));
+    if(!loss) goto cleanup_cdist_all_large;
+    int failed=np_conditional_lp_global_grid(&ctx,vector_scale_factor,0,num_eval,0,loss);
+    if(!failed) {
+      for(int j=0;j<num_eval;j++) cv_accumulator+=loss[j];
+      failed=np_distribution_cvls_finalize(cv_accumulator,ctx.num_train,num_eval,
+                 cdfontrain_extern,&cv_accumulator)!=NP_DISTRIBUTION_CVLS_FINALIZE_OK;
+    }
+    free(loss);status=failed;
+    goto cleanup_cdist_all_large;
+  }
   for(j = 0; j < num_eval; j++){
     if(np_conditional_y_eval_row_stream_op_core(vector_scale_factor,
                                                 j,
@@ -43479,6 +44252,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   const NPNNGeometryContext * const nn_geometry_context =
     np_conditional_gnn_deleted_geometry(BANDWIDTH_den_extern);
   NPConditionalXRowCtx xctx = {0};
+  NPConditionalQRDeleted deleted_qr = {0};
   NPConditionalYRowCtx yctx = {0};
   double *xrow = NULL, *yrow = NULL;
   int i, j;
@@ -43524,7 +44298,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
     double fit = 0.0;
 
     if(use_row_ctx){
-      if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
+      if(np_conditional_deleted_from_ctx(&xctx, &deleted_qr, i, xrow) != 0)
         goto cleanup_cvml_lp_stream;
       if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
         goto cleanup_cvml_lp_stream;
@@ -43544,6 +44318,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   status = 0;
 
 cleanup_cvml_lp_stream:
+  np_cqr_deleted_clear(&deleted_qr);
   np_conditional_xrow_ctx_clear(&xctx);
   np_conditional_yrow_ctx_clear(&yctx);
   np_glp_cv_clear_extern();
@@ -43637,6 +44412,7 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
   const int use_row_ctx = (BANDWIDTH_den_extern == BW_ADAP_NN);
   double *xrow = NULL, *yrow = NULL, *yconv = NULL;
   NPConditionalXRowCtx xctx = {0};
+  NPConditionalQRDeleted deleted_qr = {0};
   NPConditionalYRowCtx yctx = {0}, yconvctx = {0};
   int i, j, k;
   int status = 1;
@@ -43680,7 +44456,7 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
                                &y_log_scale) != 0)
         goto cleanup_cvls_lp_stream;
     } else if(use_row_ctx){
-      if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
+      if(np_conditional_deleted_from_ctx(&xctx, &deleted_qr, i, xrow) != 0)
         goto cleanup_cvls_lp_stream;
       if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
         goto cleanup_cvls_lp_stream;
@@ -43730,6 +44506,7 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
   status = 0;
 
 cleanup_cvls_lp_stream:
+  np_cqr_deleted_clear(&deleted_qr);
   np_conditional_xrow_ctx_clear(&xctx);
   np_conditional_yrow_ctx_clear(&yctx);
   np_conditional_yrow_ctx_clear(&yconvctx);
@@ -44260,7 +45037,7 @@ np_conditional_density_cvls_lp_supertile2_stream(
                                                  block_rows[g],
                                                  &xbwctx) != 0)
           goto cleanup_cvls_lp_supertile2;
-        if(np_conditional_x_weight_block_stream_core_impl(
+        if(np_conditional_deleted_block(
              vector_scale_factor,
              block_start[g],
              block_rows[g],
@@ -44509,7 +45286,7 @@ static int np_conditional_density_cvls_lp_stream_impl(
        (num_reg_continuous_extern > 0)){
       if(np_conditional_x_block_bw_ctx_prepare(vector_scale_factor, i0, ib, &xbwctx) != 0)
         goto cleanup_cvls_lp_block;
-      if(np_conditional_x_weight_block_stream_core_impl(
+      if(np_conditional_deleted_block(
            vector_scale_factor,
            i0,
            ib,
@@ -45584,6 +46361,7 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
   const int use_xrow_ctx = (BANDWIDTH_den_extern == BW_ADAP_NN);
   double *xrow = NULL, *yint = NULL;
   NPConditionalXRowCtx xctx = {0};
+  NPConditionalQRDeleted deleted_qr = {0};
   NPConditionalYRowCtx yintctx = {0};
   int i, j;
   int status = 1;
@@ -45616,7 +46394,7 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
   *cv = 0.0;
   for(i = 0; i < num_train; i++){
     if(use_xrow_ctx){
-      if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
+      if(np_conditional_deleted_from_ctx(&xctx, &deleted_qr, i, xrow) != 0)
         goto cleanup_cdist_lp_stream;
     } else {
       if(np_conditional_x_weight_row_stream_core(vector_scale_factor, i, xrow) != 0)
@@ -45669,6 +46447,7 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
   status = 0;
 
 cleanup_cdist_lp_stream:
+  np_cqr_deleted_clear(&deleted_qr);
   np_conditional_xrow_ctx_clear(&xctx);
   np_conditional_yrow_ctx_clear(&yintctx);
   if(xrow != NULL) free(xrow);
@@ -53608,6 +54387,7 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
   NPConditionalRouteRowContext route_x;
   NPConditionalRouteRowContext route_y;
   NPConditionalXRowCtx legacy_x = {0};
+  NPConditionalQRDeleted deleted_qr = {0};
   NPConditionalYRowCtx legacy_y = {0};
   NPReghatLPWorkspace lp_workspace;
   double *xrow = NULL;
@@ -53753,8 +54533,7 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
     } else if((BANDWIDTH_den == BW_ADAP_NN &&
                np_conditional_xrow_ctx_select_adaptive_fold(
                  &legacy_x, evaluation) != 0) ||
-              np_conditional_xrow_from_ctx(
-                &legacy_x, evaluation, xrow) != 0) {
+              np_conditional_deleted_from_ctx(&legacy_x, &deleted_qr, evaluation, xrow) != 0) {
       goto cleanup_route;
     }
 
@@ -53800,6 +54579,7 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
 cleanup_route:
   np_conditional_route_row_context_clear(&route_y);
   np_conditional_route_row_context_clear(&route_x);
+  np_cqr_deleted_clear(&deleted_qr);
   np_conditional_xrow_ctx_clear(&legacy_x);
   np_conditional_yrow_ctx_clear(&legacy_y);
   np_reghat_lp_workspace_clear(&lp_workspace);
@@ -53828,6 +54608,7 @@ typedef struct {
   NPConditionalRouteRowContext route_x;
   NPConditionalRouteRowContext route_y;
   NPConditionalXRowCtx legacy_x;
+  NPConditionalQRDeleted deleted_qr;
   NPConditionalYRowCtx legacy_y;
   NPConditionalYRowCtx legacy_y_convolution;
   NPReghatLPWorkspace lp_workspace;
@@ -53878,6 +54659,7 @@ static void np_conditional_cvls_route_context_clear(
   np_conditional_cvls_fold_grid_clear(context);
   np_conditional_route_row_context_clear(&context->route_y);
   np_conditional_route_row_context_clear(&context->route_x);
+  np_cqr_deleted_clear(&context->deleted_qr);
   np_conditional_xrow_ctx_clear(&context->legacy_x);
   np_conditional_yrow_ctx_clear(&context->legacy_y);
   np_conditional_yrow_ctx_clear(&context->legacy_y_convolution);
@@ -54078,8 +54860,8 @@ static int np_conditional_cvls_provider_x_row(
       return 1;
   }
   if(!context->beta_x)
-    return np_conditional_xrow_from_ctx(
-      &context->legacy_x, evaluation, row);
+    return np_conditional_deleted_from_ctx(
+      &context->legacy_x, &context->deleted_qr, evaluation, row);
 
   if(np_beta_scaled_row_context_fill(
        &context->route_x.scaled_row, evaluation, NULL, NULL) !=

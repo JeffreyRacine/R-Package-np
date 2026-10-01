@@ -91,7 +91,8 @@ test_that('conditional GNN local moments preserve small within-cluster distances
 })
 
 test_that('conditional GNN prefix uses the literal whole-support criterion', {
-  old <- options(np.messages=FALSE,np.largeh=TRUE,np.largelambda=TRUE)
+  old <- options(np.messages=FALSE,np.largeh=TRUE,np.largelambda=TRUE,
+                 np.tree=FALSE,np.macMseries.accelerate=FALSE)
   on.exit(options(old),add=TRUE)
   # MPI_SETUP
   d <- cgnn_fixture()
@@ -118,7 +119,7 @@ test_that('conditional GNN prefix uses the literal whole-support criterion', {
 })
 
 test_that('conditional GNN higher-order prefixes retain the literal criterion', {
-  old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  old <- options(np.messages=FALSE,np.tree=FALSE);on.exit(options(old),add=TRUE)
   # MPI_SETUP
   d <- cgnn_fixture();x <- data.frame(x=d$x)
   expected <- cgnn_literal(d$x,d$y,8L,3L,2L,xorder=8L)['score']
@@ -186,7 +187,7 @@ test_that('conditional GNN prefix tree admission cannot leak into other routes',
 })
 
 test_that('conditional GNN compact responses integrate the literal deleted criterion', {
-  old<-options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  old<-options(np.messages=FALSE,np.tree=FALSE);on.exit(options(old),add=TRUE)
   # MPI_SETUP
   d<-cgnn_fixture();x<-data.frame(x=d$x)
   for(yorder in c(2L,4L,6L,8L,0L))for(xorder in c(2L,4L,6L,8L,0L)){
@@ -214,7 +215,7 @@ test_that('conditional GNN compact responses integrate the literal deleted crite
 })
 
 test_that('conditional GNN prefix preserves ties and extended-count geometry', {
-  old<-options(np.messages=FALSE,np.extendednn=TRUE);on.exit(options(old),add=TRUE)
+  old<-options(np.messages=FALSE,np.extendednn=TRUE,np.tree=FALSE);on.exit(options(old),add=TRUE)
   # MPI_SETUP
   ns<-asNamespace('np');ev<-get('.npcdensbw_eval_only',ns)
   for(tied in c(FALSE,TRUE)){
@@ -233,7 +234,8 @@ test_that('conditional GNN prefix preserves ties and extended-count geometry', {
 })
 
 test_that('conditional GNN uniform prefixes preserve strict support and deletion', {
-  old<-options(np.messages=FALSE,np.extendednn=TRUE);on.exit(options(old),add=TRUE)
+  old<-options(np.messages=FALSE,np.extendednn=TRUE,np.tree=FALSE,
+               np.macMseries.accelerate=FALSE);on.exit(options(old),add=TRUE)
   # MPI_SETUP
   ns<-asNamespace('np')
   probe<-function(x,y,b,tree,acc){
@@ -303,7 +305,7 @@ test_that('conditional GNN prepared degree changes keep the canonical owner', {
 })
 
 test_that('conditional GNN Gaussian response orders share the literal integral', {
-  old<-options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  old<-options(np.messages=FALSE,np.tree=FALSE);on.exit(options(old),add=TRUE)
   # MPI_SETUP
   d<-cgnn_fixture();x<-data.frame(x=d$x)
   for(yorder in c(4L,6L,8L))for(xorder in c(2L,4L,6L,8L,0L)){

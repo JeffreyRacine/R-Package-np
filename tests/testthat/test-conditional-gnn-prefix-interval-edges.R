@@ -1,5 +1,5 @@
 test_that('conditional GNN prefix retains finite response interval edges', {
-  old <- options(np.messages=FALSE, np.macMseries.accelerate=FALSE)
+  old <- options(np.messages=FALSE, np.macMseries.accelerate=FALSE, np.tree=FALSE)
   on.exit(options(old), add=TRUE)
   x <- data.frame(x=c(-.83,.66,-.21,.32,-.49,.93,.09))
   # Minimal regression fixtures, not claims about practical incidence. Targets

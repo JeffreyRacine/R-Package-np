@@ -5605,7 +5605,7 @@
 
 .np_con_make_kbandwidth_x <- function(bws, xdat) {
   xdat <- toFrame(xdat)
-  kbandwidth.numeric(
+  .npcdhat_retained_kbandwidth(
     bw = .npcdhat_physical_bandwidth(bws, "x"),
     bwscaling = FALSE,
     # npksum helper constructors require raw bandwidths; bwscaling flags are
@@ -5638,7 +5638,7 @@
     "fixed"
   }
 
-  kbandwidth.numeric(
+  .npcdhat_retained_kbandwidth(
     bw = c(.npcdhat_physical_bandwidth(bws, "x"),
            .npcdhat_physical_bandwidth(bws, "y")),
     bwscaling = FALSE,

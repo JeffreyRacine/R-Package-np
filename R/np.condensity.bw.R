@@ -2101,8 +2101,9 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
         nomad.num.feval.guarded.total <<- nomad.num.feval.guarded.total + out[[4L]]
         out[[1L]]
       }
-      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn") ||
-                                      identical(template$method, "cv.ml")) 2L else 1L
+      # Conditional NN objectives use the deleted-sample ordinary domain for
+      # both X and Y; GNN CVLS now shares the n-2 cap with CVML and ANN.
+      ordinary.cap <- setup$nobs - 2L
       recovery <- .np_nn_find_raw_valid_start(
         point = native.results[[incumbent.index]]$best_point,
         nn.indices = seq_along(setup$cont_flat),
@@ -2823,8 +2824,8 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
         native.num.feval.guarded.total <<- native.num.feval.guarded.total + out[[4L]]
         out[[1L]]
       }
-      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn") ||
-                                      identical(template$method, "cv.ml")) 2L else 1L
+      # Keep automatic recovery inside the same deleted-sample native domain.
+      ordinary.cap <- setup$nobs - 2L
       recovery <- .np_nn_find_raw_valid_start(
         point = native.results[[incumbent.index]]$best_point,
         nn.indices = seq_along(setup$cont_flat),

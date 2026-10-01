@@ -1151,6 +1151,14 @@
   mean(durations) * total
 }
 
+.np_progress_bandwidth_starts_complete <- function(state) {
+  total <- state$bandwidth_nmulti_total
+  if (.np_progress_bandwidth_coordinator_active(state)) {
+    total <- state$bandwidth_coordinator_offset + state$bandwidth_coordinator_local_total
+  }
+  isTRUE(total > 1L && state$bandwidth_multistart_completed >= total)
+}
+
 .np_progress_bandwidth_format_iteration <- function(state, done = NULL, now = .np_progress_now()) {
   elapsed <- max(0, now - state$started)
   total <- suppressWarnings(as.integer(state$bandwidth_nmulti_total)[1L])
@@ -1171,6 +1179,10 @@
     fields <- c(fields, sprintf("multistart %s/%s", format(current), format(total)))
   }
 
+  if (.np_progress_bandwidth_starts_complete(state)) {
+    fields <- c(fields, "starts complete; finishing")
+  }
+
   if (!is.null(done)) {
     fields <- c(fields, sprintf("iteration %s", format(done)))
   }
@@ -1185,26 +1197,30 @@
   )
 }
 
-.np_progress_bandwidth_format_estimate <- function(state, now = .np_progress_now()) {
+.np_progress_bandwidth_format_estimate <- function(state, now = .np_progress_now(), finished = FALSE) {
   elapsed <- max(0, now - state$started)
   total <- suppressWarnings(as.integer(state$bandwidth_nmulti_total)[1L])
   completed <- suppressWarnings(as.integer(state$bandwidth_multistart_completed)[1L])
   current <- suppressWarnings(as.integer(state$bandwidth_multistart_current)[1L])
-  if (is.na(total) || total < 1L || completed < 1L) {
+  ## Native NN searches can still validate/recover/refine after their final
+  ## requested start. Only the enclosing successful return means 100% done.
+  if (is.na(total) || total < 1L || completed < 1L ||
+      (!isTRUE(finished) && .np_progress_bandwidth_starts_complete(state))) {
     return(.np_progress_bandwidth_format_iteration(state = state, done = state$last_done, now = now))
   }
 
   est.total <- .np_progress_bandwidth_estimated_total_time(state)
   base.share <- 100 * completed / total
   pct <- base.share
-  eta <- 0
+  eta <- if (isTRUE(finished)) "0.0s" else "estimating"
 
   if (is.finite(est.total) && !is.na(est.total) && est.total > 0) {
     pct.calc <- 100 * elapsed / est.total
     pct.upper <- if (completed < total) 99.9 else 100.0
     pct <- max(base.share, min(pct.upper, pct.calc))
     if (completed < total) {
-      eta <- max(0, est.total - elapsed)
+      remaining <- .np_progress_fmt_num(max(0, est.total - elapsed))
+      if (!identical(remaining, "0.0")) eta <- paste0(remaining, "s")
     }
   }
 
@@ -1232,7 +1248,7 @@
     fields,
     sprintf("%s%%", .np_progress_fmt_num(pct)),
     sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)),
-    sprintf("eta %ss", .np_progress_fmt_num(eta))
+    sprintf("eta %s", eta)
   )
 
   sprintf(
@@ -1504,7 +1520,7 @@
         state$bandwidth_multistart_current <- total
       }
       state$bandwidth_mode <- "complete_estimate"
-      line <- .np_progress_bandwidth_format_estimate(state = state, now = now)
+      line <- .np_progress_bandwidth_format_estimate(state = state, now = now, finished = TRUE)
       if (isTRUE(must_clear) || !identical(line, state$last_line)) {
         state <- .np_progress_render(
           state = state,
@@ -2207,6 +2223,7 @@
 
 .np_progress_select_bandwidth <- function(label, expr) {
   starting <- !.np_progress_bandwidth_active()
+  succeeded <- FALSE
   if (starting) {
     .np_progress_runtime$bandwidth_old_messages <- getOption("np.messages", TRUE)
     .np_progress_runtime$force_enabled <- isTRUE(.np_progress_runtime$bandwidth_old_messages)
@@ -2241,13 +2258,19 @@
       as.integer(.np_progress_runtime$bandwidth_depth) - 1L
     )
     if (starting) {
-      .np_progress_bandwidth_finish()
+      if (succeeded) {
+        .np_progress_bandwidth_finish()
+      } else {
+        .np_progress_abort(.np_progress_runtime$bandwidth_state)
+      }
       options(np.messages = .np_progress_runtime$bandwidth_old_messages)
       .np_progress_bandwidth_clear()
     }
   }, add = TRUE)
 
-  force(expr)
+  value <- withVisible(force(expr))
+  succeeded <- TRUE
+  if (value$visible) value$value else invisible(value$value)
 }
 
 .np_progress_select_bandwidth_enhanced <- function(label, expr) {
