@@ -10,6 +10,11 @@
   no longer displayed prematurely; failed searches clear the existing progress
   line without reporting success. Fit/evaluation heartbeat behavior is unchanged.
 
+* Nearest-neighbor bandwidth searches now identify an infeasible-bandwidth
+  recovery attempt explicitly in the existing progress display, separately
+  from refinement. Completed starts with remaining search work are labelled
+  as continuing search.
+
 * Fixed-bandwidth conditional local-polynomial cross-validation now assesses
   rank after deleting the held-out observation, retains the existing ridge rule
   when required, and uses stable QR for unregularized deleted designs. Ordinary
