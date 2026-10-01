@@ -1,6 +1,6 @@
 # Heavy MPI delete-one oracle; each explicit selector runs in its own bounded pool.
 npRmpi_test_gnn_deleted_query_count <- function(trees, kernels) {
-  old <- options(np.messages=FALSE, np.extendednn=TRUE)
+  old <- options(np.messages=FALSE, np.extendednn=TRUE, np.tree=FALSE)
   on.exit(options(old), add=TRUE)
   x <- data.frame(x=c(.03,.09,.18,.29,.43,.57,.71,.84,.97))
   y <- .15+.55*x$x+.1*sin(14*x$x)
@@ -28,10 +28,7 @@ npRmpi_test_gnn_deleted_query_count <- function(trees, kernels) {
         expect_equal(as.numeric(.npregbw_eval_only(x,y,rb,
           invalid.penalty="dbmax")$objective), mean((y-pred)^2),
           tolerance=2e-12, info=paste(info,rt))
-        # Generic beta/extended MPI hats require the separate H adapter.
-        # Keep their literal oracle in the campaign dependency probe.
-        if (kernel != "beta" && k <= n-1L)
-          expect_equal(as.numeric(npreghat(rb, txdat=x, y=y, output="apply",
+        expect_equal(as.numeric(npreghat(rb, txdat=x, y=y, output="apply",
           leave.one.out=TRUE)), pred, tolerance=2e-12, info=paste(info,rt))
       }
       cb <- do.call(npcdensbw, c(list(xdat=x, ydat=yd, bws=c(k,k),
@@ -52,8 +49,7 @@ npRmpi_test_gnn_deleted_query_count <- function(trees, kernels) {
           invalid.penalty="dbmax")$objective), .Machine$double.xmax)
         expect_identical(as.numeric(.npcdensbw_eval_only(x,yd,cb,
           invalid.penalty="dbmax")$objective), -.Machine$double.xmax)
-        if (kernel != "beta")
-          expect_error(npreghat(rb,txdat=x,y=y,output="apply",leave.one.out=TRUE))
+        expect_error(npreghat(rb,txdat=x,y=y,output="apply",leave.one.out=TRUE))
         options(np.extendednn=TRUE)
       }
     }

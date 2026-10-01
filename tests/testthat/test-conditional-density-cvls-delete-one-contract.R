@@ -86,6 +86,9 @@ conditional_cvls_gaussian_response_matrices <- function(data, bws, bwtype) {
 }
 
 conditional_cvls_delete_one_oracle <- function(xdat, ydat, bw) {
+  # GNN response radii depend on the integration query after deletion;
+  # a training-radius convolution is not its CVLS criterion.
+  stopifnot(!identical(bw$type, "generalized_nn"))
   n <- nrow(xdat)
   basis <- npRmpi:::W.lp(
     xdat = xdat,
@@ -228,7 +231,7 @@ test_that("conditional LP CVLS matches independent delete-one WLS", {
          bws = c(0.26, 0.29, 0.32)),
     list(type = "generalized_nn", kernel = "gaussian", order = 8L,
          degree = c(2L, 2L), bernstein = FALSE,
-         bws = c(21L, 24L, 25L))
+         bws = c(21L, 24L, 25L), oracle = 0.94383362371376034)
   )
 
   for (case in cases) {
@@ -248,7 +251,10 @@ test_that("conditional LP CVLS matches independent delete-one WLS", {
       cykerorder = 2L
     )
     native <- npRmpi:::.npcdensbw_eval_only(xdat, ydat, bw)$objective
-    oracle <- conditional_cvls_delete_one_oracle(xdat, ydat, bw)
+    # The GNN entry is independent deleted-WLS / whole-line quadrature,
+    # not a package transcript; see fixtures/cgnn-cvls-reference.md.
+    oracle <- if (identical(case$type, "generalized_nn")) case$oracle else
+      conditional_cvls_delete_one_oracle(xdat, ydat, bw)
 
     expect_equal(
       as.numeric(native), oracle, tolerance = 2e-8,

@@ -84,11 +84,12 @@ test_that('conditional GNN local moments preserve small within-cluster distances
     b <- npcdensbw(xdat=data.frame(x=x),ydat=y,bws=c(3,2),
       bwtype='generalized_nn',bwmethod='cv.ls',regtype='lc',
       cxkertype='epanechnikov',cykertype='uniform',bandwidth.compute=FALSE)
-    command <- substitute({
-      options(np.tree=TREE,np.messages=FALSE)
+    command <- substitute(local({
+      old.worker <- options(np.tree=TREE,np.messages=FALSE)
+      on.exit(options(old.worker),add=TRUE)
       get('.npcdensbw_eval_only',asNamespace('npRmpi'))(
         data.frame(x=X),Y,B,invalid.penalty='dbmax',force.local=FALSE)
-    },list(TREE=tree,X=x,Y=y,B=b))
+    }),list(TREE=tree,X=x,Y=y,B=b))
     observed <- get('.npRmpi_bcast_cmd_expr',asNamespace('npRmpi'))(
       command,comm=1L,caller.execute=TRUE)$objective
     expect_lte(abs(observed-expected),1e-9)
@@ -96,7 +97,8 @@ test_that('conditional GNN local moments preserve small within-cluster distances
 })
 
 test_that('conditional GNN prefix uses the literal whole-support criterion', {
-  old <- options(np.messages=FALSE,np.largeh=TRUE,np.largelambda=TRUE)
+  old <- options(np.messages=FALSE,np.largeh=TRUE,np.largelambda=TRUE,
+                 np.tree=FALSE,np.macMseries.accelerate=FALSE)
   on.exit(options(old),add=TRUE)
   skip_if_not(spawn_mpi_slaves(1L), "MPI session unavailable")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
@@ -116,10 +118,11 @@ test_that('conditional GNN prefix uses the literal whole-support criterion', {
         bwtype='generalized_nn',bwmethod='cv.ls',cxkertype='epanechnikov',
         cykertype='gaussian',bandwidth.compute=FALSE),ctl))
       # MPI_EVAL
-      command <- substitute({
-        options(np.tree=TREE,np.macMseries.accelerate=ACC,np.messages=FALSE)
+      command <- substitute(local({
+        old.worker <- options(np.tree=TREE,np.macMseries.accelerate=ACC,np.messages=FALSE)
+        on.exit(options(old.worker),add=TRUE)
         get('.npcdensbw_eval_only',asNamespace('npRmpi'))(X,Y,B,invalid.penalty='dbmax',force.local=FALSE)
-      },list(TREE=tree,ACC=bernstein,X=x,Y=y,B=b))
+      }),list(TREE=tree,ACC=bernstein,X=x,Y=y,B=b))
       observed <- get('.npRmpi_bcast_cmd_expr',asNamespace('npRmpi'))(command,comm=1L,caller.execute=TRUE)$objective
       expect_lte(abs(observed-ref[[degree+1L]]['score']/2),1e-9)
       expect_true(is.finite(observed))
@@ -128,7 +131,7 @@ test_that('conditional GNN prefix uses the literal whole-support criterion', {
 })
 
 test_that('conditional GNN higher-order prefixes retain the literal criterion', {
-  old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  old <- options(np.messages=FALSE,np.tree=FALSE);on.exit(options(old),add=TRUE)
   skip_if_not(spawn_mpi_slaves(1L), "MPI session unavailable")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   d <- cgnn_fixture();x <- data.frame(x=d$x)
@@ -139,11 +142,12 @@ test_that('conditional GNN higher-order prefixes retain the literal criterion', 
       bwmethod='cv.ls',regtype='lp',degree=2L,bernstein.basis=TRUE,
       cxkertype='epanechnikov',cxkerorder=8L,cykertype='gaussian',
       bandwidth.compute=FALSE)
-    command <- substitute({
-      options(np.tree=TREE,np.messages=FALSE)
+    command <- substitute(local({
+      old.worker <- options(np.tree=TREE,np.messages=FALSE)
+      on.exit(options(old.worker),add=TRUE)
       get('.npcdensbw_eval_only',asNamespace('npRmpi'))(X,Y,B,
         invalid.penalty='dbmax',force.local=FALSE)
-    },list(TREE=tree,X=x,Y=d$y,B=b))
+    }),list(TREE=tree,X=x,Y=d$y,B=b))
     observed <- get('.npRmpi_bcast_cmd_expr',asNamespace('npRmpi'))(
       command,comm=1L,caller.execute=TRUE)$objective
     expect_lte(abs(observed-expected),1e-9)
@@ -202,7 +206,7 @@ test_that('conditional GNN prefix tree admission cannot leak into other routes',
 })
 
 test_that('conditional GNN prefix preserves ties and extended-count geometry', {
-  old<-options(np.messages=FALSE,np.extendednn=TRUE);on.exit(options(old),add=TRUE)
+  old<-options(np.messages=FALSE,np.extendednn=TRUE,np.tree=FALSE);on.exit(options(old),add=TRUE)
   skip_if_not(spawn_mpi_slaves(1L), "MPI session unavailable")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   ns<-asNamespace('npRmpi');ev<-get('.npcdensbw_eval_only',ns)
@@ -222,12 +226,14 @@ test_that('conditional GNN prefix preserves ties and extended-count geometry', {
 })
 
 test_that('conditional GNN uniform prefixes preserve strict support and deletion', {
-  old<-options(np.messages=FALSE,np.extendednn=TRUE);on.exit(options(old),add=TRUE)
+  old<-options(np.messages=FALSE,np.extendednn=TRUE,np.tree=FALSE,
+               np.macMseries.accelerate=FALSE);on.exit(options(old),add=TRUE)
   skip_if_not(spawn_mpi_slaves(1L), "MPI session unavailable")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   ns<-asNamespace('npRmpi')
   probe<-function(x,y,b,tree,acc){
-    options(np.messages=FALSE,np.tree=tree,np.macMseries.accelerate=acc)
+    old.worker<-options(np.messages=FALSE,np.tree=tree,np.macMseries.accelerate=acc)
+    on.exit(options(old.worker),add=TRUE)
     get('.npcdensbw_eval_only',asNamespace('npRmpi'))(data.frame(x=x),y,b,
       invalid.penalty='dbmax',force.local=FALSE)$objective
   }
@@ -267,7 +273,8 @@ test_that('conditional GNN prepared degree changes keep the canonical owner', {
     regtype='lp',degree=2L,bernstein.basis=TRUE,cxkertype='epanechnikov',
     cykertype='gaussian',bandwidth.compute=FALSE)
   probe<-function(x,y,b){
-    ns<-asNamespace('npRmpi');options(np.messages=FALSE,np.tree=TRUE)
+    ns<-asNamespace('npRmpi');old.worker<-options(np.messages=FALSE,np.tree=TRUE)
+    on.exit(options(old.worker),add=TRUE)
     prep<-get('.npcdensbw_prepared_prepare_args',ns)(xdat=x,ydat=y,bws=b,
       invalid.penalty='baseline',degree.search=TRUE)
     names(prep)[names(prep)=='penalty_mode']<-'penalty.mode'
@@ -296,7 +303,7 @@ test_that('conditional GNN prepared degree changes keep the canonical owner', {
 })
 
 test_that('conditional GNN Gaussian response orders share the literal integral', {
-  old<-options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  old<-options(np.messages=FALSE,np.tree=FALSE);on.exit(options(old),add=TRUE)
   skip_if_not(spawn_mpi_slaves(1L), "MPI session unavailable")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   d<-cgnn_fixture();x<-data.frame(x=d$x)
@@ -314,11 +321,12 @@ test_that('conditional GNN Gaussian response orders share the literal integral',
           cykertype='gaussian',cykerorder=yorder,
           bandwidth.compute=FALSE),
           if(xorder==0L)list()else list(cxkerorder=xo),ctrl))
-        command<-substitute({
-          options(np.tree=TREE,np.messages=FALSE)
+        command<-substitute(local({
+          old.worker<-options(np.tree=TREE,np.messages=FALSE)
+          on.exit(options(old.worker),add=TRUE)
           get('.npcdensbw_eval_only',asNamespace('npRmpi'))(X,Y,B,
             invalid.penalty='dbmax',force.local=FALSE)
-        },list(TREE=tree,X=x,Y=d$y,B=b))
+        }),list(TREE=tree,X=x,Y=d$y,B=b))
         observed<-get('.npRmpi_bcast_cmd_expr',asNamespace('npRmpi'))(
           command,comm=1L,caller.execute=TRUE)$objective
         expect_lte(abs(observed-expected),1e-9)
@@ -328,7 +336,7 @@ test_that('conditional GNN Gaussian response orders share the literal integral',
 })
 
 test_that('conditional GNN compact responses integrate the literal deleted criterion', {
-  old<-options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  old<-options(np.messages=FALSE,np.tree=FALSE);on.exit(options(old),add=TRUE)
   skip_if_not(spawn_mpi_slaves(1L), "MPI session unavailable")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   d<-cgnn_fixture();x<-data.frame(x=d$x)
@@ -347,11 +355,12 @@ test_that('conditional GNN compact responses integrate the literal deleted crite
           cykertype=ykernel,bandwidth.compute=FALSE),
           if(xorder==0L)list()else list(cxkerorder=xorder),
           if(yorder==0L)list()else list(cykerorder=yorder),ctrl))
-        command<-substitute({
-          options(np.tree=TREE,np.messages=FALSE)
+        command<-substitute(local({
+          old.worker<-options(np.tree=TREE,np.messages=FALSE)
+          on.exit(options(old.worker),add=TRUE)
           get('.npcdensbw_eval_only',asNamespace('npRmpi'))(X,Y,B,
             invalid.penalty='dbmax',force.local=FALSE)
-        },list(TREE=tree,X=x,Y=d$y,B=b))
+        }),list(TREE=tree,X=x,Y=d$y,B=b))
         observed<-get('.npRmpi_bcast_cmd_expr',asNamespace('npRmpi'))(
           command,comm=1L,caller.execute=TRUE)$objective
         expect_lte(abs(observed-expected),1e-9)

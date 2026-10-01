@@ -11,6 +11,27 @@ static int np_cgnn_compare(const void *a, const void *b) {
   const NPGNNConditionalOrder *x = a, *y = b;
   return (x->x > y->x) - (x->x < y->x);
 }
+/* Exact deleted-design upper bound for this one-X polynomial owner. Reuse
+ * actual weights: signed nonzero donors count, self is excluded by identity,
+ * and repeated X values cannot supply independent basis rows. Saturation is
+ * not a numerical full-rank certificate. No shared solve policy is changed. */
+static int np_cgnn_deleted_support_sufficient(
+    const NPGNNConditionalOrder *order, const double *weights,
+    const int *native_position, int n, int held, int terms) {
+  int count = 0;
+  double previous = 0.0;
+  for (int r = 0; r < n; ++r) {
+    const int id = order[r].id;
+    if (id == held || weights[native_position ? native_position[id] : id] == 0.0)
+      continue;
+    if (count == 0 || order[r].x != previous) {
+      previous = order[r].x;
+      if (++count == terms)
+        return 1;
+    }
+  }
+  return 0;
+}
 static void np_cgnn_compensated(double v, double *s, double *e) {
   const double t = *s + v;
   *e += fabs(*s) >= fabs(v) ? (*s - t) + v : (v - t) + *s;
@@ -842,6 +863,9 @@ static SEXP np_cgnn_body(void *raw) {
   for (int i = first; i < first + count && !fail; ++i) {
     np_progress_bandwidth_loop_step();
     if (np_conditional_xrow_from_ctx(x, i, a->row) ||
+        (!scalar && !np_cgnn_deleted_support_sufficient(
+          c->order, x->kw, int_TREE_X == NP_TREE_TRUE ? ipt_lookup_extern_X : NULL,
+          n, i, terms)) ||
         np_conditional_yrow_from_ctx(&a->yctx, i, a->yrow)) {
       fail = 1;
       break;

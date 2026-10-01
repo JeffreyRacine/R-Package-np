@@ -13,8 +13,7 @@ test_that("GNN boundary radii agree with independent Gaussian distance ranks", {
     expected <- colSums(w*y)/colSums(w)
     b <- npregbw(xdat=d,ydat=y,bws=k,bwtype="generalized_nn",
       regtype="lc",bandwidth.compute=FALSE)
-    if (k <= n-1L)
-      expect_equal(as.numeric(npreghat(b,txdat=d,y=y,output="apply",
+    expect_equal(as.numeric(npreghat(b,txdat=d,y=y,output="apply",
       leave.one.out=TRUE)), expected,tolerance=2e-13)
     expect_equal(as.numeric(.npregbw_eval_only(d,y,b,
       invalid.penalty="dbmax")$objective),mean((y-expected)^2),tolerance=2e-13)

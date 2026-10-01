@@ -1,5 +1,22 @@
 # npRmpi 0.80-1
 
+* Conditional likelihood cross-validation reports a guarded evaluation on the
+  coordinator whenever any computing rank used the existing nonpositive-fit
+  rule. The counter still counts evaluations, not observations or MPI ranks;
+  likelihood values and local-mode arithmetic are unchanged.
+
+* Bandwidth progress retains iterations and the actual multistart counter while
+  search work continues after the requested starts. Completion and zero ETA are
+  no longer displayed prematurely; failed searches clear the existing progress
+  line without reporting success. Fit/evaluation heartbeat behavior is unchanged.
+
+* Fixed-bandwidth conditional local-polynomial cross-validation now assesses
+  rank after deleting the held-out observation, retains the existing ridge rule
+  when required, and uses stable QR for unregularized deleted designs. Ordinary
+  and all-large-bandwidth paths share this policy across polynomial degrees,
+  avoiding cancellation and predictor-order sensitivity. This can cost more;
+  fixed-bandwidth regression solvers and local-constant defaults are unchanged.
+
 * Single-index fits and hats no longer warn about a uniform-kernel order
   merely retained from their bandwidth object. Explicit fresh user requests
   for an ignored order still produce the advisory.
@@ -107,10 +124,11 @@
   explain raw-basis scaling and the explicit Bernstein option. Help pages clarify
   raw-polynomial instability; thresholds, defaults and computations are unchanged.
 
-* Converting retained bandwidth metadata, including regression and conditional
-  hat routes, no longer reports an ignored uniform order as though the user
-  had just supplied it. Explicit order requests still receive the advisory;
-  kernel choices and stored orders are unchanged.
+* Internal bandwidth-metadata conversion in regression and conditional hat
+  routes no longer reports an ignored uniform order as a fresh user request.
+  This does not silence every downstream constructor or bootstrap-plot route.
+  Explicit order requests still receive the advisory; kernel choices and stored
+  orders are unchanged.
 
 * Terminal bandwidth-search failures no longer mislabel nearest-neighbor
   candidates as fixed bandwidths. Search and failure policies are unchanged.
@@ -129,8 +147,10 @@
 * Hat apply/constraint methods and cached regression-hat prediction now use the
   fitted factor-response coding for explicit factor payloads, as for fitting.
   Single-index fitting also retains this coding for alphanumeric responses.
-  Reusing a numeric-response bandwidth object with a factor response now fails
-  explicitly when fitted factor coding is absent. Native regression also checks
+  Regression fitting rejects reuse of a numeric-response bandwidth object with
+  a factor response when fitted factor coding is absent. An explicit factor
+  payload to `npreghat()` retains its historical integer-code convention; this
+  is not fitted factor metadata. Native regression also checks
   response-buffer extents before reading them; factor-fitted workflows remain supported.
 
 * Direct regression consumers, including significance tests and bootstrap plots,

@@ -3675,7 +3675,7 @@ npscoefbw.scbandwidth <-
     .np_seed_exit(seed.state, remove_if_absent = TRUE)
     nn.cache <- bws$nn.cache
 
-    bws <- scbandwidth(bw = bws$bw,
+    bws <- .np_retained_uniform_constructor(scbandwidth, bw = bws$bw,
                        regtype = regtype,
                        basis = if (is.null(bws$basis)) "glp" else bws$basis,
                        degree = bws$degree,

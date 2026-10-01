@@ -1,4 +1,17 @@
-r23_scale_spread <- function(z) min(sd(z), IQR(z)/1.349, mad(z))
+r23_scale_spread <- function(z) min(sd(z), IQR(z)/(2*qnorm(.75)), mad(z))
+
+test_that("conditional scale reference exercises the IQR branch", {
+  # Sparse tails make sd large; asymmetric central spacing makes the
+  # normal-consistent MAD exceed IQR/QFAC. No RNG or fragile near-tie.
+  z <- rep(c(-100,-2,-1,-.5,0,3,3,4,100),each=5L)
+  pieces <- c(sd(z),IQR(z)/(2*qnorm(.75)),mad(z))
+  expect_identical(which.min(pieces),2L)
+  expect_equal(r23_scale_spread(z),pieces[2L],tolerance=0)
+  expect_gt(abs(r23_scale_spread(z)-IQR(z)/1.349),1e-6)
+  pkg <- getNamespaceName(environment(npcdensbw))
+  expect_equal(as.numeric(getFromNamespace("EssDee",pkg)(z)),
+               r23_scale_spread(z),tolerance=2e-12)
+})
 
 test_that("conditional fixed scaling owns each response spread", {
   old <- options(np.messages = FALSE, np.tree = FALSE)

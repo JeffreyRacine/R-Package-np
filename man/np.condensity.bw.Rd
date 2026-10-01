@@ -273,7 +273,8 @@ These arguments choose the selection criterion and the way continuous bandwidths
     \sigma_j n^{-1/(2P+l)}}{h[j] = 1.06*sigma[j]*n^(-1.0/(2.0*P+l))},
     where \eqn{\sigma_j}{sigma[j]} is an adaptive measure of spread of
     the \eqn{j}th continuous variable defined as min(standard deviation,
-    mean absolute deviation/1.4826, interquartile range/1.349), \eqn{n}
+    normal-consistent median absolute deviation, interquartile range divided
+    by \eqn{2\Phi^{-1}(0.75)}), \eqn{n}
     the number of observations, \eqn{P} the order of the kernel, and
     \eqn{l} the number of continuous variables. Note that when there
     exist factors and the normal-reference rule is used, there is zero
@@ -288,8 +289,9 @@ These arguments choose the selection criterion and the way continuous bandwidths
     related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =
     c[j]*sigma[j]*n^(-1/(2*P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
     adaptive measure of spread of continuous variable \eqn{j} defined as
-    min(standard deviation, mean absolute deviation/1.4826,
-    interquartile range/1.349), \eqn{n} the number of observations,
+    min(standard deviation, normal-consistent median absolute deviation,
+    interquartile range divided by \eqn{2\Phi^{-1}(0.75)}),
+    \eqn{n} the number of observations,
     \eqn{P}{P} the order of the kernel, and \eqn{l}{l} the number of
     continuous variables. For discrete data types, \eqn{c_j}{c[j]} and
     \eqn{h_j}{h[j]} are related by the formula \eqn{h_j =

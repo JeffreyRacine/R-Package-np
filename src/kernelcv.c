@@ -36,7 +36,10 @@ extern  int tag;
 extern  int iNum_Processors;
 extern  int iSeed_my_rank;
 extern  MPI_Status status;
+extern MPI_Comm *comm;
 #endif
+
+#include "conditional_cvml_guard.h"
 
 /*
 int int_LARGE_SF;
@@ -757,12 +760,14 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
 /* Declarations */
 
     double cv = 0.0;
+    const double guarded_before = np_guarded_cvml_hits_get();
     clock_t start, diff;
 
     if(np_beta_conditional_bw_active()) {
       start = clock();
       cv = np_beta_conditional_density_bw_objective_ctx(
         vector_scale_factor);
+      np_conditional_cvml_guard_finish(guarded_before);
       diff = clock() - start;
       timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
       return cv;
@@ -829,6 +834,7 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
 
         return(DBL_MAX);
     }
+    np_conditional_cvml_guard_finish(guarded_before);
     diff = clock() - start;
     timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
 

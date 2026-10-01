@@ -295,7 +295,8 @@
   normalization mass \eqn{D(x_j,h_j)}. Its weight at evaluation point
   \eqn{x} is \eqn{K((x-x_j)/h_j)/(h_jD(x_j,h_j))}.
   Regression fitting and bandwidth objectives use this donor-centred
-  convention; delete-one objectives use radii from the corresponding
+  convention, as do the corresponding adaptive density and conditional
+  density/distribution kernel factors. Delete-one objectives use radii from the corresponding
   deleted sample. Fixed and generalized-neighbor regression use the
   query-centred mass associated with their query bandwidth.
   Option \code{ckerbound="range"} uses
