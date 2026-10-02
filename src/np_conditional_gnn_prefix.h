@@ -899,7 +899,7 @@ static SEXP np_cgnn_body(void *raw) {
     np_progress_bandwidth_loop_step();
     if ((c->stable ? np_conditional_deleted_from_ctx_core(x,&a->qr,i,1,0,a->row,NULL) :
         np_conditional_xrow_from_ctx(x, i, a->row)) ||
-        (!scalar && !c->stable && !np_cgnn_deleted_support_sufficient(
+        (!scalar && !np_cgnn_deleted_support_sufficient(
           c->order, x->kw, int_TREE_X == NP_TREE_TRUE ? ipt_lookup_extern_X : NULL,
           n, i, terms)) ||
         np_conditional_yrow_from_ctx(&a->yctx, i, a->yrow)) {
