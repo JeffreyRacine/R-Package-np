@@ -23,6 +23,19 @@
   avoiding cancellation and predictor-order sensitivity. This can cost more;
   fixed-bandwidth regression solvers and local-constant defaults are unchanged.
 
+* Conditional positive-kernel local-polynomial cross-validation now assesses
+  deleted designs in locally centered and scaled coordinates. Uniform and
+  second-order Epanechnikov generalized-neighbor objectives retain accurate
+  polynomial coefficients in their compressed integration owner. Ambiguous
+  numerical rank or exhausted integration limits stop the conditional search
+  with a row and bandwidth diagnostic; native search allocations are released.
+  These corrections can substantially increase computation time.
+
+* Conditional-density generalized-neighbor CVLS with beta predictors or bounded
+  Gaussian predictors now uses the same whole-response criterion as unbounded
+  predictors when the response domain is unbounded. This corrects the objective
+  and can increase its cost; response boundary handling retains its own routes.
+
 * Single-index fits and hats no longer warn about a uniform-kernel order
   merely retained from their bandwidth object. Explicit fresh user requests
   for an ignored order still produce the advisory.

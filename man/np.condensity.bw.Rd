@@ -910,6 +910,15 @@ or standard-deviation factors.
   analytical convolutions available for fixed and adaptive nearest-neighbor
   bandwidths.
 
+  This whole-response criterion also applies to beta predictor kernels and
+  bounded Gaussian predictor kernels when the response domain is unbounded.
+  Predictor boundary correction does not make the response bandwidth constant.
+
+  Ambiguous numerical rank in a conditional local-polynomial design, or
+  exhaustion of the numerical integration limits in a compressed response
+  integrator, stops the search with a row and bandwidth diagnostic. Such a
+  failure is not returned as a finite cross-validation score.
+
   Computation time depends on the kernels, nearest-neighbor counts, predictor
   and response dimensions, and local-polynomial specification. Some
   configurations can be substantially more expensive. Second-order kernels

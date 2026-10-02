@@ -25,6 +25,7 @@
 #endif
 
 #include "headers.h"
+#include "conditional_failure.h"
 #include "regression_contrast.h"
 #include "regression_alllarge_residual.h"
 #include "regression_inference_reuse.h"
@@ -38,6 +39,7 @@
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
 #include "conditional_global_qr.h"
+#include "conditional_local_qr.h"
 #include "jksum_block_plan.h"
 #include "kernel_registry.h"
 #include "np_native_safety.h"
@@ -55,6 +57,24 @@
 
 #include <inttypes.h>
 
+
+/* Conditional-only envelope reuses the incumbent completion reduction. */
+static int np_conditional_outer_preflight_failed(int parallel,int failed) {
+  return np_conditional_failure_reduce(parallel,failed);
+}
+static int np_conditional_outer_buffer_finish(int parallel,int count,int failed,
+  double *buffer,const char *failure_env,const char *label) {
+#ifdef MPI2
+  if(parallel && failure_env && np_mpi_rank_failure_injected(failure_env))failed=1;
+#else
+  (void)count;(void)buffer;(void)failure_env;(void)label;
+#endif
+  if(np_conditional_failure_reduce(parallel,failed))return 1;
+#ifdef MPI2
+  if(parallel)np_mpi_allreduce_in_place_double(buffer,count,MPI_SUM,label);
+#endif
+  return 0;
+}
 /* Failure-only copying keeps the successful row path allocation-free. */
 void np_regression_failure_message(NPRegressionFailure *failure,
                                   int family, int code,
@@ -34638,6 +34658,24 @@ static int np_conditional_deleted_influence(
   if(!basis || !kw || !mean_row || !work || !qr || !row_out ||
      k <= 0 || eval_pos < 0 || eval_pos >= num_train) return 1;
   kw[eval_pos] = 0.0;
+  /* Conditional local QR uses the adopted local-design rank policy.
+   * No ambiguous/numerical result may be interpreted as an accepted score. */
+  const NPConditionalLocalQRStatus local_status = np_cqr_local_row(
+    &qr->fast, work, num_train, np_glp_cv_cache.ncon, k,
+    np_glp_cv_cache.terms, matrix_X_continuous_train_extern,
+    kw, eval_pos, mean_row, NULL);
+  if(local_status == NP_CQR_LOCAL_FULL){
+    for(j = 0; j < num_train; ++j)
+      row_out[int_TREE_X == NP_TREE_TRUE ? ipt_extern_X[j] : j] = mean_row[j];
+    return 0;
+  }
+  if(local_status != NP_CQR_LOCAL_DEFICIENT) {
+    if(local_status != NP_CQR_LOCAL_EMPTY)
+      np_conditional_failure_record(local_status==NP_CQR_LOCAL_AMBIGUOUS ?
+        NP_CONDITIONAL_RANK_AMBIGUOUS : NP_CONDITIONAL_NUMERICAL_FAILURE,
+        1+(int_TREE_X==NP_TREE_TRUE ? ipt_extern_X[eval_pos] : eval_pos));
+    return 1;
+  }
   for(l = 0; l < k; l++)
     work->rhs_source[l] =
       basis[l][eval_pos];
@@ -34697,7 +34735,7 @@ static int np_conditional_deleted_influence(
   const double anchor = work->gram_source[0];
   if(np_conditional_solve_adjoint_ranked(work, k, 1,
        1.0/(double)MAX(1, num_train),
-       np_lp_rank_upper_bound_from_weights(kw, num_train, k),
+       0, /* certified numerical deficiency; retain original ridge amount */
        &diagnostics) != NP_LP_SOLVE_POLICY_OK) return 1;
   if(np_cqr_deleted_row(qr, num_train, k, kw, basis, eval_pos,
        diagnostics.ridge_total, anchor, mean_row, NULL, NULL)) return 1;
@@ -42798,12 +42836,17 @@ finalize_all_large_context:
   if(ctx->nterms > 1) {
     ctx->stable=calloc(1,sizeof(*ctx->stable));
     if(!ctx->stable || np_cqr_prepare(ctx->stable,ctx->num_train,ctx->nterms,
-                                    ctx->basis,ctx->use_apple_dgemv))
+                                    ctx->basis,ctx->use_apple_dgemv,
+                                    np_glp_cv_cache.ncon,np_glp_cv_cache.terms,
+                                    matrix_X_continuous_train_extern,NULL,
+                                    int_TREE_X==NP_TREE_TRUE?ipt_extern_X:NULL))
       goto cleanup_all_large_prepare;
     if(ctx->basis_original_order) {
       ctx->stable_original=calloc(1,sizeof(*ctx->stable_original));
       if(!ctx->stable_original || np_cqr_prepare(ctx->stable_original,
-           ctx->num_train,ctx->nterms,ctx->basis_original_order,ctx->use_apple_dgemv))
+           ctx->num_train,ctx->nterms,ctx->basis_original_order,ctx->use_apple_dgemv,
+           np_glp_cv_cache.ncon,np_glp_cv_cache.terms,matrix_X_continuous_train_extern,
+           int_TREE_X==NP_TREE_TRUE?ipt_lookup_extern_X:NULL,NULL))
         goto cleanup_all_large_prepare;
     }
   }
@@ -45138,6 +45181,19 @@ static int np_cgnn_unbounded_admitted(void) {
     int_cxker_bound_extern == 0 && int_cyker_bound_extern == 0;
 }
 
+/* Bounded explanatory rows use the same whole-response GNN criterion.
+ * Admit only Gaussian truncation or an X-only beta route. Bounded/associated
+ * response kernels retain their existing support-specific owners. */
+static int np_cgnn_bounded_x_admitted(
+  const NPConditionalKernelExecutionContext *execution_context) {
+  if(BANDWIDTH_den_extern != BW_GEN_NN || num_var_continuous_extern <= 0 ||
+     int_cyker_bound_extern != 0 || KERNEL_den_extern < 0 || KERNEL_den_extern > 8)
+    return 0;
+  if(execution_context != NULL)
+    return execution_context->x_route != NULL && execution_context->y_route == NULL;
+  return int_cxker_bound_extern != 0 && KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= 3;
+}
+
 /* Upfront representation admission; no recovery or timing-driven dispatch. */
 static int np_cgnn_projected_admitted(void) {
   return BANDWIDTH_den_extern == BW_GEN_NN &&
@@ -45155,7 +45211,7 @@ static int np_conditional_density_cvls_lp_stream_impl(
   double *cv){
   if(np_cgnn_prefix_admitted())
     return np_cgnn_prefix_cvls(vector_scale_factor, cv);
-  if(np_cgnn_unbounded_admitted())
+  if(np_cgnn_unbounded_admitted() || np_cgnn_bounded_x_admitted(NULL))
     return np_conditional_density_cvls_lp_stream_ctx(vector_scale_factor, NULL, cv);
   const int num_obs = num_obs_train_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
@@ -54688,8 +54744,9 @@ static int np_conditional_cvls_route_context_prepare(
       np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
     return 1;
 
-  const int projected = execution_context == NULL &&
-    response_operator == OP_NORMAL && np_cgnn_unbounded_admitted();
+  const int projected = response_operator == OP_NORMAL &&
+    ((execution_context == NULL && np_cgnn_unbounded_admitted()) ||
+     np_cgnn_bounded_x_admitted(execution_context));
   context->beta_x = execution_context != NULL && execution_context->x_route != NULL;
   context->beta_y = execution_context != NULL && execution_context->y_route != NULL;
   context->fold_geometry = response_operator == OP_NORMAL &&
@@ -55493,6 +55550,7 @@ int np_conditional_density_cvls_lp_stream_ctx(
   int status = 1;
 
   if(execution_context == NULL && !np_cgnn_unbounded_admitted() &&
+     !np_cgnn_bounded_x_admitted(NULL) &&
      !(int_cyker_bound_extern != 0 && num_var_continuous_extern > 0 &&
        (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN)))
     return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
@@ -55517,9 +55575,12 @@ int np_conditional_density_cvls_lp_stream_ctx(
   provider.fold_fit_block = route_context.fold_geometry ?
     np_conditional_cvls_fold_fit_block : NULL;
 
-  if(execution_context == NULL && np_cgnn_projected_admitted()) {
+  const int bounded_x = np_cgnn_bounded_x_admitted(execution_context);
+  if((execution_context == NULL && np_cgnn_projected_admitted()) ||
+     (bounded_x && num_var_continuous_extern == 1 &&
+      num_var_unordered_extern == 0 && num_var_ordered_extern == 0)) {
     status = np_cgnn_projected_cvls(&route_context, cv);
-  } else if(execution_context == NULL && np_cgnn_unbounded_admitted()) {
+  } else if((execution_context == NULL && np_cgnn_unbounded_admitted()) || bounded_x) {
     status = np_cgnn_general_cvls(&route_context, cv);
   } else if(route_context.fold_geometry &&
      (np_conditional_density_cvls_bounded_scalar_route_ok() ||

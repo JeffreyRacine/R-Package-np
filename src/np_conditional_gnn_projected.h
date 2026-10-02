@@ -437,11 +437,10 @@ static int np_gnn_projected_integrate(NPGNNProjectedIntegral *q,
   }
   const double mid=.5*lo+.5*hi;
   if(depth>=20 || !(lo<mid && mid<hi)) {
-    if(!R_FINITE(unseen))return 1;
-    q->owner->capped+=1;
-    for(int f=0;f<q->rows;++f)if(q->selected[f])
-      q->owner->bounds[q->owner->geometry->order[q->first+f]]+=fabs(low[f]-high[f])+unseen;
-    memcpy(out,high,(size_t)q->rows*sizeof(double));return 0;
+    int fold=0;while(fold<q->rows && !q->selected[fold])++fold;
+    np_conditional_failure_record(NP_CONDITIONAL_WORK_EXHAUSTED,
+      fold<q->rows ? 1+q->owner->geometry->order[q->first+fold] : 0);
+    return 1;
   }
   if(np_gnn_projected_integrate(q,lo,mid,depth+1,out) ||
      np_gnn_projected_integrate(q,mid,hi,depth+1,other))return 1;
@@ -889,7 +888,7 @@ static int np_cgnn_projected_local(NPGNNConditionalProjectedCall *a)
   *c=(NPGNNConditionalProjectionOwner){.n=n,.folded=1,.first_fold=0,.kernel=KERNEL_den_extern,
     .end_fold=n,.pair_ranks=1,.data=matrix_Y_continuous_train_extern,
     .row=np_gnn_conditional_integral_weight,
-    .filled_row=np_lp_engine_extern==NP_LP_ENGINE_SCALAR ?
+    .filled_row=!b->route->beta_x && np_lp_engine_extern==NP_LP_ENGINE_SCALAR ?
       np_gnn_conditional_integral_filled_weight:NULL,
     .geometry=&a->geometry,.context=b,.budget=NP_CONDITIONAL_LP_TILE_BUDGET_BYTES};
   if(c->kernel>0 && c->kernel<4)np_cgnn_gaussian_derivative_constants(c->kernel,c->logG);
@@ -941,7 +940,7 @@ static SEXP np_cgnn_projected_body(void *raw)
   int fail=np_cgnn_projected_local(a),first=0,count=n;
 #ifdef MPI2
   const int parallel=np_objective_outer_rows_enabled(1);
-  if(np_objective_outer_buffer_finish(parallel,n,fail,c->values,NULL,
+  if(np_conditional_outer_buffer_finish(parallel,n,fail,c->values,NULL,
        "conditional GNN projected integral"))return R_NilValue;
   if(parallel) {
     np_mpi_allreduce_in_place_double(c->bounds,n,MPI_SUM,
@@ -971,7 +970,7 @@ static SEXP np_cgnn_projected_body(void *raw)
     a->cross[i]=linear;
   }
 #ifdef MPI2
-  if(np_objective_outer_buffer_finish(parallel,n,fail,a->cross,NULL,
+  if(np_conditional_outer_buffer_finish(parallel,n,fail,a->cross,NULL,
        "conditional GNN projected canonical I2"))return R_NilValue;
 #else
   if(fail)return R_NilValue;

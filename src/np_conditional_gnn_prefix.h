@@ -38,6 +38,7 @@ static void np_cgnn_compensated(double v, double *s, double *e) {
   *s = t;
 }
 #include "np_conditional_gnn_local.h"
+#include "np_conditional_gnn_stable.h"
 typedef struct {
   int n, folds, moments, failed, ykernel, *active, *first, *end, *orderRank;
   const double *y;
@@ -52,6 +53,10 @@ typedef struct {
   int narrow;
   double qleft, du;
   NPGNNLocalMoments local;
+  NPGNNStableMoments stable_moments;
+  int stable,full_rows,deficient_rows,coefficient_count;
+  size_t visits,interval_visits,work_limit;
+  double *radius,*ones;NPConditionalQRAcc *stable_coef,*coefficient_work;
 } NPGNNConditionalPrefix;
 static void np_cgnn_local_rule(NPGNNConditionalPrefix *c, double lo, double hi,
                                 int high, int compact, double *out);
@@ -176,7 +181,7 @@ static double np_cgnn_prefixgap(NPGNNConditionalPrefix *c, int p, int lo, int hi
   return (v[hi * nq + z] - v[lo * nq + z]) + (e[hi * nq + z] - e[lo * nq + z]);
 }
 static void np_cgnn_rule(NPGNNConditionalPrefix *c, double lo, double hi, int high, double *out) {
-  if (c->local.degree) {
+  if (c->stable || c->local.degree) {
     np_cgnn_local_rule(c, lo, hi, high, 0, out);
     return;
   }
@@ -336,6 +341,12 @@ static void np_cgnn_integrate(NPGNNConditionalPrefix *c, double lo, double hi, i
                               double *out) {
   if (c->failed)
     return;
+  ++c->visits;
+  if(++c->interval_visits > c->work_limit){
+    int row=0;while(row<c->n && !c->active[row])row++;
+    np_conditional_failure_record(NP_CONDITIONAL_WORK_EXHAUSTED,row+1);
+    c->failed=1;return;
+  }
   const int nf = c->folds;
   double *low = c->recursive + (size_t)depth * 3 * nf, *high = low + nf, *other = high + nf;
   /* A certified local remainder may spend the existing relative budget
@@ -410,14 +421,9 @@ static void np_cgnn_integrate(NPGNNConditionalPrefix *c, double lo, double hi, i
   }
   const double mid = .5 * lo + .5 * hi;
   if (depth >= 20 || !(lo < mid && mid < hi)) {
-    /* Complete this subinterval with its finite high-np_cgnn_rule estimate, keep its
-     * error estimate, and process every remaining response-state interval.
-     * One explicit warning is issued after the complete objective is formed. */
-    for (int i = 0; i < nf; ++i)
-      out[i] = high[i];
-    c->acceptedError += err;
-    ++c->capped;
-    return;
+    int row=0;while(row<c->n && !c->active[row])row++;
+    np_conditional_failure_record(NP_CONDITIONAL_WORK_EXHAUSTED,row+1);
+    c->failed=1;return;
   }
 
   np_cgnn_integrate(c, lo, mid, depth + 1, out);
@@ -474,25 +480,34 @@ static void np_cgnn_local_rule(NPGNNConditionalPrefix *c, double lo, double hi,
     }
     if (nonzero) {
       c->local.ranks[retained] = pruned ? c->selected[r] : r;
-      c->local.slots[retained++] = r;
+      c->local.slots[retained] = r;
+      if(c->stable && c->full_rows){
+        c->stable_moments.ranks[retained]=c->local.ranks[retained];
+        c->stable_moments.slots[retained]=r;
+      }
+      retained++;
     }
   }
 #ifdef NP_CF167_TRACE
   np_cgnn_trace_tree_nodes += (unsigned long)m*nq;
   np_cgnn_trace_pruned_nodes += (unsigned long)(c->n-m)*nq;
 #endif
-  np_cgnn_local_evaluate(&c->local,c->moments,c->powers,c->coef,c->factors,
+  if(c->stable && c->full_rows)
+    np_cgnn_stable_evaluate(&c->stable_moments,c->ones,c->factors,nq,retained,c->active,c->radius);
+  if(!c->stable || c->deficient_rows)
+    np_cgnn_local_evaluate(&c->local,c->moments,c->powers,c->coef,c->factors,
                           nq,retained,c->active);
   memset(out,0,(size_t)c->n*sizeof(double));
   for (int i = 0; i < c->n; ++i) if (c->active[i])
     for (int z = 0; z < nq; ++z) {
-      const double value = c->local.fit[(size_t)i*nq+z];
+      const double value = c->stable && c->radius[i]>0 ?
+        c->stable_moments.fit[(size_t)i*nq+z] : c->local.fit[(size_t)i*nq+z];
       out[i] += half*weights[z]*value*value;
     }
 }
 
 static void np_cgnn_compact_rule(NPGNNConditionalPrefix *c, double lo, double hi, double *out) {
-  if (c->local.degree) {
+  if (c->stable || c->local.degree) {
     np_cgnn_local_rule(c, lo, hi, 1, 1, out);
     return;
   }
@@ -683,6 +698,7 @@ void np_conditional_gnn_notice_emit(void) {
 
 typedef struct {
   NPGNNConditionalPrefix integral;
+  NPConditionalQRDeleted qr;
   NPConditionalXRowCtx xctx;
   NPConditionalYRowCtx yctx;
   NPGNNIntegralGeometry geometry;
@@ -695,6 +711,9 @@ static void np_cgnn_cleanup(void *raw, Rboolean jump) {
   NPGNNConditionalCall *a = (NPGNNConditionalCall *)raw;
   NPGNNConditionalPrefix *c = &a->integral;
   (void)jump;
+  np_cqr_deleted_clear(&a->qr);
+  np_cgnn_stable_clear(&c->stable_moments);
+  free(c->ones);free(c->coefficient_work);
   np_conditional_xrow_ctx_clear(&a->xctx);
   np_conditional_yrow_ctx_clear(&a->yctx);
   np_gnn_integral_geometry_clear(&a->geometry);
@@ -762,6 +781,16 @@ static SEXP np_cgnn_body(void *raw) {
     fail = 1;
   c->n = c->folds = n;
   c->moments = fail ? 0 : terms;
+  c->stable=!scalar && terms>1 && (KERNEL_reg_extern==4 || uniform);
+  c->coefficient_count=c->moments*n;
+  if(c->stable){
+    if((size_t)n>INT_MAX/((size_t)3*terms+1))fail=1;
+    else c->coefficient_count=n*(3*terms+1);
+  }
+  /* Allocate 256 recursive visits to each geometry interval up front.
+   * Both deletion branches and tails spend that same interval allocation.
+   * Total work is bounded by 256*geometry.count, independently of MPI ranks. */
+  c->work_limit=256;
   c->ykernel = KERNEL_den_extern;
   if (c->ykernel > 0 && c->ykernel < 4)
     np_cgnn_gaussian_derivative_constants(c->ykernel, c->logG);
@@ -794,7 +823,13 @@ static SEXP np_cgnn_body(void *raw) {
   if (uniform || compact) {
     NP_CGNN_ALLOC(c->orderRank, n);
   }
-  NP_CGNN_ALLOC(c->coef, (size_t)c->moments * n);
+  NP_CGNN_ALLOC(c->coef, c->coefficient_count);
+  if(c->stable && !fail){
+    c->stable_coef=(NPConditionalQRAcc *)(c->coef+(size_t)terms*n);
+    c->radius=c->coef+(size_t)3*terms*n;
+    NP_CGNN_ALLOC(c->coefficient_work,terms);NP_CGNN_ALLOC(c->ones,n);
+    if(!fail)for(int j=0;j<n;j++)c->ones[j]=1.;
+  }
   NP_CGNN_ALLOC(c->self, n);
   NP_CGNN_ALLOC(c->powers, (size_t)c->moments * n);
   NP_CGNN_ALLOC(c->args, (size_t)maxnq * n);
@@ -825,7 +860,7 @@ static SEXP np_cgnn_body(void *raw) {
   NP_CGNN_ALLOC(a->pieces, (size_t)3 * g->count);
 #undef NP_CGNN_ALLOC
 #ifdef MPI2
-  if (np_objective_outer_preflight_failed(parallel, fail))
+  if (np_conditional_outer_preflight_failed(parallel, fail))
     return R_NilValue;
   np_objective_outer_owned_rows(0, n, parallel, &first, &count);
 #else
@@ -862,8 +897,9 @@ static SEXP np_cgnn_body(void *raw) {
   const double k0 = allck[KERNEL_reg_extern](0.0);
   for (int i = first; i < first + count && !fail; ++i) {
     np_progress_bandwidth_loop_step();
-    if (np_conditional_xrow_from_ctx(x, i, a->row) ||
-        (!scalar && !np_cgnn_deleted_support_sufficient(
+    if ((c->stable ? np_conditional_deleted_from_ctx_core(x,&a->qr,i,1,0,a->row,NULL) :
+        np_conditional_xrow_from_ctx(x, i, a->row)) ||
+        (!scalar && !c->stable && !np_cgnn_deleted_support_sufficient(
           c->order, x->kw, int_TREE_X == NP_TREE_TRUE ? ipt_lookup_extern_X : NULL,
           n, i, terms)) ||
         np_conditional_yrow_from_ctx(&a->yctx, i, a->yrow)) {
@@ -898,7 +934,38 @@ static SEXP np_cgnn_body(void *raw) {
       a->folds[3 * n + i] = hi;
     }
     double denominator = 0.0, self = 0.0, sum = 0.0, error = 0.0;
-    if (scalar) {
+    if(c->stable){
+      NPLPSolveWorkspace *work=&x->regression_solve_workspace;
+      NPConditionalLocalQRStatus rank=np_cqr_local_row(&a->qr.fast,work,n,1,terms,
+        np_glp_cv_cache.terms,matrix_X_continuous_train_extern,x->kw,pos,x->mean_row,NULL);
+      if(rank==NP_CQR_LOCAL_FULL){
+        if(cqr_compensated_row(&a->qr.fast,n,terms,np_glp_cv_cache.terms,
+          matrix_X_continuous_train_extern[0],x->kw,pos,c->coefficient_work,
+          c->stable_coef+(size_t)i*terms,x->mean_row)){
+          np_conditional_failure_record(NP_CONDITIONAL_NUMERICAL_FAILURE,i+1);
+          fail=1;break;
+        }
+        /* Conversion must reproduce the independent QR row before its
+         * coefficients enter compressed I1. Keep the frozen scaled row gate. */
+        double row_scale=0.0,row_error=0.0;
+        for(int j=0;j<n;j++) {
+          const int original=int_TREE_X==NP_TREE_TRUE ? ipt_extern_X[j] : j;
+          row_scale=fmax(row_scale,fabs(a->row[original]));
+          row_error=fmax(row_error,fabs(x->mean_row[j]-a->row[original]));
+          if(j!=pos && x->kw[j]>0)
+            c->radius[i]=fmax(c->radius[i],fabs(matrix_X_continuous_train_extern[0][j]-matrix_X_continuous_train_extern[0][pos]));
+        }
+        if(!(row_error <= 1e-10*(1.0+row_scale))) {
+          np_conditional_failure_record(NP_CONDITIONAL_COEFFICIENT_FAILURE,i+1);
+          fail=1;break;
+        }
+      } else if(rank!=NP_CQR_LOCAL_DEFICIENT){
+        np_conditional_failure_record(rank==NP_CQR_LOCAL_AMBIGUOUS ?
+          NP_CONDITIONAL_RANK_AMBIGUOUS : NP_CONDITIONAL_NUMERICAL_FAILURE,i+1);
+        fail=1;break;
+      }
+      denominator=1.;
+    } else if (scalar) {
       for (int j = 0; j < n; ++j)
         denominator += x->kw[j];
     } else {
@@ -917,10 +984,10 @@ static SEXP np_cgnn_body(void *raw) {
     for (int t = 0; t < terms; ++t)
       c->coef[(size_t)terms*i+t] =
         (scalar ? 1.0 : x->regression_solve_workspace.rhs_work[t]) *
-        (uniform ? k0 : 1.0) / denominator;
+        (uniform && !c->stable ? k0 : 1.0) / denominator;
     /* Same one-owner transport: Epan-X now transports its canonical radius;
      * deletion is by disjoint ranges, not subtraction of the self term. */
-    c->self[i] = uniform ? (scalar ? k0 : self) / denominator : h;
+    c->self[i] = c->stable ? h : uniform ? (scalar ? k0 : self) / denominator : h;
     for (int j = 0; j < n; ++j) {
       a->folds[n + i] += fabs(a->row[j]);
       np_cgnn_compensated(a->row[j] * a->yrow[j] / n, &sum, &error);
@@ -928,13 +995,13 @@ static SEXP np_cgnn_body(void *raw) {
     a->folds[i] = sum + error;
   }
 #ifdef MPI2
-  if (np_objective_outer_buffer_finish(parallel, c->moments * n, fail, c->coef, NULL,
+  if (np_conditional_outer_buffer_finish(parallel, c->coefficient_count, fail, c->coef, NULL,
                                        "conditional GNN coefficients"))
     return R_NilValue;
-  if (np_objective_outer_buffer_finish(parallel, n, 0, c->self, NULL,
+  if (np_conditional_outer_buffer_finish(parallel, n, 0, c->self, NULL,
                                        "conditional GNN deletion coefficients"))
     return R_NilValue;
-  if (np_objective_outer_buffer_finish(parallel, foldPlanes * n, 0, a->folds, NULL,
+  if (np_conditional_outer_buffer_finish(parallel, foldPlanes * n, 0, a->folds, NULL,
                                        "conditional GNN I2 and influence bounds"))
     return R_NilValue;
 #else
@@ -971,9 +1038,18 @@ static SEXP np_cgnn_body(void *raw) {
   }
   np_conditional_xrow_ctx_clear(x);
   np_conditional_yrow_ctx_clear(&a->yctx);
-  if (!uniform)
+  if(c->stable){
+    for(int i=0;i<n;i++)if(c->radius[i]>0)c->full_rows++;else c->deficient_rows++;
+    fail=np_cgnn_local_prepare(&c->local,n,uniform?0:2,c->order,c->self,c->first,c->end);
+    if(!fail && c->full_rows)fail=np_cgnn_stable_prepare(&c->stable_moments,n,
+      terms-1+(uniform?0:2),c->order,c->self,c->first,c->end,c->radius);
+    if(!fail && c->full_rows)fail=npc_gnn_recipes(&c->stable_moments,n,terms,c->order,
+      c->radius,c->self,c->stable_coef,!uniform,k0);
+  } else if (!uniform)
     fail = np_cgnn_local_prepare(&c->local, n, 2*(KERNEL_reg_extern-3),
                                   c->order, c->self, c->first, c->end);
+  if(c->stable && fail)
+    np_conditional_failure_record(NP_CONDITIONAL_NUMERICAL_FAILURE,0);
   first = 0;
   count = g->count;
 #ifdef MPI2
@@ -990,6 +1066,7 @@ static SEXP np_cgnn_body(void *raw) {
     np_progress_bandwidth_loop_step();
     double sum = 0.0, error = 0.0;
     c->acceptedError = c->capped = 0.0;
+    c->interval_visits=0;
     for (int slot = 0; slot < 2 && !fail; ++slot) {
       c->anchor = slot ? interval.successor_anchor : interval.primary_anchor;
       c->narrow = 0;
@@ -1060,7 +1137,7 @@ static SEXP np_cgnn_body(void *raw) {
     a->pieces[3 * at + 2] = c->capped;
   }
 #ifdef MPI2
-  if (np_objective_outer_buffer_finish(parallel, 3 * g->count, fail, a->pieces, NULL,
+  if (np_conditional_outer_buffer_finish(parallel, 3 * g->count, fail, a->pieces, NULL,
                                        "conditional GNN response intervals"))
     return R_NilValue;
 #else
@@ -1074,6 +1151,10 @@ static SEXP np_cgnn_body(void *raw) {
     caps += a->pieces[3 * at + 2];
   }
   a->score = (total + correction) - 2.0 * (cross + cross_error);
+#ifdef NP_CF167_TRACE
+  REprintf("CF202 components I1=%.17g I2=%.17g visits=%zu full=%d deficient=%d\n",
+    total+correction,cross+cross_error,c->visits,c->full_rows,c->deficient_rows);
+#endif
   if (!R_FINITE(a->score) || !R_FINITE(estimate))
     return R_NilValue;
   np_cgnn_notice_caps += caps;

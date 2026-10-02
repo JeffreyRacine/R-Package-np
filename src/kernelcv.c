@@ -12,6 +12,7 @@
 #include <time.h>
 
 #include "headers.h"
+#include "conditional_failure.h"
 #include "continuous_kernel_row.h"
 #include "jksum_gaussian_density.h"
 #include "kernel_registry.h"
@@ -646,7 +647,7 @@ double np_cv_func_density_categorical_ml(double *vector_scale_factor)
 
 }
 
-double cv_func_con_distribution_categorical_ls(double *vector_scale_factor)
+static double cv_func_con_distribution_categorical_ls_owned(double *vector_scale_factor)
 {
 
 /* Numerical recipes wrapper function for likelihood density
@@ -747,8 +748,17 @@ double cv_func_con_distribution_categorical_ls(double *vector_scale_factor)
     return(cv);
 
 }
+double cv_func_con_distribution_categorical_ls(double *vector_scale_factor) {
+  if(np_conditional_failure_pending())return DBL_MAX;
+  const double value=cv_func_con_distribution_categorical_ls_owned(vector_scale_factor);
+  np_conditional_failure_bandwidth(vector_scale_factor,
+    num_var_continuous_extern+num_var_unordered_extern+num_var_ordered_extern+
+    num_reg_continuous_extern+num_reg_unordered_extern+num_reg_ordered_extern);
+  return value;
+}
 
-double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
+
+static double np_cv_func_con_density_categorical_ml_owned(double *vector_scale_factor){
 
 /* Numerical recipes wrapper function for likelihood density
                     cross-validation */
@@ -841,8 +851,17 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
     return(cv);
 
 }
+double np_cv_func_con_density_categorical_ml(double *vector_scale_factor) {
+  if(np_conditional_failure_pending())return DBL_MAX;
+  const double value=np_cv_func_con_density_categorical_ml_owned(vector_scale_factor);
+  np_conditional_failure_bandwidth(vector_scale_factor,
+    num_var_continuous_extern+num_var_unordered_extern+num_var_ordered_extern+
+    num_reg_continuous_extern+num_reg_unordered_extern+num_reg_ordered_extern);
+  return value;
+}
 
-double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor){
+
+static double np_cv_func_con_density_categorical_ls_npksum_owned(double *vector_scale_factor){
 
 /* Numerical recipes wrapper function for least squares conditional density
                     cross-validation */
@@ -933,6 +952,15 @@ double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor)
   return(cv);
 
 }
+double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor) {
+  if(np_conditional_failure_pending())return DBL_MAX;
+  const double value=np_cv_func_con_density_categorical_ls_npksum_owned(vector_scale_factor);
+  np_conditional_failure_bandwidth(vector_scale_factor,
+    num_var_continuous_extern+num_var_unordered_extern+num_var_ordered_extern+
+    num_reg_continuous_extern+num_reg_unordered_extern+num_reg_ordered_extern);
+  return value;
+}
+
 
 double np_cv_func_density_categorical_ls(double *vector_scale_factor){
 
