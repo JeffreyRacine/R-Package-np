@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Conditional local-polynomial NOMAD bandwidth searches now release native
+  search state before reporting a terminal numerical error, preserving the
+  original diagnostic and allowing subsequent searches in the same R session.
+  Conditional-distribution block evaluation shares the failure reason and row
+  across all ranks before stopping.
+
 * Beta generalized-neighbor local-constant derivative hats now retain
   observation identity for implicit training queries, including repeated values
   and chunked evaluation. Matrix/apply derivatives agree with the fitted

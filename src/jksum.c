@@ -55134,10 +55134,8 @@ np_conditional_distribution_cvls_lp_one(double *vector_scale_factor,
 
 #ifdef MPI2
   if(use_parallel_blocks){
-    int any_fail = 0;
-
-    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
-    if(any_fail)
+    /* Propagate numerical reason/row to every rank before exit. */
+    if(np_conditional_failure_reduce(1, local_fail))
       goto cleanup_cdist_lp_block_one;
 
     MPI_Allreduce(MPI_IN_PLACE, block_terms, nblocks, MPI_DOUBLE, MPI_SUM, comm[1]);

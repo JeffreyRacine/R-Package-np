@@ -8,7 +8,7 @@ test_that("all native NOMAD consumers use the observed solve wrapper", {
     perl = TRUE
   ))
   calls <- gregexpr(
-    "np_nomad_solve_with_progress\\s*\\(\\s*&problem",
+    "(?:np_nomad_solve_with_progress|np_conditional_nomad_solve)\\s*\\(\\s*&problem",
     source_text,
     perl = TRUE
   )[[1L]]

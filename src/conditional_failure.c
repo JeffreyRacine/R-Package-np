@@ -1,6 +1,7 @@
 #include <R.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include "conditional_failure.h"
 #ifdef MPI2
 #include <mpi.h>
@@ -53,4 +54,13 @@ void np_conditional_failure_raise(void) {
     "conditional local solve failed";
   error("conditional bandwidth search stopped: %s; row %u; bandwidth/scale factors (native coordinate order) [%s]",
     label,row,npc_bandwidth[0]?npc_bandwidth:"unavailable");
+}
+
+void np_conditional_failure_save(NPConditionalFailure *saved) {
+  saved->failure = npc_failure;
+  memcpy(saved->bandwidth, npc_bandwidth, sizeof(saved->bandwidth));
+}
+void np_conditional_failure_restore(const NPConditionalFailure *saved) {
+  npc_failure = saved->failure;
+  memcpy(npc_bandwidth, saved->bandwidth, sizeof(npc_bandwidth));
 }

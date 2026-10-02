@@ -45,8 +45,13 @@ test_that("conditional-distribution bandwidth state has one typed owner", {
     expect_match(destroy, paste0("context->", field), fixed = TRUE,
                  info = field)
   }
-  expect_match(source, "NPConditionalDistributionPreparedCtx local_context = {0};",
-               fixed = TRUE)
+  # State moved into the invocation-owned cleanup context. Verify both its
+  # owned storage and delivery to the unchanged computation owner.
+  expect_match(source, "NPConditionalDistributionPreparedCtx owned;", fixed = TRUE)
+  expect_match(source, "c->support,&c->owned);", fixed = TRUE)
+  expect_match(source,
+    "R_ExecWithCleanup(np_distribution_conditional_bw_mode_call_run,&c,np_distribution_conditional_bw_mode_call_cleanup,&c);",
+    fixed = TRUE)
   expect_match(
     source, "np_conditional_distribution_prepared_context_destroy(prepared_context);",
     fixed = TRUE
@@ -56,7 +61,7 @@ test_that("conditional-distribution bandwidth state has one typed owner", {
 test_that("prepared CDF cache identity includes response and predictor dimensions", {
   source <- np_conditional_distribution_owner_source()
   owner <- np_conditional_distribution_owner_function(
-    source, "np_distribution_conditional_bw_mode")
+    source, "np_distribution_conditional_bw_mode_owned")
   call <- regmatches(owner, regexpr(
     "bwm_nn_cache_configure_for_degree_search\\([^;]+;", owner, perl = TRUE))
   expect_length(call, 1L)

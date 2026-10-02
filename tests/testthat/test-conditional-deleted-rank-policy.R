@@ -14,7 +14,13 @@ test_that("conditional deleted-rank policy is common and degree neutral", {
   expect_match(policy, "rank_upper_bound = 0;", fixed = TRUE)
   expect_match(policy, "np_lp_solve_workspace_solve_adjoint_ranked", fixed = TRUE)
   expect_false(grepl("degree", policy, fixed = TRUE))
-  expect_match(global, "np_cqr_cert_deleted(", fixed = TRUE)
+  # The adopted local-design certificate precedes the original-coordinate
+  # deficient-rank solve; the obsolete raw-Gram certificate is not required.
+  expect_match(global, "np_cqr_local_row(", fixed = TRUE)
+  expect_match(global, "if(rank==NP_CQR_LOCAL_FULL)", fixed = TRUE)
+  expect_match(global, "if(rank!=NP_CQR_LOCAL_DEFICIENT)", fixed = TRUE)
+  expect_match(global, "np_conditional_solve_adjoint_ranked(&policy,k,1,1./n,0,&d)",
+               fixed = TRUE)
   expect_match(global, "np_conditional_solve_adjoint_ranked(", fixed = TRUE)
   expect_match(source, "np_conditional_solve_adjoint_ranked(", fixed = TRUE)
 })
