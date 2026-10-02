@@ -46,3 +46,43 @@ test_that("conditional NOMAD terminal errors preserve same-process recovery", {
   }
   recover()
 })
+
+
+test_that("conditional density preparation errors do not poison later penalties", {
+  old <- options(np.messages=FALSE, np.tree=FALSE)
+  on.exit(options(old), add=TRUE)
+  ns <- asNamespace(getNamespaceName(environment(npcdensbw)))
+  prepare <- get("npPreparedObjectivePrepareConditionalDensity", ns)
+  destroy <- get("npPreparedObjectiveDestroyConditionalDensity", ns)
+  evaluate <- get("npPreparedObjectiveEvalConditionalDensity", ns)
+  args_for <- function(dat, degree, bandwidth) {
+    bw <- npcdensbw(y~x, data=dat, regtype="lp", degree=degree,
+                   bws=bandwidth, bandwidth.compute=FALSE)
+    args <- get(".npcdensbw_prepared_prepare_args", ns)(
+      dat["x"], dat["y"], bw, start.bw=bandwidth, invalid.penalty="baseline")
+    names(args)[names(args)=="penalty_mode"] <- "penalty.mode"
+    names(args)[names(args)=="penalty_multiplier"] <- "penalty.multiplier"
+    args
+  }
+  set.seed(952)
+  healthy <- data.frame(x=seq(-1,1,length.out=48), y=rnorm(48))
+  healthy_args <- args_for(healthy, 0L, c(.5,.8))
+  penalty <- function() {
+    on.exit(destroy(), add=TRUE)
+    expect_true(as.logical(do.call(prepare, healthy_args)))
+    evaluate(c(-1,-1), 0L)
+  }
+  before <- penalty()
+  set.seed(20260322)
+  bad <- data.frame(x=sort(runif(14)), y=sort(runif(14)))
+  bandwidth <- c(.048130207494902745,.025634352719319447)
+  bad_args <- args_for(bad, 1L, bandwidth)
+  expect_error(do.call(prepare, bad_args),
+    "conditional bandwidth search stopped: ambiguous numerical rank; row 14;")
+  expect_identical(penalty(), before)
+  expect_error(npcdensbw(y~x, data=bad, regtype="lp", degree=1L,
+    bws=bandwidth, bwsolver="mads", nmulti=1L,
+    nomad.opts=list(MAX_BB_EVAL=1L)),
+    "conditional bandwidth search stopped: ambiguous numerical rank; row 14;")
+  expect_identical(penalty(), before)
+})
