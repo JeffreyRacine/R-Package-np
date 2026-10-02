@@ -34009,18 +34009,18 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	            for(i = 0; i < owner->nterms*owner->nterms; i++)
 	              owner->power2_moments[i] = 0.0;
 
-	              for(i = 0; i < num_obs_train; i++){
-	                const double w = owner_kernel_row[i];
-	                const double w2 = w*w;
-	                if(w2 == 0.0)
-	                  continue;
-	                for(int a = 0; a < owner->nterms; a++){
-	                  const double za = owner->basis[a][i];
-	                  for(int b = 0; b < owner->nterms; b++)
-	                    owner->power2_moments[a*owner->nterms+b] +=
-	                      za*owner->basis[b][i]*w2;
-	                }
+	            for(i = 0; i < num_obs_train; i++){
+	              const double w = owner_kernel_row[i];
+	              const double w2 = w*w;
+	              if(w2 == 0.0)
+	                continue;
+	              for(int a = 0; a < owner->nterms; a++){
+	                const double za = owner->basis[a][i];
+	                for(int b = 0; b < owner->nterms; b++)
+	                  owner->power2_moments[a*owner->nterms+b] +=
+	                    za*owner->basis[b][i]*w2;
 	              }
+	            }
 	          }
 	          {
 	            int variance_rhs = 1;

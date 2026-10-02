@@ -14616,7 +14616,6 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   int n_pksum = asInteger(pksum_len);
   int n_kw = asInteger(kw_len);
   int ncon = 0, nuno = 0, nord = 0, ncat = 0, i = 0;
-  int * myopti_p = NULL;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
   np_continuous_kernel_descriptor descriptor;
@@ -14647,8 +14646,6 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
                                                 "C_np_kernelsum_power12");
   if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
     error("C_np_kernelsum_power12: internal route requires kernel.pow = 1");
-
-  myopti_p = INTEGER(myopti_i);
 
   ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
   nuno = (int)INTEGER(myopti_i)[KWS_NUNOI];
