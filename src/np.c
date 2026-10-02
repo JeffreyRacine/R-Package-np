@@ -65,6 +65,16 @@ static void np_bandwidth_candidate_error(const char *message, const int bwtype)
   error("%s",message);
 }
 
+/* Conditional trial rejection has several causes; ties are not a diagnosis. */
+static void np_conditional_bandwidth_candidate_error(const char *message, const int bwtype)
+{
+  if((bwtype == BW_GEN_NN || bwtype == BW_ADAP_NN) &&
+     strstr(message,"bandwidth candidate") != NULL)
+    error("%s. Conditional trials can be rejected for inadequate kernel support or numerical accuracy. Inspect the data and bandwidth settings, including ties and nearest-neighbor counts.",
+          message);
+  error("%s",message);
+}
+
 /* Declared categorical support is preparation metadata, never inferred from
  * the observed subset. The transient view is rooted by the .Call argument;
  * native contexts copy values before returning and own their usual matrices. */
@@ -17092,7 +17102,7 @@ cleanup_np_density_conditional_bw:
 
   if (bw_error_msg != NULL) {
     np_bwm_clear_deferred_error();
-    np_bandwidth_candidate_error(bw_error_msg, myopti[CBW_DENI]);
+    np_conditional_bandwidth_candidate_error(bw_error_msg, myopti[CBW_DENI]);
   }
 
   return ;
@@ -19020,7 +19030,7 @@ cleanup_np_distribution_conditional_bw:
   if (support_error != NULL)
     error("C_np_distribution_conditional_bw: %s", support_error);
   if (bw_error_msg != NULL)
-    np_bandwidth_candidate_error(bw_error_msg, myopti[CDBW_DENI]);
+    np_conditional_bandwidth_candidate_error(bw_error_msg, myopti[CDBW_DENI]);
 
   return ;
 }
