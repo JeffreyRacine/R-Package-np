@@ -1,5 +1,13 @@
 # npRmpi 0.80-1
 
+* Conditional-density generalized-neighbor CVLS again rejects local-polynomial
+  trials with insufficient distinct nonzero-weight donors, including the
+  uniform and second-order Epanechnikov stable owner. Full-rank rows no longer
+  read unused coefficients from an unwritten solve buffer. Conditional
+  nearest-neighbor all-invalid errors now identify inadequate support or
+  numerical accuracy as possible causes, rather than attributing every failure
+  to ties.
+
 * Conditional local-polynomial bandwidth searches again use the existing
   original-coordinate rank/ridge admission when local QR rank is ambiguous.
   Rejected numerical evaluations receive the existing invalid-trial penalty,
@@ -45,7 +53,11 @@
   polynomial coefficients in their compressed integration owner. Failed
   coefficient accuracy checks or exhausted integration limits invalidate that
   trial through the existing penalty policy without terminating the search.
-  These corrections can substantially increase computation time.
+  These corrections can substantially increase computation time. Retained
+  Linux benchmarks on representative univariate `cv.ls` local-polynomial cases
+  measured about 15--21 times the earlier cost for uniform predictor kernels
+  and 3--4 times for second-order Epanechnikov kernels. These are case-specific
+  cumulative costs of the numerical repairs, not universal multipliers.
 
 * Conditional-density generalized-neighbor CVLS with beta predictors or bounded
   Gaussian predictors now uses the same whole-response criterion as unbounded
@@ -63,10 +75,11 @@
 
 * Conditional-density generalized-neighbor least-squares cross-validation
   now preserves local predictor differences in tightly clustered samples
-  with Epanechnikov predictor kernels, avoiding cancellation across orders
-  2, 4, 6, and 8. The more stable calculation can cost more; default Gaussian
-  predictor kernels are unaffected. Valid narrow response intervals are also
-  retained instead of being rejected by the integration path.
+  with uniform and second-order Epanechnikov predictor kernels. Higher-order
+  signed Epanechnikov predictor kernels retain a known accuracy limitation on
+  tightly clustered samples. The more stable calculation can cost more;
+  default Gaussian predictor kernels are unaffected. Valid narrow response
+  intervals are also retained instead of being rejected by the integration path.
 
 * Corrected unbounded conditional-density least-squares cross-validation with
   generalized nearest-neighbor bandwidths to integrate the squared leave-one-out
