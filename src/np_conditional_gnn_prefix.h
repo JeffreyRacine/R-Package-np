@@ -984,6 +984,8 @@ static SEXP np_cgnn_body(void *raw) {
     }
     for (int t = 0; t < terms; ++t)
       c->coef[(size_t)terms*i+t] =
+        /* FULL rows use stable_coef, not the unwritten incumbent solve RHS. */
+        (c->stable && c->radius[i] > 0.0) ? 0.0 :
         (scalar ? 1.0 : x->regression_solve_workspace.rhs_work[t]) *
         (uniform && !c->stable ? k0 : 1.0) / denominator;
     /* Same one-owner transport: Epan-X now transports its canonical radius;
