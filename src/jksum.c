@@ -29,6 +29,7 @@
 #endif
 
 #include "headers.h"
+#include "conditional_failure.h"
 #include "regression_contrast.h"
 #include "regression_alllarge_residual.h"
 #include "regression_inference_reuse.h"
@@ -42,6 +43,7 @@
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
 #include "conditional_global_qr.h"
+#include "conditional_local_qr.h"
 #include "jksum_block_plan.h"
 #include "kernel_registry.h"
 #include "np_native_safety.h"
@@ -22933,6 +22935,24 @@ static int np_objective_outer_buffer_finish(
 #endif
   return local_fail != 0;
 }
+/* Conditional-only envelope reuses the incumbent completion reduction. */
+static int np_conditional_outer_preflight_failed(int parallel,int failed) {
+  return np_conditional_failure_reduce(parallel,failed);
+}
+static int np_conditional_outer_buffer_finish(int parallel,int count,int failed,
+  double *buffer,const char *failure_env,const char *label) {
+#ifdef MPI2
+  if(parallel && failure_env && np_mpi_rank_failure_injected(failure_env))failed=1;
+#else
+  (void)count;(void)buffer;(void)failure_env;(void)label;
+#endif
+  if(np_conditional_failure_reduce(parallel,failed))return 1;
+#ifdef MPI2
+  if(parallel)np_mpi_allreduce_in_place_double(buffer,count,MPI_SUM,label);
+#endif
+  return 0;
+}
+
 
 static double **np_objective_outer_matrix_try(const int rows,
                                               const int columns)
@@ -38528,6 +38548,24 @@ static int np_conditional_deleted_influence(
   if(!basis || !kw || !mean_row || !work || !qr || !row_out ||
      k <= 0 || eval_pos < 0 || eval_pos >= num_train) return 1;
   kw[eval_pos] = 0.0;
+  /* Conditional local QR uses the adopted local-design rank policy.
+   * No ambiguous/numerical result may be interpreted as an accepted score. */
+  const NPConditionalLocalQRStatus local_status = np_cqr_local_row(
+    &qr->fast, work, num_train, np_glp_cv_cache.ncon, k,
+    np_glp_cv_cache.terms, matrix_X_continuous_train_extern,
+    kw, eval_pos, mean_row, NULL);
+  if(local_status == NP_CQR_LOCAL_FULL){
+    for(j = 0; j < num_train; ++j)
+      row_out[int_TREE_X == NP_TREE_TRUE ? ipt_extern_X[j] : j] = mean_row[j];
+    return 0;
+  }
+  if(local_status != NP_CQR_LOCAL_DEFICIENT) {
+    if(local_status != NP_CQR_LOCAL_EMPTY)
+      np_conditional_failure_record(local_status==NP_CQR_LOCAL_AMBIGUOUS ?
+        NP_CONDITIONAL_RANK_AMBIGUOUS : NP_CONDITIONAL_NUMERICAL_FAILURE,
+        1+(int_TREE_X==NP_TREE_TRUE ? ipt_extern_X[eval_pos] : eval_pos));
+    return 1;
+  }
   for(l = 0; l < k; l++)
     work->rhs_source[l] =
       basis[l][eval_pos];
@@ -38587,7 +38625,7 @@ static int np_conditional_deleted_influence(
   const double anchor = work->gram_source[0];
   if(np_conditional_solve_adjoint_ranked(work, k, 1,
        1.0/(double)MAX(1, num_train),
-       np_lp_rank_upper_bound_from_weights(kw, num_train, k),
+       0, /* certified numerical deficiency; retain original ridge amount */
        &diagnostics) != NP_LP_SOLVE_POLICY_OK) return 1;
   if(np_cqr_deleted_row(qr, num_train, k, kw, basis, eval_pos,
        diagnostics.ridge_total, anchor, mean_row, NULL, NULL)) return 1;
@@ -46903,12 +46941,17 @@ finalize_all_large_context:
   if(ctx->nterms > 1) {
     ctx->stable=calloc(1,sizeof(*ctx->stable));
     if(!ctx->stable || np_cqr_prepare(ctx->stable,ctx->num_train,ctx->nterms,
-                                    ctx->basis,ctx->use_apple_dgemv))
+                                    ctx->basis,ctx->use_apple_dgemv,
+                                    np_glp_cv_cache.ncon,np_glp_cv_cache.terms,
+                                    matrix_X_continuous_train_extern,NULL,
+                                    int_TREE_X==NP_TREE_TRUE?ipt_extern_X:NULL))
       goto cleanup_all_large_prepare;
     if(ctx->basis_original_order) {
       ctx->stable_original=calloc(1,sizeof(*ctx->stable_original));
       if(!ctx->stable_original || np_cqr_prepare(ctx->stable_original,
-           ctx->num_train,ctx->nterms,ctx->basis_original_order,ctx->use_apple_dgemv))
+           ctx->num_train,ctx->nterms,ctx->basis_original_order,ctx->use_apple_dgemv,
+           np_glp_cv_cache.ncon,np_glp_cv_cache.terms,matrix_X_continuous_train_extern,
+           int_TREE_X==NP_TREE_TRUE?ipt_lookup_extern_X:NULL,NULL))
         goto cleanup_all_large_prepare;
     }
   }
@@ -47494,7 +47537,7 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
       local_cv += np_guarded_cvml_contribution(fit);
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_rows,
        ctx.num_train,
        local_fail,
@@ -47662,7 +47705,7 @@ np_conditional_density_cvls_lp_all_large_parallel_stream(
        vector_scale_factor, &ctx, quad_mat,
        conv_cross, conv_diag) != 0)
     local_fail = 1;
-  if(np_objective_outer_preflight_failed(1, local_fail))
+  if(np_conditional_outer_preflight_failed(1, local_fail))
     goto cleanup_cvls_all_large_parallel;
   if(np_objective_outer_buffer_prepare(
        1, (size_t)ctx.num_train, &contributions) != 0)
@@ -47720,7 +47763,7 @@ np_conditional_density_cvls_lp_all_large_parallel_stream(
     contributions[i] = quad - 2.0*lin;
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1, ctx.num_train, local_fail, contributions,
        "NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK",
        "conditional density all-large CVLS rows MPI_Allreduce") != 0)
@@ -47923,7 +47966,7 @@ np_conditional_distribution_cvls_lp_all_large_parallel_stream(
        cross_terms == NULL || beta == NULL)
       local_fail = 1;
   }
-  if(np_objective_outer_preflight_failed(1, local_fail))
+  if(np_conditional_outer_preflight_failed(1, local_fail))
     goto cleanup_cdist_all_large_parallel;
   if(np_objective_outer_buffer_prepare(
        1, (size_t)num_eval, &contributions) != 0)
@@ -48009,7 +48052,7 @@ np_conditional_distribution_cvls_lp_all_large_parallel_stream(
   }
 
 finish_cdist_global_rows:
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1, num_eval, local_fail, contributions,
        "NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK",
        "conditional distribution all-large CVLS rows MPI_Allreduce") != 0)
@@ -48207,7 +48250,7 @@ static int np_conditional_density_cvml_lp_prepared_parallel_stream(
       local_cv += np_guarded_cvml_contribution(fit);
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_rows,
        num_obs,
        local_fail,
@@ -48525,7 +48568,7 @@ np_conditional_density_cvml_adaptive_exact(
     return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
 
   status = np_conditional_adaptive_exact_scale_status(vector_scale_factor);
-  if(np_objective_outer_preflight_failed(
+  if(np_conditional_outer_preflight_failed(
        use_parallel_rows,
        status == NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE))
     return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
@@ -48541,7 +48584,7 @@ np_conditional_density_cvml_adaptive_exact(
        vector_scale_factor, OP_NORMAL,
        num_categories_y, matrix_categorical_vals_y, &yctx) != 0)
     local_fail = 1;
-  if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
+  if(np_conditional_outer_preflight_failed(use_parallel_rows, local_fail))
     goto fail_adaptive_cvml;
   if(np_objective_outer_buffer_prepare(
        use_parallel_rows, (size_t)num_obs, &contributions) != 0)
@@ -48589,7 +48632,7 @@ np_conditional_density_cvml_adaptive_exact(
       local_cv += contribution;
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_rows, num_obs, local_fail, contributions,
        "NP_RMPI_INJECT_CDEN_ADAPTIVE_CVML_FAIL_RANK",
        "conditional density exact adaptive CVML rows MPI_Allreduce") != 0)
@@ -48809,7 +48852,7 @@ np_conditional_density_cvls_adaptive_exact(
     return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
 
   status = np_conditional_adaptive_exact_scale_status(vector_scale_factor);
-  if(np_objective_outer_preflight_failed(
+  if(np_conditional_outer_preflight_failed(
        use_parallel_rows,
        status == NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE))
     return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
@@ -48832,7 +48875,7 @@ np_conditional_density_cvls_adaptive_exact(
   if(!local_fail && scalar_overlap &&
      np_conditional_ann_overlap_prepare(&overlap_block, &yconvctx) != 0)
     local_fail = 1;
-  if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
+  if(np_conditional_outer_preflight_failed(use_parallel_rows, local_fail))
     goto fail_adaptive_cvls;
   if(np_objective_outer_buffer_prepare(
        use_parallel_rows, (size_t)num_obs, &contributions) != 0)
@@ -48922,7 +48965,7 @@ np_conditional_density_cvls_adaptive_exact(
       local_cv += quadratic - 2.0*linear;
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_rows, num_obs, local_fail, contributions,
        "NP_RMPI_INJECT_CDEN_ADAPTIVE_CVLS_FAIL_RANK",
        "conditional density exact adaptive CVLS rows MPI_Allreduce") != 0)
@@ -49268,7 +49311,7 @@ static int np_conditional_density_cvml_lp_parallel_block_stream(
     }
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1,
        num_obs,
        local_fail,
@@ -49473,7 +49516,7 @@ static int np_conditional_density_cvls_lp_row_parallel_stream(
          vector_scale_factor, OP_CONVOLUTION, &yconvctx) != 0)
       local_fail = 1;
   }
-  if(np_objective_outer_preflight_failed(1, local_fail))
+  if(np_conditional_outer_preflight_failed(1, local_fail))
     goto cleanup_cvls_lp_row_parallel;
 
   np_objective_outer_owned_rows(
@@ -49546,7 +49589,7 @@ static int np_conditional_density_cvls_lp_row_parallel_stream(
       contributions[i] = quad - 2.0*lin;
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1, num_obs, local_fail, contributions,
        "NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK",
        "conditional density LP CVLS rows MPI_Allreduce") != 0)
@@ -49650,7 +49693,7 @@ static int np_conditional_density_cvls_lp_adap_block_parallel_stream(
   if(!local_fail && np_conditional_yrow_ctx_prepare(
        vector_scale_factor, OP_CONVOLUTION, &yconvctx) != 0)
     local_fail = 1;
-  if(np_objective_outer_preflight_failed(1, local_fail))
+  if(np_conditional_outer_preflight_failed(1, local_fail))
     goto cleanup_cvls_lp_adap_parallel;
 
   for(first_block_id = first_owned_block;
@@ -49725,7 +49768,7 @@ static int np_conditional_density_cvls_lp_adap_block_parallel_stream(
           block_terms[block_id[g]] = quad[g] - 2.0*lin[g];
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1, nblocks, local_fail, block_terms,
        "NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK",
        "conditional density adaptive CVLS blocks MPI_Allreduce") != 0)
@@ -50481,6 +50524,19 @@ static int np_cgnn_unbounded_admitted(void) {
     int_cxker_bound_extern == 0 && int_cyker_bound_extern == 0;
 }
 
+/* Bounded explanatory rows use the same whole-response GNN criterion.
+ * Admit only Gaussian truncation or an X-only beta route. Bounded/associated
+ * response kernels retain their existing support-specific owners. */
+static int np_cgnn_bounded_x_admitted(
+  const NPConditionalKernelExecutionContext *execution_context) {
+  if(BANDWIDTH_den_extern != BW_GEN_NN || num_var_continuous_extern <= 0 ||
+     int_cyker_bound_extern != 0 || KERNEL_den_extern < 0 || KERNEL_den_extern > 8)
+    return 0;
+  if(execution_context != NULL)
+    return execution_context->x_route != NULL && execution_context->y_route == NULL;
+  return int_cxker_bound_extern != 0 && KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= 3;
+}
+
 /* Upfront representation admission; no recovery or timing-driven dispatch. */
 static int np_cgnn_projected_admitted(void) {
   return BANDWIDTH_den_extern == BW_GEN_NN &&
@@ -50498,7 +50554,7 @@ static int np_conditional_density_cvls_lp_stream_impl(
   double *cv){
   if(np_cgnn_prefix_admitted())
     return np_cgnn_prefix_cvls(vector_scale_factor, cv);
-  if(np_cgnn_unbounded_admitted())
+  if(np_cgnn_unbounded_admitted() || np_cgnn_bounded_x_admitted(NULL))
     return np_conditional_density_cvls_lp_stream_ctx(vector_scale_factor, NULL, cv);
   const int num_obs = num_obs_train_extern;
   const int block_size =
@@ -50976,7 +51032,7 @@ np_conditional_distribution_cvls_adaptive_exact(
     return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
 
   status = np_conditional_adaptive_exact_scale_status(vector_scale_factor);
-  if(np_objective_outer_preflight_failed(
+  if(np_conditional_outer_preflight_failed(
        use_parallel_rows,
        status == NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE))
     return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
@@ -50990,7 +51046,7 @@ np_conditional_distribution_cvls_adaptive_exact(
        vector_scale_factor, OP_INTEGRAL,
        num_categories_y, matrix_categorical_vals_y, &yctx) != 0)
     local_fail = 1;
-  if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
+  if(np_conditional_outer_preflight_failed(use_parallel_rows, local_fail))
     goto fail_adaptive_cdist;
   tree_x = np_conditional_ann_tree_x_admitted(&xctx);
   np_objective_outer_owned_rows(
@@ -50998,7 +51054,7 @@ np_conditional_distribution_cvls_adaptive_exact(
   local_fail = np_conditional_ann_loss_blocks(&xctx, &yctx, tree_x,
     owned_start, owned_start+owned_rows, contributions);
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_rows, num_train, local_fail, contributions,
        "NP_RMPI_INJECT_CDIST_ADAPTIVE_EXACT_FAIL_RANK",
        "conditional distribution exact adaptive rows MPI_Allreduce") != 0)
@@ -51082,7 +51138,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
          &np_conditional_external_geometry,
        &yctx) != 0)
     local_fail = 1;
-  if(np_objective_outer_preflight_failed(use_parallel_rows, local_fail))
+  if(np_conditional_outer_preflight_failed(use_parallel_rows, local_fail))
     goto cleanup_gnn_empirical_cdist;
 
   np_objective_outer_owned_rows(
@@ -51132,7 +51188,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
       *cv += row_contribution;
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_rows,
        num_train,
        local_fail,
@@ -51329,7 +51385,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
       local_fail = 1;
   }
 
-  if(np_objective_outer_preflight_failed(use_parallel_blocks, local_fail))
+  if(np_conditional_outer_preflight_failed(use_parallel_blocks, local_fail))
     goto cleanup_gnn_empirical_block;
 
   for(ii = 0; ii < num_train; ++ii)
@@ -51615,7 +51671,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
   }
 
 finish_gnn_empirical_block:
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_blocks,
        num_train,
        local_fail,
@@ -52197,7 +52253,7 @@ static int np_conditional_density_cvls_provider_supertile_parallel(
     }
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1, nblocks, local_fail, block_terms,
        "NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK",
        "conditional density routed CVLS blocks MPI_Allreduce") != 0)
@@ -52278,7 +52334,7 @@ static int np_conditional_distribution_cvls_lp_adap_row_parallel_stream(
        num_eval,
        &yintctx) != 0)
     local_fail = 1;
-  if(np_objective_outer_preflight_failed(1, local_fail))
+  if(np_conditional_outer_preflight_failed(1, local_fail))
     goto cleanup_cdist_adap_row_parallel;
 
   np_objective_outer_owned_rows(
@@ -52322,7 +52378,7 @@ static int np_conditional_distribution_cvls_lp_adap_row_parallel_stream(
       contributions[i] = row_loss;
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1, num_train, local_fail, contributions,
        "NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK",
        "conditional distribution adaptive CVLS rows MPI_Allreduce") != 0)
@@ -52429,7 +52485,7 @@ static int np_conditional_distribution_cvls_lp_adap_block_parallel_stream(
        num_eval,
        &yintctx) != 0)
     local_fail = 1;
-  if(np_objective_outer_preflight_failed(1, local_fail))
+  if(np_conditional_outer_preflight_failed(1, local_fail))
     goto cleanup_cdist_adap_block_parallel;
 
   for(first_block_id = first_owned_block;
@@ -52509,7 +52565,7 @@ static int np_conditional_distribution_cvls_lp_adap_block_parallel_stream(
           block_terms[block_id[g]] = block_sum[g];
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1, nblocks, local_fail, block_terms,
        "NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK",
        "conditional distribution adaptive CVLS blocks MPI_Allreduce") != 0)
@@ -53466,7 +53522,7 @@ preflight_cat_cvls:
     }
 
 preflight_profile_rows_cat_cvls:
-  if(np_objective_outer_preflight_failed(use_parallel_profiles,
+  if(np_conditional_outer_preflight_failed(use_parallel_profiles,
                                          local_profile_fail))
     goto cleanup_cat_cvls;
   if(np_objective_outer_buffer_prepare(use_parallel_profiles,
@@ -53825,7 +53881,7 @@ preflight_profile_rows_cat_cvls:
   }
 
 finish_profile_rows_cat_cvls:
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_profiles,
        nprof_xy,
        local_profile_fail,
@@ -54424,7 +54480,7 @@ preflight_cat_cdist:
     }
 
 preflight_profile_rows_cat_cdist:
-  if(np_objective_outer_preflight_failed(use_parallel_profiles,
+  if(np_conditional_outer_preflight_failed(use_parallel_profiles,
                                          local_profile_fail))
     goto cleanup_cat_cdist;
   if(np_objective_outer_buffer_prepare(use_parallel_profiles,
@@ -54571,7 +54627,7 @@ preflight_profile_rows_cat_cdist:
   }
 
 finish_profile_rows_cat_cdist:
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_profiles,
        nprof_xy,
        local_profile_fail,
@@ -62061,7 +62117,7 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
     }
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        use_parallel_rows,
        num_obs,
        local_fail,
@@ -62191,8 +62247,9 @@ static int np_conditional_cvls_route_context_prepare(
       np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
     return 1;
 
-  const int projected = execution_context == NULL &&
-    response_operator == OP_NORMAL && np_cgnn_unbounded_admitted();
+  const int projected = response_operator == OP_NORMAL &&
+    ((execution_context == NULL && np_cgnn_unbounded_admitted()) ||
+     np_cgnn_bounded_x_admitted(execution_context));
   context->beta_x = execution_context != NULL && execution_context->x_route != NULL;
   context->beta_y = execution_context != NULL && execution_context->y_route != NULL;
   context->fold_geometry = response_operator == OP_NORMAL &&
@@ -62996,6 +63053,7 @@ int np_conditional_density_cvls_lp_stream_ctx(
   int status = 1;
 
   if(execution_context == NULL && !np_cgnn_unbounded_admitted() &&
+     !np_cgnn_bounded_x_admitted(NULL) &&
      !(int_cyker_bound_extern != 0 && num_var_continuous_extern > 0 &&
        (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN)))
     return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
@@ -63020,9 +63078,12 @@ int np_conditional_density_cvls_lp_stream_ctx(
   provider.fold_fit_block = route_context.fold_geometry ?
     np_conditional_cvls_fold_fit_block : NULL;
 
-  if(execution_context == NULL && np_cgnn_projected_admitted()) {
+  const int bounded_x = np_cgnn_bounded_x_admitted(execution_context);
+  if((execution_context == NULL && np_cgnn_projected_admitted()) ||
+     (bounded_x && num_var_continuous_extern == 1 &&
+      num_var_unordered_extern == 0 && num_var_ordered_extern == 0)) {
     status = np_cgnn_projected_cvls(&route_context, cv);
-  } else if(execution_context == NULL && np_cgnn_unbounded_admitted()) {
+  } else if((execution_context == NULL && np_cgnn_unbounded_admitted()) || bounded_x) {
     status = np_cgnn_general_cvls(&route_context, cv);
   } else if(route_context.fold_geometry &&
      (np_conditional_density_cvls_bounded_scalar_route_ok() ||
@@ -63227,7 +63288,7 @@ static int np_conditional_distribution_cvls_provider_row_stream_parallel(
       contributions[i] = row_loss;
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1, num_train, local_fail, contributions,
        "NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK",
        "conditional distribution routed CVLS rows MPI_Allreduce") != 0)
@@ -63415,7 +63476,7 @@ static int np_conditional_distribution_cvls_provider_supertile_parallel(
     }
   }
 
-  if(np_objective_outer_buffer_finish(
+  if(np_conditional_outer_buffer_finish(
        1, nblocks, local_fail, contributions,
        "NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK",
        "conditional distribution routed CVLS blocks MPI_Allreduce") != 0)

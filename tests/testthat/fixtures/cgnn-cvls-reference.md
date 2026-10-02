@@ -40,3 +40,17 @@ The 17-digit CSV input SHA256 values are:
 - n96: 813c400360a21ca0688093e13f3ccb2c08ded4de5a1b25b6639e662a65442903
 
 Native agreement is a subsequent comparison, not how the references were set.
+
+## Bounded explanatory beta reference (R25 repair, 2026-10-01)
+
+The beta-X order-4, LP(2,2), seed-2026080112, n=54, k=(21,24,25)
+fixture in `test-conditional-density-cvls-delete-one-contract.R` has score
+`0.54294422783929308`. Independent beta density weights, signed deleted WLS,
+and response query-radius squared-density integration over every midpoint
+interval plus both infinite tails give this value at 32 Gauss nodes. The
+20-node result agrees to the existing test tolerance. The prior training-radius
+convolution is not an oracle for this GNN case.
+
+Retained derivation, reviewed oracle and raw results:
+`tmp/r25_release_repairs_20261001_r1/harness/bounded_x_oracle.R` and
+`attempts/bounded-x-source-2-{20,32}/raw.log` under the Development workspace.

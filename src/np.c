@@ -47,6 +47,8 @@ extern MPI_Comm	*comm;
 /* headers.h has all definitions of routines used by main() and related modules */
 
 #include "headers.h"
+#include "conditional_search.h"
+#include "conditional_failure.h"
 #include "nn_radius_error.h"
 #include "np_native_safety.h"
 #include "beta_bandwidth.h"
@@ -4501,6 +4503,13 @@ static double bwmfunc_wrapper(double *p)
 
   return val;
 }
+static double np_conditional_bwmfunc_wrapper(double *p)
+{
+  const double value=bwmfunc_wrapper(p);
+  np_conditional_failure_raise();
+  return value;
+}
+
 
 static void np_copy_scale_factor(double *dest, const double *src, int n)
 {
@@ -7572,6 +7581,7 @@ static int np_conditional_density_prepared_context_eval_native_raw(const double 
                                                                const int raw_only,
                                                                double out[4])
 {
+  np_conditional_failure_reset();
   int i;
   int degree_refresh_needed;
   int degree_refresh_ok;
@@ -7661,7 +7671,7 @@ static int np_conditional_density_prepared_context_eval_native_raw(const double 
   eval_before = bwm_eval_count;
   fast_before = np_fastcv_alllarge_hits_get();
   guarded_before = np_guarded_cvml_hits_get();
-  val = bwmfunc_wrapper(np_conditional_density_prepared_context.vector_scale_factor);
+  val = np_conditional_bwmfunc_wrapper(np_conditional_density_prepared_context.vector_scale_factor);
   fast = np_fastcv_alllarge_hits_get() - fast_before;
   guarded = np_guarded_cvml_hits_get() - guarded_before;
   evals = bwm_eval_count - eval_before;
@@ -17012,7 +17022,7 @@ void np_distribution_bw(double *myuno, double *myord, double *mycon,
 }
 
 
-void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
+static void np_density_conditional_bw_owned(double * c_uno, double * c_ord, double * c_con,
                                double * u_uno, double * u_ord, double * u_con,
                                double * mysd,
                                int * myopti, double * myoptd, double * myans, double * fval,
@@ -17028,6 +17038,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * cxkerlb, double * cxkerub,
                                double * cykerlb, double * cykerub,
                                const int eval_only, const NPCategoricalSupport *support){
+  np_conditional_failure_reset();
   int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
@@ -17187,7 +17198,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     1,
     !myopti[CBW_USTARTI]);
 
-  fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret_initial = fret_best = np_conditional_bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
   have_start_best = 0;
   have_multistart_best = 0;
@@ -17219,7 +17230,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
 conditional_density_powell_attempt:
   if(!eval_only){
-    powell(0,
+    np_conditional_powell(0,
            0,
            vector_scale_factor,
            vector_scale_factor,
@@ -17231,7 +17242,7 @@ conditional_density_powell_attempt:
            itmax,
            &iter,
            &fret,
-           bwmfunc_wrapper);
+           np_conditional_bwmfunc_wrapper);
 
     if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
@@ -17251,7 +17262,7 @@ conditional_density_powell_attempt:
                                lbd_dir, hbd_dir, d_dir, initd_dir,
                                matrix_X_continuous_train_extern,
                                matrix_Y_continuous_train_extern);
-      powell(0,
+      np_conditional_powell(0,
              0,
              vector_scale_factor,
              vector_scale_factor,
@@ -17263,7 +17274,7 @@ conditional_density_powell_attempt:
              itmax,
              &iter,
              &fret,
-             bwmfunc_wrapper);
+             np_conditional_bwmfunc_wrapper);
 
     }
   } else {
@@ -17345,7 +17356,7 @@ conditional_density_powell_attempt:
     } else {
       fret_best = fret;
     }
-    vector_scale_factor_multistart = alloc_vecd(num_all_var + 1);
+    vector_scale_factor_multistart = (double *)R_alloc(num_all_var + 1, sizeof(double));
     for(i = 1; i <= num_all_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
     np_progress_bandwidth_multistart_step(1, iNum_Multistart);
@@ -17408,7 +17419,7 @@ conditional_density_powell_attempt:
 
       bwm_reset_counters();
       
-      powell(0,
+      np_conditional_powell(0,
              0,
              vector_scale_factor,
              vector_scale_factor,
@@ -17420,7 +17431,7 @@ conditional_density_powell_attempt:
              itmax,
              &iter,
              &fret,
-             bwmfunc_wrapper);
+             np_conditional_bwmfunc_wrapper);
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
@@ -17441,7 +17452,7 @@ conditional_density_powell_attempt:
                                  matrix_X_continuous_train_extern,
                                  matrix_Y_continuous_train_extern);
 
-        powell(0,
+        np_conditional_powell(0,
                0,
                vector_scale_factor,
                vector_scale_factor,
@@ -17453,7 +17464,7 @@ conditional_density_powell_attempt:
                itmax,
                &iter,
                &fret,
-               bwmfunc_wrapper);
+               np_conditional_bwmfunc_wrapper);
       }
 				
       /* If this run resulted in an improved minimum save information */
@@ -17520,7 +17531,7 @@ conditional_density_powell_attempt:
       for(i = 1; i <= num_all_var; i++)
         vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
     }
-    free(vector_scale_factor_multistart);
+    /* R owns the multistart vector through normal return and unwind. */
   }
 
   if (np_bwm_get_deferred_error() != NULL) {
@@ -17557,6 +17568,7 @@ conditional_density_powell_attempt:
       goto cleanup_np_density_conditional_bw;
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
+    np_conditional_failure_raise();
     if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
       if ((!nn_retry_attempted) &&
           (!eval_only) &&
@@ -17658,6 +17670,70 @@ cleanup_np_density_conditional_bw:
 
   return ;
 }
+typedef struct {
+  double *c_uno;
+  double *c_ord;
+  double *c_con;
+  double *u_uno;
+  double *u_ord;
+  double *u_con;
+  double *mysd;
+  int *myopti;
+  double *myoptd;
+  double *myans;
+  double *fval;
+  double *objective_function_values;
+  double *objective_function_evals;
+  double *objective_function_invalid;
+  double *timing;
+  double *objective_function_fast;
+  double *objective_function_guarded;
+  int *penalty_mode;
+  double *penalty_mult;
+  int *glp_degree;
+  int *glp_bernstein;
+  int *glp_basis;
+  int *regtype;
+  double *cxkerlb;
+  double *cxkerub;
+  double *cykerlb;
+  double *cykerub;
+  int eval_only;
+  const NPCategoricalSupport *support;
+  int completed, had_active;
+} np_density_conditional_bw_call;
+static SEXP np_density_conditional_bw_call_run(void *raw){
+  np_density_conditional_bw_call *c=raw;
+  np_density_conditional_bw_owned(c->c_uno,c->c_ord,c->c_con,c->u_uno,c->u_ord,c->u_con,c->mysd,c->myopti,c->myoptd,c->myans,c->fval,c->objective_function_values,c->objective_function_evals,c->objective_function_invalid,c->timing,c->objective_function_fast,c->objective_function_guarded,c->penalty_mode,c->penalty_mult,c->glp_degree,c->glp_bernstein,c->glp_basis,c->regtype,c->cxkerlb,c->cxkerub,c->cykerlb,c->cykerub,c->eval_only,c->support);
+  c->completed=1;return R_NilValue;
+}
+static void np_density_conditional_bw_call_cleanup(void *raw){
+  np_density_conditional_bw_call *c=raw;
+  if(!c->completed && !c->had_active){
+    np_conditional_density_prepared_context_clear_internal();
+    np_conditional_failure_reset();
+  }
+}
+void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
+                               double * u_uno, double * u_ord, double * u_con,
+                               double * mysd,
+                               int * myopti, double * myoptd, double * myans, double * fval,
+                               double * objective_function_values, double * objective_function_evals,
+                               double * objective_function_invalid, double * timing,
+                               double * objective_function_fast,
+                               double * objective_function_guarded,
+                               int * penalty_mode, double * penalty_mult,
+                               int * glp_degree,
+                               int * glp_bernstein,
+                               int * glp_basis,
+                               int * regtype,
+                               double * cxkerlb, double * cxkerub,
+                               double * cykerlb, double * cykerub,
+                               const int eval_only, const NPCategoricalSupport *support){
+  np_density_conditional_bw_call c={.c_uno=c_uno,.c_ord=c_ord,.c_con=c_con,.u_uno=u_uno,.u_ord=u_ord,.u_con=u_con,.mysd=mysd,.myopti=myopti,.myoptd=myoptd,.myans=myans,.fval=fval,.objective_function_values=objective_function_values,.objective_function_evals=objective_function_evals,.objective_function_invalid=objective_function_invalid,.timing=timing,.objective_function_fast=objective_function_fast,.objective_function_guarded=objective_function_guarded,.penalty_mode=penalty_mode,.penalty_mult=penalty_mult,.glp_degree=glp_degree,.glp_bernstein=glp_bernstein,.glp_basis=glp_basis,.regtype=regtype,.cxkerlb=cxkerlb,.cxkerub=cxkerub,.cykerlb=cykerlb,.cykerub=cykerub,.eval_only=eval_only,.support=support,.had_active=(np_conditional_density_prepared_context.active || np_conditional_density_prepared_context.owned)};
+  R_ExecWithCleanup(np_density_conditional_bw_call_run,&c,np_density_conditional_bw_call_cleanup,&c);
+}
+
 
 static void np_conditional_distribution_prepared_context_destroy(
   NPConditionalDistributionPreparedCtx *context)
@@ -17989,6 +18065,7 @@ static int np_conditional_distribution_prepared_context_eval(
   const int *degree,
   double out[5])
 {
+  np_conditional_failure_reset();
   double eval_before;
   double fast_before;
   double fast_after;
@@ -18059,7 +18136,7 @@ static int np_conditional_distribution_prepared_context_eval(
   invalid_before = bwm_invalid_count;
   fast_before = np_fastcv_alllarge_hits_get() +
     bwm_nn_cache_hits_window + bwm_objective_cache_hits_window;
-  value = bwmfunc_wrapper(context->scale_factor);
+  value = np_conditional_bwmfunc_wrapper(context->scale_factor);
   fast_after = np_fastcv_alllarge_hits_get() +
     bwm_nn_cache_hits_window + bwm_objective_cache_hits_window;
 
@@ -18078,7 +18155,7 @@ static int np_conditional_distribution_prepared_context_eval(
   return 0;
 }
 
-static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, double * c_con,
+static void np_distribution_conditional_bw_mode_owned(double * c_uno, double * c_ord, double * c_con,
                                     double * u_uno, double * u_ord, double * u_con,
                                     double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
                                     int * myopti, double * myoptd, double * myans, double * fval,
@@ -18096,7 +18173,8 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
                                     NPConditionalDistributionPreparedCtx *retained_context,
                                     const int prepare_only,
                                     const int degree_search,
-                                    const NPCategoricalSupport *support){
+                                    const NPCategoricalSupport *support, NPConditionalDistributionPreparedCtx *unwind_context){
+  np_conditional_failure_reset();
   int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
@@ -18139,9 +18217,8 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
   int * ipt_X = NULL, * ipt_XY = NULL, * ipt_Y = NULL; 
   int * ipt_lookup_XY = NULL, * ipt_lookup_Y = NULL, * ipt_lookup_X = NULL;
   int num_obs_alt;
-  NPConditionalDistributionPreparedCtx local_context = {0};
   NPConditionalDistributionPreparedCtx *prepared_context =
-    (retained_context != NULL) ? retained_context : &local_context;
+    (retained_context != NULL) ? retained_context : unwind_context;
 
   if (prepare_only && retained_context == NULL)
     error("C_np_distribution_conditional_bw: prepare-only mode requires retained ownership");
@@ -19041,7 +19118,7 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
   if (prepare_only)
     return;
 
-  fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
+  fret_initial = fret_best = np_conditional_bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
   have_start_best = 0;
   have_multistart_best = 0;
@@ -19072,7 +19149,7 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
 
 conditional_distribution_powell_attempt:
   if(!eval_only){
-    powell(0,
+    np_conditional_powell(0,
            0,
            vector_scale_factor,
            vector_scale_factor,
@@ -19084,7 +19161,7 @@ conditional_distribution_powell_attempt:
            itmax,
            &iter,
            &fret,
-           bwmfunc_wrapper);
+           np_conditional_bwmfunc_wrapper);
 
     if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
       initialize_nr_directions(BANDWIDTH_den_extern,
@@ -19104,7 +19181,7 @@ conditional_distribution_powell_attempt:
                                matrix_X_continuous_train_extern,
                                matrix_Y_continuous_train_extern);
 
-      powell(0,
+      np_conditional_powell(0,
              0,
              vector_scale_factor,
              vector_scale_factor,
@@ -19116,7 +19193,7 @@ conditional_distribution_powell_attempt:
              itmax,
              &iter,
              &fret,
-             bwmfunc_wrapper);
+             np_conditional_bwmfunc_wrapper);
 
     }
   } else {
@@ -19254,7 +19331,7 @@ conditional_distribution_powell_attempt:
 
       bwm_reset_counters();
 
-      powell(0,
+      np_conditional_powell(0,
              0,
              vector_scale_factor,
              vector_scale_factor,
@@ -19266,7 +19343,7 @@ conditional_distribution_powell_attempt:
              itmax,
              &iter,
              &fret,
-             bwmfunc_wrapper);
+             np_conditional_bwmfunc_wrapper);
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
@@ -19288,7 +19365,7 @@ conditional_distribution_powell_attempt:
                                  matrix_Y_continuous_train_extern);
 
 
-        powell(0,
+        np_conditional_powell(0,
                0,
                vector_scale_factor,
                vector_scale_factor,
@@ -19300,7 +19377,7 @@ conditional_distribution_powell_attempt:
                itmax,
                &iter,
                &fret,
-               bwmfunc_wrapper);
+               np_conditional_bwmfunc_wrapper);
       }
 				
       /* If this run resulted in an improved minimum save information */
@@ -19397,6 +19474,7 @@ conditional_distribution_powell_attempt:
       goto cleanup_np_distribution_conditional_bw;
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
+    np_conditional_failure_raise();
     if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
       if ((!nn_retry_attempted) &&
           (!eval_only) &&
@@ -19500,6 +19578,79 @@ cleanup_np_distribution_conditional_bw:
 
   return ;
 }
+typedef struct {
+  double *c_uno;
+  double *c_ord;
+  double *c_con;
+  double *u_uno;
+  double *u_ord;
+  double *u_con;
+  double *cg_uno;
+  double *cg_ord;
+  double *cg_con;
+  double *mysd;
+  int *myopti;
+  double *myoptd;
+  double *myans;
+  double *fval;
+  double *objective_function_values;
+  double *objective_function_evals;
+  double *objective_function_invalid;
+  double *timing;
+  double *objective_function_fast;
+  int *penalty_mode;
+  double *penalty_mult;
+  int *glp_degree;
+  int *glp_bernstein;
+  int *glp_basis;
+  int *regtype;
+  double *cxkerlb;
+  double *cxkerub;
+  double *cykerlb;
+  double *cykerub;
+  int eval_only;
+  NPConditionalDistributionPreparedCtx *retained_context;
+  int prepare_only;
+  int degree_search;
+  const NPCategoricalSupport *support;
+  int completed, had_active;
+  NPConditionalDistributionPreparedCtx owned;
+} np_distribution_conditional_bw_mode_call;
+static SEXP np_distribution_conditional_bw_mode_call_run(void *raw){
+  np_distribution_conditional_bw_mode_call *c=raw;
+  np_distribution_conditional_bw_mode_owned(c->c_uno,c->c_ord,c->c_con,c->u_uno,c->u_ord,c->u_con,c->cg_uno,c->cg_ord,c->cg_con,c->mysd,c->myopti,c->myoptd,c->myans,c->fval,c->objective_function_values,c->objective_function_evals,c->objective_function_invalid,c->timing,c->objective_function_fast,c->penalty_mode,c->penalty_mult,c->glp_degree,c->glp_bernstein,c->glp_basis,c->regtype,c->cxkerlb,c->cxkerub,c->cykerlb,c->cykerub,c->eval_only,c->retained_context,c->prepare_only,c->degree_search,c->support,&c->owned);
+  c->completed=1;return R_NilValue;
+}
+static void np_distribution_conditional_bw_mode_call_cleanup(void *raw){
+  np_distribution_conditional_bw_mode_call *c=raw;
+  if(!c->completed && !c->had_active){
+    np_conditional_distribution_prepared_context_destroy(c->retained_context ? c->retained_context : &c->owned);
+    np_conditional_failure_reset();
+  }
+}
+static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, double * c_con,
+                                    double * u_uno, double * u_ord, double * u_con,
+                                    double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
+                                    int * myopti, double * myoptd, double * myans, double * fval,
+                                    double * objective_function_values, double * objective_function_evals,
+                                    double * objective_function_invalid, double * timing,
+                                    double * objective_function_fast,
+                                    int * penalty_mode, double * penalty_mult,
+                                    int * glp_degree,
+                                    int * glp_bernstein,
+                                    int * glp_basis,
+                                    int * regtype,
+                                    double * cxkerlb, double * cxkerub,
+                                    double * cykerlb, double * cykerub,
+                                    const int eval_only,
+                                    NPConditionalDistributionPreparedCtx *retained_context,
+                                    const int prepare_only,
+                                    const int degree_search,
+                                    const NPCategoricalSupport *support){
+  np_distribution_conditional_bw_mode_call c={.c_uno=c_uno,.c_ord=c_ord,.c_con=c_con,.u_uno=u_uno,.u_ord=u_ord,.u_con=u_con,.cg_uno=cg_uno,.cg_ord=cg_ord,.cg_con=cg_con,.mysd=mysd,.myopti=myopti,.myoptd=myoptd,.myans=myans,.fval=fval,.objective_function_values=objective_function_values,.objective_function_evals=objective_function_evals,.objective_function_invalid=objective_function_invalid,.timing=timing,.objective_function_fast=objective_function_fast,.penalty_mode=penalty_mode,.penalty_mult=penalty_mult,.glp_degree=glp_degree,.glp_bernstein=glp_bernstein,.glp_basis=glp_basis,.regtype=regtype,.cxkerlb=cxkerlb,.cxkerub=cxkerub,.cykerlb=cykerlb,.cykerub=cykerub,.eval_only=eval_only,.retained_context=retained_context,.prepare_only=prepare_only,.degree_search=degree_search,.support=support,.had_active=(retained_context && retained_context->active)};
+  R_ExecWithCleanup(np_distribution_conditional_bw_mode_call_run,&c,np_distribution_conditional_bw_mode_call_cleanup,&c);
+}
+
 
 void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     double * u_uno, double * u_ord, double * u_con,

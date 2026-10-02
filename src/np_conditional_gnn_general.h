@@ -91,7 +91,7 @@ static SEXP np_cgnn_general_body(void *raw)
 #endif
   }
 #ifdef MPI2
-  if(np_objective_outer_buffer_finish(parallel,n,fail,c->values,NULL,
+  if(np_conditional_outer_buffer_finish(parallel,n,fail,c->values,NULL,
        "conditional GNN whole-support integral"))return R_NilValue;
   if(parallel)
     np_mpi_allreduce_in_place_double(c->bounds,n,MPI_SUM,
@@ -114,7 +114,7 @@ static SEXP np_cgnn_general_body(void *raw)
     a->cross[i]=linear;
   }
 #ifdef MPI2
-  if(np_objective_outer_buffer_finish(parallel,n,fail,a->cross,NULL,
+  if(np_conditional_outer_buffer_finish(parallel,n,fail,a->cross,NULL,
        "conditional GNN whole-support I2"))return R_NilValue;
 #else
   if(fail)return R_NilValue;

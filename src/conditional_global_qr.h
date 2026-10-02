@@ -6,6 +6,8 @@
 #include "conditional_deleted_qr.h"
 #include "conditional_rank_admission.h"
 #include "conditional_global_rank_certificate.h"
+#include "conditional_local_qr.h"
+#include "conditional_failure.h"
 typedef struct {
   int n,k,dgemv,nexception;
   double **basis; /* borrowed original-coordinate columns */
@@ -18,9 +20,10 @@ static void np_cqr_clear(NPConditionalQRGlobal *g){
   free(g->row);free(g->exception);free(g->indices);
   np_cqr_deleted_clear(&g->deleted);memset(g,0,sizeof(*g));
 }
-static int np_cqr_prepare(NPConditionalQRGlobal *g,int n,int k,double **basis,int dgemv){
+static int np_cqr_prepare(NPConditionalQRGlobal *g,int n,int k,double **basis,int dgemv,
+  int dimensions,const int *terms,double **x,const int *positions,const int *original_ids){
   NPLPSolveWorkspace policy;np_lp_solve_workspace_init(&policy);
-  NPCQRCertificate certificate={0};
+  NPConditionalQRFast local={0};
   NPConditionalQRAcc *gram=NULL;double *tau=NULL,*work=NULL;int *pivot=NULL;
   int one=1,info=0,lwork=-1,status=1;double query=0.;
   if(!g||!basis||n<2||k<1||k>n||k>(INT_MAX-1)/3||
@@ -48,13 +51,6 @@ static int np_cqr_prepare(NPConditionalQRGlobal *g,int n,int k,double **basis,in
     }
   }
   if(!np_lp_solve_workspace_reserve(&policy,k,1))goto cleanup;
-  if(k>1 && n-1>=k){
-    for(int a=0;a<k;a++)for(int b=a;b<k;b++){
-      const NPConditionalQRAcc z=gram[a+(size_t)k*b];
-      policy.gram_source[a+(size_t)k*b]=policy.gram_source[b+(size_t)k*a]=z.hi+z.lo;
-    }
-    if(np_cqr_cert_prepare(&certificate,k,policy.gram_source)<0)goto cleanup;
-  }
   for(int i=0;i<n;i++){
     for(int a=0;a<k;a++){
       policy.rhs_source[a]=basis[a][i];
@@ -66,11 +62,21 @@ static int np_cqr_prepare(NPConditionalQRGlobal *g,int n,int k,double **basis,in
     }
     g->anchor[i]=policy.gram_source[0];
     NPLPSolvePolicyDiagnostics d={0,0.};
-    const int certified=np_cqr_cert_deleted(&certificate,policy.gram_source,policy.rhs_source,NULL);
-    const int solved=certified?
-      np_lp_solve_workspace_solve_adjoint_ranked(&policy,k,1,1./n,n-1<k?n-1:k,&d):
-      np_conditional_solve_adjoint_ranked(&policy,k,1,1./n,n-1<k?n-1:k,&d);
-    if(solved!=NP_LP_SOLVE_POLICY_OK)goto cleanup;
+    const int position=positions?positions[i]:i;
+    const NPConditionalLocalQRStatus rank=np_cqr_local_row(&local,&policy,n,
+      dimensions,k,terms,x,g->ones,position,g->row,NULL);
+    if(rank==NP_CQR_LOCAL_FULL) {
+      g->lambda[i]=0.0;
+      continue;
+    }
+    if(rank!=NP_CQR_LOCAL_DEFICIENT) {
+      np_conditional_failure_record(rank==NP_CQR_LOCAL_AMBIGUOUS ?
+        NP_CONDITIONAL_RANK_AMBIGUOUS : NP_CONDITIONAL_NUMERICAL_FAILURE,
+        1+(original_ids?original_ids[i]:i));
+      goto cleanup;
+    }
+    if(np_conditional_solve_adjoint_ranked(&policy,k,1,1./n,0,&d)
+         !=NP_LP_SOLVE_POLICY_OK)goto cleanup;
     g->lambda[i]=d.ridge_total;
   }
   F77_CALL(dgeqp3)(&n,&k,g->q,&n,pivot,tau,&query,&lwork,&info);
@@ -91,7 +97,7 @@ static int np_cqr_prepare(NPConditionalQRGlobal *g,int n,int k,double **basis,in
   }
   status=0;
 cleanup:
-  np_cqr_cert_clear(&certificate);
+  np_cqr_fast_clear(&local);
   np_lp_solve_workspace_clear(&policy);free(gram);free(tau);free(pivot);free(work);
   if(status)np_cqr_clear(g);return status;
 }

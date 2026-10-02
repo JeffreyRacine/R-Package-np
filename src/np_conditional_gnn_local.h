@@ -88,7 +88,8 @@ static int np_cgnn_local_prepare(NPGNNLocalMoments *c, int n, int degree,
   if (!np_size_mul_checked(n, (size_t)4 * (depth + 1), &c->capacity)) return 1;
   NP_CGNN_LOCAL_ALLOC(query, c->capacity);
 #undef NP_CGNN_LOCAL_ALLOC
-  if (degree == 2) {
+  if(degree==0)c->kernel[0]=.5;
+  else if (degree == 2) {
     c->kernel[0] = .33541019662496845446;
     c->kernel[2] = -.067082039324993690892;
   } else {
