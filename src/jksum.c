@@ -34661,7 +34661,7 @@ static int np_conditional_deleted_influence(
      k <= 0 || eval_pos < 0 || eval_pos >= num_train) return 1;
   kw[eval_pos] = 0.0;
   /* Conditional local QR uses the adopted local-design rank policy.
-   * No ambiguous/numerical result may be interpreted as an accepted score. */
+   * Uncertain rank uses the incumbent original-coordinate admission below. */
   const NPConditionalLocalQRStatus local_status = np_cqr_local_row(
     &qr->fast, work, num_train, np_glp_cv_cache.ncon, k,
     np_glp_cv_cache.terms, matrix_X_continuous_train_extern,
@@ -34671,7 +34671,8 @@ static int np_conditional_deleted_influence(
       row_out[int_TREE_X == NP_TREE_TRUE ? ipt_extern_X[j] : j] = mean_row[j];
     return 0;
   }
-  if(local_status != NP_CQR_LOCAL_DEFICIENT) {
+  if(local_status != NP_CQR_LOCAL_DEFICIENT &&
+     local_status != NP_CQR_LOCAL_AMBIGUOUS) {
     if(local_status != NP_CQR_LOCAL_EMPTY)
       np_conditional_failure_record(local_status==NP_CQR_LOCAL_AMBIGUOUS ?
         NP_CONDITIONAL_RANK_AMBIGUOUS : NP_CONDITIONAL_NUMERICAL_FAILURE,
@@ -34737,7 +34738,8 @@ static int np_conditional_deleted_influence(
   const double anchor = work->gram_source[0];
   if(np_conditional_solve_adjoint_ranked(work, k, 1,
        1.0/(double)MAX(1, num_train),
-       0, /* certified numerical deficiency; retain original ridge amount */
+       local_status == NP_CQR_LOCAL_DEFICIENT ? 0 :
+         np_lp_rank_upper_bound_from_weights(kw, num_train, k),
        &diagnostics) != NP_LP_SOLVE_POLICY_OK) return 1;
   if(np_cqr_deleted_row(qr, num_train, k, kw, basis, eval_pos,
        diagnostics.ridge_total, anchor, mean_row, NULL, NULL)) return 1;

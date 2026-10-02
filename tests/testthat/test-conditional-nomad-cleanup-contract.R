@@ -1,4 +1,4 @@
-test_that("conditional NOMAD terminal errors preserve same-process recovery", {
+test_that("conditional ambiguous trials retain search and same-process recovery", {
   skip_if_not_installed("crs")
   pkg <- getNamespaceName(environment(npcdensbw))
   old <- options(np.messages=FALSE, np.tree=FALSE)
@@ -15,27 +15,27 @@ test_that("conditional NOMAD terminal errors preserve same-process recovery", {
     expect_identical(got$solution, expected$solution)
     expect_identical(got$objective, expected$objective)
   }
-  # Retain the original small-n shortcut ambiguity, including its public text.
+  # The original small-n ambiguity must use the incumbent rank/ridge policy.
   for (visible in c(FALSE, TRUE)) {
     options(np.messages=visible)
     set.seed(20260322)
     dat <- data.frame(x=sort(runif(14)), y=sort(runif(14)))
-    expect_error(npcdensbw(y~x, data=dat, nomad=TRUE, degree.max=1L, nmulti=1L),
-      "conditional bandwidth search stopped: ambiguous numerical rank; row 14; bandwidth/scale factors")
+    bw <- npcdensbw(y~x, data=dat, nomad=TRUE, degree.max=1L, nmulti=1L)
+    expect_true(is.finite(bw$fval) && abs(bw$fval) < .Machine$double.xmax)
     recover()
   }
-  # Original CDF progress fixture; successful progress coverage is separate.
+  # The original CDF trajectory must complete with a raw-valid endpoint.
   options(np.messages=FALSE)
   set.seed(20260401)
   x <- sort(runif(18)); z <- sort(runif(18))
   y <- sin(2*pi*x)+rnorm(18,sd=.05)
-  expect_error(npcdistbw(y~x, data=data.frame(x,y), regtype="lp",
+  bw <- npcdistbw(y~x, data=data.frame(x,y), regtype="lp",
     degree.select="coordinate", search.engine="nomad+powell",
     degree.min=0L, degree.max=1L, degree.verify=FALSE, bwtype="fixed",
-    bwmethod="cv.ls", nmulti=2L, ngrid=30L),
-    "conditional bandwidth search stopped: ambiguous numerical rank; row 18; bandwidth/scale factors")
+    bwmethod="cv.ls", nmulti=2L, ngrid=30L)
+  expect_true(is.finite(bw$fval) && abs(bw$fval) < .Machine$double.xmax)
   recover()
-  # Actual conditional native work still succeeds after both failure owners.
+  # Actual conditional native work still succeeds after both formerly failing owners.
   set.seed(952)
   dat <- data.frame(x=seq(-1,1,length.out=48),y=rnorm(48))
   for (fun in list(npcdensbw,npcdistbw)) {
@@ -48,7 +48,7 @@ test_that("conditional NOMAD terminal errors preserve same-process recovery", {
 })
 
 
-test_that("conditional density preparation errors do not poison later penalties", {
+test_that("conditional density ambiguous preparation does not poison later penalties", {
   old <- options(np.messages=FALSE, np.tree=FALSE)
   on.exit(options(old), add=TRUE)
   ns <- asNamespace(getNamespaceName(environment(npcdensbw)))
@@ -77,12 +77,36 @@ test_that("conditional density preparation errors do not poison later penalties"
   bad <- data.frame(x=sort(runif(14)), y=sort(runif(14)))
   bandwidth <- c(.048130207494902745,.025634352719319447)
   bad_args <- args_for(bad, 1L, bandwidth)
-  expect_error(do.call(prepare, bad_args),
-    "conditional bandwidth search stopped: ambiguous numerical rank; row 14;")
+  local({
+    on.exit(destroy(), add=TRUE)
+    expect_true(as.logical(do.call(prepare, bad_args)))
+    value <- evaluate(bandwidth, 0L)
+    expect_true(all(is.finite(value)))
+  })
   expect_identical(penalty(), before)
-  expect_error(npcdensbw(y~x, data=bad, regtype="lp", degree=1L,
+  bw <- npcdensbw(y~x, data=bad, regtype="lp", degree=1L,
     bws=bandwidth, bwsolver="mads", nmulti=1L,
-    nomad.opts=list(MAX_BB_EVAL=1L)),
-    "conditional bandwidth search stopped: ambiguous numerical rank; row 14;")
+    nomad.opts=list(MAX_BB_EVAL=1L))
+  expect_true(is.finite(bw$fval) && abs(bw$fval) < .Machine$double.xmax)
   expect_identical(penalty(), before)
+})
+
+
+test_that("mixed-predictor wage1 ambiguous trial retains the conditional score", {
+  old <- options(np.messages=FALSE, np.tree=FALSE)
+  on.exit(options(old), add=TRUE)
+  pkg <- getNamespaceName(environment(npcdensbw))
+  ns <- asNamespace(pkg)
+  data("wage1", package=pkg, envir=environment())
+  X <- wage1[c("married", "female", "nonwhite", "educ", "exper", "tenure")]
+  Y <- wage1["lwage"]
+  bandwidth <- c(.12134193201574466, .385, .325, .385,
+                 .33874335307089481, 62022.24099856431, .13549734122835794)
+  for (family in c("npcdensbw", "npcdistbw")) {
+    bw <- get(family, ns)(xdat=X, ydat=Y, bws=bandwidth, regtype="lp",
+      degree=c(1L,0L,0L), bandwidth.compute=FALSE)
+    value <- get(paste0(".",family,"_eval_only"), ns)(xdat=X, ydat=Y,
+      bws=bw, invalid.penalty="dbmax")$objective
+    expect_true(is.finite(value) && abs(value) < .Machine$double.xmax)
+  }
 })

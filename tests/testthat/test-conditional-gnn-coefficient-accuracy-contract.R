@@ -1,4 +1,4 @@
-test_that("conditional GNN coefficient conversion fails closed and recovers", {
+test_that("conditional GNN coefficient rejection returns an invalid trial and recovers", {
   old <- options(np.messages=FALSE, np.tree=FALSE)
   on.exit(options(old), add=TRUE)
   # Fixed input doubles from the independent 80-digit degree-9 diagnostic.
@@ -55,15 +55,17 @@ test_that("conditional GNN coefficient conversion fails closed and recovers", {
     b <- npcdensbw(xdat=X, ydat=Y, bws=c(8,20), bwtype="generalized_nn",
       bwmethod="cv.ls", regtype="lp", degree=9L, bernstein.basis=FALSE,
       cxkertype=kernel, bandwidth.compute=FALSE)
-    expect_error(np:::.npcdensbw_eval_only(X,Y,b),
-      "polynomial coefficient reconstruction failed accuracy check; row .*bandwidth")
+    expect_identical(np:::.npcdensbw_eval_only(X,Y,b,
+      invalid.penalty="dbmax")$objective, -.Machine$double.xmax)
+    expect_identical(np:::.npcdensbw_eval_only(X,Y,b,
+      invalid.penalty="baseline")$objective, -1e7)
   }
-  # The same failure inside native MADS must unwind before a later solve.
+  # Search continues through invalid trials; an all-invalid final point is rejected.
   expect_error(npcdensbw(xdat=X, ydat=Y, bws=c(8,20),
     bwtype="generalized_nn", bwmethod="cv.ls", regtype="lp", degree=9L,
     bernstein.basis=FALSE, cxkertype="uniform", bwsolver="mads", nmulti=1L,
     nomad.opts=list(MAX_BB_EVAL=12L)),
-    "polynomial coefficient reconstruction failed accuracy check; row .*bandwidth")
+    "did not return a raw-valid solution")
   # A stable degree-9 design keeps the existing public option available.
   X <- data.frame(x=sort(cos(pi*(0:59)/59)))
   Y <- data.frame(y=sin(2*X$x)+cos(3*X$x)/3)
@@ -71,7 +73,8 @@ test_that("conditional GNN coefficient conversion fails closed and recovers", {
     b <- npcdensbw(xdat=X, ydat=Y, bws=c(20,59), bwtype="generalized_nn",
       bwmethod="cv.ls", regtype="lp", degree=9L, bernstein.basis=FALSE,
       cxkertype=kernel, bandwidth.compute=FALSE)
-    expect_true(is.finite(np:::.npcdensbw_eval_only(X,Y,b)$objective))
+    value <- np:::.npcdensbw_eval_only(X,Y,b, invalid.penalty="dbmax")$objective
+    expect_true(is.finite(value) && abs(value) < .Machine$double.xmax)
   }
 })
 

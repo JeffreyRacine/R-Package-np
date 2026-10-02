@@ -914,10 +914,12 @@ or standard-deviation factors.
   bounded Gaussian predictor kernels when the response domain is unbounded.
   Predictor boundary correction does not make the response bandwidth constant.
 
-  Ambiguous numerical rank in a conditional local-polynomial design, or
-  exhaustion of the numerical integration limits in a compressed response
-  integrator, stops the search with a row and bandwidth diagnostic. Such a
-  failure is not returned as a finite cross-validation score.
+  Ambiguous local QR rank in a conditional local-polynomial design uses the
+  existing original-coordinate rank/ridge admission. If a numerical evaluation
+  remains unusable, including a failed coefficient accuracy check or exhausted
+  integration limits, it receives the existing invalid-evaluation penalty and
+  search continues. A penalty is not a verified cross-validation score; the
+  final selected bandwidth must pass the existing raw-objective validation.
 
   Computation time depends on the kernels, nearest-neighbor counts, predictor
   and response dimensions, and local-polynomial specification. Some

@@ -68,13 +68,14 @@ static int np_cqr_prepare(NPConditionalQRGlobal *g,int n,int k,double **basis,in
       g->lambda[i]=0.0;
       continue;
     }
-    if(rank!=NP_CQR_LOCAL_DEFICIENT) {
+    if(rank!=NP_CQR_LOCAL_DEFICIENT && rank!=NP_CQR_LOCAL_AMBIGUOUS) {
       np_conditional_failure_record(rank==NP_CQR_LOCAL_AMBIGUOUS ?
         NP_CONDITIONAL_RANK_AMBIGUOUS : NP_CONDITIONAL_NUMERICAL_FAILURE,
         1+(original_ids?original_ids[i]:i));
       goto cleanup;
     }
-    if(np_conditional_solve_adjoint_ranked(&policy,k,1,1./n,0,&d)
+    if(np_conditional_solve_adjoint_ranked(&policy,k,1,1./n,
+         rank==NP_CQR_LOCAL_DEFICIENT ? 0 : (n-1<k?n-1:k),&d)
          !=NP_LP_SOLVE_POLICY_OK)goto cleanup;
     g->lambda[i]=d.ridge_total;
   }
