@@ -1,3 +1,21 @@
+test_that("conditional GNN preserves structural deleted-support admission", {
+  old <- options(np.messages=FALSE)
+  on.exit(options(old), add=TRUE)
+  set.seed(2005)
+  x <- rt(60,2); y <- .5*x+rt(60,3)
+  for (tree in c(FALSE,TRUE)) for (degree in 2:3) {
+    options(np.tree=tree)
+    for (xx in list(x,x+10,3*x)) {
+      X <- data.frame(x=xx); Y <- data.frame(y=y)
+      bw <- npcdensbw(xdat=X, ydat=Y, bws=c(8,degree+1),
+        bwtype="generalized_nn", bwmethod="cv.ls", regtype="lp",
+        degree=degree, cxkertype="uniform", bandwidth.compute=FALSE)
+      expect_identical(np:::.npcdensbw_eval_only(X,Y,bw,
+        invalid.penalty="dbmax")$objective, -.Machine$double.xmax)
+    }
+  }
+})
+
 test_that("conditional GNN coefficient rejection returns an invalid trial and recovers", {
   old <- options(np.messages=FALSE, np.tree=FALSE)
   on.exit(options(old), add=TRUE)
