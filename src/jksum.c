@@ -45585,7 +45585,7 @@ static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_sc
 #ifdef MPI2
   if(use_parallel_blocks){
     int any_fail = 0;
-    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    any_fail = np_conditional_failure_reduce(1, local_fail);
     if(any_fail)
       return 1;
     MPI_Allreduce(&local_cv, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
@@ -46593,7 +46593,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
 #ifdef MPI2
   if(use_parallel_blocks){
     int any_fail = 0;
-    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    any_fail = np_conditional_failure_reduce(1, local_fail);
     if(any_fail)
       goto cleanup_bounded_cvls_quad_general;
     MPI_Allreduce(&local_cv, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
@@ -50478,7 +50478,7 @@ np_conditional_density_cvls_lp_supertile2_stream(
     if(np_mpi_rank_failure_injected("NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK"))
       local_fail = 1;
 
-    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    any_fail = np_conditional_failure_reduce(1, local_fail);
     if(any_fail)
       goto cleanup_cvls_lp_supertile2;
 
@@ -50834,7 +50834,7 @@ static int np_conditional_density_cvls_lp_stream_impl(
     if(np_mpi_rank_failure_injected("NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK"))
       local_fail = 1;
 
-    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    any_fail = np_conditional_failure_reduce(1, local_fail);
     if(any_fail)
       goto cleanup_cvls_lp_block;
 
@@ -54935,7 +54935,7 @@ static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_fa
   if(use_parallel_blocks){
     int any_fail = 0;
 
-    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    any_fail = np_conditional_failure_reduce(1, local_fail);
     if(any_fail)
       goto cleanup_cdist_lp_block;
 

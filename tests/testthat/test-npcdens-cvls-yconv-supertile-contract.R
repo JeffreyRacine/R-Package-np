@@ -121,7 +121,7 @@ test_that("MPI CVLS supertile retains rank ownership and block-order reduction",
     "np_blas_dgemm_tn_int",
     "quad[g] += aij*quad_cross",
     "block_terms[block_id[g]]",
-    "MPI_Allreduce(&local_fail, &any_fail",
+    "np_conditional_failure_reduce(1, local_fail)",
     "MPI_Allreduce(MPI_IN_PLACE",
     "for(ii = 0; ii < nblocks; ii++)"
   )
@@ -132,7 +132,7 @@ test_that("MPI CVLS supertile retains rank ownership and block-order reduction",
   expect_true(all(diff(positions) > 0L))
   expect_equal(lengths(regmatches(
     body,
-    gregexpr("MPI_Allreduce\\(", body, perl = TRUE)
+    gregexpr("(?:MPI_Allreduce|np_conditional_failure_reduce)\\(", body, perl = TRUE)
   )), 2L)
   expect_match(
     body,

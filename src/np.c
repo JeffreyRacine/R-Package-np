@@ -6483,6 +6483,8 @@ static void np_conditional_density_refresh_penalty_canonical(
     if (!R_FINITE(baseline) || baseline == DBL_MAX)
       bwm_invalid_count += 1.0;
   }
+  if (np_conditional_failure_pending())
+    return;
   if (!R_FINITE(baseline) || baseline == DBL_MAX) {
     double *tmp = bwm_alloc_transform_tmp(
       num_all_var + bwm_num_extra_params + 1);
@@ -6560,6 +6562,8 @@ static void np_conditional_density_refresh_penalty_canonical(
           if (!R_FINITE(baseline) || baseline == DBL_MAX)
             bwm_invalid_count += 1.0;
         }
+        if (np_conditional_failure_pending())
+          break;
         if (R_FINITE(baseline) && baseline != DBL_MAX) {
           if (adaptive_lp_reseed)
             np_copy_scale_factor(
@@ -6571,6 +6575,8 @@ static void np_conditional_density_refresh_penalty_canonical(
     safe_free(tmp);
   }
 
+  if (np_conditional_failure_pending())
+    return;
   if (!R_FINITE(baseline) || baseline == DBL_MAX)
     bwm_penalty_value = pmult * 1.0e6;
   else
@@ -6783,6 +6789,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
   double lbd_init, hbd_init, d_init;
 
   np_conditional_density_prepared_context_clear_internal();
+  /* A new invocation must not inherit a caught conditional failure. */
+  np_conditional_failure_reset();
   if (support_failure != NULL)
     *support_failure = NP_SUPPORT_FAILURE_NONE;
   np_conditional_density_prepared_context.owned = 1;
@@ -7555,6 +7563,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
     int_conditional_prepared_context_extern = 1;
     bwm_reset_counters();
     np_conditional_density_prepared_context_refresh_penalty();
+    if (np_conditional_failure_pending())
+      goto fail;
     bwm_reset_counters();
   }
 
@@ -7701,6 +7711,9 @@ SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno,
 
   UNPROTECT(20);
 
+  /* Local preparation storage has been released before raising this error. */
+  if (np_conditional_failure_pending())
+    np_conditional_failure_raise();
   return ScalarInteger(ok ? 1 : -(support_failure + 1));
 }
 

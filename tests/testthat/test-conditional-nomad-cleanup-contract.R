@@ -51,14 +51,60 @@ test_that("conditional NOMAD terminal errors preserve same-process recovery", {
 })
 
 
-test_that("conditional CDF block failure shares numerical metadata", {
-  source_file <- file.path(npRmpi_namespace_hygiene_root(), "src", "jksum.c")
-  source <- paste(readLines(source_file, warn=FALSE), collapse="\n")
-  start <- regexpr("np_conditional_distribution_cvls_lp_one\\(", source)[1L]
-  end <- regexpr("#undef NP_CDIST_ONEBLOCK_ALIGN", source, fixed=TRUE)[1L]
-  expect_gt(start, 0L)
-  expect_gt(end, start)
-  owner <- substr(source, start, end-1L)
-  expect_match(owner, "np_conditional_failure_reduce(1, local_fail)", fixed=TRUE)
-  expect_false(grepl("MPI_Allreduce(&local_fail", owner, fixed=TRUE))
+test_that("conditional MPI row completions share numerical metadata", {
+  source_file <- npRmpi_test_source_path("src", "jksum.c")
+  lines <- readLines(source_file, warn=FALSE)
+  owners <- c(
+    "np_conditional_density_cvls_lp_stream_impl",
+    "np_conditional_density_cvls_lp_supertile2_stream",
+    "np_conditional_density_cvls_bounded_i1_eval_on_grid",
+    "np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream",
+    "np_conditional_distribution_cvls_lp_supertile",
+    "np_conditional_distribution_cvls_lp_one")
+  for (name in owners) {
+    owner <- npRmpi_test_extract_c_function(lines, name)
+    expect_match(owner, "np_conditional_failure_reduce(1, local_fail)",
+                 fixed=TRUE, info=name)
+    expect_false(grepl("MPI_Allreduce(&local_fail", owner, fixed=TRUE), info=name)
+  }
+})
+
+
+test_that("conditional density preparation errors do not poison later penalties", {
+  old <- options(np.messages=FALSE, np.tree=FALSE)
+  on.exit(options(old), add=TRUE)
+  ns <- asNamespace(getNamespaceName(environment(npcdensbw)))
+  prepare <- get("npRmpiPreparedObjectivePrepareConditionalDensity", ns)
+  destroy <- get("npRmpiPreparedObjectiveDestroyConditionalDensity", ns)
+  evaluate <- get("npRmpiPreparedObjectiveEvalConditionalDensity", ns)
+  args_for <- function(dat, degree, bandwidth) {
+    bw <- npcdensbw(y~x, data=dat, regtype="lp", degree=degree,
+                   bws=bandwidth, bandwidth.compute=FALSE)
+    args <- get(".npcdensbw_prepared_prepare_args", ns)(
+      dat["x"], dat["y"], bw, start.bw=bandwidth, invalid.penalty="baseline")
+    names(args)[names(args)=="penalty_mode"] <- "penalty.mode"
+    names(args)[names(args)=="penalty_multiplier"] <- "penalty.multiplier"
+    args
+  }
+  set.seed(952)
+  healthy <- data.frame(x=seq(-1,1,length.out=48), y=rnorm(48))
+  healthy_args <- args_for(healthy, 0L, c(.5,.8))
+  penalty <- function() {
+    on.exit(destroy(), add=TRUE)
+    expect_true(as.logical(do.call(prepare, healthy_args)))
+    evaluate(c(-1,-1), 0L)
+  }
+  before <- penalty()
+  set.seed(20260322)
+  bad <- data.frame(x=sort(runif(14)), y=sort(runif(14)))
+  bandwidth <- c(.048130207494902745,.025634352719319447)
+  bad_args <- args_for(bad, 1L, bandwidth)
+  expect_error(do.call(prepare, bad_args),
+    "conditional bandwidth search stopped: ambiguous numerical rank; row 14;")
+  expect_identical(penalty(), before)
+  expect_error(npcdensbw(y~x, data=bad, regtype="lp", degree=1L,
+    bws=bandwidth, bwsolver="mads", nmulti=1L,
+    nomad.opts=list(MAX_BB_EVAL=1L)),
+    "conditional bandwidth search stopped: ambiguous numerical rank; row 14;")
+  expect_identical(penalty(), before)
 })

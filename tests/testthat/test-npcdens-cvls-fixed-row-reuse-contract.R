@@ -143,11 +143,11 @@ test_that("conditional CVLS dispatch reaches only the canonical block owner", {
   )
 
   expect_match(density_body, "block_id % iNum_Processors", fixed = TRUE)
-  expect_match(density_body, "MPI_Allreduce(&local_fail, &any_fail", fixed = TRUE)
+  expect_match(density_body, "np_conditional_failure_reduce(1, local_fail)", fixed = TRUE)
   expect_match(density_body, "MPI_Allreduce(MPI_IN_PLACE, block_terms", fixed = TRUE)
   expect_equal(lengths(regmatches(
     density_body,
-    gregexpr("MPI_Allreduce\\(", density_body, perl = TRUE)
+    gregexpr("(?:MPI_Allreduce|np_conditional_failure_reduce)\\(", density_body, perl = TRUE)
   )), 2L)
 })
 

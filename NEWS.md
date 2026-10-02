@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Conditional density preparation now reports terminal numerical failures after
+  cleanup and clears caught failure state before the next preparation. In
+  `npRmpi`, conditional row completions carry the same failure reason and row
+  to every rank through their existing reduction, preventing divergent MPI
+  collective sequences after a failed row.
+
 * Conditional local-polynomial NOMAD bandwidth searches now release native
   search state before reporting a terminal numerical error, preserving the
   original diagnostic and allowing subsequent searches in the same R session.
