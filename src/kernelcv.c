@@ -753,11 +753,13 @@ static double cv_func_con_distribution_categorical_ls_owned(double *vector_scale
 
 }
 double cv_func_con_distribution_categorical_ls(double *vector_scale_factor) {
-  if(np_conditional_failure_pending())return DBL_MAX;
+  /* Numerical rejection belongs to this trial, after owned MPI completion. */
+  np_conditional_failure_reset();
   const double value=cv_func_con_distribution_categorical_ls_owned(vector_scale_factor);
-  np_conditional_failure_bandwidth(vector_scale_factor,
-    num_var_continuous_extern+num_var_unordered_extern+num_var_ordered_extern+
-    num_reg_continuous_extern+num_reg_unordered_extern+num_reg_ordered_extern);
+  if(np_conditional_failure_pending()) {
+    np_conditional_failure_reset();
+    return DBL_MAX;
+  }
   return value;
 }
 
@@ -859,11 +861,13 @@ static double np_cv_func_con_density_categorical_ml_owned(double *vector_scale_f
 
 }
 double np_cv_func_con_density_categorical_ml(double *vector_scale_factor) {
-  if(np_conditional_failure_pending())return DBL_MAX;
+  /* Numerical rejection belongs to this trial, after owned MPI completion. */
+  np_conditional_failure_reset();
   const double value=np_cv_func_con_density_categorical_ml_owned(vector_scale_factor);
-  np_conditional_failure_bandwidth(vector_scale_factor,
-    num_var_continuous_extern+num_var_unordered_extern+num_var_ordered_extern+
-    num_reg_continuous_extern+num_reg_unordered_extern+num_reg_ordered_extern);
+  if(np_conditional_failure_pending()) {
+    np_conditional_failure_reset();
+    return DBL_MAX;
+  }
   return value;
 }
 
@@ -960,11 +964,13 @@ static double np_cv_func_con_density_categorical_ls_npksum_owned(double *vector_
 
 }
 double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor) {
-  if(np_conditional_failure_pending())return DBL_MAX;
+  /* Numerical rejection belongs to this trial, after owned MPI completion. */
+  np_conditional_failure_reset();
   const double value=np_cv_func_con_density_categorical_ls_npksum_owned(vector_scale_factor);
-  np_conditional_failure_bandwidth(vector_scale_factor,
-    num_var_continuous_extern+num_var_unordered_extern+num_var_ordered_extern+
-    num_reg_continuous_extern+num_reg_unordered_extern+num_reg_ordered_extern);
+  if(np_conditional_failure_pending()) {
+    np_conditional_failure_reset();
+    return DBL_MAX;
+  }
   return value;
 }
 

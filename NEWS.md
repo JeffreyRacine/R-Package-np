@@ -1,16 +1,15 @@
 # npRmpi 0.80-1
 
-* Conditional density preparation now reports terminal numerical failures after
-  cleanup and clears caught failure state before the next preparation. In
-  `npRmpi`, conditional row completions carry the same failure reason and row
-  to every rank through their existing reduction, preventing divergent MPI
-  collective sequences after a failed row.
+* Conditional local-polynomial bandwidth searches again use the existing
+  original-coordinate rank/ridge admission when local QR rank is ambiguous.
+  Rejected numerical evaluations receive the existing invalid-trial penalty,
+  allowing search to continue; the selected endpoint must still be raw-valid.
+  This restores ordinary conditional density and distribution NOMAD searches,
+  including mixed-predictor `wage1` examples.
 
-* Conditional local-polynomial NOMAD bandwidth searches now release native
-  search state before reporting a terminal numerical error, preserving the
-  original diagnostic and allowing subsequent searches in the same R session.
-  Conditional-distribution block evaluation shares the failure reason and row
-  across all ranks before stopping.
+* Conditional numerical failure state is cleared between trials after owned
+  work completes. In `npRmpi`, existing row reductions retain shared failure
+  metadata until that completion, preserving rank-symmetric cleanup.
 
 * Beta generalized-neighbor local-constant derivative hats now retain
   observation identity for implicit training queries, including repeated values
@@ -43,9 +42,9 @@
 * Conditional positive-kernel local-polynomial cross-validation now assesses
   deleted designs in locally centered and scaled coordinates. Uniform and
   second-order Epanechnikov generalized-neighbor objectives retain accurate
-  polynomial coefficients in their compressed integration owner. Ambiguous
-  numerical rank or exhausted integration limits stop the conditional search
-  with a row and bandwidth diagnostic; native search allocations are released.
+  polynomial coefficients in their compressed integration owner. Failed
+  coefficient accuracy checks or exhausted integration limits invalidate that
+  trial through the existing penalty policy without terminating the search.
   These corrections can substantially increase computation time.
 
 * Conditional-density generalized-neighbor CVLS with beta predictors or bounded

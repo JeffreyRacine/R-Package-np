@@ -959,7 +959,8 @@ static SEXP np_cgnn_body(void *raw) {
           np_conditional_failure_record(NP_CONDITIONAL_COEFFICIENT_FAILURE,i+1);
           fail=1;break;
         }
-      } else if(rank!=NP_CQR_LOCAL_DEFICIENT){
+      } else if(rank!=NP_CQR_LOCAL_DEFICIENT &&
+                rank!=NP_CQR_LOCAL_AMBIGUOUS){
         np_conditional_failure_record(rank==NP_CQR_LOCAL_AMBIGUOUS ?
           NP_CONDITIONAL_RANK_AMBIGUOUS : NP_CONDITIONAL_NUMERICAL_FAILURE,i+1);
         fail=1;break;
