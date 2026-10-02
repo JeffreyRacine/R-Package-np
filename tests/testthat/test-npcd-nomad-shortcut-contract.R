@@ -5,7 +5,9 @@ test_that("npcdens nomad shortcut matches the explicit density preset", {
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260322)
-  dat <- data.frame(x = sort(runif(14)), y = sort(runif(14)))
+  # Independent responses avoid a nearly deterministic small-n fit; the
+  # original ambiguity fixture is retained in the cleanup regression test.
+  dat <- data.frame(x = sort(runif(40)), y = rnorm(40))
 
   bw_short <- np::npcdensbw(
     y ~ x,
@@ -73,7 +75,9 @@ test_that("npcdist nomad shortcut matches the explicit distribution preset", {
   on.exit(options(old_opts), add = TRUE)
 
   set.seed(20260322)
-  dat <- data.frame(x = sort(runif(14)), y = sort(runif(14)))
+  # Independent responses avoid a nearly deterministic small-n fit; the
+  # original ambiguity fixture is retained in the cleanup regression test.
+  dat <- data.frame(x = sort(runif(40)), y = rnorm(40))
 
   bw_short <- np::npcdistbw(
     y ~ x,

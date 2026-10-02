@@ -1,4 +1,4 @@
-test_that('compact GNN CVLS rejects structurally deficient deleted designs', {
+test_that('compact GNN CVLS preserves the adopted deleted-support policy', {
   old <- options(np.messages=FALSE,np.tree=FALSE)
   on.exit(options(old),add=TRUE)
   pkg <- getNamespaceName(environment(npcdensbw))
@@ -17,14 +17,22 @@ test_that('compact GNN CVLS rejects structurally deficient deleted designs', {
   # n=100: uniform k=3 leaves only two nonzero donors after self deletion.
   # This is not restricted to a small training sample.
   set.seed(31);x <- runif(100,-1,1);y <- sin(2*x)+rnorm(100,sd=.4)
+  # Independent original-coordinate ridge oracle: G = Z'WZ,
+  # lambda = max(abs(diag(G)))/n, followed by intercept correction.
+  # The Gaussian2 response square-integral is evaluated over all real y
+  # in reciprocal coordinates on each second-neighbour radius interval.
+  # Bernstein uses full-training-range shifted Legendre factors.
+  reference <- c(`FALSE`=-64.522782642533471, `TRUE`=-66.927541787818697)
   for(bernstein in c(FALSE,TRUE)) {
     b <- npcdensbw(xdat=data.frame(x=x),ydat=y,bws=c(2,3),
       bwtype='generalized_nn',bwmethod='cv.ls',regtype='lp',degree=2L,
       bernstein.basis=bernstein,cxkertype='uniform',bandwidth.compute=FALSE)
-    for(tree in list(FALSE,TRUE,'auto'))
-      expect_identical(evaluate(x,y,b,tree),-.Machine$double.xmax)
+    for(tree in list(FALSE,TRUE,'auto')) {
+      expected <- reference[[as.character(bernstein)]]
+      expect_lte(abs(evaluate(x,y,b,tree)-expected)/(1+abs(expected)),1e-10)
+    }
   }
-  # Repeated observations cannot restore deleted-design rank.
+  # Retain the tied-data rejection control separately from deficient ridge.
   set.seed(30);x <- runif(30,-1,1);y <- sin(2*x)+rnorm(30,sd=.4)
   x[5] <- x[2];x[9] <- x[2];y[7] <- y[3];y[11] <- y[3]
   b <- npcdensbw(xdat=data.frame(x=x),ydat=y,bws=c(2,3),

@@ -835,6 +835,7 @@ static int np_conditional_distribution_prepared_context_eval(
   NPConditionalDistributionPreparedCtx *context,
   const double *bandwidth,
   const int *degree,
+  const int defer_failure,
   double out[5]);
 static void np_conditional_distribution_prepared_context_destroy(
   NPConditionalDistributionPreparedCtx *context);
@@ -1477,6 +1478,123 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
 
   return status;
 }
+
+/* Only conditional native searches use this stop transport. The shared NOMAD
+ * wrapper and protected regression callers retain their existing path. */
+enum { NP_CONDITIONAL_NATIVE_STOP = 2 };
+typedef struct {
+  crs_nomad_observer observer;
+  crs_nomad_observer_poll_fn poll;
+  const np_nomad_progress_spec *progress;
+  NPConditionalFailure saved_failure;
+  int terminal;
+  int progress_enabled;
+  char progress_error[256];
+} np_conditional_nomad_stop_context;
+
+typedef struct {
+  const crs_nomad_observer_event *event;
+  np_conditional_nomad_stop_context *stop;
+  char *message;
+  size_t message_size;
+  int status;
+} np_conditional_nomad_progress_call;
+
+static void np_conditional_nomad_progress_call_body(void *data)
+{
+  np_conditional_nomad_progress_call *call = data;
+  call->status = np_nomad_progress_observer(call->event,
+    (void *)call->stop->progress, call->message, call->message_size);
+}
+
+static int np_conditional_nomad_observer(
+  const crs_nomad_observer_event *event, void *data,
+  char *message, size_t message_size)
+{
+  np_conditional_nomad_stop_context *stop = data;
+  if (stop->terminal)
+    return CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT;
+  if (stop->progress_enabled) {
+    np_conditional_nomad_progress_call call = {
+      event, stop, message, message_size, CRS_NOMAD_OBSERVER_OUTCOME_ERROR
+    };
+    const int ok = R_ToplevelExec(np_conditional_nomad_progress_call_body, &call);
+    if (ok && call.status == CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT)
+      return call.status;
+    if (!ok || call.status != CRS_NOMAD_OBSERVER_OUTCOME_OK) {
+      /* Reporting failure must never disable numerical-error transport. */
+      snprintf(stop->progress_error, sizeof(stop->progress_error), "%s",
+        message != NULL && message[0] != '\0' ? message :
+        "conditional NOMAD progress dispatcher failed");
+      stop->progress_enabled = 0;
+      stop->observer.interval_sec = DBL_MAX;
+    }
+  }
+  return CRS_NOMAD_OBSERVER_OUTCOME_OK;
+}
+
+static void np_conditional_nomad_stop(np_conditional_nomad_stop_context *stop)
+{
+  if (!stop->terminal) {
+    np_conditional_failure_save(&stop->saved_failure);
+    stop->terminal = 1;
+  }
+  /* Poll synchronously, before crs can turn callback failure into a score. */
+  stop->observer.interval_sec = 0.0;
+  stop->poll();
+}
+
+static int np_conditional_nomad_solve(
+  const crs_nomad_problem *problem, crs_nomad_eval_fn eval, void *user_data,
+  const np_nomad_progress_spec *progress, crs_nomad_result *result,
+  np_conditional_nomad_stop_context *stop)
+{
+  crs_nomad_solve_observed_fn solve;
+  crs_nomad_problem fixed_problem;
+  const crs_nomad_problem *solve_problem;
+  const int previous_callback = nomad_c_callback_active;
+  crs_nomad_observer_poll_fn previous_poll = np_crs_nomad_observer_poll;
+  double interval = 2.0;
+  int status;
+
+  np_load_crs_namespace();
+  solve = (crs_nomad_solve_observed_fn)
+    R_GetCCallable("crs", "crs_nomad_solve_observed");
+  stop->poll = (crs_nomad_observer_poll_fn)
+    R_GetCCallable("crs", "crs_nomad_observer_poll");
+  if (solve == NULL || stop->poll == NULL)
+    error("required crs 0.15-46 native NOMAD observer capability is unavailable");
+  solve_problem = np_nomad_fixed_degree_problem(problem, progress, &fixed_problem);
+  stop->progress = progress;
+  stop->progress_enabled = np_nomad_progress_observer_config(&interval);
+  stop->observer.api_version = CRS_NOMAD_OBSERVER_API_VERSION;
+  stop->observer.struct_size = sizeof(stop->observer);
+  stop->observer.observe = np_conditional_nomad_observer;
+  stop->observer.user_data = stop;
+  stop->observer.interval_sec = stop->progress_enabled ? interval : DBL_MAX;
+
+  np_crs_nomad_observer_poll = stop->poll;
+  if (solve_problem != NULL && solve_problem->callback_mode == CRS_NOMAD_CALLBACK_C)
+    nomad_c_callback_active = 1;
+  status = solve(solve_problem, eval, user_data, &stop->observer, result);
+  nomad_c_callback_active = previous_callback;
+  np_crs_nomad_observer_poll = previous_poll;
+  if (!stop->terminal) {
+    status = np_nomad_fixed_degree_solution_status(problem, progress, result, status);
+    if (stop->progress_error[0] != '\0')
+      np_nomad_progress_observer_report(stop->progress_error);
+  }
+  return status;
+}
+
+static void np_conditional_nomad_raise(np_conditional_nomad_stop_context *stop)
+{
+  np_conditional_failure_restore(&stop->saved_failure);
+  np_conditional_failure_raise();
+  error("conditional NOMAD terminal failure metadata is unavailable");
+}
+
+
 
 static int *np_compute_support_counts(int num_obs, int ncon, double **matrix_continuous)
 {
@@ -6300,6 +6418,7 @@ SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno,
 static int np_conditional_density_prepared_context_eval_native_raw(const double *rbw,
                                                                const int *glp_degree,
                                                                const int raw_only,
+                                                               const int defer_failure,
                                                                double out[4])
 {
   np_conditional_failure_reset();
@@ -6357,7 +6476,12 @@ static int np_conditional_density_prepared_context_eval_native_raw(const double 
   eval_before = bwm_eval_count;
   fast_before = np_fastcv_alllarge_hits_get();
   guarded_before = np_guarded_cvml_hits_get();
-  val = np_conditional_bwmfunc_wrapper(np_conditional_density_prepared_context.vector_scale_factor);
+  val = bwmfunc_wrapper(np_conditional_density_prepared_context.vector_scale_factor);
+  if (np_conditional_failure_pending()) {
+    if (defer_failure)
+      return NP_CONDITIONAL_NATIVE_STOP;
+    np_conditional_failure_raise();
+  }
   fast = np_fastcv_alllarge_hits_get() - fast_before;
   guarded = np_guarded_cvml_hits_get() - guarded_before;
   evals = bwm_eval_count - eval_before;
@@ -6398,7 +6522,7 @@ static SEXP np_density_conditional_prepared_eval_mode(SEXP rbw, SEXP glp_degree,
 
   if (np_conditional_density_prepared_context_eval_native_raw(REAL(rbw_r),
                                                           INTEGER(degree_i),
-                                                          raw_only,
+                                                          raw_only, 0,
                                                           eval_out) != 0) {
     UNPROTECT(2);
     error("resident npcdens prepared objective native evaluator failed");
@@ -6424,6 +6548,7 @@ SEXP C_np_density_conditional_prepared_eval_raw(SEXP rbw, SEXP glp_degree)
 }
 
 typedef struct {
+  np_conditional_nomad_stop_context stop;
   int n;
   int nbw_point;
   int nbw_flat;
@@ -6530,11 +6655,13 @@ static int np_cdens_native_search_callback(int n,
       degree[j] = context->fixed_degree[j];
   }
 
-  status = np_conditional_density_prepared_context_eval_native_raw(flat_bw, degree, 0, eval_out);
+  status = np_conditional_density_prepared_context_eval_native_raw(flat_bw, degree, 0, 1, eval_out);
   if (status != 0) {
     context->callback_failures++;
     NP_NOMAD_CALLBACK_FREE(flat_bw);
     NP_NOMAD_CALLBACK_FREE(degree);
+    if (status == NP_CONDITIONAL_NATIVE_STOP)
+      np_conditional_nomad_stop(&context->stop);
     return 1;
   }
 
@@ -6748,13 +6875,24 @@ SEXP C_np_density_conditional_prepared_native_search(SEXP x0,
 
   nomad_degree_progress_active = (context.ndegree > 0);
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
-  status = np_nomad_solve_with_progress(&problem,
+  status = np_conditional_nomad_solve(&problem,
                                         np_cdens_native_search_callback,
                                         &context,
                                         &progress_spec,
-                                        &result);
+                                        &result, &context.stop);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
+  if (context.stop.terminal) {
+    R_Free(solution);
+    R_Free(best_point);
+    R_Free(best_flat_bw);
+    R_Free(flat_map);
+    R_Free(best_degree_i);
+    if (native_options != NULL) R_Free(native_options);
+    np_conditional_density_prepared_context_clear_internal();
+    UNPROTECT(9);
+    np_conditional_nomad_raise(&context.stop);
+  }
   if (context.ndegree > 0 && context.callback_calls > 0)
     np_progress_nomad_degree_step(context.callback_calls,
                                   context.best_degree,
@@ -7028,13 +7166,24 @@ SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP x0,
 
   nomad_degree_progress_active = (context.ndegree > 0);
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
-  status = np_nomad_solve_with_progress(&problem,
+  status = np_conditional_nomad_solve(&problem,
                                         np_cdens_native_search_callback,
                                         &context,
                                         &progress_spec,
-                                        &result);
+                                        &result, &context.stop);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
+  if (context.stop.terminal) {
+    R_Free(solution);
+    R_Free(best_point);
+    R_Free(best_flat_bw);
+    R_Free(flat_map);
+    R_Free(best_degree_i);
+    if (native_options != NULL) R_Free(native_options);
+    np_conditional_density_prepared_context_clear_internal();
+    UNPROTECT(9);
+    np_conditional_nomad_raise(&context.stop);
+  }
   if (context.ndegree > 0 && context.callback_calls > 0)
     np_progress_nomad_degree_step(context.callback_calls,
                                   context.best_degree,
@@ -12188,6 +12337,7 @@ SEXP C_np_distribution_conditional_bw_eval(SEXP c_uno,
 }
 
 typedef struct {
+  np_conditional_nomad_stop_context stop;
   NPConditionalDistributionPreparedCtx prepared;
   int n;
   int nbw;
@@ -12374,9 +12524,11 @@ static int np_cdist_native_search_callback(int n,
     eval_out[4] = 1.0;
   } else {
     status = np_conditional_distribution_prepared_context_eval(
-      &context->prepared, eval_bw, degree_work, eval_out);
+      &context->prepared, eval_bw, degree_work, 1, eval_out);
     if (status != 0) {
       context->callback_failures++;
+      if (status == NP_CONDITIONAL_NATIVE_STOP)
+        np_conditional_nomad_stop(&context->stop);
       return 1;
     }
   }
@@ -12725,11 +12877,11 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
 
   nomad_degree_progress_active = (context.ndegree > 0);
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
-  status = np_nomad_solve_with_progress(&problem,
+  status = np_conditional_nomad_solve(&problem,
                                         np_cdist_native_search_callback,
                                         &context,
                                         &progress_spec,
-                                        &result);
+                                        &result, &context.stop);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
   R_Free(context.raw_point);
@@ -12740,6 +12892,15 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   context.eval_bw = NULL;
   context.degree_work = NULL;
   np_conditional_distribution_prepared_context_destroy(&context.prepared);
+  if (context.stop.terminal) {
+    R_Free(solution);
+    R_Free(best_point);
+    if (best_degree_i != NULL) R_Free(best_degree_i);
+    if (first_degree_i != NULL) R_Free(first_degree_i);
+    if (native_options != NULL) R_Free(native_options);
+    UNPROTECT(23);
+    np_conditional_nomad_raise(&context.stop);
+  }
   if (context.ndegree > 0 && context.callback_calls > 0)
     np_progress_nomad_degree_step(context.callback_calls,
                                   context.best_degree,
@@ -17294,6 +17455,8 @@ static void np_conditional_distribution_prepared_context_refresh_penalty(
   pmult = MAX(1.0, context->penalty_multiplier);
   baseline = bwmfunc_raw_current_scale(context->scale_factor,
                                        context->num_all_var);
+  if (np_conditional_failure_pending())
+    return;
   if (!R_FINITE(baseline) || baseline == DBL_MAX) {
     tmp = bwm_alloc_transform_tmp(context->num_all_var + 1);
     if (tmp != NULL &&
@@ -17307,6 +17470,8 @@ static void np_conditional_distribution_prepared_context_refresh_penalty(
     }
     safe_free(tmp);
   }
+  if (np_conditional_failure_pending())
+    return;
   bwm_penalty_value = (!R_FINITE(baseline) || baseline == DBL_MAX) ?
     pmult * 1.0e6 : baseline + (fabs(baseline) + 1.0) * pmult;
   if (R_FINITE(bwm_penalty_value))
@@ -17317,6 +17482,7 @@ static int np_conditional_distribution_prepared_context_eval(
   NPConditionalDistributionPreparedCtx *context,
   const double *bandwidth,
   const int *degree,
+  const int defer_failure,
   double out[5])
 {
   np_conditional_failure_reset();
@@ -17390,13 +17556,23 @@ static int np_conditional_distribution_prepared_context_eval(
   invalid_before = bwm_invalid_count;
   fast_before = np_fastcv_alllarge_hits_get() +
     bwm_nn_cache_hits_window + bwm_objective_cache_hits_window;
-  value = np_conditional_bwmfunc_wrapper(context->scale_factor);
+  value = bwmfunc_wrapper(context->scale_factor);
+  if (np_conditional_failure_pending()) {
+    if (defer_failure)
+      return NP_CONDITIONAL_NATIVE_STOP;
+    np_conditional_failure_raise();
+  }
   fast_after = np_fastcv_alllarge_hits_get() +
     bwm_nn_cache_hits_window + bwm_objective_cache_hits_window;
 
   if ((!R_FINITE(value) || value == DBL_MAX) &&
       context->penalty_mode == 1) {
     np_conditional_distribution_prepared_context_refresh_penalty(context);
+    if (np_conditional_failure_pending()) {
+      if (defer_failure)
+        return NP_CONDITIONAL_NATIVE_STOP;
+      np_conditional_failure_raise();
+    }
     value = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ?
       bwm_penalty_value : DBL_MAX;
   }

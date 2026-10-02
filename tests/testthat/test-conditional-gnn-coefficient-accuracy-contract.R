@@ -58,6 +58,12 @@ test_that("conditional GNN coefficient conversion fails closed and recovers", {
     expect_error(np:::.npcdensbw_eval_only(X,Y,b),
       "polynomial coefficient reconstruction failed accuracy check; row .*bandwidth")
   }
+  # The same failure inside native MADS must unwind before a later solve.
+  expect_error(npcdensbw(xdat=X, ydat=Y, bws=c(8,20),
+    bwtype="generalized_nn", bwmethod="cv.ls", regtype="lp", degree=9L,
+    bernstein.basis=FALSE, cxkertype="uniform", bwsolver="mads", nmulti=1L,
+    nomad.opts=list(MAX_BB_EVAL=12L)),
+    "polynomial coefficient reconstruction failed accuracy check; row .*bandwidth")
   # A stable degree-9 design keeps the existing public option available.
   X <- data.frame(x=sort(cos(pi*(0:59)/59)))
   Y <- data.frame(y=sin(2*X$x)+cos(3*X$x)/3)

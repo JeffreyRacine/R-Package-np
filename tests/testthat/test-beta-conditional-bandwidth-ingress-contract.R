@@ -116,7 +116,7 @@ test_that("conditional beta bandwidth ingress is open for both estimators", {
     fixed = TRUE
   )[[1L]]
   distribution_starts <- gregexpr(
-    "static void np_distribution_conditional_bw_mode(double * c_uno",
+    "static void np_distribution_conditional_bw_mode_owned(double * c_uno",
     ingress,
     fixed = TRUE
   )[[1L]]
