@@ -58,6 +58,7 @@
 #include <inttypes.h>
 
 
+#ifdef MPI2
 /* Conditional-only envelope reuses the incumbent completion reduction. */
 static int np_conditional_outer_preflight_failed(int parallel,int failed) {
   return np_conditional_failure_reduce(parallel,failed);
@@ -75,6 +76,7 @@ static int np_conditional_outer_buffer_finish(int parallel,int count,int failed,
 #endif
   return 0;
 }
+#endif
 /* Failure-only copying keeps the successful row path allocation-free. */
 void np_regression_failure_message(NPRegressionFailure *failure,
                                   int family, int code,

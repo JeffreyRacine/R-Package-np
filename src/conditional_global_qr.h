@@ -5,7 +5,6 @@
  * Canonical original-coordinate policy; global Q only evaluates admitted rows. */
 #include "conditional_deleted_qr.h"
 #include "conditional_rank_admission.h"
-#include "conditional_global_rank_certificate.h"
 #include "conditional_local_qr.h"
 #include "conditional_failure.h"
 typedef struct {
