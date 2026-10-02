@@ -1,3 +1,21 @@
+test_that("conditional GNN preserves structural deleted-support admission", {
+  old <- options(np.messages=FALSE, np.tree=FALSE)
+  on.exit(options(old), add=TRUE)
+  set.seed(2005)
+  x <- rt(60,2); y <- .5*x+rt(60,3)
+  for (tree in c(FALSE,TRUE)) for (degree in 2:3) {
+    options(np.tree=tree)
+    for (xx in list(x,x+10,3*x)) {
+      X <- data.frame(x=xx); Y <- data.frame(y=y)
+      bw <- npcdensbw(xdat=X, ydat=Y, bws=c(8,degree+1),
+        bwtype="generalized_nn", bwmethod="cv.ls", regtype="lp",
+        degree=degree, cxkertype="uniform", bandwidth.compute=FALSE)
+      expect_identical(npRmpi:::.npcdensbw_eval_only(X,Y,bw,
+        invalid.penalty="dbmax")$objective, -.Machine$double.xmax)
+    }
+  }
+})
+
 test_that("conditional GNN coefficient rejection returns an invalid trial and recovers", {
   old <- options(np.messages=FALSE, np.tree=FALSE)
   on.exit(options(old), add=TRUE)
@@ -66,6 +84,10 @@ test_that("conditional GNN coefficient rejection returns an invalid trial and re
     bernstein.basis=FALSE, cxkertype="uniform", bwsolver="mads", nmulti=1L,
     nomad.opts=list(MAX_BB_EVAL=12L)),
     "did not return a raw-valid solution")
+  expect_error(npcdensbw(xdat=X, ydat=Y, bws=c(8,20),
+    bwtype="generalized_nn", bwmethod="cv.ls", regtype="lp", degree=9L,
+    bernstein.basis=FALSE, cxkertype="epanechnikov", nmulti=1L),
+    "kernel support or numerical accuracy", fixed=TRUE)
   # A stable degree-9 design keeps the existing public option available.
   X <- data.frame(x=sort(cos(pi*(0:59)/59)))
   Y <- data.frame(y=sin(2*X$x)+cos(3*X$x)/3)

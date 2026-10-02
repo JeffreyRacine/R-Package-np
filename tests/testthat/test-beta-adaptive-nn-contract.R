@@ -120,7 +120,11 @@ test_that("adaptive-NN beta PDF preserves leave-one-out and extended-NN policy",
     return.kernel.weights = TRUE
   )
   expect_identical(diag(fit$kw), rep(0, nrow(train)))
-  expect_equal(as.double(fit$ksum), colSums(fit$kw), tolerance = 0)
+  # Native and R summation may use different accumulation orders. Bound
+  # their roundoff by the standard positive-sum error budget, not bit identity.
+  sum.error <- 2 * nrow(train) * .Machine$double.eps *
+    colSums(abs(fit$kw))
+  expect_true(all(abs(as.double(fit$ksum) - colSums(fit$kw)) <= sum.error))
 
   old <- options(np.extendednn = FALSE)
   on.exit(options(old), add = TRUE)

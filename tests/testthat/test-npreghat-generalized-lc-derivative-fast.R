@@ -127,7 +127,34 @@ test_that("generalized-NN beta derivative route preserves endpoint behavior", {
   legacy <- capture_generalized_hat_contract(
     legacy_generalized_lc_derivative_hat(bws = bw, txdat = tx, s = 1L)
   )
-  expect_identical(as.double(fast$value), as.double(legacy$value))
+  # Training rows use self-excluded NN radii; the external-query legacy hat
+  # above intentionally has a different radius. Retain its endpoint warnings.
+  fit <- suppressWarnings(npreg(bws=bw, txdat=tx, tydat=y, gradients=TRUE))
+  interior <- tx$x>0 & tx$x<1
+  expect_equal(drop(fast$value %*% y)[interior],
+               as.double(fit$grad)[interior], tolerance=1e-12)
+  expect_identical(is.na(fast$value), is.na(legacy$value))
+  # Independent derivative of normalized beta weights with the NN radius fixed.
+  radius <- vapply(seq_len(nrow(tx)), function(i)
+    sort(abs(tx$x[-i]-tx$x[i]))[11L], numeric(1L))
+  oracle <- vapply(seq_len(nrow(tx)), function(i) {
+    target <- tx$x[i]; donor <- tx$x
+    if (target==0 || target==1) return(NA_real_)
+    weights <- derivatives <- numeric(length(donor))
+    interior <- donor>0 & donor<1
+    for (j in 1:3) {
+      concentration <- 1/(j*radius[i]^2)
+      alpha <- 1+target*concentration
+      beta <- 1+(1-target)*concentration
+      part <- (-1)^(j+1L)*choose(3L,j)*dbeta(donor,alpha,beta)
+      weights <- weights+part
+      derivatives[interior] <- derivatives[interior]+part[interior]*concentration*
+        (log(donor[interior])-log1p(-donor[interior])-digamma(alpha)+digamma(beta))
+    }
+    (sum(derivatives*y)-sum(weights*y)*sum(derivatives)/sum(weights))/sum(weights)
+  }, numeric(1L))
+  interior <- is.finite(oracle)
+  expect_equal(drop(fast$value %*% y)[interior], oracle[interior], tolerance=1e-10)
   expect_identical(fast$warnings, legacy$warnings)
 })
 

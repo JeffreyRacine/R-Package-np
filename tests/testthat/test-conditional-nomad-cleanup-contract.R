@@ -4,9 +4,20 @@ test_that("conditional ambiguous trials retain search and same-process recovery"
   old <- options(np.messages=FALSE, np.tree=FALSE)
   on.exit(options(old), add=TRUE)
   loadNamespace("crs")
-  quadratic <- function() .Call("crs_nomad_native_test_solve", list(
-    x0=c(.1,.2), lower=c(-1,-1), upper=c(1,1), input_type=c(0L,0L),
-    output_type=0L, max_eval=12L, random_seed=42L), PACKAGE="crs")
+  quadratic <- function() {
+    command <- quote({
+      loadNamespace("crs")
+      .Call("crs_nomad_native_test_solve", list(
+        x0=c(.1,.2), lower=c(-1,-1), upper=c(1,1), input_type=c(0L,0L),
+        output_type=0L, max_eval=12L, random_seed=42L), PACKAGE="crs")
+    })
+    # This private test entry mutates native NOMAD state. Every participating
+    # rank must execute it before the next distributed conditional search.
+    if (.mpi_pool_active() && !.mpi_suite_local_mode_owned())
+      npRmpi:::.npRmpi_bcast_cmd_expr(command, comm=1L, caller.execute=TRUE)
+    else
+      eval(command)
+  }
   expected <- quadratic()
   expect_identical(expected$status, 0L)
   recover <- function() {
@@ -88,17 +99,19 @@ test_that("conditional density ambiguous preparation does not poison later penal
   set.seed(952)
   healthy <- data.frame(x=seq(-1,1,length.out=48), y=rnorm(48))
   healthy_args <- args_for(healthy, 0L, c(.5,.8))
-  penalty <- function() {
+  # These private prepared entry points do not autodispatch. Exercise their
+  # lifetime locally; the public searches below still use the active pool.
+  penalty <- function() npRmpi:::.npRmpi_with_local_regression({
     on.exit(destroy(), add=TRUE)
     expect_true(as.logical(do.call(prepare, healthy_args)))
     evaluate(c(-1,-1), 0L)
-  }
+  })
   before <- penalty()
   set.seed(20260322)
   bad <- data.frame(x=sort(runif(14)), y=sort(runif(14)))
   bandwidth <- c(.048130207494902745,.025634352719319447)
   bad_args <- args_for(bad, 1L, bandwidth)
-  local({
+  npRmpi:::.npRmpi_with_local_regression({
     on.exit(destroy(), add=TRUE)
     expect_true(as.logical(do.call(prepare, bad_args)))
     value <- evaluate(bandwidth, 0L)
