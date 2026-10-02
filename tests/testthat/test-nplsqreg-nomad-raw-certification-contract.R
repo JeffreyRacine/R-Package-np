@@ -78,6 +78,8 @@ test_that("nplsqreg Powell can recover an invalid direct NOMAD payload", {
   expect_lt(abs(bw$objective - 0.01174402187), 1e-6)
   expect_lt(abs(bw$bw - 0.07777644704), 1e-6)
   expect_identical(bw$degree, 1L)
-  expect_gte(bw$num.feval, 114)
+  # Recovery must evaluate beyond the deliberately exhausted direct NOMAD
+  # budget; the exact Powell trajectory/count is platform dependent.
+  expect_gt(bw$num.feval, arguments$nomad.opts$MAX_BB_EVAL)
   expect_identical(bw$reg.bws$nomad.restart.fval, 3.374004)
 })

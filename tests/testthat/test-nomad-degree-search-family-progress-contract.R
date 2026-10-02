@@ -36,19 +36,10 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
   y_sc <- (1 + z$z^2) * x$x + rnorm(n, sd = 0.05)
   y_idx <- sin(x$x + 0.5 * z$z) + rnorm(n, sd = 0.05)
 
-  conditional_data <- local({
-    saved_seed <- .Random.seed
-    on.exit(assign(".Random.seed", saved_seed, .GlobalEnv))
-    set.seed(20260322)
-    data.frame(x = sort(runif(40)), y_reg = rnorm(40))
-  })
-
   cases <- list(
     npcdistbw = function() np::npcdistbw(
       y_reg ~ x,
-      # The progress contract needs a successful search, independent of the
-      # separate ambiguous-rank failure/recovery contract.
-      data = conditional_data,
+      data = data.frame(y_reg = y_reg, x = x$x),
       regtype = "lp",
       degree.select = "coordinate",
       search.engine = "nomad+powell",

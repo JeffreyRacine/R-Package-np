@@ -18,8 +18,9 @@ test_that("conditional deleted-rank policy is common and degree neutral", {
   # deficient-rank solve; the obsolete raw-Gram certificate is not required.
   expect_match(global, "np_cqr_local_row(", fixed = TRUE)
   expect_match(global, "if(rank==NP_CQR_LOCAL_FULL)", fixed = TRUE)
-  expect_match(global, "if(rank!=NP_CQR_LOCAL_DEFICIENT)", fixed = TRUE)
-  expect_match(global, "np_conditional_solve_adjoint_ranked(&policy,k,1,1./n,0,&d)",
+  expect_match(global, "if(rank!=NP_CQR_LOCAL_DEFICIENT && rank!=NP_CQR_LOCAL_AMBIGUOUS)", fixed = TRUE)
+  # Deficiency is certified; ambiguity retains the original-coordinate admission.
+  expect_match(global, "rank==NP_CQR_LOCAL_DEFICIENT ? 0 : (n-1<k?n-1:k)",
                fixed = TRUE)
   expect_match(global, "np_conditional_solve_adjoint_ranked(", fixed = TRUE)
   expect_match(source, "np_conditional_solve_adjoint_ranked(", fixed = TRUE)

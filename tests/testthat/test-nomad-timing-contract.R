@@ -80,15 +80,9 @@ test_that("NOMAD timing is consistent across supported serial families", {
   expect_nomad_bw_timing(bw_cdens)
   expect_nomad_fit_timing(fit_cdens)
 
-  d_cdf <- local({
-    saved_seed <- .Random.seed
-    on.exit(assign(".Random.seed", saved_seed, .GlobalEnv))
-    set.seed(20260322)
-    data.frame(x = sort(runif(40)), y = rnorm(40))
-  })
   bw_cdist <- quiet_nomad_eval(npcdistbw(
     y ~ x,
-    data = d_cdf,
+    data = d1,
     regtype = "lp",
     degree.select = "coordinate",
     degree.min = 0L,
@@ -97,7 +91,7 @@ test_that("NOMAD timing is consistent across supported serial families", {
     bwmethod = "cv.ls",
     nmulti = 1L
   ))
-  fit_cdist <- quiet_nomad_eval(npcdist(y ~ x, data = d_cdf, nomad = TRUE, degree.max = 1L, nmulti = 1L, ngrid = 7L))
+  fit_cdist <- quiet_nomad_eval(npcdist(y ~ x, data = d1, nomad = TRUE, degree.max = 1L, nmulti = 1L, ngrid = 7L))
   expect_nomad_bw_timing(bw_cdist)
   expect_nomad_fit_timing(fit_cdist)
 
