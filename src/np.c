@@ -1434,7 +1434,7 @@ np_nomad_fixed_degree_solution_status(const crs_nomad_problem *problem,
 
 static SEXP np_nomad_callback_error_state(void)
 {
-  return allocVector(VECSXP, 1);
+  return np_nomad_unwind_state();
 }
 
 static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
