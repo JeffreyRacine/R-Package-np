@@ -80,3 +80,17 @@ test_that("the GNN singleton wrappers cover every explicit tree and kernel", {
   expect_identical(loops[[1L]][[3L]], as.name("trees"))
   expect_identical(loops[[1L]][[4L]][[3L]], as.name("kernels"))
 })
+
+
+test_that("GNN fit/tree influence oracles have an independent MPI budget", {
+  helper <- testthat::test_path("..", "validation", "full_mpi_test_plan.R")
+  skip_if_not(file.exists(helper), "source plan helper unavailable")
+  scope <- new.env(parent = globalenv())
+  sys.source(helper, envir = scope)
+  required <- "test-regression-gnn-fit-tree.R"
+  files <- sort(list.files(testthat::test_path(), "^test-.*\\.[rR]$"))
+  expect_true(required %in% files)
+  expect_true(required %in% scope$npRmpi_full_test_singleton_files())
+  plan <- scope$npRmpi_full_test_plan(files, 10L)
+  expect_equal(sum(vapply(plan, identical, logical(1L), required)), 1L)
+})
