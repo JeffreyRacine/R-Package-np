@@ -62272,7 +62272,9 @@ static int np_conditional_cvls_route_context_prepare(
   const int response_operator)
 {
   const int num_obs = num_obs_train_extern;
-  const int num_y_eval = response_operator == OP_INTEGRAL ?
+  const int cdf_fold = response_operator == OP_INTEGRAL &&
+    (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN);
+  const int num_y_eval = response_operator == OP_INTEGRAL && !cdf_fold ?
     num_obs_eval_extern : num_obs;
   const int use_general_lp = np_lp_engine_extern == NP_LP_ENGINE_GENERAL;
   const int use_bernstein = int_glp_bernstein_extern != 0;
@@ -62290,8 +62292,8 @@ static int np_conditional_cvls_route_context_prepare(
      np_cgnn_bounded_x_admitted(execution_context));
   context->beta_x = execution_context != NULL && execution_context->x_route != NULL;
   context->beta_y = execution_context != NULL && execution_context->y_route != NULL;
-  context->fold_geometry = response_operator == OP_NORMAL &&
-    (int_cyker_bound_extern != 0 || projected) && num_var_continuous_extern > 0 &&
+  context->fold_geometry = (cdf_fold || (response_operator == OP_NORMAL &&
+    (int_cyker_bound_extern != 0 || projected) && num_var_continuous_extern > 0)) &&
     (BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN);
   context->vector_scale_factor = vector_scale_factor;
   context->execution_context = execution_context;
@@ -62331,13 +62333,13 @@ static int np_conditional_cvls_route_context_prepare(
          KERNEL_den_unordered_extern, KERNEL_den_ordered_extern,
          matrix_Y_unordered_train_extern, matrix_Y_ordered_train_extern,
          matrix_Y_continuous_train_extern,
-         response_operator == OP_INTEGRAL ?
+         response_operator == OP_INTEGRAL && !cdf_fold ?
            matrix_Y_unordered_eval_extern :
            matrix_Y_unordered_train_extern,
-         response_operator == OP_INTEGRAL ?
+         response_operator == OP_INTEGRAL && !cdf_fold ?
            matrix_Y_ordered_eval_extern :
            matrix_Y_ordered_train_extern,
-         response_operator == OP_INTEGRAL ?
+         response_operator == OP_INTEGRAL && !cdf_fold ?
            matrix_Y_continuous_eval_extern :
            matrix_Y_continuous_train_extern,
          response_operator, vector_scale_factor,
@@ -62345,15 +62347,15 @@ static int np_conditional_cvls_route_context_prepare(
          execution_context->y_route, execution_context->y_diagnostics,
          execution_context->categorical_compress, context->fold_geometry) != 0)
       goto fail_prepare;
-  } else if(response_operator == OP_NORMAL) {
+  } else if(response_operator == OP_NORMAL || cdf_fold) {
     if(context->fold_geometry && BANDWIDTH_den_extern == BW_ADAP_NN ?
-       np_conditional_yrow_ctx_prepare_adaptive_fold(vector_scale_factor, OP_NORMAL,
+       np_conditional_yrow_ctx_prepare_adaptive_fold(vector_scale_factor, response_operator,
          num_categories_extern_Y, matrix_categorical_vals_extern_Y,
          &context->legacy_y) != 0 :
-       np_conditional_yrow_ctx_prepare_ctx(vector_scale_factor, OP_NORMAL,
+       np_conditional_yrow_ctx_prepare_ctx(vector_scale_factor, response_operator,
          context->fold_geometry ? &training_geometry : NULL, &context->legacy_y) != 0)
       goto fail_prepare;
-    if(int_cyker_bound_extern == 0 && !projected &&
+    if(!cdf_fold && int_cyker_bound_extern == 0 && !projected &&
        np_conditional_yrow_ctx_prepare(
          vector_scale_factor, OP_CONVOLUTION,
          &context->legacy_y_convolution) != 0)
@@ -63174,6 +63176,8 @@ static int np_conditional_distribution_cvls_provider_supertile_parallel(
   double *cv,
   const NPConditionalCVLSRowProvider *provider);
 
+#include "np_conditional_cdf_fold.h"
+
 /*
  * Route-bearing sibling for conditional-distribution CVLS.  The null route
  * is the literal incumbent owner.  Routed execution uses the same canonical
@@ -63200,10 +63204,19 @@ int np_conditional_distribution_cvls_lp_stream_ctx(
     error("conditional distribution CVLS kernel route has an invalid layout");
 
   np_conditional_cvls_route_context_init(&route_context);
-  if(np_conditional_cvls_route_context_prepare(
-       &route_context, vector_scale_factor, execution_context,
-       OP_INTEGRAL) != 0)
+  const int prepare_failed = np_conditional_cvls_route_context_prepare(
+    &route_context, vector_scale_factor, execution_context, OP_INTEGRAL) != 0;
+#ifdef MPI2
+  if((BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     np_conditional_outer_preflight_failed(
+       np_objective_outer_rows_enabled(int_conditional_prepared_context_extern),
+       prepare_failed)) goto cleanup_route;
+#endif
+  if(prepare_failed) goto cleanup_route;
+  if(route_context.fold_geometry) {
+    status = np_cdf_fold_cvls(&route_context, cv);
     goto cleanup_route;
+  }
 
   provider.context = &route_context;
   provider.x_row = np_conditional_cvls_provider_x_row;
