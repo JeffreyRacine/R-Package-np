@@ -67,7 +67,8 @@ static int np_cqr_deleted_compensated(NPConditionalQRDeleted *s,int n,int k,
     scale[a]=F77_CALL(dnrm2)(&m,col,&one);
     if(isfinite(scale[a])&&scale[a]>0)scale[a]=scalbn(1.,ilogb(scale[a]));
     if(!isfinite(scale[a])||scale[a]==0)return 1;
-    for(int i=0;i<m;i++)col[i]/=scale[a];p[a]=a;
+    for(int i=0;i<m;i++)col[i]/=scale[a];
+    p[a]=a;
   }
   for(int a=0;a<k;a++){
     int pivot=a;double best=-1;
@@ -116,7 +117,8 @@ static int np_cqr_deleted_row(NPConditionalQRDeleted *s,int n,int k,
   int m=lambda>0?s->fast.capacity:n,one=1;
   double norm=F77_CALL(dnrm2)(&m,s->fast.v,&one);
   if(!isfinite(norm))return 1;
-  if(norm_out)*norm_out=norm;if(owner_out)*owner_out=norm>1.;
+  if(norm_out)*norm_out=norm;
+  if(owner_out)*owner_out=norm>1.;
   return norm>1.?np_cqr_deleted_compensated(s,n,k,w,basis,pos,lambda,anchor,row):0;
 }
 
