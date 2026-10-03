@@ -34158,6 +34158,35 @@ static int np_conditional_xrow_ctx_select_adaptive_fold(
   return 0;
 }
 
+/* Necessary support admission for compact positive-kernel conditional NN
+ * objectives only. Distinct complete basis rows bound rank from above; a
+ * saturated count is not a numerical or algebraic full-rank certificate.
+ * Call only after the row output has consumed mean_row. That scratch has n
+ * entries; p <= n-1 bounds writes, and donor indices are exact as doubles. */
+static int np_conditional_nn_deleted_support(double **basis, const double *kw,
+                                              int held, double *mean_row)
+{
+  if((BANDWIDTH_den_extern != BW_GEN_NN && BANDWIDTH_den_extern != BW_ADAP_NN) ||
+     (KERNEL_reg_extern != CK_EPAN2 && KERNEL_reg_extern != CK_UNIF))
+    return 0;
+  const int n = num_obs_train_extern, p = np_glp_cv_cache.nterms;
+  if(p <= 1) return 0;
+  if(p > n-1 || basis == NULL || mean_row == NULL) return 1;
+  int count = 0;
+  for(int j = 0; j < n && count < p; ++j) {
+    if(j == held || kw[j] == 0.0) continue;
+    int duplicate = 0;
+    for(int a = 0; a < count && !duplicate; ++a) {
+      const int other = (int)mean_row[a];
+      int k = 0;
+      while(k < p && basis[k][j] == basis[k][other]) ++k;
+      duplicate = k == p;
+    }
+    if(!duplicate) mean_row[count++] = (double)j;
+  }
+  return count < p;
+}
+
 /* Preserve the established conditional-objective delete-row contract while
  * sharing the row geometry context.  Regression leave-one-out rows select the
  * canonical direct-delete sibling below; conditional objectives continue to
@@ -34281,6 +34310,9 @@ static int np_conditional_xrow_influence(
   if(drop_eval_self){
     double denominator;
 
+    if(np_conditional_nn_deleted_support(ctx->basis, ctx->kw,
+                                         eval_pos, ctx->mean_row))
+      return 1;
     if(!np_lp_delete_denominator(row_out[eval_idx], &denominator))
       return 1;
     for(j = 0; j < num_train; j++){
@@ -37797,6 +37829,9 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
 
     if(drop_eval_self){
       double den;
+      if(np_conditional_nn_deleted_support(np_glp_cv_cache.basis, kw,
+                                           eval_pos, mean_row))
+        goto cleanup_xweight_row;
       if(!np_lp_delete_denominator(row_out[eval_idx], &den))
         goto cleanup_xweight_row;
       for(j = 0; j < num_train; j++){
@@ -41975,6 +42010,9 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
 
       if(drop_eval_self){
         double den;
+        if(np_conditional_nn_deleted_support(np_glp_cv_cache.basis, kw,
+                                             eval_pos, mean_row))
+          goto cleanup_xweight_block;
         if(!np_lp_delete_denominator(rows_out[i][eval_idx], &den))
           goto cleanup_xweight_block;
         for(j = 0; j < num_train; j++){

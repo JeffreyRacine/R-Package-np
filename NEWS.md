@@ -16,16 +16,18 @@
   scalar tree-based Klein--Spady route. CVLS/CVAIC and directed MPI arithmetic
   are unchanged.
 
-* Conditional-density generalized-neighbor CVLS rejects local-polynomial
-  trials with insufficient distinct nonzero-weight donors in the one-predictor
-  prefix owner. For two or more continuous predictors with unbounded uniform
-  or second-order Epanechnikov predictor kernels, the whole-response owners
-  now reject trials with fewer distinct deleted basis rows than basis terms.
-  This structural upper bound does not certify numerical full rank. Full-rank
-  prefix rows no longer read unused coefficients from an unwritten solve buffer.
-  Conditional nearest-neighbor all-invalid errors now identify inadequate support or
-  numerical accuracy as possible causes, rather than attributing every failure
-  to ties.
+* Conditional density (CVML/CVLS) and distribution (CVLS) nearest-neighbor
+  local-polynomial objectives with uniform or second-order Epanechnikov
+  predictor kernels reject trials with fewer distinct nonzero-weight deleted
+  basis rows than basis terms. The structural check now also covers adaptive
+  neighbors, bounded predictor kernels and mixed continuous/categorical data.
+  It uses existing weights and the existing invalid-trial penalty; admitted
+  trials retain their arithmetic. A sufficient count does not certify full rank.
+  The one-predictor CVLS prefix owner's existing support check is retained;
+  its full-rank rows no longer read unused coefficients from an unwritten buffer.
+  Conditional nearest-neighbor all-invalid errors identify inadequate support
+  or numerical accuracy as possible causes, rather than attributing every
+  failure to ties.
 
 * Conditional local-polynomial bandwidth searches again use the existing
   original-coordinate rank/ridge admission when local QR rank is ambiguous.
