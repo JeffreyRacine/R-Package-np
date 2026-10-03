@@ -7,6 +7,15 @@
   searches retain their separate handling; this is not a distributed MPI
   timeout-cleanup repair.
 
+* Native searches are not re-entrant: user condition/event handlers must not
+  start another np search while a native np search is active.
+
+* Bounded fixed-bandwidth check-loss and Klein--Spady criteria now cancel the
+  query-only kernel boundary mass before symmetric pair accumulation. This
+  restores the directed leave-one-out fit for these criteria, including the
+  scalar tree-based Klein--Spady route. CVLS/CVAIC and directed MPI arithmetic
+  are unchanged.
+
 * Conditional-density generalized-neighbor CVLS rejects local-polynomial
   trials with insufficient distinct nonzero-weight donors in the one-predictor
   prefix owner. For two or more continuous predictors with unbounded uniform
@@ -25,9 +34,10 @@
   This restores ordinary conditional density and distribution NOMAD searches,
   including mixed-predictor `wage1` examples.
 
-* Nearly coincident predictor values can still trigger original-coordinate
-  ridging after structural support admission and make conditional GNN CVLS
-  scores depend on predictor units. This numerical-rank limitation is deferred;
+* Nearly coincident or exactly collinear predictor values (including tied
+  integer-valued predictors) can still trigger original-coordinate ridging after
+  structural support admission and make conditional NN scores depend on predictor
+  units. These remaining rank limitations are deferred;
   the structural-support correction does not change ridge coordinates or the
   frozen coefficient-accuracy threshold.
 
@@ -68,7 +78,8 @@
   Linux benchmarks on representative univariate `cv.ls` local-polynomial cases
   at sample sizes 200 and 400 measured about 16--28 times the earlier cost for
   uniform predictor kernels and 4--5 times for second-order Epanechnikov kernels,
-  with the ratio increasing with sample size. These are case-specific cumulative
+  with the uniform-kernel ratio increasing with sample size in those cases.
+  These are case-specific cumulative
   costs of the numerical repairs, not universal multipliers.
 
 * Conditional-density generalized-neighbor CVLS with beta predictors or bounded
