@@ -64,6 +64,10 @@ static int np_nomad_callback_contained(int n, const double *x, int m,
                                       double *outputs, void *data)
 {
   NPNomadCallbackError *owner = data;
+  /* A stop request may still be followed by another callback. Do not enter R
+   * again or overwrite the suspended continuation before native cleanup. */
+  if (np_nomad_error_pending(owner->error_state))
+    return 1;
   NPNomadCallbackCall call = {
     .owner = owner, .n = n, .m = m, .status = 1, .x = x, .outputs = outputs
   };
