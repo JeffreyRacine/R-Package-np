@@ -146,7 +146,7 @@ test_that("parallel conditional distribution row fallback retains ownership", {
   expect_match(route, "np_objective_outer_buffer_prepare(", fixed = TRUE)
   expect_match(route, "np_objective_outer_owned_rows(", fixed = TRUE)
   expect_match(route, "contributions[i] = row_loss;", fixed = TRUE)
-  expect_match(route, "np_objective_outer_buffer_finish(", fixed = TRUE)
+  expect_match(route, "np_conditional_outer_buffer_finish(", fixed = TRUE)
   expect_match(route, '"NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK"', fixed = TRUE)
   expect_false(grepl("alloc_matd(num_train, num_train)", route, fixed = TRUE))
   expect_false(grepl("diag(num_train)", route, fixed = TRUE))
@@ -172,7 +172,7 @@ test_that("parallel conditional distribution supertile owns bounded groups", {
   expect_match(route, "block_index[g] = i0 + g*owned_stride;", fixed = TRUE)
   expect_match(route, "contributions[block_index[g]] = block_sum[g];",
                fixed = TRUE)
-  expect_match(route, "np_objective_outer_buffer_finish(", fixed = TRUE)
+  expect_match(route, "np_conditional_outer_buffer_finish(", fixed = TRUE)
   expect_match(route, '"NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK"', fixed = TRUE)
   expect_match(route, "np_blas_dgemm_tn_int(", fixed = TRUE)
   expect_match(route, "provider->y_integral_row(", fixed = TRUE)
@@ -378,7 +378,7 @@ test_that("analytic routed CVLS uses bounded tiles and only an allocation fallba
   expect_match(parallel, "const int first_owned_block = my_rank;",
                fixed = TRUE)
   expect_match(parallel, "np_objective_outer_buffer_prepare(", fixed = TRUE)
-  expect_match(parallel, "np_objective_outer_buffer_finish(", fixed = TRUE)
+  expect_match(parallel, "np_conditional_outer_buffer_finish(", fixed = TRUE)
   expect_match(parallel, '"NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK"',
                fixed = TRUE)
   expect_match(parallel, "np_blas_dgemm_tn_int(", fixed = TRUE)

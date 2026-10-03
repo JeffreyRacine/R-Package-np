@@ -106,7 +106,7 @@ test_that("npcdist categorical profile CVLS owns a bounded MPI tri-state workspa
   )
   expect_match(
     implementation,
-    "np_objective_outer_buffer_finish",
+    "np_conditional_outer_buffer_finish",
     fixed = TRUE
   )
   expect_match(

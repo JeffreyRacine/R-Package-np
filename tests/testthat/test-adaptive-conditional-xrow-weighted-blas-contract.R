@@ -169,7 +169,7 @@ test_that("MPI adaptive density CVML reuses rank-local row contexts", {
   )
   expect_match(
     body,
-    "np_objective_outer_buffer_finish(",
+    "np_conditional_outer_buffer_finish(",
     fixed = TRUE
   )
   expect_false(grepl(

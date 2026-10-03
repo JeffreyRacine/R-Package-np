@@ -65,11 +65,11 @@ test_that("MPI density all-large CVLS owns complete rows", {
     )
   )
 
-  expect_match(parallel, "np_objective_outer_preflight_failed(", fixed = TRUE)
+  expect_match(parallel, "np_conditional_outer_preflight_failed(", fixed = TRUE)
   expect_match(parallel, "np_objective_outer_buffer_prepare(", fixed = TRUE)
   expect_match(parallel, "np_objective_outer_owned_rows(", fixed = TRUE)
   expect_match(parallel, "contributions[i] = quad - 2.0*lin;", fixed = TRUE)
-  expect_match(parallel, "np_objective_outer_buffer_finish(", fixed = TRUE)
+  expect_match(parallel, "np_conditional_outer_buffer_finish(", fixed = TRUE)
   expect_match(parallel, '"NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK"',
                fixed = TRUE)
   expect_match(parallel, "np_conditional_y_row_stream_op_core_suppress(",
@@ -148,11 +148,11 @@ test_that("MPI distribution all-large CVLS owns complete evaluation rows", {
     )
   )
 
-  expect_match(parallel, "np_objective_outer_preflight_failed(", fixed = TRUE)
+  expect_match(parallel, "np_conditional_outer_preflight_failed(", fixed = TRUE)
   expect_match(parallel, "np_objective_outer_buffer_prepare(", fixed = TRUE)
   expect_match(parallel, "np_objective_outer_owned_rows(", fixed = TRUE)
   expect_match(parallel, "contributions[j] = row_loss;", fixed = TRUE)
-  expect_match(parallel, "np_objective_outer_buffer_finish(", fixed = TRUE)
+  expect_match(parallel, "np_conditional_outer_buffer_finish(", fixed = TRUE)
   expect_match(parallel, '"NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK"',
                fixed = TRUE)
   expect_match(parallel, "row_loss += difference*difference;", fixed = TRUE)

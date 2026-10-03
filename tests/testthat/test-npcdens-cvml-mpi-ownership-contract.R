@@ -99,7 +99,7 @@ test_that("routed beta CVML uses the canonical prepared outer-row owner", {
   expect_match(routed, "np_objective_outer_owned_rows(", fixed = TRUE)
   expect_match(
     routed,
-    "np_objective_outer_buffer_finish(",
+    "np_conditional_outer_buffer_finish(",
     fixed = TRUE
   )
   expect_false(grepl("MPI_Allreduce[[:space:]]*\\(", routed))
@@ -137,7 +137,7 @@ test_that("all positive-width CVML exits use canonical contribution finish", {
   for (body in list(all_large, row, block)) {
     expect_match(
       body,
-      "np_objective_outer_buffer_finish(",
+      "np_conditional_outer_buffer_finish(",
       fixed = TRUE
     )
     expect_true(
