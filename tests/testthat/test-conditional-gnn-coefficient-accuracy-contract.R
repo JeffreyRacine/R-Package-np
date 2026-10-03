@@ -79,6 +79,10 @@ test_that("conditional GNN coefficient rejection returns an invalid trial and re
       invalid.penalty="baseline")$objective, -1e7)
   }
   # Search continues through invalid trials; an all-invalid final point is rejected.
+  # Eight distinct locations cannot span ten degree-9 terms at any bandwidth.
+  # Unlike a near-threshold coefficient fixture, this cause is platform invariant.
+  X <- data.frame(x = rep(seq(-1, 1, length.out = 8), 3))
+  Y <- data.frame(y = sin(seq_len(24)))
   expect_error(npcdensbw(xdat=X, ydat=Y, bws=c(8,20),
     bwtype="generalized_nn", bwmethod="cv.ls", regtype="lp", degree=9L,
     bernstein.basis=FALSE, cxkertype="uniform", bwsolver="mads", nmulti=1L,
