@@ -19237,7 +19237,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   const NP_OuterPackCtx frozen_runtime_options = {
     .runtime_options_frozen = 1,
     .fixed_cv_cancel_row_mass = (bwm == RBWM_CVAIC) ||
-      ((bwm == RBWM_CVLS)
+      ((bwm == RBWM_CVLS || bwm == RBWM_CVCHECK || bwm == RBWM_CVKS)
 #ifdef MPI2
        && (iNum_Processors <= 1)
 #endif
