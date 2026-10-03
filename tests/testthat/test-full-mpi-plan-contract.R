@@ -19,6 +19,19 @@ test_that("the bounded MPI plan preserves every sorted test and heavy singleton"
                "singleton registry is invalid")
 })
 
+test_that("formula training ownership has an independent MPI budget", {
+  helper <- testthat::test_path("..", "validation", "full_mpi_test_plan.R")
+  skip_if_not(file.exists(helper), "source plan helper unavailable")
+  scope <- new.env(parent = globalenv())
+  sys.source(helper, envir = scope)
+  required <- "test-formula-training-ownership.R"
+  files <- sort(list.files(testthat::test_path(), "^test-.*\\.[rR]$"))
+  expect_true(required %in% files)
+  expect_true(required %in% scope$npRmpi_full_test_singleton_files())
+  plan <- scope$npRmpi_full_test_plan(files, 10L)
+  expect_equal(sum(vapply(plan, identical, TRUE, required)), 1L)
+})
+
 test_that("expensive conditional GNN oracles have independent MPI budgets", {
   helper <- testthat::test_path("..", "validation", "full_mpi_test_plan.R")
   skip_if_not(file.exists(helper), "source plan helper unavailable")
