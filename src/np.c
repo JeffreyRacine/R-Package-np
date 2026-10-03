@@ -946,7 +946,7 @@ static SEXP np_nomad_callback_error_state(void)
   /* A callback-wide catch cannot skip an unfinished collective. */
   if (np_mpi_distributed_interrupt_active())
     return R_NilValue;
-  return allocVector(VECSXP, 1);
+  return np_nomad_unwind_state();
 }
 
 static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,

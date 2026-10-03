@@ -1,8 +1,10 @@
-/* Callback-internal R error containment. The caller roots the condition cell
+/* Callback-internal R unwind containment. The caller roots the continuation cell
  * until all native invocation owners have been released. This is deliberately
  * not an MPI error protocol: distributed callbacks retain their existing path. */
 #ifndef NP_NOMAD_CALLBACK_ERROR_H
 #define NP_NOMAD_CALLBACK_ERROR_H
+
+#include <setjmp.h>
 
 typedef struct {
   crs_nomad_eval_fn eval;
@@ -20,7 +22,18 @@ typedef struct {
   int n, m, status;
   const double *x;
   double *outputs;
+  jmp_buf jump;
 } NPNomadCallbackCall;
+
+/* Allocate before the caller acquires native invocation resources. Slot zero
+ * is only set when an unwind is suspended; slot one roots the reusable token. */
+static SEXP np_nomad_unwind_state(void)
+{
+  SEXP state = PROTECT(Rf_allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(state, 1, R_MakeUnwindCont());
+  UNPROTECT(1);
+  return state;
+}
 
 static int np_nomad_error_pending(SEXP state)
 {
@@ -35,19 +48,29 @@ static SEXP np_nomad_callback_body(void *data)
   return R_NilValue;
 }
 
-static SEXP np_nomad_callback_caught(SEXP condition, void *data)
+static void np_nomad_callback_unwind(void *data, Rboolean jump)
 {
   NPNomadCallbackCall *call = data;
-  SET_VECTOR_ELT(call->owner->error_state, 0, condition);
-  return R_NilValue;
+  if (jump) {
+    SET_VECTOR_ELT(call->owner->error_state, 0,
+                   VECTOR_ELT(call->owner->error_state, 1));
+    /* The target is inside this C callback, below every NOMAD C++ frame.
+     * Return normally through NOMAD before the caller resumes R's unwind. */
+    longjmp(call->jump, 1);
+  }
 }
 
 static int np_nomad_callback_contained(int n, const double *x, int m,
                                       double *outputs, void *data)
 {
   NPNomadCallbackError *owner = data;
-  NPNomadCallbackCall call = {owner, n, m, 1, x, outputs};
-  R_tryCatchError(np_nomad_callback_body, &call, np_nomad_callback_caught, &call);
+  NPNomadCallbackCall call = {
+    .owner = owner, .n = n, .m = m, .status = 1, .x = x, .outputs = outputs
+  };
+  if (setjmp(call.jump) == 0)
+    R_UnwindProtect(np_nomad_callback_body, &call,
+                    np_nomad_callback_unwind, &call,
+                    VECTOR_ELT(owner->error_state, 1));
   if (np_nomad_error_pending(owner->error_state)) {
     /* Synchronous polling is essential: otherwise crs treats callback failure
      * as an invalid evaluation and keeps searching. */
@@ -55,6 +78,8 @@ static int np_nomad_callback_contained(int n, const double *x, int m,
     owner->poll();
     return 1;
   }
+  /* call.status can change during evaluation. Read it only on ordinary
+   * return, never after longjmp (the pending branch above always returns). */
   return call.status;
 }
 
@@ -122,10 +147,8 @@ static void np_nomad_error_observer_init(NPNomadCallbackError *owner,
 
 static void np_nomad_error_raise(SEXP state)
 {
-  /* Native R errors carry condition objects; R's stop(condition) is needed to
-   * re-signal the original class, call and fields, rather than a new string. */
-  SEXP call = PROTECT(Rf_lang2(Rf_install("stop"), VECTOR_ELT(state, 0)));
-  Rf_eval(call, R_BaseEnv);
-  UNPROTECT(1);
+  /* Resume the original error, interrupt, restart or exiting handler only
+   * after the existing caller has released native owners and restored globals. */
+  R_ContinueUnwind(VECTOR_ELT(state, 1));
 }
 #endif
