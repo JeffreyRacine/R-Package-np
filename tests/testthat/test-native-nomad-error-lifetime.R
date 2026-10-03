@@ -3,6 +3,14 @@ test_that("witnessed native errors and flag interrupts cannot poison NOMAD", {
   # R_PolledEvents is a Unix API. Windows GUI interruption needs its platform
   # release lane; do not pretend that a pre-entry timer tests a native callback.
   skip_on_os("windows")
+  # An unavailable configured compiler is infrastructure; a real build failure
+  # below remains a test failure. Respect compiler paths quoted by R's config.
+  cc <- system2(file.path(R.home("bin"), "R"), c("CMD", "config", "CC"),
+                stdout = TRUE)
+  expect_null(attr(cc, "status"))
+  compiler <- scan(text = paste(cc, collapse = " "), what = "", quiet = TRUE)[1L]
+  skip_if(is.na(compiler) || !nzchar(Sys.which(compiler)),
+          "R's configured C compiler is unavailable")
   pkg <- getNamespaceName(environment(npregbw))
   work <- tempfile("native-unwind-")
   dir.create(work)
