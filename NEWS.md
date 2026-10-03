@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Native NOMAD bandwidth searches preserve R errors, including time-limit
+  errors, and release search state so a subsequent local search can run.
+  This repair covers local execution; recovery from asynchronous R errors
+  during distributed searches remains a known limitation.
+
 * Conditional-density generalized-neighbor CVLS again rejects local-polynomial
   trials with insufficient distinct nonzero-weight donors, including the
   uniform and second-order Epanechnikov stable owner. Full-rank rows no longer
