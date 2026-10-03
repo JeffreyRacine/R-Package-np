@@ -1,15 +1,22 @@
 # npRmpi 0.80-1
 
-* Native NOMAD bandwidth searches preserve R errors, including time-limit
-  errors, and release search state so a subsequent local search can run.
+* Local native NOMAD objective callbacks now contain R errors and flag-based
+  interrupts, complete native search cleanup, and then resume the original R
+  condition or restart. This includes time limits raised inside these callbacks.
+  Errors from progress displays, R-callback degree searches and distributed
+  searches retain their separate handling; this is not a distributed MPI
+  timeout-cleanup repair.
   This repair covers local execution; recovery from asynchronous R errors
   during distributed searches remains a known limitation.
 
-* Conditional-density generalized-neighbor CVLS again rejects local-polynomial
-  trials with insufficient distinct nonzero-weight donors, including the
-  uniform and second-order Epanechnikov stable owner. Full-rank rows no longer
-  read unused coefficients from an unwritten solve buffer. Conditional
-  nearest-neighbor all-invalid errors now identify inadequate support or
+* Conditional-density generalized-neighbor CVLS rejects local-polynomial
+  trials with insufficient distinct nonzero-weight donors in the one-predictor
+  prefix owner. For two or more continuous predictors with unbounded uniform
+  or second-order Epanechnikov predictor kernels, the whole-response owners
+  now reject trials with fewer distinct deleted basis rows than basis terms.
+  This structural upper bound does not certify numerical full rank. Full-rank
+  prefix rows no longer read unused coefficients from an unwritten solve buffer.
+  Conditional nearest-neighbor all-invalid errors now identify inadequate support or
   numerical accuracy as possible causes, rather than attributing every failure
   to ties.
 
@@ -19,6 +26,12 @@
   allowing search to continue; the selected endpoint must still be raw-valid.
   This restores ordinary conditional density and distribution NOMAD searches,
   including mixed-predictor `wage1` examples.
+
+* Nearly coincident predictor values can still trigger original-coordinate
+  ridging after structural support admission and make conditional GNN CVLS
+  scores depend on predictor units. This numerical-rank limitation is deferred;
+  the structural-support correction does not change ridge coordinates or the
+  frozen coefficient-accuracy threshold.
 
 * Conditional numerical failure state is cleared between trials after owned
   work completes. In `npRmpi`, existing row reductions retain shared failure
@@ -60,9 +73,10 @@
   trial through the existing penalty policy without terminating the search.
   These corrections can substantially increase computation time. Retained
   Linux benchmarks on representative univariate `cv.ls` local-polynomial cases
-  measured about 15--21 times the earlier cost for uniform predictor kernels
-  and 3--4 times for second-order Epanechnikov kernels. These are case-specific
-  cumulative costs of the numerical repairs, not universal multipliers.
+  at sample sizes 200 and 400 measured about 16--28 times the earlier cost for
+  uniform predictor kernels and 4--5 times for second-order Epanechnikov kernels,
+  with the ratio increasing with sample size. These are case-specific cumulative
+  costs of the numerical repairs, not universal multipliers.
 
 * Conditional-density generalized-neighbor CVLS with beta predictors or bounded
   Gaussian predictors now uses the same whole-response criterion as unbounded
