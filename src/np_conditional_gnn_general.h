@@ -29,6 +29,7 @@ static void np_cgnn_general_cleanup(void *raw, Rboolean jump)
   free(a->integral.values);
   free(a->integral.bounds);
   free(a->adapter.xrow);
+  free(a->adapter.support_reps);
   free(a->adapter.yrow);
   free(a->cross);
 }
@@ -104,7 +105,7 @@ static SEXP np_cgnn_general_body(void *raw)
   for(int i=first;i<first+count && !fail;++i) {
     double logscale=0.0, linear;
     np_progress_bandwidth_loop_step();
-    if(np_conditional_cvls_provider_x_row(b->route,i,b->xrow) ||
+    if(np_cgnn_integral_x_row(b,i) ||
        np_conditional_cvls_provider_y_train_row(b->route,i,b->yrow,&logscale)) {
       fail=1;break;
     }
