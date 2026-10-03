@@ -29,7 +29,6 @@ static void np_cgnn_general_cleanup(void *raw, Rboolean jump)
   free(a->integral.values);
   free(a->integral.bounds);
   free(a->adapter.xrow);
-  free(a->adapter.support_reps);
   free(a->adapter.yrow);
   free(a->cross);
 }
