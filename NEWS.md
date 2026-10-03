@@ -16,6 +16,15 @@
   scalar tree-based Klein--Spady route. CVLS/CVAIC and directed MPI arithmetic
   are unchanged.
 
+* Conditional-distribution CVLS with beta kernels and generalized or adaptive
+  nearest-neighbor bandwidths now recomputes both predictor and response radii
+  after deleting the held-out observation. CDF evaluation nodes stay fixed.
+  Bounded response tiles reuse the two possible radii and their kernel values;
+  wider responses use coordinate-factor caches. This corrects objective values
+  and can change selected bandwidths. The additional computation is confined to
+  these beta NN objectives; fixed bandwidths, non-beta CDF, density and ordinary
+  regression routes retain their existing owners.
+
 * Conditional density (CVML/CVLS) and distribution (CVLS) nearest-neighbor
   local-polynomial objectives with uniform or second-order Epanechnikov
   predictor kernels reject trials with fewer distinct nonzero-weight deleted
