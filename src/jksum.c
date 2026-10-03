@@ -18309,7 +18309,8 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   int tsf = 0;
   const NP_OuterPackCtx frozen_runtime_options = {
     .runtime_options_frozen = 1,
-    .fixed_cv_cancel_row_mass = (bwm == RBWM_CVLS || bwm == RBWM_CVAIC)
+    .fixed_cv_cancel_row_mass = (bwm == RBWM_CVLS || bwm == RBWM_CVAIC ||
+                                 bwm == RBWM_CVCHECK || bwm == RBWM_CVKS)
   };
   const int track_lowsupport_requested =
     (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) || (bwm == RBWM_CVKS);
