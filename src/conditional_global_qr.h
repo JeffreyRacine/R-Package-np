@@ -99,7 +99,8 @@ static int np_cqr_prepare(NPConditionalQRGlobal *g,int n,int k,double **basis,in
 cleanup:
   np_cqr_fast_clear(&local);
   np_lp_solve_workspace_clear(&policy);free(gram);free(tau);free(pivot);free(work);
-  if(status)np_cqr_clear(g);return status;
+  if(status)np_cqr_clear(g);
+  return status;
 }
 static int np_cqr_row(NPConditionalQRGlobal *g,int i,double *row){
   if(!g||i<0||i>=g->n||!row)return 1;
@@ -115,7 +116,8 @@ static int np_cqr_cross(const NPConditionalQRGlobal *g,const double *rhs,double 
   int one=1;double alpha=1.,beta=0.;
   if(g->dgemv)F77_CALL(dgemv)("T",&g->n,&g->k,&alpha,g->q,&g->n,rhs,&one,&beta,cross,&one FCONE);
   else for(int a=0;a<g->k;a++)cross[a]=F77_CALL(ddot)(&g->n,g->q+(size_t)g->n*a,&one,rhs,&one);
-  for(int a=0;a<g->k;a++)if(!isfinite(cross[a]))return 1;return 0;
+  for(int a=0;a<g->k;a++)if(!isfinite(cross[a]))return 1;
+  return 0;
 }
 static int np_cqr_linear(NPConditionalQRGlobal *g,int i,const double *rhs,const double *cross,double *fit){
   if(!g||i<0||i>=g->n||!rhs||!cross||!fit)return 1;
@@ -134,7 +136,9 @@ static int np_cqr_quadratic(NPConditionalQRGlobal *g,NPConditionalQRResponseRow 
   double *rhs=NULL,*cross=NULL,*diag=NULL,*conv=NULL,*tile=NULL;
   NPConditionalQRAcc *moment=NULL,*acc=NULL;
   size_t rowbytes=(size_t)n*sizeof(double),limit=((size_t)1<<20)/rowbytes;
-  if(limit<1)limit=1;if(limit>16)limit=16;if(limit>(size_t)k)limit=k;
+  if(limit<1)limit=1;
+  if(limit>16)limit=16;
+  if(limit>(size_t)k)limit=k;
   if(test_tile_limit>0&&(size_t)test_tile_limit<limit)limit=test_tile_limit;
   int capacity=(int)limit;
   if((size_t)n>SIZE_MAX/limit/sizeof(double))return 1;
@@ -172,7 +176,8 @@ static int np_cqr_quadratic(NPConditionalQRGlobal *g,NPConditionalQRResponseRow 
     values[i]=(z.hi+z.lo)/(den*den);
   }
   for(int i=0;i<n;i++)if(!isfinite(values[i]))goto cleanup;
-  if(passes_out)*passes_out=passes;status=0;
+  if(passes_out)*passes_out=passes;
+  status=0;
 cleanup:
   free(rhs);free(cross);free(diag);free(conv);free(moment);free(tile);free(acc);return status;
 }
