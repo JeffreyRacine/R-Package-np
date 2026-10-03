@@ -91,31 +91,26 @@ test_that("npindexbw adopts the generic bandwidth selection line", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  res <- with_nprmpi_bindings(
-    list(
-      .np_progress_is_interactive = function() TRUE,
-      .np_progress_is_master = function() TRUE,
-      .np_progress_now = progress_time_counter()
+  shadow <- capture_progress_shadow_trace(
+    npindexbw(
+      xdat = data.frame(x1 = x1, x2 = x2),
+      ydat = y,
+      method = "ichimura",
+      nmulti = 3,
+      optim.maxit = 100
     ),
-    capture_progress_conditions(
-      npindexbw(
-        xdat = data.frame(x1 = x1, x2 = x2),
-        ydat = y,
-        method = "ichimura",
-        nmulti = 3,
-        optim.maxit = 100
-      )
-    )
+    force_renderer = "single_line",
+    now = progress_time_counter()
   )
+  messages <- vapply(shadow$trace, `[[`, character(1L), "render_line")
 
-  messages <- normalize_messages(res$messages)
-
-  expect_s3_class(res$value, "sibandwidth")
+  expect_s3_class(shadow$value, "sibandwidth")
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, [0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(ms 2/3, iter [0-9]+, [0-9]+\\.[0-9]%, elap [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$", messages)))
+  expect_identical(tail(shadow$trace, 1L)[[1L]]$event, "finish")
+  expect_match(shadow$final_line, "^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$")
 })
 
 test_that("npindexbw progress respects np.messages FALSE", {

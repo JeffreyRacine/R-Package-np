@@ -60,28 +60,23 @@ test_that("npudensbw uses the generic bandwidth selection line on master", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  res <- NULL
-  messages <- capture.output(
-    res <- with_nprmpi_bindings(
-      list(
-        .np_progress_is_interactive = function() TRUE,
-        .np_progress_is_master = function() TRUE,
-        .np_progress_now = progress_time_counter()
-      ),
-      npudensbw(
-        dat = data.frame(x = x),
-        bwmethod = "cv.ml",
-        nmulti = 3
-      )
+  shadow <- capture_progress_shadow_trace(
+    npudensbw(
+      dat = data.frame(x = x),
+      bwmethod = "cv.ml",
+      nmulti = 3
     ),
-    type = "message"
+    force_renderer = "single_line",
+    now = progress_time_counter()
   )
-  messages <- normalize_messages(messages)
+  res <- shadow$value
+  messages <- vapply(shadow$trace, `[[`, character(1L), "line")
 
   expect_s3_class(res, "bandwidth")
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, [0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$", messages)))
+  expect_identical(tail(shadow$trace, 1L)[[1L]]$event, "finish")
+  expect_match(shadow$final_line, "^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$")
 })
 
 test_that("npregbw uses the generic bandwidth selection line on master", {
@@ -100,28 +95,23 @@ test_that("npregbw uses the generic bandwidth selection line on master", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  res <- NULL
-  messages <- capture.output(
-    res <- with_nprmpi_bindings(
-      list(
-        .np_progress_is_interactive = function() TRUE,
-        .np_progress_is_master = function() TRUE,
-        .np_progress_now = progress_time_counter()
-      ),
-      npregbw(
-        xdat = data.frame(x = x),
-        ydat = y,
-        regtype = "lc",
-        bwmethod = "cv.aic",
-        nmulti = 3
-      )
+  shadow <- capture_progress_shadow_trace(
+    npregbw(
+      xdat = data.frame(x = x),
+      ydat = y,
+      regtype = "lc",
+      bwmethod = "cv.aic",
+      nmulti = 3
     ),
-    type = "message"
+    force_renderer = "single_line",
+    now = progress_time_counter()
   )
-  messages <- normalize_messages(messages)
+  res <- shadow$value
+  messages <- vapply(shadow$trace, `[[`, character(1L), "line")
 
   expect_s3_class(res, "rbandwidth")
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, [0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$", messages)))
+  expect_identical(tail(shadow$trace, 1L)[[1L]]$event, "finish")
+  expect_match(shadow$final_line, "^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$")
 })
