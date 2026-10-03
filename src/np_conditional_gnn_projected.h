@@ -783,8 +783,42 @@ typedef struct {
   NPConditionalCVLSRouteContext *route;
   NPGNNIntegralUniformContext categories;
   double *values,*bounds,*xrow,*yrow,*cv;
+  int *support_reps;
   int status;
 } NPGNNConditionalIntegralContext;
+
+/* Structural admission for this conditional-density GNN CVLS owner only.
+ * The incumbent provider leaves its actual X weights and basis in X-tree
+ * order. Count distinct complete deleted basis rows, stopping at basis width.
+ * This is a rank upper bound, never a numerical full-rank certificate. */
+static int np_cgnn_integral_x_row(NPGNNConditionalIntegralContext *c,
+                                 int evaluation)
+{
+  if(np_conditional_cvls_provider_x_row(c->route,evaluation,c->xrow))return 1;
+  if(BANDWIDTH_den_extern!=BW_GEN_NN || c->route->beta_x ||
+     num_reg_continuous_extern<2 || int_cxker_bound_extern ||
+     (KERNEL_reg_extern!=4 && KERNEL_reg_extern!=8) ||
+     np_lp_engine_extern!=NP_LP_ENGINE_GENERAL)return 0;
+  NPConditionalXRowCtx *x=&c->route->legacy_x;
+  const int p=np_glp_cv_cache.nterms, n=num_obs_train_extern;
+  const int held=int_TREE_X==NP_TREE_TRUE ? ipt_lookup_extern_X[evaluation] : evaluation;
+  int count=0;
+  if(p<=1)return 0;
+  if(!c->support_reps)c->support_reps=np_cgnn_calloc(p,sizeof(int));
+  if(!c->support_reps)return 1;
+  for(int j=0;j<n && count<p;++j) {
+    if(j==held || x->kw[j]==0.0)continue;
+    int duplicate=0;
+    for(int a=0;a<count && !duplicate;++a) {
+      const int other=c->support_reps[a];
+      int k=0;
+      while(k<p && x->basis[k][j]==x->basis[k][other])++k;
+      duplicate=k==p;
+    }
+    if(!duplicate)c->support_reps[count++]=j;
+  }
+  return count<p;
+}
 
 /* The route produces original-index X rows; the integral has Y-tree donor
  * order. The fold and both donor maps are explicit and applied exactly once. */
@@ -792,7 +826,7 @@ static int np_gnn_conditional_integral_weight(void *raw,int fold,double *row)
 {
   NPGNNConditionalIntegralContext *c=(NPGNNConditionalIntegralContext *)raw;
   const int i=int_TREE_Y == NP_TREE_TRUE ? ipt_extern_Y[fold] : fold;
-  if(np_conditional_cvls_provider_x_row(c->route,i,c->xrow))return 1;
+  if(np_cgnn_integral_x_row(c,i))return 1;
   for(int j=0;j<num_obs_train_extern;++j)
     row[j]=c->xrow[int_TREE_Y == NP_TREE_TRUE ? ipt_extern_Y[j] : j];
   return 0;
@@ -870,6 +904,7 @@ static void np_cgnn_projected_cleanup(void *raw,Rboolean jump)
   (void)jump;
   np_gnn_integral_geometry_clear(&a->geometry);
   free(a->adapter.xrow);free(a->adapter.yrow);free(a->cross);
+  free(a->adapter.support_reps);
   free(c->values);free(c->bounds);free(c->weight_row);
   free(c->left);free(c->right);free(c->overlap);free(c->products);
   free(c->profile_moments);free(c->profile_left);free(c->profile_right);
@@ -960,7 +995,7 @@ static SEXP np_cgnn_projected_body(void *raw)
   for(int i=first;i<first+count && !fail;++i) {
     np_progress_bandwidth_loop_step();
     double logscale=0.0,linear;
-    if(np_conditional_cvls_provider_x_row(b->route,i,b->xrow) ||
+    if(np_cgnn_integral_x_row(b,i) ||
        np_conditional_cvls_provider_y_train_row(b->route,i,b->yrow,&logscale)) {
       fail=1;break;
     }
