@@ -19,6 +19,7 @@
 #include <stdint.h>
 
 #include <crs_nomad_native.h>
+#include "np_nomad_callback_error.h"
 
 #ifdef MPI2
 #include "mpi.h"
@@ -231,7 +232,7 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
                                         crs_nomad_eval_fn eval,
                                         void *user_data,
                                         const np_nomad_progress_spec *progress_spec,
-                                        crs_nomad_result *result);
+                                        crs_nomad_result *result, SEXP callback_error);
 
 int int_TREE_X;
 int int_TREE_Y;
@@ -440,7 +441,7 @@ SEXP C_np_nomad_r_callback_native_search(SEXP eval_f,
                                         NULL,
                                         &r_callback,
                                         NULL,
-                                        &result);
+                                        &result, R_NilValue);
 
   PROTECT(out = allocVector(VECSXP, 13)); nprotect++;
   PROTECT(names = allocVector(STRSXP, 13)); nprotect++;
@@ -1431,17 +1432,25 @@ np_nomad_fixed_degree_solution_status(const crs_nomad_problem *problem,
   return status;
 }
 
+static SEXP np_nomad_callback_error_state(void)
+{
+  return allocVector(VECSXP, 1);
+}
+
 static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
                                         crs_nomad_eval_fn eval,
                                         void *user_data,
                                         const np_nomad_progress_spec *progress_spec,
-                                        crs_nomad_result *result)
+                                        crs_nomad_result *result, SEXP callback_error)
 {
   crs_nomad_solve_observed_fn solve_observed;
   crs_nomad_observer_poll_fn observer_poll;
   crs_nomad_problem fixed_degree_problem;
   const crs_nomad_problem *solve_problem;
   crs_nomad_observer observer;
+  NPNomadCallbackError error_owner;
+  const int contain_errors = callback_error != R_NilValue;
+  crs_nomad_observer_poll_fn previous_poll = np_crs_nomad_observer_poll;
   double interval_sec = 2.0;
   int observer_enabled;
   int previous_callback_state;
@@ -1468,17 +1477,24 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
     observer.interval_sec = interval_sec;
   }
 
+  if (contain_errors)
+    np_nomad_error_observer_init(&error_owner, &observer, observer_poll,
+                                eval, user_data, callback_error);
   previous_callback_state = nomad_c_callback_active;
   if (solve_problem != NULL &&
       solve_problem->callback_mode == CRS_NOMAD_CALLBACK_C)
     nomad_c_callback_active = 1;
   status = solve_observed(solve_problem,
-                          eval,
-                          user_data,
-                          observer_enabled ? &observer : NULL,
+                          contain_errors ? np_nomad_callback_contained : eval,
+                          contain_errors ? &error_owner : user_data,
+                          (observer_enabled || contain_errors) ? &observer : NULL,
                           result);
   nomad_c_callback_active = previous_callback_state;
-  np_crs_nomad_observer_poll = NULL;
+  np_crs_nomad_observer_poll = previous_poll;
+  if (np_nomad_error_pending(callback_error))
+    return status;
+  if (contain_errors && error_owner.progress_error[0] != '\0')
+    np_nomad_progress_observer_report(error_owner.progress_error);
   status = np_nomad_fixed_degree_solution_status(
     problem, progress_spec, result, status);
 
@@ -1489,8 +1505,8 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
   return status;
 }
 
-/* Only conditional native searches use this stop transport. The shared NOMAD
- * wrapper and protected regression callers retain their existing path. */
+/* Conditional numerical failures keep their separate stop metadata. R errors
+ * use the callback condition owner and do not alter invalid-trial policy. */
 enum { NP_CONDITIONAL_NATIVE_STOP = 2 };
 typedef struct {
   crs_nomad_observer observer;
@@ -1557,9 +1573,11 @@ static void np_conditional_nomad_stop(np_conditional_nomad_stop_context *stop)
 static int np_conditional_nomad_solve(
   const crs_nomad_problem *problem, crs_nomad_eval_fn eval, void *user_data,
   const np_nomad_progress_spec *progress, crs_nomad_result *result,
-  np_conditional_nomad_stop_context *stop)
+  np_conditional_nomad_stop_context *stop, SEXP callback_error)
 {
   crs_nomad_solve_observed_fn solve;
+  NPNomadCallbackError error_owner;
+  const int contain_errors = callback_error != R_NilValue;
   crs_nomad_problem fixed_problem;
   const crs_nomad_problem *solve_problem;
   const int previous_callback = nomad_c_callback_active;
@@ -1583,12 +1601,20 @@ static int np_conditional_nomad_solve(
   stop->observer.user_data = stop;
   stop->observer.interval_sec = stop->progress_enabled ? interval : DBL_MAX;
 
+  if (contain_errors)
+    np_nomad_error_observer_init(&error_owner, &stop->observer, stop->poll,
+                                eval, user_data, callback_error);
   np_crs_nomad_observer_poll = stop->poll;
   if (solve_problem != NULL && solve_problem->callback_mode == CRS_NOMAD_CALLBACK_C)
     nomad_c_callback_active = 1;
-  status = solve(solve_problem, eval, user_data, &stop->observer, result);
+  status = solve(solve_problem,
+                 contain_errors ? np_nomad_callback_contained : eval,
+                 contain_errors ? &error_owner : user_data,
+                 &stop->observer, result);
   nomad_c_callback_active = previous_callback;
   np_crs_nomad_observer_poll = previous_poll;
+  if (np_nomad_error_pending(callback_error))
+    return status;
   if (!stop->terminal) {
     status = np_nomad_fixed_degree_solution_status(problem, progress, result, status);
     if (stop->progress_error[0] != '\0')
@@ -6598,6 +6624,8 @@ typedef struct {
   int progress_last_signal_eval;
   clock_t progress_last_signal_clock;
   time_t progress_last_signal_wall;
+  double *callback_flat_bw;
+  int *callback_degree;
 } np_cdens_native_search_context;
 
 static int np_cdens_native_search_callback(int n,
@@ -6619,15 +6647,17 @@ static int np_cdens_native_search_callback(int n,
       context->ncont_point > context->nbw_point)
     return 1;
 
+  context->callback_flat_bw = NULL;
+  context->callback_degree = NULL;
   degree_len = (context->ndegree > 0) ? context->ndegree : context->nfixed_degree;
-  flat_bw = NP_NOMAD_CALLBACK_CALLOC(context->nbw_flat, double);
+  flat_bw = context->callback_flat_bw = NP_NOMAD_CALLBACK_CALLOC(context->nbw_flat, double);
   if (degree_len > 0)
-    degree = NP_NOMAD_CALLBACK_CALLOC(degree_len, int);
+    degree = context->callback_degree = NP_NOMAD_CALLBACK_CALLOC(degree_len, int);
   if (flat_bw == NULL || (degree_len > 0 && degree == NULL)) {
-    if (flat_bw != NULL)
-      NP_NOMAD_CALLBACK_FREE(flat_bw);
-    if (degree != NULL)
-      NP_NOMAD_CALLBACK_FREE(degree);
+    NP_NOMAD_CALLBACK_FREE(flat_bw);
+    NP_NOMAD_CALLBACK_FREE(degree);
+    context->callback_flat_bw = NULL;
+    context->callback_degree = NULL;
     return 1;
   }
 
@@ -6635,14 +6665,18 @@ static int np_cdens_native_search_callback(int n,
     const int idx = context->flat_from_point[j];
     if (idx < 0 || idx >= context->nbw_point) {
       NP_NOMAD_CALLBACK_FREE(flat_bw);
+      context->callback_flat_bw = NULL;
       NP_NOMAD_CALLBACK_FREE(degree);
+      context->callback_degree = NULL;
       return 1;
     }
     if (idx >= context->ncont_point) {
       if (np_nomad_decode_categorical_bandwidth(
             x[idx], context->scaling, context->ncatfac, &flat_bw[j]) != 0) {
         NP_NOMAD_CALLBACK_FREE(flat_bw);
+        context->callback_flat_bw = NULL;
         NP_NOMAD_CALLBACK_FREE(degree);
+        context->callback_degree = NULL;
         return 1;
       }
     } else if (BANDWIDTH_den_extern == BW_FIXED) {
@@ -6671,7 +6705,9 @@ static int np_cdens_native_search_callback(int n,
     if (context->nfixed_degree > 0 && context->fixed_degree == NULL) {
       context->callback_failures++;
       NP_NOMAD_CALLBACK_FREE(flat_bw);
+      context->callback_flat_bw = NULL;
       NP_NOMAD_CALLBACK_FREE(degree);
+      context->callback_degree = NULL;
       return 1;
     }
     for (j = 0; j < context->nfixed_degree; j++)
@@ -6682,7 +6718,9 @@ static int np_cdens_native_search_callback(int n,
   if (status != 0) {
     context->callback_failures++;
     NP_NOMAD_CALLBACK_FREE(flat_bw);
+    context->callback_flat_bw = NULL;
     NP_NOMAD_CALLBACK_FREE(degree);
+    context->callback_degree = NULL;
     if (status == NP_CONDITIONAL_NATIVE_STOP)
       np_conditional_nomad_stop(&context->stop);
     return 1;
@@ -6712,7 +6750,9 @@ static int np_cdens_native_search_callback(int n,
     }
   }
   NP_NOMAD_CALLBACK_FREE(flat_bw);
+  context->callback_flat_bw = NULL;
   NP_NOMAD_CALLBACK_FREE(degree);
+  context->callback_degree = NULL;
   bb_outputs[0] = min_objective;
   return 0;
 }
@@ -6762,6 +6802,8 @@ SEXP C_np_density_conditional_prepared_native_search(SEXP x0,
   PROTECT(point_upper_r = coerceVector(point_upper, REALSXP));
   PROTECT(option_names_s = coerceVector(option_names, STRSXP));
   PROTECT(option_values_s = coerceVector(option_values, STRSXP));
+  /* Root errors before acquiring any native invocation resources. */
+  SEXP callback_error = PROTECT(np_nomad_callback_error_state());
 
   n = (int) XLENGTH(x0_r);
   if (n <= 0 ||
@@ -6769,34 +6811,34 @@ SEXP C_np_density_conditional_prepared_native_search(SEXP x0,
       XLENGTH(lower_r) != n ||
       XLENGTH(upper_r) != n)
   {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native NOMAD search received inconsistent problem dimensions");
   }
   if (XLENGTH(flat_i) != np_conditional_density_prepared_context.num_all_var) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native NOMAD search received invalid bandwidth map length");
   }
   if (XLENGTH(decode_scale_r) != np_conditional_density_prepared_context.num_all_var) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native NOMAD search received invalid fixed decode scale length");
   }
   if (XLENGTH(point_upper_r) != (n - np_conditional_density_prepared_context.num_reg_continuous)) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native NOMAD search received invalid point upper-bound length");
   }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
   inner_count = asInteger(inner_start_count);
   if (budget < 0 || seed < 0 || inner_count < 0) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native NOMAD search received invalid budget or seed");
   }
   if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native NOMAD search received inconsistent option name/value lengths");
   }
   if (XLENGTH(option_names_s) > INT_MAX) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native NOMAD search received too many options");
   }
   n_options = (int) XLENGTH(option_names_s);
@@ -6814,7 +6856,7 @@ SEXP C_np_density_conditional_prepared_native_search(SEXP x0,
     if (best_flat_bw != NULL) R_Free(best_flat_bw);
     if (flat_map != NULL) R_Free(flat_map);
     if (best_degree_i != NULL) R_Free(best_degree_i);
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("failed to allocate native NOMAD search buffers");
   }
   if (n_options > 0) {
@@ -6825,7 +6867,7 @@ SEXP C_np_density_conditional_prepared_native_search(SEXP x0,
       R_Free(best_flat_bw);
       R_Free(flat_map);
       R_Free(best_degree_i);
-      UNPROTECT(9);
+      UNPROTECT(10);
       error("failed to allocate native NOMAD option buffers");
     }
     for (i = 0; i < n_options; i++) {
@@ -6902,10 +6944,12 @@ SEXP C_np_density_conditional_prepared_native_search(SEXP x0,
                                         np_cdens_native_search_callback,
                                         &context,
                                         &progress_spec,
-                                        &result, &context.stop);
+                                        &result, &context.stop, callback_error);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
-  if (context.stop.terminal) {
+  if (np_nomad_error_pending(callback_error) || context.stop.terminal) {
+    NP_NOMAD_CALLBACK_FREE(context.callback_flat_bw);
+    NP_NOMAD_CALLBACK_FREE(context.callback_degree);
     R_Free(solution);
     R_Free(best_point);
     R_Free(best_flat_bw);
@@ -6913,9 +6957,13 @@ SEXP C_np_density_conditional_prepared_native_search(SEXP x0,
     R_Free(best_degree_i);
     if (native_options != NULL) R_Free(native_options);
     np_conditional_density_prepared_context_clear_internal();
+    if (np_nomad_error_pending(callback_error))
+      np_nomad_error_raise(callback_error);
+    UNPROTECT(1);
     UNPROTECT(9);
     np_conditional_nomad_raise(&context.stop);
   }
+  UNPROTECT(1);
   if (context.ndegree > 0 && context.callback_calls > 0)
     np_progress_nomad_degree_step(context.callback_calls,
                                   context.best_degree,
@@ -7050,6 +7098,8 @@ SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP x0,
   PROTECT(point_upper_r = coerceVector(point_upper, REALSXP));
   PROTECT(option_names_s = coerceVector(option_names, STRSXP));
   PROTECT(option_values_s = coerceVector(option_values, STRSXP));
+  /* Root errors before acquiring any native invocation resources. */
+  SEXP callback_error = PROTECT(np_nomad_callback_error_state());
 
   n = (int) XLENGTH(x0_r);
   if (n <= 0 ||
@@ -7057,34 +7107,34 @@ SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP x0,
       XLENGTH(lower_r) != n ||
       XLENGTH(upper_r) != n)
   {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native fixed-degree NOMAD search received inconsistent problem dimensions");
   }
   if (XLENGTH(flat_i) != np_conditional_density_prepared_context.num_all_var) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native fixed-degree NOMAD search received invalid bandwidth map length");
   }
   if (XLENGTH(decode_scale_r) != np_conditional_density_prepared_context.num_all_var) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native fixed-degree NOMAD search received invalid fixed decode scale length");
   }
   if (XLENGTH(point_upper_r) != n) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native fixed-degree NOMAD search received invalid point upper-bound length");
   }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
   inner_count = asInteger(inner_start_count);
   if (budget < 0 || seed < 0 || inner_count < 0) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native fixed-degree NOMAD search received invalid budget or seed");
   }
   if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native fixed-degree NOMAD search received inconsistent option name/value lengths");
   }
   if (XLENGTH(option_names_s) > INT_MAX) {
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("native fixed-degree NOMAD search received too many options");
   }
   n_options = (int) XLENGTH(option_names_s);
@@ -7102,7 +7152,7 @@ SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP x0,
     if (best_flat_bw != NULL) R_Free(best_flat_bw);
     if (flat_map != NULL) R_Free(flat_map);
     if (best_degree_i != NULL) R_Free(best_degree_i);
-    UNPROTECT(9);
+    UNPROTECT(10);
     error("failed to allocate native fixed-degree NOMAD search buffers");
   }
   if (n_options > 0) {
@@ -7113,7 +7163,7 @@ SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP x0,
       R_Free(best_flat_bw);
       R_Free(flat_map);
       R_Free(best_degree_i);
-      UNPROTECT(9);
+      UNPROTECT(10);
       error("failed to allocate native fixed-degree NOMAD option buffers");
     }
     for (i = 0; i < n_options; i++) {
@@ -7193,10 +7243,12 @@ SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP x0,
                                         np_cdens_native_search_callback,
                                         &context,
                                         &progress_spec,
-                                        &result, &context.stop);
+                                        &result, &context.stop, callback_error);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
-  if (context.stop.terminal) {
+  if (np_nomad_error_pending(callback_error) || context.stop.terminal) {
+    NP_NOMAD_CALLBACK_FREE(context.callback_flat_bw);
+    NP_NOMAD_CALLBACK_FREE(context.callback_degree);
     R_Free(solution);
     R_Free(best_point);
     R_Free(best_flat_bw);
@@ -7204,9 +7256,13 @@ SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP x0,
     R_Free(best_degree_i);
     if (native_options != NULL) R_Free(native_options);
     np_conditional_density_prepared_context_clear_internal();
+    if (np_nomad_error_pending(callback_error))
+      np_nomad_error_raise(callback_error);
+    UNPROTECT(1);
     UNPROTECT(9);
     np_conditional_nomad_raise(&context.stop);
   }
+  UNPROTECT(1);
   if (context.ndegree > 0 && context.callback_calls > 0)
     np_progress_nomad_degree_step(context.callback_calls,
                                   context.best_degree,
@@ -8149,53 +8205,55 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
   PROTECT(decode_scale_r = coerceVector(decode_scale, REALSXP));
+  /* Root errors before acquiring any native invocation resources. */
+  SEXP callback_error = PROTECT(np_nomad_callback_error_state());
 
   n = (int) XLENGTH(x0_r);
   if (n <= 0 ||
       XLENGTH(bbin_i) != n ||
       XLENGTH(lower_r) != n ||
       XLENGTH(upper_r) != n) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search received inconsistent problem dimensions");
   }
   if (XLENGTH(myopti_i) < RBW_OPTIONS_COUNT ||
       XLENGTH(degree_i) < 1 ||
       XLENGTH(glp_bernstein) < 1 ||
       XLENGTH(glp_basis) < 1) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search received incomplete regression state");
   }
   if (XLENGTH(myoptd_r) <= RBW_SFLOORD) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search received incomplete myoptd");
   }
   nbw = INTEGER(myopti_i)[RBW_NCONI] + INTEGER(myopti_i)[RBW_NUNOI] + INTEGER(myopti_i)[RBW_NORDI];
   ndegree = n - nbw;
   if (nbw <= 0 || ndegree < 0) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search received inconsistent bandwidth/degree dimensions");
   }
   if (XLENGTH(decode_scale_r) != nbw) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search received inconsistent decode scale dimensions");
   }
   if (ndegree > 0 && XLENGTH(degree_i) != ndegree) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search received inconsistent degree dimensions");
   }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
   inner_count = asInteger(inner_start_count);
   if (budget < 0 || seed < 0 || inner_count < 0) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search received invalid budget or seed");
   }
   if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search received inconsistent option name/value lengths");
   }
   if (XLENGTH(option_names_s) > INT_MAX) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search received too many options");
   }
   n_options = (int) XLENGTH(option_names_s);
@@ -8251,7 +8309,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   }
   if (np_regression_native_decode_eval_bw(
         &context, raw_start, eval_start) != 0) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npreg NOMAD search failed to decode initial state");
   }
   if (ndegree > 0) {
@@ -8296,7 +8354,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
     if (context.eval_bw != NULL) R_Free(context.eval_bw);
     if (context.degree_work != NULL) R_Free(context.degree_work);
     np_regression_prepared_context_destroy(&context.prepared);
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("failed to allocate native npreg callback scratch");
   }
 
@@ -8316,7 +8374,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
     R_Free(context.eval_bw);
     if (context.degree_work != NULL) R_Free(context.degree_work);
     np_regression_prepared_context_destroy(&context.prepared);
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("failed to allocate native npreg NOMAD buffers");
   }
   if (n_options > 0) {
@@ -8330,7 +8388,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
       R_Free(context.eval_bw);
       if (context.degree_work != NULL) R_Free(context.degree_work);
       np_regression_prepared_context_destroy(&context.prepared);
-      UNPROTECT(17);
+      UNPROTECT(18);
       error("failed to allocate native npreg NOMAD option buffers");
     }
     for (i = 0; i < n_options; i++) {
@@ -8388,9 +8446,22 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
                                         np_regression_native_search_callback,
                                         &context,
                                         &progress_spec,
-                                        &result);
+                                        &result, callback_error);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
+  if (np_nomad_error_pending(callback_error)) {
+    R_Free(context.raw_point);
+    R_Free(context.eval_bw);
+    if (context.degree_work != NULL) R_Free(context.degree_work);
+    np_regression_prepared_context_destroy(&context.prepared);
+    R_Free(solution);
+    R_Free(best_point);
+    if (best_degree_i != NULL) R_Free(best_degree_i);
+    if (first_degree_i != NULL) R_Free(first_degree_i);
+    if (native_options != NULL) R_Free(native_options);
+    np_nomad_error_raise(callback_error);
+  }
+  UNPROTECT(1);
   if (context.callback_calls > 0 &&
       np_regression_native_decode_eval_bw(
         &context, best_point, context.eval_bw) == 0) {
@@ -11206,6 +11277,8 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   PROTECT(option_values_s = coerceVector(option_values, STRSXP));
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+  /* Root errors before acquiring any native invocation resources. */
+  SEXP callback_error = PROTECT(np_nomad_callback_error_state());
 
   np_density_bw_integer_contract_or_error(
     myopti_i, "native npudens NOMAD search");
@@ -11223,26 +11296,26 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
       XLENGTH(bbin_i) != n ||
       XLENGTH(lower_r) != n ||
       XLENGTH(upper_r) != n) {
-    UNPROTECT(14);
+    UNPROTECT(15);
     error("native npudens NOMAD search received inconsistent problem dimensions");
   }
   if (XLENGTH(myoptd_r) <= BW_SFLOORD) {
-    UNPROTECT(14);
+    UNPROTECT(15);
     error("native npudens NOMAD search received incomplete myoptd");
   }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
   inner_count = asInteger(inner_start_count);
   if (budget < 0 || seed < 0 || inner_count < 0) {
-    UNPROTECT(14);
+    UNPROTECT(15);
     error("native npudens NOMAD search received invalid budget or seed");
   }
   if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
-    UNPROTECT(14);
+    UNPROTECT(15);
     error("native npudens NOMAD search received inconsistent option name/value lengths");
   }
   if (XLENGTH(option_names_s) > INT_MAX) {
-    UNPROTECT(14);
+    UNPROTECT(15);
     error("native npudens NOMAD search received too many options");
   }
   n_options = (int) XLENGTH(option_names_s);
@@ -11283,7 +11356,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
         context.penalty_mode, context.penalty_mult,
         context.ckerlb, context.ckerub, &support) != 0) {
     np_density_prepared_context_destroy(&context.prepared);
-    UNPROTECT(14);
+    UNPROTECT(15);
     error("native npudens NOMAD search failed to prepare objective state");
   }
 
@@ -11293,7 +11366,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
     if (context.raw_point != NULL) R_Free(context.raw_point);
     if (context.eval_bw != NULL) R_Free(context.eval_bw);
     np_density_prepared_context_destroy(&context.prepared);
-    UNPROTECT(14);
+    UNPROTECT(15);
     error("failed to allocate native npudens callback scratch");
   }
 
@@ -11305,7 +11378,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
     R_Free(context.raw_point);
     R_Free(context.eval_bw);
     np_density_prepared_context_destroy(&context.prepared);
-    UNPROTECT(14);
+    UNPROTECT(15);
     error("failed to allocate native npudens NOMAD buffers");
   }
   if (n_options > 0) {
@@ -11316,7 +11389,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
       R_Free(context.raw_point);
       R_Free(context.eval_bw);
       np_density_prepared_context_destroy(&context.prepared);
-      UNPROTECT(14);
+      UNPROTECT(15);
       error("failed to allocate native npudens NOMAD option buffers");
     }
     for (i = 0; i < n_options; i++) {
@@ -11363,13 +11436,20 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
                                         np_udens_native_search_callback,
                                         &context,
                                         NULL,
-                                        &result);
+                                        &result, callback_error);
   bwm_objective_cache_callback_option_end();
   R_Free(context.raw_point);
   R_Free(context.eval_bw);
   context.raw_point = NULL;
   context.eval_bw = NULL;
   np_density_prepared_context_destroy(&context.prepared);
+  if (np_nomad_error_pending(callback_error)) {
+    R_Free(solution);
+    R_Free(best_point);
+    if (native_options != NULL) R_Free(native_options);
+    np_nomad_error_raise(callback_error);
+  }
+  UNPROTECT(1);
 
   PROTECT(out = allocVector(VECSXP, 23));
   PROTECT(names = allocVector(STRSXP, 23));
@@ -11793,6 +11873,8 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   PROTECT(option_values_s = coerceVector(option_values, STRSXP));
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+  /* Root errors before acquiring any native invocation resources. */
+  SEXP callback_error = PROTECT(np_nomad_callback_error_state());
 
   if(XLENGTH(myopti_i) <= DBW_NCONI)
     error("native npudist NOMAD search received incomplete myopti");
@@ -11808,26 +11890,26 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
       XLENGTH(bbin_i) != n ||
       XLENGTH(lower_r) != n ||
       XLENGTH(upper_r) != n) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npudist NOMAD search received inconsistent problem dimensions");
   }
   if (XLENGTH(myoptd_r) <= DBW_SFLOORD) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npudist NOMAD search received incomplete myoptd");
   }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
   inner_count = asInteger(inner_start_count);
   if (budget < 0 || seed < 0 || inner_count < 0) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npudist NOMAD search received invalid budget or seed");
   }
   if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npudist NOMAD search received inconsistent option name/value lengths");
   }
   if (XLENGTH(option_names_s) > INT_MAX) {
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npudist NOMAD search received too many options");
   }
   n_options = (int) XLENGTH(option_names_s);
@@ -11838,7 +11920,7 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   if (solution == NULL || best_point == NULL) {
     if (solution != NULL) R_Free(solution);
     if (best_point != NULL) R_Free(best_point);
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("failed to allocate native npudist NOMAD buffers");
   }
   if (n_options > 0) {
@@ -11846,7 +11928,7 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
-      UNPROTECT(17);
+      UNPROTECT(18);
       error("failed to allocate native npudist NOMAD option buffers");
     }
     for (i = 0; i < n_options; i++) {
@@ -11907,7 +11989,7 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
     R_Free(best_point);
     if (native_options != NULL)
       R_Free(native_options);
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("native npudist NOMAD search failed to prepare objective state");
   }
 
@@ -11921,7 +12003,7 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
     R_Free(best_point);
     if (native_options != NULL)
       R_Free(native_options);
-    UNPROTECT(17);
+    UNPROTECT(18);
     error("failed to allocate native npudist callback scratch");
   }
 
@@ -11955,13 +12037,20 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
                                         np_udist_native_search_callback,
                                         &context,
                                         NULL,
-                                        &result);
+                                        &result, callback_error);
   bwm_objective_cache_callback_option_end();
   R_Free(context.raw_point);
   R_Free(context.eval_bw);
   context.raw_point = NULL;
   context.eval_bw = NULL;
   np_distribution_prepared_context_destroy(&context.prepared);
+  if (np_nomad_error_pending(callback_error)) {
+    R_Free(solution);
+    R_Free(best_point);
+    if (native_options != NULL) R_Free(native_options);
+    np_nomad_error_raise(callback_error);
+  }
+  UNPROTECT(1);
 
   PROTECT(out = allocVector(VECSXP, 23));
   PROTECT(names = allocVector(STRSXP, 23));
@@ -12664,18 +12753,20 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   PROTECT(cxkerub_r = coerceVector(cxkerub, REALSXP));
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
+  /* Root errors before acquiring any native invocation resources. */
+  SEXP callback_error = PROTECT(np_nomad_callback_error_state());
 
   if (XLENGTH(myopti_i) <= CDBW_CATCOMPI) {
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("native npcdist NOMAD search received incomplete myopti");
   }
   n = (int) XLENGTH(x0_r);
   if (n <= 0 || XLENGTH(bbin_i) != n || XLENGTH(lower_r) != n || XLENGTH(upper_r) != n) {
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("native npcdist NOMAD search received inconsistent problem dimensions");
   }
   if (XLENGTH(myoptd_r) <= CDBW_SFLOORD) {
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("native npcdist NOMAD search received incomplete myoptd");
   }
   nbw = INTEGER(myopti_i)[CDBW_UNCONI] + INTEGER(myopti_i)[CDBW_CNCONI] +
@@ -12683,26 +12774,26 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
     INTEGER(myopti_i)[CDBW_UNUNOI] + INTEGER(myopti_i)[CDBW_UNORDI];
   ndegree = n - nbw;
   if (nbw <= 0 || ndegree < 0) {
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("native npcdist NOMAD search received inconsistent bandwidth/degree dimensions");
   }
   if (ndegree > 0 && XLENGTH(degree_i) != ndegree) {
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("native npcdist NOMAD search received inconsistent degree dimensions");
   }
   budget = asInteger(max_eval);
   seed = asInteger(random_seed);
   inner_count = asInteger(inner_start_count);
   if (budget < 0 || seed < 0 || inner_count < 0) {
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("native npcdist NOMAD search received invalid budget or seed");
   }
   if (XLENGTH(option_names_s) != XLENGTH(option_values_s)) {
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("native npcdist NOMAD search received inconsistent option name/value lengths");
   }
   if (XLENGTH(option_names_s) > INT_MAX) {
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("native npcdist NOMAD search received too many options");
   }
   n_options = (int) XLENGTH(option_names_s);
@@ -12765,7 +12856,7 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
       raw_start[i] = context.upper[i];
   }
   if (np_cdist_native_decode_eval_bw(&context, raw_start, eval_start) != 0) {
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("native npcdist NOMAD search failed to decode initial state");
   }
   if (ndegree > 0) {
@@ -12811,7 +12902,7 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
     if (context.eval_bw != NULL) R_Free(context.eval_bw);
     if (context.degree_work != NULL) R_Free(context.degree_work);
     np_conditional_distribution_prepared_context_destroy(&context.prepared);
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("failed to allocate native npcdist callback scratch");
   }
 
@@ -12831,7 +12922,7 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
     R_Free(context.eval_bw);
     if (context.degree_work != NULL) R_Free(context.degree_work);
     np_conditional_distribution_prepared_context_destroy(&context.prepared);
-    UNPROTECT(23);
+    UNPROTECT(24);
     error("failed to allocate native npcdist NOMAD buffers");
   }
   if (n_options > 0) {
@@ -12845,7 +12936,7 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
       R_Free(context.eval_bw);
       if (context.degree_work != NULL) R_Free(context.degree_work);
       np_conditional_distribution_prepared_context_destroy(&context.prepared);
-      UNPROTECT(23);
+      UNPROTECT(24);
       error("failed to allocate native npcdist NOMAD option buffers");
     }
     for (i = 0; i < n_options; i++) {
@@ -12904,7 +12995,7 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
                                         np_cdist_native_search_callback,
                                         &context,
                                         &progress_spec,
-                                        &result, &context.stop);
+                                        &result, &context.stop, callback_error);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
   R_Free(context.raw_point);
@@ -12915,15 +13006,19 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   context.eval_bw = NULL;
   context.degree_work = NULL;
   np_conditional_distribution_prepared_context_destroy(&context.prepared);
-  if (context.stop.terminal) {
+  if (np_nomad_error_pending(callback_error) || context.stop.terminal) {
     R_Free(solution);
     R_Free(best_point);
     if (best_degree_i != NULL) R_Free(best_degree_i);
     if (first_degree_i != NULL) R_Free(first_degree_i);
     if (native_options != NULL) R_Free(native_options);
+    if (np_nomad_error_pending(callback_error))
+      np_nomad_error_raise(callback_error);
+    UNPROTECT(1);
     UNPROTECT(23);
     np_conditional_nomad_raise(&context.stop);
   }
+  UNPROTECT(1);
   if (context.ndegree > 0 && context.callback_calls > 0)
     np_progress_nomad_degree_step(context.callback_calls,
                                   context.best_degree,
