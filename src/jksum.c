@@ -62430,10 +62430,10 @@ fail_prepare:
 }
 
 /*
- * Form one full signed smoother row and delete its evaluation observation by
- * the package-wide exact identity h[-i] / (1 - h_ii).  Scalar width one and
- * general LP therefore share the same deletion contract; only full-row
- * construction differs.  No positivity shortcut or fallback is permitted.
+ * Normalize scalar beta CVLS rows on the deleted sample, omitting self before
+ * choosing the common scale so a dominant self weight cannot erase donors.
+ * General LP retains its incumbent full-row solve and leverage deletion;
+ * changing that numerical admission is a separate repair.
  */
 static int np_conditional_cvls_provider_x_row(
   void *raw_context,
@@ -62463,8 +62463,10 @@ static int np_conditional_cvls_provider_x_row(
     return np_conditional_deleted_from_ctx(
       &context->legacy_x, &context->deleted_qr, evaluation, row);
 
-  if(np_beta_scaled_row_context_fill(
-       &context->route_x.scaled_row, evaluation, NULL, NULL) !=
+  if(np_beta_scaled_row_context_fill_omitting(
+       &context->route_x.scaled_row, evaluation,
+       np_lp_engine_extern == NP_LP_ENGINE_SCALAR ? evaluation : -1,
+       NULL, NULL) !=
      NP_CONTINUOUS_ROW_OK)
     return 1;
 
@@ -62477,6 +62479,7 @@ static int np_conditional_cvls_provider_x_row(
       return 1;
     for(observation = 0; observation < num_obs; ++observation)
       row[observation] = context->route_x.row[observation]/denominator;
+    return 0;
   } else {
     int term;
 
