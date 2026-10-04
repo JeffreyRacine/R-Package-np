@@ -1125,11 +1125,12 @@ static int np_nomad_progress_observer_config(double *interval_sec)
   return enabled;
 }
 
-static int np_nomad_progress_observer(
+static int np_nomad_progress_observer_call(
   const crs_nomad_observer_event *event,
   void *user_data,
   char *message,
-  size_t message_size)
+  size_t message_size,
+  int propagate)
 {
   const np_nomad_progress_spec *spec =
     (const np_nomad_progress_spec *) user_data;
@@ -1189,12 +1190,17 @@ static int np_nomad_progress_observer(
     spec != NULL && spec->best_objective != NULL &&
     spec->accepted_evaluations != NULL && *spec->accepted_evaluations > 0 ?
       *spec->best_objective : NA_REAL)); nprotect++;
-  PROTECT(call = Rf_lang5(fn,
-                          iteration,
-                          current_degree,
-                          best_degree,
-                          best_objective)); nprotect++;
-  value = np_progress_evaluate(call, ns, &err, &interrupted);
+  if (propagate) {
+    SEXP propagate_r = PROTECT(Rf_ScalarLogical(1)); nprotect++;
+    PROTECT(call = Rf_lang6(fn, iteration, current_degree, best_degree,
+                            best_objective, propagate_r)); nprotect++;
+    /* The contained observer owns the catch around this entire invocation. */
+    value = Rf_eval(call, ns);
+  } else {
+    PROTECT(call = Rf_lang5(fn, iteration, current_degree, best_degree,
+                            best_objective)); nprotect++;
+    value = np_progress_evaluate(call, ns, &err, &interrupted);
+  }
   if (interrupted) {
     status = CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT;
     goto observer_done;
@@ -1219,6 +1225,18 @@ static int np_nomad_progress_observer(
 observer_done:
   UNPROTECT(nprotect);
   return status;
+}
+
+static int np_nomad_progress_observer(
+  const crs_nomad_observer_event *event, void *data, char *message, size_t size)
+{
+  return np_nomad_progress_observer_call(event, data, message, size, 0);
+}
+
+static int np_nomad_progress_observer_contained(
+  const crs_nomad_observer_event *event, void *data, char *message, size_t size)
+{
+  return np_nomad_progress_observer_call(event, data, message, size, 1);
 }
 
 static void np_nomad_progress_observer_report(const char *message)
@@ -1472,7 +1490,8 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
   if (observer_enabled) {
     observer.api_version = CRS_NOMAD_OBSERVER_API_VERSION;
     observer.struct_size = sizeof(observer);
-    observer.observe = np_nomad_progress_observer;
+    observer.observe = contain_errors ? np_nomad_progress_observer_contained :
+      np_nomad_progress_observer;
     observer.user_data = (void *) progress_spec;
     observer.interval_sec = interval_sec;
   }
@@ -1515,6 +1534,7 @@ typedef struct {
   NPConditionalFailure saved_failure;
   int terminal;
   int progress_enabled;
+  int contain_errors;
   char progress_error[256];
 } np_conditional_nomad_stop_context;
 
@@ -1529,8 +1549,9 @@ typedef struct {
 static void np_conditional_nomad_progress_call_body(void *data)
 {
   np_conditional_nomad_progress_call *call = data;
-  call->status = np_nomad_progress_observer(call->event,
-    (void *)call->stop->progress, call->message, call->message_size);
+  call->status = np_nomad_progress_observer_call(call->event,
+    (void *)call->stop->progress, call->message, call->message_size,
+    call->stop->contain_errors);
 }
 
 static int np_conditional_nomad_observer(
@@ -1544,7 +1565,11 @@ static int np_conditional_nomad_observer(
     np_conditional_nomad_progress_call call = {
       event, stop, message, message_size, CRS_NOMAD_OBSERVER_OUTCOME_ERROR
     };
-    const int ok = R_ToplevelExec(np_conditional_nomad_progress_call_body, &call);
+    int ok = 1;
+    if (stop->contain_errors)
+      np_conditional_nomad_progress_call_body(&call);
+    else
+      ok = R_ToplevelExec(np_conditional_nomad_progress_call_body, &call);
     if (ok && call.status == CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT)
       return call.status;
     if (!ok || call.status != CRS_NOMAD_OBSERVER_OUTCOME_OK) {
@@ -1594,6 +1619,7 @@ static int np_conditional_nomad_solve(
     error("required crs 0.15-46 native NOMAD observer capability is unavailable");
   solve_problem = np_nomad_fixed_degree_problem(problem, progress, &fixed_problem);
   stop->progress = progress;
+  stop->contain_errors = contain_errors;
   stop->progress_enabled = np_nomad_progress_observer_config(&interval);
   stop->observer.api_version = CRS_NOMAD_OBSERVER_API_VERSION;
   stop->observer.struct_size = sizeof(stop->observer);

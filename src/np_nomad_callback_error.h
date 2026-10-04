@@ -25,12 +25,16 @@ typedef struct {
   jmp_buf jump;
 } NPNomadCallbackCall;
 
-/* Allocate before the caller acquires native invocation resources. Slot zero
- * is only set when an unwind is suspended; slot one roots the reusable token. */
+/* Allocate before native resources. Slot zero holds the first failure: either
+ * the slot-one objective continuation or the original observer condition.
+ * Slot two roots observer catch classes before any native invocation. */
 static SEXP np_nomad_unwind_state(void)
 {
-  SEXP state = PROTECT(Rf_allocVector(VECSXP, 2));
+  SEXP state = PROTECT(Rf_allocVector(VECSXP, 3));
   SET_VECTOR_ELT(state, 1, R_MakeUnwindCont());
+  SET_VECTOR_ELT(state, 2, Rf_allocVector(STRSXP, 2));
+  SET_STRING_ELT(VECTOR_ELT(state, 2), 0, Rf_mkChar("interrupt"));
+  SET_STRING_ELT(VECTOR_ELT(state, 2), 1, Rf_mkChar("error"));
   UNPROTECT(1);
   return state;
 }
@@ -52,8 +56,9 @@ static void np_nomad_callback_unwind(void *data, Rboolean jump)
 {
   NPNomadCallbackCall *call = data;
   if (jump) {
-    SET_VECTOR_ELT(call->owner->error_state, 0,
-                   VECTOR_ELT(call->owner->error_state, 1));
+    if (!np_nomad_error_pending(call->owner->error_state))
+      SET_VECTOR_ELT(call->owner->error_state, 0,
+                     VECTOR_ELT(call->owner->error_state, 1));
     /* The target is inside this C callback, below every NOMAD C++ frame.
      * Return normally through NOMAD before the caller resumes R's unwind. */
     longjmp(call->jump, 1);
@@ -95,11 +100,22 @@ typedef struct {
   int status;
 } NPNomadErrorProgressCall;
 
-static void np_nomad_error_progress_body(void *data)
+static SEXP np_nomad_error_progress_body(void *data)
 {
   NPNomadErrorProgressCall *call = data;
   call->status = call->owner->observe(call->event, call->owner->observe_data,
                                      call->message, call->message_size);
+  return R_NilValue;
+}
+
+static SEXP np_nomad_error_progress_condition(SEXP condition, void *data)
+{
+  NPNomadErrorProgressCall *call = data;
+  /* Root the condition before requesting stop. Do not retain an unwind whose
+   * target is crs's observer-only R_ToplevelExec context. */
+  if (!np_nomad_error_pending(call->owner->error_state))
+    SET_VECTOR_ELT(call->owner->error_state, 0, condition);
+  return R_NilValue;
 }
 
 static int np_nomad_error_observer(const crs_nomad_observer_event *event,
@@ -112,10 +128,14 @@ static int np_nomad_error_observer(const crs_nomad_observer_event *event,
     NPNomadErrorProgressCall call = {
       owner, event, message, size, CRS_NOMAD_OBSERVER_OUTCOME_ERROR
     };
-    int ok = R_ToplevelExec(np_nomad_error_progress_body, &call);
-    if (ok && call.status == CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT)
+    R_tryCatch(np_nomad_error_progress_body, &call,
+               VECTOR_ELT(owner->error_state, 2),
+               np_nomad_error_progress_condition, &call, NULL, NULL);
+    if (np_nomad_error_pending(owner->error_state))
+      return CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT;
+    if (call.status == CRS_NOMAD_OBSERVER_OUTCOME_INTERRUPT)
       return call.status;
-    if (!ok || call.status != CRS_NOMAD_OBSERVER_OUTCOME_OK) {
+    if (call.status != CRS_NOMAD_OBSERVER_OUTCOME_OK) {
       /* A broken progress reporter must not disable native error transport. */
       snprintf(owner->progress_error, sizeof(owner->progress_error), "%s",
                message != NULL && message[0] != '\0' ? message :
@@ -151,8 +171,13 @@ static void np_nomad_error_observer_init(NPNomadCallbackError *owner,
 
 static void np_nomad_error_raise(SEXP state)
 {
-  /* Resume the original error, interrupt, restart or exiting handler only
-   * after the existing caller has released native owners and restored globals. */
-  R_ContinueUnwind(VECTOR_ELT(state, 1));
+  /* All native owners are gone and globals restored. Objective failures keep
+   * their original continuation; observer failures re-signal the saved object
+   * in the caller context, without claiming the original restart context. */
+  if (VECTOR_ELT(state, 0) == VECTOR_ELT(state, 1))
+    R_ContinueUnwind(VECTOR_ELT(state, 1));
+  SEXP call = PROTECT(Rf_lang2(Rf_install("stop"), VECTOR_ELT(state, 0)));
+  Rf_eval(call, R_BaseEnv);
+  UNPROTECT(1);
 }
 #endif

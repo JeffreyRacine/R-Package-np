@@ -2486,7 +2486,8 @@
 .np_progress_nomad_native_observer_dispatch <- function(iteration,
                                                          current.degree,
                                                          best.degree,
-                                                         best.objective) {
+                                                         best.objective,
+                                                         propagate = FALSE) {
   tryCatch(
     {
       state <- .np_progress_runtime$bandwidth_state
@@ -2504,9 +2505,11 @@
       list(0L, "")
     },
     interrupt = function(e) {
+      if (propagate) stop(e)
       list(2L, conditionMessage(e))
     },
     error = function(e) {
+      if (propagate) stop(e)
       list(1L, conditionMessage(e))
     }
   )

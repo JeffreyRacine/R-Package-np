@@ -50,9 +50,11 @@
 * Local native NOMAD objective callbacks now contain R errors and flag-based
   interrupts, complete native search cleanup, and then resume the original R
   condition or restart. This includes time limits raised inside these callbacks.
-  Errors from progress displays, including elapsed-time-limit errors raised
-  there, can still disable reporting without stopping the search. R-callback
-  degree searches and distributed searches retain their separate handling;
+  Local native progress errors and interrupts now also stop the search after
+  cleanup and re-signal the original condition object, preserving its class,
+  message, call and custom fields (not its original restart context). This
+  includes time limits raised during progress reporting. R-callback degree
+  searches and distributed searches retain their separate handling;
   this is not a distributed MPI timeout-cleanup repair.
 
 * Native searches are not re-entrant: user condition/event handlers must not
