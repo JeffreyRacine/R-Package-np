@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* One-dimensional density plots now honor the default 50-point continuous
+  evaluation grid, consistently with explicit `neval`. Fixed-grid conditional
+  mode plots preserve fractional evaluation and conditioning coordinates for
+  numeric predictors stored as integers. Categorical density bootstrap plots
+  now report profile-kernel failures instead of silently changing computation.
+
 * Conditional CVLS with beta predictor kernels now omits the held-out
   observation before scaling and normalizing local-constant rows or solving
   local-polynomial rows. This prevents dominant self weights from erasing
