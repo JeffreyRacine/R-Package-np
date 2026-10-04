@@ -34,15 +34,17 @@
   explicit deleted-sample refits on ill-conditioned data.
 
 * Generalized-neighbor conditional-density `cv.ls` with bounded uniform or
-  second-order Epanechnikov predictor kernels now uses the corrected
+  Epanechnikov predictor kernels of orders 2, 4, 6 and 8 now uses the corrected
   deleted-sample geometry and whole-response integral for unbounded responses.
   This can change selected bandwidths and costs more than the former incorrect
   criterion. In retained n = 480 cases the corrected criterion took about
   44--53 ms more per evaluation (about 9 times the former cost); other platforms
   and workloads have shown larger ratios. Packing gains depend on the workload
-  and platform. Bounded Epanechnikov predictor orders 4, 6 and 8 still retain
-  the earlier criterion and its known error; this correction covers only the
-  named uniform and second-order Epanechnikov predictor kernels.
+  and platform. Newly covered Epanechnikov predictor orders 4, 6 and 8 took
+  about 49--50 ms per evaluation instead of 5--6 ms in retained n = 480
+  local-constant cases, with trees both off and on. This added correctness
+  cost is specific to the affected bounded-X GNN CVLS route. Fixed bandwidths,
+  default second-order kernels and other criteria retain their existing paths.
 
 * Interrupt containment does not make all nested native allocations unwind-safe.
   Interrupted searches can retain allocations from shared/nested helpers; this
