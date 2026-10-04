@@ -609,7 +609,10 @@ np_render_control <- function(style = c("band", "bar"),
 }
 
 .np_plot_restore_bandwidth_from_call <- function(object, bws, caller_env = parent.frame()) {
-  if (!is.null(bws$formula) || is.null(object$call))
+  # The fitted sample is authoritative; calls only recover legacy state.
+  if (!is.null(bws$formula) ||
+      !is.null(bws[[".np.native.training", exact = TRUE]]) ||
+      is.null(object$call))
     return(bws)
 
   bws.orig <- tryCatch(
@@ -658,14 +661,10 @@ np_render_control <- function(style = c("band", "bar"),
   )
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.npregression")
-  if (is.null(dots$xdat) && is.null(dots$ydat) &&
-      is.null(object$bws$formula) &&
-      !is.null(object$call)) {
-    bws.orig <- tryCatch(.np_eval_call_arg(object$call, "bws", caller_env = parent.frame(2L)),
-                         error = function(e) NULL)
-    if (!is.null(bws.orig) && any(grepl("bandwidth$", class(bws.orig))))
-      object$bws <- bws.orig
-  }
+  if (is.null(dots$xdat) && is.null(dots$ydat))
+    object$bws <- .np_plot_restore_bandwidth_from_call(
+      object, object$bws, caller_env = parent.frame(2L)
+    )
 
   if (is.null(dots$xdat) && is.null(dots$ydat) &&
       isTRUE(object$trainiseval) &&

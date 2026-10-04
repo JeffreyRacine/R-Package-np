@@ -76,3 +76,29 @@ test_that("optional smooth-coefficient z data do not displace manual bandwidths"
   expect_identical(fitted(a), fitted(b))
   expect_identical(a$bws$bw, b$bws$bw)
 })
+
+# A reused bandwidth object must not restore its original sample during plotting.
+test_that("native regression plots retain the fit's replacement sample", {
+  withr::local_options(np.messages = FALSE)
+  set.seed(9)
+  xa <- data.frame(x = rnorm(60)); xb <- data.frame(x = rnorm(60, 5, 2))
+  ya <- sin(xa$x) + rnorm(60, sd = .1)
+  yb <- cos(xb$x) + rnorm(60, sd = .1)
+  b <- npregbw(xdat = xa, ydat = ya, bws = .5, bandwidth.compute = FALSE)
+  for (residuals in c(FALSE, TRUE)) {
+    fit <- npreg(bws = b, txdat = xb, tydat = yb, residuals = residuals)
+    actual <- plot(fit, output = "data", neval = 9L)[[1L]]
+    expected <- fitted(npreg(bws = b, txdat = xb, tydat = yb, exdat = actual$eval))
+    expect_equal(range(actual$eval[[1L]]), range(xb$x))
+    expect_equal(actual$mean, expected, tolerance = 1e-12)
+    # Recovery must not evaluate descriptive call expressions for modern state.
+    fit$call$bws <- quote(stop("descriptive call was evaluated"))
+    expect_equal(plot(fit, output = "data", neval = 9L)[[1L]]$mean, expected,
+                 tolerance = 1e-12)
+    override <- plot(fit, xdat = xa, ydat = ya, output = "data", neval = 9L)[[1L]]
+    expect_equal(range(override$eval[[1L]]), range(xa$x))
+    expect_equal(override$mean,
+      fitted(npreg(bws = b, txdat = xa, tydat = ya, exdat = override$eval)),
+      tolerance = 1e-12)
+  }
+})
