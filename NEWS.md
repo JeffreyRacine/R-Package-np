@@ -2914,8 +2914,9 @@
 
 * Hardened native NOMAD observer and interrupt handling. Explicit user
   interruption is now reported as an R `interrupt` condition only after
-  native cleanup, ordinary observer errors remain fail-open, native callables
-  are resolved per solve rather than retained across package reloads, and the
+  native cleanup; local contained observers also preserve and re-signal R
+  errors after cleanup. Native callables are resolved per solve rather than
+  retained across package reloads, and the
   declared R 3.5 compatibility floor is preserved.
 
 * Restored timely progress updates during native NOMAD bandwidth and degree
