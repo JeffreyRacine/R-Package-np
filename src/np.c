@@ -2984,6 +2984,22 @@ static double *np_continuous_extendednn_upper_alloc(
   return upper;
 }
 
+/* An evaluation envelope must contain both the raw initialization coordinate
+ * and the integer decoded by the NN radius owner. Search-derived bounds keep
+ * their existing contract. Call only from extended-NN evaluation setup. */
+static double np_extendednn_eval_upper(double candidate, const double base_k)
+{
+  const double hard_upper = (double)INT_MAX / 4.0;
+  if (!R_FINITE(candidate) || candidate < base_k)
+    candidate = base_k;
+  if (candidate > hard_upper)
+    candidate = hard_upper;
+  const double rounded = (double)np_fround(candidate);
+  if (rounded > candidate && rounded <= hard_upper)
+    candidate = rounded;
+  return candidate;
+}
+
 static double *np_continuous_extendednn_eval_upper_alloc(
   const int bandwidth,
   const int num_obs,
@@ -2991,7 +3007,6 @@ static double *np_continuous_extendednn_eval_upper_alloc(
   const double *rbw)
 {
   const int base_k = num_obs - 1;
-  const double hard_upper = (double)INT_MAX / 4.0;
   double *upper = NULL;
   int i;
 
@@ -3005,12 +3020,7 @@ static double *np_continuous_extendednn_eval_upper_alloc(
 
   upper = alloc_vecd(num_continuous);
   for (i = 0; i < num_continuous; i++) {
-    double candidate = rbw[i];
-    if (!R_FINITE(candidate) || candidate < (double)base_k)
-      candidate = (double)base_k;
-    if (candidate > hard_upper)
-      candidate = hard_upper;
-    upper[i] = candidate;
+    upper[i] = np_extendednn_eval_upper(rbw[i], (double)base_k);
   }
 
   return upper;
@@ -16225,14 +16235,9 @@ static int np_density_prepared_context_eval(
 
   if (context->extendednn_upper != NULL) {
     const double base_k = (double)(num_obs_train_extern - 1);
-    const double hard_upper = (double)INT_MAX / 4.0;
     for (i = 0; i < context->num_continuous; i++) {
-      double candidate = bw[i];
-      if (!R_FINITE(candidate) || candidate < base_k)
-        candidate = base_k;
-      if (candidate > hard_upper)
-        candidate = hard_upper;
-      context->extendednn_upper[i] = candidate;
+      context->extendednn_upper[i] =
+        np_extendednn_eval_upper(bw[i], base_k);
     }
   }
 
@@ -17262,14 +17267,9 @@ static int np_distribution_prepared_context_eval(
 
   if (context->extendednn_upper != NULL) {
     const double base_k = (double)(num_obs_train_extern - 1);
-    const double hard_upper = (double)INT_MAX / 4.0;
     for (i = 0; i < context->num_continuous; i++) {
-      double candidate = bw[i];
-      if (!R_FINITE(candidate) || candidate < base_k)
-        candidate = base_k;
-      if (candidate > hard_upper)
-        candidate = hard_upper;
-      context->extendednn_upper[i] = candidate;
+      context->extendednn_upper[i] =
+        np_extendednn_eval_upper(bw[i], base_k);
     }
   }
 
@@ -18408,15 +18408,10 @@ static int np_conditional_distribution_prepared_context_eval(
 
   if (context->extendednn_upper != NULL) {
     const double base_k = (double)(num_obs_train_extern - 1);
-    const double hard_upper = (double)INT_MAX / 4.0;
     for (i = 0; i < context->num_var_continuous +
                     context->num_reg_continuous; i++) {
-      double candidate = bandwidth[i];
-      if (!R_FINITE(candidate) || candidate < base_k)
-        candidate = base_k;
-      if (candidate > hard_upper)
-        candidate = hard_upper;
-      context->extendednn_upper[i] = candidate;
+      context->extendednn_upper[i] =
+        np_extendednn_eval_upper(bandwidth[i], base_k);
     }
   }
 

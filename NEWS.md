@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Extended nearest-neighbor objective evaluation now admits fractional counts
+  consistently with their rounded integer, including counts just beyond the
+  ordinary sample-size boundary.
+
 * Regression profile and constant-basis bootstrap plots now propagate errors
   from their selected computation instead of attempting another route.
   Copula plots explicitly reject `neval`; set the probability grid when

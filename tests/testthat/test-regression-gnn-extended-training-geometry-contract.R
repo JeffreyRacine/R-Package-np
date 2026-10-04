@@ -31,3 +31,23 @@ test_that("extended generalized-NN regression fits preserve training identity", 
   expect_true(any(grepl("NPRMPI_REGRESSION_EXTENDED_GNN_OK",
                         result$output, fixed=TRUE)), info=info)
 })
+
+# Evaluation admission is distinct from the radius/fit identity above.
+test_that("fractional extended NN objectives share their integer cell", {
+  withr::local_options(np.messages = FALSE, np.tree = FALSE, np.extendednn = TRUE)
+  set.seed(2701)
+  x <- data.frame(x = rnorm(60), z = rnorm(60))
+  y <- sin(x$x) + .5*x$z + rnorm(60)
+  for (type in c("generalized_nn", "adaptive_nn")) {
+    evaluate <- function(k) {
+      b <- npregbw(xdat = x, ydat = y, bws = c(k, 22), bwtype = type,
+                   regtype = "lp", degree = c(2L, 2L), bandwidth.compute = FALSE)
+      .npregbw_eval_only(x, y, b, invalid.penalty = "dbmax")$objective
+    }
+    for (k in c(59.5, 59.6, 60.4, 60.5, 60.6, 61.4)) {
+      expected <- evaluate(round(k))
+      expect_true(is.finite(expected) && abs(expected) < 1e100)
+      expect_identical(evaluate(k), expected)
+    }
+  }
+})
