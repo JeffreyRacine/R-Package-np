@@ -1,5 +1,8 @@
 # np 0.80-1
 
+* Beta-kernel conditional-distribution NN searches now check for cancellation
+  between objective evaluations, including when progress display is off.
+
 * Regression plots now use the fitted object's retained training sample when
   its bandwidth object was originally constructed on different data. Native
   smooth-coefficient and partially linear plots also preserve retained samples
