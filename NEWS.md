@@ -1,5 +1,24 @@
 # np 0.80-1
 
+* Local-constant conditional CVLS with beta predictor kernels now omits the
+  held-out observation before scaling and normalizing its kernel row. This
+  prevents a dominant self weight from erasing the remaining donors or causing
+  cancellation through leverage subtraction. Density and distribution criteria
+  share this scalar correction; LP solvers and ordinary regression are unchanged.
+  Beta local-polynomial CVLS rows can still lose precision near support bounds
+  when their self leverage approaches one, producing inaccurate or penalized
+  trials; that separate numerical limitation remains unresolved.
+
+* Generalized-neighbor conditional-density `cv.ls` with bounded uniform or
+  second-order Epanechnikov predictor kernels retains a known deleted-geometry
+  limitation: its criterion can differ from explicit leave-one-out refits, even
+  when the bounds do not truncate the kernel. Selected bandwidths can differ.
+  This limitation remains unresolved.
+
+* Interrupt containment does not make all nested native allocations unwind-safe.
+  Interrupted searches can retain allocations from shared/nested helpers; this
+  previously deferred cleanup limitation is separate from callback containment.
+
 * Local native NOMAD objective callbacks now contain R errors and flag-based
   interrupts, complete native search cleanup, and then resume the original R
   condition or restart. This includes time limits raised inside these callbacks.
@@ -23,7 +42,13 @@
   wider responses use coordinate-factor caches. This corrects objective values
   and can change selected bandwidths. The additional computation is confined to
   these beta NN objectives; fixed bandwidths, non-beta CDF, density and ordinary
-  regression routes retain their existing owners.
+  regression routes retain their existing owners. Retained audit cases using
+  the default `ngrid = 100` and three continuous responses measured about
+  5--6.5 times the earlier per-evaluation cost at n = 360--600; one n = 300
+  search cost about 5.4 times as much. These are case-specific correctness
+  costs, not universal multipliers. With `np.extendednn = FALSE`, a deleted
+  sample of n-1 observations admits neighbor counts only through n-2.
+  The separate non-beta GNN `do.full.integral` geometry limitation remains.
 
 * Conditional density (CVML/CVLS) and distribution (CVLS) nearest-neighbor
   local-polynomial objectives with uniform or second-order Epanechnikov
@@ -46,7 +71,8 @@
   including mixed-predictor `wage1` examples.
 
 * Nearly coincident or exactly collinear predictor values (including tied
-  integer-valued predictors) can still trigger original-coordinate ridging after
+  integer-valued predictors), and minimally supported local designs far from
+  the coordinate origin, can still trigger original-coordinate ridging after
   structural support admission and make conditional NN scores depend on predictor
   units. These remaining rank limitations are deferred;
   the structural-support correction does not change ridge coordinates or the
