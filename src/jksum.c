@@ -50565,7 +50565,8 @@ static int np_cgnn_unbounded_admitted(void) {
 }
 
 /* Bounded explanatory rows use the same whole-response GNN criterion.
- * Admit only Gaussian truncation or an X-only beta route. Bounded/associated
+ * Admit Gaussian truncation, positive compact X or an X-only beta route.
+ * Bounded/associated
  * response kernels retain their existing support-specific owners. */
 static int np_cgnn_bounded_x_admitted(
   const NPConditionalKernelExecutionContext *execution_context) {
@@ -50574,7 +50575,9 @@ static int np_cgnn_bounded_x_admitted(
     return 0;
   if(execution_context != NULL)
     return execution_context->x_route != NULL && execution_context->y_route == NULL;
-  return int_cxker_bound_extern != 0 && KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= 3;
+  return int_cxker_bound_extern != 0 &&
+    ((KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= 3) ||
+     KERNEL_reg_extern == CK_UNIF || KERNEL_reg_extern == CK_EPAN2);
 }
 
 /* Upfront representation admission; no recovery or timing-driven dispatch. */
@@ -62430,10 +62433,10 @@ fail_prepare:
 }
 
 /*
- * Normalize scalar beta CVLS rows on the deleted sample, omitting self before
+ * Form beta CVLS influence rows on the deleted sample, omitting self before
  * choosing the common scale so a dominant self weight cannot erase donors.
- * General LP retains its incumbent full-row solve and leverage deletion;
- * changing that numerical admission is a separate repair.
+ * Both scalar normalization and the existing LP solve use omitted weights;
+ * no subtraction of a near-unit self leverage is needed.
  */
 static int np_conditional_cvls_provider_x_row(
   void *raw_context,
@@ -62443,7 +62446,6 @@ static int np_conditional_cvls_provider_x_row(
   NPConditionalCVLSRouteContext * const context =
     (NPConditionalCVLSRouteContext *)raw_context;
   const int num_obs = num_obs_train_extern;
-  double delete_denominator;
   int observation;
 
   if(context == NULL || !context->ready || row == NULL ||
@@ -62465,7 +62467,7 @@ static int np_conditional_cvls_provider_x_row(
 
   if(np_beta_scaled_row_context_fill_omitting(
        &context->route_x.scaled_row, evaluation,
-       np_lp_engine_extern == NP_LP_ENGINE_SCALAR ? evaluation : -1,
+       evaluation,
        NULL, NULL) !=
      NP_CONTINUOUS_ROW_OK)
     return 1;
@@ -62492,11 +62494,6 @@ static int np_conditional_cvls_provider_x_row(
       return 1;
   }
 
-  if(!np_lp_delete_denominator(row[evaluation], &delete_denominator))
-    return 1;
-  for(observation = 0; observation < num_obs; ++observation)
-    row[observation] = observation == evaluation ?
-      0.0 : row[observation]/delete_denominator;
   return 0;
 }
 

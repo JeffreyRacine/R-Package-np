@@ -19,7 +19,7 @@ typedef struct {
   double *projected_factor,*projected_diagonal,*projected_residual;
   double *projected_recursive,*projected_estimates;
   double *compact_cuts;
-  int compact_pair_geometry;
+  int compact_pair_geometry,compact_bounded_x;
   int *projected_selected;
   int projected_rows,projected_intervals,projected_shared;
   size_t projected_bytes;
@@ -45,7 +45,7 @@ static int np_gnn_projected_storage(NPGNNConditionalProjectionOwner *c)
   const size_t n=(size_t)c->n;
   const size_t compact_bytes=c->kernel>=4 ? (2*n+2)*sizeof(double) : 0;
   /* Shared-basis storage is linear in n with at most 512 seed columns. */
-  if(c->folded && !c->has_categories && c->filled_row!=NULL &&
+  if(c->folded && !c->has_categories && c->filled_row!=NULL && !c->compact_bounded_x &&
      c->first_fold==0 && c->end_fold==c->n) {
     size_t bytes=sizeof(*c)+sizeof(NPGNNIntegralGeometry)+compact_bytes,cells;
     int invalid=n>(size_t)INT_MAX/192 ||
@@ -403,7 +403,7 @@ static int np_gnn_projected_integrate(NPGNNProjectedIntegral *q,
   const size_t capacity=(size_t)q->owner->projected_rows;
   double *low=q->owner->projected_recursive+3*(size_t)depth*capacity;
   double *high=low+capacity,*other=high+capacity;int pass=1;
-  const int certificate_domain=q->owner->kernel==0 && q->groups==1 && q->owner->filled_row != NULL &&
+  const int certificate_domain=q->owner->kernel==0 && q->groups==1 && (q->owner->filled_row != NULL || q->owner->compact_bounded_x) &&
     q->owner->geometry->scale==1;
   const double analytic=certificate_domain ? np_cgnn_gauss4_log_bound(lo,hi,
     q->anchor-q->owner->geometry->sorted[q->owner->n-1],
@@ -681,7 +681,7 @@ static int np_gnn_projected_contract(NPGNNConditionalProjectionOwner *c)
           interval_width[records]=width;
           interval[records]=z;alternate[records]=successor;
           const double mid=.5*left[records]+.5*right[records],half=.5*width;
-          const int certificate_domain=c->kernel==0 && q.groups==1 && c->filled_row != NULL && g->scale==1;
+          const int certificate_domain=c->kernel==0 && q.groups==1 && (c->filled_row != NULL || c->compact_bounded_x) && g->scale==1;
           analytic[records]=certificate_domain ? np_cgnn_gauss4_log_bound(left[records],right[records],
              anchor[records]-g->sorted[n-1],anchor[records]-g->sorted[0],q.norm_max*q.norm_max) : R_PosInf;
           const int certified=certificate_domain &&
@@ -716,7 +716,23 @@ static int np_gnn_projected_contract(NPGNNConditionalProjectionOwner *c)
       if(q.rank)
         F77_CALL(dgemm)("N","N",&nq,&q.rank,&n,&one,c->overlap,&nq,
           c->projected_factor,&n,&zero,c->profile_right,&nq FCONE FCONE);
-      for(int rec=0;rec<records;++rec) {
+      /* The newly admitted bounded compact-X rows use one packed BLAS
+       * contraction. Delete-one response masks still select exactly the
+       * incumbent primary/successor products, before error estimation. */
+      const int packed_compact_x=c->compact_bounded_x;
+      if(packed_compact_x) {
+        np_gnn_projected_multiply(&q,nq,nq,0,0,q.rows);
+        for(int rec=0;rec<records;++rec) {
+          const NPGNNIntegralInterval t=g->intervals[interval[rec]];
+          for(int f=0;f<q.rows;++f) {
+            const int pos=first+f;
+            const int deleted=c->folded && pos>=t.first_deleted && pos<t.end_deleted;
+            if(deleted!=alternate[rec])
+              memset(c->products+(size_t)f*output_stride+offset[rec],0,
+                (size_t)points[rec]*sizeof(double));
+          }
+        }
+      } else for(int rec=0;rec<records;++rec) {
         const NPGNNIntegralInterval t=g->intervals[interval[rec]];
         const int active_begin=MAX(0,MIN(q.rows,t.first_deleted-first));
         const int active_end=MAX(0,MIN(q.rows,t.end_deleted-first));
@@ -895,6 +911,10 @@ static int np_cgnn_projected_local(NPGNNConditionalProjectedCall *a)
   const int n=num_obs_train_extern;
   *c=(NPGNNConditionalProjectionOwner){.n=n,.folded=1,.first_fold=0,.kernel=KERNEL_den_extern,
     .end_fold=n,.pair_ranks=1,.data=matrix_Y_continuous_train_extern,
+    /* New bounded compact-X admission uses exact bounded slabs. Its signed
+     * deleted rows have measured L1 norms for the Gaussian rule certificate. */
+    .compact_bounded_x=int_cxker_bound_extern &&
+      (KERNEL_reg_extern==CK_UNIF || KERNEL_reg_extern==CK_EPAN2),
     .row=np_gnn_conditional_integral_weight,
     .filled_row=!b->route->beta_x && np_lp_engine_extern==NP_LP_ENGINE_SCALAR ?
       np_gnn_conditional_integral_filled_weight:NULL,
