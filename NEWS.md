@@ -12,8 +12,9 @@
   consistently with their rounded integer, including counts just beyond the
   ordinary sample-size boundary.
 
-* Regression profile and constant-basis bootstrap plots now propagate errors
-  from their selected computation instead of attempting another route.
+* Regression profile and constant-basis bootstrap plots, and categorical
+  partially linear fits, now propagate errors from their selected computation
+  instead of attempting another route.
   Copula plots explicitly reject `neval`; set the probability grid when
   constructing the copula object.
 
@@ -35,8 +36,12 @@
   second-order Epanechnikov predictor kernels now uses the corrected
   deleted-sample geometry and whole-response integral for unbounded responses.
   This can change selected bandwidths and costs more than the former incorrect
-  criterion. Packed integration and certified Gaussian quadrature reduce that
-  cost without changing numerical tolerances or defaults.
+  criterion. In retained n = 480 cases the corrected criterion took about
+  44--53 ms more per evaluation (about 9 times the former cost); other platforms
+  and workloads have shown larger ratios. Packing gains depend on the workload
+  and platform. Bounded Epanechnikov predictor orders 4, 6 and 8 still retain
+  the earlier criterion and its known error; this correction covers only the
+  named uniform and second-order Epanechnikov predictor kernels.
 
 * Interrupt containment does not make all nested native allocations unwind-safe.
   Interrupted searches can retain allocations from shared/nested helpers; this
@@ -45,9 +50,10 @@
 * Local native NOMAD objective callbacks now contain R errors and flag-based
   interrupts, complete native search cleanup, and then resume the original R
   condition or restart. This includes time limits raised inside these callbacks.
-  Errors from progress displays, R-callback degree searches and distributed
-  searches retain their separate handling; this is not a distributed MPI
-  timeout-cleanup repair.
+  Errors from progress displays, including elapsed-time-limit errors raised
+  there, can still disable reporting without stopping the search. R-callback
+  degree searches and distributed searches retain their separate handling;
+  this is not a distributed MPI timeout-cleanup repair.
 
 * Native searches are not re-entrant: user condition/event handlers must not
   start another np search while a native np search is active.
@@ -92,6 +98,11 @@
   allowing search to continue; the selected endpoint must still be raw-valid.
   This restores ordinary conditional density and distribution NOMAD searches,
   including mixed-predictor `wage1` examples.
+
+* Conditional NN local-polynomial searches can select different local optima
+  after changing predictor units even when fixed-candidate objective values
+  agree. Existing multistart controls can help explore search sensitivity;
+  rescaling does not guarantee the same selected bandwidth or fitted values.
 
 * Nearly coincident or exactly collinear predictor values (including tied
   integer-valued predictors), and minimally supported local designs far from
