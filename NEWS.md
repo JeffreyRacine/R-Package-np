@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Regression plots now use the fitted object's retained training sample when
+  its bandwidth object was originally constructed on different data. Native
+  smooth-coefficient and partially linear plots also preserve retained samples
+  when recovering bandwidth state.
+
 * Extended nearest-neighbor objective evaluation now admits fractional counts
   consistently with their rounded integer, including counts just beyond the
   ordinary sample-size boundary.
