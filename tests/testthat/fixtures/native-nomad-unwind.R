@@ -17,16 +17,23 @@ state <- new.env()
 condition <- structure(list(message = "native lifetime probe", call = NULL,
   token = new.env()), class = c("lifetimeProbe", "error", "condition"))
 wrappers <- c(npregbw = "npNomadNativeSearchRegression",
-  npcdensbw = "npPreparedObjectiveFixedNativeSearchConditionalDensity")
+  npcdensbw = "npPreparedObjectiveFixedNativeSearchConditionalDensity",
+  npcdistbw = "npNomadNativeSearchConditionalDistribution")
 if (spec$pkg == "npRmpi") wrappers[] <- c(
   "npRmpiPreparedObjectiveNativeSearchRegression",
-  "npRmpiPreparedObjectiveFixedNativeSearchConditionalDensity")
+  "npRmpiPreparedObjectiveFixedNativeSearchConditionalDensity",
+  "npNomadNativeSearchConditionalDistribution")
 for (family in names(wrappers)) {
   fun <- get(family, asNamespace(spec$pkg))
   search <- function() run(function() {
     set.seed(42)
-    b <- fun(y ~ x + z, data = dat, regtype = "lp", degree = c(1L, 1L),
-      bwsolver = "mads", nmulti = 1L, nomad.opts = list(MAX_BB_EVAL = 12L))
+    args <- list(formula = y ~ x + z, data = dat, regtype = "lp",
+      degree = c(1L, 1L), bwsolver = "mads", nmulti = 1L,
+      nomad.opts = list(MAX_BB_EVAL = 12L))
+    if (family == "npcdistbw")
+      args <- c(args, list(bwtype = "generalized_nn", cxkertype = "beta",
+        cykertype = "beta", cxkerbound = "range", cykerbound = "range"))
+    b <- do.call(fun, args)
     list(b$bw, b$xbw, b$ybw, b$fval, b$num.feval)
   })
   before <- search()

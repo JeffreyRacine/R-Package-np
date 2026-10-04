@@ -19,6 +19,7 @@
 
 #include <R.h>
 #include <Rmath.h>
+#include <R_ext/Utils.h>
 
 #if defined(__GNUC__) || defined(__clang__)
 #define NP_KERNELCV_NOINLINE __attribute__((noinline))
@@ -312,6 +313,11 @@ static NP_KERNELCV_NOINLINE double
 np_beta_conditional_distribution_bw_objective_ls_ctx(
   double *vector_scale_factor)
 {
+  /* Poll between beta NN objectives, before acquiring route/fold buffers.
+   * Distributed callers retain their collective interruption protocol. */
+  if((BANDWIDTH_den_extern == BW_GEN_NN || BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     np_mpi_local_regression_active())
+    R_CheckUserInterrupt();
   double cv = 0.0;
   NPContinuousKernelRoute beta_x_route;
   NPContinuousKernelRoute beta_y_route;
