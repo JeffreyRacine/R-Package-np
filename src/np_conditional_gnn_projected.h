@@ -914,7 +914,7 @@ static int np_cgnn_projected_local(NPGNNConditionalProjectedCall *a)
     /* New bounded compact-X admission uses exact bounded slabs. Its signed
      * deleted rows have measured L1 norms for the Gaussian rule certificate. */
     .compact_bounded_x=int_cxker_bound_extern &&
-      (KERNEL_reg_extern==CK_UNIF || KERNEL_reg_extern==CK_EPAN2),
+      (KERNEL_reg_extern>=CK_EPAN2 && KERNEL_reg_extern<=CK_UNIF),
     .row=np_gnn_conditional_integral_weight,
     .filled_row=!b->route->beta_x && np_lp_engine_extern==NP_LP_ENGINE_SCALAR ?
       np_gnn_conditional_integral_filled_weight:NULL,

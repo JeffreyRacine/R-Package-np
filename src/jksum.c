@@ -45225,7 +45225,7 @@ static int np_cgnn_unbounded_admitted(void) {
 }
 
 /* Bounded explanatory rows use the same whole-response GNN criterion.
- * Admit Gaussian truncation, positive compact X or an X-only beta route.
+ * Admit Gaussian truncation, compact X of every order or an X-only beta route.
  * Bounded/associated
  * response kernels retain their existing support-specific owners. */
 static int np_cgnn_bounded_x_admitted(
@@ -45236,8 +45236,7 @@ static int np_cgnn_bounded_x_admitted(
   if(execution_context != NULL)
     return execution_context->x_route != NULL && execution_context->y_route == NULL;
   return int_cxker_bound_extern != 0 &&
-    ((KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= 3) ||
-     KERNEL_reg_extern == CK_UNIF || KERNEL_reg_extern == CK_EPAN2);
+    KERNEL_reg_extern >= 0 && KERNEL_reg_extern <= CK_UNIF;
 }
 
 /* Upfront representation admission; no recovery or timing-driven dispatch. */
