@@ -546,51 +546,41 @@ test_that("conditional beta distribution CVLS uses signed canonical LP rows", {
   grid <- data.frame(y = seq(0.05, 0.95, length.out = 7L))
   indicator <- outer(y$y, grid$y, "<=")
 
-  influence <- function(weights, degree, bernstein) {
-    if (is.null(degree)) {
-      full <- sweep(weights, 2L, colSums(weights), "/")
-    } else {
-      design <- npRmpi:::W.lp(
-        x, degree = degree, basis = "glp",
-        bernstein.basis = bernstein
-      )
-      full <- matrix(0, n, n)
-      for (evaluation in seq_len(n)) {
-        weight <- weights[, evaluation]
-        coefficient <- solve(
-          crossprod(design, design * weight),
-          design[evaluation, ]
-        )
-        full[, evaluation] <-
-          weight * drop(design %*% coefficient)
-      }
-    }
+  deleted_prediction <- function(hx, hy, bwtype, order, degree, bernstein) {
+    design <- if (is.null(degree)) matrix(1, n, 1L) else
+      npRmpi:::W.lp(x, degree = degree, basis = "glp",
+                    bernstein.basis = bernstein)
+    predictions <- matrix(0, n, nrow(grid))
     for (evaluation in seq_len(n)) {
-      full[, evaluation] <- full[, evaluation] /
-        (1 - full[evaluation, evaluation])
-      full[evaluation, evaluation] <- 0
+      keep <- setdiff(seq_len(n), evaluation)
+      weight <- drop(conditional_beta_bw_weights(
+        x$x[keep], x$x[evaluation], hx, bwtype, order = order
+      ))
+      response <- conditional_beta_bw_weights(
+        y$y[keep], grid$y, hy, bwtype, order = order,
+        operator = "integral"
+      )
+      deleted <- design[keep, , drop = FALSE]
+      coefficient <- solve(crossprod(deleted, deleted * weight),
+                           design[evaluation, ])
+      row <- weight * drop(deleted %*% coefficient)
+      predictions[evaluation, ] <- drop(crossprod(row, response))
     }
-    full
+    predictions
   }
 
   for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
     hx <- if (identical(bwtype, "fixed")) 0.2 else 7L
     hy <- if (identical(bwtype, "fixed")) 0.18 else 6L
     for (order in c(2L, 8L)) {
-      wx <- conditional_beta_bw_weights(
-        x$x, x$x, hx, bwtype, order = order
-      )
-      wy <- conditional_beta_bw_weights(
-        y$y, grid$y, hy, bwtype, order = order,
-        operator = "integral"
-      )
       for (engine in list(
         list(regtype = "lc", degree = NULL, bernstein = FALSE),
         list(regtype = "lp", degree = 2L, bernstein = FALSE),
         list(regtype = "lp", degree = 2L, bernstein = TRUE)
       )) {
-        xrow <- influence(wx, engine$degree, engine$bernstein)
-        expected <- mean((indicator - crossprod(xrow, wy))^2)
+        expected <- mean((indicator - deleted_prediction(
+          hx, hy, bwtype, order, engine$degree, engine$bernstein
+        ))^2)
         arguments <- list(
           xdat = x, ydat = y, bws = c(hy, hx),
           bandwidth.compute = FALSE, bwmethod = "cv.ls",
