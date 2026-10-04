@@ -3329,8 +3329,9 @@
   interruption is now reported as an R `interrupt` condition only after
   native cleanup; active MPI work defers a master interrupt until the current
   rank-common computation boundary so workers remain reusable without adding
-  MPI commands or payloads. Ordinary observer errors remain fail-open, native
-  callables are resolved per solve rather than retained across package
+  MPI commands or payloads. Local contained observers preserve and re-signal
+  R errors after cleanup; distributed observers retain separate handling.
+  Native callables are resolved per solve rather than retained across package
   reloads, and the declared R 3.5 compatibility floor is preserved.
 
 * Restored timely master-only progress updates during native NOMAD bandwidth
