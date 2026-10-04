@@ -138,6 +138,8 @@ estimated and where it is evaluated.
     number of probability values per margin in the automatically
     generated two-dimensional grid used when \code{bws} is a formula,
     \code{evaluation="grid"}, and \code{u} is omitted.
+    This is a constructor argument; \code{plot} uses the object's stored
+    probability coordinates and rejects plot-level \code{neval}.
   }
 
   \item{target}{
