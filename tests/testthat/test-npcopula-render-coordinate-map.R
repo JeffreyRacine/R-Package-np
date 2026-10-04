@@ -107,3 +107,14 @@ test_that("all copula renderers and uncertainty layers share the coordinate map"
   skip_if_not_installed("rgl")
   check.renderer("rgl")
 })
+
+
+test_that("copula plot rejects constructor-only neval before computation", {
+  object <- structure(list(), class = "npcopula")
+  expect_error(plot(object, neval = 7L, output = "data"),
+               "unused plot argument: neval", fixed = TRUE)
+  expect_error(plot(object, neval = stop("must not evaluate neval")),
+               "unused plot argument: neval", fixed = TRUE)
+  expect_error(do.call(plot, list(x = object, neval = NULL)),
+               "unused plot argument: neval", fixed = TRUE)
+})

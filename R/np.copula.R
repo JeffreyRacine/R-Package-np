@@ -1045,6 +1045,10 @@ plot.npcopula <- function(x,
                           zlim = NULL,
                           ...) {
   .np_plot_reject_retired_spelling(substitute(list(...))[-1L], "boot.control")
+  .np_plot_stop_unused_args(
+    intersect(.np_plot_dot_names(substitute(list(...))[-1L]), "neval"),
+    character()
+  )
   bootstrap.supplied <- !missing(bootstrap) || !missing(B) || !missing(center)
   interval.supplied <- !missing(band) || !missing(alpha)
   view <- match.arg(view)

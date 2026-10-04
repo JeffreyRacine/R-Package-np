@@ -3477,14 +3477,11 @@
   train.profile.codes <- train.codes[train.rep, , drop = FALSE]
   eval.profile.codes <- eval.codes[eval.rep, , drop = FALSE]
   train.profile.dat <- txdat[train.rep, , drop = FALSE]
-  L.eval <- tryCatch(
-    .np_regression_cat_profile_kernel_matrix(
-      eval.codes = eval.profile.codes,
-      train.codes = train.profile.codes,
-      xdat = train.profile.dat,
-      bws = bws
-    ),
-    error = function(e) NULL
+  L.eval <- .np_regression_cat_profile_kernel_matrix(
+    eval.codes = eval.profile.codes,
+    train.codes = train.profile.codes,
+    xdat = train.profile.dat,
+    bws = bws
   )
   if (is.null(L.eval))
     return(NULL)
@@ -3562,14 +3559,11 @@
 
   train.profile.codes <- train.codes[train.rep, , drop = FALSE]
   eval.profile.codes <- eval.codes[eval.rep, , drop = FALSE]
-  L.eval <- tryCatch(
-    .np_regression_cat_profile_kernel_matrix(
-      eval.codes = eval.profile.codes,
-      train.codes = train.profile.codes,
-      xdat = xdat,
-      bws = bws
-    ),
-    error = function(e) NULL
+  L.eval <- .np_regression_cat_profile_kernel_matrix(
+    eval.codes = eval.profile.codes,
+    train.codes = train.profile.codes,
+    xdat = xdat,
+    bws = bws
   )
   if (is.null(L.eval))
     return(NULL)
@@ -3581,14 +3575,11 @@
     return(NULL)
   t0.profile <- as.vector(L.eval %*% sums / den.eval)
 
-  L.train <- tryCatch(
-    .np_regression_cat_profile_kernel_matrix(
-      eval.codes = train.profile.codes,
-      train.codes = train.profile.codes,
-      xdat = xdat,
-      bws = bws
-    ),
-    error = function(e) NULL
+  L.train <- .np_regression_cat_profile_kernel_matrix(
+    eval.codes = train.profile.codes,
+    train.codes = train.profile.codes,
+    xdat = xdat,
+    bws = bws
   )
   if (is.null(L.train))
     return(NULL)
@@ -4904,15 +4895,12 @@
 
   if (constant.basis) {
     H <- suppressWarnings(
-      tryCatch(
-        npreghat.rbandwidth(
-          bws = bws,
-          txdat = xdat,
-          exdat = exdat,
-          s = 0L,
-          output = "matrix"
-        ),
-        error = function(e) NULL
+      npreghat.rbandwidth(
+        bws = bws,
+        txdat = xdat,
+        exdat = exdat,
+        s = 0L,
+        output = "matrix"
       )
     )
     if (!is.null(H)) {

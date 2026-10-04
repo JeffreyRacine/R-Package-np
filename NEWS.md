@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Regression profile and constant-basis bootstrap plots now propagate errors
+  from their selected computation instead of attempting another route.
+  Copula plots explicitly reject `neval`; set the probability grid when
+  constructing the copula object.
+
 * One-dimensional density plots now honor the default 50-point continuous
   evaluation grid, consistently with explicit `neval`. Fixed-grid conditional
   mode plots preserve fractional evaluation and conditioning coordinates for
