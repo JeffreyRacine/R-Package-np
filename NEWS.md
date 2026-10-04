@@ -1,19 +1,19 @@
 # np 0.80-1
 
-* Local-constant conditional CVLS with beta predictor kernels now omits the
-  held-out observation before scaling and normalizing its kernel row. This
-  prevents a dominant self weight from erasing the remaining donors or causing
-  cancellation through leverage subtraction. Density and distribution criteria
-  share this scalar correction; LP solvers and ordinary regression are unchanged.
-  Beta local-polynomial CVLS rows can still lose precision near support bounds
-  when their self leverage approaches one, producing inaccurate or penalized
-  trials; that separate numerical limitation remains unresolved.
+* Conditional CVLS with beta predictor kernels now omits the held-out
+  observation before scaling and normalizing local-constant rows or solving
+  local-polynomial rows. This prevents dominant self weights from erasing
+  remaining donors and avoids cancellation when self leverage approaches one,
+  improving density and distribution criteria near support bounds. Existing
+  local-polynomial regularization can still produce small differences from
+  explicit deleted-sample refits on ill-conditioned data.
 
 * Generalized-neighbor conditional-density `cv.ls` with bounded uniform or
-  second-order Epanechnikov predictor kernels retains a known deleted-geometry
-  limitation: its criterion can differ from explicit leave-one-out refits, even
-  when the bounds do not truncate the kernel. Selected bandwidths can differ.
-  This limitation remains unresolved.
+  second-order Epanechnikov predictor kernels now uses the corrected
+  deleted-sample geometry and whole-response integral for unbounded responses.
+  This can change selected bandwidths and costs more than the former incorrect
+  criterion. Packed integration and certified Gaussian quadrature reduce that
+  cost without changing numerical tolerances or defaults.
 
 * Interrupt containment does not make all nested native allocations unwind-safe.
   Interrupted searches can retain allocations from shared/nested helpers; this
