@@ -15,7 +15,7 @@ conditional_nn_support_value <- function(X, Y, b, cdf = FALSE) {
 }
 
 test_that("compact NN CVML and CDF reject insufficient deleted designs in all units", {
-  old <- options(np.messages = FALSE)
+  old <- options(np.messages = FALSE, np.tree = getOption("np.tree"))
   on.exit(options(old), add = TRUE)
   set.seed(2701)
   x1 <- rnorm(60); x2 <- rnorm(60)
@@ -46,7 +46,7 @@ test_that("compact NN CVML and CDF reject insufficient deleted designs in all un
 })
 
 test_that("adaptive and bounded conditional owners retain deleted-support admission", {
-  old <- options(np.messages = FALSE)
+  old <- options(np.messages = FALSE, np.tree = getOption("np.tree"))
   on.exit(options(old), add = TRUE)
   set.seed(2701)
   X <- data.frame(x1 = rnorm(60), x2 = rnorm(60))
@@ -72,7 +72,7 @@ test_that("adaptive and bounded conditional owners retain deleted-support admiss
 })
 
 test_that("categorical predictors do not bypass the compact NN support check", {
-  old <- options(np.messages = FALSE)
+  old <- options(np.messages = FALSE, np.tree = getOption("np.tree"))
   on.exit(options(old), add = TRUE)
   set.seed(1)
   x <- rnorm(100); f <- factor(sample(letters[1:3], 100, TRUE))

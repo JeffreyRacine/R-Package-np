@@ -79,10 +79,9 @@ test_that("conditional distribution provider is bounded and operator explicit", 
   expect_match(
     engine,
     paste0(
-      "&route_context, vector_scale_factor, execution_context,\n",
-      "       OP_INTEGRAL)"
-    ),
-    fixed = TRUE
+      "&route_context,[[:space:]]*vector_scale_factor,[[:space:]]*",
+      "execution_context,[[:space:]]*OP_INTEGRAL\\)"
+    )
   )
 })
 
