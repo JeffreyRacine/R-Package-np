@@ -670,54 +670,6 @@ np_render_control <- function(style = c("band", "bar"),
          call. = FALSE)
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity")
-  plot.rug <- FALSE
-  if (!is.null(dots$plot.rug)) {
-    plot.rug <- .np_plot_match_flag(dots$plot.rug, "plot.rug")
-    dots$plot.rug <- NULL
-  }
-
-  direct.args <- c("plot.behavior", "plot.errors.method", "plot.errors.type",
-                   "plot.errors.boot.num", "plot.errors.boot.method",
-                   "plot.errors.boot.nonfixed",
-                   "plot.errors.alpha", "perspective", "gradients",
-                   "xdat", "data", "neval", "xtrim", "xq")
-  use.direct <- isTRUE(object$ndim == 1) &&
-    isTRUE(object$trainiseval) &&
-    !any(direct.args %in% names(dots))
-
-  if (use.direct) {
-    ex <- object$eval[[1]]
-    if (!is.factor(ex)) {
-      ord <- order(ex)
-      xlab.val <- if (!is.null(dots$xlab)) dots$xlab else gen.label(object$xnames[1], "X1")
-      ylab.val <- if (!is.null(dots$ylab)) dots$ylab else "Density"
-      type.val <- if (!is.null(dots$type)) dots$type else "l"
-
-      dots$xlab <- NULL
-      dots$ylab <- NULL
-      dots$type <- NULL
-
-      do.call(plot, c(list(x = as.numeric(ex[ord]),
-                           y = as.numeric(object$dens[ord]),
-                           type = type.val,
-                           xlab = xlab.val,
-                           ylab = ylab.val),
-                      dots))
-      if (isTRUE(plot.rug)) {
-        .np_plot_validate_rug_request(
-          plot.rug = TRUE,
-          route = "plot.npdensity()",
-          supported.route = TRUE,
-          renderer = "base"
-        )
-        .np_plot_draw_rug_1d(as.numeric(ex))
-      }
-      return(invisible(object))
-    }
-  }
-
-  if (isTRUE(plot.rug))
-    dots$plot.rug <- TRUE
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_condensity <- function(object, ..., .plot_dots_call = NULL) {
@@ -940,8 +892,6 @@ np_render_control <- function(style = c("band", "bar"),
     return(.np_factor_with_levels(x,
                   levels = levels(template),
                   ordered = is.ordered(template)))
-  if (is.integer(template))
-    return(as.integer(x))
   if (is.numeric(template))
     return(as.numeric(x))
   x

@@ -2284,17 +2284,12 @@
 
   train.profile.codes <- train.codes[train.rep, , drop = FALSE]
   eval.profile.codes <- eval.codes[eval.rep, , drop = FALSE]
-  L.eval <- tryCatch(
-    .np_density_cat_profile_kernel_matrix(
-      eval.codes = eval.profile.codes,
-      train.codes = train.profile.codes,
-      xdat = xdat,
-      bws = bws
-    ),
-    error = function(e) NULL
+  L.eval <- .np_density_cat_profile_kernel_matrix(
+    eval.codes = eval.profile.codes,
+    train.codes = train.profile.codes,
+    xdat = xdat,
+    bws = bws
   )
-  if (is.null(L.eval))
-    return(NULL)
 
   counts <- as.double(tabulate(train.id, nbins = G))
   n <- nrow(xdat)

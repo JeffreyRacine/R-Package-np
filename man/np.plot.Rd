@@ -69,7 +69,10 @@ Named options passed via \code{\dots} include:
       }
       \item{\code{neval}}{
         the number of evaluation points used for each plotted continuous
-        margin.
+        margin, defaulting to \code{50L}. Continuous numeric variables use
+        this grid even when their observed values are integers or have few
+        distinct values. Categorical margins use their levels. A surface
+        with two continuous margins has \code{neval^2} evaluation points.
       }
       \item{\code{xdat}, \code{ydat}, \code{zdat}}{
         training data used when plotting bandwidth objects. \code{xdat}
