@@ -566,7 +566,7 @@ test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
     collapse = "\n"
   )
   expect_true(grepl(
-    "np_lp_delete_denominator(row[evaluation], &delete_denominator)",
+    "np_beta_scaled_row_context_fill_omitting(",
     beta_provider,
     fixed = TRUE
   ))

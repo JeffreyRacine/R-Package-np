@@ -1,5 +1,6 @@
 test_that("bounded positive compact GNN CVLS retains the whole-response criterion", {
-  old <- options(np.messages = FALSE, np.extendednn = TRUE)
+  old <- options(np.messages = FALSE, np.extendednn = TRUE,
+                 np.tree = getOption("np.tree"))
   on.exit(options(old), add = TRUE)
   set.seed(2701)
   x <- data.frame(x = runif(30))
