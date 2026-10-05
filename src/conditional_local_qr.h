@@ -29,11 +29,54 @@ static double np_cqr_local_power(double x, int exponent)
   return value;
 }
 
-static NPConditionalLocalQRStatus np_cqr_local_row(
+/* Degree dispatch belongs outside the donor loop. Keep the same product order
+ * as np_cqr_local_power; higher degrees share the generic arithmetic. */
+static void np_cqr_local_multiply(double *column, const double *sqrtw,
+  const double *x, const int *index, int count,
+  double center, double radius, int power)
+{
+  if(power == 1){
+    for(int i = 0; i < count; ++i)
+      if(sqrtw[i] != 0.0)
+        column[i] *= (x[index[i]]-center)/radius;
+  } else if(power == 2){
+    for(int i = 0; i < count; ++i){
+      if(sqrtw[i] == 0.0) continue;
+      const double z = (x[index[i]]-center)/radius;
+      column[i] *= z*z;
+    }
+  } else {
+    for(int i = 0; i < count; ++i)
+      if(sqrtw[i] != 0.0)
+        column[i] *= np_cqr_local_power((x[index[i]]-center)/radius, power);
+  }
+}
+
+/* Q = H[0] ... H[k-1]. Apply it to the sole adjoint vector in reverse
+ * reflector order. BLAS vector operations avoid the general matrix/RHS
+ * machinery of DORMQR; the stored leading reflector entry is implicitly 1. */
+static void np_cqr_local_apply_q(NPConditionalQRFast *fast, int count, int k)
+{
+  const int one = 1;
+  for(int j = k-1; j >= 0; --j){
+    if(fast->tau[j] == 0.0) continue;
+    const int tail = count-j-1;
+    const double *reflector = fast->a+(size_t)fast->capacity*j+j+1;
+    double inner = fast->v[j];
+    if(tail)
+      inner += F77_CALL(ddot)(&tail, reflector, &one, fast->v+j+1, &one);
+    const double update = -fast->tau[j]*inner;
+    fast->v[j] += update;
+    if(tail)
+      F77_CALL(daxpy)(&tail, &update, reflector, &one, fast->v+j+1, &one);
+  }
+}
+
+static NPConditionalLocalQRStatus np_cqr_local_factor(
   NPConditionalQRFast *fast, NPLPSolveWorkspace *policy,
   int n, int dimensions, int terms_count, const int *terms,
   double * const *x, const double *weights, int position,
-  double *row, double *ratio_out)
+  int *count_out, double *ratio_out)
 {
   const int one = 1;
   const int k = terms_count;
@@ -41,8 +84,9 @@ static NPConditionalLocalQRStatus np_cqr_local_row(
   int positive = 0;
   double maxw = 0.0;
 
+  if(count_out) *count_out = 0;
   if(ratio_out) *ratio_out = NA_REAL;
-  if(!fast || !policy || !terms || !x || !weights || !row ||
+  if(!fast || !policy || !terms || !x || !weights || !count_out ||
      n < 2 || dimensions < 1 || k < 1 || position < 0 || position >= n ||
      k > INT_MAX/5 || policy->p_capacity < k ||
      !policy->gram_work || !policy->rank_values || !policy->rank_work ||
@@ -55,7 +99,7 @@ static NPConditionalLocalQRStatus np_cqr_local_row(
     }
   }
   for(int i = 0; i < n; ++i){
-    if(!R_FINITE(weights[i])) return NP_CQR_LOCAL_NONFINITE;
+    if(!isfinite(weights[i])) return NP_CQR_LOCAL_NONFINITE;
     if(weights[i] < 0.0) return NP_CQR_LOCAL_FAILED;
     if(i != position && weights[i] > 0.0){
       ++positive;
@@ -66,11 +110,18 @@ static NPConditionalLocalQRStatus np_cqr_local_row(
   if(positive < k) return NP_CQR_LOCAL_DEFICIENT;
   if(np_cqr_fast_init(fast, n, k)) return NP_CQR_LOCAL_FAILED;
 
-  for(int i = 0; i < n; ++i)
-    fast->sqrtw[i] = i == position ? 0.0 : sqrt(weights[i]/maxw);
+  /* Removing exact zero rows changes neither the weighted design nor its
+   * singular values. Retain original n below in the adopted rank threshold.
+   * The small R/scales/pivot contract is independent of this packed layout. */
+  int count = 0;
+  for(int i = 0; i < n; ++i){
+    if(i == position || weights[i] == 0.0) continue;
+    fast->row_index[count] = i;
+    fast->sqrtw[count++] = sqrt(weights[i]/maxw);
+  }
   for(int t = 0; t < k; ++t){
     double *column = fast->a + (size_t)fast->capacity*t;
-    memcpy(column, fast->sqrtw, (size_t)n*sizeof(double));
+    memcpy(column, fast->sqrtw, (size_t)count*sizeof(double));
   }
   /* A scale multiplies each monomial column by a single positive constant,
    * which cancels under column normalization. No rounded raw basis is shifted. */
@@ -79,13 +130,13 @@ static NPConditionalLocalQRStatus np_cqr_local_row(
     for(int t = 0; t < k; ++t)
       if(terms[(size_t)t*dimensions+d]) active = 1;
     if(!active) continue;
-    if(!x[d] || !R_FINITE(x[d][position])) return NP_CQR_LOCAL_NONFINITE;
-    const double center = x[d][position];
+    const double *coordinate = x[d];
+    if(!coordinate || !isfinite(coordinate[position])) return NP_CQR_LOCAL_NONFINITE;
+    const double center = coordinate[position];
     double radius = 0.0;
-    for(int i = 0; i < n; ++i){
-      if(i == position || weights[i] == 0.0) continue;
-      const double delta = x[d][i] - center;
-      if(!R_FINITE(delta)) return NP_CQR_LOCAL_NONFINITE;
+    for(int i = 0; i < count; ++i){
+      const double delta = coordinate[fast->row_index[i]] - center;
+      if(!isfinite(delta)) return NP_CQR_LOCAL_NONFINITE;
       radius = fmax(radius, fabs(delta));
     }
     if(!(radius > 0.0)) return NP_CQR_LOCAL_DEFICIENT;
@@ -93,21 +144,22 @@ static NPConditionalLocalQRStatus np_cqr_local_row(
       const int power = terms[(size_t)t*dimensions+d];
       if(!power) continue;
       double *column = fast->a + (size_t)fast->capacity*t;
-      for(int i = 0; i < n; ++i){
-        if(fast->sqrtw[i] == 0.0) continue;
-        column[i] *= np_cqr_local_power((x[d][i]-center)/radius, power);
-      }
+      np_cqr_local_multiply(column, fast->sqrtw, coordinate, fast->row_index,
+                            count, center, radius, power);
     }
   }
   for(int t = 0; t < k; ++t){
     double *column = fast->a + (size_t)fast->capacity*t;
-    fast->scale[t] = F77_CALL(dnrm2)(&n, column, &one);
-    if(!R_FINITE(fast->scale[t])) return NP_CQR_LOCAL_NONFINITE;
+    fast->scale[t] = F77_CALL(dnrm2)(&count, column, &one);
+    if(!isfinite(fast->scale[t])) return NP_CQR_LOCAL_NONFINITE;
     if(!(fast->scale[t] > 0.0)) return NP_CQR_LOCAL_DEFICIENT;
-    for(int i = 0; i < n; ++i) column[i] /= fast->scale[t];
-    fast->pivot[t] = 0;
+    for(int i = 0; i < count; ++i) column[i] /= fast->scale[t];
+    fast->pivot[t] = t+1;
   }
-  F77_CALL(dgeqp3)(&n, &k, fast->a, &fast->capacity, fast->pivot,
+  /* Rank is decided by the SVD of R, not by pivot magnitudes. Column
+   * permutations leave those singular values unchanged; retain identity
+   * ordering for the existing small-R coefficient consumer. */
+  F77_CALL(dgeqrf)(&count, &k, fast->a, &fast->capacity,
                    fast->tau, fast->work, &fast->lwork, &info);
   if(info) return NP_CQR_LOCAL_FAILED;
   for(int j = 0; j < k; ++j)
@@ -124,12 +176,31 @@ static NPConditionalLocalQRStatus np_cqr_local_row(
   const double ratio = policy->rank_values[k-1]/policy->rank_values[0];
   const double neps = ((double)n+k)*DBL_EPSILON;
   const double threshold = neps/(1.0-neps);
-  if(!R_FINITE(ratio)) return NP_CQR_LOCAL_NONFINITE;
+  if(!isfinite(ratio)) return NP_CQR_LOCAL_NONFINITE;
   if(ratio_out) *ratio_out = ratio;
   if(ratio <= threshold/10.0) return NP_CQR_LOCAL_DEFICIENT;
   if(ratio <= 10.0*threshold) return NP_CQR_LOCAL_AMBIGUOUS;
 
-  memset(fast->v, 0, (size_t)n*sizeof(double));
+  *count_out = count;
+  return NP_CQR_LOCAL_FULL;
+}
+
+static NPConditionalLocalQRStatus np_cqr_local_row(
+  NPConditionalQRFast *fast, NPLPSolveWorkspace *policy,
+  int n, int dimensions, int terms_count, const int *terms,
+  double * const *x, const double *weights, int position,
+  double *row, double *ratio_out)
+{
+  if(!row){
+    if(ratio_out) *ratio_out = NA_REAL;
+    return NP_CQR_LOCAL_FAILED;
+  }
+  int count = 0;
+  const int k = terms_count;
+  const NPConditionalLocalQRStatus status = np_cqr_local_factor(
+    fast, policy, n, dimensions, k, terms, x, weights, position, &count, ratio_out);
+  if(status != NP_CQR_LOCAL_FULL) return status;
+  memset(fast->v, 0, (size_t)count*sizeof(double));
   for(int i = 0; i < k; ++i){
     const int pivot = fast->pivot[i]-1;
     if(pivot < 0 || pivot >= k) return NP_CQR_LOCAL_FAILED;
@@ -137,15 +208,14 @@ static NPConditionalLocalQRStatus np_cqr_local_row(
     for(int j = 0; j < i; ++j)
       value -= fast->a[j+(size_t)fast->capacity*i]*fast->v[j];
     fast->v[i] = value/fast->a[i+(size_t)fast->capacity*i];
-    if(!R_FINITE(fast->v[i])) return NP_CQR_LOCAL_NONFINITE;
+    if(!isfinite(fast->v[i])) return NP_CQR_LOCAL_NONFINITE;
   }
-  F77_CALL(dormqr)("L", "N", &n, &one, &k, fast->a, &fast->capacity,
-                   fast->tau, fast->v, &fast->capacity, fast->work,
-                   &fast->lwork, &info FCONE FCONE);
-  if(info) return NP_CQR_LOCAL_FAILED;
-  for(int i = 0; i < n; ++i)
-    if(!R_FINITE(fast->sqrtw[i]*fast->v[i])) return NP_CQR_LOCAL_NONFINITE;
-  for(int i = 0; i < n; ++i) row[i] = fast->sqrtw[i]*fast->v[i];
+  np_cqr_local_apply_q(fast, count, k);
+  for(int i = 0; i < count; ++i)
+    if(!isfinite(fast->sqrtw[i]*fast->v[i])) return NP_CQR_LOCAL_NONFINITE;
+  memset(row, 0, (size_t)n*sizeof(double));
+  for(int i = 0; i < count; ++i)
+    row[fast->row_index[i]] = fast->sqrtw[i]*fast->v[i];
   return NP_CQR_LOCAL_FULL;
 }
 #endif

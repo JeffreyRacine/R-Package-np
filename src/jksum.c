@@ -34693,6 +34693,7 @@ static int np_conditional_deleted_influence(
   int j, l;
   if(!basis || !kw || !mean_row || !work || !qr || !row_out ||
      k <= 0 || eval_pos < 0 || eval_pos >= num_train) return 1;
+  qr->local_status = -1;
   kw[eval_pos] = 0.0;
   /* Conditional local QR uses the adopted local-design rank policy.
    * Uncertain rank uses the incumbent original-coordinate admission below. */
@@ -34700,6 +34701,7 @@ static int np_conditional_deleted_influence(
     &qr->fast, work, num_train, np_glp_cv_cache.ncon, k,
     np_glp_cv_cache.terms, matrix_X_continuous_train_extern,
     kw, eval_pos, mean_row, NULL);
+  qr->local_status = (int)local_status;
   if(local_status == NP_CQR_LOCAL_FULL){
     for(j = 0; j < num_train; ++j)
       row_out[int_TREE_X == NP_TREE_TRUE ? ipt_extern_X[j] : j] = mean_row[j];

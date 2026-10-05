@@ -62,8 +62,11 @@ static int np_cqr_prepare(NPConditionalQRGlobal *g,int n,int k,double **basis,in
     g->anchor[i]=policy.gram_source[0];
     NPLPSolvePolicyDiagnostics d={0,0.};
     const int position=positions?positions[i]:i;
-    const NPConditionalLocalQRStatus rank=np_cqr_local_row(&local,&policy,n,
-      dimensions,k,terms,x,g->ones,position,g->row,NULL);
+    /* Admission needs the factor's rank, not an influence row that is
+     * discarded before the common global factor is formed. */
+    int local_count=0;
+    const NPConditionalLocalQRStatus rank=np_cqr_local_factor(&local,&policy,n,
+      dimensions,k,terms,x,g->ones,position,&local_count,NULL);
     if(rank==NP_CQR_LOCAL_FULL) {
       g->lambda[i]=0.0;
       continue;

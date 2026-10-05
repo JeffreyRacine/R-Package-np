@@ -16,7 +16,7 @@ test_that("conditional deleted-rank policy is common and degree neutral", {
   expect_false(grepl("degree", policy, fixed = TRUE))
   # The adopted local-design certificate precedes the original-coordinate
   # deficient-rank solve; the obsolete raw-Gram certificate is not required.
-  expect_match(global, "np_cqr_local_row(", fixed = TRUE)
+  expect_match(global, "np_cqr_local_factor(", fixed = TRUE)
   expect_match(global, "if(rank==NP_CQR_LOCAL_FULL)", fixed = TRUE)
   expect_match(global, "if(rank!=NP_CQR_LOCAL_DEFICIENT && rank!=NP_CQR_LOCAL_AMBIGUOUS)", fixed = TRUE)
   # Deficiency is certified; ambiguity retains the original-coordinate admission.
