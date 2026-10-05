@@ -45,8 +45,11 @@ test_that("witnessed native errors and flag interrupts cannot poison NOMAD", {
     child <- list(status = if (is.null(status)) 0L else status, output = log)
   }
   unavailable <- grep("CF234_NATIVE_OWNER_SKIPPED", child$output, value = TRUE)
-  if (length(unavailable)) message(paste(unavailable, collapse = "\n"))
   expect_identical(child$status, 0L, info = paste(child$output, collapse = "\n"))
   expect_true(any(grepl("NATIVE_UNWIND_PASS", child$output, fixed = TRUE)),
               info = paste(child$output, collapse = "\n"))
+  # All unrelated runtime cases and their assertions ran above. Record the
+  # unavailable CF-234 witness as skipped so release accounting cannot call
+  # this complete native-poll coverage on stripped/unsupported nm builds.
+  if (length(unavailable)) skip(paste(unavailable, collapse = "\n"))
 })
