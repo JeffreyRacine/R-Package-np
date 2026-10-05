@@ -5,8 +5,9 @@
 
 * Regression plots now use the fitted object's retained training sample when
   its bandwidth object was originally constructed on different data. Native
-  smooth-coefficient and partially linear plots also preserve retained samples
-  when recovering bandwidth state.
+  partially linear plots also preserve retained samples when recovering
+  bandwidth state. Smooth-coefficient plots now also work when smoothing
+  variables are omitted and the model uses its predictors for smoothing.
 
 * Extended nearest-neighbor objective evaluation now admits fractional counts
   consistently with their rounded integer, including counts just beyond the
@@ -38,8 +39,9 @@
   This can change selected bandwidths and costs more than the former incorrect
   criterion. In retained n = 480 cases the corrected criterion took about
   44--53 ms more per evaluation (about 9 times the former cost); other platforms
-  and workloads have shown larger ratios. Packing gains depend on the workload
-  and platform. Newly covered Epanechnikov predictor orders 4, 6 and 8 took
+  and workloads have shown larger ratios, including 21--69 times the former
+  cost in retained reference-BLAS cases. These are case-specific measurements.
+  Packing gains depend on the workload and platform. Newly covered Epanechnikov predictor orders 4, 6 and 8 took
   about 49--50 ms per evaluation instead of 5--6 ms in retained n = 480
   local-constant cases, with trees both off and on. This added correctness
   cost is specific to the affected bounded-X GNN CVLS route. Fixed bandwidths,
@@ -55,9 +57,9 @@
   Local native progress errors and interrupts now also stop the search after
   cleanup and re-signal the original condition object, preserving its class,
   message, call and custom fields (not its original restart context). This
-  includes time limits raised during progress reporting. R-callback degree
-  searches and distributed searches retain their separate handling;
-  this is not a distributed MPI timeout-cleanup repair.
+  includes time limits raised during progress reporting. Message-less user
+  interrupts retain interrupt behavior, including inside error-only handlers.
+  R-callback degree searches retain their separate handling.
 
 * Native searches are not re-entrant: user condition/event handlers must not
   start another np search while a native np search is active.
@@ -84,12 +86,14 @@
   The separate non-beta GNN `do.full.integral` geometry limitation remains.
 
 * Conditional density (CVML/CVLS) and distribution (CVLS) nearest-neighbor
-  local-polynomial objectives with uniform or second-order Epanechnikov
-  predictor kernels reject trials with fewer distinct nonzero-weight deleted
+  local-polynomial objectives with uniform or Epanechnikov predictor kernels
+  of orders 2, 4, 6 and 8 reject trials with fewer distinct nonzero-weight deleted
   basis rows than basis terms. The structural check now also covers adaptive
   neighbors, bounded predictor kernels and mixed continuous/categorical data.
   It uses existing weights and the existing invalid-trial penalty; admitted
-  trials retain their arithmetic. A sufficient count does not certify full rank.
+  trials retain their arithmetic. Higher-order kernels can therefore select
+  different bandwidths, including without bounds. A sufficient count does not
+  certify full rank.
   The one-predictor CVLS prefix owner's existing support check is retained;
   its full-rank rows no longer read unused coefficients from an unwritten buffer.
   Conditional nearest-neighbor all-invalid errors identify inadequate support
