@@ -510,7 +510,7 @@ test_that("canonical LP hat and apply routes share the typed solve policy", {
   ))
 })
 
-test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
+test_that("conditional LP LOO rows preserve signed deletion and beta deleted-sample rows and no QR", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -570,6 +570,7 @@ test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
     beta_provider,
     fixed = TRUE
   ))
+  expect_false(grepl("np_lp_delete_denominator(", beta_provider, fixed = TRUE))
   expect_false(grepl("fabs(", beta_provider, fixed = TRUE))
   expect_true(grepl(
     "np_regression_cv_lp_continuous_route",
