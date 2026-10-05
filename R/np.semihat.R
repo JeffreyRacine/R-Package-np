@@ -799,8 +799,11 @@
   )
 
   if (npIsCanonicalLp0Spec(spec, ncon = bws$ncon)) {
-    state$z.train <- adjustLevels(tzdat, bws$zdati)
-    state$z.eval <- if (leave.one.out) state$z.train else adjustLevels(ezdat, bws$zdati, allowNewCells = TRUE)
+    # With omitted z the public model smooths on x and retains x metadata.
+    dati <- bws[["zdati", exact = TRUE]]
+    if (is.null(dati)) dati <- bws[["xdati", exact = TRUE]]
+    state$z.train <- adjustLevels(tzdat, dati)
+    state$z.eval <- if (leave.one.out) state$z.train else adjustLevels(ezdat, dati, allowNewCells = TRUE)
     return(state)
   }
 
