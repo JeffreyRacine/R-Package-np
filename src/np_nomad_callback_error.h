@@ -176,6 +176,19 @@ static void np_nomad_error_raise(SEXP state)
    * in the caller context, without claiming the original restart context. */
   if (VECTOR_ELT(state, 0) == VECTOR_ELT(state, 1))
     R_ContinueUnwind(VECTOR_ELT(state, 1));
+  if (Rf_inherits(VECTOR_ELT(state, 0), "interrupt")) {
+    /* A real R interrupt has no message. signalCondition preserves its class
+     * for caller handlers; abort supplies interruption's default control flow
+     * when no exiting handler takes it. stop(condition) can turn it into an
+     * ordinary error that try() silently catches. */
+    SEXP signal = PROTECT(Rf_lang2(Rf_install("signalCondition"),
+                                   VECTOR_ELT(state, 0)));
+    Rf_eval(signal, R_BaseEnv);
+    SEXP restart = PROTECT(Rf_mkString("abort"));
+    SEXP abort = PROTECT(Rf_lang2(Rf_install("invokeRestart"), restart));
+    Rf_eval(abort, R_BaseEnv);
+    UNPROTECT(3);
+  }
   SEXP call = PROTECT(Rf_lang2(Rf_install("stop"), VECTOR_ELT(state, 0)));
   Rf_eval(call, R_BaseEnv);
   UNPROTECT(1);

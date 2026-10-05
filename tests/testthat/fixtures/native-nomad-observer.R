@@ -1,6 +1,10 @@
 # Isolated child; namespace hooks and elapsed limits are confined to this process.
 suppressPackageStartupMessages(library(spec$pkg, character.only = TRUE))
 ns <- asNamespace(spec$pkg)
+if (!is.null(spec$dll)) {
+  dll <- dyn.load(spec$dll)
+  real_interrupt <- getNativeSymbolInfo("probe_interrupt", dll)
+}
 options(np.messages = FALSE, np.tree = FALSE)
 run <- function(fun) {
   if (spec$pkg == "npRmpi") get(".npRmpi_with_local_regression", ns)(fun())
@@ -28,7 +32,7 @@ for (family in c("npregbw", "npudensbw", "npudistbw", "npcdensbw", "npcdistbw"))
     list(b$bw, b$xbw, b$ybw, b$fval, b$num.feval)
   })
   before <- search()
-  for (kind in c("error", "interrupt", "time")) {
+  for (kind in c("error", "interrupt", "time", if (!is.null(spec$dll)) "real_interrupt")) {
     state <- new.env()
     state$fired <- FALSE
     state$after <- 0L
@@ -49,6 +53,7 @@ for (family in c("npregbw", "npudensbw", "npudistbw", "npcdensbw", "npcdistbw"))
       withCallingHandlers({
         gc()
         if (kind == "error") stop(condition)
+        if (kind == "real_interrupt") .Call(real_interrupt)
         if (kind == "interrupt") stop(structure(list(message = "interrupt", call = NULL),
           class = c("interrupt", "condition")))
         setTimeLimit(elapsed = .01, transient = TRUE)

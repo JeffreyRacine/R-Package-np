@@ -2505,7 +2505,10 @@
       list(0L, "")
     },
     interrupt = function(e) {
-      if (propagate) stop(e)
+      if (propagate) {
+        signalCondition(e)
+        invokeRestart("abort")
+      }
       list(2L, conditionMessage(e))
     },
     error = function(e) {
