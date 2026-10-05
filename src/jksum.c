@@ -38039,16 +38039,17 @@ static int np_conditional_xrow_ctx_select_adaptive_fold(
   return 0;
 }
 
-/* Necessary support admission for compact positive-kernel conditional NN
+/* Necessary support admission for compact-kernel conditional NN
  * objectives only. Distinct complete basis rows bound rank from above; a
  * saturated count is not a numerical or algebraic full-rank certificate.
+ * Nonzero signed weights count: their sign cannot increase this rank bound.
  * Call only after the row output has consumed mean_row. That scratch has n
  * entries; p <= n-1 bounds writes, and donor indices are exact as doubles. */
 static int np_conditional_nn_deleted_support(double **basis, const double *kw,
                                               int held, double *mean_row)
 {
   if((BANDWIDTH_den_extern != BW_GEN_NN && BANDWIDTH_den_extern != BW_ADAP_NN) ||
-     (KERNEL_reg_extern != CK_EPAN2 && KERNEL_reg_extern != CK_UNIF))
+     (KERNEL_reg_extern < CK_EPAN2 || KERNEL_reg_extern > CK_UNIF))
     return 0;
   const int n = num_obs_train_extern, p = np_glp_cv_cache.nterms;
   if(p <= 1) return 0;
