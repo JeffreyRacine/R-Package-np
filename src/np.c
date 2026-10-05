@@ -967,6 +967,17 @@ static SEXP np_nomad_callback_error_state(void)
   return np_nomad_unwind_state();
 }
 
+/* A broadcast can run independent native replicas under COMM_SELF. Keep its
+ * established progress handling even though objective evaluation is local.
+ * The command context, unlike pool existence or the temporary communicator,
+ * distinguishes these replicas from an explicitly local call with idle slaves.
+ * Objective unwind containment remains independent of this observer policy. */
+static int np_nomad_progress_observer_can_propagate(void)
+{
+  return Rf_asLogical(Rf_GetOption1(
+    Rf_install("npRmpi.manual.bcast.context"))) != TRUE;
+}
+
 static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
                                         crs_nomad_eval_fn eval,
                                         void *user_data,
@@ -1015,7 +1026,8 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
   if (observer_enabled) {
     observer.api_version = CRS_NOMAD_OBSERVER_API_VERSION;
     observer.struct_size = sizeof(observer);
-    observer.observe = contain_errors ? np_nomad_progress_observer_contained :
+    observer.observe = contain_errors && np_nomad_progress_observer_can_propagate() ?
+      np_nomad_progress_observer_contained :
       np_nomad_progress_observer;
     observer.user_data = (void *) progress_spec;
     observer.interval_sec = interval_sec;
@@ -1151,7 +1163,8 @@ static int np_conditional_nomad_solve(
     solve_problem = &distributed_problem;
   }
   stop->progress = progress;
-  stop->contain_errors = contain_errors;
+  stop->contain_errors = contain_errors &&
+    np_nomad_progress_observer_can_propagate();
   stop->progress_enabled = np_nomad_progress_observer_config(&interval);
 #ifdef MPI2
   if (my_rank != 0)
