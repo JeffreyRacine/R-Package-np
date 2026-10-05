@@ -935,9 +935,10 @@ static SEXP np_cgnn_body(void *raw) {
     }
     double denominator = 0.0, self = 0.0, sum = 0.0, error = 0.0;
     if(c->stable){
-      NPLPSolveWorkspace *work=&x->regression_solve_workspace;
-      NPConditionalLocalQRStatus rank=np_cqr_local_row(&a->qr.fast,work,n,1,terms,
-        np_glp_cv_cache.terms,matrix_X_continuous_train_extern,x->kw,pos,x->mean_row,NULL);
+      /* The successful deleted-row producer above owns this same fold's
+       * factor. No X weights or factor storage changed since that call. */
+      const NPConditionalLocalQRStatus rank=
+        (NPConditionalLocalQRStatus)a->qr.local_status;
       if(rank==NP_CQR_LOCAL_FULL){
         if(cqr_compensated_row(&a->qr.fast,n,terms,np_glp_cv_cache.terms,
           matrix_X_continuous_train_extern[0],x->kw,pos,c->coefficient_work,

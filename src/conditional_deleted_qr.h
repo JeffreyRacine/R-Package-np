@@ -26,6 +26,9 @@ static void np_cqr_product(NPConditionalQRAcc *s,double x,double y){
 #include "conditional_deleted_dot.h"
 typedef struct {
   NPConditionalQRFast fast;
+  /* Admission returned by the current conditional local-row producer.
+   * Only its immediately following GNN coefficient consumer reads this. */
+  int local_status;
   int m,k;
   double *q,*r,*scale,*v,*sw;
   int *pivot;

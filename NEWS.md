@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Local-polynomial conditional density and distribution bandwidth searches
+  now avoid duplicate local factorizations, omit exact zero-weight rows from
+  their local QR work, and apply the required orthogonal factor to a single
+  vector directly. The corrected deleted-sample criteria, rank policy and
+  regularization are retained. This reduces search overhead without changing
+  fitting, prediction or fixed-bandwidth regression implementations.
+
 * Beta-kernel conditional-distribution NN searches now check for cancellation
   between objective evaluations, including when progress display is off.
   This applies to local execution; distributed cancellation is unchanged.

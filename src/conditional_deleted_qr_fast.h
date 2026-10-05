@@ -6,10 +6,12 @@ typedef struct {
   int n,k,capacity,lwork;
   double *a,*scale,*tau,*v,*sqrtw,*work;
   int *pivot;
+  /* Original donor identities for the conditional local-design factor. */
+  int *row_index;
 } NPConditionalQRFast;
 static void np_cqr_fast_clear(NPConditionalQRFast *s) {
   free(s->a);free(s->scale);free(s->tau);free(s->v);free(s->sqrtw);
-  free(s->work);free(s->pivot);memset(s,0,sizeof(*s));
+  free(s->work);free(s->pivot);free(s->row_index);memset(s,0,sizeof(*s));
 }
 static int np_cqr_fast_init(NPConditionalQRFast *s,int n,int k) {
   if(s->n==n && s->k==k && s->work)return 0;
@@ -20,14 +22,17 @@ static int np_cqr_fast_init(NPConditionalQRFast *s,int n,int k) {
   s->a=calloc(m*(size_t)k,sizeof(double));s->scale=calloc(k,sizeof(double));
   s->tau=calloc(k,sizeof(double));s->v=calloc(m,sizeof(double));
   s->sqrtw=calloc(n,sizeof(double));s->pivot=calloc(k,sizeof(int));
-  if(!s->a||!s->scale||!s->tau||!s->v||!s->sqrtw||!s->pivot)goto fail;
-  int lw=-1,info=0,one=1;double q1=0.,q2=0.;
+  s->row_index=calloc(n,sizeof(int));
+  if(!s->a||!s->scale||!s->tau||!s->v||!s->sqrtw||!s->pivot||!s->row_index)goto fail;
+  int lw=-1,info=0,one=1;double q1=0.,q2=0.,q3=0.;
   F77_CALL(dgeqp3)(&s->capacity,&k,s->a,&s->capacity,s->pivot,s->tau,&q1,&lw,&info);
   if(info)goto fail;
   F77_CALL(dormqr)("L","N",&s->capacity,&one,&k,s->a,&s->capacity,s->tau,
                    s->v,&s->capacity,&q2,&lw,&info FCONE FCONE);
-  if(info||!isfinite(q1)||!isfinite(q2)||q1>INT_MAX||q2>INT_MAX||q1<1||q2<1)goto fail;
-  s->lwork=(int)fmax(fmax(q1,q2),3*k+1);
+  if(info)goto fail;
+  F77_CALL(dgeqrf)(&s->capacity,&k,s->a,&s->capacity,s->tau,&q3,&lw,&info);
+  if(info||!isfinite(q1)||!isfinite(q2)||!isfinite(q3)||q1>INT_MAX||q2>INT_MAX||q3>INT_MAX||q1<1||q2<1||q3<1)goto fail;
+  s->lwork=(int)fmax(fmax(fmax(q1,q2),q3),3*k+1);
   s->work=calloc(s->lwork,sizeof(double));if(!s->work)goto fail;
   return 0;
 fail:
