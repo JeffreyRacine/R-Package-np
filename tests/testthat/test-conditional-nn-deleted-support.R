@@ -88,3 +88,37 @@ test_that("categorical predictors do not bypass the compact NN support check", {
                      if (cdf) .Machine$double.xmax else -.Machine$double.xmax)
   }
 })
+
+
+test_that("signed compact NN criteria reject insufficient deleted designs", {
+  old <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+  set.seed(2702)
+  X <- data.frame(x1 = runif(80, -1, 1), x2 = runif(80, -1, 1))
+  Y <- data.frame(y = X$x1^2 + X$x2 + rnorm(80, sd = .3))
+  # Ordinary continuous sample: this bandwidth was selected by an unmodified
+  # public order-six search. Two folds have at most four nonzero donors for
+  # six total-degree quadratic terms. Weight signs cannot repair this bound.
+  donors <- vapply(seq_len(80), function(i) {
+    keep <- setdiff(seq_len(80), i)
+    a <- abs(X$x1[keep] - X$x1[i]); b <- abs(X$x2[keep] - X$x2[i])
+    sum((a/sort(a)[21L])^2 < 5 & (b/sort(b)[9L])^2 < 5)
+  }, 0L)
+  expect_true(any(donors < 6L))
+  for (tree in c(FALSE, TRUE)) for (order in c(4L, 6L, 8L)) {
+    options(np.tree = tree)
+    for (type in c("generalized_nn", "adaptive_nn")) {
+      for (method in c("cv.ls", "cv.ml", "cdf")) {
+        args <- list(xdat = X, ydat = Y, bws = c(54, 21, 9),
+          bwtype = type, regtype = "lp", degree = c(2L, 2L),
+          cxkertype = "epanechnikov", cxkerorder = order,
+          bandwidth.compute = FALSE)
+        if (method != "cdf") args$bwmethod <- method
+        make <- if (method == "cdf") npcdistbw else npcdensbw
+        b <- do.call(make, args)
+        expect_identical(conditional_nn_support_value(X, Y, b, method == "cdf"),
+          if (method == "cdf") .Machine$double.xmax else -.Machine$double.xmax)
+      }
+    }
+  }
+})
