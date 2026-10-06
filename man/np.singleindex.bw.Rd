@@ -122,7 +122,7 @@ These arguments identify the data, formula interface, method label, and whether 
     \code{singleindexbandwidth}
     object returned from an invocation of \code{npindexbw}, or
     as a vector of parameters (beta) with each element \eqn{i}
-    corresponding to the coefficient for column \eqn{i} in \code{xdat}
+    corresponding to the coefficient for design column \eqn{i} (see Factors and Index Coordinates)
     where the first element is normalized to 1, and a scalar bandwidth
     (h). If specified as a vector, then additional arguments will need
     to be supplied as necessary to specify the bandwidth type, kernel
@@ -507,6 +507,46 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+  \subsection{Factors and Index Coordinates}{
+    For newly constructed bandwidth objects, factors enter the linear index
+    through R model-matrix contrasts. An unordered factor with \eqn{k} observed
+    levels ordinarily contributes \eqn{k-1} coefficients. Ordered factors use
+    their R contrasts (polynomial contrasts by default), including when their
+    level labels look numeric. To fit a single coefficient on specified scores
+    instead, supply those scores as a numeric predictor.
+
+    For supported additive formulas, coefficient names and predictor columns
+    follow \code{model.matrix()}. The intercept is absorbed into the unknown
+    link and is not an index coefficient. The first retained design coefficient
+    is normalized to one; the package does not reorder predictors to choose a
+    different normalization. Thus a factor listed first can supply the
+    normalized contrast coefficient. These are relative index coefficients,
+    not linear-regression slopes. This representation does not add support for
+    otherwise unsupported formula syntax.
+
+    Native data-frame calls use the corresponding additive design. A manually
+    supplied \code{bws} vector contains one beta for each expanded design column,
+    in model-matrix order, followed by the scalar bandwidth. Automatic start
+    vectors use the same coordinates. Numeric-only inputs keep their existing
+    representation. A new factor design with aliased columns or a constant
+    direction is rejected: for example, \code{y ~ 0 + x + group} supplies all
+    group indicators and has an unidentified constant direction. Use the
+    ordinary contrast formula \code{y ~ x + group} or independent numeric columns.
+
+    Factor levels and the actual contrast matrices are retained at construction.
+    Prediction uses this design even if global contrast options change or an
+    evaluation sample omits some training levels. New evaluation levels are an
+    error. Levels absent from the complete training sample do not identify
+    coefficients. Custom contrasts must remain identifiable on that sample.
+
+    Older saved bandwidth objects without retained design metadata preserve
+    their historical single-score factor representation. Reconstruct a bandwidth
+    object to adopt the contrast design; the package does not silently reinterpret
+    an existing coefficient vector. The \code{index.design} component records the
+    raw predictor names, retained levels/contrasts, and expanded column mapping;
+    coefficient names and dimensions refer to the expanded design.
+  }
+
 Formula bandwidth objects retain the prepared training sample (after alignment,
 subsetting and missing-value handling) and the resolved missing-value policy.
 Later refits use that sample even if constructor variables are rebound.

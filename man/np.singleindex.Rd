@@ -213,6 +213,29 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   }
 }
 \details{
+  \subsection{Factor Predictors and Coefficient Inference}{
+    New bandwidth objects expand factors into the retained R contrast design
+    described in \code{\link{npindexbw}}. Training refits, prediction and plots
+    reuse the same columns, levels and contrasts. Numeric scores and older saved
+    bandwidth objects retain their existing interpretation. Supply raw predictor
+    data to the public fitting and prediction interfaces; expansion is automatic.
+
+    Coefficients, covariance and gradients use expanded design-column names.
+    Gradients for factor contrast columns are derivatives of the numerical
+    design extension, \eqn{g'(X^\prime\beta)\beta_j}; they are not the effect of
+    switching between observed categories. Such effects require comparing
+    predictions at the desired categories. No coefficient is estimated for the
+    intercept, which is absorbed into the unknown link.
+
+    Klein--Spady coefficient covariance uses the link derivative multiplied by
+    covariates centered on their conditional means given the index. This corrects
+    a legacy raw-covariate information calculation, including for numeric-only
+    inputs. Ichimura retains its conditional-centered sandwich calculation.
+    Coefficient inference requires additional conditional-moment computation;
+    \code{se=FALSE} skips this work. This correction does not change the search
+    objective or the conditional fitted-value uncertainty calculation.
+  }
+
   Fixed kernel endpoints retained in the bandwidth object are also used by
   fitting, prediction, inference and bootstrap resamples. They are not
   recomputed from the evaluation grid or from a resampled training set.

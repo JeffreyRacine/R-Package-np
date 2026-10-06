@@ -54,6 +54,8 @@
     xy <- .np_plot_resolve_xydat(bws = bws, xdat = xdat, ydat = ydat, miss.xy = miss.xy)
     xdat <- xy$xdat
     ydat <- xy$ydat
+    if (!is.null(bws[["index.design", exact = TRUE]]))
+      xdat <- .np_index_design_apply(bws[["index.design", exact = TRUE]], xdat)
 
 
     if (missing(plot.errors.method) &
@@ -502,7 +504,9 @@
                                 ylab,
                                 .np_plot_gradient_axis_label(
                                   target = response.axis.label,
-                                  predictor = bws$xnames[i],
+                                  predictor = if (!is.null(bws[["index.design", exact = TRUE]]) &&
+                                    bws$index.design$factor.columns[i])
+                                    paste0(bws$xnames[i], " (contrast)") else bws$xnames[i],
                                   predictor.fallback = paste0("X", i)
                                 )
                               ),
@@ -603,6 +607,11 @@
       par(mfrow=c(1,1),cex=par()$cex)
     
     if (plot.behavior != "plot"){
+      if (gradients && !is.null(bws[["index.design", exact = TRUE]])) {
+        for (name in c("grad", "glerr", "gherr", "gbias", "gradient.bias.corrected"))
+          if (is.matrix(plot.out[[1L]][[name]]))
+            colnames(plot.out[[1L]][[name]]) <- bws$xnames
+      }
       names(plot.out) = paste(if (gradients) "si.grad" else "si", seq_along(plot.out), sep = "")
       
       return (plot.out)

@@ -1,5 +1,14 @@
 # np 0.80-1
 
+- Single-index factor predictors now use retained R model-matrix contrasts in
+  both Ichimura and Klein-Spady models. Coefficient names/dimensions, prediction,
+  gradients and plots share that design. Numeric scores remain numeric; old
+  saved bandwidth objects keep their original factor-score interpretation.
+- Klein-Spady coefficient covariance now centers covariates conditionally on
+  the fitted index, correcting dependence of reported uncertainty on arbitrary
+  predictor translations. Search and point-estimation formulas are unchanged;
+  the additional moment calculation runs only when inference is requested.
+
 * Single-index fits now use evaluation outcomes automatically for accuracy and
   goodness-of-fit diagnostics. Predictor-only evaluation returns predictions
   with unavailable diagnostics instead of substituting training scores.
