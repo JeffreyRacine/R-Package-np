@@ -1364,7 +1364,17 @@ npindex.sibandwidth <-
       ## We divide by P(1-P) so test for P=0 or 1...
 
       keep <- which(covariance.mean < 1 & covariance.mean > 0)
-      dg.db <- txdat[,-1,drop=FALSE]*covariance.grad[,1]
+      # The unknown link absorbs the conditional covariate mean. Use the
+      # centered semiparametric score, including for numeric-only designs.
+      W <- txdat[, -1L, drop = FALSE]
+      moments <- .np_retained_uniform_constructor(.np_index_kernel_moments,
+        y = W, txdat = index.df, bws = bws$bw, bwtype = bws$type,
+        ckertype = bws$ckertype, ckerorder = bws$ckerorder,
+        ckerbound = bws$ckerbound, ckerlb = kernel.args$ckerlb,
+        ckerub = kernel.args$ckerub)
+      centered <- W - t(sweep(moments$numerator, 2L,
+                              moments$denominator, `/`))
+      dg.db <- centered * covariance.grad[, 1L]
 
       ## First row & column of covariance matrix are zero due to
       ## identification condition that beta_1=1. Note the n^{-1} in
