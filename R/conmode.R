@@ -314,6 +314,7 @@ summary.conmode <- function(object, ...){
 
   cat(genBwSelStr(object$bws))
   cat('\n')
+  .np_diagnostics_summary(object)
   pCatGofStr(object)
 
   cat(genBwKerStrs(object$bws))

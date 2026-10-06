@@ -65,9 +65,10 @@ npindex <-
   }
 
 npindex.formula <-
-    function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
+    function(bws, data = NULL, newdata = NULL, y.eval = NULL,
              se = TRUE, ..., se.type = c("asymptotic", "bootstrap")){
 
+        if (!is.null(y.eval)) y.eval <- npValidateScalarLogical(y.eval, "y.eval")
         raw.formula <- inherits(bws, "formula")
         dots <- if (raw.formula)
           .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
@@ -126,21 +127,18 @@ npindex.formula <-
         }
         has.eval <- !is.null(newdata) && !("exdat" %in% names(dots))
         if (has.eval) {
-          if (!y.eval){
-            npValidateNewdataFormula(newdata, tt, include.response = FALSE)
-            tt <- delete.response(tt)
-          }
-          
-          if (y.eval)
-            npValidateNewdataFormula(newdata, tt, include.response = TRUE)
-          umf.args <- list(formula = tt, data = newdata)
-          umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
+          # Outcomes are optional scoring data, not part of the prediction frame.
+          response <- if (!identical(y.eval, FALSE) && !("eydat" %in% names(dots)))
+            .np_diagnostics_response(newdata, tt = tt, required = isTRUE(y.eval)) else NULL
+          eval.tt <- delete.response(tt)
+          npValidateNewdataFormula(newdata, eval.tt, include.response = FALSE)
+          umf <- .np_diagnostics_model_frame(eval.tt, newdata)
           emf <- umf
-
-          if (y.eval)
-            eydat <- model.response(emf)
-          
-          exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"),"term.labels")), drop = FALSE]
+          if ("eydat" %in% names(dots))
+            dots$eydat <- .np_diagnostics_align_response(dots$eydat, emf)
+          if (!is.null(response))
+            eydat <- .np_diagnostics_align_response(response, emf)
+          exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"), "term.labels")), drop = FALSE]
         }
 
         si.bws <- if (!is.null(dots$.np_index_explicit_bws)) {
@@ -155,10 +153,10 @@ npindex.formula <-
             bws
         }
 
-        si.args <- list(txdat = txdat, tydat = tydat)
+        si.args <- list(txdat = txdat, tydat = tydat, y.eval = y.eval)
         if (has.eval) {
           si.args$exdat <- exdat
-          if (y.eval)
+          if (!is.null(response))
             si.args$eydat <- eydat
         }
         # Raw formula variables above are already prepared. Do not apply the
@@ -464,8 +462,10 @@ npindex.sibandwidth <-
            B = 399,
            se = TRUE,
            gradients = FALSE,
-           residuals = FALSE, ..., se.type = c("asymptotic", "bootstrap")) {
+           residuals = FALSE, ..., se.type = c("asymptotic", "bootstrap"),
+           y.eval = NULL) {
 
+    if (!is.null(y.eval)) y.eval <- npValidateScalarLogical(y.eval, "y.eval")
     fit.start <- proc.time()[3]
     se.type <- match.arg(se.type)
     asymptotic.se <- isTRUE(se) && identical(se.type, "asymptotic")
@@ -488,10 +488,18 @@ npindex.sibandwidth <-
       native.eval <- .np_native_newdata_parts(
         native.newdata, list(exdat = bws$xnames), "npindex")
       exdat <- native.eval$exdat
+      if (missing(eydat) && !identical(y.eval, FALSE)) {
+        response <- .np_diagnostics_response(native.newdata, ynames = bws$ynames,
+                                             required = isTRUE(y.eval))
+        if (!is.null(response)) eydat <- response
+      }
     }
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)
+    if (!no.ex && no.ey && isTRUE(y.eval))
+      stop("'y.eval = TRUE' requires evaluation outcomes in 'newdata' or 'eydat'",
+           call. = FALSE)
 
     fit.activity <- .np_progress_activity_begin(
       label = "Fitting single-index model", detail = "fitted values")
@@ -556,8 +564,6 @@ npindex.sibandwidth <-
     if (!no.ex){
       keep.eval <- rep_len(TRUE, nrow(exdat))
       eval.df <- data.frame(exdat)
-      if (!no.ey)
-        eval.df <- data.frame(eval.df, eydat)
       rows.omit <- attr(na.omit(eval.df), "na.action")
       if (length(rows.omit) > 0L)
         keep.eval[as.integer(rows.omit)] <- FALSE
@@ -1099,47 +1105,38 @@ npindex.sibandwidth <-
       }
       .np_progress_activity_end(progress, completed = TRUE)
     }
-    ## goodness of fit
+    ## Diagnostics refer to one explicitly identified sample.
+    diagnostics.sample <- if (!no.ey) "evaluation" else if (no.ex || identical(y.eval, FALSE))
+      "training" else "unavailable"
+    score.y <- if (!no.ey) eydat else if (diagnostics.sample == "training") tydat else numeric(0)
+    score.mean <- if (!no.ey) index.mean else if (diagnostics.sample == "training") index.tmean else numeric(0)
+    score.keep <- !is.na(score.y) & !is.na(score.mean)
+    score.y <- score.y[score.keep]
+    score.mean <- score.mean[score.keep]
+    diagnostics.nobs <- length(score.y)
+    if (!diagnostics.nobs) diagnostics.sample <- "unavailable"
 
-    if(bws$method == "ichimura") {
-      if (!no.ey) {
-        RSQ = RSQfunc(eydat,index.mean)
-        MSE = MSEfunc(eydat,index.mean)
-        MAE = MAEfunc(eydat,index.mean)
-        MAPE = MAPEfunc(eydat,index.mean)
-        CORR = if (fast.largeh) suppressWarnings(CORRfunc(eydat,index.mean)) else CORRfunc(eydat,index.mean)
-        SIGN = SIGNfunc(eydat,index.mean)
-      } else {
-        RSQ = RSQfunc(tydat,index.tmean)
-        MSE = MSEfunc(tydat,index.tmean)
-        MAE = MAEfunc(tydat,index.tmean)
-        MAPE = MAPEfunc(tydat,index.tmean)
-        CORR = if (fast.largeh) suppressWarnings(CORRfunc(tydat,index.tmean)) else CORRfunc(tydat,index.tmean)
-        SIGN = SIGNfunc(tydat,index.tmean)
+    if (bws$method == "ichimura") {
+      RSQ <- MSE <- MAE <- MAPE <- CORR <- SIGN <- NA_real_
+      if (diagnostics.nobs) {
+        RSQ <- RSQfunc(score.y, score.mean)
+        MSE <- MSEfunc(score.y, score.mean)
+        MAE <- MAEfunc(score.y, score.mean)
+        MAPE <- MAPEfunc(score.y, score.mean)
+        CORR <- if (fast.largeh) suppressWarnings(CORRfunc(score.y, score.mean)) else CORRfunc(score.y, score.mean)
+        SIGN <- SIGNfunc(score.y, score.mean)
       }
-      strgof = "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN),"
-      strres = (if (residuals) "resid = tydat - index.tmean," else "")
-    } else if(bws$method == "kleinspady") {
-      index.pred <- .np_index_ks_prediction(
-        if (!no.ey) index.mean else index.tmean
-      )
-
-      confusion.matrix <- .np_index_ks_confusion_matrix(
-        actual = if (!no.ey) eydat else tydat,
-        pred = index.pred
-      )
-
-      CCR.overall <- sum(diag(confusion.matrix))/sum(confusion.matrix)
-      CCR.byoutcome <- diag(confusion.matrix)/rowSums(confusion.matrix)
-
-      fit.mcfadden <- confusion.matrix/sum(confusion.matrix)
-
-      fit.mcfadden <- sum(diag(fit.mcfadden)) -
-        (sum(fit.mcfadden^2)-sum(diag(fit.mcfadden)^2))
-
-      strgof = "confusion.matrix = confusion.matrix, CCR.overall = CCR.overall,
-           CCR.byoutcome =  CCR.byoutcome, fit.mcfadden = fit.mcfadden,"
-      strres = ""
+    } else if (bws$method == "kleinspady") {
+      confusion.matrix <- CCR.overall <- CCR.byoutcome <- fit.mcfadden <- NA
+      if (diagnostics.nobs) {
+        index.pred <- .np_index_ks_prediction(score.mean)
+        confusion.matrix <- .np_index_ks_confusion_matrix(score.y, index.pred)
+        CCR.overall <- sum(diag(confusion.matrix))/sum(confusion.matrix)
+        CCR.byoutcome <- diag(confusion.matrix)/rowSums(confusion.matrix)
+        fit.mcfadden <- confusion.matrix/sum(confusion.matrix)
+        fit.mcfadden <- sum(diag(fit.mcfadden)) -
+          (sum(fit.mcfadden^2)-sum(diag(fit.mcfadden)^2))
+      }
     }
 
     ev.args <- list(
@@ -1177,6 +1174,8 @@ npindex.sibandwidth <-
       ev.args$fit.mcfadden <- fit.mcfadden
     }
     ev <- do.call(singleindex, ev.args)
+    ev$diagnostics.sample <- diagnostics.sample
+    ev$diagnostics.nobs <- diagnostics.nobs
     ev$eval.rows.omit <- if (no.ex) integer(0) else which(!keep.eval)
     fit.elapsed <- proc.time()[3] - fit.start
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_

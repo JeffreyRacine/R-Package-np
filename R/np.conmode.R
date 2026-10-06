@@ -69,24 +69,20 @@ npconmode.formula <-
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
     .npConmodeValidateCategoricalResponse(tydat)
 
-    has.eval <- !is.null(newdata) && !any(c("exdat", "eydat") %in% names(dots))
+    has.eval <- !is.null(newdata) && !("exdat" %in% names(dots))
     if (has.eval) {
-      has.ey <- bws$variableNames[["response"]] %in% names(newdata)
-      eval.tt <- if (has.ey) tt else .np_formula_conditional_rhs_terms(bws)
-      npValidateNewdataFormula(newdata, eval.tt, include.response = has.ey)
-
-      if (has.ey){
-        umf.args <- list(formula = tt, data = newdata)
-        umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
-        emf <- umf
-        eval.omit <- attr(emf, "na.action")
-        eydat <- emf[, bws$variableNames[["response"]], drop = FALSE]
-      } else {
-        umf.args <- list(formula = eval.tt, data = newdata)
-        umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
-        emf <- umf
-        eval.omit <- attr(emf, "na.action")
-      }
+      response <- if (!("eydat" %in% names(dots)))
+        .np_diagnostics_response(newdata, tt = tt) else NULL
+      has.ey <- !is.null(response)
+      eval.tt <- .np_formula_conditional_rhs_terms(bws)
+      npValidateNewdataFormula(newdata, eval.tt, include.response = FALSE)
+      umf <- .np_diagnostics_model_frame(eval.tt, newdata)
+      emf <- umf
+      eval.omit <- attr(emf, "na.action")
+      if ("eydat" %in% names(dots))
+        dots$eydat <- .np_diagnostics_align_response(dots$eydat, emf)
+      if (has.ey)
+        eydat <- toFrame(.np_diagnostics_align_response(response, emf))
 
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]
     } else {
@@ -528,6 +524,10 @@ npconmode.conbandwidth <-
       native.eval <- .np_native_newdata_parts(
         native.newdata, list(exdat = bws$xnames), "npconmode")
       exdat <- native.eval$exdat
+      if (missing(eydat)) {
+        response <- .np_diagnostics_response(native.newdata, ynames = bws$ynames)
+        if (!is.null(response)) eydat <- toFrame(response)
+      }
     }
 
     no.ex = missing(exdat)
@@ -557,8 +557,6 @@ npconmode.conbandwidth <-
     if (!no.ex){
       keep.eval <- rep_len(TRUE, nrow(exdat))
       eval.df <- data.frame(exdat)
-      if (!no.ey)
-        eval.df <- data.frame(eval.df, eydat)
       eval.omit <- attr(na.omit(eval.df), "na.action")
       if (.npConmodeOmitLength(eval.omit) > 0L)
         keep.eval[as.integer(eval.omit)] <- FALSE
@@ -723,29 +721,35 @@ npconmode.conbandwidth <-
       cm.args$yeval <- if (no.ey) tydat else eydat
     con.mode <- do.call(conmode, cm.args)
     
-    if (!(no.ey && !no.ex)){
+    score.y <- if (no.ex) tydat[,1] else if (!no.ey) eydat[,1] else NULL
+    score.keep <- if (is.null(score.y)) rep_len(FALSE, enrow) else
+      !is.na(score.y) & !is.na(con.mode$conmode)
+    con.mode$diagnostics.nobs <- sum(score.keep)
+    con.mode$diagnostics.sample <- if (!any(score.keep)) "unavailable" else
+      if (no.ex) "training" else "evaluation"
+    if (any(score.keep)) {
       confusion.matrix <- 
-        table(factor(if (no.ex) tydat[,1] else eydat[,1], exclude = NULL),
-              factor(con.mode$conmode,exclude = NULL), dnn=c("Actual", "Predicted"))
+        table(factor(score.y[score.keep], exclude = NULL),
+              factor(con.mode$conmode[score.keep],exclude = NULL), dnn=c("Actual", "Predicted"))
 
-      cj <- match(levels(factor(if (no.ex) tydat[,1] else eydat[,1], exclude = NULL)),
-                  levels(factor(con.mode$conmode,exclude = NULL)), nomatch = 0)
+      cj <- match(levels(factor(score.y[score.keep], exclude = NULL)),
+                  levels(factor(con.mode$conmode[score.keep],exclude = NULL)), nomatch = 0)
       rj <- cj > 0
 
       t.diag <- cj
       t.diag[rj] <-  diag(confusion.matrix[rj,cj,drop=FALSE])
       
-      CCR.overall <- sum(t.diag)/enrow
+      CCR.overall <- sum(t.diag)/sum(score.keep)
       
       CCR.byoutcome <- t.diag/rowSums(confusion.matrix)
-      names(CCR.byoutcome) <- levels(factor(if (no.ex) tydat[,1] else eydat[,1], exclude = NULL))
+      names(CCR.byoutcome) <- levels(factor(score.y[score.keep], exclude = NULL))
 
       con.mode$confusion.matrix <- confusion.matrix
       con.mode$CCR.overall <- CCR.overall
       con.mode$CCR.byoutcome <- CCR.byoutcome
 
-      confusion.matrix <- confusion.matrix/enrow
-      t.diag <- t.diag/enrow
+      confusion.matrix <- confusion.matrix/sum(score.keep)
+      t.diag <- t.diag/sum(score.keep)
 
       fit.mcfadden <- sum(t.diag) - (sum(confusion.matrix^2)-sum(t.diag^2))
       con.mode$fit.mcfadden <- fit.mcfadden
