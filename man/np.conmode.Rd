@@ -607,7 +607,8 @@ model.logit <- glm(low~smoke+
 
 # Generate the confusion matrix and correct classification ratio
 
-cm <- table(low, ifelse(fitted(model.logit)>0.5, 1, 0))
+cm <- table(factor(low, levels = 0:1),
+            factor(ifelse(fitted(model.logit)>0.5, 1, 0), levels = 0:1))
 ccr <- sum(diag(cm))/sum(cm)
 
 # Now do the same with a nonparametric model.  Note - this may take a
@@ -676,7 +677,8 @@ model.logit <- glm(low~factor(smoke)+
 
 # Generate the confusion matrix and correct classification ratio
 
-cm <- table(low, ifelse(fitted(model.logit)>0.5, 1, 0))
+cm <- table(factor(low, levels = 0:1),
+            factor(ifelse(fitted(model.logit)>0.5, 1, 0), levels = 0:1))
 ccr <- sum(diag(cm))/sum(cm)
 
 # Now do the same with a nonparametric model...
