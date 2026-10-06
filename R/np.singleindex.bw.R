@@ -2503,9 +2503,15 @@ npindexbw.sibandwidth <-
               fixed.h.lower <- if (identical(bws$type, "fixed")) {
                 start.scale <- .npindex_start_bandwidth_scale(fit = fit, nobs = nobs)
                 # Refinement inherits the physical domain of its NOMAD owner.
-                if (is.null(.fixed.h.lower))
+                if (!is.null(.fixed.h.lower)) {
+                  .fixed.h.lower
+                } else if (only.optimize.beta && is.finite(bws$bw) && bws$bw > 0) {
+                  # A supplied h is held, not searched. Keep its stored search
+                  # control for later joint searches without re-anchoring it.
+                  NULL
+                } else {
                   h.start.controls$scale.factor.search.lower * start.scale
-                else .fixed.h.lower
+                }
               } else {
                 NULL
               }

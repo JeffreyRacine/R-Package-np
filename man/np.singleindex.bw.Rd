@@ -282,7 +282,10 @@ These controls define deterministic and random continuous scale-factor starts an
     candidates and to effective search starts only. It does not rewrite
     explicit bandwidths supplied for storage with
     \code{bandwidth.compute = FALSE}. Final fixed-bandwidth search
-    candidates must also have a finite valid raw objective value.
+    candidates must also have a finite valid raw objective value. A supplied
+    positive fixed bandwidth held by a fixed-degree
+    \code{only.optimize.beta=TRUE} refit is not a
+    bandwidth-search candidate and is not restricted by this control.
   }
 
 \subsection{Local-Polynomial Model Specification}{
@@ -426,7 +429,14 @@ These arguments control outer optimization behavior for the semiparametric searc
 
    \item{only.optimize.beta}{
      signals the routine to only minimize the objective function with
-     respect to beta
+     respect to beta. For fixed-degree refits, including fixed-degree cells
+     within a \code{search.engine="cell"} degree search, a supplied positive
+     fixed bandwidth is held unchanged;
+     the public \code{scale.factor.search.lower} control does not restrict
+     that held bandwidth, whether inherited or explicitly supplied. The
+     control is retained for subsequent bandwidth searches. Positivity,
+     finiteness and raw-objective validity checks still apply. When no
+     positive bandwidth is supplied, the usual initialization rules apply.
    }
 
   \item{optim.abstol}{
