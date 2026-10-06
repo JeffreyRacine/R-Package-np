@@ -283,7 +283,7 @@ These controls define deterministic and random continuous scale-factor starts an
     explicit bandwidths supplied for storage with
     \code{bandwidth.compute = FALSE}. Final fixed-bandwidth search
     candidates must also have a finite valid raw objective value. A supplied
-    positive fixed bandwidth held by a fixed-degree
+    positive fixed bandwidth held by a
     \code{only.optimize.beta=TRUE} refit is not a
     bandwidth-search candidate and is not restricted by this control.
   }
@@ -428,15 +428,22 @@ These arguments control outer optimization behavior for the semiparametric searc
 }
 
    \item{only.optimize.beta}{
-     signals the routine to only minimize the objective function with
-     respect to beta. For fixed-degree refits, including fixed-degree cells
-     within a \code{search.engine="cell"} degree search, a supplied positive
-     fixed bandwidth is held unchanged;
-     the public \code{scale.factor.search.lower} control does not restrict
-     that held bandwidth, whether inherited or explicitly supplied. The
-     control is retained for subsequent bandwidth searches. Positivity,
-     finiteness and raw-objective validity checks still apply. When no
-     positive bandwidth is supplied, the usual initialization rules apply.
+     minimizes the objective function with respect to beta while retaining
+     the existing polynomial degree and bandwidth (or nearest-neighbor count).
+     Automatic degree search, including NOMAD and cell search, is not run;
+     \code{nomad}, \code{degree.select} and other degree-search controls do
+     not replace the retained model specification. A bandwidth object carries
+     its selected degree; with a numeric \code{bws} vector and
+     \code{regtype="lp"}, supply \code{degree} explicitly.
+     The public \code{scale.factor.search.lower} control does not restrict
+     a supplied positive fixed bandwidth held in this way, whether inherited
+     or explicitly supplied. The control is retained for later bandwidth
+     searches. Positivity, finiteness and raw-objective validity checks still
+     apply. When no positive bandwidth is supplied, the usual initialization
+     rules apply. A supplied normalized beta vector is used as the first
+     starting point, including when all its free coefficients are zero.
+     With \code{nmulti=1}, this provides a single hot start; the usual
+     convergence checks and recovery rules still apply.
    }
 
   \item{optim.abstol}{

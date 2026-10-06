@@ -1,10 +1,11 @@
 # np 0.80-1
 
-- Single-index fixed-degree coefficient-only refits now preserve a supplied
-  fixed bandwidth
-  even when the refitted index scale would place it below the bandwidth-search
-  floor. Validity checks remain in force, and searches that optimize bandwidth
-  retain their lower bound.
+- Single-index coefficient-only refits retain their degree and bandwidth or
+  nearest-neighbor count without re-entering automatic degree search. A supplied
+  normalized coefficient vector is used as the first start, including zero
+  free coefficients; single-start refits avoid unnecessary OLS initialization.
+  A held fixed bandwidth is no longer rejected by a recomputed bandwidth-search
+  floor. Validity checks and lower bounds for actual bandwidth searches remain.
 
 - Bandwidth-object refits now report the current training sample size after
   missing-row removal in regression, density, distribution, conditional density

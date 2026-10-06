@@ -1854,6 +1854,9 @@ npindexbw.default <-
            ...,
            nomad.opts = list()){
 
+    only.beta <- !missing(only.optimize.beta) &&
+      npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
+    if (only.beta) npValidateNomadControl(nomad, "nomad")
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npindexbw")
     xdat <- toFrame(xdat)
 
@@ -1890,8 +1893,9 @@ npindexbw.default <-
       dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npindexbw")
     dot.names <- names(dots)
+    # Beta-only refits retain the fixed model specification, not a search preset.
     nomad.shortcut <- .np_prepare_nomad_shortcut(
-      nomad = nomad,
+      nomad = if (only.beta) FALSE else nomad,
       call_names = unique(c(mc.names, dot.names)),
       preset = list(
         regtype = "lp",
@@ -1942,7 +1946,7 @@ npindexbw.default <-
     } else {
       42L
     }
-    degree.select.value <- if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else "manual"
+    degree.select.value <- if (only.beta) "manual" else if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else "manual"
     degree.search <- .npindexbw_degree_search_controls(
       regtype = if (!is.null(nomad.shortcut$values$regtype)) nomad.shortcut$values$regtype else regtype,
       regtype.named = isTRUE(nomad.shortcut$enabled) || ("regtype" %in% mc.names),
@@ -1968,7 +1972,7 @@ npindexbw.default <-
     } else {
       0L
     }
-    if (nomad.inner.named &&
+    if (!only.beta && nomad.inner.named &&
         (is.null(degree.search) || !(degree.search$engine %in% c("nomad", "nomad+powell")))) {
       stop("nomad.nmulti is only supported when regtype='lp', automatic degree search is active, and search.engine is 'nomad' or 'nomad+powell'")
     }
@@ -2489,12 +2493,14 @@ npindexbw.sibandwidth <-
 
             if(i == 1) {
 
-              ## Initial values taken from OLS fit with a constant used for
-              ## multistart 1
-              ols.fit <- lm(ydat~xdat,x=TRUE)
+              # A normalized supplied beta may have zero free coefficients.
+              beta.auto <- if (only.optimize.beta) all(bws$beta == 0) else
+                setequal(bws$beta[-1L], c(0))
+              ols.fit <- if (!only.optimize.beta || beta.auto || nmulti > 1L)
+                lm(ydat~xdat,x=TRUE) else NULL
 
               if (p != 1L){
-                if (setequal(bws$beta[2:p], c(0)))
+                if (beta.auto)
                   beta <- .npindex_ols_beta_tail(ols.fit)
                 else
                   beta = bws$beta[2:p]
@@ -2579,6 +2585,7 @@ npindexbw.sibandwidth <-
             attempts <- 0
             while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
               attempts <- attempts + 1
+              if (is.null(ols.fit)) ols.fit <- lm(ydat~xdat,x=TRUE)
               ols.beta <- .npindex_ols_beta_tail(ols.fit)
               beta.length <- length(ols.beta)
               beta <- runif(beta.length,min=0.5,max=1.5)*ols.beta

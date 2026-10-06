@@ -79,7 +79,7 @@ make_npindex_invalid_nomad_fixture <- function(engine) {
     bwtype = "fixed",
     ckertype = "epanechnikov",
     nmulti = 1L,
-    only.optimize.beta = identical(engine, "nomad+powell"),
+    only.optimize.beta = FALSE,
     optim.maxit = 5L,
     powell.remin = FALSE,
     scale.factor.search.lower = 0,
@@ -93,7 +93,7 @@ test_that("npindexbw NOMAD boundaries reject invalid starts or endpoints", {
     expect_error(
       do.call(npindexbw, make_npindex_invalid_nomad_fixture(engine)),
       if (engine == "nomad+powell")
-        "raw-invalid held bandwidth; restoration is disabled" else
+        "raw-invalid explicit initial bandwidth; restoration is disabled" else
         "npindexbw search did not return a raw-valid selected candidate",
       fixed = TRUE,
       info = engine
