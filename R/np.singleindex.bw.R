@@ -3814,7 +3814,7 @@ npindexbw.sibandwidth <-
                        num.feval.fast = bws$num.feval.fast,
                        numimp = bws$numimp,
                        fval.vector = bws$fval.vector,
-                       nobs = bws$nobs,
+                       nobs = nobs,
                        xdati = bws$xdati,
                        ydati = bws$ydati,
                        xnames = bws$xnames,
