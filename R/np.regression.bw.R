@@ -576,7 +576,7 @@ npregbw.rbandwidth <-
           bwsolver = bwsolver,
           nomad.opts = nomad.opts
         )
-        return(.npregbw_run_fixed_degree_mads(
+        out <- .npregbw_run_fixed_degree_mads(
           xdat = xdat.frame,
           ydat = ydat,
           bws = tbw$bw,
@@ -600,7 +600,10 @@ npregbw.rbandwidth <-
           opt.args = opt.args,
           yname = tbw$ynames,
           bwsolver = bwsolver
-        ))
+        )
+        out$rows.omit <- if (length(rows.omit)) rows.omit else NA
+        out$nobs.omit <- length(rows.omit)
+        return(out)
       }
       cont.start <- npContinuousSearchStartControls(
         scale.factor.init.lower,
@@ -752,7 +755,7 @@ npregbw.rbandwidth <-
                       fval.history = tbw$fval.history,
                       eval.history = tbw$eval.history,
                       invalid.history = tbw$invalid.history,
-                      nobs = tbw$nobs,
+                      nobs = nrow,
                       xdati = tbw$xdati,
                       ydati = tbw$ydati,
                       xnames = tbw$xnames,
@@ -2816,14 +2819,24 @@ npregbw.default <-
     }
 
     if (!is.null(degree.search)) {
+      # Keep search setup, degree admission and all child fits on one sample.
+      train.df <- data.frame(xdat, ydat)
+      rows.omit <- attr(na.omit(train.df), "na.action")
+      keep.rows <- rep_len(TRUE, NROW(xdat))
+      if (length(rows.omit)) keep.rows[as.integer(rows.omit)] <- FALSE
+      if (!any(keep.rows)) stop("Data has no rows without NAs")
+      search.xdat <- xdat[keep.rows, , drop = FALSE]
+      search.ydat <- ydat[keep.rows]
+      degree.search$nobs <- sum(keep.rows)
+
       eval_fun <- function(degree.vec) {
         cell.reg.args <- reg.args
         cell.reg.args$regtype <- "lp"
         cell.reg.args$degree <- as.integer(degree.vec)
         cell.reg.args$bernstein.basis <- degree.search$bernstein.basis
         cell.bws <- .npregbw_run_fixed_degree(
-          xdat = xdat,
-          ydat = ydat,
+          xdat = search.xdat,
+          ydat = search.ydat,
           bws = bws,
           reg.args = cell.reg.args,
           opt.args = opt.args,
@@ -2863,8 +2876,8 @@ npregbw.default <-
         )
       } else {
         search.result <- .npregbw_nomad_search(
-          xdat = xdat,
-          ydat = ydat,
+          xdat = search.xdat,
+          ydat = search.ydat,
           bws = bws,
           reg.args = reg.args,
           opt.args = opt.args,
@@ -2882,6 +2895,8 @@ npregbw.default <-
         bws = search.result$best_payload,
         search_result = search.result
       )
+      tbw$rows.omit <- if (length(rows.omit)) rows.omit else NA
+      tbw$nobs.omit <- length(rows.omit)
       tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
       mc <- match.call(expand.dots = FALSE)
       environment(mc) <- parent.frame()
