@@ -36,9 +36,18 @@
   Explicit native evaluation arguments retain their positional contract and
   take precedence over \code{newdata}.
 
-  For a native bandwidth object, \code{newdata} supplies \code{exdat};
-  explicitly supplied native evaluation arguments take precedence. This
-  evaluates at the requested rows without repeating bandwidth selection.
+  For both formula and native bandwidth objects, \code{newdata} supplies
+  evaluation predictors and, when present, named evaluation outcomes. Explicit
+  native evaluation arguments take precedence. This evaluates at the requested
+  rows without repeating bandwidth selection.
+
+  With evaluation predictors and outcomes, the confusion matrix and accuracy
+  describe the evaluation sample. With evaluation predictors only, predictions
+  are returned normally and these diagnostics are \code{NA}. Without evaluation
+  inputs, diagnostics describe training data. Missing evaluation outcomes do
+  not remove predictor-complete prediction rows: scores use observed
+  outcome/prediction pairs, and are \code{NA} when none are available. Supplying
+  outcomes never changes fitted class support, probabilities or gradients.
 
   Formula variables of class \code{ts}, including lagged variables, are
   aligned on their common time support before fitting. Other variables
@@ -188,9 +197,10 @@ These arguments control where the conditional mode is evaluated.
 
 
   \item{eydat}{
-    a one (1) dimensional numeric or integer vector of the true values
-    (outcomes) of the dependent variable. By default,
-    evaluation takes place on the data provided by \code{tydat}.
+    Optional observed categorical outcomes at \code{exdat}, supplied as a
+    factor or a one-column data frame. Used only for evaluation diagnostics.
+    When \code{exdat} is supplied without outcomes, classification diagnostics
+    are \code{NA}; training outcomes are not substituted.
   }
 
 
@@ -399,6 +409,9 @@ prediction/evaluation route, or plot route as appropriate.
   \item{yeval}{ a vector of type \code{factor} (or \code{ordered
       factor}) containing the actual outcomes, or \code{NA} if not
     provided }
+  \item{diagnostics.sample}{\code{"training"}, \code{"evaluation"}, or
+    \code{"unavailable"}, identifying the sample used for classification diagnostics.}
+  \item{diagnostics.nobs}{Number of observed outcome/prediction pairs scored.}
   \item{confusion.matrix}{ the confusion matrix or \code{NA} if outcomes
     are not available }
   \item{CCR.overall}{ the overall correct

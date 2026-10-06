@@ -59,8 +59,12 @@ test_that("single-index training and evaluation agree with integer time indices"
     fit <- npindex(bw, se = TRUE, gradients = TRUE)
     native <- npindex(bw, txdat = x, tydat = response, se = TRUE, gradients = TRUE)
     evaluated <- npindex(bw, newdata = new, se = TRUE, gradients = TRUE)
+    # Predictor lags extend one row past the supplied response support.
+    # Keep that prediction; score only the 18 observed evaluation outcomes.
     oracle <- npindex(bw, txdat = x, tydat = response, exdat = ex,
+      eydat = c(as.numeric(new$y)[3:20], NA_real_),
       se = TRUE, gradients = TRUE)
+    expect_identical(evaluated$diagnostics.nobs, 18L)
     for (field in c("mean", "merr", "grad", "gerr", "betavcov", "R2", "MSE")) {
       expect_equal(fit[[field]], native[[field]], tolerance = 1e-12, info = paste(type, field))
       expect_equal(evaluated[[field]], oracle[[field]], tolerance = 1e-12, info = paste(type, field))

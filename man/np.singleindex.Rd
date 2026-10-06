@@ -24,7 +24,7 @@ npindex(bws, \dots, B = 399)
 \method{npindex}{formula}(bws,
         data = NULL,
         newdata = NULL,
-        y.eval = FALSE,
+        y.eval = NULL,
         se = TRUE,
         \dots, se.type = c("asymptotic", "bootstrap"))
 
@@ -45,7 +45,8 @@ npindex(bws, \dots, B = 399)
         se = TRUE,
         gradients = FALSE,
         residuals = FALSE,
-        \dots, se.type = c("asymptotic", "bootstrap"))
+        \dots, se.type = c("asymptotic", "bootstrap"),
+        y.eval = NULL)
 }
 
 \arguments{
@@ -147,9 +148,15 @@ These arguments control where the single-index fit is evaluated and which evalua
 
 
   \item{y.eval}{
-    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
-    \code{\link{npRmpi}} will compute goodness of fit statistics on these
-    data and return them. Defaults to \code{FALSE}.
+    Selects the outcomes used for goodness-of-fit diagnostics. The default
+    \code{NULL} uses evaluation outcomes when supplied in \code{newdata} or
+    \code{eydat}. With evaluation predictors only, predictions are returned
+    normally and diagnostics are \code{NA}. Explicit \code{TRUE} requires
+    evaluation outcomes when evaluating new predictors. Explicit \code{FALSE}
+    ignores outcomes in \code{newdata} and preserves historical training
+    diagnostics, identified as such in the summary. Explicit \code{eydat}
+    takes precedence. With no evaluation inputs, diagnostics describe training
+    data.
   }
 
 
@@ -229,9 +236,21 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   Explicit native evaluation arguments retain their positional contract and
   take precedence over \code{newdata}.
 
-  For a native bandwidth object, \code{newdata} supplies \code{exdat};
-  explicitly supplied native evaluation arguments take precedence. This
-  evaluates at the requested rows without repeating bandwidth selection.
+  For a native bandwidth object, \code{newdata} supplies \code{exdat}
+  and, in automatic mode, a named response column supplies evaluation outcomes.
+  Explicit native evaluation arguments take precedence. This evaluates at the
+  requested rows without repeating bandwidth selection or re-estimating index
+  coefficients. For held-out assessment, estimate the coefficients and any
+  data-selected bandwidths using the training sample.
+
+  Evaluation outcomes affect diagnostics only. Missing outcomes do not remove
+  predictor-complete prediction rows. Time-series outcomes are matched to the
+  predictor time coordinates; predictions outside the supplied outcome time
+  support remain available but are not scored. Scores use observed outcome/prediction
+  pairs, and are \code{NA} when none are available. Formula responses, including
+  transformations, are evaluated only when their variables are present in
+  \code{newdata}; an ambient response is never substituted. Predictor omission
+  and row-restoration conventions are unchanged.
 
   Formula variables of class \code{ts}, including lagged variables, are
   aligned on their common time support before fitting. Other variables
@@ -320,6 +339,9 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \item{CORR}{if \code{method="ichimura"}, absolute value of Pearson's correlation coefficient }
   \item{SIGN}{if \code{method="ichimura"}, fraction of observations where fitted and observed values
     agree in sign }
+  \item{diagnostics.sample}{\code{"training"}, \code{"evaluation"}, or
+    \code{"unavailable"}, identifying the sample used for goodness-of-fit statistics.}
+  \item{diagnostics.nobs}{Number of observed outcome/prediction pairs scored.}
   \item{confusion.matrix}{if \code{method="kleinspady"}, the confusion matrix or \code{NA} if outcomes
     are not available }
   \item{CCR.overall}{if \code{method="kleinspady"},  the overall correct

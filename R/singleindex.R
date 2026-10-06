@@ -180,8 +180,11 @@ summary.singleindex <- function(object, ...){
   cat("Bandwidth:", object$bw)
   cat(genRegEstStr(object))
   cat("\n")
-  cat(genGofStr(object))
-  pCatGofStr(object)
+  .np_diagnostics_summary(object)
+  if (!identical(object[["diagnostics.sample", exact = TRUE]], "unavailable")) {
+    cat(genGofStr(object))
+    pCatGofStr(object)
+  }
   cat(genBwKerStrs(object$bws))
   cat(genTimingStr(object))
   

@@ -25,9 +25,10 @@ test_that("GNN index training statistics are independent of evaluation requests"
         set.seed(123)
         a <- do.call(npindex, c(list(bws = bw, txdat = x, tydat = y,
                                     residuals = TRUE), mode))
+        # This test intentionally requests the historical training diagnostics.
         set.seed(123)
         b <- do.call(npindex, c(list(bws = bw, txdat = x, tydat = y,
-                                    exdat = x[1:5, ], residuals = TRUE), mode))
+                                    exdat = x[1:5, ], y.eval = FALSE, residuals = TRUE), mode))
         expect_equal(a$R2, b$R2, tolerance = 1e-12)
         expect_equal(a$resid, b$resid, tolerance = 1e-12)
         expect_equal(a$fit.mcfadden, b$fit.mcfadden, tolerance = 1e-12)

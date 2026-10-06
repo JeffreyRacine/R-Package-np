@@ -1,5 +1,13 @@
 # npRmpi 0.80-1
 
+* Single-index fits now use evaluation outcomes automatically for accuracy and
+  goodness-of-fit diagnostics. Predictor-only evaluation returns predictions
+  with unavailable diagnostics instead of substituting training scores.
+  Explicit `y.eval=FALSE` retains labelled training diagnostics. Conditional
+  mode fits now use supplied outcomes consistently with both formula and native
+  `newdata`. Missing evaluation outcomes affect scoring only, and summaries
+  identify the sample and number of observations scored.
+
 * Local-polynomial conditional density and distribution bandwidth searches
   now avoid duplicate local factorizations, omit exact zero-weight rows from
   their local QR work, and apply the required orthogonal factor to a single
