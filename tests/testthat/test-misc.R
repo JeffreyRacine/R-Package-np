@@ -12,20 +12,22 @@ test_that("uocquantile basic functionality works", {
 test_that("plot basic functionality works", {
   # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   data("faithful")
   bw <- npudensbw(dat=faithful, bws=c(0.5, 5), bandwidth.compute=FALSE)
   
   # Use pdf(NULL) to avoid opening a window
   pdf(NULL)
-  on.exit(dev.off())
+  on.exit(dev.off(), add = TRUE)
   
-  plot(bw)
+  expect_error(plot(bw), NA)
 })
 
 test_that("se and gradients methods work", {
   # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   data("cps71")
   cps71_sub <- cps71[1:50, ]
