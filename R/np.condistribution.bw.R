@@ -238,6 +238,35 @@ npcdistbw.condbandwidth <-
     if (dim(ydat)[1] != dim(xdat)[1])
       stop(paste("number of rows of", "'ydat'", "does not match", "'xdat'"))
 
+    if ((any(bws$iycon) &&
+         !all(vapply(as.data.frame(ydat[, bws$iycon]), inherits, logical(1), c("integer", "numeric")))) ||
+        (any(bws$iyord) &&
+         !all(vapply(as.data.frame(ydat[, bws$iyord]), inherits, logical(1), "ordered"))) ||
+        (any(bws$iyuno) &&
+         !all(vapply(as.data.frame(ydat[, bws$iyuno]), inherits, logical(1), "factor"))))
+      stop(paste("supplied bandwidths do not match", "'ydat'", "in type"))
+
+    if ((any(bws$ixcon) &&
+         !all(vapply(as.data.frame(xdat[, bws$ixcon]), inherits, logical(1), c("integer", "numeric")))) ||
+        (any(bws$ixord) &&
+         !all(vapply(as.data.frame(xdat[, bws$ixord]), inherits, logical(1), "ordered"))) ||
+        (any(bws$ixuno) &&
+         !all(vapply(as.data.frame(xdat[, bws$ixuno]), inherits, logical(1), "factor"))))
+      stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
+
+    npValidateConditionalExtendedNn(bws, where = "npcdistbw")
+
+    ##if (bws$type != 'fixed')
+    ##stop("only fixed bandwidths currently supported with ccdf bandwidth selection")
+
+    ## catch and destroy NA's
+    goodrows <- seq_len(nrow(xdat))
+    rows.omit <- unclass(na.action(na.omit(data.frame(xdat,ydat))))
+    goodrows[rows.omit] <- 0
+
+    if (all(goodrows==0))
+      stop("Data has no rows without NAs")
+
     if (bandwidth.compute && npBwsolverUsesMads(bwsolver)) {
       bws.regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
       bws.pregtype <- if (is.null(bws$pregtype)) "Local-Constant" else bws$pregtype
@@ -249,9 +278,9 @@ npcdistbw.condbandwidth <-
       bws.degree.engine <- bws.reg.spec$degree.engine
       bws.bernstein.engine <- bws.reg.spec$bernstein.engine
 
-      return(.npcdistbw_run_fixed_degree_mads(
-        xdat = xdat,
-        ydat = ydat,
+      out <- .npcdistbw_run_fixed_degree_mads(
+        xdat = xdat[goodrows, , drop = FALSE],
+        ydat = ydat[goodrows, , drop = FALSE],
         bws = c(bws$ybw, bws$xbw),
         reg.args = list(
           bwmethod = bws$method,
@@ -318,37 +347,11 @@ npcdistbw.condbandwidth <-
           nomad.opts = dot.args$nomad.opts
         ),
         bwsolver = bwsolver
-      ))
+      )
+      out$rows.omit <- if (length(rows.omit)) rows.omit else NA
+      out$nobs.omit <- length(rows.omit)
+      return(out)
     }
-
-    if ((any(bws$iycon) &&
-         !all(vapply(as.data.frame(ydat[, bws$iycon]), inherits, logical(1), c("integer", "numeric")))) ||
-        (any(bws$iyord) &&
-         !all(vapply(as.data.frame(ydat[, bws$iyord]), inherits, logical(1), "ordered"))) ||
-        (any(bws$iyuno) &&
-         !all(vapply(as.data.frame(ydat[, bws$iyuno]), inherits, logical(1), "factor"))))
-      stop(paste("supplied bandwidths do not match", "'ydat'", "in type"))
-
-    if ((any(bws$ixcon) &&
-         !all(vapply(as.data.frame(xdat[, bws$ixcon]), inherits, logical(1), c("integer", "numeric")))) ||
-        (any(bws$ixord) &&
-         !all(vapply(as.data.frame(xdat[, bws$ixord]), inherits, logical(1), "ordered"))) ||
-        (any(bws$ixuno) &&
-         !all(vapply(as.data.frame(xdat[, bws$ixuno]), inherits, logical(1), "factor"))))
-      stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
-
-    npValidateConditionalExtendedNn(bws, where = "npcdistbw")
-
-    ##if (bws$type != 'fixed')
-    ##stop("only fixed bandwidths currently supported with ccdf bandwidth selection")
-
-    ## catch and destroy NA's
-    goodrows <- seq_len(nrow(xdat))
-    rows.omit <- unclass(na.action(na.omit(data.frame(xdat,ydat))))
-    goodrows[rows.omit] <- 0
-
-    if (all(goodrows==0))
-      stop("Data has no rows without NAs")
 
     spec <- npCanonicalConditionalRegSpec(
       regtype = if (is.null(bws$regtype)) "lc" else bws$regtype,
@@ -702,7 +705,7 @@ npcdistbw.condbandwidth <-
                         fval.history = tbw$fval.history,
                          eval.history = tbw$eval.history,
                          invalid.history = tbw$invalid.history,
-                         nobs = tbw$nobs,
+                         nobs = nrow,
                          xdati = tbw$xdati,
                          ydati = tbw$ydati,
                          xnames = tbw$xnames,
@@ -3502,6 +3505,16 @@ npcdistbw.default <-
     opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
     if (!is.null(degree.search)) {
+      # Keep search setup, degree admission and all child fits on one sample.
+      train.df <- data.frame(xdat, ydat)
+      rows.omit <- attr(na.omit(train.df), "na.action")
+      keep.rows <- rep_len(TRUE, NROW(xdat))
+      if (length(rows.omit)) keep.rows[as.integer(rows.omit)] <- FALSE
+      if (!any(keep.rows)) stop("Data has no rows without NAs")
+      search.xdat <- xdat[keep.rows, , drop = FALSE]
+      search.ydat <- ydat[keep.rows, , drop = FALSE]
+      degree.search$nobs <- sum(keep.rows)
+
       eval_fun <- function(degree.vec) {
         cell.reg.args <- reg.args
         cell.reg.args$regtype <- "lp"
@@ -3512,8 +3525,8 @@ npcdistbw.default <-
         cell.reg.args$degree.engine <- as.integer(degree.vec)
         cell.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
         cell.bws <- .npcdistbw_run_fixed_degree(
-          xdat = xdat,
-          ydat = ydat,
+          xdat = search.xdat,
+          ydat = search.ydat,
           bws = bws,
           reg.args = cell.reg.args,
           opt.args = opt.args
@@ -3551,8 +3564,8 @@ npcdistbw.default <-
         )
       } else {
         search.result <- .npcdistbw_nomad_search(
-          xdat = xdat,
-          ydat = ydat,
+          xdat = search.xdat,
+          ydat = search.ydat,
           bws = bws,
           reg.args = reg.args,
           opt.args = opt.args,
@@ -3569,6 +3582,8 @@ npcdistbw.default <-
         bws = search.result$best_payload,
         search_result = search.result
       )
+      tbw$rows.omit <- if (length(rows.omit)) rows.omit else NA
+      tbw$nobs.omit <- length(rows.omit)
     } else {
       tbw <- .npcdistbw_build_condbandwidth(
         xdat = xdat,

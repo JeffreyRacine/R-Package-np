@@ -216,7 +216,7 @@ npplregbw.plbandwidth =
                        xnames = bws$xnames,
                        ynames = bws$ynames,
                        znames = bws$znames,
-                       nobs = bws$nobs,
+                       nobs = NROW(xdat),
                        fval = fval,
                        num.feval = num.feval,
                        num.feval.fast = num.feval.fast,
@@ -1007,6 +1007,17 @@ npplregbw.default =
       opt.args$scale.factor.search.lower <- scale.factor.search.lower
 
       if (!is.null(degree.search)) {
+        # Keep search setup, degree admission and all child fits on one sample.
+        train.df <- data.frame(xdat, ydat, zdat)
+        rows.omit <- attr(na.omit(train.df), "na.action")
+        keep.rows <- rep_len(TRUE, NROW(xdat))
+        if (length(rows.omit)) keep.rows[as.integer(rows.omit)] <- FALSE
+        if (!any(keep.rows)) stop("Data has no rows without NAs")
+        search.xdat <- xdat[keep.rows, , drop = FALSE]
+        search.ydat <- ydat[keep.rows]
+        search.zdat <- zdat[keep.rows, , drop = FALSE]
+        degree.search$nobs <- sum(keep.rows)
+
         eval_fun <- function(degree.vec) {
           cell.reg.args <- reg.args
           cell.reg.args$regtype <- "lp"
@@ -1017,9 +1028,9 @@ npplregbw.default =
           cell.outer.args$degree <- as.integer(degree.vec)
           cell.outer.args$bernstein.basis <- degree.search$bernstein.basis
           cell.bws <- .npplregbw_run_fixed_degree(
-            xdat = xdat,
-            ydat = ydat,
-            zdat = zdat,
+            xdat = search.xdat,
+            ydat = search.ydat,
+            zdat = search.zdat,
             bws = bws,
             reg.args = cell.reg.args,
             outer.args = cell.outer.args,
@@ -1058,9 +1069,9 @@ npplregbw.default =
           )
         } else {
           search.result <- .npplregbw_child_specific_nomad_search(
-            xdat = xdat,
-            ydat = ydat,
-            zdat = zdat,
+            xdat = search.xdat,
+            ydat = search.ydat,
+            zdat = search.zdat,
             bws = bws,
             reg.args = reg.args,
             outer.args = outer.args,
@@ -1077,6 +1088,8 @@ npplregbw.default =
           bws = search.result$best_payload,
           search_result = search.result
         )
+        tbw$rows.omit <- if (length(rows.omit)) rows.omit else NA
+        tbw$nobs.omit <- length(rows.omit)
         mc <- match.call(expand.dots = FALSE)
         environment(mc) <- parent.frame()
         tbw$call <- mc

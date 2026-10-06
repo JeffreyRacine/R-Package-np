@@ -1203,7 +1203,7 @@ npudistbw.dbandwidth <-
                       fval.history = tbw$fval.history,
                       eval.history = tbw$eval.history,
                       invalid.history = tbw$invalid.history,
-                      nobs = tbw$nobs,
+                      nobs = nrow,
                       xdati = tbw$xdati,
                       xnames = tbw$xnames,
                       sfactor = tbw$sfactor,

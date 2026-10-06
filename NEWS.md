@@ -1,6 +1,14 @@
 # npRmpi 0.80-1
 
-- `npindexbw()` refits now report the current training sample size after missing-row removal instead of retaining the original bandwidth object's count.
+- Bandwidth-object refits now report the current training sample size after
+  missing-row removal in regression, density, distribution, conditional density
+  and distribution, smooth-coefficient, partially linear and single-index models.
+  Sample-size validation uses this current count rather than the original
+  bandwidth object's count.
+
+- Native conditional MADS and automatic degree searches now remove jointly
+  incomplete training rows before search setup. Regression MADS and automatic
+  degree-search results retain the corresponding omitted-row information.
 
 - Single-index factor predictors now use retained R model-matrix contrasts in
   both Ichimura and Klein-Spady models. Coefficient names/dimensions, prediction,
