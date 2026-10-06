@@ -119,7 +119,23 @@ test_that("npregivderiv formula and regression-consistent accessors preserve sta
   expect_identical(formula$phi.prime, native$phi.prime)
   expect_identical(explicit.ll$phi, native$phi)
   expect_identical(explicit.ll$phi.prime, native$phi.prime)
-  expect_identical(explicit.ll$bws, native$bws)
+  # Independent fits carry distinct clock readings, not distinct bandwidth state.
+  volatile <- c("wall_elapsed_sec", "compute_elapsed_sec", "user_sec", "system_sec",
+                "timestamp_start", "timestamp_end")
+  clean <- function(bws) {
+    profile <- bws[["timing.profile", exact = TRUE]]
+    if (!is.null(profile)) {
+      for (name in intersect(volatile, names(profile))) {
+        expect_type(profile[[name]], "double")
+        expect_length(profile[[name]], 1L)
+        expect_true(is.finite(profile[[name]]))
+        profile[[name]] <- 0
+      }
+      bws$timing.profile <- profile
+    }
+    bws
+  }
+  expect_identical(clean(explicit.ll$bws), clean(native$bws))
   expect_identical(formula$call[[1L]], quote(npregivderiv))
   expect_false("..." %in% names(formula$call))
   expect_null(attr(formula$call, ".Environment"))
