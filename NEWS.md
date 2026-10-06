@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+- Single-index fixed-degree coefficient-only refits now preserve a supplied
+  fixed bandwidth
+  even when the refitted index scale would place it below the bandwidth-search
+  floor. Validity checks remain in force, and searches that optimize bandwidth
+  retain their lower bound.
+
 - Bandwidth-object refits now report the current training sample size after
   missing-row removal in regression, density, distribution, conditional density
   and distribution, smooth-coefficient, partially linear and single-index models.
