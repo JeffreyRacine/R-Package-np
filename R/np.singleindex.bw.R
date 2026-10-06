@@ -79,7 +79,9 @@ npindexbw.NULL <-
     mc <- match.call(expand.dots = FALSE)
     dots <- list(...)
     dot.names <- names(dots)
-    nomad.requested <- "nomad" %in% dot.names &&
+    only.beta <- "only.optimize.beta" %in% dot.names &&
+      npValidateScalarLogical(dots[["only.optimize.beta", exact = TRUE]], "only.optimize.beta")
+    nomad.requested <- !only.beta && "nomad" %in% dot.names &&
       (npValidateNomadControl(dots$nomad, "nomad") %in% c("true", "auto"))
     degree.select.value <- if ("degree.select" %in% dot.names) {
       match.arg(as.character(dots$degree.select[[1L]]),
@@ -87,8 +89,8 @@ npindexbw.NULL <-
     } else {
       "manual"
     }
-    automatic.degree.search <- isTRUE(nomad.requested) ||
-      !identical(degree.select.value, "manual")
+    automatic.degree.search <- !only.beta && (isTRUE(nomad.requested) ||
+      !identical(degree.select.value, "manual"))
     method.value <- if ("method" %in% dot.names) {
       match.arg(as.character(dots$method[[1L]]), c("ichimura", "kleinspady"))
     } else {
@@ -114,7 +116,7 @@ npindexbw.NULL <-
       identical(method.value, "ichimura") &&
       identical(regtype.value, "lp") &&
       search.engine.value %in% c("nomad", "nomad+powell")
-    .np_nomad_validate_inner_multistart(
+    if (!only.beta) .np_nomad_validate_inner_multistart(
       call_names = names(mc),
       dot.args = dots,
       regtype = regtype.value,
@@ -2782,6 +2784,8 @@ npindexbw.default <-
            scale.factor.search.lower = NULL,
            ...,
            nomad.opts = list()){
+    only.beta <- !missing(only.optimize.beta) &&
+      npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npindexbw")
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
     if (.npRmpi_master_local_entry_needed()) {
@@ -2797,7 +2801,9 @@ npindexbw.default <-
     npRejectUnsupportedBwsolver(dots, "npindexbw")
     dot.names <- names(dots)
     nomad.mode <- npValidateNomadControl(nomad, "nomad")
-    degree.select.value <- if (nomad.mode %in% c("true", "auto")) {
+    degree.select.value <- if (only.beta) {
+      "manual"
+    } else if (nomad.mode %in% c("true", "auto")) {
       "coordinate"
     } else if ("degree.select" %in% search.mc.names) {
       degree.select
@@ -2812,7 +2818,7 @@ npindexbw.default <-
     }
     collective.degree.search <- isTRUE(automatic.degree.search) &&
       identical(method.value, "kleinspady")
-    nomad.requested <- nomad.mode %in% c("true", "auto")
+    nomad.requested <- !only.beta && nomad.mode %in% c("true", "auto")
     regtype.value <- if ("regtype" %in% search.mc.names) {
       match.arg(regtype, c("lc", "ll", "lp"))
     } else if (isTRUE(nomad.requested)) {
@@ -2868,8 +2874,9 @@ npindexbw.default <-
 
     p <- ncol(xdat)
     mc.names <- names(mc)
+    # Beta-only refits retain the fixed model specification, not a search preset.
     nomad.shortcut <- .np_prepare_nomad_shortcut(
-      nomad = nomad,
+      nomad = if (only.beta) FALSE else nomad,
       call_names = unique(c(mc.names, dot.names)),
       preset = list(
         regtype = "lp",
@@ -2920,7 +2927,7 @@ npindexbw.default <-
     } else {
       42L
     }
-    degree.select.value <- if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else degree.select.value
+    degree.select.value <- if (only.beta) "manual" else if (!is.null(nomad.shortcut$values$degree.select)) nomad.shortcut$values$degree.select else degree.select.value
     degree.search <- .npindexbw_degree_search_controls(
       regtype = if (!is.null(nomad.shortcut$values$regtype)) nomad.shortcut$values$regtype else regtype,
       regtype.named = isTRUE(nomad.shortcut$enabled) || ("regtype" %in% mc.names),
@@ -2940,7 +2947,10 @@ npindexbw.default <-
       nomad.source = nomad.shortcut$metadata$source,
       nomad.auto.filled = nomad.shortcut$metadata$auto.filled
     )
-    nomad.inner <- .np_nomad_validate_inner_multistart(
+    nomad.inner <- if (only.beta) {
+      list(named = "nomad.nmulti" %in% mc.names,
+           nmulti = npValidateNonNegativeInteger(nomad.nmulti, "nomad.nmulti"))
+    } else .np_nomad_validate_inner_multistart(
       call_names = mc.names,
       dot.args = dots,
       nomad.nmulti = nomad.nmulti,
@@ -3589,12 +3599,14 @@ npindexbw.sibandwidth <-
 
             if(i == 1) {
 
-              ## Initial values taken from OLS fit with a constant used for
-              ## multistart 1
-              ols.fit <- lm(ydat~xdat,x=TRUE)
+              # A normalized supplied beta may have zero free coefficients.
+              beta.auto <- if (only.optimize.beta) all(bws$beta == 0) else
+                setequal(bws$beta[-1L], c(0))
+              ols.fit <- if (!only.optimize.beta || beta.auto || nmulti > 1L)
+                lm(ydat~xdat,x=TRUE) else NULL
 
               if (p != 1L){
-                if (setequal(bws$beta[2:p], c(0)))
+                if (beta.auto)
                   beta <- .npindex_ols_beta_tail(ols.fit)
                 else
                   beta = bws$beta[2:p]
@@ -3679,6 +3691,7 @@ npindexbw.sibandwidth <-
             attempts <- 0
             while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
               attempts <- attempts + 1
+              if (is.null(ols.fit)) ols.fit <- lm(ydat~xdat,x=TRUE)
               ols.beta <- .npindex_ols_beta_tail(ols.fit)
               beta.length <- length(ols.beta)
               beta <- runif(beta.length,min=0.5,max=1.5)*ols.beta

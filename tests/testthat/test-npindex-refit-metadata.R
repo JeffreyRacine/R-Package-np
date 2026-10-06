@@ -62,3 +62,40 @@ test_that("beta-only refits preserve held h without re-anchoring the search floo
       "below the continuous")
   }
 })
+
+test_that("beta-only calls retain degree and use the supplied zero-tail start", {
+  old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
+  x <- data.frame(x = seq(-2, 2, length.out = 80), z = sin(seq_len(80)))
+  y <- sin(x$x + .3*x$z)
+  seen <- new.env(parent = emptyenv()); seen$starts <- list()
+  base.optim <- get("optim", envir = asNamespace("npRmpi"))
+  testthat::local_mocked_bindings(
+    .npindexbw_nomad_search = function(...) stop("unexpected NOMAD degree search"),
+    .np_degree_search = function(...) stop("unexpected cell degree search"),
+    lm = function(...) stop("unexpected OLS initialization"),
+    optim = function(par, ...) {
+      seen$starts[[length(seen$starts) + 1L]] <- par
+      base.optim(par, ...)
+    }, .package = "npRmpi")
+  for (engine in c("nomad", "nomad+powell", "cell")) {
+    b <- npindexbw(xdat = x, ydat = y, bws = c(1, 0, .8),
+      regtype = "lp", degree = 1L, bernstein.basis = FALSE,
+      only.optimize.beta = TRUE, nmulti = 1L, degree.select = "exhaustive",
+      search.engine = engine, degree.min = 0L, degree.max = 2L)
+    expect_identical(b$degree, 1L)
+    expect_identical(b$bw, .8)
+    expect_false(b$bernstein.basis)
+    expect_null(b$degree.search)
+    expect_true(is.finite(b$fval))
+  }
+  expect_length(seen$starts, 3L)
+  expect_true(all(vapply(seen$starts, function(p) identical(as.double(p), 0), logical(1))))
+  shortcut <- npindexbw(xdat = x, ydat = y, bws = c(1, 0, .8),
+    regtype = "lp", degree = 1L, only.optimize.beta = TRUE, nmulti = 1L,
+    nomad = TRUE, nomad.nmulti = 1L)
+  expect_identical(shortcut$degree, 1L)
+  expect_null(shortcut$nomad.shortcut)
+  expect_error(npindexbw(xdat = x, ydat = y, bws = c(1, 0, .8),
+    regtype = "lp", only.optimize.beta = TRUE, degree.select = "exhaustive"),
+    "degree must be supplied explicitly")
+})
