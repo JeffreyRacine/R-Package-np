@@ -44,7 +44,7 @@ npindexbw.formula <-
     mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
 
     ydat <- model.response(mf)
-    xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]
+    xdat <- .np_index_formula_xdat(mf)
 
     tbw <- do.call(npindexbw, c(list(xdat = xdat, ydat = ydat), list(...)))
 
@@ -126,15 +126,12 @@ npindexbw.NULL <-
            isTRUE(collective.degree.search) ||
            isTRUE(ichimura.lp.nomad.degree.search) ||
            .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
-      return(.npRmpi_autodispatch_call(mc, parent.frame(), owner.name = "npindexbw.NULL"))
+      return(.np_index_dispatch(mc, xdat, ydat, parent.frame(),
+                               owner.name = "npindexbw.NULL"))
 
     xdat <- toFrame(xdat)
 
-    bws <- double(ncol(xdat)+1)
-
-    tbw <- npindexbw.default(xdat = xdat,
-                             ydat = ydat,
-                             bws = bws, ...)
+    tbw <- npindexbw.default(xdat = xdat, ydat = ydat, ...)
 
     ## clean up (possible) inconsistencies due to recursion ...
     environment(mc) <- parent.frame()
@@ -2837,7 +2834,8 @@ npindexbw.default <-
            isTRUE(collective.degree.search) ||
            isTRUE(ichimura.lp.nomad.degree.search) ||
            .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
-      return(.npRmpi_autodispatch_call(mc, parent.frame(), owner.name = "npindexbw.default"))
+      return(.np_index_dispatch(mc, xdat, ydat, parent.frame(),
+                               owner.name = "npindexbw.default"))
 
     xdat <- toFrame(xdat)
 
@@ -2851,6 +2849,18 @@ npindexbw.default <-
       .np_warning(paste("xdat has one dimension. Using a single index model to reduce",
                     "dimensionality is unnecessary."))
     }
+
+    raw.xdat <- xdat
+    prepared <- attr(xdat, ".np.index.prepared", exact = TRUE)
+    attr(raw.xdat, ".np.index.prepared") <- NULL
+    if (is.null(prepared)) prepared <- .np_index_design_train(xdat, ydat)
+    if (!is.null(prepared)) xdat <- prepared$data
+    if (missing(bws)) bws <- double(ncol(xdat) + 1L)
+    if (!is.null(prepared) && length(bws) != ncol(xdat) + 1L)
+      stop(paste0("npindexbw: 'bws' requires coefficients for ",
+                  paste(names(xdat), collapse = ", "), " followed by the bandwidth. ",
+                  "Supply numeric predictors explicitly if category scores are intended."),
+           call. = FALSE)
 
     if (coarseclass(bws) != "numeric" || length(bws) != ncol(xdat)+1)
       stop(paste("manually specified 'bws' must be a numeric vector of length ncol(xdat)+1.",
@@ -3122,7 +3132,8 @@ npindexbw.default <-
     tbw$call <- mc
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
-    return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat))
+    if (!is.null(prepared)) tbw[["index.design"]] <- prepared$schema
+    return(.np_bws_retain_native_training(tbw, xdat = raw.xdat, ydat = ydat))
   }
 
 npindexbw.sibandwidth <-
@@ -3157,9 +3168,10 @@ npindexbw.sibandwidth <-
 
 
     xdat = toFrame(xdat)
+    index.design <- bws[["index.design", exact = TRUE]]
 
     if (missing(nmulti)){
-      nmulti <- npDefaultNmulti(ncol(xdat))
+      nmulti <- npDefaultNmulti(if (is.null(index.design)) ncol(xdat) else length(bws$beta))
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     .certify.selected <- npValidateScalarLogical(
@@ -3230,6 +3242,8 @@ npindexbw.sibandwidth <-
     else
       ydat <- as.double(ydat)
 
+    if (!is.null(index.design))
+      xdat <- .np_index_design_apply(index.design, xdat)
     xdat = toMatrix(xdat)
     p <- ncol(xdat)
     beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
@@ -3812,6 +3826,7 @@ npindexbw.sibandwidth <-
                        only.optimize.beta = only.optimize.beta,
                        total.time = total.time)
     bws$nn.cache <- nn.cache
+    if (!is.null(index.design)) bws[["index.design"]] <- index.design
     bws <- npSetScaleFactorSearchLower(bws, scale.factor.search.lower)
 
     if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {

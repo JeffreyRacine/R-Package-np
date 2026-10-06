@@ -222,7 +222,7 @@ sibandwidth <-
 print.sibandwidth <- function(x, digits=NULL, ...){
   cat("\nSingle Index Model",
       "\nRegression data (",x$nobs,
-      " observations, ",x$ndim," variable(s)):\n\n",sep="")
+      " observations, ",x$ndim,if (is.null(x[["index.design", exact = TRUE]])) " variable(s)):" else " index coordinate(s)):","\n\n",sep="")
 
   print(matrix(x$beta,ncol=x$ndim,dimnames=list(paste("Beta",":",sep=""),x$xnames)))
   cat("Bandwidth: ",x$bw)
@@ -245,7 +245,7 @@ predict.sibandwidth <- function(object, ...) { npindex(bws = object, ...) }
 summary.sibandwidth <- function(object, ...){
   cat("\nSingle Index Model",
       "\nRegression data (",object$nobs,
-      " observations, ",object$ndim," variable(s)):\n\n",sep="")
+      " observations, ",object$ndim,if (is.null(object[["index.design", exact = TRUE]])) " variable(s)):" else " index coordinate(s)):","\n\n",sep="")
 
   print(matrix(object$beta,ncol=object$ndim,dimnames=list(paste("Beta",":",sep=""),object$xnames)))
   cat("Bandwidth: ",object$bw)

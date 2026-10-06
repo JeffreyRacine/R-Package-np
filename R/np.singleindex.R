@@ -123,7 +123,7 @@ npindex.formula <-
           if (!raw.formula) bws <- .np_bws_retain_fit_frame(bws, tmf)
           response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
           tydat <- model.response(tmf)
-          txdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
+          txdat <- .np_index_formula_xdat(tmf)
         }
         has.eval <- !is.null(newdata) && !("exdat" %in% names(dots))
         if (has.eval) {
@@ -240,8 +240,7 @@ npindex.call <-
 }
 
 .np_index_formula_reentry_xdat <- function(mf) {
-  terms.obj <- attr(mf, "terms")
-  mf[, .np_formula_term_names(attr(terms.obj, "term.labels")), drop = FALSE]
+  .np_index_formula_xdat(mf)
 }
 
 .np_index_formula_reentry_rhs_terms <- function(formula, xdat) {
@@ -664,7 +663,7 @@ npindex.sibandwidth <-
     native.newdata <- dots[["newdata", exact = TRUE]]
     if (missing(exdat) && !is.null(native.newdata)) {
       native.eval <- .np_native_newdata_parts(
-        native.newdata, list(exdat = bws$xnames), "npindex")
+        native.newdata, list(exdat = .np_index_predictor_names(bws)), "npindex")
       exdat <- native.eval$exdat
       if (missing(eydat) && !identical(y.eval, FALSE)) {
         response <- .np_diagnostics_response(native.newdata, ynames = bws$ynames,
@@ -673,6 +672,7 @@ npindex.sibandwidth <-
       }
     }
 
+    design <- bws[["index.design", exact = TRUE]]
     no.ex = missing(exdat)
     no.ey = missing(eydat)
     if (!no.ex && no.ey && isTRUE(y.eval))
@@ -763,7 +763,7 @@ npindex.sibandwidth <-
     ## don't evaluate on the training data
 
     if (!no.ex){
-      if (! txdat %~% exdat )
+      if (is.null(design) && ! txdat %~% exdat )
         stop("'txdat' and 'exdat' are not similar data frames!")
 
       if (!no.ey){
@@ -822,10 +822,11 @@ npindex.sibandwidth <-
     ## re-assign levels in training and evaluation data to ensure correct
     ## conversion to numeric type.
 
-    txdat <- adjustLevels(txdat, bws$xdati)
-
-    if (!no.ex)
-      exdat <- adjustLevels(exdat, bws$xdati)
+    if (is.null(design)) {
+      txdat <- adjustLevels(txdat, bws$xdati)
+      if (!no.ex)
+        exdat <- adjustLevels(exdat, bws$xdati)
+    }
 
     ## grab the evaluation data before it is converted to numeric
     if(no.ex)
@@ -836,6 +837,10 @@ npindex.sibandwidth <-
     ## put the unordered, ordered, and continuous data in their own objects
     ## data that is not a factor is continuous.
 
+    if (!is.null(design)) {
+      txdat <- .np_index_design_apply(design, txdat)
+      if (!no.ex) exdat <- .np_index_design_apply(design, exdat)
+    }
     txdat = toMatrix(txdat)
 
     if (!no.ex){
@@ -1682,6 +1687,10 @@ npindex.sibandwidth <-
       }
     }
 
+    if (!is.null(design) && gradients) {
+      colnames(index.grad) <- bws$xnames
+      if (se) colnames(index.gerr) <- bws$xnames
+    }
     ev.args <- list(
       bws = bws,
       index = index.eval,

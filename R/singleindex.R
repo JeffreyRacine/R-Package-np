@@ -68,7 +68,7 @@ print.singleindex <- function(x, digits=NULL, ...){
       "\nRegression data: ", x$ntrain, " training points,",
       if (x$trainiseval) "" else paste(" and ", x$nobs,
                                       " evaluation points,", sep=""),
-      " in ",x$ndim," variable(s)\n",sep="")
+      " in ",x$ndim,if (is.null(x$bws[["index.design", exact = TRUE]])) " variable(s)\n" else " index coordinate(s)\n",sep="")
 
   print(matrix(x$beta,ncol=x$ndim,dimnames=list(paste("Beta",":",sep=""),x$xnames)))
   
@@ -112,7 +112,7 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   } else if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
     dots$exdat <- .np_native_newdata_parts(
-      dots$newdata, list(exdat = object$bws$xnames), "predict")$exdat
+      dots$newdata, list(exdat = .np_index_predictor_names(object$bws)), "predict")$exdat
     dots$newdata <- NULL
   }
 
@@ -172,7 +172,7 @@ summary.singleindex <- function(object, ...){
       "\nRegression Data: ", object$ntrain, " training points,",
       if (object$trainiseval) "" else paste(" and ", object$nobs,
                                       " evaluation points,", sep=""),
-      " in ",object$ndim," variable(s)\n\n",sep="")
+      " in ",object$ndim,if (is.null(object$bws[["index.design", exact = TRUE]])) " variable(s)\n\n" else " index coordinate(s)\n\n",sep="")
 
   cat(genOmitStr(object))
   print(matrix(object$beta,ncol=object$ndim,dimnames=list(paste("Beta",":",sep=""),object$xnames)))
