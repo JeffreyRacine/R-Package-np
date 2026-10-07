@@ -266,7 +266,10 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   coefficients. For held-out assessment, estimate the coefficients and any
   data-selected bandwidths using the training sample.
 
-  Evaluation outcomes affect diagnostics only. Missing outcomes do not remove
+  Evaluation outcomes affect diagnostics only. In automatic mode, outcomes that
+  cannot be evaluated, aligned, or validated are treated as unavailable for
+  diagnostics; predictions remain available. Explicit \code{y.eval=TRUE} and
+  explicitly supplied \code{eydat} retain strict validation. Missing outcomes do not remove
   predictor-complete prediction rows. Time-series outcomes are matched to the
   predictor time coordinates; predictions outside the supplied outcome time
   support remain available but are not scored. Scores use observed outcome/prediction
@@ -365,6 +368,11 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \item{diagnostics.sample}{\code{"training"}, \code{"evaluation"}, or
     \code{"unavailable"}, identifying the sample used for goodness-of-fit statistics.}
   \item{diagnostics.nobs}{Number of observed outcome/prediction pairs scored.}
+  \item{training.MSE}{For Ichimura fits, the training mean squared error when
+    training fitted values were computed, otherwise \code{NA}. Prediction's
+    \code{residual.scale} retains this training quantity in its historical MSE
+    units, independently of evaluation outcomes. No additional training fit is
+    performed solely to populate this field.}
   \item{confusion.matrix}{if \code{method="kleinspady"}, the confusion matrix or \code{NA} if outcomes
     are not available }
   \item{CCR.overall}{if \code{method="kleinspady"},  the overall correct

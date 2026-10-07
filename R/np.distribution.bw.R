@@ -920,8 +920,6 @@ npudistbw.dbandwidth <-
          !all(vapply(as.data.frame(dat[, bws$iuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'dat'", "in type"))
 
-    npValidateExtendedNnContinuousBandwidth(bws, where = "npudistbw")
-
     if(any(bws$iuno))
       stop("distribution bandwidth selection does not support unordered data types")
 
@@ -929,6 +927,9 @@ npudistbw.dbandwidth <-
     rows.omit <- unclass(na.action(dat))
     if (nrow(dat) == 0L)
       stop("Data has no rows without NAs")
+
+    npValidateExtendedNnContinuousBandwidth(bws, where = "npudistbw",
+                                           nobs = nrow(dat))
 
     nrow = dim(dat)[1]
     ncol = dim(dat)[2]

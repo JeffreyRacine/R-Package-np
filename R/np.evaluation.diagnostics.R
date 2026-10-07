@@ -20,16 +20,16 @@
     stop("evaluation response columns must have unique names", call. = FALSE)
   npValidateNewdataColumns(newdata, required.names)
   if (!is.null(tt)) {
-    response.formula <- as.formula(call("~", response, 1), env = environment(tt))
-    # Validate above before model.frame can consult the formula environment.
-    frame <- model.frame(response.formula, data = newdata, na.action = na.pass)
-    value <- model.response(frame)
+    # Validate above before evaluation can consult the formula environment.
+    # Evaluate only the response: model.frame's raw-row warning is inappropriate
+    # for length-changing time series which are aligned by time below.
+    value <- eval(response, newdata, environment(tt))
   } else {
     if (length(required.names) != 1L)
       stop("evaluation response must have one unambiguous column", call. = FALSE)
     value <- newdata[[required.names]]
   }
-  if (NROW(value) != NROW(newdata))
+  if (!inherits(value, "ts") && NROW(value) != NROW(newdata))
     stop("evaluation response must have one value per 'newdata' row", call. = FALSE)
   value
 }
@@ -91,4 +91,31 @@
         " scored observations)\n", sep = "")
   }
   invisible(NULL)
+}
+
+# Only automatically discovered scoring data may fail without aborting a fit.
+# Explicit outcomes retain their validation errors and warnings.
+.np_diagnostics_optional <- function(expr, required = FALSE) {
+  if (required) return(expr)
+  tryCatch(suppressWarnings(expr), error = function(e) NULL)
+}
+
+.np_index_diagnostics_response <- function(value, method, required = FALSE) {
+  if (is.null(value)) return(NULL)
+  .np_diagnostics_optional({
+    if (match.arg(method, c("ichimura", "kleinspady")) == "kleinspady")
+      .npindex_check_binary_response(value, "npindex() evaluation response")
+    else if (!(is.numeric(value) || is.factor(value)) || !is.null(dim(value)))
+      stop("npindex() evaluation response must be a numeric vector or factor",
+           call. = FALSE)
+    value
+  }, required = required)
+}
+
+.np_index_training_mse <- function(object) {
+  value <- object[["training.MSE", exact = TRUE]]
+  if (!is.null(value)) return(value)
+  # Historical objects lack this provenance; preserve their stored scale.
+  sample <- object[["diagnostics.sample", exact = TRUE]]
+  if (is.null(sample) || identical(sample, "training")) object$MSE else NA_real_
 }

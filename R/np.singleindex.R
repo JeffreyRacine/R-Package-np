@@ -129,7 +129,9 @@ npindex.formula <-
         if (has.eval) {
           # Outcomes are optional scoring data, not part of the prediction frame.
           response <- if (!identical(y.eval, FALSE) && !("eydat" %in% names(dots)))
-            .np_diagnostics_response(newdata, tt = tt, required = isTRUE(y.eval)) else NULL
+            .np_diagnostics_optional(
+              .np_diagnostics_response(newdata, tt = tt, required = isTRUE(y.eval)),
+              required = isTRUE(y.eval)) else NULL
           eval.tt <- delete.response(tt)
           npValidateNewdataFormula(newdata, eval.tt, include.response = FALSE)
           umf <- .np_diagnostics_model_frame(eval.tt, newdata)
@@ -137,7 +139,8 @@ npindex.formula <-
           if ("eydat" %in% names(dots))
             dots$eydat <- .np_diagnostics_align_response(dots$eydat, emf)
           if (!is.null(response))
-            eydat <- .np_diagnostics_align_response(response, emf)
+            response <- .np_diagnostics_optional(
+              .np_diagnostics_align_response(response, emf), required = isTRUE(y.eval))
           exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"), "term.labels")), drop = FALSE]
         }
 
@@ -155,9 +158,13 @@ npindex.formula <-
 
         si.args <- list(txdat = txdat, tydat = tydat, y.eval = y.eval)
         if (has.eval) {
+          response <- .np_index_diagnostics_response(response,
+            method = if (inherits(si.bws, "sibandwidth")) si.bws$method else
+              if (!is.null(dots$method)) dots$method else "ichimura",
+            required = isTRUE(y.eval))
           si.args$exdat <- exdat
           if (!is.null(response))
-            si.args$eydat <- eydat
+            si.args$eydat <- response
         }
         # Raw formula variables above are already prepared. Do not apply the
         # formula again through the explicit-native formula reentry interface.
@@ -488,8 +495,11 @@ npindex.sibandwidth <-
         native.newdata, list(exdat = .np_index_predictor_names(bws)), "npindex")
       exdat <- native.eval$exdat
       if (missing(eydat) && !identical(y.eval, FALSE)) {
-        response <- .np_diagnostics_response(native.newdata, ynames = bws$ynames,
-                                             required = isTRUE(y.eval))
+        response <- .np_diagnostics_optional(
+          .np_diagnostics_response(native.newdata, ynames = bws$ynames,
+                                   required = isTRUE(y.eval)), required = isTRUE(y.eval))
+        response <- .np_index_diagnostics_response(response, bws$method,
+                                                    required = isTRUE(y.eval))
         if (!is.null(response)) eydat <- response
       }
     }
@@ -1193,6 +1203,10 @@ npindex.sibandwidth <-
       ev.args$fit.mcfadden <- fit.mcfadden
     }
     ev <- do.call(singleindex, ev.args)
+    # Retain the training quantity when already computed, without another fit.
+    ev$training.MSE <- if (identical(bws$method, "ichimura") &&
+                          exists("index.tmean", inherits = FALSE))
+      MSEfunc(tydat, index.tmean) else NA_real_
     ev$diagnostics.sample <- diagnostics.sample
     ev$diagnostics.nobs <- diagnostics.nobs
     ev$eval.rows.omit <- if (no.ex) integer(0) else which(!keep.eval)

@@ -879,7 +879,8 @@ npreg.rbandwidth <-
       se = se,
       gradients = gradients,
       residuals = residuals,
-      xtra = myout$xtra,
+      # Native output has zero-filled scores when evaluation outcomes are absent.
+      xtra = if (!no.ex && no.ey) rep(NA_real_, 6L) else myout$xtra,
       rows.omit = if (no.ex) train.rows.omit else eval.rows.omit,
       train.rows.omit = train.rows.omit,
       eval.rows.omit = if (no.ex) integer(0) else eval.rows.omit,

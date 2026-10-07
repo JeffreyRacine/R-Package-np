@@ -1,5 +1,21 @@
 # np 0.80-1
 
+- Regression NN refits also validate against the current complete sample.
+  Predictor-only regression evaluations report unavailable goodness-of-fit
+  scores as NA, without additional fitting work.
+- Contained native-search progress interrupts now restore R's interrupt/error
+  hooks and traceback after cleanup. Message-bearing constructed conditions
+  retain their original identity and reporting.
+
+- Single-index prediction treats unusable automatically discovered outcomes as
+  unavailable diagnostics while preserving strict explicit outcome validation.
+  Differenced time-series responses align by time. Prediction residual.scale
+  retains training MSE units and provenance, and factor-design plots preserve
+  non-syntactic predictor names.
+- Fresh stored single-index and partially linear bandwidths report the common
+  complete-case sample and omissions. Density/distribution NN refits validate
+  their supplied counts against the current complete-case sample.
+
 - Single-index coefficient-only refits retain their degree and bandwidth or
   nearest-neighbor count without re-entering automatic degree search. A supplied
   normalized coefficient vector is used as the first start, including zero

@@ -490,8 +490,6 @@ npcdensbw.conbandwidth <-
          !all(vapply(as.data.frame(xdat[, bws$ixuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
 
-    npValidateConditionalExtendedNn(bws, where = "npcdensbw")
-
     ## catch and destroy NA's
     goodrows <- seq_len(nrow(xdat))
     rows.omit <- unclass(na.action(na.omit(data.frame(xdat,ydat))))
@@ -499,6 +497,9 @@ npcdensbw.conbandwidth <-
 
     if (all(goodrows==0))
       stop("Data has no rows without NAs")
+
+    npValidateConditionalExtendedNn(bws, where = "npcdensbw",
+                                    nobs = sum(goodrows != 0L))
 
     if (bandwidth.compute && npBwsolverUsesMads(bwsolver)) {
       bws.regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype

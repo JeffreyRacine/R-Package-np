@@ -139,7 +139,10 @@ These arguments control where the regression is evaluated and which fitted quant
   \item{eydat}{
     a one (1) dimensional numeric or integer vector of the true values
     of the dependent variable. Optional, and used only to calculate the
-    true errors.
+    true errors. When evaluation predictors are supplied without evaluation
+    outcomes, goodness-of-fit scores (including \code{R2} and \code{MSE}) are
+    unavailable and reported as \code{NA}; no additional training fit is
+    performed for these diagnostics.
   }
 
 
