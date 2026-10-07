@@ -103,9 +103,9 @@
       zdat <- training$tzdat
     } else {
       if(all(miss.xyz) && !is.null(bws$call)){
-        xdat <- data.frame(.np_eval_bws_call_arg(bws, "xdat"))
+        xdat <- data.frame(.np_eval_bws_call_arg(bws, "xdat"), check.names = FALSE)
         ydat = .np_eval_bws_call_arg(bws, "ydat")
-        zdat <- data.frame(.np_eval_bws_call_arg(bws, "zdat"))
+        zdat <- data.frame(.np_eval_bws_call_arg(bws, "zdat"), check.names = FALSE)
       }
       xdat = toFrame(xdat)
       zdat = toFrame(zdat)

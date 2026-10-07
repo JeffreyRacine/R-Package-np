@@ -3,7 +3,8 @@
 - Local-smoothing quantile fits reuse the retained sample and bandwidth
   specification of formula-based regression bandwidth objects.
 - Partially linear plot surfaces retain predictor names and grid dimensions,
-  so their returned model objects support print() and summary().
+  including non-syntactic native predictor names, so their returned model
+  objects support print() and summary().
 - Local-smoothing quantile bandwidth selection can re-enter its progress
   wrapper from private method calls without a function-lookup error.
 - Vector-quantile searches no longer strand MPI workers during progress
