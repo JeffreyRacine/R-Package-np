@@ -121,11 +121,14 @@ predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
+  score.dots <- dots
   dots <- .np_scoef_replay_controls(object, dots)
   tr <- do.call(npscoef, c(list(bws = object$bws, se = se.fit), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
-                df = tr$nobs, residual.scale = tr$MSE))
+                df = tr$nobs, residual.scale = .np_prediction_training_mse(
+                  object, tr, score.dots,
+                  controls = c("iterate", "maxiter", "tol", "leave.one.out"))))
   else
     return(fitted(tr))
 }

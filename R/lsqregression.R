@@ -870,7 +870,8 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
   tr <- do.call(npreg, fit.args)
   out <- if (se.fit) {
     list(fit = fitted(tr), se.fit = se(tr),
-         df = tr$nobs, residual.scale = tr$MSE)
+         df = tr$nobs, residual.scale = .np_prediction_training_mse(
+           object$fit, tr, dots))
   } else {
     fitted(tr)
   }

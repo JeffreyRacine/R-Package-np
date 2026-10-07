@@ -312,8 +312,10 @@ predict.npregression <- function(object, se.fit = FALSE, ...) {
       tr, fields = c("mean", if (se.fit) "merr"))
   if (se.fit) {
     # Reuse known training scores only; never add a fit to recover metadata.
-    alternate.outcomes <- any(!is.na(pmatch(names(dots), "eydat", duplicates.ok = TRUE)))
-    training.override <- any(!is.na(pmatch(
+    unnamed.args <- is.null(names(dots)) && length(dots) > 0L ||
+      any(is.na(names(dots)) | !nzchar(names(dots)))
+    alternate.outcomes <- unnamed.args || any(!is.na(pmatch(names(dots), "eydat", duplicates.ok = TRUE)))
+    training.override <- unnamed.args || any(!is.na(pmatch(
       names(dots), c("data", "txdat", "tydat", "subset", "na.action",
                      ".np.formula.state"), duplicates.ok = TRUE)))
     mse.owner <- if (isTRUE(tr[["trainiseval", exact = TRUE]]) && !alternate.outcomes) {

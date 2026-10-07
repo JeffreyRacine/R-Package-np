@@ -431,7 +431,7 @@
           mean = tobj$mean,
           ntrain = dim(xdat)[1],
           trainiseval = FALSE,
-          xtra=c(tobj$RSQ,tobj$MSE,0,0,0,0))
+          xtra=rep(NA_real_, 6L))
 
         r1$merr = NA
         r1$bias = NA
@@ -975,7 +975,7 @@
                            mean = na.omit(temp.mean),
                            ntrain = dim(xdat)[1],
                            trainiseval = FALSE,
-                           xtra = c(tobj$RSQ, tobj$MSE, 0, 0, 0, 0))
+                           xtra = rep(NA_real_, 6L))
             plot.out[[plot.index]]$merr = NA
             plot.out[[plot.index]]$bias = NA
             plot.out[[plot.index]]$bias.corrected = NA
@@ -1227,7 +1227,7 @@
                            mean = na.omit(temp.mean),
                            ntrain = dim(zdat)[1],
                            trainiseval = FALSE,
-                           xtra = c(tobj$RSQ, tobj$MSE, 0, 0, 0, 0))
+                           xtra = rep(NA_real_, 6L))
             plot.out[[plot.index]]$merr = NA
             plot.out[[plot.index]]$bias = NA
             plot.out[[plot.index]]$bias.corrected = NA

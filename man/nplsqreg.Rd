@@ -149,6 +149,12 @@ selection, prediction, or plotting route.
   }
 }
 \details{
+  Prediction with \code{se.fit = TRUE} reports known training mean squared
+  error in \code{residual.scale}, retaining MSE units, or \code{NA} when
+  training provenance is unavailable. Evaluation outcomes do not replace this
+  training score. No additional fit is performed to recover it.
+  This score concerns the regression on the transformed quantile response.
+
   Formula fits retain trained terms and prediction expressions, so
   data-dependent transformations are reused for \code{newdata} rather than
   recalculated on each prediction grid. The same terms are retained by the
