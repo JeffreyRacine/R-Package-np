@@ -1,5 +1,24 @@
 # npRmpi 0.80-1
 
+- Pooled single-index LP search cleanup preserves the original error message
+  when releasing workers, instead of substituting a generic service error.
+
+- Native search interrupt handling uses a portable R API on Windows and Unix.
+  Interrupt hooks and traceback run after cleanup; an explicit request to
+  resume a released search fails with a clear error.
+- Partially linear plot-data objects report unavailable goodness-of-fit scores
+  as NA instead of shifting the training MSE into the R-squared field.
+- Klein-Spady automatic degree searches reject a single-class complete sample
+  before entering NOMAD and identify class loss after omission clearly.
+- Automatic single-index prediction diagnostics now tolerate incompatible
+  factor outcomes; explicit outcome requests remain strictly validated.
+- Prediction residual.scale no longer reuses old training MSE for positional
+  training-data overrides. Smooth-coefficient and local-smoothing quantile
+  predictions also report known training MSE, or NA when unavailable, without
+  an extra fit. Local-smoothing quantile scale refers to its transformed response.
+- Single-index factor-design transport caches no longer escape into retained
+  training data, and native fits no longer retain the dispatch caller frame.
+
 - Klein-Spady bandwidth selection accepts missing binary outcomes and checks
   that both classes remain after joint predictor/response omission. Native
   calls no longer reject valid incomplete samples or admit samples that lose
@@ -8,7 +27,7 @@
   residual.scale, preserving its historical units. Evaluation MSE is never
   substituted; unavailable training information is reported as NA.
 
-- Regression NN refits also validate against the current complete sample.
+- Regression NN bandwidth-constructor refits also validate against the current complete sample.
   Predictor-only regression evaluations report unavailable goodness-of-fit
   scores as NA, without additional fitting work.
 - Contained native-search progress interrupts now restore R's interrupt/error
@@ -21,7 +40,7 @@
   retains training MSE units and provenance, and factor-design plots preserve
   non-syntactic predictor names.
 - Fresh stored single-index and partially linear bandwidths report the common
-  complete-case sample and omissions. Density/distribution NN refits validate
+  complete-case sample and omissions. Density/distribution NN bandwidth-constructor refits validate
   their supplied counts against the current complete-case sample.
 - Direct pooled single-index construction resolves factor contrasts on the
   master and carries that design to workers, without changing worker options.
