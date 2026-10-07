@@ -254,8 +254,6 @@ npcdistbw.condbandwidth <-
          !all(vapply(as.data.frame(xdat[, bws$ixuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
 
-    npValidateConditionalExtendedNn(bws, where = "npcdistbw")
-
     ##if (bws$type != 'fixed')
     ##stop("only fixed bandwidths currently supported with ccdf bandwidth selection")
 
@@ -266,6 +264,9 @@ npcdistbw.condbandwidth <-
 
     if (all(goodrows==0))
       stop("Data has no rows without NAs")
+
+    npValidateConditionalExtendedNn(bws, where = "npcdistbw",
+                                    nobs = sum(goodrows != 0L))
 
     if (bandwidth.compute && npBwsolverUsesMads(bwsolver)) {
       bws.regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype

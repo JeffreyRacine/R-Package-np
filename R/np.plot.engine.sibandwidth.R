@@ -51,6 +51,12 @@
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
 
     miss.xy = c(missing(xdat),missing(ydat))
+    if (all(miss.xy) && !is.null(bws[["index.design", exact = TRUE]]) &&
+        all(c("xdat", "ydat") %in% names(bws$call))) {
+      xdat <- toFrame(.np_eval_bws_call_arg(bws, "xdat"))
+      ydat <- .np_eval_bws_call_arg(bws, "ydat")
+      miss.xy <- c(FALSE, FALSE)
+    }
     xy <- .np_plot_resolve_xydat(bws = bws, xdat = xdat, ydat = ydat, miss.xy = miss.xy)
     xdat <- xy$xdat
     ydat <- xy$ydat

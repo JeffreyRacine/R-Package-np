@@ -97,7 +97,8 @@
 # Resolve contrasts in the calling session, not independently on each rank.
 # The private transport cache is consumed by the constructor and never retained
 # in the public training frame. Numeric-only calls keep the original payload.
-.np_index_dispatch <- function(mc, xdat, ydat, caller.env, owner.name) {
+.np_index_dispatch <- function(mc, xdat, ydat, caller.env, owner.name,
+                               data.names = c("xdat", "ydat")) {
   original.call <- mc
   xdat <- toFrame(xdat)
   prepared <- attr(xdat, ".np.index.prepared", exact = TRUE)
@@ -105,8 +106,8 @@
   if (is.null(prepared))
     return(.npRmpi_autodispatch_call(mc, caller.env, owner.name = owner.name))
   attr(xdat, ".np.index.prepared") <- prepared
-  mc$xdat <- xdat
-  mc$ydat <- ydat
+  mc[[data.names[1L]]] <- xdat
+  mc[[data.names[2L]]] <- ydat
   result <- .npRmpi_autodispatch_call(mc, caller.env, owner.name = owner.name)
   # The dispatcher materializes arguments in returned calls. Restore the
   # caller's expression so the private transport cache cannot escape with it.

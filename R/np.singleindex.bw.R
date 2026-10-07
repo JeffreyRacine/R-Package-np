@@ -3013,13 +3013,20 @@ npindexbw.default <-
         match.arg(dots[["method", exact = TRUE]], c("ichimura", "kleinspady")) == "kleinspady")
       .npindex_check_binary_response(ydat, "npindexbw()", require.both = TRUE)
 
+    stored.rows <- if (!bandwidth.compute) {
+      .np_require_paired_rows(xdat, ydat, "xdat", "ydat")
+      which(!complete.cases(xdat, ydat))
+    } else integer(0)
+    if (!bandwidth.compute && length(stored.rows) == nrow(xdat))
+      stop("Data has no rows without NAs")
     tbw <- sibandwidth(beta = bws[seq_len(p)],
                        h = bws[p+1L], ...,
                        regtype = spec$regtype,
                        basis = spec$basis,
                        degree = spec$degree,
                        bernstein.basis = spec$bernstein.basis,
-                       nobs = dim(xdat)[1],
+                       nobs = nrow(xdat) - length(stored.rows),
+                       rows.omit = stored.rows,
                        xdati = untangle(xdat),
                        ydati = untangle(data.frame(ydat)),
                        xnames = names(xdat),

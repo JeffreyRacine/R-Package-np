@@ -882,12 +882,13 @@ npudensbw.bandwidth <-
          !all(vapply(as.data.frame(dat[, bws$iuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'dat'", "in type"))
 
-    npValidateExtendedNnContinuousBandwidth(bws, where = "npudensbw")
-
     dat <- na.omit(dat)
     rows.omit <- unclass(na.action(dat))
     if (nrow(dat) == 0L)
       stop("Data has no rows without NAs")
+
+    npValidateExtendedNnContinuousBandwidth(bws, where = "npudensbw",
+                                           nobs = nrow(dat))
 
     nrow = dim(dat)[1]
     ncol = dim(dat)[2]

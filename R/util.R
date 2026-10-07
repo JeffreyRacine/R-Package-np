@@ -3263,17 +3263,18 @@ npValidateConditionalExtendedNn <- function(bws,
 
 npValidateRegressionExtendedNn <- function(bws,
                                         where,
-                                        bandwidth.compute = FALSE) {
+                                        bandwidth.compute = FALSE,
+                                        nobs = bws$nobs) {
   if (!inherits(bws, "rbandwidth") ||
       is.null(bws$type) ||
       identical(as.character(bws$type)[1L], "fixed") ||
       is.null(bws$icon) ||
       !any(bws$icon) ||
-      is.null(bws$nobs)) {
+      is.null(nobs)) {
     return(invisible(bws))
   }
 
-  upper <- as.integer(bws$nobs) - 1L
+  upper <- as.integer(nobs) - 1L
   if (!is.finite(upper) || upper < 1L)
     return(invisible(bws))
 

@@ -219,11 +219,6 @@ npregbw.rbandwidth <-
       where = "npregbw",
       allow.zero.placeholder = TRUE
     )
-    npValidateRegressionExtendedNn(
-      bws,
-      where = "npregbw",
-      bandwidth.compute = bandwidth.compute
-    )
 
     if ((any(bws$icon) &&
          !all(vapply(xdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
@@ -250,6 +245,10 @@ npregbw.rbandwidth <-
 
     nrow = dim(xdat)[1]
     ncol = dim(xdat)[2]
+    npValidateRegressionExtendedNn(
+      bws, where = "npregbw", bandwidth.compute = bandwidth.compute,
+      nobs = nrow
+    )
 
     ## at this stage, data to be sent to the c routines must be converted to
     ## numeric type.

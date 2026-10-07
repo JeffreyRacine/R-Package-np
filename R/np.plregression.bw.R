@@ -1098,6 +1098,17 @@ npplregbw.default =
       }
     }
 
+    stored.data <- NULL
+    if (!bandwidth.compute) {
+      .np_require_paired_rows(xdat, ydat, "xdat", "ydat")
+      .np_require_paired_rows(xdat, zdat, "xdat", "zdat")
+      stored.data <- list(xdat = xdat, ydat = ydat, zdat = zdat)
+      keep <- complete.cases(xdat, ydat, zdat)
+      if (!any(keep)) stop("Data has no rows without NAs")
+      xdat <- xdat[keep, , drop = FALSE]
+      ydat <- ydat[keep]
+      zdat <- zdat[keep, , drop = FALSE]
+    }
     tbw <- .npplregbw_build_plbandwidth(
       xdat = xdat,
       ydat = ydat,
@@ -1121,5 +1132,12 @@ npplregbw.default =
     tbw$call <- mc
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
+    if (!is.null(stored.data)) {
+      tbw$rows.omit <- if (all(keep)) NA else which(!keep)
+      tbw$nobs.omit <- sum(!keep)
+      xdat <- stored.data$xdat
+      ydat <- stored.data$ydat
+      zdat <- stored.data$zdat
+    }
     return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat, zdat = zdat))
   }

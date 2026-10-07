@@ -125,7 +125,7 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
         fit = fitted(object),
         se.fit = se(object),
         df = object$nobs,
-        residual.scale = object$MSE
+        residual.scale = .np_index_training_mse(object)
       ))
     }
     return(fitted(object))
@@ -137,9 +137,13 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
   if (se.fit && is.null(dots$se.type) && !is.null(object[["se.type"]]))
     dots$se.type <- object[["se.type"]]
   tr <- do.call(npindex, c(list(bws = object$bws, se = se.fit), dots))
-  if (se.fit)
+  if (se.fit) {
+    training.mse <- .np_index_training_mse(tr)
+    if (is.na(training.mse) && !any(c("data", "txdat", "tydat") %in% names(dots)))
+      training.mse <- .np_index_training_mse(object)
     return(list(fit = fitted(tr), se.fit = se(tr),
-                df = tr$nobs, residual.scale = tr$MSE))
+                df = tr$nobs, residual.scale = training.mse))
+  }
   fitted(tr)
 }
 se.singleindex <- function(x){
