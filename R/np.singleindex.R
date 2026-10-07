@@ -161,7 +161,9 @@ npindex.formula <-
           response <- .np_index_diagnostics_response(response,
             method = if (inherits(si.bws, "sibandwidth")) si.bws$method else
               if (!is.null(dots$method)) dots$method else "ichimura",
-            required = isTRUE(y.eval))
+            required = isTRUE(y.eval),
+            training.info = if (inherits(si.bws, "sibandwidth")) si.bws$ydati
+              else untangle(data.frame(tydat)))
           si.args$exdat <- exdat
           if (!is.null(response))
             si.args$eydat <- response
@@ -499,7 +501,7 @@ npindex.sibandwidth <-
           .np_diagnostics_response(native.newdata, ynames = bws$ynames,
                                    required = isTRUE(y.eval)), required = isTRUE(y.eval))
         response <- .np_index_diagnostics_response(response, bws$method,
-                                                    required = isTRUE(y.eval))
+          required = isTRUE(y.eval), training.info = bws$ydati)
         if (!is.null(response)) eydat <- response
       }
     }

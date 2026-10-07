@@ -100,7 +100,8 @@
   tryCatch(suppressWarnings(expr), error = function(e) NULL)
 }
 
-.np_index_diagnostics_response <- function(value, method, required = FALSE) {
+.np_index_diagnostics_response <- function(value, method, required = FALSE,
+                                           training.info = NULL) {
   if (is.null(value)) return(NULL)
   .np_diagnostics_optional({
     if (match.arg(method, c("ichimura", "kleinspady")) == "kleinspady")
@@ -108,6 +109,8 @@
     else if (!(is.numeric(value) || is.factor(value)) || !is.null(dim(value)))
       stop("npindex() evaluation response must be a numeric vector or factor",
            call. = FALSE)
+    if (is.factor(value) && !is.null(training.info))
+      .np_regression_response_levels(data.frame(value), training.info)
     value
   }, required = required)
 }
@@ -118,4 +121,28 @@
   # Historical objects lack this provenance; preserve their stored scale.
   sample <- object[["diagnostics.sample", exact = TRUE]]
   if (is.null(sample) || identical(sample, "training")) object$MSE else NA_real_
+}
+
+# Prediction metadata only: never fit or compare training data to recover MSE.
+.np_prediction_training_mse <- function(object, prediction, dots,
+                                        controls = character()) {
+  nms <- names(dots)
+  unnamed <- length(nms) != length(dots) || any(is.na(nms) | !nzchar(nms))
+  changed <- unnamed || any(!is.na(pmatch(nms,
+    c("data", "txdat", "tydat", "tzdat", "subset", "na.action",
+      ".np.formula.state", controls), duplicates.ok = TRUE)))
+  alternate <- unnamed || any(!is.na(pmatch(nms, "eydat", duplicates.ok = TRUE)))
+  owner <- if (isTRUE(prediction[["trainiseval", exact = TRUE]]) && !alternate)
+    prediction else if (!changed && isTRUE(object[["trainiseval", exact = TRUE]]))
+    object else NULL
+  if (is.null(owner)) return(NA_real_)
+  call <- owner[["call", exact = TRUE]]
+  if (is.call(call)) {
+    args <- c(names(call)[-1L], names(call[["..."]]))
+    if (any(is.na(args) | !nzchar(args)) ||
+        any(!is.na(pmatch(args, "eydat", duplicates.ok = TRUE))))
+      return(NA_real_)
+  }
+  value <- owner[["MSE", exact = TRUE]]
+  if (is.null(value)) NA_real_ else value
 }
