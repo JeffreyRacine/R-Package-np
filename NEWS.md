@@ -1,5 +1,8 @@
 # np 0.80-1
 
+- Initialize guarded native temporaries and remove unused categorical-profile
+  bookkeeping to avoid compiler warnings without changing estimator arithmetic.
+
 - Local-smoothing quantile fits reuse the retained sample and bandwidth
   specification of formula-based regression bandwidth objects.
 - Partially linear plot surfaces retain predictor names and grid dimensions,

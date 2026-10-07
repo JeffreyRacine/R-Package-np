@@ -47894,13 +47894,11 @@ double *cv){
     for(g0 = 0; g0 < nprof_xy; g0 += profile_group_width){
       const int group_count =
         MIN(profile_group_width, nprof_xy - g0);
-      int group_yg[NP_CDENS_PROFILE_GROUP_WIDTH];
       double group_cxg[NP_CDENS_PROFILE_GROUP_WIDTH];
       double group_den_loo[NP_CDENS_PROFILE_GROUP_WIDTH];
       double group_lin[NP_CDENS_PROFILE_GROUP_WIDTH] = {0.0};
       double group_quad[NP_CDENS_PROFILE_GROUP_WIDTH] = {0.0};
       double *group_kx[NP_CDENS_PROFILE_GROUP_WIDTH];
-      double *group_kyn[NP_CDENS_PROFILE_GROUP_WIDTH];
       int q;
 
       for(q = 0; q < group_count; q++){
@@ -47915,7 +47913,6 @@ double *cv){
         np_hot_loop_check_interrupt(gq,
                                     nprof_xy,
                                     profile_interrupt_stride);
-        group_yg[q] = yg;
         group_cxg[q] = cxg;
 
         if(use_x_cache){
@@ -47980,7 +47977,6 @@ double *cv){
           kyn_row = kyn + (size_t)yg*(size_t)nprof_y;
         }
         group_kx[q] = kx_row;
-        group_kyn[q] = kyn_row;
 
         for(h = 0; h < nprof_xy; h++){
           const int rep_h = xy_rep[h];
