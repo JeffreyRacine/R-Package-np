@@ -559,6 +559,17 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   and \code{\link{plot}} support objects of this type. The returned object
   has the following components:
 
+  With \code{se.fit=TRUE}, \code{predict()} returns \code{fit},
+  \code{se.fit}, \code{df}, and \code{residual.scale}. The last field
+  uses training MSE in its historical units, not its square root or an
+  evaluation MSE. It reuses a known training fit's MSE without an additional
+  fit. It is \code{NA} when training MSE is unavailable, including an object
+  created at external evaluation points or scored against explicit
+  \code{eydat}, and external predictions with explicit training-data or
+  model-frame overrides. A prediction evaluated on replacement training data
+  can use that new training fit's MSE. Evaluation outcomes do not substitute
+  for training residual information.
+
 
   \item{eval}{ evaluation points }
   \item{mean}{ estimates of the regression function (conditional mean) at the

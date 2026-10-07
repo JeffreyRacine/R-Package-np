@@ -310,10 +310,31 @@ predict.npregression <- function(object, se.fit = FALSE, ...) {
   if (.npreg_explicit_eval_exclude(dots) && !isTRUE(tr$trainiseval))
     tr <- .npreg_restore_eval_exclude(
       tr, fields = c("mean", if (se.fit) "merr"))
-  if(se.fit)
-    return(list(fit = fitted(tr), se.fit = se(tr), 
-                df = tr$nobs, residual.scale = tr$MSE))
-  else
+  if (se.fit) {
+    # Reuse known training scores only; never add a fit to recover metadata.
+    alternate.outcomes <- any(!is.na(pmatch(names(dots), "eydat", duplicates.ok = TRUE)))
+    training.override <- any(!is.na(pmatch(
+      names(dots), c("data", "txdat", "tydat", "subset", "na.action",
+                     ".np.formula.state"), duplicates.ok = TRUE)))
+    mse.owner <- if (isTRUE(tr[["trainiseval", exact = TRUE]]) && !alternate.outcomes) {
+      tr
+    } else if (!training.override && isTRUE(object[["trainiseval", exact = TRUE]])) {
+      object
+    } else NULL
+    residual.scale <- NA_real_
+    if (!is.null(mse.owner)) {
+      owner.call <- mse.owner[["call", exact = TRUE]]
+      if (is.call(owner.call)) {
+        score.args <- c(names(owner.call), names(owner.call[["..."]]))
+        # trainiseval describes X locations; explicit eydat can still change MSE.
+        score.args <- score.args[!is.na(score.args) & nzchar(score.args)]
+        if (!any(!is.na(pmatch(score.args, "eydat", duplicates.ok = TRUE))))
+          residual.scale <- mse.owner[["MSE", exact = TRUE]]
+      }
+    }
+    return(list(fit = fitted(tr), se.fit = se(tr),
+                df = tr$nobs, residual.scale = residual.scale))
+  } else
     return(fitted(tr))
 }
 
