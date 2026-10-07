@@ -21,6 +21,14 @@
 #include <crs_nomad_native.h>
 #include "np_nomad_callback_error.h"
 
+/* Failure-only bridge for the R progress dispatcher; no successful-path work. */
+SEXP C_np_nomad_condition_raise(SEXP condition)
+{
+  np_nomad_condition_raise(condition);
+  return R_NilValue;
+}
+
+
 #ifdef MPI2
 #include "mpi.h"
 int my_rank;

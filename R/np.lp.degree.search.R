@@ -2506,8 +2506,7 @@
     },
     interrupt = function(e) {
       if (propagate) {
-        signalCondition(e)
-        invokeRestart("abort")
+        .Call("C_np_nomad_condition_raise", e, PACKAGE = "np")
       }
       list(2L, conditionMessage(e))
     },
