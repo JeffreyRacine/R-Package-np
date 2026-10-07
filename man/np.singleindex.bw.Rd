@@ -180,7 +180,9 @@ These arguments identify the data, formula interface, method label, and whether 
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
     \code{xdat}.
     For \code{method="kleinspady"}, the response must be numeric 0/1 with both
-    values present. Factor responses are rejected rather than converted to
+    values present after jointly omitting rows with missing predictors or
+    responses. Missing outcomes are permitted; a complete sample containing
+    only one response class is rejected. Factor responses are rejected rather than converted to
     internal category codes; explanatory variables may still be factors.
   }
 

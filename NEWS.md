@@ -1,5 +1,10 @@
 # np 0.80-1
 
+- Klein-Spady bandwidth selection accepts missing binary outcomes and checks
+  that both classes remain after joint predictor/response omission. Native
+  calls no longer reject valid incomplete samples or admit samples that lose
+  a response class during omission.
+
 - Regression NN refits also validate against the current complete sample.
   Predictor-only regression evaluations report unavailable goodness-of-fit
   scores as NA, without additional fitting work.

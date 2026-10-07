@@ -2025,9 +2025,10 @@ npindexbw.default <-
         )
       }
     }
-    if (!is.null(dots[["method", exact = TRUE]]) &&
-        match.arg(dots[["method", exact = TRUE]], c("ichimura", "kleinspady")) == "kleinspady")
-      .npindex_check_binary_response(ydat, "npindexbw()", require.both = TRUE)
+    kleinspady <- !is.null(dots[["method", exact = TRUE]]) &&
+      match.arg(dots[["method", exact = TRUE]], c("ichimura", "kleinspady")) == "kleinspady"
+    if (kleinspady)
+      .npindex_check_binary_response(ydat, "npindexbw()")
 
     stored.rows <- if (!bandwidth.compute) {
       .np_require_paired_rows(xdat, ydat, "xdat", "ydat")
@@ -2035,6 +2036,11 @@ npindexbw.default <-
     } else integer(0)
     if (!bandwidth.compute && length(stored.rows) == nrow(xdat))
       stop("Data has no rows without NAs")
+    if (kleinspady && !bandwidth.compute) {
+      # Class membership belongs to the same complete sample as stored nobs.
+      complete.ydat <- if (length(stored.rows)) ydat[-stored.rows] else ydat
+      .npindex_check_binary_response(complete.ydat, "npindexbw()", require.both = TRUE)
+    }
     tbw <- sibandwidth(beta = bws[seq_len(p)],
                        h = bws[p+1L], ...,
                        regtype = spec$regtype,
@@ -2237,7 +2243,7 @@ npindexbw.sibandwidth <-
     )
 
     if (bws$method == "kleinspady")
-      .npindex_check_binary_response(ydat, "npindexbw()", require.both = TRUE)
+      .npindex_check_binary_response(ydat, "npindexbw()")
 
     if (ncol(xdat) < 2) {
       if (coarseclass(xdat[,1]) != "numeric")
@@ -2260,6 +2266,8 @@ npindexbw.sibandwidth <-
 
     xdat <- xdat[keep.rows,,drop = FALSE]
     ydat <- ydat[keep.rows]
+    if (bws$method == "kleinspady")
+      .npindex_check_binary_response(ydat, "npindexbw()", require.both = TRUE)
 
     ## convert to numeric
     if (is.factor(ydat))
