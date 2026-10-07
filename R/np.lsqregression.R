@@ -1824,15 +1824,21 @@ nplsqreg.formula <-
 
     .npRmpi_require_active_slave_pool(where = "nplsqreg()")
 
+    supplied.bws <- inherits(bws, "rbandwidth")
+    model.formula <- stats::formula(bws)
     tt <- .np_formula_aligned_terms(terms(bws))
     dots <- list(...)
     response.name <- .nplsqreg_formula_response_name(bws)
     native.exdat <- dots$exdat
     dots$exdat <- NULL
     mc <- match.call(expand.dots = FALSE)
-    m <- match(c("bws", "data", "subset", "na.action"),
-               names(mc), nomatch = 0)
-    tmf <- mc[c(1, m)]
+    frame.call <- if (supplied.bws && !is.null(bws$call)) bws$call else mc
+    m <- match(c(if (supplied.bws) "formula" else "bws",
+                 "data", "subset", "na.action"),
+               names(frame.call), nomatch = 0)
+    tmf <- frame.call[c(1, m)]
+    for (name in intersect(c("subset", "na.action"), names(mc)))
+      tmf[[name]] <- mc[[name]]
     if ("bws" %in% names(tmf))
       names(tmf)[names(tmf) == "bws"] <- "formula"
     tmf[[1]] <- as.name("model.frame")
@@ -1841,8 +1847,20 @@ nplsqreg.formula <-
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
     if (!is.null(dots$scale)) mf.args$.np.auxiliary <- list(scale = dots$scale)
-    mf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
-    if (!is.null(dots$scale)) dots$scale <- mf[["(scale)"]]
+    if (supplied.bws) {
+      overrides <- list()
+      if (!missing(na.action)) overrides["na.action"] <- list(na.action)
+      mf <- .np_bws_formula_model_frame(bws, mf.args,
+        data.override = !is.null(data), overrides = overrides)
+      # A retained frame has already selected its rows. Its scale is supplied
+      # in retained-sample order; never replay the constructor to align it.
+      if (!is.null(dots$scale) && "(scale)" %in% names(mf))
+        dots$scale <- mf[["(scale)"]]
+      dots$bws <- bws
+    } else {
+      mf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
+      if (!is.null(dots$scale)) dots$scale <- mf[["(scale)"]]
+    }
     train.omit <- attr(mf, "na.action")
     ydat <- model.response(mf)
     xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
@@ -1881,7 +1899,7 @@ nplsqreg.formula <-
     }
     out$call <- match.call(expand.dots = FALSE)
     out$call <- .nplsqreg_describe_call(out$call, parent.frame())
-    out <- .nplsqreg_retain_formula_terms(out, bws, tt)
+    out <- .nplsqreg_retain_formula_terms(out, model.formula, tt)
     out <- .nplsqreg_set_response_name(out, response.name)
     out <- .nplsqreg_record_omit(out, train.omit)
     out$bws <- .nplsqreg_record_omit(out$bws, train.omit)
