@@ -32,6 +32,6 @@ test_that("predictor-only regression scores are unavailable without changing fit
     expect_identical(gradients(a),gradients(c))
     expect_equal(c$MSE,mean((y[1:20]-fitted(c))^2))
     expect_equal(f$MSE,mean((y-fitted(f))^2))
-    expect_true(is.na(predict(f,exdat=x[1:20,],se.fit=TRUE)$residual.scale))
+    expect_equal(predict(f,exdat=x[1:20,],se.fit=TRUE)$residual.scale, f$MSE)
   }
 })

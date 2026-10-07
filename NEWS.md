@@ -4,6 +4,9 @@
   that both classes remain after joint predictor/response omission. Native
   calls no longer reject valid incomplete samples or admit samples that lose
   a response class during omission.
+- Regression prediction with se.fit=TRUE reports available training MSE as
+  residual.scale, preserving its historical units. Evaluation MSE is never
+  substituted; unavailable training information is reported as NA.
 
 - Regression NN refits also validate against the current complete sample.
   Predictor-only regression evaluations report unavailable goodness-of-fit
