@@ -120,3 +120,42 @@ test_that("density and distribution NN refits validate against current complete 
       options(np.extendednn=FALSE)
     }
 })
+
+
+test_that("automatic factor outcomes cannot prevent Ichimura prediction", {
+  old <- options(np.messages=FALSE); on.exit(options(old),add=TRUE)
+  set.seed(5101); d <- data.frame(x=rnorm(90),z=rnorm(90)); d$y <- rpois(90,2)
+  e <- d[1:20,]; e$y <- factor(e$y)
+  for (factor.train in c(FALSE,TRUE)) {
+    tr <- d
+    if (factor.train) {tr$y <- factor(tr$y); e$y <- factor(rep("99",20))}
+    b <- npindexbw(y ~ x + z, data=tr, bws=c(1,.5,.8), bandwidth.compute=FALSE)
+    f <- npindex(b,se=FALSE)
+    expected <- predict(f,newdata=e,y.eval=FALSE)
+    expect_identical(predict(f,newdata=e),expected)
+    expect_identical(fitted(npindex(b,newdata=e,se=FALSE)),expected)
+    expect_error(predict(f,newdata=e,y.eval=TRUE), "factor|level")
+    expect_error(npindex(b,exdat=e[c("x","z")],eydat=e$y,se=FALSE), "factor|level")
+  }
+})
+
+
+test_that("factor dispatch retains only public design and training state", {
+  old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
+  set.seed(33252)
+  d <- data.frame(x = rnorm(90), g = factor(rep(letters[1:3], 30)))
+  d$y <- sin(d$x) + as.integer(d$g) / 4
+  make <- function() {
+    unrelated <- numeric(2e5)
+    npindex(txdat = d[c("x", "g")], tydat = d$y,
+      bws = c(1, .2, .3, .8), bandwidth.compute = FALSE, se = FALSE)
+  }
+  fit <- make()
+  expect_null(fit$call)
+  expect_lt(length(serialize(fit, NULL)), 8 * 2e5)
+  expect_null(attr(fit$bws$.np.native.training$xdat, ".np.index.prepared"))
+  expect_null(attr(fit$bws$call$xdat, ".np.index.prepared"))
+  restored <- unserialize(serialize(fit, NULL))
+  expect_identical(predict(restored, newdata = d[1:8, ]),
+                   predict(fit, newdata = d[1:8, ]))
+})

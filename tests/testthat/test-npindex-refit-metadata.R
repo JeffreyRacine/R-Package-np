@@ -64,6 +64,7 @@ test_that("beta-only refits preserve held h without re-anchoring the search floo
 })
 
 test_that("beta-only calls retain degree and use the supplied zero-tail start", {
+  .npRmpi_with_local_regression({
   old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
   x <- data.frame(x = seq(-2, 2, length.out = 80), z = sin(seq_len(80)))
   y <- sin(x$x + .3*x$z)
@@ -98,4 +99,27 @@ test_that("beta-only calls retain degree and use the supplied zero-tail start", 
   expect_error(npindexbw(xdat = x, ydat = y, bws = c(1, 0, .8),
     regtype = "lp", only.optimize.beta = TRUE, degree.select = "exhaustive"),
     "degree must be supplied explicitly")
+  })
+})
+
+
+test_that("single-index LP service cleanup preserves the original error message", {
+  old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
+  set.seed(33256)
+  x <- data.frame(x = rnorm(90), z = rnorm(90))
+  for (method in c("ichimura", "kleinspady")) {
+    y <- if (method == "ichimura") sin(x$x + .3*x$z) else rep(c(0, 1), 45)
+    b <- npindexbw(xdat = x, ydat = y, method = method, regtype = "lp",
+      degree = 1L, bws = c(1, .3, .12), bandwidth.compute = FALSE,
+      scale.factor.search.lower = 1)
+    error <- tryCatch(npindexbw(xdat = x, ydat = y, bws = b, nmulti = 1L),
+                      error = identity)
+    expect_s3_class(error, "error")
+    expect_match(conditionMessage(error), "below the continuous scale-factor lower bound")
+    expect_false(grepl("service stopped", conditionMessage(error), fixed = TRUE))
+    held <- npindexbw(xdat = x, ydat = y, bws = b,
+      only.optimize.beta = TRUE, nmulti = 1L, optim.maxit = 20L)
+    expect_identical(held$bw, b$bw)
+    expect_true(is.finite(held$fval))
+  }
 })

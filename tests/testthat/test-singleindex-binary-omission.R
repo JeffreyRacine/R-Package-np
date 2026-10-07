@@ -49,3 +49,17 @@ test_that("binary domain validation remains strict before numeric conversion", {
   expect_true(all(is.finite(fitted(f))))
   expect_equal(f$diagnostics.nobs, 20L)
 })
+
+
+test_that("degree searches reject single-class complete samples before NOMAD", {
+  old <- options(np.messages=FALSE); on.exit(options(old),add=TRUE)
+  set.seed(907); x <- data.frame(x=rnorm(80), z=runif(80)); y <- rep(0,80)
+  for (lost in c(FALSE,TRUE)) {
+    xx <- x; yy <- y
+    if (lost) {yy[5] <- 1; xx$x[5] <- NA_real_}
+    expect_error(npindexbw(xdat=xx, ydat=yy, method="kleinspady",
+      nomad=TRUE, degree.max=1L, nmulti=1L), "both 0 and 1.*complete training")
+    expect_error(npindexbw(y ~ x + z, data=data.frame(xx,y=yy),
+      method="kleinspady", nomad=TRUE, degree.max=1L, nmulti=1L), "both 0 and 1")
+  }
+})

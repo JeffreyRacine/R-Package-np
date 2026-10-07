@@ -109,9 +109,42 @@
   mc[[data.names[1L]]] <- xdat
   mc[[data.names[2L]]] <- ydat
   result <- .npRmpi_autodispatch_call(mc, caller.env, owner.name = owner.name)
+  # Dispatch materializes returned calls after the constructor has finished.
+  # Strip transport attributes at that final boundary, after all ranks used
+  # the master design. Only package-owned training slots are changed.
+  clean.bandwidth <- function(bws) {
+    training <- bws[[".np.native.training", exact = TRUE]]
+    if (!is.null(training[["xdat", exact = TRUE]])) {
+      attr(training[["xdat"]], ".np.index.prepared") <- NULL
+      bws[[".np.native.training"]] <- training
+    }
+    call <- bws[["call", exact = TRUE]]
+    if (is.call(call) && is.data.frame(call[["xdat"]])) {
+      attr(call[["xdat"]], ".np.index.prepared") <- NULL
+      bws[["call"]] <- call
+    }
+    bws
+  }
+  if (inherits(result, "singleindex"))
+    result$bws <- clean.bandwidth(result$bws)
+  else if (inherits(result, "sibandwidth"))
+    result <- clean.bandwidth(result)
   # The dispatcher materializes arguments in returned calls. Restore the
   # caller's expression so the private transport cache cannot escape with it.
-  result$call <- original.call
-  environment(result$call) <- caller.env
+  if (identical(owner.name, "npindex.default")) {
+    # Native fits have no public call in the serial contract. Retaining this
+    # transport call would additionally retain the dispatch caller's frame.
+    result$call <- NULL
+  } else {
+    for (name in data.names) {
+      value <- original.call[[name]]
+      if (is.data.frame(value)) {
+        attr(value, ".np.index.prepared") <- NULL
+        original.call[[name]] <- value
+      }
+    }
+    result$call <- original.call
+    environment(result$call) <- caller.env
+  }
   result
 }

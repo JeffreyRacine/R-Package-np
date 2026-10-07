@@ -17,13 +17,14 @@ npindexbw <-
 .npindex_check_binary_response <- function(y, where, require.both = FALSE) {
   valid <- is.numeric(y) && !is.complex(y) && is.null(dim(y)) &&
     all(y == 0 | y == 1, na.rm = TRUE)
-  if (valid && require.both)
-    valid <- setequal(y, c(0, 1))
   if (!valid)
     stop(paste0(where, ": Klein and Spady's estimator requires a numeric ",
                 "(integer or double) response coded 0/1; factors and other ",
                 "response values are not accepted.",
                 if (require.both) " Bandwidth selection requires both 0 and 1." else ""),
+         call. = FALSE)
+  if (require.both && !setequal(y, c(0, 1)))
+    stop(paste0(where, ": Bandwidth selection requires both 0 and 1 in the complete training sample after removing incomplete rows."),
          call. = FALSE)
   invisible(NULL)
 }
@@ -2272,13 +2273,19 @@ npindexbw.NULL <-
     ))
   service.eval.counter <- 0L
   service.done <- FALSE
+  service.failure <- NULL
   if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
     on.exit({
       if (!isTRUE(service.done))
-        .npindexbw_ichimura_lp_service_error("npindex Ichimura LP NOMAD service stopped before returning a result", service.ctx)
+        .npindexbw_ichimura_lp_service_error(
+          if (is.null(service.failure)) "npindex Ichimura LP NOMAD service stopped before returning a result" else service.failure,
+          service.ctx)
     }, add = TRUE)
   }
 
+  # Keep the original error message for the existing worker cleanup broadcast.
+  # The calling handler observes errors without catching or replacing them.
+  withCallingHandlers({
   .np_nomad_baseline_note(degree.search$start.degree)
 
   point_h_to_raw <- function(h.point) {
@@ -2640,6 +2647,9 @@ npindexbw.NULL <-
   }
 
   search.result
+  }, error = function(e) {
+    if (is.null(service.failure)) service.failure <<- conditionMessage(e)
+  })
 }
 
 .npindexbw_degree_search_controls <- function(regtype,
@@ -3013,6 +3023,13 @@ npindexbw.default <-
       match.arg(dots[["method", exact = TRUE]], c("ichimura", "kleinspady")) == "kleinspady"
     if (kleinspady)
       .npindex_check_binary_response(ydat, "npindexbw()")
+    if (kleinspady && bandwidth.compute && !is.null(degree.search)) {
+      # NOMAD bounds need a valid response before the first objective callback.
+      # Use the same joint complete sample as the ordinary bandwidth owner.
+      .np_require_paired_rows(xdat, ydat, "xdat", "ydat")
+      .npindex_check_binary_response(ydat[complete.cases(xdat, ydat)],
+                                    "npindexbw()", require.both = TRUE)
+    }
 
     stored.rows <- if (!bandwidth.compute) {
       .np_require_paired_rows(xdat, ydat, "xdat", "ydat")
@@ -3341,20 +3358,27 @@ npindexbw.sibandwidth <-
       ))
     service.eval.counter <- 0L
     service.done <- FALSE
+    service.failure <- NULL
     if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
       on.exit({
         if (!isTRUE(service.done))
-          .npindexbw_ichimura_lp_service_error("npindex Ichimura LP fixed-degree service stopped before returning a result", service.ctx)
+          .npindexbw_ichimura_lp_service_error(
+            if (is.null(service.failure)) "npindex Ichimura LP fixed-degree service stopped before returning a result" else service.failure,
+            service.ctx)
       }, add = TRUE)
     }
     ks.service.done <- FALSE
     if (isTRUE(ks.service.ctx$active) && isTRUE(ks.service.ctx$root)) {
       on.exit({
         if (!isTRUE(ks.service.done))
-          .npindexbw_kleinspady_lp_service_error("npindex Klein-Spady LP fixed-degree service stopped before returning a result", ks.service.ctx)
+          .npindexbw_kleinspady_lp_service_error(
+            if (is.null(service.failure)) "npindex Klein-Spady LP fixed-degree service stopped before returning a result" else service.failure,
+            ks.service.ctx)
       }, add = TRUE)
     }
 
+    # Share only the error text with cleanup; leave propagation and MPI ordering intact.
+    withCallingHandlers({
     total.time <-
       system.time({
 
@@ -3873,5 +3897,8 @@ npindexbw.sibandwidth <-
     }
 
     bws
+    }, error = function(e) {
+      if (is.null(service.failure)) service.failure <<- conditionMessage(e)
+    })
 
   }
