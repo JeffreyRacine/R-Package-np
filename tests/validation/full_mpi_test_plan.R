@@ -7,6 +7,10 @@ npRmpi_full_test_singleton_files <- function() {
     "test-conditional-gnn-projected.R",
     # Repeated distributed formula fits need an independent bounded unit.
     "test-formula-training-ownership.R",
+    # Measured unit-037 formula workloads must not share one 300-second cap.
+    "test-formula-lsq-subset-dispatch.R",
+    "test-formula-saved-data-readers.R",
+    "test-formula-subset-dispatch.R",
     "test-generalized-cdf-fold-grid-contract.R",
     "test-gnn-deleted-query-count-beta-off.R",
     "test-gnn-deleted-query-count-beta-on.R",

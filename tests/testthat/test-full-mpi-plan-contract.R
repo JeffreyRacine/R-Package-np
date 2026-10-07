@@ -94,3 +94,19 @@ test_that("GNN fit/tree influence oracles have an independent MPI budget", {
   plan <- scope$npRmpi_full_test_plan(files, 10L)
   expect_equal(sum(vapply(plan, identical, logical(1L), required)), 1L)
 })
+
+
+test_that("measured formula workloads have separate bounded MPI units", {
+  helper <- testthat::test_path("..", "validation", "full_mpi_test_plan.R")
+  skip_if_not(file.exists(helper), "source plan helper unavailable")
+  scope <- new.env(parent = globalenv())
+  sys.source(helper, envir = scope)
+  required <- c("test-formula-lsq-subset-dispatch.R",
+                "test-formula-saved-data-readers.R",
+                "test-formula-subset-dispatch.R")
+  files <- sort(list.files(testthat::test_path(), "^test-.*\\.[rR]$"))
+  plan <- scope$npRmpi_full_test_plan(files, 10L)
+  expect_identical(unlist(plan, use.names = FALSE), files)
+  for (file in required)
+    expect_equal(sum(vapply(plan, identical, TRUE, file)), 1L, info = file)
+})
