@@ -616,11 +616,11 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   if (!is.null(bws$call)) {
-    out$xdat <- tryCatch(data.frame(.np_eval_bws_call_arg(bws, "xdat")),
+    out$xdat <- tryCatch(data.frame(.np_eval_bws_call_arg(bws, "xdat"), check.names = FALSE),
                          error = function(e) NULL)
     out$ydat <- tryCatch(.np_eval_bws_call_arg(bws, "ydat"),
                          error = function(e) NULL)
-    out$zdat <- tryCatch(data.frame(.np_eval_bws_call_arg(bws, "zdat")),
+    out$zdat <- tryCatch(data.frame(.np_eval_bws_call_arg(bws, "zdat"), check.names = FALSE),
                          error = function(e) NULL)
   }
 
