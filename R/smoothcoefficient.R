@@ -109,6 +109,9 @@ predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
   if ("se" %in% names(dots))
     stop("predict.smoothcoefficient uses 'se.fit', not 'se'", call. = FALSE)
   has.formula.route <- !is.null(object$bws$formula)
+  if (!has.formula.route)
+    dots <- .np_match_native_args(dots, npscoef.scbandwidth,
+                                  c("txdat", "tydat", "tzdat"))
 
   if ((!is.null(dots$exdat) || !is.null(dots$ezdat)) && !is.null(dots$newdata)) {
     dots$newdata <- NULL

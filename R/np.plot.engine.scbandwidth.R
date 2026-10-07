@@ -1040,7 +1040,7 @@
                                                                        temp.err[eval.rows, 2])) else NA,
                                 ntrain = dim(xdat)[1],
                                 trainiseval = FALSE,
-                                xtra = c(0, 0, 0, 0, 0, 0))
+                                xtra = rep(NA_real_, 6L))
             plot.out[[plot.index]]$gbias = NA
             plot.out[[plot.index]]$gradient.bias.corrected = NA
             if (.np_plot_center_is_bias_corrected(plot.errors.center))
@@ -1063,7 +1063,7 @@
                                 mean = na.omit(temp.mean),
                                 ntrain = dim(xdat)[1],
                                 trainiseval = FALSE,
-                                xtra = c(0, 0, 0, 0, 0, 0))
+                                xtra = rep(NA_real_, 6L))
             plot.out[[plot.index]]$merr = NA
             plot.out[[plot.index]]$bias = NA
             plot.out[[plot.index]]$bias.corrected = NA

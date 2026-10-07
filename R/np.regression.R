@@ -378,7 +378,7 @@ npreg.formula <-
 npreg.call <-
   function(bws, ...) {
     ev <- do.call(npreg, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npreg.rbandwidth))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
     return(ev)

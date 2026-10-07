@@ -68,7 +68,9 @@ and training data.
 
   \item{subset}{
     an optional vector specifying a subset of observations to be used by
-    the formula method.
+    the formula method. When reusing a bandwidth object with retained training
+    data, a new subset requires explicit \code{data}; otherwise supply the
+    bandwidth object without a new subset to reuse its retained rows.
   }
 
   \item{na.action}{
@@ -158,6 +160,8 @@ selection, prediction, or plotting route.
   training provenance is unavailable. Evaluation outcomes do not replace this
   training score. No additional fit is performed to recover it.
   This score concerns the regression on the transformed quantile response.
+  For vector \code{tau}, \code{residual.scale} is a named vector with one
+  training MSE for each requested quantile, matching the prediction columns.
 
   Formula fits retain trained terms and prediction expressions, so
   data-dependent transformations are reused for \code{newdata} rather than

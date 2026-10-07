@@ -224,6 +224,9 @@ predict.condensity <- function(object, se.fit = FALSE, ...) {
   }
   dots[["se"]] <- se.fit
   has.formula.route <- !is.null(object$bws$formula)
+  if (!has.formula.route)
+    dots <- .np_match_native_args(dots, npcdens.conbandwidth,
+                                  c("txdat", "tydat"))
 
   if ((!is.null(dots$exdat) || !is.null(dots$eydat)) && !is.null(dots$newdata))
     dots$newdata <- NULL

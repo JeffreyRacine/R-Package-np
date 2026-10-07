@@ -78,8 +78,8 @@ npudist.formula <-
 
 npudist.call <-
   function(bws, ...) {
-    npudist(tdat = .np_eval_bws_call_arg(bws, "dat"),
-          bws = bws, ...)
+    do.call(npudist, .np_retained_training_args(
+      bws, c(tdat = "dat"), list(...), npudist.dbandwidth))
   }
 
 npudist.dbandwidth <-

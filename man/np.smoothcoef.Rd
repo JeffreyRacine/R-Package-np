@@ -326,6 +326,9 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
     summaries, not to redefine these residuals. }
   \item{R2}{ coefficient of determination (Doksum and Samarov (1995))}
   \item{MSE}{ mean squared error }
+  \item{training.MSE}{Known mean squared error against the training outcomes,
+    retained independently of any evaluation-outcome override; \code{NA} when
+    it is unavailable without another fit.}
   \item{MAE}{ mean absolute error }
   \item{MAPE}{ mean absolute percentage error }
   \item{CORR}{ absolute value of Pearson's correlation coefficient }

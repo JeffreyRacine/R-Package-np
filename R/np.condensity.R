@@ -102,7 +102,7 @@ npcdens.formula <-
 npcdens.call <-
   function(bws, ...) {
     do.call(npcdens, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npcdens.conbandwidth))
   }
 
 

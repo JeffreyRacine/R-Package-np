@@ -7,9 +7,12 @@ collect_plot_payload_fields <- function(x, path = character()) {
     return(out)
   }
 
-  if (is.data.frame(x)) {
-    x <- as.list(x)
+  leaf <- if (length(path)) path[[length(path)]] else ""
+  if (is.data.frame(x) && leaf %in% c("evalx", "evaly", "evalz")) {
+    out[[paste(path, collapse = ".")]] <- x
+    return(out)
   }
+  if (is.data.frame(x)) x <- as.list(x)
 
   if (is.list(x)) {
     nm <- names(x)
@@ -63,10 +66,22 @@ expect_plot_payload_comparable <- function(pair,
 
   expect_equal(sort(names(exact.fields)), sort(names(frozen.fields)), info = label)
 
+  if (identical(label, "npplreg")) {
+    expect_true(any(grepl("(^|[.])evalx$", names(exact.fields))), info = label)
+    expect_true(any(grepl("(^|[.])evalz$", names(exact.fields))), info = label)
+  }
   for (nm in names(exact.fields)) {
     exact.val <- exact.fields[[nm]]
     frozen.val <- frozen.fields[[nm]]
     leaf <- sub("^.*\\.", "", nm)
+    if (is.data.frame(exact.val)) {
+      expect_identical(dim(frozen.val), dim(exact.val), info = label)
+      expect_identical(names(frozen.val), names(exact.val), info = label)
+      expect_true(all(is.finite(as.matrix(exact.val))), info = label)
+      expect_true(all(is.finite(as.matrix(frozen.val))), info = label)
+      expect_equal(frozen.val, exact.val, tolerance = 1e-10, info = label)
+      next
+    }
 
     expect_equal(length(frozen.val), length(exact.val), info = sprintf("%s %s length", label, nm))
     if (leaf %in% c("mean", "evalx", "evaly", "evalz")) {

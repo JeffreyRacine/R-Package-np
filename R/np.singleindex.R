@@ -208,7 +208,7 @@ npindex.formula <-
 npindex.call <-
   function(bws, ...) {
     do.call(npindex, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npindex.sibandwidth))
   }
 
 .np_index_kernel_args <- function(bws) {

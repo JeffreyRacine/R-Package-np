@@ -10,8 +10,11 @@ test_that("vector LSQ search re-enters its private method with owned controls", 
     scale = { count <- count + 1L; rep(.3, n) }, bandwidth.compute = FALSE)
   expect_identical(count, 1L)
   expect_length(fitted(fit), n)
-  bw <- nplsqregbw(start, xdat = x, ydat = y, tau = c(.2, .5, .8),
+  count <- 0L
+  bw <- nplsqregbw(start, xdat = { count <- count + 1L; x },
+                   ydat = y, tau = c(.2, .5, .8),
                    scale = rep(.3, n), nmulti = 1L, itmax = 2L)
+  expect_identical(count, 1L)
   expect_s3_class(bw, "lsqregressionbandwidth")
   expect_equal(bw$tau, c(.2, .5, .8), tolerance = 0)
   expect_identical(bw$call[[1L]], as.name("nplsqregbw"))

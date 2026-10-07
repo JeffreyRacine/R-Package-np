@@ -1,5 +1,20 @@
 # np 0.80-1
 
+- Match positional native training arguments before reusing retained data, while
+  preserving positional evaluation arguments in fitted-object prediction.
+
+- Local-smoothing quantile calls evaluate supplied arguments once in their
+  originating scope, including pooled calls and progress-wrapper re-entry.
+  Applying a new subset to a retained formula bandwidth requires explicit data.
+- Smooth-coefficient predictions preserve known training MSE even when the
+  original fit was scored against alternative outcomes. Vector-quantile
+  prediction reports one residual.scale value per tau.
+- Automatic Ichimura diagnostics do not score numeric outcomes against a model
+  trained on factor codes. Explicit outcomes must match the trained response type.
+- Conditional density/distribution and regression plot-data objects retain
+  grid dimensions and trained variable names. Smooth-coefficient plot-data
+  objects report unavailable goodness-of-fit scores as NA.
+
 - Initialize guarded native temporaries and remove unused categorical-profile
   bookkeeping to avoid compiler warnings without changing estimator arithmetic.
 
@@ -12,8 +27,10 @@
   wrapper from private method calls without a function-lookup error.
 
 - Native search interrupt handling uses a portable R API on Windows and Unix.
-  Interrupt hooks and traceback run after cleanup; an explicit request to
-  resume a released search fails with a clear error.
+  For interrupts observed by R, hooks and traceback run after cleanup; an explicit request to
+  resume a released search fails with a clear error. Terminal SIGINT handled
+  directly by the search dependency retains that dependency's existing error
+  behavior; it does not use this R-observed interrupt path.
 - Partially linear plot-data objects report unavailable goodness-of-fit scores
   as NA instead of shifting the training MSE into the R-squared field.
 - Klein-Spady automatic degree searches reject a single-class complete sample
@@ -36,7 +53,7 @@
 - Regression NN bandwidth-constructor refits also validate against the current complete sample.
   Predictor-only regression evaluations report unavailable goodness-of-fit
   scores as NA, without additional fitting work.
-- Contained native-search progress interrupts now restore R's interrupt/error
+- Contained R-observed native-search progress interrupts now restore R's interrupt/error
   hooks and traceback after cleanup. Message-bearing constructed conditions
   retain their original identity and reporting.
 

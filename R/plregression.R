@@ -235,6 +235,9 @@ predict.plregression <- function(object, se.fit = FALSE, ...) {
   obj.bws <- .np_plreg_bws(object, where = "predict.plregression")
   dots <- list(...)
   has.formula.route <- !is.null(obj.bws$formula)
+  if (!has.formula.route)
+    dots <- .np_match_native_args(dots, npplreg.plbandwidth,
+                                  c("txdat", "tydat", "tzdat"))
 
   if ((!is.null(dots$exdat) || !is.null(dots$ezdat)) && !is.null(dots$newdata)) {
     dots$newdata <- NULL

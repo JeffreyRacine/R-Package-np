@@ -109,6 +109,11 @@
     else if (!(is.numeric(value) || is.factor(value)) || !is.null(dim(value)))
       stop("npindex() evaluation response must be a numeric vector or factor",
            call. = FALSE)
+    if (identical(method, "ichimura") && !is.factor(value) &&
+        !is.null(training.info) &&
+        (any(training.info$iuno) || any(training.info$iord)))
+      stop("npindex() evaluation response must be a factor matching the training response levels",
+           call. = FALSE)
     if (is.factor(value) && !is.null(training.info))
       .np_regression_response_levels(data.frame(value), training.info)
     value
@@ -136,6 +141,8 @@
     prediction else if (!changed && isTRUE(object[["trainiseval", exact = TRUE]]))
     object else NULL
   if (is.null(owner)) return(NA_real_)
+  known <- owner[["training.MSE", exact = TRUE]]
+  if (!is.null(known)) return(known)
   call <- owner[["call", exact = TRUE]]
   if (is.call(call)) {
     args <- c(names(call)[-1L], names(call[["..."]]))

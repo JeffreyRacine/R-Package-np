@@ -1198,6 +1198,29 @@ nplsqregbw.NULL <- function(...) {
   nplsqregbw.default(...)
 }
 
+# Re-enter or dispatch only arguments owned by this invocation. Formal
+# promises cache their original evaluation; looking up their expressions again
+# can capture a method local, a global binding, or a second random draw.
+.nplsqreg_owned_call <- function(call, owner, materialize = FALSE) {
+  parts <- as.list(call)
+  parts[["..."]] <- NULL
+  for (name in names(parts)[-1L]) {
+    value <- if (materialize) get(name, envir = owner, inherits = FALSE) else
+      as.name(name)
+    parts[name] <- list(if (materialize && is.language(value))
+      substitute(quote(VALUE), list(VALUE = value)) else value)
+  }
+  if (materialize) {
+    dots <- lapply(eval(quote(list(...)), owner), function(value) {
+      if (is.language(value)) substitute(quote(VALUE), list(VALUE = value)) else value
+    })
+    parts <- c(parts, dots)
+  } else {
+    parts <- c(parts, list(quote(...)))
+  }
+  as.call(parts)
+}
+
 nplsqregbw.default <-
   function(bws,
            xdat = stop("invoked without data 'xdat'"),
@@ -1223,19 +1246,22 @@ nplsqregbw.default <-
     if (isTRUE(bandwidth.compute) &&
         !progress.wrapped &&
         !.np_progress_bandwidth_active()) {
-      mc <- match.call(expand.dots = TRUE)
-      # Re-entry may occur from a caller that cannot resolve this private
-      # method by name. Keep the argument evaluation environment unchanged.
-      mc[[1L]] <- nplsqregbw.default
+      public.call <- match.call(expand.dots = FALSE)
+      mc <- .nplsqreg_owned_call(public.call, environment())
+      mc[[1L]] <- as.name("nplsqregbw.default")
       old.progress.wrapped <- .np_progress_runtime$nplsqreg_bw_wrapped
       .np_progress_runtime$nplsqreg_bw_wrapped <- TRUE
       on.exit({
         .np_progress_runtime$nplsqreg_bw_wrapped <- old.progress.wrapped
       }, add = TRUE)
-      return(.np_progress_select_bandwidth_enhanced(
+      result <- .np_progress_select_bandwidth_enhanced(
         "Selecting least-squares quantile regression bandwidth",
-        eval.parent(mc)
-      ))
+        eval(mc, envir = environment())
+      )
+      # Re-entry changes only evaluation ownership, not the public call.
+      # This also keeps rank-local progress wrappers publication-equivalent.
+      result$call <- .nplsqreg_describe_call(public.call, parent.frame())
+      return(result)
     }
 
     tau.raw <- .nplsqreg_validate_tau_values(tau)
@@ -1644,6 +1670,10 @@ nplsqreg.formula <-
            gradient.order = 1L, se = FALSE, ...) {
 
     supplied.bws <- inherits(bws, "rbandwidth")
+    if (supplied.bws && !missing(subset) && is.null(data) &&
+        !is.null(bws[[".np.formula.training", exact = TRUE]]))
+      stop("nplsqreg(): supply explicit 'data' when applying a new 'subset' to a retained bandwidth object",
+           call. = FALSE)
     model.formula <- stats::formula(bws)
     tt <- .np_formula_aligned_terms(terms(bws))
     dots <- list(...)

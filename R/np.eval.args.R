@@ -4,7 +4,34 @@
   c(defaults[!names(defaults) %in% names(explicit)], explicit)
 }
 
-.np_retained_training_args <- function(bws, roles, explicit) {
+# Match positions/partial names before retained training data fills omissions.
+# Match integer tokens, not argument values: language objects remain data and
+# no supplied expression is evaluated again. Prediction reserves training slots.
+.np_match_native_args <- function(args, definition, retained = character()) {
+  if (!length(args)) return(args)
+  nms <- names(args)
+  formal.names <- names(formals(definition))
+  if (!is.null(nms) && all(nzchar(nms)) && all(nms %in% formal.names))
+    return(args)
+  tokens <- as.list(seq_along(args))
+  names(tokens) <- nms
+  match.tokens <- function(x) as.list(match.call(definition,
+    as.call(c(list(as.name("native"), bws = 0L), x)),
+    expand.dots = TRUE))[-1L]
+  if (length(retained)) {
+    named <- if (is.null(nms)) rep(FALSE, length(args)) else nzchar(nms)
+    supplied <- names(match.tokens(tokens[named]))
+    reserve <- setdiff(retained, supplied)
+    tokens <- c(setNames(rep(list(0L), length(reserve)), reserve), tokens)
+  }
+  matched <- match.tokens(tokens)
+  positions <- unlist(matched, use.names = FALSE)
+  keep <- positions > 0L
+  setNames(args[positions[keep]], names(matched)[keep])
+}
+
+.np_retained_training_args <- function(bws, roles, explicit, definition) {
+  explicit <- .np_match_native_args(explicit, definition)
   for (arg in setdiff(names(roles), names(explicit)))
     explicit[arg] <- list(.np_eval_bws_call_arg(bws, roles[[arg]]))
   .np_args_with_defaults(list(bws = bws), explicit)

@@ -107,6 +107,9 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
   has.formula.route <- !is.null(object$bws$formula)
+  if (!has.formula.route)
+    dots <- .np_match_native_args(dots, npindex.sibandwidth,
+                                  c("txdat", "tydat"))
 
   if (!is.null(dots$exdat) && !is.null(dots$newdata)) {
     dots$newdata <- NULL

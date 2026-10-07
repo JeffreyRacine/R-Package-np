@@ -88,7 +88,7 @@ npplreg.formula <-
 npplreg.call <-
   function(bws, ...) {
     do.call(npplreg, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat", tzdat = "zdat"), list(...)))
+      bws, c(txdat = "xdat", tydat = "ydat", tzdat = "zdat"), list(...), npplreg.plbandwidth))
   }
 
 .np_plreg_fit_progress_targets <- function(xnames) {
