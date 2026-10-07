@@ -1,5 +1,15 @@
 # npRmpi 0.80-1
 
+- Local-smoothing quantile fits reuse the retained sample and bandwidth
+  specification of formula-based regression bandwidth objects.
+- Partially linear plot surfaces retain predictor names and grid dimensions,
+  so their returned model objects support print() and summary().
+- Local-smoothing quantile bandwidth selection can re-enter its progress
+  wrapper from private method calls without a function-lookup error.
+- Vector-quantile searches no longer strand MPI workers during progress
+  re-entry. Their saved calls are consistent across ranks, and controls
+  supplied as local expressions are evaluated in the originating call.
+
 - Pooled single-index LP search cleanup preserves the original error message
   when releasing workers, instead of substituting a generic service error.
 
