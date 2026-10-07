@@ -292,9 +292,11 @@ nplsqregbw <-
 .nplsqreg_describe_call <- function(call, owner) {
   # do.call on these internal methods can store the closure as the call head.
   # Keep a portable descriptive public call, not the package function itself.
-  if (identical(call[[1L]], nplsqregbw.default))
+  if (identical(call[[1L]], nplsqregbw.default) ||
+      identical(call[[1L]], as.name("nplsqregbw.default")))
     call[[1L]] <- as.name("nplsqregbw")
-  else if (identical(call[[1L]], nplsqreg.default))
+  else if (identical(call[[1L]], nplsqreg.default) ||
+           identical(call[[1L]], as.name("nplsqreg.default")))
     call[[1L]] <- as.name("nplsqreg")
   environment(call) <- .np_call_owner_environment(owner)
   call
@@ -1222,6 +1224,9 @@ nplsqregbw.default <-
         !progress.wrapped &&
         !.np_progress_bandwidth_active()) {
       mc <- match.call(expand.dots = TRUE)
+      # Re-entry may occur from a caller that cannot resolve this private
+      # method by name. Keep the argument evaluation environment unchanged.
+      mc[[1L]] <- nplsqregbw.default
       old.progress.wrapped <- .np_progress_runtime$nplsqreg_bw_wrapped
       .np_progress_runtime$nplsqreg_bw_wrapped <- TRUE
       on.exit({
