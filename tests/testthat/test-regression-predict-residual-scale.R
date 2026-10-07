@@ -50,3 +50,18 @@ test_that("prediction residual scale follows known training MSE", {
                              na.action = na.exclude, se.fit = TRUE)$residual.scale))
   }
 })
+
+
+test_that("positional training overrides do not reuse stale residual scale", {
+  old <- options(np.messages=FALSE); on.exit(options(old),add=TRUE)
+  set.seed(334); d <- data.frame(x=rnorm(90),z=rnorm(90)); d$y <- sin(d$x)+rnorm(90)
+  b <- npregbw(y~x+z,data=d,bws=c(.7,.8),bandwidth.compute=FALSE)
+  f <- npreg(b,se=TRUE); d2 <- d[1:70,]; d2$y <- d2$y+cos(d2$x)
+  e <- d[71:90,]
+  named <- predict(f,TRUE,data=d2,newdata=e)
+  positional <- predict(f,TRUE,d2,e)
+  expect_true(is.na(named$residual.scale))
+  expect_true(is.na(positional$residual.scale))
+  expect_identical(named$fit,positional$fit)
+  expect_identical(named$se.fit,positional$se.fit)
+})

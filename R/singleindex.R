@@ -138,7 +138,10 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
   tr <- do.call(npindex, c(list(bws = object$bws, se = se.fit), dots))
   if (se.fit) {
     training.mse <- .np_index_training_mse(tr)
-    if (is.na(training.mse) && !any(c("data", "txdat", "tydat") %in% names(dots)))
+    if (is.na(training.mse) && length(names(dots)) == length(dots) &&
+        all(!is.na(names(dots)) & nzchar(names(dots))) &&
+        !any(!is.na(pmatch(names(dots),
+          c("data", "txdat", "tydat", "subset", "na.action"), duplicates.ok = TRUE))))
       training.mse <- .np_index_training_mse(object)
     return(list(fit = fitted(tr), se.fit = se(tr),
                 df = tr$nobs, residual.scale = training.mse))

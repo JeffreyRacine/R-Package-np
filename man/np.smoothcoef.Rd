@@ -248,6 +248,11 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   }
 }
 \details{
+  Prediction with \code{se.fit = TRUE} reports known training mean squared
+  error in \code{residual.scale}, retaining MSE units, or \code{NA} when
+  training provenance is unavailable. Evaluation outcomes do not replace this
+  training score. No additional fit is performed to recover it.
+
   In native calls, three unnamed arguments follow the fitter's bandwidth-first
   convention: \code{npscoef(bws, txdat, tydat)}; the smoothing data default
   to the training predictors. Numeric argument types cannot distinguish this
