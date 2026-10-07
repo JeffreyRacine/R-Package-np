@@ -1,5 +1,12 @@
 # np 0.80-1
 
+- Local-smoothing quantile fits reuse the retained sample and bandwidth
+  specification of formula-based regression bandwidth objects.
+- Partially linear plot surfaces retain predictor names and grid dimensions,
+  so their returned model objects support print() and summary().
+- Local-smoothing quantile bandwidth selection can re-enter its progress
+  wrapper from private method calls without a function-lookup error.
+
 - Native search interrupt handling uses a portable R API on Windows and Unix.
   Interrupt hooks and traceback run after cleanup; an explicit request to
   resume a released search fails with a clear error.
