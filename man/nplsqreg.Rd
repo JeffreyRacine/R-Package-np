@@ -54,6 +54,10 @@ and training data.
     bandwidth vector, or omitted for automatic bandwidth selection.
     Exact nplsqreg reuse is through the fitted object's \code{$bws}
     component; \code{$reg.bws} is internal regression state.
+    A formula-based \code{rbandwidth} retains its training sample and
+    bandwidth specification; supplying \code{data} explicitly replaces the
+    training sample. With \code{bandwidth.compute = FALSE}, its bandwidths
+    are held fixed in the quantile fit.
   }
 
   \item{data}{
@@ -285,6 +289,12 @@ selection, prediction, or plotting route.
   over the saved policy. Native fitting still requires complete rows, so
   a permissive policy does not guarantee the same retained sample as
   \code{stats::model.frame}.
+
+  When converting a formula-based \code{rbandwidth} without replacement
+  \code{data}, an explicitly supplied \code{scale} vector must follow the
+  retained complete training sample in its stored order. With replacement
+  \code{data}, scale follows the formula's ordinary subset and missing-data
+  handling.
 
   When reusing a bandwidth object without explicit training or evaluation
   data, newly constructed bandwidth objects use retained training values.
