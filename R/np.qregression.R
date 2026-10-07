@@ -1411,7 +1411,7 @@ npqreg.formula <-
 npqreg.call <-
   function(bws, ...) {
     do.call(npqreg, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npqreg.condbandwidth))
   }
 
 npqreg.conbandwidth <-

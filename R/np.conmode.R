@@ -108,9 +108,8 @@ npconmode.formula <-
 
 npconmode.call <-
   function(bws, ...) {
-    npconmode(txdat = .np_eval_bws_call_arg(bws, "xdat"),
-              tydat = .np_eval_bws_call_arg(bws, "ydat"),
-              bws = bws, ...)
+    do.call(npconmode, .np_retained_training_args(
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npconmode.conbandwidth))
   }
 
 npconmode.condbandwidth <-

@@ -463,7 +463,7 @@
         
       if (plot.behavior != "plot"){
         r1 = npregression(bws = bws,
-          eval = x.eval,
+          eval = setNames(x.eval, bws$xnames),
           mean = as.double(treg),
           merr = terr[,1:2],
           ntrain = dim(xdat)[1])
@@ -1068,7 +1068,7 @@
           if (gradients){
             plot.out[[i]] =
               npregression(bws = bws,
-                           eval = as.data.frame(subcol(exdat,ei,i)[seq_len(xi.neval),]),
+                           eval = setNames(subcol(exdat,ei,i)[seq_len(xi.neval), , drop = FALSE], bws$xnames),
                            mean = tr$mean,
                            merr = tr$merr,
                            grad = if (component.available) {
@@ -1092,7 +1092,7 @@
           } else {
             plot.out[[i]] =
               npregression(bws = bws,
-                           eval = as.data.frame(subcol(exdat,ei,i)[seq_len(xi.neval),]),
+                           eval = setNames(subcol(exdat,ei,i)[seq_len(xi.neval), , drop = FALSE], bws$xnames),
                            mean = na.omit(temp.mean),
                            merr = na.omit(cbind(-temp.err[,1],
                              temp.err[,2])),

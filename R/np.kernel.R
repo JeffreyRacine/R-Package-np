@@ -75,6 +75,17 @@ npksum.formula <-
 npksum.integer <-
   function(...) { npksum.numeric(...) }
 
+# Transport already-owned dots instead of replaying expressions on workers.
+# This is local to npksum; shared dispatcher targets and protocol are unchanged.
+.npRmpi_npksum_owned_call <- function(mc, dots) {
+  if (length(dots)) {
+    mc[["..."]] <- as.pairlist(lapply(dots, function(value) {
+      if (is.language(value)) substitute(quote(VALUE), list(VALUE = value)) else value
+    }))
+  }
+  .npRmpi_autodispatch_expand_dots_call(mc)
+}
+
 npksum.numeric <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
@@ -108,7 +119,9 @@ npksum.numeric <-
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npksum.numeric"))
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_npksum_owned_call(match.call(expand.dots = FALSE), list(...)),
+        parent.frame(), owner.name = "npksum.numeric"))
 
     txdat <- toFrame(txdat)
     if (!missing(exdat)) {
@@ -247,7 +260,9 @@ npksum.default <-
       }))
     }
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npksum.default"))
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_npksum_owned_call(match.call(expand.dots = FALSE), list(...)),
+        parent.frame(), owner.name = "npksum.default"))
 
     miss.ty <- missing(tydat)
     miss.ex <- missing(exdat)

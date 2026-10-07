@@ -96,6 +96,9 @@ predict.npdensity <- function(object, se.fit = FALSE, ...) {
     dots[["se"]] <- NULL
   }
   has.formula.route <- !is.null(object$bws$formula)
+  if (!has.formula.route)
+    dots <- .np_match_native_args(dots, npudens.bandwidth,
+                                  c("tdat"))
 
   if (!is.null(dots$edat) && !is.null(dots$newdata)) {
     dots$newdata <- NULL

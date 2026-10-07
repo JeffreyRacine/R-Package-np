@@ -144,7 +144,9 @@
       }
     }
     result$call <- original.call
-    environment(result$call) <- caller.env
+    # Native training is retained by value; retaining the call's frame would
+    # pin unrelated caller data. Formula methods restore their own call owner.
+    environment(result$call) <- if (is.null(result$formula)) NULL else caller.env
   }
   result
 }

@@ -289,6 +289,9 @@ predict.npregression <- function(object, se.fit = FALSE, ...) {
   if ("se" %in% names(dots))
     stop("predict.npregression uses 'se.fit', not 'se'", call. = FALSE)
   has.formula.route <- !is.null(object$bws$formula)
+  if (!has.formula.route)
+    dots <- .np_match_native_args(dots, npreg.rbandwidth,
+                                  c("txdat", "tydat"))
 
   if (!is.null(dots$exdat) && !is.null(dots$newdata)) {
     dots$newdata <- NULL

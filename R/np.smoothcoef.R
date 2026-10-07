@@ -130,7 +130,7 @@ npscoef.call <-
     roles <- c(txdat = "xdat", tydat = "ydat")
     if (!is.null(bws$zdati))
       roles <- c(roles, tzdat = "zdat")
-    do.call(npscoef, .np_retained_training_args(bws, roles, list(...)))
+    do.call(npscoef, .np_retained_training_args(bws, roles, list(...), npscoef.scbandwidth))
   }
 
 .np_scoef_fit_progress_begin <- function(handoff = FALSE, detail = NULL) {
@@ -1362,6 +1362,11 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (!(miss.ey && !miss.ex))
       sc.obj.args$xtra <- c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
     ev <- do.call(smoothcoefficient, sc.obj.args)
+    # An outcome-only override changes reported scores, not the fitted sample.
+    # Reuse the existing training score on the ordinary path; never refit.
+    ev$training.MSE <- if (miss.ex) {
+      if (miss.ey) MSE else MSEfunc(tydat, mean)
+    } else NA_real_
     ev$eval.rows.omit <- if (miss.ex) integer(0) else which(!keep.eval)
     # Replay only fitting controls, never calls, caller frames or training data.
     ev$fit.controls <- list(iterate = iterate, maxiter = maxiter, tol = tol,

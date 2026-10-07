@@ -101,7 +101,7 @@ npcdist.formula <-
 npcdist.call <-
   function(bws, ...) {
     do.call(npcdist, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...)))
+      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npcdist.condbandwidth))
   }
 
 

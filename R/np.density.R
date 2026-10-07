@@ -88,8 +88,8 @@ npudens.formula <-
 
 npudens.call <-
   function(bws, ...) {
-    npudens(bws, tdat = .np_eval_bws_call_arg(bws, "dat"),
-            ...)
+    do.call(npudens, .np_retained_training_args(
+      bws, c(tdat = "dat"), list(...), npudens.bandwidth))
   }
 
 npudens.bandwidth <-

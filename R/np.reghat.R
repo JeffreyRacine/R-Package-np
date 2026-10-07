@@ -2017,7 +2017,7 @@ npreghat.call <-
   function(bws, ...) {
     dots <- list(...)
     args <- .np_retained_training_args(
-      bws, c(txdat = "xdat", y = "ydat"), dots)
+      bws, c(txdat = "xdat", y = "ydat"), dots, npreghat.rbandwidth)
     ev <- do.call(npreghat, args)
     attr(ev, "call") <- match.call(expand.dots = FALSE)
     ev

@@ -787,6 +787,7 @@ gradients.lsqregression <- function(x, se = FALSE,
 predict.lsqregression <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
+  dots <- .np_match_native_args(dots, npreg.rbandwidth, c("txdat", "tydat"))
   defer.empty <- isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])
   dots$.np.defer.empty.rows <- NULL
   npRejectLegacyBooleanErrors(dots, "predict.lsqregression")
@@ -850,7 +851,8 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
       colnames(fit) <- labels
       colnames(se.out) <- labels
       out <- list(fit = fit, se.fit = se.out, df = pred[[1L]]$df,
-                  residual.scale = pred[[1L]]$residual.scale)
+                  residual.scale = setNames(vapply(pred, function(one)
+                    one$residual.scale, numeric(1L)), labels))
       return(finish(out, empty.state$rows))
     }
     out <- do.call(cbind, pred)

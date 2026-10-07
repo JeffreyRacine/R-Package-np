@@ -437,14 +437,20 @@
                           "quant" = qregression,
                           "dist" = condistribution,
                           "dens" = condensity)
-        ret.args <- list(bws = bws, xeval = tex, ntrain = dim(xdat)[1])
+        # Preserve frame dimensions and trained names in the returned object.
+        # The evaluation and bootstrap inputs above are unchanged.
+        result.x <- if (quantreg) x.eval else x.eval[, 1L, drop = FALSE]
+        names(result.x) <- bws$xnames
+        ret.args <- list(bws = bws, xeval = result.x, ntrain = dim(xdat)[1])
         if (quantreg) {
           ret.args$tau <- tau
           ret.args$fit.controls <- list(tol = tol, small = small, itmax = as.integer(itmax))
           ret.args$quantile <- tcomp
           ret.args$quanterr <- terr[,1:2]
         } else {
-          ret.args$yeval <- tey
+          result.y <- x.eval[, 2L, drop = FALSE]
+          names(result.y) <- bws$ynames
+          ret.args$yeval <- result.y
           if (cdf) ret.args$condist <- tcomp else ret.args$condens <- tcomp
           ret.args$conderr <- terr[,1:2]
           if (cdf) {
