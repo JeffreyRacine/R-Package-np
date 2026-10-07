@@ -29,8 +29,18 @@ search <- function() {
   if (spec$pkg == "npRmpi") get(".npRmpi_with_local_regression", ns)(body())
   else body()
 }
+if (spec$wrap == "error-hook")
+  options(error = function() {
+    cat("REAL_INTERRUPT_ERROR_HOOK\n", file = stderr())
+    q(save = "no", status = 3L)
+  })
+if (spec$wrap == "interrupt-hook")
+  options(interrupt = function() cat("REAL_INTERRUPT_HOOK\n", file = stderr()))
+if (spec$wrap == "traceback")
+  options(error = quote(cat("REAL_INTERRUPT_ERROR_HOOK\n", file = stderr())))
 switch(spec$wrap,
   top = search(),
   try = try(search(), silent = TRUE),
-  error = tryCatch(search(), error = identity))
-cat("REAL_OBSERVER_INCORRECTLY_CONTINUED\n")
+  error = tryCatch(search(), error = identity),
+  search())
+if (spec$wrap != "traceback") cat("REAL_OBSERVER_INCORRECTLY_CONTINUED\n")
