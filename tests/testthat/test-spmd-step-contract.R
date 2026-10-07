@@ -1,3 +1,80 @@
+# These cheap ACK fixtures cover reporting decisions without starting MPI.
+# Real collectives and sequence divergence are covered by the subprocess tests.
+spmd_ack_fixture <- function(condition = simpleError("invalid option"), size = 4L) {
+  envelope <- getFromNamespace(".npRmpi_spmd_make_envelope", "npRmpi")(
+    opcode = "autodispatch.unit_test", seq_id = 1L, timeout_class = "unit")
+  ok <- is.null(condition)
+  ack <- list(seq_id = 1L, opcode = envelope$opcode,
+              status = if (ok) "ACK" else "ERR",
+              publication_kind = "", publication_id = "",
+              publication_capability = "", publication_fingerprint = "")
+  local <- list(ok = ok, ack = ack, result = if (ok) 17L else NULL)
+  if (!ok) {
+    local$error <- conditionMessage(condition)
+    local$condition <- condition
+  }
+  fields <- c("rank", "seq_id", "opcode", "status", "error",
+              "publication_kind", "publication_id", "publication_capability",
+              "publication_fingerprint")
+  acks <- vapply(seq_len(size) - 1L, function(rank)
+    c(as.character(rank), "1", envelope$opcode, ack$status,
+      if (ok) "" else conditionMessage(condition), rep("", 4L)), character(9L))
+  rownames(acks) <- fields
+  list(envelope = envelope, local = local, acks = acks, size = size)
+}
+
+spmd_ack_run_fixture <- function(fixture, rank = 0L, gather.error = NULL) {
+  testthat::with_mocked_bindings(
+    getFromNamespace(".npRmpi_spmd_collective_ack", "npRmpi")(
+      fixture$local, fixture$envelope, where = "unit ACK"),
+    mpi.comm.size = function(comm) fixture$size,
+    mpi.comm.rank = function(comm) rank,
+    mpi.allgather.Robj = function(obj, comm) {
+      if (!is.null(gather.error)) stop(gather.error)
+      as.vector(fixture$acks)
+    }, .package = "npRmpi")
+}
+
+test_that("SPMD unanimous failures retain the captured condition", {
+  conditions <- list(
+    simpleError("unused nplsqregbw argument 'total_nonsense'"),
+    structure(simpleError("typed application error"), class = c("unit_error", "error", "condition")),
+    structure(simpleError("coordinated failure"), class = c("npRmpi_coordinated_error", "error", "condition")),
+    structure(simpleError("zero radius"), class = c("np_nn_zero_radius", "error", "condition")))
+  for (condition in conditions) {
+    fixture <- spmd_ack_fixture(condition)
+    got <- tryCatch(spmd_ack_run_fixture(fixture), error = identity)
+    expect_identical(got, condition)
+    expect_identical(spmd_ack_run_fixture(fixture, rank = 1L), fixture$local)
+  }
+})
+
+test_that("SPMD error agreement cannot hide transaction disagreement", {
+  for (field in c("status", "error", "seq_id", "opcode")) {
+    fixture <- spmd_ack_fixture()
+    fixture$acks[field, 2L] <- switch(field, status = "ACK", error = "different error",
+                                    seq_id = "9", opcode = "autodispatch.other")
+    expect_error(spmd_ack_run_fixture(fixture), "ACK mismatch", fixed = TRUE)
+  }
+  fixture <- spmd_ack_fixture()
+  fixture$acks["seq_id", 2L] <- NA_character_
+  expect_error(spmd_ack_run_fixture(fixture), "ACK mismatch", fixed = TRUE)
+  fixture$acks <- fixture$acks[, -2L, drop = FALSE]
+  expect_error(spmd_ack_run_fixture(fixture), "ACK gather shape mismatch", fixed = TRUE)
+  expect_error(spmd_ack_run_fixture(spmd_ack_fixture(), gather.error = simpleError("transport failed")),
+               "ACK gather failed", fixed = TRUE)
+})
+
+test_that("SPMD success, publication checks and local fallback are unchanged", {
+  fixture <- spmd_ack_fixture(NULL)
+  expect_identical(spmd_ack_run_fixture(fixture), fixture$local)
+  fixture$acks["publication_id", 2L] <- "different publication"
+  expect_error(spmd_ack_run_fixture(fixture), "ACK mismatch", fixed = TRUE)
+  fixture <- spmd_ack_fixture(NULL, size = 1L)
+  expect_identical(spmd_ack_run_fixture(fixture), fixture$local)
+  expect_error(spmd_ack_run_fixture(spmd_ack_fixture(size = 1L)), "local failure", fixed = TRUE)
+})
+
 run_spmd_subprocess <- function(lines, timeout = 60L, env = character()) {
   script <- tempfile("npRmpi-spmd-", fileext = ".R")
   writeLines(lines, script, useBytes = TRUE)

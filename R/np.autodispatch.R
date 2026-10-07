@@ -1735,13 +1735,14 @@
     if (isTRUE(unanimous.nn.radius))
       stop(local$condition)
 
-    unanimous.coordinated <- !is.na(rank) && rank == 0L &&
-      inherits(local$condition, "npRmpi_coordinated_error") &&
+    # Matching failed executions are application errors, not ACK disagreement.
+    unanimous.error <- !is.na(rank) && rank == 0L &&
+      inherits(local$condition, "error") &&
       all(status.vec == "ERR") &&
       all(seq.vec == as.integer(envelope$seq_id)) &&
       all(opcode.vec == as.character(envelope$opcode)[1L]) &&
       all(ack.mat["error", ] == conditionMessage(local$condition))
-    if (isTRUE(unanimous.coordinated))
+    if (isTRUE(unanimous.error))
       stop(local$condition)
 
     detail.index <- unique(c(1L, bad))

@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+- Pooled calls report a matching error from every rank without mislabelling it
+  as an ACK mismatch, including invalid local-smoothing quantile arguments.
+
 - Local-smoothing quantile fits reuse the retained sample and bandwidth
   specification of formula-based regression bandwidth objects.
 - Partially linear plot surfaces retain predictor names and grid dimensions,
