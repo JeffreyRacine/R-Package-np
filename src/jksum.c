@@ -26145,7 +26145,7 @@ double * cv){
     np_distribution_profile_cv_mpi_tile_max_bytes :
     np_distribution_profile_cv_serial_tile_max_bytes;
   size_t tile_capacity_rows;
-  int tile_rows;
+  int tile_rows = 0;
   NPCategoricalProfileTileStatus tile_status;
   double *profile_y[1];
   NPDistributionProfileCvConsumer consumer = {0};
@@ -53743,13 +53743,11 @@ preflight_profile_rows_cat_cvls:
         g0 += profile_group_width){
       const int group_count =
         MIN(profile_group_width, owned_profile_end - g0);
-      int group_yg[NP_CDENS_PROFILE_GROUP_WIDTH];
       double group_cxg[NP_CDENS_PROFILE_GROUP_WIDTH];
       double group_den_loo[NP_CDENS_PROFILE_GROUP_WIDTH];
       double group_lin[NP_CDENS_PROFILE_GROUP_WIDTH] = {0.0};
       double group_quad[NP_CDENS_PROFILE_GROUP_WIDTH] = {0.0};
       double *group_kx[NP_CDENS_PROFILE_GROUP_WIDTH];
-      double *group_kyn[NP_CDENS_PROFILE_GROUP_WIDTH];
       int q;
 
       for(q = 0; q < group_count; q++){
@@ -53764,7 +53762,6 @@ preflight_profile_rows_cat_cvls:
         np_hot_loop_check_interrupt(gq,
                                     nprof_xy,
                                     profile_interrupt_stride);
-        group_yg[q] = yg;
         group_cxg[q] = cxg;
 
         if(use_x_cache){
@@ -53837,7 +53834,6 @@ preflight_profile_rows_cat_cvls:
           kyn_row = kyn + (size_t)yg*(size_t)nprof_y;
         }
         group_kx[q] = kx_row;
-        group_kyn[q] = kyn_row;
 
         for(h = 0; h < nprof_xy; h++){
           const int rep_h = xy_rep[h];
@@ -55544,7 +55540,7 @@ static int np_density_cvls_beta_cross_term_mpi(
 {
   NPBetaScaledRowContext context;
   NPBetaLooGeometry geometry = {0};
-  NPContinuousKernelRowStatus row_status;
+  NPContinuousKernelRowStatus row_status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
   double *contributions = NULL;
   double local_cross_term = 0.0;
   int owned_start = 0;

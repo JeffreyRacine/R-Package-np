@@ -2858,7 +2858,7 @@ np_continuous_kernel_beta_dual_power_rows_validated(
 
     for(observation = 0; observation < plan->num_train; ++observation) {
       double value;
-      double value_power2;
+      double value_power2 = 0.0;
 
       if(retain_common_scale) {
         value = row_result->row[observation];

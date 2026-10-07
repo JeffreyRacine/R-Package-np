@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+- Initialize guarded native temporaries and remove unused categorical-profile
+  bookkeeping to avoid compiler warnings without changing estimator arithmetic.
+
 - Pooled calls report a matching error from every rank without mislabelling it
   as an ACK mismatch, including invalid local-smoothing quantile arguments.
 
