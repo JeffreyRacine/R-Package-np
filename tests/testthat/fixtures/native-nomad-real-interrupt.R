@@ -42,5 +42,6 @@ switch(spec$wrap,
   top = search(),
   try = try(search(), silent = TRUE),
   error = tryCatch(search(), error = identity),
+  resume = withCallingHandlers(search(), interrupt = function(e) invokeRestart("resume")),
   search())
 if (spec$wrap != "traceback") cat("REAL_OBSERVER_INCORRECTLY_CONTINUED\n")

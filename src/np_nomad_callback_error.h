@@ -5,7 +5,7 @@
 #define NP_NOMAD_CALLBACK_ERROR_H
 
 #include <setjmp.h>
-#include <Rinterface.h>
+#include "np_interrupt.h"
 
 typedef struct {
   crs_nomad_eval_fn eval;
@@ -173,13 +173,13 @@ static void np_nomad_error_observer_init(NPNomadCallbackError *owner,
 /* Real R interrupts are empty list conditions. R's epilogue signals handlers,
  * runs the configured hooks and records the traceback. Do not signal twice or
  * use abort, which bypasses that epilogue. The original native invocation has
- * been cleaned up, so it cannot offer a resume restart. Constructed conditions
+ * been cleaned up; the portable adapter rejects any request to resume it. Constructed conditions
  * with fields retain their identity, message and historical stop semantics. */
 static void np_nomad_condition_raise(SEXP condition)
 {
   if (Rf_inherits(condition, "interrupt") &&
       TYPEOF(condition) == VECSXP && Rf_length(condition) == 0)
-    Rf_onintrNoResume();
+    np_raise_real_interrupt();
   SEXP call = PROTECT(Rf_lang2(Rf_install("stop"), condition));
   Rf_eval(call, R_BaseEnv);
   UNPROTECT(1);
