@@ -266,11 +266,14 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   coefficients. For held-out assessment, estimate the coefficients and any
   data-selected bandwidths using the training sample.
 
-  For Ichimura fits trained on a factor response, evaluation outcomes must
+  For Ichimura fits trained on an unordered factor response (or an ordered
+  response without numeric levels), evaluation outcomes must
   also be factors compatible with the training levels: raw numeric labels
   do not identify the factor-code scale used for fitting. In automatic mode
   such numeric outcomes leave diagnostics unavailable, without blocking
   predictions; explicit evaluation-outcome requests report an error.
+  For ordered training responses with numeric levels, numeric evaluation
+  outcomes on that same scale are also accepted.
 
   Evaluation outcomes affect diagnostics only. In automatic mode, outcomes that
   cannot be evaluated, aligned, or validated are treated as unavailable for

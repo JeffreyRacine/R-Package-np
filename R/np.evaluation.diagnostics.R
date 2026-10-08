@@ -111,7 +111,8 @@
            call. = FALSE)
     if (identical(method, "ichimura") && !is.factor(value) &&
         !is.null(training.info) &&
-        (any(training.info$iuno) || any(training.info$iord)))
+        (any(training.info$iuno) ||
+         any(training.info$iord & !training.info$inumord)))
       stop("npindex() evaluation response must be a factor matching the training response levels",
            call. = FALSE)
     if (is.factor(value) && !is.null(training.info))

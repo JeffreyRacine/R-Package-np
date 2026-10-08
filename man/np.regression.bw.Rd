@@ -168,8 +168,8 @@ These arguments control regression type, local-polynomial specification, and opt
     \code{degree.select != "manual"}. \code{ll} and positive-degree
     \code{lp} require at least one continuous predictor; for
     categorical-only predictors use \code{lc} or \code{lp} with
-    \code{degree=0}. The beta associated-kernel route currently requires
-    \code{regtype="lc"}. Defaults to \code{lc}.
+    \code{degree=0}. The beta associated-kernel route supports
+    \code{lc}, \code{ll}, and \code{lp}. Defaults to \code{lc}.
   }
 
   \item{basis}{
@@ -422,7 +422,7 @@ These controls set numerical search starts, kernel choices, and support bounds.
   \item{ckertype}{
     character string used to specify the continuous kernel type.
     Can be set as \code{gaussian}, \code{epanechnikov}, \code{uniform}, or
-    \code{beta}; see Details for the local-constant finite-support beta
+    \code{beta}; see Details for the finite-support beta
     contract. Defaults to \code{gaussian}.
   }
 
@@ -720,18 +720,18 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
   for continuous data types include the second, fourth, sixth, and eighth
   order Gaussian and Epanechnikov kernels, and the uniform kernel. Beta
   associated kernels of orders 2, 4, 6, and 8 are additionally available for
-  local-constant bandwidth objects. Unordered discrete data types use a variation on Aitchison and
+  local-constant, local-linear and local-polynomial bandwidth objects. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
 
   The beta contract requires \code{ckertype="beta"}, \code{ckerorder} in
-  \code{c(2,4,6,8)}, \code{regtype="lc"}, finite
-  \code{ckerbound="fixed"} bounds or \code{ckerbound="range"}, continuous
-  predictors only, and no gradient request. Explicit bandwidth objects and
-  automatic \code{cv.ls}/\code{cv.aic} search support fixed,
-  generalized-NN, and adaptive-NN modes. Normal-reference selection,
-  categorical predictors, and local-linear/local-polynomial regression are
-  not silently approximated; unsupported combinations fail explicitly. See
+  \code{c(2,4,6,8)} and finite \code{ckerbound="fixed"} bounds or
+  \code{ckerbound="range"} for each continuous predictor. Local-constant,
+  local-linear and local-polynomial regression support mixed continuous and
+  categorical predictors. Explicit bandwidth objects and automatic
+  \code{cv.ls}/\code{cv.aic} search support fixed, generalized-NN, and
+  adaptive-NN modes. Normal-reference selection is unsupported. Gradient
+  and standard-error support is described in \code{\link{npreg}}. See
   \code{\link{npreg}} and \code{\link{np.kernels}} for the exact beta weight,
   bandwidth convention, ratio estimator, and standard-error definition.
 

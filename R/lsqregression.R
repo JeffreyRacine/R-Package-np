@@ -787,7 +787,11 @@ gradients.lsqregression <- function(x, se = FALSE,
 predict.lsqregression <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
-  dots <- .np_match_native_args(dots, npreg.rbandwidth, c("txdat", "tydat"))
+  # Formula evaluation owns names and transformations; native exdat already
+  # contains model coordinates. Reserve training slots for positional newdata.
+  dots <- if (is.null(object$bws$formula))
+    .np_match_native_args(dots, npreg.rbandwidth, c("txdat", "tydat")) else
+    .np_match_native_args(dots, nplsqreg.formula, "data")
   defer.empty <- isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])
   dots$.np.defer.empty.rows <- NULL
   npRejectLegacyBooleanErrors(dots, "predict.lsqregression")

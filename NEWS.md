@@ -1,5 +1,23 @@
 # npRmpi 0.80-1
 
+- Pooled calls preserve the master method's already-evaluated argument values,
+  including random starts, search controls and constructor metadata passed
+  through `...`. Formula subset evaluation and numerical owners are unchanged.
+- Partial positional training replacements no longer combine new observations
+  with a bandwidth object's old sample. Supply all required training roles;
+  the smooth-coefficient default uses the newly supplied predictors for smoothing.
+- Formula-based local-smoothing quantile predictions process positional newdata
+  using trained terms and predictor names, including transformed predictors.
+- Local-smoothing quantile subsets on regression bandwidth objects use the data
+  mask once and accept NULL/TRUE no-op subsets. Stored LSQ bandwidth objects
+  report an error for replacement training controls instead of ignoring them.
+- Explicit single-index evaluation outcomes now enforce response-scale
+  compatibility; numeric outcomes remain valid for numeric-labelled ordered
+  training responses.
+- Regression bandwidth documentation reflects beta-kernel support for
+  local-linear/local-polynomial and mixed-predictor regression.
+
+
 - Materialize additional npksum arguments on the master before pooled execution,
   preventing worker-side name resolution failures for locally supplied values.
 
@@ -8,14 +26,15 @@
 
 - Local-smoothing quantile calls evaluate supplied arguments once in their
   originating scope, including pooled calls and progress-wrapper re-entry.
-  Applying a new subset to a retained formula bandwidth requires explicit data.
+  Applying a row-changing subset to a retained formula regression bandwidth
+  requires explicit data.
 - Smooth-coefficient predictions preserve known training MSE even when the
   original fit was scored against alternative outcomes. Vector-quantile
   prediction reports one residual.scale value per tau.
 - Automatic Ichimura diagnostics do not score numeric outcomes against a model
-  trained on factor codes. Explicit outcomes must match the trained response type.
-- Conditional density/distribution and regression plot-data objects retain
-  grid dimensions and trained variable names. Smooth-coefficient plot-data
+  trained on factor codes. Explicit outcomes must use a compatible training-response scale.
+- Conditional density/distribution perspective surfaces and regression plot-data
+  objects retain grid dimensions and trained variable names. Smooth-coefficient plot-data
   objects report unavailable goodness-of-fit scores as NA.
 - Native factor-index bandwidth objects no longer retain unrelated caller frames.
 

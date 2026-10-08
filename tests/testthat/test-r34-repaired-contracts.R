@@ -123,7 +123,7 @@ test_that("native factor-index bandwidths retain data without caller frames", {
 test_that("positional native refits replace training observations", {
   set.seed(260); n <- 80L
   x <- data.frame(x=rnorm(n)); y <- sin(x$x)+rnorm(n,sd=.2)
-  X <- data.frame(x=rev(x$x)); Y <- cos(X$x)+rnorm(n,sd=.2)
+  X <- data.frame(x=rev(x$x)+.7); Y <- cos(X$x)+rnorm(n,sd=.2)
   b <- npregbw(xdat=x,ydat=y,bws=.5,bandwidth.compute=FALSE)
   positional <- npreg(b,X,Y)
   named <- npreg(b,txdat=X,tydat=Y)

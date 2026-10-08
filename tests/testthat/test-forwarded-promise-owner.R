@@ -133,3 +133,25 @@ test_that("public native constructors materialize stateful data once before tran
     }
   }
 })
+
+test_that("dispatch binds supplied control and dots promises without forcing NSE", {
+  method <- function(bws, nmulti, subset, call, ...) {
+    force(bws); force(nmulti); force(list(...))
+    .npRmpi_autodispatch_bind_data_promises(match.call(expand.dots = FALSE),
+      environment(), sys.call(), sys.function(), parent.frame())
+  }
+  environment(method) <- asNamespace("npRmpi")
+  state <- new.env(parent = emptyenv()); state$n <- 0L
+  value <- function(x) { state$n <- state$n + 1L; x }
+  out <- method(value(.4), value(1L), subset = nonexistent.column > 0,
+                call = stop("call remains language"), xnames = value("X"),
+                ynames = value(NULL), extra = value(quote(stop("language value"))))
+  expect_identical(state$n, 5L)
+  expect_identical(out$bws, .4)
+  expect_identical(out$nmulti, 1L)
+  expect_identical(out$xnames, "X")
+  expect_true("ynames" %in% names(out)); expect_null(out$ynames)
+  expect_identical(eval(out$extra), quote(stop("language value")))
+  expect_identical(out$subset, quote(nonexistent.column > 0))
+  expect_identical(out$call, quote(stop("call remains language")))
+})

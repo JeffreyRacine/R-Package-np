@@ -2296,6 +2296,12 @@
   nms <- names(arg.list)
   targets <- .npRmpi_autodispatch_target_args()
   call.base <- sub("\\..*$", "", .npRmpi_autodispatch_call_name(mc))
+  # Constructor metadata and legacy controls accepted through ... share the
+  # public admission policy. Avoid a second, inevitably incomplete allow-list.
+  # Ordinary calls need no policy lookup; NSE arguments retain their owners.
+  extra <- setdiff(nms, c("", targets, "subset", "call"))
+  if (length(extra) && call.base %in% names(.np_public_dots_owners))
+    targets <- c(targets, intersect(extra, .np_public_dots_policy(call.base)$allowed))
 
   out <- mc
   if (is.call(out) && length(out) >= 1L && is.symbol(out[[1L]])) {
@@ -2985,20 +2991,26 @@
       !identical(environment(definition), asNamespace("npRmpi"))) return(mc)
   original <- match.call(definition = definition, call = owner.call,
                          expand.dots = FALSE, envir = caller)
-  data.names <- c("bws", "xdat", "ydat", "zdat", "dat", "txdat", "tydat", "tzdat",
-                  "tdat", "exdat", "eydat", "ezdat", "edat")
-  owned <- intersect(names(mc), intersect(data.names,
-    intersect(names(formals(definition)), names(original))))
+  dots <- original[["..."]]
+  original <- .npRmpi_autodispatch_expand_dots_call(original)
+  mc <- .npRmpi_autodispatch_expand_dots_call(mc)
+  owned <- setdiff(intersect(names(mc), names(original)), c("", "subset", "call"))
+  formal.names <- names(formals(definition))
   for (name in owned) {
-    # A method can deliberately replace an argument for its dispatched leaf.
-    # Only its unchanged original argument denotes the owned formal promise.
-    if (identical(mc[[name]], original[[name]])) {
+    # Rewrites for a dispatched leaf keep their own values. Only unchanged
+    # arguments denote this activation's formal/dots promises. Subset and call
+    # belong to model-frame/call reconstruction, not ordinary value transport.
+    if (!identical(mc[[name]], original[[name]])) next
+    if (name %in% formal.names) {
       value <- get(name, envir = owner, inherits = FALSE)
-      # A realized formula/call is a value, not another expression to execute.
-      if (identical(name, "bws") && is.language(value))
-        value <- substitute(quote(VALUE), list(VALUE = value))
-      mc[name] <- list(value)
+    } else {
+      positions <- which(names(dots) == name)
+      if (length(positions) != 1L) next
+      value <- eval(as.name(paste0("..", positions)), envir = owner)
     }
+    if (is.language(value))
+      value <- substitute(quote(VALUE), list(VALUE = value))
+    mc[name] <- list(value)
   }
   mc
 }
@@ -3033,9 +3045,25 @@
 
   method <- sys.parent()
   definition <- if (method > 0L) sys.function(method) else NULL
+  # A package forwarding helper (currently the index contrast owner) can sit
+  # between the method and dispatch. Follow only the dynamic parent chain to
+  # the explicitly named package function, never a same-named local binding.
+  expected <- if (!is.null(owner.name))
+    get0(owner.name, envir = asNamespace("npRmpi"), mode = "function",
+         inherits = FALSE) else NULL
+  if (is.function(expected) && !identical(definition, expected)) {
+    parents <- sys.parents()
+    at <- method
+    while (at > 0L && !identical(sys.function(at), expected))
+      at <- parents[[at]]
+    if (at > 0L) {
+      method <- at
+      definition <- expected
+    }
+  }
   owner.call <- sys.call(method)
   mc <- .npRmpi_autodispatch_bind_call_owner(mc, owner.name, owner.call, definition)
-  mc <- .npRmpi_autodispatch_bind_data_promises(mc, owner = parent.frame(),
+  mc <- .npRmpi_autodispatch_bind_data_promises(mc, owner = sys.frame(method),
     owner.call = owner.call, definition = definition,
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
   .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE)
