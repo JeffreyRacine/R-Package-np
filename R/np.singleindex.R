@@ -73,6 +73,12 @@ npindex.formula <-
         dots <- if (raw.formula)
           .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
         else list(...)
+        # Preserve an explicit evaluation policy before training-response
+        # replacement consumes its control arguments. Retained training and
+        # native evaluation routes keep their existing separate owners.
+        has.eval <- !is.null(newdata) && !("exdat" %in% names(dots))
+        eval.na.action <- if (has.eval && "na.action" %in% names(dots))
+          dots["na.action"] else NULL
         npRejectLegacyBooleanErrors(dots, "npindex")
         se <- npValidateScalarLogical(se, "se")
         se.type <- match.arg(se.type)
@@ -129,7 +135,6 @@ npindex.formula <-
           tydat <- model.response(tmf)
           txdat <- .np_index_formula_xdat(tmf)
         }
-        has.eval <- !is.null(newdata) && !("exdat" %in% names(dots))
         if (has.eval) {
           # Outcomes are optional scoring data, not part of the prediction frame.
           response <- if (!identical(y.eval, FALSE) && !("eydat" %in% names(dots)))
@@ -138,7 +143,10 @@ npindex.formula <-
               required = isTRUE(y.eval)) else NULL
           eval.tt <- delete.response(tt)
           npValidateNewdataFormula(newdata, eval.tt, include.response = FALSE)
-          umf <- .np_diagnostics_model_frame(eval.tt, newdata)
+          umf <- if (is.null(eval.na.action))
+            .np_diagnostics_model_frame(eval.tt, newdata) else
+            .np_diagnostics_model_frame(eval.tt, newdata,
+                                        na.action = eval.na.action[[1L]])
           emf <- umf
           if ("eydat" %in% names(dots))
             dots$eydat <- .np_diagnostics_align_response(dots$eydat, emf)
