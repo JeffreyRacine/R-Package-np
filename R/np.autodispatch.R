@@ -2994,12 +2994,14 @@
   dots <- original[["..."]]
   original <- .npRmpi_autodispatch_expand_dots_call(original)
   mc <- .npRmpi_autodispatch_expand_dots_call(mc)
-  owned <- setdiff(intersect(names(mc), names(original)), c("", "subset", "call"))
   formal.names <- names(formals(definition))
+  syntax <- if (any(c("formula", "subset") %in% formal.names))
+    c("subset", "call") else character()
+  owned <- setdiff(intersect(names(mc), names(original)), c("", syntax))
   for (name in owned) {
     # Rewrites for a dispatched leaf keep their own values. Only unchanged
-    # arguments denote this activation's formal/dots promises. Subset and call
-    # belong to model-frame/call reconstruction, not ordinary value transport.
+    # arguments denote this activation's formal/dots promises. Formula-owned
+    # syntax retains its data-mask owner; native dots are ordinary values.
     if (!identical(mc[[name]], original[[name]])) next
     if (name %in% formal.names) {
       value <- get(name, envir = owner, inherits = FALSE)
@@ -3066,7 +3068,28 @@
   mc <- .npRmpi_autodispatch_bind_data_promises(mc, owner = sys.frame(method),
     owner.call = owner.call, definition = definition,
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
-  .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE)
+  result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE)
+  # Transport symbols are implementation details, never public outcome names.
+  # Change only leaked labels; supplied names and formula metadata stay intact.
+  if (is.list(result)) {
+    bandwidth <- if (is.list(result[["bws", exact = TRUE]])) result[["bws"]] else result
+    label <- bandwidth[["ynames", exact = TRUE]]
+    if (is.character(label) && length(label) == 1L &&
+        startsWith(label, ".__npRmpi_autod_")) {
+      role <- intersect(c("ydat", "tydat"), names(formals(definition)))
+      if (length(role)) {
+        expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))),
+                     envir = sys.frame(method))
+        label <- deparse(expr)
+        bandwidth <- updateBwNameMetadata(list(ynames = label), bandwidth)
+        if (is.list(result[["bws", exact = TRUE]])) {
+          result[["bws"]] <- bandwidth
+          if (!is.null(result[["ynames", exact = TRUE]])) result[["ynames"]] <- label
+        } else result <- bandwidth
+      }
+    }
+  }
+  result
 }
 
 .npRmpi_manual_distributed_call <- function(mc, caller_env = parent.frame(), comm = 1L) {

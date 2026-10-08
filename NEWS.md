@@ -1,5 +1,13 @@
 # npRmpi 0.80-1
 
+- Response-only native refits keep the retained design, while partial design
+  replacements still require the other training roles. Smooth-coefficient fits
+  using the default z=x retain that convention for prediction and refitting.
+- Fits that select bandwidths use the first realization of supplied search
+  controls. Forwarded local-smoothing quantile subsets retain their data mask.
+- Pooled native calls resolve accepted subset/call values on the master and
+  preserve public response names for evaluation diagnostics and plot labels.
+
 - Pooled calls preserve the master method's already-evaluated argument values,
   including random starts, search controls and constructor metadata passed
   through `...`. Formula subset evaluation and numerical owners are unchanged.
