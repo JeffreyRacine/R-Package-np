@@ -456,7 +456,18 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   through the \code{stats} model-frame owner; pass a caller-local policy as
   a function object rather than its name. With replacement training data,
   an explicit \code{na.action}, including \code{NULL}, takes precedence
-  over the saved policy. Native fitting still requires complete rows, so
+  over the saved policy. For formula evaluation with \code{newdata}, an
+  explicit \code{na.action} also applies to the evaluation predictors:
+  \code{na.omit} drops incomplete predictor rows, \code{na.exclude}
+  restores their positions with \code{NA} in predictions, standard errors
+  and requested gradients, and \code{na.fail} rejects them. When omitted,
+  evaluation uses the current model-frame missing-data policy. Evaluation
+  outcomes are scored separately and do not remove prediction rows.
+  With both replacement training data and evaluation data, the policy is
+  applied separately to each frame. An evaluation-only request does not
+  refilter retained training data. Explicit native evaluation arguments
+  retain precedence and their existing complete-row handling.
+  Native fitting still requires complete rows, so
   a permissive policy does not guarantee the same retained sample as
   \code{stats::model.frame}.
 

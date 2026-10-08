@@ -36,7 +36,7 @@
 
 # Retain prediction time coordinates without evaluating RHS transformations twice.
 # The shared frame owner still applies its existing alignment and NA policy.
-.np_diagnostics_model_frame <- function(tt, newdata) {
+.np_diagnostics_model_frame <- function(tt, newdata, na.action) {
   prediction <- .np_formula_unwrap_prediction(tt)$prediction
   values <- eval(prediction, newdata, environment(tt))
   series <- Filter(function(x) inherits(x, "ts"), values)
@@ -51,7 +51,9 @@
     times <- as.numeric(stats::time(grid))
   }
   attr(tt, "predvars") <- values
-  frame <- .np_formula_model_frame(tt, data = newdata)
+  frame <- if (missing(na.action))
+    .np_formula_model_frame(tt, data = newdata) else
+    .np_formula_model_frame(tt, data = newdata, na.action = na.action)
   retained <- attr(frame, "terms")
   attr(retained, "predvars") <- prediction
   attr(frame, "terms") <- retained

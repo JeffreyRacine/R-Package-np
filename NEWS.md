@@ -1,5 +1,10 @@
 # np 0.80-1
 
+- Formula single-index evaluation now honors an explicit `na.action` for
+  predictor rows, including `na.exclude` prediction padding and `na.fail`.
+  Omitted evaluation policies, retained training samples and native evaluation
+  precedence are unchanged; missing scoring outcomes do not remove predictions.
+
 - Forwarded formula subsets retain caller-local masks and loop variables as
   well as data-column lookup, including single-index and local-smoothing
   quantile fits.
