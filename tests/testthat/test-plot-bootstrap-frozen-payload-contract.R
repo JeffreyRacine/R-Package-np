@@ -287,3 +287,42 @@ test_that("density and distribution plots preserve points, grids and interval la
   )
   expect_plot_payload_comparable(cf.pair, "npcdist", min.merr.corr = 0.90, max.merr.rel = 0.75)
 })
+
+test_that("density plot interval values equal quantiles of their own bootstrap draws", {
+  pkg<-getNamespaceName(environment(npudens))
+  original<-getFromNamespace('.np_plot_bootstrap_centered_interval_payload',pkg)
+  seen<-list()
+  testthat::local_mocked_bindings(.np_plot_bootstrap_centered_interval_payload=
+    function(boot.t,t0,alpha,band.type,center,...) {
+      expect_identical(band.type,'pointwise');expect_identical(center,'estimate')
+      bounds<-t(apply(as.matrix(boot.t),2,quantile,probs=c(alpha/2,1-alpha/2)))
+      seen[[length(seen)+1L]]<<-list(point=as.numeric(t0),err=sweep(bounds,1,as.numeric(t0),'-'))
+      original(boot.t=boot.t,t0=t0,alpha=alpha,band.type=band.type,center=center,...)
+    },.package=pkg)
+  set.seed(36174);n<-80L;d<-data.frame(x=runif(n));d$y<-sin(3*d$x)+rnorm(n,sd=.4)
+  fits<-list(npudens(npudensbw(~y,data=d,bws=20,bwtype='adaptive_nn',bandwidth.compute=FALSE)),
+    npudist(npudistbw(~y,data=d,bws=20,bwtype='adaptive_nn',bandwidth.compute=FALSE)),
+    npcdens(npcdensbw(y~x,data=d,bws=c(20,20),bwtype='generalized_nn',bandwidth.compute=FALSE)),
+    npcdist(npcdistbw(y~x,data=d,bws=c(20,20),bwtype='generalized_nn',bandwidth.compute=FALSE)))
+  for (fit in fits) for(mode in c('exact','frozen')) {
+    seen<-list();set.seed(9174)
+    suppressWarnings(capture.output(out<-plot(fit,output='data',perspective=FALSE,view='fixed',
+      errors='bootstrap',bootstrap='inid',B=41L,band='pointwise',center='estimate',neval=7L,
+      boot.control=np_boot_control(nonfixed=mode))))
+    fields<-collect_plot_payload_fields(out)
+    intervals<-grep('(^|[.])(derr|conderr)$',names(fields),value=TRUE)
+    expect_true(length(intervals)>0L);expect_equal(length(intervals),length(seen))
+    for(nm in intervals){
+      prefix<-sub('(derr|conderr)$','',nm)
+      point.names<-paste0(prefix,c('dens','dist','condens','condist'))
+      point<-fields[[intersect(point.names,names(fields))]]
+      index<-which(vapply(seen,function(s)length(s$point)==length(point)&&max(abs(s$point-point))<1e-10,logical(1)))
+      expect_length(index,1L)
+      expected<-seen[[index]]$err;actual<-fields[[nm]]
+      expect_equal(unname(actual),unname(expected),tolerance=1e-12)
+      # Calibrate this fixture against the reported undetected mutations.
+      expect_false(isTRUE(all.equal(unname(actual*3),unname(expected),tolerance=1e-12)))
+      expect_false(isTRUE(all.equal(unname(actual[,2:1,drop=FALSE]),unname(expected),tolerance=1e-12)))
+    }
+  }
+})

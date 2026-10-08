@@ -344,6 +344,14 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
 
     miss.z <- missing(tzdat) || is.null(tzdat)
 
+    # The returned native fit must replay the same z=x convention, including
+    # prediction without ezdat, rather than the bandwidth call's old z data.
+    if (miss.z && is.null(bws[["formula", exact = TRUE]])) {
+      bws$zdati <- NULL
+      bws$znames <- NULL
+      bws$varnames$z <- NULL
+    }
+
     native.newdata <- dots[["newdata", exact = TRUE]]
     if (missing(exdat) && missing(ezdat) && !is.null(native.newdata)) {
       native.eval <- .np_native_newdata_parts(

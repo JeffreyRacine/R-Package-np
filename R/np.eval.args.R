@@ -33,8 +33,9 @@
 .np_retained_training_args <- function(bws, roles, explicit, definition,
                                        training = names(roles)) {
   explicit <- .np_match_native_args(explicit, definition)
-  # Retained rows are one sample, never defaults for a partial replacement.
-  if (!any(training %in% names(explicit))) {
+  # Response-only replacement retains the design (e.g. a wild bootstrap).
+  # A replaced design must still supply every required training role.
+  if (!any(setdiff(training, "tydat") %in% names(explicit))) {
     for (arg in setdiff(names(roles), names(explicit)))
       explicit[arg] <- list(.np_eval_bws_call_arg(bws, roles[[arg]]))
   } else {

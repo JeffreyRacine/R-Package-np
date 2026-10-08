@@ -1,5 +1,11 @@
 # np 0.80-1
 
+- Response-only native refits keep the retained design, while partial design
+  replacements still require the other training roles. Smooth-coefficient fits
+  using the default z=x retain that convention for prediction and refitting.
+- Fits that select bandwidths use the first realization of supplied search
+  controls. Forwarded local-smoothing quantile subsets retain their data mask.
+
 - Partial positional training replacements no longer combine new observations
   with a bandwidth object's old sample. Supply all required training roles;
   the smooth-coefficient default uses the newly supplied predictors for smoothing.

@@ -1689,6 +1689,8 @@ nplsqreg.formula <-
                  "data", "subset", "na.action"),
                names(frame.call), nomatch = 0)
     tmf <- frame.call[c(1, m)]
+    if ("subset" %in% names(mc))
+      mc[["subset"]] <- .np_formula_dot_expression(mc[["subset"]], parent.frame())
     for (name in intersect(c("subset", "na.action"), names(mc)))
       tmf[name] <- list(mc[[name]])
     if ("bws" %in% names(tmf))

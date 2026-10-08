@@ -151,9 +151,11 @@
 
   Beta continuous coordinates can be combined with unordered and ordered
   categorical coordinates in kernel sums and supported estimators. Automatic
-  mixed-data bandwidth selection is available for unconditional density;
-  automatic beta selection in other estimator families remains
-  continuous-only until each corresponding objective is activated.
+  mixed-data bandwidth selection is available for unconditional density and
+  regression. Regression supports automatic \code{cv.ls}/\code{cv.aic}
+  selection with fixed, generalized-NN, and adaptive-NN bandwidths; see
+  \code{\link{npregbw}}. Consult each family's bandwidth help page for its
+  supported beta selection criteria and configurations.
   Regression and conditional fitting support the canonical scalar and general
   local-polynomial engines. \code{npksum} supports categorical products,
   integer powers, normal, integral, convolution, and one-coordinate

@@ -410,6 +410,29 @@
   # not to an explicitly named native training argument.
   call <- .np_formula_expand_call(call, caller)
   matched <- match.call(definition = definition, call = call, expand.dots = TRUE)
+  # Progress inspection and selector replay must use the first realization of
+  # ordinary controls. Data/formula roles keep their dedicated handoff owners.
+  controls <- setdiff(names(matched), c("", "bws", "formula", "data", "subset",
+    "call", "na.action", "tdat", "txdat", "tydat", "tzdat", "dat", "xdat",
+    "ydat", "zdat", "newdata", "exdat", "eydat", "ezdat", "edat"))
+  if (length(controls)) {
+    tagged <- call
+    for (i in seq.int(2L, length(tagged))) tagged[[i]] <- i
+    positions <- match.call(definition, tagged, expand.dots = TRUE)
+    owner <- parent.frame()
+    dots <- eval(quote(substitute(list(...))), envir = owner)[-1L]
+    for (name in controls) {
+      if (name %in% names(formals(definition))) {
+        value <- get(name, envir = owner, inherits = FALSE)
+      } else {
+        index <- match(name, names(dots), nomatch = 0L)
+        if (!index) next
+        value <- eval(substitute(...elt(I), list(I = index)), envir = owner)
+      }
+      call[positions[[name]]] <- list(if (is.language(value))
+        substitute(quote(VALUE), list(VALUE = value)) else value)
+    }
+  }
   if (!"bws" %in% names(matched) || "bws" %in% names(call)) return(call)
   labels <- names(call)
   if (is.null(labels)) labels <- rep.int("", length(call))
