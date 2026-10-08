@@ -509,6 +509,9 @@ npindex.sibandwidth <-
     design <- bws[["index.design", exact = TRUE]]
     no.ex = missing(exdat)
     no.ey = missing(eydat)
+    if (!no.ey)
+      eydat <- .np_index_diagnostics_response(eydat, bws$method,
+        required = TRUE, training.info = bws$ydati)
     if (!no.ex && no.ey && isTRUE(y.eval))
       stop("'y.eval = TRUE' requires evaluation outcomes in 'newdata' or 'eydat'",
            call. = FALSE)

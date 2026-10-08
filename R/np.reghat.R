@@ -1784,7 +1784,8 @@ npreghat.call <-
   function(bws, ...) {
     dots <- list(...)
     args <- .np_retained_training_args(
-      bws, c(txdat = "xdat", y = "ydat"), dots, npreghat.rbandwidth)
+      bws, c(txdat = "xdat", y = "ydat"), dots, npreghat.rbandwidth,
+      training = "txdat")
     ev <- do.call(npreghat, args)
     attr(ev, "call") <- match.call(expand.dots = FALSE)
     ev

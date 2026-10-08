@@ -8,7 +8,7 @@ collect_plot_payload_fields <- function(x, path = character()) {
   }
 
   leaf <- if (length(path)) path[[length(path)]] else ""
-  if (is.data.frame(x) && leaf %in% c("evalx", "evaly", "evalz")) {
+  if (is.data.frame(x) && leaf %in% c("eval", "xeval", "yeval", "evalx", "evaly", "evalz")) {
     out[[paste(path, collapse = ".")]] <- x
     return(out)
   }
@@ -31,11 +31,14 @@ collect_plot_payload_fields <- function(x, path = character()) {
   }
 
   leaf <- if (length(path)) path[[length(path)]] else ""
-  if (!(leaf %in% c("mean", "merr", "evalx", "evaly", "evalz"))) {
+  if (!(leaf %in% c("mean", "merr", "dens", "dist", "condens", "condist",
+                    "derr", "conderr", "eval", "xeval", "yeval",
+                    "evalx", "evaly", "evalz"))) {
     return(out)
   }
 
-  out[[paste(path, collapse = ".")]] <- as.numeric(x)
+  out[[paste(path, collapse = ".")]] <-
+    if (leaf %in% c("derr", "conderr")) x else as.numeric(x)
   out
 }
 
@@ -64,7 +67,17 @@ expect_plot_payload_comparable <- function(pair,
   exact.fields <- collect_plot_payload_fields(pair$exact)
   frozen.fields <- collect_plot_payload_fields(pair$frozen)
 
+  expect_true(length(exact.fields) > 0L, info = label)
+  expect_true(length(frozen.fields) > 0L, info = label)
   expect_equal(sort(names(exact.fields)), sort(names(frozen.fields)), info = label)
+
+  required <- list(npudens = c("dens", "eval", "derr"),
+                   npudist = c("dist", "eval", "derr"),
+                   npcdens = c("condens", "xeval", "yeval", "conderr"),
+                   npcdist = c("condist", "xeval", "yeval", "conderr"))
+  for (field in required[[label]])
+    expect_true(any(grepl(paste0("(^|[.])", field, "$"), names(exact.fields))),
+                info = paste(label, "missing", field))
 
   if (identical(label, "npplreg")) {
     expect_true(any(grepl("(^|[.])evalx$", names(exact.fields))), info = label)
@@ -84,10 +97,28 @@ expect_plot_payload_comparable <- function(pair,
     }
 
     expect_equal(length(frozen.val), length(exact.val), info = sprintf("%s %s length", label, nm))
-    if (leaf %in% c("mean", "evalx", "evaly", "evalz")) {
+    if (leaf %in% c("mean", "dens", "dist", "condens", "condist",
+                    "eval", "xeval", "yeval", "evalx", "evaly", "evalz")) {
       expect_true(all(is.finite(exact.val)), info = sprintf("%s %s exact finite", label, nm))
       expect_true(all(is.finite(frozen.val)), info = sprintf("%s %s frozen finite", label, nm))
       expect_equal(frozen.val, exact.val, tolerance = 1e-10, info = sprintf("%s %s", label, nm))
+      next
+    }
+
+    if (leaf %in% c("derr", "conderr")) {
+      # These fields were not collected by the old test. Exact resampling
+      # recomputes NN bandwidths; frozen resampling holds them fixed. There
+      # is no contract that their uncertainty estimates meet the regression
+      # merr correlation thresholds below. Check the interval payload, while
+      # the point estimates and coordinates above must agree exactly.
+      expect_identical(dim(frozen.val), dim(exact.val), info = label)
+      expect_identical(is.na(frozen.val), is.na(exact.val), info = label)
+      for (value in list(exact.val, frozen.val)) {
+        observed <- value[!is.na(value)]
+        expect_true(length(observed) > 0L, info = label)
+        expect_true(all(is.finite(observed)), info = label)
+        expect_true(any(observed != 0), info = label)
+      }
       next
     }
 
@@ -197,7 +228,7 @@ test_that("exact and frozen plot payloads stay comparable for regression and sem
   expect_plot_payload_comparable(sc.pair, "npscoef", min.merr.corr = 0.95, max.merr.rel = 0.35)
 })
 
-test_that("exact and frozen plot payloads stay comparable for density and distribution families", {
+test_that("density and distribution plots preserve points, grids and interval layout", {
   set.seed(20260323)
 
   n.u <- 75L

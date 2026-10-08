@@ -6,7 +6,9 @@ nplsqreg <-
   function(bws, ...) {
     .np_reject_gradient_order_alias(substitute(list(...))[-1L],
                                     "nplsqreg", suggest = TRUE)
-    args <- if (!missing(bws) && inherits(bws, "formula"))
+    args <- if (!missing(bws) &&
+        (inherits(bws, "formula") ||
+         inherits(bws, "rbandwidth") && !is.null(bws$formula)))
       .nplsqreg_formula_dispatch_args(
         nplsqreg.formula, substitute(list(...))[-1L], environment())
     else list(...)
@@ -1671,7 +1673,8 @@ nplsqreg.formula <-
 
     supplied.bws <- inherits(bws, "rbandwidth")
     if (supplied.bws && !missing(subset) && is.null(data) &&
-        !is.null(bws[[".np.formula.training", exact = TRUE]]))
+        !is.null(bws[[".np.formula.training", exact = TRUE]]) &&
+        !is.null(subset) && !isTRUE(subset))
       stop("nplsqreg(): supply explicit 'data' when applying a new 'subset' to a retained bandwidth object",
            call. = FALSE)
     model.formula <- stats::formula(bws)
@@ -1687,7 +1690,7 @@ nplsqreg.formula <-
                names(frame.call), nomatch = 0)
     tmf <- frame.call[c(1, m)]
     for (name in intersect(c("subset", "na.action"), names(mc)))
-      tmf[[name]] <- mc[[name]]
+      tmf[name] <- list(mc[[name]])
     if ("bws" %in% names(tmf))
       names(tmf)[names(tmf) == "bws"] <- "formula"
     tmf[[1]] <- as.name("model.frame")
@@ -1839,6 +1842,18 @@ nplsqreg.default <-
     defer.empty <- isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])
     dots$.np.defer.empty.rows <- NULL
     npRejectLegacyBooleanErrors(dots, "nplsqreg")
+    if (!missing(bws) && inherits(bws, "lsqregressionbandwidth")) {
+      controls <- intersect(c("data", "subset", "na.action"), names(dots))
+      controls <- controls[vapply(controls, function(name)
+        if (name == "na.action") TRUE else
+          !is.null(dots[[name]]) && !(name == "subset" && isTRUE(dots[[name]])),
+        logical(1L))]
+      if (length(controls))
+        stop(paste0("nplsqreg(): a stored LSQ bandwidth object retains its training sample; ",
+                    "do not supply ", paste(shQuote(controls), collapse = ", "),
+                    ". Rebuild it with nplsqregbw() for another training sample, ",
+                    "or use newdata/exdat for prediction."), call. = FALSE)
+    }
     native.newdata <- dots$newdata
     dots$newdata <- NULL
     dots$exdat <- NULL

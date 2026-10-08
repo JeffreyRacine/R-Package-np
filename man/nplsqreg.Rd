@@ -68,9 +68,11 @@ and training data.
 
   \item{subset}{
     an optional vector specifying a subset of observations to be used by
-    the formula method. When reusing a bandwidth object with retained training
-    data, a new subset requires explicit \code{data}; otherwise supply the
-    bandwidth object without a new subset to reuse its retained rows.
+    the formula method. When using a formula-based regression bandwidth
+    object as a starting bandwidth, a row-changing subset requires explicit
+    \code{data}; \code{NULL} and \code{TRUE} reuse all retained rows.
+    A stored LSQ bandwidth object cannot be resubsetted; rebuild it with
+    \code{nplsqregbw()} for another training sample.
   }
 
   \item{na.action}{
@@ -163,11 +165,20 @@ selection, prediction, or plotting route.
   For vector \code{tau}, \code{residual.scale} is a named vector with one
   training MSE for each requested quantile, matching the prediction columns.
 
+  A stored \code{lsqregressionbandwidth} object retains its training
+  sample, pilots and transformed response. Replacement \code{data}, a
+  row-changing \code{subset}, or a new \code{na.action} is an error:
+  use \code{nplsqregbw()} to construct bandwidth state on the new sample.
+  Use \code{newdata} or \code{exdat} for prediction instead.
+
   Formula fits retain trained terms and prediction expressions, so
   data-dependent transformations are reused for \code{newdata} rather than
   recalculated on each prediction grid. The same terms are retained by the
   scalar children of vector-\code{tau} fits. Native \code{exdat} already
-  contains model coordinates and is not transformed again. Older saved
+  contains model coordinates and is not transformed again. An unnamed
+  evaluation argument in \code{...} follows \code{newdata} for formula
+  predictions and \code{exdat} for native predictions; name \code{se.fit}
+  explicitly when using this positional form. Older saved
   objects without trained terms retain their formula-based fallback.
 
   Omitted training rows are restored as \code{NA} in fitted values and

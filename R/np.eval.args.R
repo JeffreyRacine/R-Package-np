@@ -30,10 +30,22 @@
   setNames(args[positions[keep]], names(matched)[keep])
 }
 
-.np_retained_training_args <- function(bws, roles, explicit, definition) {
+.np_retained_training_args <- function(bws, roles, explicit, definition,
+                                       training = names(roles)) {
   explicit <- .np_match_native_args(explicit, definition)
-  for (arg in setdiff(names(roles), names(explicit)))
-    explicit[arg] <- list(.np_eval_bws_call_arg(bws, roles[[arg]]))
+  # Retained rows are one sample, never defaults for a partial replacement.
+  if (!any(training %in% names(explicit))) {
+    for (arg in setdiff(names(roles), names(explicit)))
+      explicit[arg] <- list(.np_eval_bws_call_arg(bws, roles[[arg]]))
+  } else {
+    # A missing dispatch role would otherwise re-enter this call method.
+    # Preserve concrete-method required roles and optional defaults (e.g. z=x).
+    for (arg in setdiff(training, names(explicit))) {
+      default <- formals(definition)[[arg]]
+      if (is.call(default) && identical(default[[1L]], quote(stop)))
+        stop(sprintf("training data '%s' missing", arg), call. = FALSE)
+    }
+  }
   .np_args_with_defaults(list(bws = bws), explicit)
 }
 

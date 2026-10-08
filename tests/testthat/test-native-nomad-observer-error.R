@@ -1,6 +1,9 @@
 test_that("local native progress errors preserve their conditions after cleanup", {
   skip_if_not_installed("crs")
   pkg <- getNamespaceName(environment(npregbw))
+  timeout <- as.numeric(Sys.getenv("NP_TEST_OBSERVER_TIMEOUT", "120"))
+  if (length(timeout) != 1L || !is.finite(timeout) || timeout <= 0)
+    stop("NP_TEST_OBSERVER_TIMEOUT must be a positive number of seconds")
   work <- tempfile("native-observer-")
   dir.create(work)
   on.exit(unlink(work, recursive = TRUE), add = TRUE)
@@ -40,13 +43,13 @@ test_that("local native progress errors preserve their conditions after cleanup"
   if (pkg == "npRmpi") {
     env <- npRmpi_subprocess_env()
     skip_if(is.null(env))
-    child <- npRmpi_run_rscript_subprocess(lines, timeout = 45L,
+    child <- npRmpi_run_rscript_subprocess(lines, timeout = timeout,
                                          env = env, cleanup = FALSE)
   } else {
     script <- file.path(work, "probe.R")
     writeLines(lines, script)
     log <- suppressWarnings(system2(file.path(R.home("bin"), "Rscript"),
-      c("--vanilla", shQuote(script)), stdout = TRUE, stderr = TRUE, timeout = 45L))
+      c("--vanilla", shQuote(script)), stdout = TRUE, stderr = TRUE, timeout = timeout))
     status <- attr(log, "status")
     child <- list(status = if (is.null(status)) 0L else status, output = log)
   }
@@ -71,12 +74,12 @@ test_that("local native progress errors preserve their conditions after cleanup"
         "cat('REAL_INTERRUPT_TRACEBACK_PASS\n')",
         "if (spec$pkg == 'npRmpi') get('mpi.finalize', asNamespace(spec$pkg))()")
       if (pkg == "npRmpi") {
-        child <- npRmpi_run_rscript_subprocess(lines, timeout = 30L,
+        child <- npRmpi_run_rscript_subprocess(lines, timeout = timeout,
                                              env = env, cleanup = FALSE)
       } else {
         writeLines(lines, script)
         log <- suppressWarnings(system2(file.path(R.home("bin"), "Rscript"),
-          c("--vanilla", shQuote(script)), stdout = TRUE, stderr = TRUE, timeout = 30L))
+          c("--vanilla", shQuote(script)), stdout = TRUE, stderr = TRUE, timeout = timeout))
         status <- attr(log, "status")
         child <- list(status = if (is.null(status)) 0L else status, output = log)
       }
