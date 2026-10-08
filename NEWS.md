@@ -1,5 +1,19 @@
 # npRmpi 0.80-1
 
+- Forwarded formula subsets retain caller-local masks and loop variables as
+  well as data-column lookup, including single-index and local-smoothing
+  quantile fits.
+- Native fits that construct bandwidths keep compact response labels rather
+  than embedding response values in the reported variable name.
+- Smooth-coefficient refits using z=x report consistent smoothing-role metadata
+  and print bandwidth summaries without spurious warnings.
+- Kernel documentation now describes beta support for mixed-data and
+  local-linear/local-polynomial regression and conditional estimation.
+- Pooled native conditional-moment tests resolve supplied call labels on the
+  master. Unconditional bandwidths made from a vector retain its public name
+  for named-data prediction.
+- The demo CPU monitor stops and reaps its sleep process when interrupted.
+
 - Response-only native refits keep the retained design, while partial design
   replacements still require the other training roles. Smooth-coefficient fits
   using the default z=x retain that convention for prediction and refitting.

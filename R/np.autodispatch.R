@@ -2997,6 +2997,14 @@
   formal.names <- names(formals(definition))
   syntax <- if (any(c("formula", "subset") %in% formal.names))
     c("subset", "call") else character()
+  # Dual-interface tests also accept native x/y calls. In that invocation,
+  # call is an ordinary dot value, not formula syntax. Keep incomplete/mixed
+  # calls and the unused native subset formal under their existing owners.
+  if ("call" %in% names(original) &&
+      all(c("formula", "xdat", "ydat") %in% formal.names) &&
+      !"formula" %in% names(original) &&
+      all(c("xdat", "ydat") %in% names(original)))
+    syntax <- setdiff(syntax, "call")
   owned <- setdiff(intersect(names(mc), names(original)), c("", syntax))
   for (name in owned) {
     # Rewrites for a dispatched leaf keep their own values. Only unchanged
@@ -3069,23 +3077,27 @@
     owner.call = owner.call, definition = definition,
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
   result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE)
-  # Transport symbols are implementation details, never public outcome names.
+  # Transport symbols are implementation details, never public variable names.
   # Change only leaked labels; supplied names and formula metadata stay intact.
   if (is.list(result)) {
     bandwidth <- if (is.list(result[["bws", exact = TRUE]])) result[["bws"]] else result
-    label <- bandwidth[["ynames", exact = TRUE]]
-    if (is.character(label) && length(label) == 1L &&
-        startsWith(label, ".__npRmpi_autod_")) {
-      role <- intersect(c("ydat", "tydat"), names(formals(definition)))
-      if (length(role)) {
-        expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))),
-                     envir = sys.frame(method))
-        label <- deparse(expr)
-        bandwidth <- updateBwNameMetadata(list(ynames = label), bandwidth)
-        if (is.list(result[["bws", exact = TRUE]])) {
-          result[["bws"]] <- bandwidth
-          if (!is.null(result[["ynames", exact = TRUE]])) result[["ynames"]] <- label
-        } else result <- bandwidth
+    for (name in c("ynames", "xnames")) {
+      label <- bandwidth[[name, exact = TRUE]]
+      if (is.character(label) && length(label) == 1L &&
+          startsWith(label, ".__npRmpi_autod_")) {
+        role <- intersect(if (name == "ynames") c("ydat", "tydat") else
+                            c("dat", "tdat"), names(formals(definition)))
+        if (length(role)) {
+          expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))),
+                       envir = sys.frame(method))
+          label <- if (name == "ynames") deparse(expr) else
+            paste(deparse(expr), collapse = "")
+          bandwidth <- updateBwNameMetadata(setNames(list(label), name), bandwidth)
+          if (is.list(result[["bws", exact = TRUE]])) {
+            result[["bws"]] <- bandwidth
+            if (!is.null(result[[name, exact = TRUE]])) result[[name]] <- label
+          } else result <- bandwidth
+        }
       }
     }
   }

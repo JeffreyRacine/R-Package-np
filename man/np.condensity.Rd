@@ -279,8 +279,9 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   (\code{cykertype="beta"}). Orders 2, 4, 6, and 8, fixed/generalized-NN/
   adaptive-NN bandwidths, explicit finite bounds, sample-range bounds, and
   automatic \code{cv.ml}/\code{cv.ls} bandwidth selection are supported.
-  If either side uses beta, all X and Y coordinates must be continuous and the
-  fit must be local constant. Analytic first derivatives with respect to the
+  Beta kernels act on continuous coordinates and can coexist with
+  supported categorical X or Y coordinates using their respective categorical kernels.
+  Local-constant, local-linear and local-polynomial fits are supported. For local-constant fits, analytic first derivatives with respect to the
   continuous X coordinates are available with \code{gradients=TRUE}, including
   beta-X/legacy-Y, legacy-X/beta-Y, fixed, generalized-NN, and adaptive-NN
   combinations. NN bandwidths are held fixed while differentiating. Exact
@@ -299,9 +300,7 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   while \code{nonfixed="frozen"} keeps the original fitted bandwidths. In both
   modes, resolved beta \code{"range"} support bounds are replayed from the
   bandwidth object rather than recomputed from bootstrap counts. This
-  mixed-family level-bootstrap support does not extend beta estimation beyond
-  continuous X and Y with local-constant fitting, and it does not alter the
-  separate restrictions on gradient, quantile, or bias-corrected centers.
+  mixed-family level-bootstrap support does not alter the separate restrictions on gradient, quantile, or bias-corrected centers.
   Higher-order fits
   are signed and need not be proper densities; no positivity repair is
   applied. Bounded beta-response \code{cv.ls} integrates the actual

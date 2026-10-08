@@ -91,7 +91,12 @@
 # The constructor's model.frame, not this helper, evaluates that expression.
 .np_formula_dispatch_call <- function(fun, args, expressions, envir) {
   indices <- .np_formula_subset_indices(NULL, expressions)
-  do.call(fun, c(args, as.list(expressions)[indices]), envir = envir)
+  # envir is the activation owning these dots, not its parent. Keep the
+  # promise reference so the model-frame owner can recover both expression
+  # and original scope instead of splicing syntax into the formula's scope.
+  subsets <- stats::setNames(lapply(indices, function(i)
+    as.name(paste0("..", i))), names(expressions)[indices])
+  do.call(fun, c(args, subsets), envir = envir)
 }
 
 # Evaluate expression values once, align them transiently, and retain portable
@@ -196,6 +201,11 @@
     .np.capture$na.action <- policy
     frame.call["na.action"] <- list(policy)
   }
+  subset.expr <- substitute(subset)
+  if (!missing(subset) && is.symbol(subset.expr) &&
+      grepl("^\\.\\.[0-9]+$", as.character(subset.expr)))
+    frame.call["subset"] <- .np_formula_subset_inputs(
+      data, subset.expr, parent.frame())["subset"]
   frame <- eval(frame.call, parent.frame())
   # Preserve unambiguously preselected legacy auxiliaries. Full-length inputs
   # always belong to the original sample, even when subset only reorders it.
@@ -272,6 +282,33 @@
 # Resolve formula subsets before any transport or model-frame replay. Return
 # values only: the caller environment is used transiently, never retained.
 .np_formula_subset_inputs <- function(data, subset.expr, caller) {
+  # match.call expands forwarded dots to ..n references without discarding
+  # their owner. Follow only that invocation's actual parent chain; never
+  # search arbitrary frames for a same-named variable. substitute(list(...))
+  # alone would return the final expression but lose its evaluation frame.
+  while (is.symbol(subset.expr) &&
+         grepl("^\\.\\.[0-9]+$", as.character(subset.expr))) {
+    frames <- sys.frames()
+    position <- which(vapply(frames, identical, logical(1L), caller))
+    if (!length(position))
+      stop("cannot resolve forwarded subset owner", call. = FALSE)
+    # eval() can add later frames using the same environment. The first
+    # activation is the function that owns these dots.
+    position <- position[[1L]]
+    parent <- sys.parents()[[position]]
+    origin <- sys.frame(parent)
+    matched <- match.call(sys.function(position), sys.call(position),
+                          expand.dots = FALSE, envir = origin)
+    index <- as.integer(substring(as.character(subset.expr), 3L))
+    dots <- matched[["..."]]
+    if (index < 1L || index > length(dots))
+      stop("invalid forwarded subset position", call. = FALSE)
+    subset.expr <- dots[[index]]
+    caller <- origin
+  }
+  # Formula variables retain their formula environment. Subset is evaluated
+  # once in its data mask and original invocation environment, then supplied
+  # to model.frame as a value so it cannot bind to an unrelated global.
   list(data = data, subset = eval(subset.expr, envir = data, enclos = caller))
 }
 

@@ -383,7 +383,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (miss.z && is.null(bws[["formula", exact = TRUE]])) {
       bws$zdati <- NULL
       bws$znames <- NULL
-      bws$varnames$z <- NULL
+      bws <- .np_scbandwidth_role_metadata(bws)
     }
 
     native.newdata <- dots[["newdata", exact = TRUE]]
@@ -1451,7 +1451,8 @@ npscoef.scbandwidth <-
       if (is.null(result$bws[["formula", exact = TRUE]]) &&
           is.null(result$bws$zdati)) {
         bws$znames <- NULL
-        bws$varnames$z <- NULL
+        bws$zdati <- NULL
+        bws <- .np_scbandwidth_role_metadata(bws)
       }
       return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
     }

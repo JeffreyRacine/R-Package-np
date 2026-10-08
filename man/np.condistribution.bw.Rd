@@ -760,9 +760,9 @@ functions should not rely on subsequently modified closure state.
   and 8, fixed/generalized-NN/adaptive-NN bandwidths,
   \code{cxkerbound}/\code{cykerbound} equal to \code{"fixed"} or
   \code{"range"}, explicit bandwidth objects, and automatic \code{cv.ls}
-  search are supported. Normal-reference selection is not. If either side
-  uses beta, all X and Y coordinates must be continuous and
-  \code{regtype="lc"}. Local-constant gradients with respect to X are
+  search are supported. Normal-reference selection is not. Beta kernels act on continuous
+  coordinates alongside the kernels for categorical coordinates.
+  Local-constant, local-linear and local-polynomial fits are supported. Local-constant gradients with respect to X are
   available: a beta X coordinate uses its analytic evaluation-coordinate PDF
   derivative, while the beta or legacy Y CDF factor is held fixed. Exact
   matching beta-X endpoints use structural cancellation in the normalized

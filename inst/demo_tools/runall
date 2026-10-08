@@ -32,6 +32,8 @@ CURRENT_STAGE="startup"
 cleanup_all() {
   if [ -n "${MONITOR_PID}" ]; then
     kill "${MONITOR_PID}" >/dev/null 2>&1 || true
+    wait "${MONITOR_PID}" >/dev/null 2>&1 || true
+    MONITOR_PID=""
   fi
   cleanup_slaves
 }

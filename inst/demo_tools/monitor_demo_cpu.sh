@@ -12,6 +12,20 @@ RUN_ROOT="$3"
 OUT_CSV="$4"
 INTERVAL="${5:-10}"
 
+# Only jobs created by this monitor belong to its cleanup. An asynchronous
+# sleep lets a signal interrupt wait immediately; the EXIT trap reaps the job
+# even when the signal arrives between starting it and entering wait.
+cleanup_jobs() {
+  local child
+  for child in $(jobs -pr); do
+    kill "${child}" >/dev/null 2>&1 || true
+  done
+  wait || true
+}
+trap cleanup_jobs EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 mkdir -p "$(dirname "${OUT_CSV}")"
 
 if [ ! -f "${OUT_CSV}" ]; then
@@ -83,7 +97,8 @@ while kill -0 "${RUN_PID}" >/dev/null 2>&1; do
       } >> "${OUT_CSV}"
     done || true
 
-  sleep "${INTERVAL}"
+  sleep "${INTERVAL}" &
+  wait "$!"
 done
 
 ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
