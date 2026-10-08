@@ -349,7 +349,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (miss.z && is.null(bws[["formula", exact = TRUE]])) {
       bws$zdati <- NULL
       bws$znames <- NULL
-      bws$varnames$z <- NULL
+      bws <- .np_scbandwidth_role_metadata(bws)
     }
 
     native.newdata <- dots[["newdata", exact = TRUE]]

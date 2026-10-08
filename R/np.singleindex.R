@@ -30,7 +30,7 @@ npindex <-
       args$B <- B
       return(.np_formula_dispatch_call(npindex.formula,
                      c(list(bws = formula.input), args),
-                     substitute(list(...))[-1L], envir = parent.frame()))
+                     substitute(list(...))[-1L], envir = environment()))
     }
 
     if (!missing(bws)){
@@ -43,7 +43,7 @@ npindex <-
         args$B <- B
         return(.np_formula_dispatch_call(npindex.formula,
                        c(list(bws = formula), args),
-                       substitute(list(...))[-1L], envir = parent.frame()))
+                       substitute(list(...))[-1L], envir = environment()))
       }
       if (inherits(bws, "formula") && is.null(args$txdat))
         UseMethod("npindex", bws)
@@ -97,6 +97,10 @@ npindex.formula <-
         if (!missing(data) && !is.null(data))
           tmf[["data"]] <- data
         mf.args <- as.list(tmf)[-1L]
+        if (raw.formula && is.symbol(mf.args[["subset"]]) &&
+            grepl("^\\.\\.[0-9]+$", as.character(mf.args[["subset"]])))
+          mf.args["subset"] <- .np_formula_subset_inputs(
+            data, mf.args[["subset"]], parent.frame())["subset"]
         if (inherits(bws, "sibandwidth") &&
             is.null(bws[[".np.formula.training", exact = TRUE]]) &&
             (missing(data) || is.null(data)) &&

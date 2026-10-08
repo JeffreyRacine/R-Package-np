@@ -103,12 +103,8 @@
   if (any(vapply(as.list(call_obj)[-1L], identical, logical(1L), quote(...)))) {
     call_obj <- match.call(definition = function(...) NULL, call = call_obj,
                            expand.dots = TRUE, envir = caller_env)
-    # Keep ordinary arguments as references to the original dot promises.
-    # subset alone is syntax evaluated in the model-frame data mask; ..n is
-    # not meaningful in that mask or in a separately constructed formula env.
-    subset <- match("subset", names(call_obj), nomatch = 0L)
-    if (subset) call_obj[[subset]] <-
-      .np_formula_dot_expression(call_obj[[subset]], caller_env)
+    # Keep references to the original dot promises, including subset. Its
+    # data-mask evaluation belongs to the model-frame owner below.
   }
   call_obj
 }
@@ -133,7 +129,7 @@
 }
 
 .np_bw_native_values <- function(call_obj, map, frame) {
-  if (is.null(map)) return(list(call = call_obj, expressions = list()))
+  if (is.null(map)) return(list(call = call_obj, expressions = list(), values = list()))
   if (!is.environment(frame) || is.null(names(map)) ||
       anyDuplicated(names(map)) || any(!nzchar(names(map))))
     stop("invalid native bandwidth handoff", call. = FALSE)
@@ -145,6 +141,7 @@
     stats::setNames(rep(alist(value = ), length(map)), names(map)), alist(... = )))
   matched <- match.call(matcher, tagged, expand.dots = TRUE)
   expressions <- list()
+  values <- list()
   for (name in intersect(names(map), names(matched))) {
     index <- matched[[name]]
     source <- as.name(map[[name]])
@@ -159,9 +156,11 @@
       value <- eval(source, envir = frame)
     }
     expressions[name] <- list(call_obj[[index]])
-    call_obj[[index]] <- substitute(quote(VALUE), list(VALUE = value))
+    binding <- paste0(".np_native_", name)
+    values[binding] <- list(value)
+    call_obj[[index]] <- as.name(binding)
   }
-  list(call = call_obj, expressions = expressions)
+  list(call = call_obj, expressions = expressions, values = values)
 }
 
 .np_eval_bw_call <- function(call_obj, caller_env = parent.frame(),
@@ -204,10 +203,30 @@
   native <- if (is.null(formula.value))
     .np_bw_native_values(call_obj, native.map, native.frame) else
     list(call = call_obj, expressions = list())
-  result <- eval(native$call, envir = caller_env)
-  if (is.list(result) && is.call(result[["call"]]))
+  # Bound values avoid deparsing an entire response vector as a variable
+  # name. The child environment exists only during this selector invocation;
+  # restore the public call and its owner before returning the object.
+  value.env <- if (length(native$values))
+    list2env(native$values, parent = caller_env) else caller_env
+  result <- eval(native$call, envir = value.env)
+  if (is.list(result) && is.call(result[["call"]])) {
     for (name in intersect(names(native$expressions), names(result[["call"]])))
       result[["call"]][[name]] <- native$expressions[[name]]
+    if (identical(environment(result[["call"]]), value.env))
+      environment(result[["call"]]) <- caller_env
+  }
+  if (is.list(result)) {
+    for (name in names(native$expressions)) {
+      binding <- paste0(".np_native_", name)
+      field <- switch(name, dat = "xnames", xdat = "xnames",
+                      ydat = "ynames", zdat = "znames")
+      if (!is.null(field) && identical(result[[field]], binding)) {
+        label <- deparse(native$expressions[[name]])
+        if (field != "ynames") label <- paste(label, collapse = "")
+        result <- updateBwNameMetadata(stats::setNames(list(label), field), result)
+      }
+    }
+  }
   # Execute with the already-resolved value, but preserve the user's formula
   # expression in the existing call metadata. No handoff state is retained.
   if (!is.null(formula.expression) && is.list(result) &&

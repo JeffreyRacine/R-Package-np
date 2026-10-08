@@ -19,6 +19,12 @@ test_that("smooth coefficient refits retain the z=x convention they used", {
     expect_equal(fitted(f),oracle(X),tolerance=1e-11)
     expect_equal(fitted(npscoef(b,txdat=X,tydat=Y,tzdat=NULL,newdata=E)),oracle(E),tolerance=1e-11)
     expect_null(f$bws$zdati); expect_null(f$bws$znames); expect_null(f$bws$varnames$z)
+    expect_named(f$bws$dati, c("x", "y", "z"))
+    expect_named(f$bws$varnames, c("x", "y", "z"))
+    expect_null(f$bws$dati$z)
+    for (field in c("sfactor", "bandwidth", "sumNum", "klist"))
+      expect_named(f$bws[[field]], "x")
+    expect_warning(capture.output(summary(f$bws)), NA)
     expect_equal(fitted(npscoef(f$bws)),oracle(X),tolerance=1e-11)
     expect_equal(predict(f,exdat=E),oracle(E),tolerance=1e-11)
     expect_equal(predict(f,exdat=E,ezdat=E),oracle(E),tolerance=1e-11)
@@ -82,10 +88,44 @@ test_that("native entry values and response labels survive dispatch", {
   expect_identical(a$bw,b$bw)
   make<-function(){response<-Y;npindexbw(xdat=X,ydat=response,bws=c(1,.2,.3),bandwidth.compute=FALSE)}
   b<-make();expect_identical(b$ynames,'response')
-  E<-data.frame(X,response=Y)
+  evaluation.y <- rev(Y) + .7
+  E<-data.frame(X,response=evaluation.y)
   for(obj in list(b,unserialize(serialize(b,NULL)))) {
     f<-npindex(obj,newdata=E,se=FALSE)
     expect_identical(f$diagnostics.sample,'evaluation')
-    expect_equal(f$MSE,mean((Y-fitted(f))^2),tolerance=1e-13)
+    expect_equal(f$MSE,mean((evaluation.y-fitted(f))^2),tolerance=1e-13)
   }
+})
+
+# The default lane adds two small ownership witnesses, not a kernel/search
+# matrix. Existing R36 data-only subset controls above cover the adjacent route.
+test_that("forwarded subsets retain caller-local bindings", {
+  set.seed(3707)
+  d <- data.frame(x = runif(90), grp = rep(1:3, c(45, 30, 15)))
+  d$y <- sin(4*d$x) + rnorm(90, sd = .2)
+  i <- 3L
+  wrapper <- function(...) npreg(y ~ x, data = d, bws = .2,
+                                 bandwidth.compute = FALSE, ...)
+  expect_identical(vapply(1:2, function(i)
+    length(fitted(wrapper(subset = d$grp == i))), 0L), c(45L, 30L))
+  b <- npregbw(y ~ x, data = d, bws = .2, bandwidth.compute = FALSE)
+  keep <- d$x > .9
+  analysis <- function(fun) { keep <- d$x > .4; fun(subset = keep) }
+  lsq <- function(...) nplsqreg(b, data = d, ..., delta = .5,
+                               bandwidth.compute = FALSE)
+  expect_length(fitted(analysis(function(...) lsq(...))), sum(d$x > .4))
+  d$z <- seq_len(nrow(d))/nrow(d)
+  index <- function(...) npindex(y ~ x + z, data = d, bws = c(1, .5, .2),
+                                 bandwidth.compute = FALSE, se = FALSE, ...)
+  expect_identical(vapply(1:2, function(i)
+    length(fitted(index(subset = d$grp == i))), 0L), c(45L, 30L))
+})
+
+test_that("native one-call response labels do not contain data values", {
+  set.seed(3708)
+  X <- data.frame(x = runif(50)); response <- sin(X$x)
+  fit <- npreg(txdat = X, tydat = response, bws = .2,
+               bandwidth.compute = FALSE)
+  expect_identical(fit$bws$ynames, "response")
+  expect_identical(fit$bws$call$ydat, quote(response))
 })

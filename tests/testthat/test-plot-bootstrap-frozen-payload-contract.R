@@ -295,6 +295,8 @@ test_that("density plot interval values equal quantiles of their own bootstrap d
   testthat::local_mocked_bindings(.np_plot_bootstrap_centered_interval_payload=
     function(boot.t,t0,alpha,band.type,center,...) {
       expect_identical(band.type,'pointwise');expect_identical(center,'estimate')
+      expect_identical(alpha, .05)
+      expect_equal(nrow(as.matrix(boot.t)), 41L)
       bounds<-t(apply(as.matrix(boot.t),2,quantile,probs=c(alpha/2,1-alpha/2)))
       seen[[length(seen)+1L]]<<-list(point=as.numeric(t0),err=sweep(bounds,1,as.numeric(t0),'-'))
       original(boot.t=boot.t,t0=t0,alpha=alpha,band.type=band.type,center=center,...)

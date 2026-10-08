@@ -215,11 +215,7 @@ scbandwidth <-
                 okertype = okertype,
                 pokertype = mybw$pokertype))
 
-  zorx <- if (is.null(zdati)) "x" else "z"
-  names(mybw$sfactor) <- zorx
-  names(mybw$bandwidth) <- zorx 
-  names(mybw$sumNum) <- zorx
-  names(mybw$klist) <- zorx
+  mybw <- .np_scbandwidth_role_metadata(mybw)
   
   if(!bandwidth.compute)
     mybw$pmethod <- "Manual"
@@ -230,6 +226,18 @@ scbandwidth <-
     validateBandwidth(mybw)
   mybw
   
+}
+
+# One reporting-role owner for construction and a native z=x refit. This
+# changes labels and parallel reporting lists only; smoothing coordinates,
+# bandwidth values and computational admission stay with their existing owner.
+.np_scbandwidth_role_metadata <- function(bws) {
+  role <- if (is.null(bws[["zdati", exact = TRUE]])) "x" else "z"
+  for (field in c("sfactor", "bandwidth", "sumNum", "klist"))
+    names(bws[[field]]) <- role
+  bws$dati <- list(x = bws[["xdati", exact = TRUE]], y = bws[["ydati", exact = TRUE]], z = bws[["zdati", exact = TRUE]])
+  bws$varnames <- list(x = bws[["xnames", exact = TRUE]], y = bws[["ynames", exact = TRUE]], z = bws[["znames", exact = TRUE]])
+  bws
 }
 
 as.double.scbandwidth <- function(x, ...){

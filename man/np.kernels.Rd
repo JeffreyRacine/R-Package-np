@@ -107,9 +107,11 @@
   theorem automatically extends to random NN bandwidths.
 
   In the present implementation orders 2, 4, 6, and 8 are available through
-  \code{npksum}, \code{npudens}, \code{npudist}, local-constant
-  \code{npreg}, and the local-constant conditional density/distribution
-  families. Manual and cross-validated bandwidth objects support
+  \code{npksum}, \code{npudens}, \code{npudist}, \code{npreg},
+  and the conditional density/distribution families. Regression and the
+  conditional families support local-constant, local-linear and
+  local-polynomial fits; categorical coordinates retain their categorical
+  kernels alongside continuous beta coordinates. Manual and cross-validated bandwidth objects support
   \code{bwtype="fixed"}, \code{"generalized_nn"}, and
   \code{"adaptive_nn"}. Bounds may be explicit
   (\code{ckerbound="fixed"}) or inferred from the training sample
