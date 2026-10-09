@@ -103,10 +103,9 @@ npindex.formula <-
         if (!missing(data) && !is.null(data))
           tmf[["data"]] <- data
         mf.args <- as.list(tmf)[-1L]
-        if (raw.formula && is.symbol(mf.args[["subset"]]) &&
-            grepl("^\\.\\.[0-9]+$", as.character(mf.args[["subset"]])))
-          mf.args["subset"] <- .np_formula_subset_inputs(
-            data, mf.args[["subset"]], parent.frame())["subset"]
+        if (raw.formula && "subset" %in% names(mf.args))
+          mf.args$.np.subset <- .np_formula_subset_inputs(
+            data, mf.args[["subset"]], parent.frame(), resolve.only = TRUE)
         if (inherits(bws, "sibandwidth") &&
             is.null(bws[[".np.formula.training", exact = TRUE]]) &&
             (missing(data) || is.null(data)) &&
@@ -186,18 +185,29 @@ npindex.formula <-
           si.args$bws <- si.bws
         ev <- do.call(npindex, c(si.args, list(se = se, se.type = se.type), dots))
         ev$call <- mc
-        environment(ev$call) <- parent.frame()
+        environment(ev$call) <- .np_call_owner_environment(
+          parent.frame(), replacement = environment(tt))
 
         if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
+            ev$ynames <- response.name
             if (!is.null(ev$bws))
-                ev$bws$ynames <- response.name
+                ev$bws <- updateBwNameMetadata(list(ynames = response.name), ev$bws)
         }
         if (!is.null(ev$bws) && inherits(bws, "formula")) {
+            # Preserve the existing materialized native call fields used by
+            # explicit plotting/replay consumers, and add formula provenance.
+            ev$bws$call["formula"] <- list(mc[["bws"]])
+            if ("data" %in% names(mc)) ev$bws$call["data"] <- list(mc[["data"]])
             ev$bws$formula <- bws
             ev$bws$terms <- attr(tmf, "terms")
             ev$bws <- .np_bws_retain_fit_frame(ev$bws, tmf)
         }
 
+        # A pass/NULL/custom policy can leave predictor NAs for the native
+        # owner to remove. Reconcile those rows in the original formula frame
+        # before deriving the public map; preserve omit versus exclude policy.
+        if (has.eval && length(ev[["eval.rows.omit", exact = TRUE]]))
+            umf <- .np_formula_complete_training_frame(umf)
         ev$omit <- .np_formula_output_action(ev, umf, has.eval)
         ev$rows.omit <- as.vector(ev$omit)
         ev$nobs.omit <- length(ev$rows.omit)

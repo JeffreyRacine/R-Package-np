@@ -55,3 +55,13 @@ test_that("lexical dots preserve the original subset mask and scope", {
   npreg(bw,data=d);expect_identical(probe$n,2L)
   expect_error(local.fit(subset=stop("owned-subset-error")),"owned-subset-error")
 })
+
+test_that("one-call index stores replayable subset provenance", {
+  withr::local_options(np.messages=FALSE)
+  set.seed(1);d<-data.frame(x=runif(90),z=runif(90));d$y<-sin(d$x)+d$z
+  wrap<-function(...)npindex(y~x+z,data=d,bws=c(1,.3,.3),bandwidth.compute=FALSE,se=FALSE,...)
+  f<-wrap(subset=x>.4)
+  expect_identical(f$bws$call$subset,quote(x>.4))
+  expect_equal(fitted(npindex(f$bws,data=d,se=FALSE)),fitted(f),tolerance=0)
+  b<-unserialize(serialize(f$bws,NULL));expect_equal(fitted(npindex(b,data=d,se=FALSE)),fitted(f),tolerance=0)
+})
