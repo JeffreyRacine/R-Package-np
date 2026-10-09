@@ -2997,13 +2997,10 @@
   formal.names <- names(formals(definition))
   syntax <- if (any(c("formula", "subset") %in% formal.names))
     c("subset", "call") else character()
-  # Dual-interface tests also accept native x/y calls. In that invocation,
-  # call is an ordinary dot value, not formula syntax. Keep incomplete/mixed
-  # calls and the unused native subset formal under their existing owners.
-  if ("call" %in% names(original) &&
-      all(c("formula", "xdat", "ydat") %in% formal.names) &&
-      !"formula" %in% names(original) &&
-      all(c("xdat", "ydat") %in% names(original)))
+  # CMS dual interfaces consume call as an ordinary dot value on BOTH
+  # routes. Only functions with a genuine call formal own call syntax.
+  if ("call" %in% names(original) && !"call" %in% formal.names &&
+      all(c("formula", "xdat", "ydat") %in% formal.names))
     syntax <- setdiff(syntax, "call")
   owned <- setdiff(intersect(names(mc), names(original)), c("", syntax))
   for (name in owned) {
