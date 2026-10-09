@@ -1710,7 +1710,14 @@ nplsqreg.formula <-
     if (supplied.bws) {
       overrides <- list()
       if (!missing(na.action)) overrides["na.action"] <- list(na.action)
-      mf <- .np_bws_formula_model_frame(bws, mf.args,
+      frame.bws <- bws
+      if (!is.null(data) && "subset" %in% names(mc) &&
+          !is.null(frame.bws[[".np.formula.training", exact = TRUE]])) {
+        # This explicit refit owns its subset. Keep the original bandwidth
+        # intact for later reuse; only frame preparation drops the old owner.
+        frame.bws[[".np.formula.training"]][["subset"]] <- NULL
+      }
+      mf <- .np_bws_formula_model_frame(frame.bws, mf.args,
         data.override = !is.null(data), overrides = overrides)
       # A retained frame has already selected its rows. Its scale is supplied
       # in retained-sample order; never replay the constructor to align it.
