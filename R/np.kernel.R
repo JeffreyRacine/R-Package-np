@@ -41,7 +41,7 @@ npksum.formula <-
       if (missing(data)) terms(formula) else terms(formula, data = data))
     if (!missing(subset))
       mf.args[c("data", "subset")] <- .np_formula_subset_inputs(
-        if (missing(data)) NULL else data, substitute(subset), parent.frame())
+        if (missing(data)) NULL else data, match.call()[["subset"]], parent.frame())
     if (!is.null(dots$weights)) mf.args$.np.auxiliary <- list(weights = dots$weights)
     mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
     if (!is.null(dots$weights)) dots$weights <- model.weights(mf)

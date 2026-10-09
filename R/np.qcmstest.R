@@ -255,7 +255,7 @@ npqcmstest <- function(formula,
     dispatch.call <- match.call()
     if (!missing(formula) && missing(xdat) && missing(ydat) && !missing(subset))
       dispatch.call[c("data", "subset")] <- .np_formula_subset_inputs(
-        data, substitute(subset), parent.frame())
+        data, match.call()[["subset"]], parent.frame())
     return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npqcmstest"))
   }
 
@@ -283,7 +283,7 @@ npqcmstest <- function(formula,
     mf.args <- list(formula = formula, data = data, na.action = na.omit)
     if (!missing(subset))
       mf.args[c("data", "subset")] <- .np_formula_subset_inputs(
-        data, substitute(subset), parent.frame())
+        data, match.call()[["subset"]], parent.frame())
     mf <- do.call(model.frame, mf.args)
     ydat <- model.response(mf)
     xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]

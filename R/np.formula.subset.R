@@ -150,7 +150,8 @@
 
 .np_formula_model_frame <- function(formula, data = NULL, subset, na.action,
                                     drop.unused.levels = FALSE, xlev = NULL, ...,
-                                    .np.capture = NULL, .np.auxiliary = list()) {
+                                    .np.capture = NULL, .np.auxiliary = list(),
+                                    .np.subset = NULL) {
   if (!is.data.frame(data) && !is.environment(data) && !is.null(attr(data, "class")))
     data <- as.data.frame(data)
   tt <- if (inherits(formula, "terms")) formula else terms(formula, data = data)
@@ -186,6 +187,7 @@
   frame.call["data"] <- list(data)
   frame.call$.np.capture <- NULL
   frame.call$.np.auxiliary <- NULL
+  frame.call$.np.subset <- NULL
   if (length(auxiliary))
     frame.call[names(auxiliary)[!selected]] <- auxiliary[!selected]
   if (!is.null(.np.capture)) {
@@ -201,11 +203,14 @@
     .np.capture$na.action <- policy
     frame.call["na.action"] <- list(policy)
   }
-  subset.expr <- substitute(subset)
-  if (!missing(subset) && is.symbol(subset.expr) &&
-      grepl("^\\.\\.[0-9]+$", as.character(subset.expr)))
-    frame.call["subset"] <- .np_formula_subset_inputs(
-      data, subset.expr, parent.frame())["subset"]
+  # Keep syntax and its owner together; a saved ..k is not a reusable call.
+  subset.spec <- .np.subset
+  if (is.null(subset.spec) && !missing(subset))
+    subset.spec <- .np_formula_subset_inputs(data, match.call()[["subset"]],
+                                            parent.frame(), resolve.only = TRUE)
+  if (!is.null(subset.spec))
+    frame.call["subset"] <- list(eval(subset.spec$expression, data,
+                                      subset.spec$envir))
   frame <- eval(frame.call, parent.frame())
   # Preserve unambiguously preselected legacy auxiliaries. Full-length inputs
   # always belong to the original sample, even when subset only reorders it.
@@ -220,6 +225,7 @@
   attr(retained, "predvars") <- prediction
   attr(frame, "terms") <- retained
   if (!is.null(.np.capture)) frame <- .np_formula_complete_training_frame(frame)
+  if (!is.null(.np.capture)) attr(frame, ".np.subset") <- subset.spec
   frame
 }
 
@@ -279,15 +285,21 @@
   mc
 }
 
-# Resolve formula subsets before any transport or model-frame replay. Return
-# values only: the caller environment is used transiently, never retained.
-.np_formula_subset_inputs <- function(data, subset.expr, caller) {
+# Resolve formula subsets before transport or model-frame replay. Value-only
+# consumers evaluate once; retained formula frames also need syntax and scope.
+.np_formula_subset_inputs <- function(data, subset.expr, caller,
+                                      resolve.only = FALSE) {
   # match.call expands forwarded dots to ..n references without discarding
   # their owner. Follow only that invocation's actual parent chain; never
   # search arbitrary frames for a same-named variable. substitute(list(...))
   # alone would return the final expression but lose its evaluation frame.
   while (is.symbol(subset.expr) &&
          grepl("^\\.\\.[0-9]+$", as.character(subset.expr))) {
+    # ..k resolves lexically. An lapply/local callback may inherit dots from
+    # an enclosing invocation rather than own the dynamically preceding call.
+    while (!exists("...", envir = caller, inherits = FALSE) &&
+           !identical(caller, emptyenv()))
+      caller <- parent.env(caller)
     frames <- sys.frames()
     position <- which(vapply(frames, identical, logical(1L), caller))
     if (!length(position))
@@ -306,6 +318,7 @@
     subset.expr <- dots[[index]]
     caller <- origin
   }
+  if (resolve.only) return(list(expression = subset.expr, envir = caller))
   # Formula variables retain their formula environment. Subset is evaluated
   # once in its data mask and original invocation environment, then supplied
   # to model.frame as a value so it cannot bind to an unrelated global.
@@ -314,7 +327,13 @@
 
 .np_bws_retain_formula_training <- function(bws, frame, na.action) {
   attr(frame, ".np.na.policy") <- NULL
-  bws[[".np.formula.training"]] <- list(frame = frame, na.action = na.action)
+  subset.spec <- attr(frame, ".np.subset", exact = TRUE)
+  attr(frame, ".np.subset") <- NULL
+  previous <- bws[[".np.formula.training", exact = TRUE]]
+  if (is.null(subset.spec)) subset.spec <- previous[["subset", exact = TRUE]]
+  bws[[".np.formula.training"]] <- list(frame = frame, na.action = na.action,
+                                         subset = subset.spec)
+  if (!is.null(subset.spec)) bws$call["subset"] <- list(subset.spec$expression)
   bws[[".np.native.training"]] <- NULL
   call.env <- environment(bws$call)
   # An internal constructor activation is not the owner of a user's formula.
@@ -509,6 +528,7 @@
     if (!data.override)
       return(.np_formula_complete_training_frame(training[["frame", exact = TRUE]]))
     mf.args["na.action"] <- training["na.action"]
+    mf.args$.np.subset <- training[["subset", exact = TRUE]]
   }
   # Compatibility for objects saved before training frames were retained.
   # Their original values cannot be reconstructed after caller rebinding.
