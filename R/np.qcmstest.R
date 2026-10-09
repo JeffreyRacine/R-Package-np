@@ -41,7 +41,7 @@ npqcmstest <- function(formula,
     mf.args <- list(formula = formula, data = data, na.action = na.omit)
     if (!missing(subset))
       mf.args[c("data", "subset")] <- .np_formula_subset_inputs(
-        data, substitute(subset), parent.frame())
+        data, match.call()[["subset"]], parent.frame())
     mf <- do.call(model.frame, mf.args)
     ydat <- model.response(mf)
     xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"),"term.labels")), drop = FALSE]
