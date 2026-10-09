@@ -58,3 +58,34 @@ test_that("LSQ formula bandwidth reuse owns transformed and selected rows", {
   expect_equal(fitted(fresh), fitted(expected), tolerance = 0)
   expect_equal(fresh$bws$scale, rep(1, nrow(chosen)), tolerance = 0)
 })
+
+test_that("LSQ explicit subset precedence does not change later saved-sample reuse", {
+  d <- data.frame(x = seq(.01, .99, length.out = 64L))
+  d$y <- sin(4 * d$x) + d$x^2
+  b <- npregbw(y ~ x, data = d, subset = x < .5, bws = .2,
+               bandwidth.compute = FALSE)
+  original <- b
+  retained <- nplsqreg(b, bandwidth.compute = FALSE,
+                       scale = rep(1, 32L), delta = .5)
+  selections <- list(NULL, TRUE, 29:64, d$x > .5)
+  rows <- list(seq_len(64L), seq_len(64L), 29:64, which(d$x > .5))
+  for (i in seq_along(selections)) {
+    fresh <- do.call(nplsqreg, list(bws = b, data = d,
+      subset = selections[[i]], bandwidth.compute = FALSE,
+      scale = rep(1, 64L), delta = .5))
+    chosen <- rows[[i]]
+    expected <- nplsqreg(b, txdat = d[chosen, "x", drop = FALSE],
+                         tydat = d$y[chosen], bandwidth.compute = FALSE,
+                         scale = rep(1, length(chosen)), delta = .5)
+    expect_equal(fitted(fresh), fitted(expected), tolerance = 0)
+    expect_equal(fresh$bws$xdat, d[chosen, "x", drop = FALSE], tolerance = 0)
+    expect_equal(fresh$bws$ydat, expected$bws$ydat, tolerance = 0)
+    expect_identical(b, original)
+  }
+  replay <- nplsqreg(b, data = d, bandwidth.compute = FALSE,
+                     scale = rep(1, 64L), delta = .5)
+  expect_equal(fitted(replay), fitted(retained), tolerance = 0)
+  expect_equal(fitted(nplsqreg(b, bandwidth.compute = FALSE,
+                              scale = rep(1, 32L), delta = .5)),
+               fitted(retained), tolerance = 0)
+})

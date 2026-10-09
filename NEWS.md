@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+- Local-smoothing quantile refits with explicit data and a new subset now use
+  the requested rows when the starting regression bandwidth also had a subset.
+  Omitting a new subset continues to replay the original selection.
+
 - Formula subset provenance now survives bandwidth reuse, serialization, and
   forwarding through lexical callbacks. Single-index evaluation records rows
   removed after `na.pass` or `NULL`, and native vector labels support named
