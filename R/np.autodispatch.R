@@ -3081,18 +3081,35 @@
   # Change only leaked labels; supplied names and formula metadata stay intact.
   if (is.list(result)) {
     bandwidth <- if (is.list(result[["bws", exact = TRUE]])) result[["bws"]] else result
-    for (name in c("ynames", "xnames")) {
+    for (name in c("ynames", "xnames", "znames")) {
       label <- bandwidth[[name, exact = TRUE]]
       if (is.character(label) && length(label) == 1L &&
           startsWith(label, ".__npRmpi_autod_")) {
-        role <- intersect(if (name == "ynames") c("ydat", "tydat") else
-                            c("dat", "tdat"), names(formals(definition)))
+        roles <- switch(name, ynames = c("ydat", "tydat"),
+                        xnames = c("xdat", "txdat", "dat", "tdat"),
+                        znames = c("zdat", "tzdat"))
+        role <- intersect(roles, names(formals(definition)))
         if (length(role)) {
           expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))),
                        envir = sys.frame(method))
+          expr <- .np_formula_dot_expression(expr,
+            sys.frame(sys.parents()[[method]]))
           label <- if (name == "ynames") deparse(expr) else
             paste(deparse(expr), collapse = "")
           bandwidth <- updateBwNameMetadata(setNames(list(label), name), bandwidth)
+          if (inherits(bandwidth, "plbandwidth")) {
+            if (name == "ynames")
+              bandwidth$bw$yzbw <- updateBwNameMetadata(list(ynames = label), bandwidth$bw$yzbw)
+            if (name == "xnames")
+              for (i in seq_along(label))
+                bandwidth$bw[[i + 1L]] <- updateBwNameMetadata(list(ynames = label[[i]]), bandwidth$bw[[i + 1L]])
+            if (name == "znames")
+              bandwidth$bw <- lapply(bandwidth$bw, function(bw)
+                updateBwNameMetadata(list(xnames = label), bw))
+          }
+          if (inherits(bandwidth, "lsqregressionbandwidth"))
+            bandwidth <- .nplsqreg_set_response_name(bandwidth, bandwidth$ynames,
+              predictor.names = if (name == "xnames") label else NULL)
           if (is.list(result[["bws", exact = TRUE]])) {
             result[["bws"]] <- bandwidth
             if (!is.null(result[[name, exact = TRUE]])) result[[name]] <- label

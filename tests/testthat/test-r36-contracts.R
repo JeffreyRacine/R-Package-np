@@ -14,11 +14,17 @@ test_that("smooth coefficient refits retain the z=x convention they used", {
   },0.0)
   E <- X[1:11,,drop=FALSE]
   progress.entry <- new.env(parent = emptyenv()); progress.entry$n <- 0L
+  progress.entry$restored <- 0L
   pooled <- npRmpi:::.npRmpi_autodispatch_active()
   if (pooled) {
     original.fit <- npRmpi:::.np_scoef_fit_internal
+    original.restore <- npRmpi:::.npRmpi_restore_nomad_fit_bws_metadata
     testthat::local_mocked_bindings(
       .np_progress_is_interactive = function() TRUE,
+      .npRmpi_restore_nomad_fit_bws_metadata = function(...) {
+        progress.entry$restored <- progress.entry$restored + 1L
+        original.restore(...)
+      },
       .np_scoef_fit_internal = function(...) {
         progress.entry$n <- progress.entry$n + 1L
         original.fit(...)
@@ -27,8 +33,14 @@ test_that("smooth coefficient refits retain the z=x convention they used", {
   for (messages in c(FALSE, TRUE)) for (positional in c(FALSE,TRUE)) {
     withr::local_options(np.messages=messages)
     entered.before <- progress.entry$n
+    restored.before <- progress.entry$restored
     f <- if(positional) npscoef(b,X,Y) else npscoef(b,txdat=X,tydat=Y)
-    if (pooled && messages) expect_gt(progress.entry$n, entered.before)
+    if (pooled) {
+      expect_identical(progress.entry$n - entered.before, 1L)
+      # Both routes enter the master fit; only autodispatch restores metadata.
+      expect_identical(progress.entry$restored - restored.before,
+                       if (messages) 0L else 1L)
+    }
     expect_equal(fitted(f),oracle(X),tolerance=1e-11)
     expect_equal(fitted(npscoef(b,txdat=X,tydat=Y,tzdat=NULL,newdata=E)),oracle(E),tolerance=1e-11)
     expect_null(f$bws$zdati); expect_null(f$bws$znames); expect_null(f$bws$varnames$z)
@@ -37,6 +49,8 @@ test_that("smooth coefficient refits retain the z=x convention they used", {
     expect_null(f$bws$dati$z)
     for (field in c("sfactor", "bandwidth", "sumNum", "klist"))
       expect_named(f$bws[[field]], "x")
+    # Values retain the established construction-sample convention.
+    expect_identical(unname(f$bws$sfactor), unname(b$sfactor))
     expect_warning(capture.output(summary(f$bws)), NA)
     expect_equal(fitted(npscoef(f$bws)),oracle(X),tolerance=1e-11)
     expect_equal(predict(f,exdat=E),oracle(E),tolerance=1e-11)

@@ -798,15 +798,29 @@ npconmode.default <- function(bws, txdat, tydat,
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
-  if(txdat.named)
+  if(txdat.named || (bws.named && !no.txdat && !inherits(txdat, "formula"))) {
+    # Keep the caller's vector name; explicit frame/matrix names are authoritative.
+    original.name <- if (is.null(dim(txdat)))
+      paste(deparse(.np_formula_dot_expression(substitute(txdat), parent.frame())), collapse = "") else NULL
     txdat <- toFrame(txdat)
+    if (!is.null(original.name)) names(txdat) <- original.name
+  }
 
-  if(tydat.named)
+  if(tydat.named) {
+    # Keep the caller's vector name; explicit frame/matrix names are authoritative.
+    original.name <- if (is.null(dim(tydat)))
+      paste(deparse(.np_formula_dot_expression(substitute(tydat), parent.frame())), collapse = "") else NULL
     tydat <- toFrame(tydat)
+    if (!is.null(original.name)) names(tydat) <- original.name
+  }
 
   if(!no.tydat) {
-    if(!tydat.named)
+    if(!tydat.named) {
+      original.name <- if (is.null(dim(tydat)))
+        paste(deparse(.np_formula_dot_expression(substitute(tydat), parent.frame())), collapse = "") else NULL
       tydat <- toFrame(tydat)
+      if (!is.null(original.name)) names(tydat) <- original.name
+    }
     .npConmodeValidateCategoricalResponse(tydat)
   }
 

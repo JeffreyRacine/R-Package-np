@@ -112,6 +112,11 @@
 .np_formula_dot_expression <- function(expr, caller_env) {
   if (is.symbol(expr) && grepl("^\\.\\.[0-9]+$", as.character(expr))) {
     index <- as.integer(substring(as.character(expr), 3L))
+    # Labels need syntax only. Lexically inherited dots can outlive their call;
+    # substitute them without forcing values or requiring an active invocation.
+    while (!exists("...", envir = caller_env, inherits = FALSE) &&
+           !identical(caller_env, emptyenv()))
+      caller_env <- parent.env(caller_env)
     expressions <- eval(quote(substitute(list(...))), envir = caller_env)
     if (index > 0L && index < length(expressions)) return(expressions[[index + 1L]])
   }
@@ -128,7 +133,7 @@
   NULL
 }
 
-.np_bw_native_values <- function(call_obj, map, frame) {
+.np_bw_native_values <- function(call_obj, map, frame, caller_env) {
   if (is.null(map)) return(list(call = call_obj, expressions = list(), values = list()))
   if (!is.environment(frame) || is.null(names(map)) ||
       anyDuplicated(names(map)) || any(!nzchar(names(map))))
@@ -155,7 +160,7 @@
     } else {
       value <- eval(source, envir = frame)
     }
-    expressions[name] <- list(call_obj[[index]])
+    expressions[name] <- list(.np_formula_dot_expression(call_obj[[index]], caller_env))
     binding <- paste0(".np_native_", name)
     values[binding] <- list(value)
     call_obj[[index]] <- as.name(binding)
@@ -201,7 +206,7 @@
     }
   }
   native <- if (is.null(formula.value))
-    .np_bw_native_values(call_obj, native.map, native.frame) else
+    .np_bw_native_values(call_obj, native.map, native.frame, caller_env) else
     list(call = call_obj, expressions = list())
   # Bound values avoid deparsing an entire response vector as a variable
   # name. The child environment exists only during this selector invocation;

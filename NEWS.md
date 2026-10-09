@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+- Formula subset provenance now survives bandwidth reuse, serialization, and
+  forwarding through lexical callbacks. Single-index evaluation records rows
+  removed after `na.pass` or `NULL`, and native vector labels support named
+  prediction data. Formula single-index calls no longer retain generic frames.
+
 - Formula single-index evaluation now honors an explicit `na.action` for
   predictor rows, including `na.exclude` prediction padding and `na.fail`.
   Omitted evaluation policies, retained training samples and native evaluation

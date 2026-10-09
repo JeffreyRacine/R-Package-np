@@ -79,7 +79,7 @@ npscoefbw.formula <-
     if (!miss.z)
       zdat <- mf[, .np_formula_term_names(chromoly[[3]]), drop = FALSE]
 
-    bw.args <- list(xdat = xdat, ydat = ydat)
+    bw.args <- list(xdat = xdat, ydat = quote(ydat))
     if (!miss.z)
       bw.args$zdat <- zdat
     dots <- list(...)
