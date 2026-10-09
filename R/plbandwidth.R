@@ -191,6 +191,10 @@ plbandwidth <-
     if(!bandwidth.compute)
       mybw$pmethod <- "Manual"
 
+    # Child descriptions follow the same declared response roles as the
+    # outer object. This does not change their retained samples or bandwidths.
+    for (i in seq_along(mybw$bw))
+      mybw$bw[[i]] <- updateBwNameMetadata(list(ynames = c(ynames, xnames)[[i]]), mybw$bw[[i]])
     class(mybw) = "plbandwidth"
     mybw <- .np_ordered_bandwidth_contract(mybw)
     if(!any(is.na(mybw$bandwidth)))

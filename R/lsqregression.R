@@ -421,18 +421,35 @@ lsqregression <-
   bws
 }
 
-.nplsqreg_set_response_name <- function(x, response.name) {
+.nplsqreg_set_response_name <- function(x, response.name, predictor.names = NULL) {
   x$ynames <- response.name
+  labels <- list(ynames = response.name)
+  if (!is.null(predictor.names)) {
+    x$xnames <- predictor.names
+    labels$xnames <- predictor.names
+  }
   if (!is.null(x$reg.bws))
-    x$reg.bws$ynames <- response.name
+    x$reg.bws <- updateBwNameMetadata(labels, x$reg.bws)
+  # The mean pilot models this response; the scale pilot models squared
+  # residuals and retains its distinct response description. Retained sample
+  # column names are left intact: they belong to the LSQ reuse identity check.
+  if (!is.null(x$mean.fit)) {
+    x$mean.fit$ynames <- response.name
+    if (!is.null(predictor.names)) x$mean.fit$xnames <- predictor.names
+    x$mean.fit$bws <- updateBwNameMetadata(labels, x$mean.fit$bws)
+  }
+  if (!is.null(predictor.names) && !is.null(x$scale.fit)) {
+    x$scale.fit$xnames <- predictor.names
+    x$scale.fit$bws <- updateBwNameMetadata(list(xnames = predictor.names), x$scale.fit$bws)
+  }
   if (!is.null(x$bws))
-    x$bws <- .nplsqreg_set_response_name(x$bws, response.name)
+    x$bws <- .nplsqreg_set_response_name(x$bws, response.name, predictor.names)
   if (!is.null(x$tau.bws))
     x$tau.bws <- lapply(x$tau.bws, .nplsqreg_set_response_name,
-                        response.name = response.name)
+                        response.name = response.name, predictor.names = predictor.names)
   if (!is.null(x$tau.fits))
     x$tau.fits <- lapply(x$tau.fits, .nplsqreg_set_response_name,
-                         response.name = response.name)
+                         response.name = response.name, predictor.names = predictor.names)
   x
 }
 

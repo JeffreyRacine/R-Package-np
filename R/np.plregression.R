@@ -769,11 +769,21 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
-  if(txdat.named)
+  if(txdat.named) {
+    # Preserve vector syntax before coercion gives it the formal's name.
+    original.name <- if (is.null(dim(txdat)))
+      paste(deparse(.np_formula_dot_expression(substitute(txdat), parent.frame())), collapse = "") else NULL
     txdat <- toFrame(txdat)
+    if (!is.null(original.name)) names(txdat) <- original.name
+  }
 
-  if(tzdat.named)
+  if(tzdat.named) {
+    # Preserve vector syntax before coercion gives it the formal's name.
+    original.name <- if (is.null(dim(tzdat)))
+      paste(deparse(.np_formula_dot_expression(substitute(tzdat), parent.frame())), collapse = "") else NULL
     tzdat <- toFrame(tzdat)
+    if (!is.null(original.name)) names(tzdat) <- original.name
+  }
 
   sc.bw <- sc
   
@@ -835,6 +845,10 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
                         formula.value = .np_formula_value(formula.input, bws, txdat))
   }
   
+  if (!has.explicit.bws && is.null(tbw$formula) && !no.tydat)
+    tbw <- updateBwNameMetadata(list(ynames = paste(deparse(
+      .np_formula_dot_expression(substitute(tydat), parent.frame())), collapse = "")), tbw)
+  tbw$bw$yzbw <- updateBwNameMetadata(list(ynames = tbw$ynames), tbw$bw$yzbw)
   call.args <- list(bws = tbw, se = se)
   if (!is.null(frame.state)) {
     call.args$.np.formula.state <- frame.state

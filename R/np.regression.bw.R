@@ -31,7 +31,7 @@ npregbw.formula <-
     dots <- list(...)
     .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], mf)
     dots$.np.formula.state <- NULL
-    tbw <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat), dots))
+    tbw <- do.call(npregbw, c(list(xdat = xdat, ydat = quote(ydat)), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))

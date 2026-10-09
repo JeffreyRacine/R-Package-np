@@ -42,7 +42,6 @@ test_that("native one-call selectors consume the original data promises once", {
     b <- a[["bws", exact = TRUE]]
     list(point = if (!is.null(a[["P", exact = TRUE]])) a$P else fitted(a),
          statistic = a[["In", exact = TRUE]],
-         names = b[intersect(c("xnames", "ynames", "znames", "names"), names(b))],
          training = b[[".np.native.training", exact = TRUE]])
   }
   for (id in names(cases)) for (wrapped in c(FALSE, TRUE)) {
@@ -70,6 +69,10 @@ test_that("native one-call selectors consume the original data promises once", {
     invisible(runif(sum(counts > 0L)))
     expected <- eval(strip(expr))
     expect_identical(fields(actual), fields(expected), info = paste(id, wrapped))
+    if (id %in% c("reg", "index", "scoef", "sigtest")) {
+      expect_identical(actual$bws$ynames, 'touch("y", y)', info = paste(id, wrapped))
+      expect_identical(expected$bws$ynames, "y", info = paste(id, wrapped))
+    }
     expect_identical(.Random.seed, actual.rng, info = paste(id, wrapped, "RNG"))
   }
 })

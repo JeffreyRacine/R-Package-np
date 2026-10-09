@@ -313,8 +313,13 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
-  if(tdat.named)
+  if(tdat.named) {
+    # Preserve vector syntax before coercion gives it the formal's name.
+    original.name <- if (is.null(dim(tdat)))
+      paste(deparse(.np_formula_dot_expression(substitute(tdat), parent.frame())), collapse = "") else NULL
     tdat <- toFrame(tdat)
+    if (!is.null(original.name)) names(tdat) <- original.name
+  }
 
   if(bws.named){
     sc.bw$bandwidth.compute <- FALSE

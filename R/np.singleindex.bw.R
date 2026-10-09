@@ -47,7 +47,7 @@ npindexbw.formula <-
     ydat <- model.response(mf)
     xdat <- .np_index_formula_xdat(mf)
 
-    tbw <- do.call(npindexbw, c(list(xdat = xdat, ydat = ydat), list(...)))
+    tbw <- do.call(npindexbw, c(list(xdat = xdat, ydat = quote(ydat)), list(...)))
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- match.call(expand.dots = FALSE)

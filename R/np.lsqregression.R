@@ -340,10 +340,14 @@ nplsqregbw <-
   if (isTRUE(nomad.pilot))
     pilot.dots$nomad <- TRUE
 
-  mean.args <- c(list(txdat = xdat, tydat = ydat), pilot.dots)
-  mean.fit <- do.call(npreg, mean.args)
+  # Bind already-prepared values by local symbols so internal response
+  # descriptions do not expand the entire sample into the retained objects.
+  mean.args <- c(alist(txdat = xdat, tydat = ydat), pilot.dots)
+  mean.fit <- do.call(npreg, mean.args, envir = environment())
   res <- as.numeric(ydat) - as.numeric(fitted(mean.fit))
   scale.fit <- npreg(bws = mean.fit$bws, txdat = xdat, tydat = res^2)
+  scale.fit$ynames <- "res^2"
+  scale.fit$bws <- updateBwNameMetadata(list(ynames = "res^2"), scale.fit$bws)
   variance.hat <- as.numeric(fitted(scale.fit))
   scale <- .nplsqreg_finalize_scale_pilot(variance.hat, res)
   mean.fit <- .nplsqreg_retain_native_fit(mean.fit, xdat, ydat)
@@ -1863,10 +1867,15 @@ nplsqreg.default <-
     dots$exdat <- NULL
 
     if (missing(bws) || !isa(bws, "lsqregressionbandwidth")) {
+      predictor.name <- if (is.null(dim(txdat))) paste(deparse(
+        .np_formula_dot_expression(substitute(txdat), parent.frame())), collapse = "") else NULL
       bw.args <- list(xdat = txdat, ydat = tydat, tau = tau.raw)
       if (!missing(bws))
         bw.args$bws <- bws
       bw <- do.call(nplsqregbw, c(bw.args, dots))
+      bw <- .nplsqreg_set_response_name(bw, paste(deparse(
+        .np_formula_dot_expression(substitute(tydat), parent.frame())), collapse = ""),
+        predictor.names = predictor.name)
       fit.args <- list(bws = bw, txdat = txdat, tydat = tydat,
                        gradients = gradients, residuals = residuals,
                        gradient.order = gradient.order, se = se)
