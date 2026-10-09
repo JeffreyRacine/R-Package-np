@@ -42,7 +42,12 @@ local({
     }
     options(na.action='na.omit');x<-data.frame(x=c(-.3,.4),z=c(.2,.5))
     expect_equal(predict(f,newdata=e,exdat=x,na.action=na.fail),predict(f,exdat=x))
-    expect_equal(predict(f,newdata=e,na.action=NULL),predict(f,newdata=e,na.action=na.pass))
+    for(policy in list(NULL,na.pass)) {
+      actual<-npindex(f$bws,newdata=e,se=FALSE,na.action=policy)
+      expect_equal(actual$rows.omit,2L);expect_equal(actual$nobs.omit,1L)
+      expect_equal(fitted(actual),predict(f,newdata=e[-2,],na.action=na.fail))
+      expect_length(fitted(actual),14L)
+    }
   })
   test_that('policy function values are realized once and training stays retained', {
     options(na.action='na.omit');f<-make();e<-d[1:15,];e$x[2]<-NA
