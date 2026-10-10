@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+- `predict()` for location-scale quantile fits now accepts named `tau` to
+  select stored quantiles in the requested order, with aligned standard errors
+  and training scores. Omitted or NULL `tau` retains the original behavior;
+  unfitted quantiles fail clearly without bandwidth selection or recalibration.
+
 - The standalone `npregiv` and `Engel95` demos keep their MPI workers alive
   until the demo finishes and close them on exit.
 

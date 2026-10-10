@@ -24,6 +24,8 @@
 \usage{
 nplsqreg(bws, \dots)
 
+\method{predict}{lsqregression}(object, se.fit = FALSE, \dots, tau = NULL)
+
 \method{nplsqreg}{formula}(bws, data = NULL, newdata = NULL, tau = 0.5,
        gradients = FALSE, residuals = FALSE, subset, na.action,
        gradient.order = 1L, se = FALSE, \dots)
@@ -43,6 +45,10 @@ nplsqreg(bws, \dots)
        \dots)
 }
 \arguments{
+  \item{object}{a fitted \code{lsqregression} object.}
+  \item{se.fit}{logical; whether prediction standard errors are returned.
+    Defaults to \code{FALSE}.}
+
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
 These arguments identify the bandwidth specification, formula/data interface,
 and training data.
@@ -140,6 +146,10 @@ selection, prediction, or plotting route.
   \item{tau}{
     a numeric scalar or vector specifying the quantile probability or
     probabilities \eqn{\tau}{tau}. Values must lie strictly in \eqn{(0,1)}.
+    For \code{predict()}, omit \code{tau} or use \code{NULL} to predict
+    all stored quantiles. Otherwise supply distinct, exactly matching stored
+    values in the desired order. Unfitted values are an error; prediction
+    does not select bandwidths or recalibrate a new quantile.
   }
 
   \item{\dots}{
@@ -157,6 +167,14 @@ selection, prediction, or plotting route.
   }
 }
 \details{
+  The \code{tau} prediction argument must be named. Selecting one stored
+  quantile returns the ordinary scalar prediction vector (or the scalar
+  prediction list when \code{se.fit = TRUE}). Selecting several returns
+  prediction and standard-error matrices with columns in the requested order,
+  preserving the stored quantile labels and aligning \code{residual.scale}.
+  Omitting \code{tau}, or supplying \code{NULL}, preserves the fitted
+  object's original scalar or matrix output shape.
+
   Prediction with \code{se.fit = TRUE} reports known training mean squared
   error in \code{residual.scale}, retaining MSE units, or \code{NA} when
   training provenance is unavailable. Evaluation outcomes do not replace this
