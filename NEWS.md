@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+- The standalone `npregiv` and `Engel95` demos keep their MPI workers alive
+  until the demo finishes and close them on exit.
+
 - Local-smoothing quantile refits with explicit data and a new subset now use
   the requested rows when the starting regression bandwidth also had a subset.
   Omitting a new subset continues to replay the original selection.
