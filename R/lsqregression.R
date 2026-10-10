@@ -793,8 +793,16 @@ gradients.lsqregression <- function(x, se = FALSE,
        omit = attr(mf, "na.action"))
 }
 
-predict.lsqregression <- function(object, se.fit = FALSE, ...) {
+predict.lsqregression <- function(object, se.fit = FALSE, ..., tau = NULL) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
+  tau.index <- NULL
+  if (!is.null(tau)) {
+    tau <- .nplsqreg_validate_tau_values(tau)
+    tau.index <- match(tau, object[["tau", exact = TRUE]])
+    if (anyNA(tau.index))
+      stop("requested 'tau' was not fitted; fit the missing quantile with nplsqreg() before predicting",
+           call. = FALSE)
+  }
   dots <- list(...)
   # Formula evaluation owns names and transformations; native exdat already
   # contains model coordinates. Reserve training slots for positional newdata.
@@ -842,11 +850,16 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
     if (is.null(object$tau.fits) || length(object$tau.fits) != length(object$tau))
       stop("vector nplsqreg object lacks per-tau fit state", call. = FALSE)
     labels <- .nplsqreg_tau_labels(object$tau)
+    prediction.fits <- object$tau.fits
+    if (!is.null(tau.index)) {
+      labels <- labels[tau.index]
+      prediction.fits <- prediction.fits[tau.index]
+    }
     empty.state <- new.env(hash = FALSE, parent = emptyenv())
     empty.state$rows <- NULL
     child.dots <- dots
     child.dots$.np.defer.empty.rows <- TRUE
-    pred <- lapply(object$tau.fits, function(one) {
+    pred <- lapply(prediction.fits, function(one) {
       # The parent owns restoration once, including legacy children that did
       # not retain a training omission map of their own.
       if (retained.evaluation)
@@ -858,6 +871,10 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
       if(!is.null(flags)) attr(value, ".np.empty.rows") <- NULL
       value
     })
+    # Keep formula preparation and row restoration with the vector parent,
+    # even when the request selects just one scalar child.
+    if (!is.null(tau.index) && length(tau.index) == 1L)
+      return(finish(pred[[1L]], empty.state$rows))
     if (se.fit) {
       fit <- do.call(cbind, lapply(pred, `[[`, "fit"))
       se.out <- do.call(cbind, lapply(pred, `[[`, "se.fit"))

@@ -1,5 +1,10 @@
 # np 0.80-1
 
+- `predict()` for location-scale quantile fits now accepts named `tau` to
+  select stored quantiles in the requested order, with aligned standard errors
+  and training scores. Omitted or NULL `tau` retains the original behavior;
+  unfitted quantiles fail clearly without bandwidth selection or recalibration.
+
 - Local-smoothing quantile refits with explicit data and a new subset now use
   the requested rows when the starting regression bandwidth also had a subset.
   Omitting a new subset continues to replay the original selection.
