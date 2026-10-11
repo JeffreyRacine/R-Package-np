@@ -857,7 +857,9 @@
             plot.args$y <- temp.mean
           panel.ylim <- NULL
           if (plot.errors)
-            panel.ylim <- if (plot.errors.type == "all")
+            panel.ylim <- if (joint.request && identical(plot.errors.type, "simultaneous"))
+              .np_plot_joint_panel_range(temp.mean, temp.err, plotOnEstimate)
+            else if (plot.errors.type == "all")
               compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
             else
               c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
@@ -1171,7 +1173,9 @@
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- temp.mean
           if (plot.errors)
-            plot.args$ylim <- if (plot.errors.type == "all")
+            plot.args$ylim <- if (joint.request && identical(plot.errors.type, "simultaneous"))
+              .np_plot_joint_panel_range(temp.mean, temp.err, plotOnEstimate)
+            else if (plot.errors.type == "all")
               compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
             else
               c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
@@ -1362,7 +1366,15 @@
       }
 
       if (common.scale && (plot.behavior != "data")){
-        if (plot.errors && plot.errors.type == "all") {
+        if (joint.request && identical(plot.errors.type, "simultaneous")) {
+          columns <- 3L * seq_len(ncol(data.eval))
+          joint.range <- .np_plot_joint_panel_range(as.double(data.eval),
+            cbind(as.double(data.err[, columns - 2L, drop = FALSE]),
+                  as.double(data.err[, columns - 1L, drop = FALSE]),
+                  as.double(data.err[, columns, drop = FALSE])), plotOnEstimate)
+          y.min <- joint.range[1L]
+          y.max <- joint.range[2L]
+        } else if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
           for (k in seq_len(bws$xndim + bws$zndim)) {

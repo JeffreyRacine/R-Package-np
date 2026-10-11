@@ -1,5 +1,9 @@
 # np 0.80-1
 
+- Unavailable simultaneous-only plot limits retain their NA rows, aligned with
+  retained fitted centers. Smooth-coefficient and partially linear displays
+  retain a finite axis range when the requested joint limits are unavailable.
+
 - Joint-band reconstruction, residual-information and workspace limitations
   now produce a warning and NA simultaneous limits; `band="all"` retains its
   pointwise and Bonferroni bands. Invalid arguments and unexpected errors

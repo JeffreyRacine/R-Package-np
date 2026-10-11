@@ -304,3 +304,25 @@ test_that("joint unavailability preserves only the declared compatibility bounda
   expect_warning(.np_plot_gaussian_draws(9999L, .01, 50L), "38031")
   expect_warning(.np_plot_gaussian_draws(7299L, .05, 2500L), NA)
 })
+
+# Protect NA row retention and the finite display range after joint rejection.
+test_that("unavailable joint limits retain rows and render fitted centers", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  errors <- matrix(NA_real_, 3L, 2L)
+  kept <- .np_plot_joint_interval_rows(errors, c(1, NA, 3), TRUE, "simultaneous")
+  expect_identical(dim(kept), c(2L, 2L))
+  expect_true(all(is.na(kept)))
+  expect_identical(.np_plot_joint_panel_range(c(1, NA, 3), errors), c(1, 3))
+  x <- data.frame(x = seq(-1, 1, length.out = 24L))
+  y <- x$x + sin(seq_len(24L)) / 4
+  bw <- npregbw(xdat = x, ydat = y, bws = .5, regtype = "ll",
+                bandwidth.compute = FALSE)
+  for (gradient in c(FALSE, TRUE)) {
+    expect_warning(out <- plot(bw, errors = "asymptotic", band = "simultaneous",
+      gradients = gradient, neval = 513L, output = "data")[[1L]], "memory/grid budget")
+    limits <- if (gradient) out$gerr else out$merr
+    expect_identical(dim(limits), c(513L, 2L))
+    expect_true(all(is.na(limits)))
+  }
+})

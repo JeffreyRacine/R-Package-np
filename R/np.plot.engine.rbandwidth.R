@@ -1023,7 +1023,9 @@
                              temp.mean[seq_len(xi.neval)]
                            },
                            gerr = if (component.available) {
-                             na.omit(cbind(-temp.err[,1], temp.err[,2]))
+                             .np_plot_joint_interval_rows(
+                               cbind(-temp.err[,1], temp.err[,2]), temp.mean,
+                               joint.request, plot.errors.type)
                            } else {
                              cbind(-temp.err[seq_len(xi.neval),1],
                                temp.err[seq_len(xi.neval),2])
@@ -1040,8 +1042,9 @@
               npregression(bws = bws,
                            eval = setNames(subcol(exdat,ei,i)[seq_len(xi.neval), , drop = FALSE], bws$xnames),
                            mean = na.omit(temp.mean),
-                           merr = na.omit(cbind(-temp.err[,1],
-                             temp.err[,2])),
+                           merr = .np_plot_joint_interval_rows(
+                             cbind(-temp.err[,1], temp.err[,2]), temp.mean,
+                             joint.request, plot.errors.type),
                            ntrain = dim(xdat)[1])
             plot.out[[i]]$bias = NA
             plot.out[[i]]$bias.corrected = NA
