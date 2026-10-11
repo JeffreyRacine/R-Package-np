@@ -52,7 +52,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, .np.empty.report = NULL){
+           random.seed, .np.empty.report = NULL, gaussian.draws = 50000L){
 
     sub.supplied <- !missing(sub)
 
@@ -187,6 +187,21 @@
     }
 
     
+    joint.request <- identical(as.character(plot.errors.method)[1L], "asymptotic") &&
+      as.character(plot.errors.type)[1L] %in% c("simultaneous", "all")
+    if (!missing(gaussian.draws) && !joint.request)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
+    joint.eligible <- FALSE
+    joint.residual <- NULL
+    if (joint.request) {
+      if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+        stop("asymptotic joint bands require coordinator context in an active session or attach pool; they cannot run inside mpi.bcast.cmd(...)",
+             call. = FALSE)
+      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws", 1000000L)
+      joint.eligible <- .np_plot_regression_joint_supported(bws, gradients) &&
+        !(isTRUE(perspective) && bws$ncon + bws$nord == 2L &&
+          bws$nuno == 0L && !any(xor(bws$xdati$iord, bws$xdati$inumord)))
+    }
     normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
@@ -201,7 +216,8 @@
       plot.errors.bar = plot.errors.bar,
       xdat = xdat,
       common.scale = common.scale,
-      ylim = ylim
+      ylim = ylim,
+      allow_asymptotic_simultaneous = joint.eligible
     )
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
@@ -702,6 +718,7 @@
         temp.mean[] =  NA
         temp.boot = list()
         temp.all.err <- NULL
+        joint.calibration <- NULL
 
         xi.factor = is.factor(xdat[,i])
         component.available <- !isTRUE(gradients) || plot.gradient.available[i]
@@ -806,6 +823,30 @@
               band.type = plot.errors.type,
               m = xi.neval
             )
+            if (joint.eligible && !xi.factor) {
+              if (any(!is.finite(tr$merr)) || any(!is.finite(tr$mean)))
+                stop("joint variability bands require identified finite uncertainty at every grid point",
+                     call. = FALSE)
+              joint <- .np_plot_activity_run("Computing joint regression plot covariance",
+                .np_plot_regression_joint_covariance(bws, xdat, ydat,
+                  subcol(exdat, ei, i)[seq_len(xi.neval), , drop = FALSE],
+                  residual = joint.residual))
+              joint.residual <- joint$residual
+              joint.se <- sqrt(diag(joint$covariance))
+              if (any(abs(joint.se - tr$merr) > 1e-9 * pmax(1, abs(tr$merr))))
+                stop("joint covariance does not reproduce the regression standard errors",
+                     call. = FALSE)
+              joint.calibration <- .np_plot_activity_run("Calibrating Gaussian plot maximum",
+                .np_plot_gaussian_calibrate(joint$covariance,
+                  alpha = plot.errors.alpha, draws = gaussian.draws))
+              simultaneous <- cbind(tr$merr, tr$merr) * joint.calibration$critical
+              if (identical(plot.errors.type, "all"))
+                asym.obj$all.err$simultaneous <- simultaneous
+              else
+                asym.obj$err <- simultaneous
+            } else if (joint.eligible && xi.factor) {
+              .np_warning("asymptotic simultaneous variability intervals are unavailable for categorical panels; returning NA simultaneous limits")
+            }
             temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
             temp.all.err <- asym.obj$all.err
           } else if (plot.errors.method == "bootstrap"){
@@ -1107,6 +1148,11 @@
               )
           }
           plot.out[[i]]$bxp = temp.boot
+          if (!is.null(joint.calibration)) {
+            plot.out[[i]]$band.calibration <- joint.calibration
+            if (identical(plot.errors.type, "all"))
+              plot.out[[i]]$band.errors <- temp.all.err
+          }
         }
       }
       

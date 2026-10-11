@@ -26,7 +26,8 @@ test_that("variability descriptors distinguish bootstrap and asymptotic construc
 
   asym.simultaneous <- descriptor("asymptotic", "simultaneous", 0.05,
                                   "estimate")
-  expect_length(asym.simultaneous$candidates, 0L)
+  expect_match(asym.simultaneous$candidates[[1L]], "Gaussian simultaneous", fixed = TRUE)
+  expect_match(asym.simultaneous$candidates[[1L]], "finite grid within panel", fixed = TRUE)
 })
 
 test_that("annotation placement follows actual geometry and figure ownership", {
