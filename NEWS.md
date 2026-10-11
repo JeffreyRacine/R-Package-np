@@ -1,5 +1,16 @@
 # np 0.80-1
 
+- Asymptotic Gaussian simultaneous bands now include supported regression,
+  single-index and smooth-coefficient gradients, and regression and
+  smooth-coefficient mean surfaces in perspective and rgl plots. Surface
+  calibration uses observation influence factors without a square grid
+  covariance matrix. `gaussian.draws` now defaults to a fixed 99,999; counts
+  below `ceiling(2*m/alpha - 1)` warn without being increased, where `m` counts
+  every evaluation point, including the full surface grid. The fixed
+  one-million draw ceiling has been removed; allocation checks remain. Gaussian
+  simulation reports draw progress and elapsed time using the bootstrap
+  heartbeat mechanism.
+
 - Plot joint-band admission now honors the existing legacy argument
   abbreviations consistently with full method and band names.
 
