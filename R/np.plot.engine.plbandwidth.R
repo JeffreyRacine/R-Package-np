@@ -163,7 +163,7 @@
         stop("asymptotic joint bands require coordinator context in an active session or attach pool; they cannot run inside mpi.bcast.cmd(...)",
              call. = FALSE)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
-      joint.eligible <- !coef && all(vapply(bws$bw,
+      joint.eligible <- !coef && all(vapply(bws[["bw", exact = TRUE]],
         .np_plot_regression_joint_supported, logical(1L)))
     }
     joint_update <- function(interval, fit, categorical = FALSE) {
