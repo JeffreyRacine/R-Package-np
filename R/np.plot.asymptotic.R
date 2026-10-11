@@ -1,3 +1,18 @@
+# A missing joint interval must retain one row per retained plotted center.
+# Other interval routes preserve their established omission behavior.
+.np_plot_joint_interval_rows <- function(errors, center, joint, type) {
+  if (joint && identical(type, "simultaneous"))
+    errors[!is.na(center), , drop = FALSE]
+  else
+    na.omit(errors)
+}
+
+.np_plot_joint_panel_range <- function(estimate, err, plotOnEstimate = TRUE) {
+  limits <- .np_plot_panel_error_range(estimate, err,
+    plot.errors.type = "simultaneous", plotOnEstimate = plotOnEstimate)
+  if (all(is.finite(limits))) limits else c(-1, 1)
+}
+
 .np_plot_joint_unavailable <- function(message, call. = FALSE) {
   stop(structure(list(message = message, call = NULL),
                  class = c("np_plot_joint_unavailable", "error", "condition")))

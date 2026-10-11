@@ -964,7 +964,9 @@
             plot.args$y <- temp.mean
           panel.ylim <- NULL
           if (plot.errors)
-            panel.ylim <- if (plot.errors.type == "all")
+            panel.ylim <- if (joint.request && identical(plot.errors.type, "simultaneous"))
+              .np_plot_joint_panel_range(temp.mean, temp.err, plotOnEstimate)
+            else if (plot.errors.type == "all")
               compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
             else
               c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
@@ -1137,8 +1139,9 @@
                                 eval = eval.obj,
                                 mean = na.omit(temp.mean),
                                 grad = na.omit(temp.mean),
-                                gerr = if (plot.errors) na.omit(cbind(-temp.err[eval.rows, 1],
-                                                                       temp.err[eval.rows, 2])) else NA,
+                                gerr = if (plot.errors) .np_plot_joint_interval_rows(
+                                  cbind(-temp.err[eval.rows, 1], temp.err[eval.rows, 2]),
+                                  temp.mean[eval.rows], joint.request, plot.errors.type) else NA,
                                 ntrain = dim(xdat)[1],
                                 trainiseval = FALSE,
                                 xtra = rep(NA_real_, 6L))
@@ -1301,7 +1304,9 @@
               plot.args$y <- temp.mean
             panel.ylim <- NULL
             if (plot.errors)
-              panel.ylim <- if (plot.errors.type == "all")
+              panel.ylim <- if (joint.request && identical(plot.errors.type, "simultaneous"))
+              .np_plot_joint_panel_range(temp.mean, temp.err, plotOnEstimate)
+            else if (plot.errors.type == "all")
                 compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
               else
                 c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
@@ -1470,8 +1475,9 @@
                                     ezdat = subcol(ezdat,ei,i)[eval.rows,, drop = FALSE]),
                                   mean = na.omit(temp.mean),
                                   grad = na.omit(temp.mean),
-                                  gerr = if (plot.errors) na.omit(cbind(-temp.err[eval.rows, 1],
-                                                                         temp.err[eval.rows, 2])) else NA,
+                                  gerr = if (plot.errors) .np_plot_joint_interval_rows(
+                                  cbind(-temp.err[eval.rows, 1], temp.err[eval.rows, 2]),
+                                  temp.mean[eval.rows], joint.request, plot.errors.type) else NA,
                                   ntrain = dim(zdat)[1],
                                   trainiseval = FALSE)
               plot.out[[plot.index]]$gbias = NA
@@ -1526,7 +1532,15 @@
       if (common.scale && (plot.behavior != "data")){
         jj = seq_len(bws$xndim + bws$zndim)*3
         
-        if (plot.errors && plot.errors.type == "all") {
+        if (joint.request && identical(plot.errors.type, "simultaneous")) {
+          columns <- 3L * seq_len(ncol(data.eval))
+          joint.range <- .np_plot_joint_panel_range(as.double(data.eval),
+            cbind(as.double(data.err[, columns - 2L, drop = FALSE]),
+                  as.double(data.err[, columns - 1L, drop = FALSE]),
+                  as.double(data.err[, columns, drop = FALSE])), plotOnEstimate)
+          y.min <- joint.range[1L]
+          y.max <- joint.range[2L]
+        } else if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
           for (k in seq_len(bws$xndim + bws$zndim)) {
