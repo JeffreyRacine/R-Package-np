@@ -37,7 +37,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, .np.empty.report = NULL, gaussian.draws = 50000L){
+           random.seed, .np.empty.report = NULL, gaussian.draws = 99999L){
 
     sub.supplied <- !missing(sub)
 
@@ -86,8 +86,8 @@
       if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
         stop("asymptotic joint bands require coordinator context in an active session or attach pool; they cannot run inside mpi.bcast.cmd(...)",
              call. = FALSE)
-      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws", 1000000L)
-      joint.eligible <- !isTRUE(gradients) && identical(bws$type, "fixed") &&
+      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+      joint.eligible <- identical(bws$type, "fixed") &&
         bws$ckertype %in% c("gaussian", "epanechnikov") &&
         identical(as.integer(bws$ckerorder), 2L)
     }
@@ -236,22 +236,29 @@
           m = maxneval
         )
         if (joint.eligible) {
-          if (any(!is.finite(tobj$merr)) || any(!is.finite(tobj$mean)))
+          target.se <- if (gradients) tobj$gerr.index else tobj$merr
+          target.value <- if (gradients) tobj$grad.index else tobj$mean
+          if (any(!is.finite(target.se)) || any(!is.finite(target.value)))
             stop("joint variability bands require identified finite uncertainty at every grid point",
                  call. = FALSE)
           rbw <- .np_indexhat_rbw(bws, eval.info$idx.train)
           joint <- .np_plot_activity_run("Computing joint single-index plot covariance",
             .np_plot_regression_joint_covariance(rbw, eval.info$idx.train,
-              .np_hat_response(ydat, bws[["ydati", exact = TRUE]]), eval.info$idx.eval))
-          if (any(abs(sqrt(diag(joint$covariance)) - tobj$merr) >
-                  1e-9 * pmax(1, abs(tobj$merr))))
+              .np_hat_response(ydat, bws[["ydati", exact = TRUE]]), eval.info$idx.eval,
+              deriv = if (gradients) 1L else NULL))
+          if (gradients && any(abs(joint$estimate - target.value) >
+                               1e-9 * pmax(1, abs(target.value))))
+            stop("joint influence map does not reproduce the single-index derivative",
+                 call. = FALSE)
+          if (any(abs(sqrt(diag(joint$covariance)) - target.se) >
+                  1e-9 * pmax(1, abs(target.se))))
             stop("joint covariance does not reproduce the single-index standard errors",
                  call. = FALSE)
           joint.calibration <- .np_plot_activity_run("Calibrating Gaussian plot maximum",
             .np_plot_gaussian_calibrate(joint$covariance,
               alpha = plot.errors.alpha, draws = gaussian.draws))
           joint.calibration$conditioning <- "fitted index coefficients and smoothing specification"
-          simultaneous <- cbind(tobj$merr, tobj$merr) * joint.calibration$critical
+          simultaneous <- cbind(target.se, target.se, deparse.level = 0L) * joint.calibration$critical
           if (identical(plot.errors.type, "all"))
             asym.obj$all.err$simultaneous <- simultaneous
           else
@@ -519,6 +526,16 @@
           )
           plot.out[[1]]$glerr = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
           plot.out[[1]]$gherr = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
+          if (!is.null(joint.calibration)) {
+            plot.out[[1]]$band.calibration <- joint.calibration
+            if (identical(plot.errors.type, "all"))
+              plot.out[[1]]$band.errors <- lapply(temp.all.err, function(err) {
+                out <- array(rep(err[i.sort, , drop = FALSE], ncol(xdat)),
+                  dim = c(maxneval, 2L, ncol(xdat)),
+                  dimnames = list(NULL, c("lower", "upper"), bws$xnames))
+                sweep(out, 3L, abs(bws$beta), "*")
+              })
+          }
           if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
             plot.out[[1]]$gbias = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))
             plot.out[[1]]$gradient.bias.corrected = matrix(data=0,nrow = maxneval, ncol = ncol(xdat))

@@ -55,7 +55,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, gaussian.draws = 50000L){
+           random.seed, gaussian.draws = 99999L){
 
     sub.supplied <- !missing(sub)
     coef.index <- .np_plot_match_coef_index(coef.index)
@@ -219,14 +219,9 @@
       if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
         stop("asymptotic joint bands require coordinator context in an active session or attach pool; they cannot run inside mpi.bcast.cmd(...)",
              call. = FALSE)
-      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws", 1000000L)
-      joint.surface <- isTRUE(perspective) &&
-        sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord)) == 2 &&
-        sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0 &&
-        !any(xor(c(bws$xdati$iord, bws$zdati$iord),
-                 c(bws$xdati$inumord, bws$zdati$inumord)))
-      joint.eligible <- !coef && !joint.surface &&
-        .np_plot_regression_joint_supported(bws, gradients)
+      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+      joint.eligible <- !coef &&
+        .np_plot_regression_joint_supported(bws)
     }
 
     normalized.opts <- .np_plot_normalize_common_options(
@@ -374,6 +369,7 @@
       )
       if (!miss.z)
         scoef.args$tzdat <- zdat
+      if (joint.eligible) scoef.args$residuals <- TRUE
       if (miss.z) {
         scoef.args$exdat <- x.eval
       } else {
@@ -441,6 +437,32 @@
           band.type = plot.errors.type,
           m = nrow(x.eval)
         )
+        if (joint.eligible) {
+          if (any(!is.finite(tobj$merr)) || any(!is.finite(tobj$mean)))
+            stop("joint variability bands require identified finite uncertainty at every grid point",
+                 call. = FALSE)
+          joint <- .np_plot_activity_run("Computing joint smooth-coefficient surface influence",
+            .np_plot_scoef_joint_covariance(bws, xdat, ydat,
+              if (miss.z) NULL else zdat, scoef.args$exdat, scoef.args$ezdat,
+              residual = tobj[["resid", exact = TRUE]], factor = TRUE))
+          if (any(abs(joint$mean - tobj$mean) > 1e-9 * pmax(1, abs(tobj$mean))))
+            stop("joint influence map does not reproduce the smooth-coefficient fitted mean",
+                 call. = FALSE)
+          joint.se <- vapply(seq_len(nrow(x.eval)), function(i)
+            sqrt(sum(joint$influence[i, ]^2)), numeric(1L))
+          if (any(abs(joint.se - tobj$merr) > 1e-9 * pmax(1, abs(tobj$merr))))
+            stop("joint covariance does not reproduce the smooth-coefficient standard errors",
+                 call. = FALSE)
+          joint.calibration <- .np_plot_activity_run("Calibrating Gaussian surface maximum",
+            .np_plot_gaussian_factor_calibrate(joint$influence,
+              alpha = plot.errors.alpha, draws = gaussian.draws))
+          joint.calibration$conditioning <- "noniterated plotted mean and smoothing specification"
+          simultaneous <- cbind(tobj$merr, tobj$merr) * joint.calibration$critical
+          if (identical(plot.errors.type, "all"))
+            terr.obj$all.err$simultaneous <- simultaneous
+          else
+            terr.obj$err <- simultaneous
+        }
         terr[,1:2] <- terr.obj$err
         terr.all <- terr.obj$all.err
         lerr = matrix(data = tobj$mean - terr[,1],
@@ -480,6 +502,10 @@
         ))
         r1$bias = NA
         r1$bias.corrected = NA
+        if (!is.null(joint.calibration)) {
+          r1$band.calibration <- joint.calibration
+          if (identical(plot.errors.type, "all")) r1$band.errors <- terr.all
+        }
 
         if (.np_plot_center_is_bias_corrected(plot.errors.center))
           r1 <- .np_plot_add_bias_fields(r1, as.double(treg), terr[,3])
@@ -788,7 +814,9 @@
             .np_warning("asymptotic simultaneous variability intervals are unavailable for categorical panels; returning NA simultaneous limits")
             return(asym.obj)
           }
-          if (any(!is.finite(tobj$merr)) || any(!is.finite(tobj$mean)))
+          target.se <- extract_scoef_se(tobj)
+          target.value <- extract_scoef_value(tobj)
+          if (any(!is.finite(target.se)) || any(!is.finite(target.value)))
             stop("joint variability bands require identified finite uncertainty at every grid point",
                  call. = FALSE)
           if (is.null(joint.residual))
@@ -798,20 +826,25 @@
           joint <- .np_plot_activity_run("Computing joint smooth-coefficient plot covariance",
             .np_plot_scoef_joint_covariance(bws, xdat, ydat,
               if (miss.z) NULL else zdat, ex.slice, ez.slice,
-              residual = joint.residual))
+              residual = joint.residual,
+              gradient.index = if (gradients) gradient.index else NULL))
           joint.residual <<- joint$residual
-          if (any(abs(joint$mean - tobj$mean) > 1e-9 * pmax(1, abs(tobj$mean))))
-            stop("joint influence map does not reproduce the smooth-coefficient fitted mean",
+          if (any(abs(joint$mean - target.value) > 1e-9 * pmax(1, abs(target.value))))
+            stop(if (gradients)
+                   "joint influence map does not reproduce the smooth-coefficient gradient" else
+                   "joint influence map does not reproduce the smooth-coefficient fitted mean",
                  call. = FALSE)
-          if (any(abs(sqrt(diag(joint$covariance)) - tobj$merr) >
-                  1e-9 * pmax(1, abs(tobj$merr))))
+          if (any(abs(sqrt(diag(joint$covariance)) - target.se) >
+                  1e-9 * pmax(1, abs(target.se))))
             stop("joint covariance does not reproduce the smooth-coefficient standard errors",
                  call. = FALSE)
           joint.calibration <<- .np_plot_activity_run("Calibrating Gaussian plot maximum",
             .np_plot_gaussian_calibrate(joint$covariance,
               alpha = plot.errors.alpha, draws = gaussian.draws))
-          joint.calibration$conditioning <<- "noniterated plotted mean and smoothing specification"
-          simultaneous <- cbind(tobj$merr, tobj$merr) * joint.calibration$critical
+          joint.calibration$conditioning <<- if (gradients)
+            "noniterated slope coefficient and smoothing specification" else
+            "noniterated plotted mean and smoothing specification"
+          simultaneous <- cbind(target.se, target.se, deparse.level = 0L) * joint.calibration$critical
           if (identical(plot.errors.type, "all"))
             asym.obj$all.err$simultaneous <- simultaneous
           else

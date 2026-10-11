@@ -52,7 +52,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, .np.empty.report = NULL, gaussian.draws = 50000L){
+           random.seed, .np.empty.report = NULL, gaussian.draws = 99999L){
 
     sub.supplied <- !missing(sub)
 
@@ -199,10 +199,8 @@
       if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
         stop("asymptotic joint bands require coordinator context in an active session or attach pool; they cannot run inside mpi.bcast.cmd(...)",
              call. = FALSE)
-      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws", 1000000L)
-      joint.eligible <- .np_plot_regression_joint_supported(bws, gradients) &&
-        !(isTRUE(perspective) && bws$ncon + bws$nord == 2L &&
-          bws$nuno == 0L && !any(xor(bws$xdati$iord, bws$xdati$inumord)))
+      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+      joint.eligible <- .np_plot_regression_joint_supported(bws)
     }
     normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
@@ -399,6 +397,7 @@
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
+      joint.calibration <- NULL
       lerr.all <- NULL
       herr.all <- NULL
       
@@ -448,6 +447,27 @@
           band.type = plot.errors.type,
           m = nrow(x.eval)
         )
+        if (joint.eligible) {
+          if (any(!is.finite(tobj$merr)) || any(!is.finite(tobj$mean)))
+            stop("joint variability bands require identified finite uncertainty at every grid point",
+                 call. = FALSE)
+          joint <- .np_plot_activity_run("Computing joint regression surface influence",
+            .np_plot_regression_joint_covariance(bws, xdat, ydat, x.eval,
+                                                 factor = TRUE))
+          joint.se <- vapply(seq_len(nrow(x.eval)), function(i)
+            sqrt(sum(joint$influence[i, ]^2)), numeric(1L))
+          if (any(abs(joint.se - tobj$merr) > 1e-9 * pmax(1, abs(tobj$merr))))
+            stop("joint covariance does not reproduce the regression standard errors",
+                 call. = FALSE)
+          joint.calibration <- .np_plot_activity_run("Calibrating Gaussian surface maximum",
+            .np_plot_gaussian_factor_calibrate(joint$influence,
+              alpha = plot.errors.alpha, draws = gaussian.draws))
+          simultaneous <- cbind(tobj$merr, tobj$merr) * joint.calibration$critical
+          if (identical(plot.errors.type, "all"))
+            terr.obj$all.err$simultaneous <- simultaneous
+          else
+            terr.obj$err <- simultaneous
+        }
         terr[,1:2] <- terr.obj$err
         terr.all <- terr.obj$all.err
         center.val <- tobj$mean
@@ -488,6 +508,10 @@
           ntrain = dim(xdat)[1])
           r1$bias = NA
           r1$bias.corrected = NA
+        if (!is.null(joint.calibration)) {
+          r1$band.calibration <- joint.calibration
+          if (identical(plot.errors.type, "all")) r1$band.errors <- terr.all
+        }
 
         if (.np_plot_center_is_bias_corrected(plot.errors.center))
           r1 <- .np_plot_add_bias_fields(r1, as.double(treg), terr[,3])
@@ -827,22 +851,33 @@
               m = xi.neval
             )
             if (joint.eligible && !xi.factor) {
-              if (any(!is.finite(tr$merr)) || any(!is.finite(tr$mean)))
+              target.se <- if (gradients) tr$gerr[, i] else tr$merr
+              target.value <- if (gradients) tr$grad[, i] else tr$mean
+              deriv <- NULL
+              if (gradients) {
+                deriv <- integer(bws$ncon)
+                deriv[match(i, which(bws$icon))] <- plot.gradient.order.label[i]
+              }
+              if (any(!is.finite(target.se)) || any(!is.finite(target.value)))
                 stop("joint variability bands require identified finite uncertainty at every grid point",
                      call. = FALSE)
               joint <- .np_plot_activity_run("Computing joint regression plot covariance",
                 .np_plot_regression_joint_covariance(bws, xdat, ydat,
                   subcol(exdat, ei, i)[seq_len(xi.neval), , drop = FALSE],
-                  residual = joint.residual))
+                  residual = joint.residual, deriv = deriv))
               joint.residual <- joint$residual
               joint.se <- sqrt(diag(joint$covariance))
-              if (any(abs(joint.se - tr$merr) > 1e-9 * pmax(1, abs(tr$merr))))
+              if (gradients && any(abs(joint$estimate - target.value) >
+                                   1e-9 * pmax(1, abs(target.value))))
+                stop("joint influence map does not reproduce the regression gradient",
+                     call. = FALSE)
+              if (any(abs(joint.se - target.se) > 1e-9 * pmax(1, abs(target.se))))
                 stop("joint covariance does not reproduce the regression standard errors",
                      call. = FALSE)
               joint.calibration <- .np_plot_activity_run("Calibrating Gaussian plot maximum",
                 .np_plot_gaussian_calibrate(joint$covariance,
                   alpha = plot.errors.alpha, draws = gaussian.draws))
-              simultaneous <- cbind(tr$merr, tr$merr) * joint.calibration$critical
+              simultaneous <- cbind(target.se, target.se, deparse.level = 0L) * joint.calibration$critical
               if (identical(plot.errors.type, "all"))
                 asym.obj$all.err$simultaneous <- simultaneous
               else

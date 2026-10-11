@@ -484,27 +484,47 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \code{"bonferroni"} applies the same rule with \eqn{\alpha/m} in place
   of \eqn{\alpha}.
 
-  Regression, single-index and smooth-coefficient mean curves support asymptotic Gaussian simultaneous variability
+  Regression, single-index and smooth-coefficient mean and gradient curves support asymptotic Gaussian simultaneous variability
   bands within each panel's finite evaluation grid. This requires fixed
   bandwidths and second-order Gaussian or Epanechnikov kernels, with the
   existing LC, LL or LP specification. Continuous slices may include mixed
-  training covariates. Surfaces, derivatives, categorical panels, nearest-neighbor
+  training covariates. Regression and smooth-coefficient mean surfaces support
+  the same bands with both perspective and \code{renderer="rgl"} rendering.
+  Gradients retain their slice plots; single-index plots retain their existing
+  scalar-index geometry. Categorical slice panels, nearest-neighbor
   bandwidths and other kernels retain a warning and unavailable simultaneous
   limits. With \code{band="all"}, supported curves retain the pointwise and
   Bonferroni families and add the Gaussian simultaneous family.
 
-  The separately named plot argument \code{gaussian.draws} defaults to 50000
-  and must be an integer from 1 to 1000000. It applies only to asymptotic
+  The separately named plot argument \code{gaussian.draws} has a fixed default
+  of 99999 and accepts positive integer counts subject to representability and
+  workspace limits, without a fixed one-million upper cap. It applies only to asymptotic
   simultaneous/all requests; \code{B} remains bootstrap-only. The usual
   \code{random.seed} (default 42) controls calibration without changing the
-  caller's random-number state. Simulation uses bounded blocks. The joint
-  request is limited to 512 grid points and a conservative 64 MiB workspace
-  budget; reduce \code{neval} if the requested workspace is too large.
+  caller's random-number state. A count below
+  \code{ceiling(2*m/alpha - 1)} produces a warning and is used unchanged;
+  it is never increased silently. Here \code{m} is the actual number of points
+  in the panel, including \code{neval^2} for a full perspective/rgl grid.
+  Thus the default meets this recommendation for 50 by 50 points at
+  \code{alpha=0.05}. This is the package's bootstrap-inspired conservative
+  tail-resolution recommendation, not a finite-simulation accuracy guarantee
+  or a draw-count prescription in Chernozhukov, Chetverikov and Kato (2013).
+  Simulation uses bounded blocks and the bootstrap progress mechanism to
+  report completed draws, elapsed time and estimated time remaining during
+  interactive computation. It uses a conservative 64 MiB workspace budget;
+  reduce \code{neval} or \code{gaussian.draws} if the workspace is too large.
+  Slice covariance calibration is limited to 512 grid points. Surfaces instead
+  use observation-level influence factors, avoiding a grid-by-grid covariance
+  matrix and that grid-size limit.
 
   Write \eqn{S} for the training smoother and \eqn{L} for its evaluation
   influence map. The covariance is
   \eqn{L\operatorname{diag}(z_i^2)L^\mathsf{T}}, where
   \eqn{z_i=((I-S)y)_i/\sqrt{\sum_j(\delta_{ij}-S_{ij})^2}}.
+  For regression derivatives, replace \eqn{L} by the corresponding derivative
+  influence map; the training smoother and normalized residuals remain those
+  of the fitted mean. Available higher-order continuous partials use the
+  existing \code{gradient.order} contract.
   A simulated maximum of the absolute standardized joint Gaussian coordinates
   supplies one multiplier for the existing standard errors. Invalid covariance
   or unavailable residual information causes an explicit error for an admitted
@@ -523,12 +543,18 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   confidence coverage.
 
   Single-index bands additionally condition on the fitted index coefficients;
-  they retain the scalar-index regression standard-error convention. Partially
+  gradient panels multiply the scalar-index derivative by the corresponding
+  fitted index coefficient and its widths by that coefficient's absolute value.
+  They retain the scalar-index regression standard-error convention. Partially
   linear joint bands are not provided. Smooth-coefficient bands describe the
-  noniterated plotted mean and use the fitted raw training residuals in place
-  of the normalized residuals above. Coefficient panels are excluded. A joint
+  noniterated plotted mean or existing slope-coefficient gradient selected by
+  \code{coef.index}, and use fitted raw training residuals in place
+  of the normalized residuals above. These gradients hold the smoothing
+  coordinates fixed, including when explanatory and smoothing variables
+  overlap; they are not total derivatives through those coordinates.
+  The separate \code{coef=TRUE} display remains excluded. A joint
   request fails explicitly if its influence map cannot reproduce the incumbent
-  fitted mean and standard errors, including incompatible locally deficient
+  plotted target and standard errors, including incompatible locally deficient
   solve configurations. Existing pointwise intervals are unchanged.
 
   Bandwidths and the polynomial specification are held fixed. This construction
@@ -536,6 +562,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   coverage. It does not cover points between the grid or jointly cover different
   panels. Returned data include compact \code{band.calibration} metadata;
   \code{band="all"} also returns the three width matrices in \code{band.errors}.
+  Surface widths follow the flattened evaluation-grid order. For a single-index
+  gradient object, each width family is an evaluation-point by bound by
+  coefficient array, aligned with the returned gradient columns. Factor-based
+  surface calibration reports \code{rank=NA} because no eigendecomposition is
+  computed.
 
   Joint Gaussian bands must be requested from the coordinator in an active
   session or attach pool. They cannot run inside \code{mpi.bcast.cmd(...)};

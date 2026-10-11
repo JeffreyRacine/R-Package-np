@@ -1,16 +1,78 @@
 # Finite-grid Gaussian calibration. These helpers have no estimator callers.
-.np_plot_gaussian_integer <- function(value, name, maximum) {
+.np_plot_gaussian_integer <- function(value, name, maximum = 2^53 - 1) {
   if (!is.numeric(value) || length(value) != 1L || !is.finite(value) ||
       value < 1 || value != floor(value) || value > maximum)
-    stop(sprintf("%s must be an integer in [1, %d]", name, maximum),
+    stop(sprintf("%s must be an integer in [1, %.0f]", name, maximum),
          call. = FALSE)
-  as.integer(value)
+  if (value <= .Machine$integer.max) as.integer(value) else as.double(value)
+}
+
+.np_plot_gaussian_draws <- function(draws, alpha, m) {
+  # Match the bootstrap's conservative tail-resolution recommendation. This
+  # is a simulation convention, not a finite-draw guarantee from CCK (2013).
+  minimum <- ceiling(2 * as.double(m) / alpha - 1)
+  draws <- .np_plot_gaussian_integer(draws, "gaussian.draws")
+  if (draws < minimum)
+    .np_warning(sprintf(paste0("gaussian.draws=%.0f is too small for the recommended ",
+      "tail resolution (alpha=%g, m=%.0f evaluation points). Minimum recommended ",
+      "is %.0f using ceiling(2*m/alpha - 1); retaining the requested count."),
+      draws, alpha, m, minimum), call. = FALSE)
+  draws
+}
+
+# Surface grids use the observation-level factor directly: A %*% e has
+# covariance A %*% t(A), without allocating or diagonalizing a g-by-g matrix.
+.np_plot_gaussian_factor_calibrate <- function(influence, alpha = 0.05,
+                                               draws = 99999L, block = 4096L,
+                                               max.bytes = 64 * 1024^2) {
+  if (!is.numeric(alpha) || length(alpha) != 1L || !is.finite(alpha) ||
+      alpha <= 0 || alpha >= 0.5)
+    stop("alpha must lie in (0, 0.5)", call. = FALSE)
+  if (!is.matrix(influence) || !is.numeric(influence) ||
+      nrow(influence) < 1L || ncol(influence) < 1L || any(!is.finite(influence)))
+    stop("Gaussian influence factor must be a finite nonempty numeric matrix",
+         call. = FALSE)
+  if (!is.numeric(max.bytes) || length(max.bytes) != 1L ||
+      !is.finite(max.bytes) || max.bytes <= 0)
+    stop("Gaussian memory budget must be positive and finite", call. = FALSE)
+  g <- nrow(influence)
+  n <- ncol(influence)
+  draws <- .np_plot_gaussian_draws(draws, alpha, g)
+  block <- .np_plot_gaussian_integer(block, "Gaussian draw block", 1000000L)
+  available <- max.bytes - 8 * as.double(g) * n - 24 * draws - 64 * g
+  block <- min(block, draws, floor(available / (64 * (as.double(g) + n))))
+  if (block < 1)
+    stop("finite-grid Gaussian influence factor exceeds the plot memory budget",
+         call. = FALSE)
+  # Row sums avoid a second full factor-sized squared array.
+  se <- vapply(seq_len(g), function(i) sqrt(sum(influence[i, ]^2)), numeric(1L))
+  if (any(!is.finite(se)))
+    stop("Gaussian influence factor has nonfinite variance", call. = FALSE)
+  active <- se > 0
+  metadata <- list(method = "asymptotic Gaussian", scope = "finite grid within panel",
+                   draws = draws, critical = 0, grid.size = g,
+                   positive.variance = sum(active), rank = NA_integer_,
+                   representation = "observation influence factor")
+  if (!any(active)) return(metadata)
+  divisor <- ifelse(active, se, 1)
+  maxima <- numeric(draws)
+  progress <- .np_plot_bootstrap_progress_begin(draws, "Gaussian plot calibration",
+                                                 unit = "draw")
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+  for (start in seq.int(1L, draws, by = block)) {
+    last <- min(draws, start + block - 1L)
+    normal <- matrix(rnorm(n * (last - start + 1L)), nrow = n)
+    simulated <- (influence %*% normal) / divisor
+    maxima[start:last] <- apply(abs(simulated), 2L, max)
+    progress <- .np_plot_progress_tick(progress, last)
+  }
+  metadata$critical <- unname(quantile(maxima, 1 - alpha, type = 1L))
+  metadata
 }
 
 .np_plot_gaussian_calibrate <- function(covariance, alpha = 0.05,
-                                        draws = 50000L, block = 4096L,
+                                        draws = 99999L, block = 4096L,
                                         max.bytes = 64 * 1024^2) {
-  draws <- .np_plot_gaussian_integer(draws, "gaussian.draws", 1000000L)
   block <- .np_plot_gaussian_integer(block, "Gaussian draw block", 1000000L)
   if (!is.numeric(alpha) || length(alpha) != 1L || !is.finite(alpha) ||
       alpha <= 0 || alpha >= 0.5)
@@ -23,7 +85,8 @@
     stop("Gaussian covariance must be a nonempty square numeric matrix",
          call. = FALSE)
   g <- nrow(covariance)
-  if (g > 512L || 64 * as.double(g)^2 + 8 * draws + 64 * g > max.bytes)
+  draws <- .np_plot_gaussian_draws(draws, alpha, g)
+  if (g > 512L || 64 * as.double(g)^2 + 24 * draws + 64 * g > max.bytes)
     stop("finite-grid Gaussian covariance exceeds the plot memory/grid budget",
          call. = FALSE)
   if (any(!is.finite(covariance)))
@@ -56,14 +119,18 @@
   # column of the normal matrix is one draw in canonical coordinate order.
   root <- tcrossprod(sweep(eig$vectors, 2L, sqrt(values), "*"), eig$vectors)
   block <- min(block, draws, floor((max.bytes - 64 * as.double(g)^2 -
-                                     8 * draws) / (64 * g)))
+                                     24 * draws) / (64 * g)))
   maxima <- numeric(draws)
+  progress <- .np_plot_bootstrap_progress_begin(draws, "Gaussian plot calibration",
+                                                 unit = "draw")
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
   for (start in seq.int(1L, draws, by = block)) {
     last <- min(draws, start + block - 1L)
     normal <- matrix(rnorm(length(active) * (last - start + 1L)),
                      nrow = length(active))
     simulated <- root %*% normal
     maxima[start:last] <- apply(abs(simulated), 2L, max)
+    progress <- .np_plot_progress_tick(progress, last)
   }
   metadata$critical <- unname(quantile(maxima, 1 - alpha, type = 1L))
   metadata$rank <- sum(values > tolerance)
@@ -71,7 +138,8 @@
 }
 
 .np_plot_regression_joint_covariance <- function(bws, xdat, ydat, exdat,
-                                                residual = NULL,
+                                                residual = NULL, deriv = NULL,
+                                                factor = FALSE,
                                                 block.bytes = 4 * 1024^2,
                                                 max.bytes = 64 * 1024^2) {
   n <- nrow(xdat)
@@ -90,17 +158,18 @@
   # Conservative workspace allowance includes the unchanged operator's basis,
   # solve, coordinate copies and tree, as well as the plot-owned arrays.
   setup.bytes <- 64 * n * (width + ncol(xdat) + 1) + 128 * width^2
-  available <- min(block.bytes, max.bytes - 64 * as.double(g)^2 -
+  joint.bytes <- if (factor) 16 * as.double(g) * n else 64 * as.double(g)^2
+  available <- min(block.bytes, max.bytes - joint.bytes -
                      16 * n - setup.bytes)
   rows <- floor(available / (64 * as.double(n)))
-  if (n < 2L || g < 1L || g > 512L || rows < 1 ||
+  if (n < 2L || g < 1L || (!factor && g > 512L) || rows < 1 ||
       length(ydat) != n || any(!is.finite(ydat)) ||
       anyNA(xdat) || anyNA(exdat))
     stop("joint covariance has invalid data or exceeds the plot memory/grid budget",
          call. = FALSE)
   rows <- min(rows, n, g)
-  operator <- function(evaluation) {
-    npreghat(bws = bws, txdat = xdat, exdat = evaluation,
+  operator <- function(evaluation, derivative = NULL) {
+    npreghat(bws = bws, txdat = xdat, exdat = evaluation, deriv = derivative,
              output = "matrix", .np.require.finite = TRUE)
   }
   z <- residual
@@ -139,25 +208,34 @@
   }
   if (length(z) != n || any(!is.finite(z)))
     stop("joint covariance normalized residuals are nonfinite", call. = FALSE)
-  covariance <- matrix(0, g, g)
+  covariance <- if (factor) NULL else matrix(0, g, g)
+  influence <- if (factor) matrix(0, g, n) else NULL
+  estimate <- if (!is.null(deriv)) numeric(g) else NULL
   starts <- seq.int(1L, g, by = rows)
   for (a in seq_along(starts)) {
     ia <- seq.int(starts[a], min(g, starts[a] + rows - 1L))
-    left <- sweep(operator(exdat[ia, , drop = FALSE]), 2L, z, "*")
+    hat <- operator(exdat[ia, , drop = FALSE], deriv)
+    if (!is.null(deriv)) estimate[ia] <- drop(hat %*% ydat)
+    left <- sweep(hat, 2L, z, "*")
+    if (factor) {
+      influence[ia, ] <- left
+      next
+    }
     for (b in seq_len(a)) {
       ib <- seq.int(starts[b], min(g, starts[b] + rows - 1L))
       right <- if (a == b) left else
-        sweep(operator(exdat[ib, , drop = FALSE]), 2L, z, "*")
+        sweep(operator(exdat[ib, , drop = FALSE], deriv), 2L, z, "*")
       cell <- tcrossprod(left, right)
       covariance[ia, ib] <- cell
       covariance[ib, ia] <- t(cell)
     }
   }
-  list(covariance = covariance, residual = z, block.rows = rows)
+  list(covariance = covariance, residual = z, block.rows = rows,
+       estimate = estimate, influence = influence)
 }
 
-.np_plot_regression_joint_supported <- function(bws, gradients = FALSE) {
-  !isTRUE(gradients) && identical(bws[["type", exact = TRUE]], "fixed") &&
+.np_plot_regression_joint_supported <- function(bws) {
+  identical(bws[["type", exact = TRUE]], "fixed") &&
     bws[["ckertype", exact = TRUE]] %in% c("gaussian", "epanechnikov") &&
     identical(as.integer(bws[["ckerorder", exact = TRUE]]), 2L) &&
     isTRUE(bws[["ncon", exact = TRUE]] > 0L)
@@ -165,6 +243,7 @@
 
 .np_plot_scoef_joint_covariance <- function(bws, xdat, ydat, zdat,
                                            exdat, ezdat, residual,
+                                           gradient.index = NULL, factor = FALSE,
                                            block.bytes = 4 * 1024^2,
                                            max.bytes = 64 * 1024^2) {
   n <- nrow(xdat)
@@ -183,15 +262,20 @@
     stop("joint covariance memory budgets must be positive and finite",
          call. = FALSE)
   setup.bytes <- 64 * n * (width + ncol(zdat) + 1) + 128 * width^2
-  available <- min(block.bytes, max.bytes - 64 * as.double(g)^2 -
+  joint.bytes <- if (factor) 16 * as.double(g) * n else 64 * as.double(g)^2
+  available <- min(block.bytes, max.bytes - joint.bytes -
                      16 * n - setup.bytes)
   rows <- floor(available / (64 * as.double(n)))
-  if (n < 2L || g < 1L || g > 512L || rows < 1 ||
+  if (n < 2L || g < 1L || (!factor && g > 512L) || rows < 1 ||
       nrow(zdat) != n || nrow(ezdat) != g ||
       length(ydat) != n || any(!is.finite(ydat)) ||
       anyNA(xdat) || anyNA(exdat) || anyNA(zdat) || anyNA(ezdat))
     stop("joint covariance has invalid data or exceeds the plot memory/grid budget",
          call. = FALSE)
+  if (!is.null(gradient.index))
+    rows <- min(rows, floor(available / (64 * (as.double(n) + width^2))))
+  if (rows < 1)
+    stop("joint coefficient covariance exceeds the plot memory budget", call. = FALSE)
   rows <- min(rows, n, g)
   operator <- function(x, z) {
     args <- list(bws = bws, txdat = xdat, exdat = x,
@@ -200,7 +284,16 @@
       args$tzdat <- zdat
       args$ezdat <- z
     }
-    hat <- do.call(npscoefhat, args)
+    if (is.null(gradient.index)) {
+      hat <- do.call(npscoefhat, args)
+    } else {
+      args$output <- NULL
+      args$tydat <- ydat
+      args$se <- FALSE
+      args$.np_coefficient_projection <- gradient.index
+      state <- do.call(.np_scoef_fit_internal, args)
+      hat <- .npscoef_coefficient_projection_block(state, 1L, nrow(x))
+    }
     if (any(!is.finite(hat)))
       stop("joint covariance requires a finite smooth-coefficient influence map",
            call. = FALSE)
@@ -209,7 +302,8 @@
   z <- residual
   if (length(z) != n || any(!is.finite(z)))
     stop("joint covariance smooth-coefficient residuals are nonfinite", call. = FALSE)
-  covariance <- matrix(0, g, g)
+  covariance <- if (factor) NULL else matrix(0, g, g)
+  influence <- if (factor) matrix(0, g, n) else NULL
   mean <- numeric(g)
   starts <- seq.int(1L, g, by = rows)
   for (a in seq_along(starts)) {
@@ -217,6 +311,10 @@
     hat <- operator(exdat[ia, , drop = FALSE], ezdat[ia, , drop = FALSE])
     mean[ia] <- drop(hat %*% ydat)
     left <- sweep(hat, 2L, z, "*")
+    if (factor) {
+      influence[ia, ] <- left
+      next
+    }
     for (b in seq_len(a)) {
       ib <- seq.int(starts[b], min(g, starts[b] + rows - 1L))
       right <- if (a == b) left else
@@ -227,5 +325,6 @@
       covariance[ib, ia] <- t(cell)
     }
   }
-  list(covariance = covariance, residual = z, block.rows = rows, mean = mean)
+  list(covariance = covariance, residual = z, block.rows = rows,
+       mean = mean, influence = influence)
 }
