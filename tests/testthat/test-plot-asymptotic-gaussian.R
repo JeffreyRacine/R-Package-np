@@ -172,3 +172,57 @@ test_that("legacy error request resolution preserves scalar-choice defaults", {
   expect_error(.np_plot_normalize_error_request("invalid", "all"), "arg")
   expect_error(.np_plot_normalize_error_request("asymptotic", "p"), "arg")
 })
+
+test_that("NN joint normalization retains training radii", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  x <- data.frame(x = seq(-1, 1, length.out = 24L))
+  y <- x$x^2 + sin(seq_len(24L)) / 4
+  for (kind in c("generalized_nn", "adaptive_nn")) {
+    bw <- npregbw(xdat = x, ydat = y, bws = 14L, bwtype = kind,
+                  regtype = "ll", bandwidth.compute = FALSE)
+    S <- npreghat(bw, txdat = x)
+    E <- diag(nrow(x)) - S
+    expected <- drop(E %*% y) / sqrt(rowSums(E^2))
+    a <- .np_plot_regression_joint_covariance(bw, x, y, x[1:5, , drop = FALSE])
+    expect_equal(a$residual, expected, tolerance = 1e-10)
+    if (kind == "generalized_nn") {
+      external <- diag(nrow(x)) - npreghat(bw, txdat = x, exdat = x)
+      wrong <- drop(external %*% y) / sqrt(rowSums(external^2))
+      expect_gt(max(abs(expected - wrong)), 1e-6)
+    }
+    out <- plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
+                gaussian.draws = 199L, neval = 5L, output = "data")[[1L]]
+    expect_true(all(is.finite(out$band.errors$simultaneous)))
+  }
+})
+
+test_that("partially linear plots include shared-response covariance", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  z <- data.frame(z = seq(-1, 1, length.out = 24L))
+  x <- data.frame(x = z$z + sin(seq_len(24L)))
+  y <- .5 * x$x + z$z^2 + cos(seq_len(24L)) / 4
+  bw <- npplregbw(xdat = x, ydat = y, zdat = z, bws = matrix(c(.6, .6), 2L),
+                  regtype = "ll", bandwidth.compute = FALSE)
+  ex <- x[1:5, , drop = FALSE]; ez <- z[1:5, , drop = FALSE]
+  a <- .np_plot_plreg_influence(bw, x, y, z, ex, ez, factor = TRUE)
+  shifted <- .np_plot_plreg_influence(bw, x, y + 5 * x$x, z, ex, ez, factor = TRUE)
+  expect_equal(a$se, shifted$se, tolerance = 1e-10)
+  expect_equal(shifted$mean - a$mean, 5 * ex$x, tolerance = 1e-10)
+  H <- npplreghat(bw, txdat = x, tzdat = z, exdat = ex, ezdat = ez, output = "matrix")
+  S <- npplreghat(bw, txdat = x, tzdat = z, output = "matrix")
+  E <- diag(nrow(x)) - S
+  factor <- sweep(H, 2L, drop(E %*% y) / sqrt(rowSums(E^2)), "*")
+  expect_equal(a$influence, unclass(factor), ignore_attr = TRUE, tolerance = 1e-10)
+  out <- plot(bw, errors = "asymptotic", band = "all", perspective = FALSE,
+              gaussian.draws = 199L, neval = 5L, output = "data")
+  point <- plot(bw, errors = "asymptotic", band = "pointwise", perspective = FALSE,
+                neval = 5L, output = "data")
+  for (j in seq_along(out)) {
+    expect_identical(out[[j]]$mean, point[[j]]$mean)
+    expect_identical(out[[j]]$merr, point[[j]]$merr)
+    expect_true(all(is.finite(out[[j]]$band.errors$simultaneous)))
+    expect_match(out[[j]]$band.calibration$conditioning, "includes coefficient estimation")
+  }
+})
