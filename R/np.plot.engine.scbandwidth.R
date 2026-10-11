@@ -805,12 +805,8 @@
       }
 
       if (joint.eligible) {
-        joint_update <- function(asym.obj, tobj, ex.slice, ez.slice, categorical) {
+        joint_update <- function(asym.obj, tobj, ex.slice, ez.slice) {
           joint.calibration <<- NULL
-          if (categorical) {
-            .np_warning("asymptotic simultaneous variability intervals are unavailable for categorical panels; returning NA simultaneous limits")
-            return(asym.obj)
-          }
           target.se <- extract_scoef_se(tobj)
           target.value <- extract_scoef_value(tobj)
           if (any(!is.finite(target.se)) || any(!is.finite(target.value)))
@@ -891,7 +887,7 @@
               m = xi.neval
             )
             if (joint.eligible)
-              asym.obj <- joint_update(asym.obj, tobj, ex.slice, ez.slice, xi.factor)
+              asym.obj <- joint_update(asym.obj, tobj, ex.slice, ez.slice)
             temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
             temp.all.err <- asym.obj$all.err
           } else if (plot.errors.method == "bootstrap"){
@@ -1232,7 +1228,7 @@
                 m = xi.neval
               )
               if (joint.eligible)
-                asym.obj <- joint_update(asym.obj, tobj, ex.slice, ez.slice, xi.factor)
+                asym.obj <- joint_update(asym.obj, tobj, ex.slice, ez.slice)
               temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
               temp.all.err <- asym.obj$all.err
             } else if (plot.errors.method == "bootstrap"){

@@ -139,6 +139,7 @@
 
 .np_plot_regression_joint_covariance <- function(bws, xdat, ydat, exdat,
                                                 residual = NULL, deriv = NULL,
+                                                categorical.index = NULL,
                                                 factor = FALSE,
                                                 block.bytes = 4 * 1024^2,
                                                 max.bytes = 64 * 1024^2) {
@@ -210,14 +211,25 @@
   }
   if (length(z) != n || any(!is.finite(z)))
     stop("joint covariance normalized residuals are nonfinite", call. = FALSE)
+  evaluation.operator <- operator
+  if (!is.null(categorical.index)) {
+    if (!is.null(deriv))
+      stop("joint covariance cannot combine continuous and categorical derivatives",
+           call. = FALSE)
+    evaluation.operator <- function(evaluation, derivative = NULL) {
+      frames <- npCategoricalFirstDifferenceFrames(evaluation, categorical.index,
+                                                   "plot joint covariance")
+      operator(frames$upper) - operator(frames$lower)
+    }
+  }
   covariance <- if (factor) NULL else matrix(0, g, g)
   influence <- if (factor) matrix(0, g, n) else NULL
-  estimate <- if (!is.null(deriv)) numeric(g) else NULL
+  estimate <- if (!is.null(deriv) || !is.null(categorical.index)) numeric(g) else NULL
   starts <- seq.int(1L, g, by = rows)
   for (a in seq_along(starts)) {
     ia <- seq.int(starts[a], min(g, starts[a] + rows - 1L))
-    hat <- operator(exdat[ia, , drop = FALSE], deriv)
-    if (!is.null(deriv)) estimate[ia] <- drop(hat %*% ydat)
+    hat <- evaluation.operator(exdat[ia, , drop = FALSE], deriv)
+    if (!is.null(estimate)) estimate[ia] <- drop(hat %*% ydat)
     left <- sweep(hat, 2L, z, "*")
     if (factor) {
       influence[ia, ] <- left
@@ -226,7 +238,7 @@
     for (b in seq_len(a)) {
       ib <- seq.int(starts[b], min(g, starts[b] + rows - 1L))
       right <- if (a == b) left else
-        sweep(operator(exdat[ib, , drop = FALSE], deriv), 2L, z, "*")
+        sweep(evaluation.operator(exdat[ib, , drop = FALSE], deriv), 2L, z, "*")
       cell <- tcrossprod(left, right)
       covariance[ia, ib] <- cell
       covariance[ib, ia] <- t(cell)
@@ -238,9 +250,9 @@
 
 .np_plot_regression_joint_supported <- function(bws) {
   bws[["type", exact = TRUE]] %in% c("fixed", "generalized_nn", "adaptive_nn") &&
-    bws[["ckertype", exact = TRUE]] %in% c("gaussian", "epanechnikov") &&
-    identical(as.integer(bws[["ckerorder", exact = TRUE]]), 2L) &&
-    isTRUE(bws[["ncon", exact = TRUE]] > 0L)
+    (isTRUE(bws[["ncon", exact = TRUE]] == 0L) ||
+     (bws[["ckertype", exact = TRUE]] %in% c("gaussian", "epanechnikov") &&
+      identical(as.integer(bws[["ckerorder", exact = TRUE]]), 2L)))
 }
 
 .np_plot_scoef_joint_covariance <- function(bws, xdat, ydat, zdat,

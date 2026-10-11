@@ -166,13 +166,9 @@
       joint.eligible <- !coef && all(vapply(bws[["bw", exact = TRUE]],
         .np_plot_regression_joint_supported, logical(1L)))
     }
-    joint_update <- function(interval, fit, categorical = FALSE) {
+    joint_update <- function(interval, fit) {
       joint.calibration <<- NULL
       if (!joint.eligible) return(interval)
-      if (categorical) {
-        .np_warning("asymptotic simultaneous variability intervals are unavailable for categorical panels; returning NA simultaneous limits")
-        return(interval)
-      }
       if (any(!is.finite(fit$merr)))
         stop("joint variability bands require identified finite uncertainty at every grid point",
              call. = FALSE)
@@ -767,7 +763,7 @@
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
             .np.empty.report = .np.empty.report,
-          joint = joint.eligible && !xi.factor
+            joint = joint.eligible
           )
         } else {
           .np_plot_plreg_local_fit(
@@ -792,7 +788,7 @@
               band.type = plot.errors.type,
               m = xi.neval
             )
-            asym.obj <- joint_update(asym.obj, tobj, xi.factor)
+            asym.obj <- joint_update(asym.obj, tobj)
             temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
             temp.all.err <- asym.obj$all.err
           } else if (plot.errors.method == "bootstrap"){
@@ -1082,7 +1078,7 @@
             exdat = exdat[seq_len(xi.neval),, drop = FALSE],
             ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             .np.empty.report = .np.empty.report,
-          joint = joint.eligible && !xi.factor
+            joint = joint.eligible
           )
         } else {
           .np_plot_plreg_local_fit(
@@ -1107,7 +1103,7 @@
               band.type = plot.errors.type,
               m = xi.neval
             )
-            asym.obj <- joint_update(asym.obj, tobj, xi.factor)
+            asym.obj <- joint_update(asym.obj, tobj)
             temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
             temp.all.err <- asym.obj$all.err
           } else if (plot.errors.method == "bootstrap"){

@@ -711,11 +711,11 @@
               band.type = plot.errors.type,
               m = xi.neval
             )
-            if (joint.eligible && !xi.factor) {
+            if (joint.eligible) {
               target.se <- if (gradients) tr$gerr[, i] else tr$merr
               target.value <- if (gradients) tr$grad[, i] else tr$mean
               deriv <- NULL
-              if (gradients) {
+              if (gradients && !xi.factor) {
                 deriv <- integer(bws$ncon)
                 deriv[match(i, which(bws$icon))] <- plot.gradient.order.label[i]
               }
@@ -725,7 +725,8 @@
               joint <- .np_plot_activity_run("Computing joint regression plot covariance",
                 .np_plot_regression_joint_covariance(bws, xdat, ydat,
                   subcol(exdat, ei, i)[seq_len(xi.neval), , drop = FALSE],
-                  residual = joint.residual, deriv = deriv))
+                  residual = joint.residual, deriv = deriv,
+                  categorical.index = if (gradients && xi.factor) i else NULL))
               joint.residual <- joint$residual
               joint.se <- sqrt(diag(joint$covariance))
               if (gradients && any(abs(joint$estimate - target.value) >
@@ -743,8 +744,6 @@
                 asym.obj$all.err$simultaneous <- simultaneous
               else
                 asym.obj$err <- simultaneous
-            } else if (joint.eligible && xi.factor) {
-              .np_warning("asymptotic simultaneous variability intervals are unavailable for categorical panels; returning NA simultaneous limits")
             }
             temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
             temp.all.err <- asym.obj$all.err

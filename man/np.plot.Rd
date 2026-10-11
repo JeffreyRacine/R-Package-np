@@ -485,12 +485,15 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Regression, single-index and smooth-coefficient mean and gradient curves support asymptotic Gaussian simultaneous variability
   bands within each panel's finite evaluation grid. This supports fixed, generalized nearest-neighbor and adaptive nearest-neighbor
   bandwidths with second-order Gaussian or Epanechnikov kernels and the
-  existing LC, LL or LP specification. Continuous slices may include mixed
-  training covariates. Regression, partially linear and smooth-coefficient mean surfaces support
+  existing LC, LL or LP specification. Numeric, unordered-factor and
+  ordered-factor panels are supported, including mixed-data models and
+  all-categorical smoothing under its existing local-constant specification.
+  When there are no continuous smoothing variables, continuous-kernel settings
+  do not restrict joint calibration. Regression, partially linear and smooth-coefficient mean surfaces support
   the same bands with both perspective and \code{renderer="rgl"} rendering.
   Gradients retain their slice plots; single-index plots retain their existing
-  scalar-index geometry. Categorical slice panels and other kernels retain a warning and unavailable simultaneous
-  limits. With \code{band="all"}, supported curves retain the pointwise and
+  scalar-index geometry. Other continuous kernels retain a warning and
+  unavailable simultaneous limits. With \code{band="all"}, supported curves retain the pointwise and
   Bonferroni families and add the Gaussian simultaneous family.
 
   The separately named plot argument \code{gaussian.draws} has a fixed default
@@ -522,7 +525,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   For regression derivatives, replace \eqn{L} by the corresponding derivative
   influence map; the training smoother and normalized residuals remain those
   of the fitted mean. Available higher-order continuous partials use the
-  existing \code{gradient.order} contract.
+  existing \code{gradient.order} contract. For categorical regression
+  gradients, use the difference of the two endpoint influence rows. Unordered
+  factors compare each level with the first retained level; ordered factors
+  use adjacent-level differences, with the first forward difference repeated
+  at the first level. This retains the covariance between endpoints, gives
+  zero width for an unordered reference contrast, and calibrates jointly over
+  all displayed levels. Simultaneity remains within each panel, not across
+  separate panels.
   A simulated maximum of the absolute standardized joint Gaussian coordinates
   supplies one multiplier for the existing standard errors. Invalid covariance
   or unavailable residual information causes an explicit error for an admitted

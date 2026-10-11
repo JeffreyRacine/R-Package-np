@@ -226,3 +226,43 @@ test_that("partially linear plots include shared-response covariance", {
     expect_match(out[[j]]$band.calibration$conditioning, "includes coefficient estimation")
   }
 })
+
+# Unique contract: categorical endpoint covariance and degenerate contrast
+# rows. Broad kernel/bandwidth/family matrices stay in the external harness.
+test_that("categorical joint bands retain endpoint covariance and level semantics", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  x <- data.frame(u = factor(rep(c("c", "a", "b"), 12L),
+                            levels = c("c", "a", "b")),
+                  o = ordered(rep(c("low", "mid", "high"), each = 12L),
+                              levels = c("low", "mid", "high")))
+  y <- as.integer(x$u) / 3 + as.integer(x$o) / 4 + sin(seq_len(36L)) / 5
+  bw <- npregbw(xdat = x, ydat = y, bws = c(.2, .3),
+                regtype = "lc", bandwidth.compute = FALSE)
+  ex <- x[c(1L, 2L, 14L, 28L), , drop = FALSE]
+  for (j in seq_len(2L)) {
+    frames <- npCategoricalFirstDifferenceFrames(ex, j, "test")
+    D <- npreghat(bw, txdat = x, exdat = frames$upper, output = "matrix") -
+      npreghat(bw, txdat = x, exdat = frames$lower, output = "matrix")
+    joint <- .np_plot_regression_joint_covariance(bw, x, y, ex,
+                                                  categorical.index = j)
+    expect_equal(joint$estimate, drop(D %*% y), ignore_attr = TRUE)
+    expect_equal(joint$covariance, tcrossprod(sweep(D, 2L, joint$residual, "*")),
+                 ignore_attr = TRUE)
+  }
+  levels <- plot(bw, errors = "asymptotic", band = "all", output = "data",
+                 perspective = FALSE, gaussian.draws = 199L)
+  grad <- plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
+               output = "data", perspective = FALSE, gaussian.draws = 199L)
+  point <- plot(bw, errors = "asymptotic", band = "pointwise", gradients = TRUE,
+                output = "data", perspective = FALSE)
+  for (j in seq_len(2L)) {
+    expect_true(all(is.finite(levels[[j]]$band.errors$simultaneous)))
+    expect_true(all(is.finite(grad[[j]]$band.errors$simultaneous)))
+    expect_identical(grad[[j]]$grad, point[[j]]$grad)
+    expect_identical(grad[[j]]$gerr, point[[j]]$gerr)
+  }
+  expect_equal(grad[[1L]]$band.errors$simultaneous[1L, ], c(0, 0))
+  expect_equal(grad[[2L]]$band.errors$simultaneous[1L, ],
+               grad[[2L]]$band.errors$simultaneous[2L, ])
+})
