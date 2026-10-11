@@ -22,7 +22,7 @@
            plot.behavior = c("plot","plot-data","data"),
            neval = 50,
            plot.errors.method = c("none","bootstrap","asymptotic"),
-           plot.errors.boot.num = 1999,
+           plot.errors.boot.num = 9999,
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
            plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
@@ -37,7 +37,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, .np.empty.report = NULL, gaussian.draws = 99999L){
+           random.seed, .np.empty.report = NULL, gaussian.draws = 9999L){
 
     sub.supplied <- !missing(sub)
 
@@ -236,10 +236,11 @@
           m = maxneval
         )
         if (joint.eligible) {
+          .np_plot_joint_try({
           target.se <- if (gradients) tobj$gerr.index else tobj$merr
           target.value <- if (gradients) tobj$grad.index else tobj$mean
           if (any(!is.finite(target.se)) || any(!is.finite(target.value)))
-            stop("joint variability bands require identified finite uncertainty at every grid point",
+            .np_plot_joint_unavailable("joint variability bands require identified finite uncertainty at every grid point",
                  call. = FALSE)
           rbw <- .np_indexhat_rbw(bws, eval.info$idx.train)
           joint <- .np_plot_activity_run("Computing joint single-index plot covariance",
@@ -248,11 +249,11 @@
               deriv = if (gradients) 1L else NULL))
           if (gradients && any(abs(joint$estimate - target.value) >
                                1e-9 * pmax(1, abs(target.value))))
-            stop("joint influence map does not reproduce the single-index derivative",
+            .np_plot_joint_unavailable("joint influence map does not reproduce the single-index derivative",
                  call. = FALSE)
           if (any(abs(sqrt(diag(joint$covariance)) - target.se) >
                   1e-9 * pmax(1, abs(target.se))))
-            stop("joint covariance does not reproduce the single-index standard errors",
+            .np_plot_joint_unavailable("joint covariance does not reproduce the single-index standard errors",
                  call. = FALSE)
           joint.calibration <- .np_plot_activity_run("Calibrating Gaussian plot maximum",
             .np_plot_gaussian_calibrate(joint$covariance,
@@ -263,6 +264,7 @@
             asym.obj$all.err$simultaneous <- simultaneous
           else
             asym.obj$err <- simultaneous
+          })
         }
         temp.err[,1:2] <- asym.obj$err
         temp.all.err <- asym.obj$all.err

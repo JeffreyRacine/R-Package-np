@@ -35,7 +35,7 @@
            view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
-           plot.errors.boot.num = 1999,
+           plot.errors.boot.num = 9999,
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
            plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
@@ -52,7 +52,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, .np.empty.report = NULL, gaussian.draws = 99999L){
+           random.seed, .np.empty.report = NULL, gaussian.draws = 9999L){
 
     sub.supplied <- !missing(sub)
 
@@ -448,8 +448,9 @@
           m = nrow(x.eval)
         )
         if (joint.eligible) {
+          .np_plot_joint_try({
           if (any(!is.finite(tobj$merr)) || any(!is.finite(tobj$mean)))
-            stop("joint variability bands require identified finite uncertainty at every grid point",
+            .np_plot_joint_unavailable("joint variability bands require identified finite uncertainty at every grid point",
                  call. = FALSE)
           joint <- .np_plot_activity_run("Computing joint regression surface influence",
             .np_plot_regression_joint_covariance(bws, xdat, ydat, x.eval,
@@ -457,7 +458,7 @@
           joint.se <- vapply(seq_len(nrow(x.eval)), function(i)
             sqrt(sum(joint$influence[i, ]^2)), numeric(1L))
           if (any(abs(joint.se - tobj$merr) > 1e-9 * pmax(1, abs(tobj$merr))))
-            stop("joint covariance does not reproduce the regression standard errors",
+            .np_plot_joint_unavailable("joint covariance does not reproduce the regression standard errors",
                  call. = FALSE)
           joint.calibration <- .np_plot_activity_run("Calibrating Gaussian surface maximum",
             .np_plot_gaussian_factor_calibrate(joint$influence,
@@ -467,6 +468,7 @@
             terr.obj$all.err$simultaneous <- simultaneous
           else
             terr.obj$err <- simultaneous
+          })
         }
         terr[,1:2] <- terr.obj$err
         terr.all <- terr.obj$all.err
@@ -851,6 +853,7 @@
               m = xi.neval
             )
             if (joint.eligible) {
+              .np_plot_joint_try({
               target.se <- if (gradients) tr$gerr[, i] else tr$merr
               target.value <- if (gradients) tr$grad[, i] else tr$mean
               deriv <- NULL
@@ -859,7 +862,7 @@
                 deriv[match(i, which(bws$icon))] <- plot.gradient.order.label[i]
               }
               if (any(!is.finite(target.se)) || any(!is.finite(target.value)))
-                stop("joint variability bands require identified finite uncertainty at every grid point",
+                .np_plot_joint_unavailable("joint variability bands require identified finite uncertainty at every grid point",
                      call. = FALSE)
               joint <- .np_plot_activity_run("Computing joint regression plot covariance",
                 .np_plot_regression_joint_covariance(bws, xdat, ydat,
@@ -870,10 +873,10 @@
               joint.se <- sqrt(diag(joint$covariance))
               if (gradients && any(abs(joint$estimate - target.value) >
                                    1e-9 * pmax(1, abs(target.value))))
-                stop("joint influence map does not reproduce the regression gradient",
+                .np_plot_joint_unavailable("joint influence map does not reproduce the regression gradient",
                      call. = FALSE)
               if (any(abs(joint.se - target.se) > 1e-9 * pmax(1, abs(target.se))))
-                stop("joint covariance does not reproduce the regression standard errors",
+                .np_plot_joint_unavailable("joint covariance does not reproduce the regression standard errors",
                      call. = FALSE)
               joint.calibration <- .np_plot_activity_run("Calibrating Gaussian plot maximum",
                 .np_plot_gaussian_calibrate(joint$covariance,
@@ -883,6 +886,7 @@
                 asym.obj$all.err$simultaneous <- simultaneous
               else
                 asym.obj$err <- simultaneous
+              })
             }
             temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
             temp.all.err <- asym.obj$all.err

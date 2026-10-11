@@ -1,11 +1,25 @@
 # npRmpi 0.80-1
 
+- Joint-band reconstruction, residual-information and workspace limitations
+  now produce a warning and NA simultaneous limits; `band="all"` retains its
+  pointwise and Bonferroni bands. Invalid arguments and unexpected errors
+  still fail explicitly. The estimator, ridge policy and reconstruction
+  tolerances are unchanged.
+
+- All plot bootstrap defaults are now `B=9999`, including class-probability
+  and copula plots. Gaussian simultaneous calibration defaults to 9,999 draws.
+  Bootstrap warnings distinguish bare tail resolution from endpoint precision;
+  Gaussian warnings use an alpha-dependent Monte Carlo precision target for
+  the maximum probability. Explicit counts remain unchanged, and estimator
+  and hypothesis-test bootstrap defaults are unaffected.
+
 - Gaussian simultaneous plot intervals now include unordered and ordered
   categorical panels for regression, smooth-coefficient and partially linear
   means, and the existing supported gradients. Regression categorical
   gradients retain endpoint cross-covariances and the established reference
   or adjacent-level contrast convention. All-categorical local-constant
-  smoothing is included; default, pointwise and bootstrap behavior is unchanged.
+  smoothing is included. Existing categorical contrast definitions and
+  bootstrap constructions are preserved.
 
 - Gaussian simultaneous plot bands also support generalized and adaptive
   nearest-neighbor bandwidths. Training residual normalization preserves the
@@ -20,9 +34,7 @@
   single-index and smooth-coefficient gradients, and regression and
   smooth-coefficient mean surfaces in perspective and rgl plots. Surface
   calibration uses observation influence factors without a square grid
-  covariance matrix. `gaussian.draws` now defaults to a fixed 99,999; counts
-  below `ceiling(2*m/alpha - 1)` warn without being increased, where `m` counts
-  every evaluation point, including the full surface grid. The fixed
+  covariance matrix. `gaussian.draws` uses a fixed draw count. The fixed
   one-million draw ceiling has been removed; allocation checks remain. Gaussian
   simulation reports draw progress and elapsed time using the bootstrap
   heartbeat mechanism.

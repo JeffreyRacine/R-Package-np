@@ -1,3 +1,21 @@
+.np_plot_joint_unavailable <- function(message, call. = FALSE) {
+  stop(structure(list(message = message, call = NULL),
+                 class = c("np_plot_joint_unavailable", "error", "condition")))
+}
+
+# Only declared joint-band limitations are recoverable here. Invalid arguments,
+# programming errors, invalid covariance objects and interrupts still propagate.
+.np_plot_joint_try <- function(expr, unavailable = NULL) {
+  expression <- substitute(expr)
+  context <- parent.frame()
+  tryCatch(eval(expression, context), np_plot_joint_unavailable = function(e) {
+    .np_warning(paste0("asymptotic simultaneous variability bands are unavailable: ",
+      conditionMessage(e), "; returning NA simultaneous limits and retaining any ",
+      "pointwise/Bonferroni intervals."), call. = FALSE)
+    unavailable
+  })
+}
+
 # Finite-grid Gaussian calibration. These helpers have no estimator callers.
 .np_plot_gaussian_integer <- function(value, name, maximum = 2^53 - 1) {
   if (!is.numeric(value) || length(value) != 1L || !is.finite(value) ||
@@ -8,22 +26,25 @@
 }
 
 .np_plot_gaussian_draws <- function(draws, alpha, m) {
-  # Match the bootstrap's conservative tail-resolution recommendation. This
-  # is a simulation convention, not a finite-draw guarantee from CCK (2013).
-  minimum <- ceiling(2 * as.double(m) / alpha - 1)
+  # The simulated statistic is one maximum: its upper tail has mass alpha,
+  # irrespective of grid size. This is a probability-scale Monte Carlo target,
+  # not an endpoint-accuracy or statistical-coverage guarantee.
+  minimum <- ceiling(qnorm(.975)^2 * (1 - alpha) / (.1^2 * alpha))
   draws <- .np_plot_gaussian_integer(draws, "gaussian.draws")
   if (draws < minimum)
-    .np_warning(sprintf(paste0("gaussian.draws=%.0f is too small for the recommended ",
-      "tail resolution (alpha=%g, m=%.0f evaluation points). Minimum recommended ",
-      "is %.0f using ceiling(2*m/alpha - 1); retaining the requested count."),
-      draws, alpha, m, minimum), call. = FALSE)
+    .np_warning(sprintf(paste0("gaussian.draws=%.0f is below the recommended Monte Carlo ",
+      "precision count %.0f (alpha=%g, m=%.0f evaluation points). This approximate ",
+      "95%% target limits relative simulation error in the maximum's upper-tail ",
+      "probability to 10%%; it does not guarantee endpoint accuracy or statistical ",
+      "coverage. Increase gaussian.draws for greater precision; retaining the requested count."),
+      draws, minimum, alpha, m), call. = FALSE)
   draws
 }
 
 # Surface grids use the observation-level factor directly: A %*% e has
 # covariance A %*% t(A), without allocating or diagonalizing a g-by-g matrix.
 .np_plot_gaussian_factor_calibrate <- function(influence, alpha = 0.05,
-                                               draws = 99999L, block = 4096L,
+                                               draws = 9999L, block = 4096L,
                                                max.bytes = 64 * 1024^2) {
   if (!is.numeric(alpha) || length(alpha) != 1L || !is.finite(alpha) ||
       alpha <= 0 || alpha >= 0.5)
@@ -42,7 +63,7 @@
   available <- max.bytes - 8 * as.double(g) * n - 24 * draws - 64 * g
   block <- min(block, draws, floor(available / (64 * (as.double(g) + n))))
   if (block < 1)
-    stop("finite-grid Gaussian influence factor exceeds the plot memory budget",
+    .np_plot_joint_unavailable("finite-grid Gaussian influence factor exceeds the plot memory budget",
          call. = FALSE)
   # Row sums avoid a second full factor-sized squared array.
   se <- vapply(seq_len(g), function(i) sqrt(sum(influence[i, ]^2)), numeric(1L))
@@ -71,7 +92,7 @@
 }
 
 .np_plot_gaussian_calibrate <- function(covariance, alpha = 0.05,
-                                        draws = 99999L, block = 4096L,
+                                        draws = 9999L, block = 4096L,
                                         max.bytes = 64 * 1024^2) {
   block <- .np_plot_gaussian_integer(block, "Gaussian draw block", 1000000L)
   if (!is.numeric(alpha) || length(alpha) != 1L || !is.finite(alpha) ||
@@ -87,7 +108,7 @@
   g <- nrow(covariance)
   draws <- .np_plot_gaussian_draws(draws, alpha, g)
   if (g > 512L || 64 * as.double(g)^2 + 24 * draws + 64 * g > max.bytes)
-    stop("finite-grid Gaussian covariance exceeds the plot memory/grid budget",
+    .np_plot_joint_unavailable("finite-grid Gaussian covariance exceeds the plot memory/grid budget",
          call. = FALSE)
   if (any(!is.finite(covariance)))
     stop("Gaussian covariance must be finite", call. = FALSE)
@@ -163,11 +184,12 @@
   available <- min(block.bytes, max.bytes - joint.bytes -
                      16 * n - setup.bytes)
   rows <- floor(available / (64 * as.double(n)))
-  if (n < 2L || g < 1L || (!factor && g > 512L) || rows < 1 ||
+  if (n < 2L || g < 1L ||
       length(ydat) != n || any(!is.finite(ydat)) ||
       anyNA(xdat) || anyNA(exdat))
-    stop("joint covariance has invalid data or exceeds the plot memory/grid budget",
-         call. = FALSE)
+    stop("joint covariance has invalid data", call. = FALSE)
+  if ((!factor && g > 512L) || rows < 1)
+    .np_plot_joint_unavailable("joint covariance exceeds the plot memory/grid budget")
   rows <- min(rows, n, g)
   operator <- function(evaluation, derivative = NULL) {
     npreghat(bws = bws, txdat = xdat, exdat = evaluation, deriv = derivative,
@@ -191,7 +213,7 @@
         weights <- hat[j, -i]
         scale <- max(abs(weights))
         if (scale == 0)
-          stop("joint covariance has unidentified training residual information",
+          .np_plot_joint_unavailable("joint covariance has unidentified training residual information",
                call. = FALSE)
         weights <- weights / scale
         z[i] <- sum(weights * (ydat[i] - ydat[-i])) /
@@ -201,7 +223,7 @@
         residual.row[i] <- 1 + residual.row[i]
         scale <- max(abs(residual.row))
         if (scale == 0)
-          stop("joint covariance has unidentified training residual information",
+          .np_plot_joint_unavailable("joint covariance has unidentified training residual information",
                call. = FALSE)
         residual.row <- residual.row / scale
         z[i] <- sum(residual.row * ydat) / sqrt(sum(residual.row^2))
@@ -210,7 +232,7 @@
   }
   }
   if (length(z) != n || any(!is.finite(z)))
-    stop("joint covariance normalized residuals are nonfinite", call. = FALSE)
+    .np_plot_joint_unavailable("joint covariance normalized residuals are nonfinite", call. = FALSE)
   evaluation.operator <- operator
   if (!is.null(categorical.index)) {
     if (!is.null(deriv))
@@ -280,16 +302,17 @@
   available <- min(block.bytes, max.bytes - joint.bytes -
                      16 * n - setup.bytes)
   rows <- floor(available / (64 * as.double(n)))
-  if (n < 2L || g < 1L || (!factor && g > 512L) || rows < 1 ||
+  if (n < 2L || g < 1L ||
       nrow(zdat) != n || nrow(ezdat) != g ||
       length(ydat) != n || any(!is.finite(ydat)) ||
       anyNA(xdat) || anyNA(exdat) || anyNA(zdat) || anyNA(ezdat))
-    stop("joint covariance has invalid data or exceeds the plot memory/grid budget",
-         call. = FALSE)
+    stop("joint covariance has invalid data", call. = FALSE)
+  if ((!factor && g > 512L) || rows < 1)
+    .np_plot_joint_unavailable("joint covariance exceeds the plot memory/grid budget")
   if (!is.null(gradient.index))
     rows <- min(rows, floor(available / (64 * (as.double(n) + width^2))))
   if (rows < 1)
-    stop("joint coefficient covariance exceeds the plot memory budget", call. = FALSE)
+    .np_plot_joint_unavailable("joint coefficient covariance exceeds the plot memory budget", call. = FALSE)
   rows <- min(rows, n, g)
   operator <- function(x, z) {
     args <- list(bws = bws, txdat = xdat, exdat = x,
@@ -309,13 +332,13 @@
       hat <- .npscoef_coefficient_projection_block(state, 1L, nrow(x))
     }
     if (any(!is.finite(hat)))
-      stop("joint covariance requires a finite smooth-coefficient influence map",
+      .np_plot_joint_unavailable("joint covariance requires a finite smooth-coefficient influence map",
            call. = FALSE)
     hat
   }
   z <- residual
   if (length(z) != n || any(!is.finite(z)))
-    stop("joint covariance smooth-coefficient residuals are nonfinite", call. = FALSE)
+    .np_plot_joint_unavailable("joint covariance smooth-coefficient residuals are nonfinite", call. = FALSE)
   covariance <- if (factor) NULL else matrix(0, g, g)
   influence <- if (factor) matrix(0, g, n) else NULL
   mean <- numeric(g)
@@ -373,7 +396,7 @@
       E[cbind(seq_along(index), index)] <- 1 + E[cbind(seq_along(index), index)]
       scale <- apply(abs(E), 1L, max)
       if (any(!is.finite(scale)) || any(scale == 0))
-        stop("plot covariance has unidentified training residual information", call. = FALSE)
+        .np_plot_joint_unavailable("plot covariance has unidentified training residual information", call. = FALSE)
       E <- E / scale
       z[index] <- drop(E %*% ydat) / sqrt(rowSums(E^2))
       progress <- .np_plot_progress_tick(progress, n * as.integer(partial) + max(index))
@@ -419,7 +442,7 @@
     progress <- .np_plot_progress_tick(progress, max(index))
   }
   if (any(!is.finite(square)) || any(square == 0))
-    stop("plot covariance has unidentified training residual information", call. = FALSE)
+    .np_plot_joint_unavailable("plot covariance has unidentified training residual information", call. = FALSE)
   list(residual = score / sqrt(square), coefficient.map = K)
 }
 
@@ -440,6 +463,12 @@
   width <- max(widths)
   setup <- 64 * n * (width + p + ncol(zdat) + 1) + 128 * (width^2 + p^2) + 64 * g * (p + 1)
   retained <- if (factor) 16 * as.double(g) * n else 0
+  joint.unavailable <- NULL
+  if (factor && max.bytes - setup - retained < 64 * as.double(n)) {
+    factor <- FALSE
+    retained <- 0
+    joint.unavailable <- "partially linear joint influence exceeds the plot memory budget"
+  }
   rows <- min(n, g, floor(min(block.bytes, max.bytes - setup - retained) / (64 * as.double(n))))
   if (n < 2L || p < 1L || g < 1L || rows < 1 ||
       length(ydat) != n || any(!is.finite(ydat)))
@@ -479,5 +508,6 @@
     se[index] <- sqrt(rowSums(A^2))
     if (factor) influence[index, ] <- A
   }
-  list(mean = mean, se = se, influence = influence, residual = z, block.rows = rows)
+  list(mean = mean, se = se, influence = influence, residual = z, block.rows = rows,
+       joint.unavailable = joint.unavailable)
 }

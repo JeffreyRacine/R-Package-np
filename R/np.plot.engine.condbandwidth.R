@@ -41,7 +41,7 @@
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.blocklen = NULL,
-           plot.errors.boot.num = 1999,
+           plot.errors.boot.num = 9999,
            plot.errors.center = c("estimate", "bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,

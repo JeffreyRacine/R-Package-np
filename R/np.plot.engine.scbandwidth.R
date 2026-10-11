@@ -38,7 +38,7 @@
            view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
-           plot.errors.boot.num = 1999,
+           plot.errors.boot.num = 9999,
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
            plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
@@ -55,7 +55,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, gaussian.draws = 99999L){
+           random.seed, gaussian.draws = 9999L){
 
     sub.supplied <- !missing(sub)
     coef.index <- .np_plot_match_coef_index(coef.index)
@@ -438,20 +438,21 @@
           m = nrow(x.eval)
         )
         if (joint.eligible) {
+          .np_plot_joint_try({
           if (any(!is.finite(tobj$merr)) || any(!is.finite(tobj$mean)))
-            stop("joint variability bands require identified finite uncertainty at every grid point",
+            .np_plot_joint_unavailable("joint variability bands require identified finite uncertainty at every grid point",
                  call. = FALSE)
           joint <- .np_plot_activity_run("Computing joint smooth-coefficient surface influence",
             .np_plot_scoef_joint_covariance(bws, xdat, ydat,
               if (miss.z) NULL else zdat, scoef.args$exdat, scoef.args$ezdat,
               residual = tobj[["resid", exact = TRUE]], factor = TRUE))
           if (any(abs(joint$mean - tobj$mean) > 1e-9 * pmax(1, abs(tobj$mean))))
-            stop("joint influence map does not reproduce the smooth-coefficient fitted mean",
+            .np_plot_joint_unavailable("joint influence map does not reproduce the smooth-coefficient fitted mean",
                  call. = FALSE)
           joint.se <- vapply(seq_len(nrow(x.eval)), function(i)
             sqrt(sum(joint$influence[i, ]^2)), numeric(1L))
           if (any(abs(joint.se - tobj$merr) > 1e-9 * pmax(1, abs(tobj$merr))))
-            stop("joint covariance does not reproduce the smooth-coefficient standard errors",
+            .np_plot_joint_unavailable("joint covariance does not reproduce the smooth-coefficient standard errors",
                  call. = FALSE)
           joint.calibration <- .np_plot_activity_run("Calibrating Gaussian surface maximum",
             .np_plot_gaussian_factor_calibrate(joint$influence,
@@ -462,6 +463,7 @@
             terr.obj$all.err$simultaneous <- simultaneous
           else
             terr.obj$err <- simultaneous
+          })
         }
         terr[,1:2] <- terr.obj$err
         terr.all <- terr.obj$all.err
@@ -809,11 +811,12 @@
 
       if (joint.eligible) {
         joint_update <- function(asym.obj, tobj, ex.slice, ez.slice) {
+          .np_plot_joint_try({
           joint.calibration <<- NULL
           target.se <- extract_scoef_se(tobj)
           target.value <- extract_scoef_value(tobj)
           if (any(!is.finite(target.se)) || any(!is.finite(target.value)))
-            stop("joint variability bands require identified finite uncertainty at every grid point",
+            .np_plot_joint_unavailable("joint variability bands require identified finite uncertainty at every grid point",
                  call. = FALSE)
           if (is.null(joint.residual))
             joint.residual <<- tobj[["resid", exact = TRUE]]
@@ -826,13 +829,13 @@
               gradient.index = if (gradients) gradient.index else NULL))
           joint.residual <<- joint$residual
           if (any(abs(joint$mean - target.value) > 1e-9 * pmax(1, abs(target.value))))
-            stop(if (gradients)
+            .np_plot_joint_unavailable(if (gradients)
                    "joint influence map does not reproduce the smooth-coefficient gradient" else
                    "joint influence map does not reproduce the smooth-coefficient fitted mean",
                  call. = FALSE)
           if (any(abs(sqrt(diag(joint$covariance)) - target.se) >
                   1e-9 * pmax(1, abs(target.se))))
-            stop("joint covariance does not reproduce the smooth-coefficient standard errors",
+            .np_plot_joint_unavailable("joint covariance does not reproduce the smooth-coefficient standard errors",
                  call. = FALSE)
           joint.calibration <<- .np_plot_activity_run("Calibrating Gaussian plot maximum",
             .np_plot_gaussian_calibrate(joint$covariance,
@@ -846,6 +849,7 @@
           else
             asym.obj$err <- simultaneous
           asym.obj
+                  }, unavailable = asym.obj)
         }
       }
 

@@ -61,7 +61,7 @@ np_render_control(style = c("band", "bar"),
 plot(fit,
      errors = "bootstrap",
      bootstrap = "inid",
-     B = 1999,
+     B = 9999,
      band = "pointwise",
      boot.control = np_boot_control(nonfixed = "exact"))
 }
