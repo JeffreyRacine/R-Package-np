@@ -15788,6 +15788,18 @@ compute.default.error.range <- function(center, err) {
   out
 }
 
+.np_plot_normalize_error_request <- function(method, type) {
+  scalar_choice <- function(value, default) {
+    if (is.null(value) || length(value) < 1L || is.na(value[1L])) default else value[1L]
+  }
+  list(
+    method = match.arg(scalar_choice(method, "none"),
+                       c("none", "bootstrap", "asymptotic")),
+    type = match.arg(scalar_choice(type, "simultaneous"),
+                     c("simultaneous", "pointwise", "bonferroni", "pmzsd", "all"))
+  )
+}
+
 .np_plot_normalize_common_options <- function(plot.behavior,
                                              plot.errors.method,
                                              plot.errors.boot.method,
@@ -15803,7 +15815,8 @@ compute.default.error.range <- function(center, err) {
                                              common.scale,
                                              ylim,
                                              allow_asymptotic_quantile = TRUE,
-                                             allow_asymptotic_simultaneous = FALSE) {
+                                             allow_asymptotic_simultaneous = FALSE,
+                                             error.request = NULL) {
   scalar_choice <- function(value, default) {
     if (is.null(value) || length(value) < 1L || is.na(value[1L])) default else value[1L]
   }
@@ -15812,10 +15825,10 @@ compute.default.error.range <- function(center, err) {
     scalar_choice(plot.behavior, "plot"),
     c("plot", "plot-data", "data")
   )
-  plot.errors.method <- match.arg(
-    scalar_choice(plot.errors.method, "none"),
-    c("none", "bootstrap", "asymptotic")
-  )
+  if (is.null(error.request))
+    error.request <- .np_plot_normalize_error_request(plot.errors.method,
+                                                      plot.errors.type)
+  plot.errors.method <- error.request$method
   plot.errors.boot.method <- match.arg(
     scalar_choice(plot.errors.boot.method, "wild"),
     c("wild", "inid", "fixed", "geom")
@@ -15832,10 +15845,7 @@ compute.default.error.range <- function(center, err) {
     scalar_choice(plot.errors.center, "estimate"),
     c("estimate", "bias-corrected")
   )
-  plot.errors.type <- match.arg(
-    scalar_choice(plot.errors.type, "simultaneous"),
-    c("simultaneous", "pointwise", "bonferroni", "pmzsd", "all")
-  )
+  plot.errors.type <- error.request$type
 
   if (identical(plot.errors.method, "bootstrap") &&
       isTRUE(.npRmpi_autodispatch_called_from_bcast()))

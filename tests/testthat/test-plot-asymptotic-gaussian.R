@@ -79,3 +79,63 @@ test_that("smooth-coefficient mean bands retain the accepted marginal errors", {
     expect_true(all(is.finite(all[[i]]$band.errors$simultaneous)))
   }
 })
+
+for (family in c("npreg", "npindex", "npscoef")) {
+  test_that(paste(family, "joint bands normalize legacy values before admission"), {
+    skip_on_cran()
+    skip_if_not(spawn_mpi_slaves())
+    on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+    old <- options(np.messages = FALSE)
+    on.exit(options(old), add = TRUE)
+    x <- data.frame(x = seq(-1, 1, length.out = 36L), w = sin(seq_len(36L)))
+    z <- data.frame(z = cos(seq_len(36L)))
+    y <- x$x + (1 + z$z) * x$w + sin(2 * seq_len(36L)) / 4
+    bw <- switch(family,
+      npreg = npregbw(xdat = x["x"], ydat = y, bws = .5,
+                      bandwidth.compute = FALSE),
+      npindex = npindexbw(xdat = x, ydat = y, bws = c(1, .2, .5),
+                          bandwidth.compute = FALSE),
+      npscoef = npscoefbw(xdat = x, ydat = y, zdat = z, bws = .6,
+                          bandwidth.compute = FALSE)
+    )
+    args <- list(x = bw, neval = 7L, output = "data")
+    if (family == "npscoef") args$perspective <- FALSE
+    for (band in c("all", "simultaneous")) {
+      full <- do.call(plot, c(args, list(errors = "asymptotic", band = band,
+                                        gaussian.draws = 199L)))
+      legacy <- do.call(plot, c(args, list(plot.errors.method = "asy",
+                                          plot.errors.type = substr(band, 1L, 1L),
+                                          gaussian.draws = 199L)))
+      for (i in seq_along(full)) {
+        expect_identical(legacy[[i]]$band.calibration, full[[i]]$band.calibration)
+        expect_identical(legacy[[i]]$merr, full[[i]]$merr)
+        expect_identical(legacy[[i]]$band.errors, full[[i]]$band.errors)
+      }
+    }
+    full <- do.call(plot, c(args, list(errors = "asymptotic", band = "all")))
+    legacy <- do.call(plot, c(args, list(plot.errors.method = "asy",
+                                        plot.errors.type = "a")))
+    for (i in seq_along(full))
+      expect_identical(legacy[[i]]$band.calibration, full[[i]]$band.calibration)
+    expect_error(do.call(plot, c(args, list(errors = "asy", band = "all"))),
+                 "errors")
+    expect_error(do.call(plot, c(args, list(errors = "asymptotic", band = "a"))),
+                 "band")
+    expect_error(do.call(plot, c(args, list(plot.errors.method = "asy",
+                                           plot.errors.type = "a",
+                                           gaussian.draws = 0))), "integer")
+  })
+}
+
+test_that("legacy error request resolution preserves scalar-choice defaults", {
+  expect_identical(.np_plot_normalize_error_request("asy", "s"),
+                   list(method = "asymptotic", type = "simultaneous"))
+  for (empty in list(NULL, character(), NA_character_))
+    expect_identical(.np_plot_normalize_error_request(empty, empty),
+                     list(method = "none", type = "simultaneous"))
+  expect_identical(.np_plot_normalize_error_request(c("none", "asymptotic"),
+                                                   c("pmzsd", "all")),
+                   list(method = "none", type = "pmzsd"))
+  expect_error(.np_plot_normalize_error_request("invalid", "all"), "arg")
+  expect_error(.np_plot_normalize_error_request("asymptotic", "p"), "arg")
+})

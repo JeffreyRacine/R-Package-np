@@ -206,8 +206,10 @@
     }
 
     
-    joint.request <- identical(as.character(plot.errors.method)[1L], "asymptotic") &&
-      as.character(plot.errors.type)[1L] %in% c("simultaneous", "all")
+    error.request <- .np_plot_normalize_error_request(plot.errors.method,
+                                                      plot.errors.type)
+    joint.request <- identical(error.request$method, "asymptotic") &&
+      error.request$type %in% c("simultaneous", "all")
     if (!missing(gaussian.draws) && !joint.request)
       stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- FALSE
@@ -242,7 +244,8 @@
       xdat = xdat,
       common.scale = common.scale,
       ylim = ylim,
-      allow_asymptotic_simultaneous = joint.eligible
+      allow_asymptotic_simultaneous = joint.eligible,
+      error.request = error.request
     )
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
