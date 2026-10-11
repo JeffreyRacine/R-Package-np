@@ -13658,7 +13658,7 @@ plotFactor <- function(f, y, ...){
            zdat,
            exdat,
            ezdat,
-           .np.empty.report = NULL) {
+           .np.empty.report = NULL, joint = FALSE) {
     activity <- .np_plot_activity_begin("Computing partially linear plot asymptotic fit")
     on.exit(.np_plot_activity_end(activity), add = TRUE)
 
@@ -13702,47 +13702,21 @@ plotFactor <- function(f, y, ...){
       .np.defer.empty.rows = TRUE
     )
 
-    yfit <- npreg(
-      txdat = zdat,
-      tydat = ydat,
-      exdat = ezdat,
-      bws = bws$bw$yzbw,
-      se = TRUE,
-      .np.defer.empty.rows = TRUE
-    )
-
-    empty.rows <- .npreg_merge_empty_rows(
-      attr(fit, ".np.empty.rows", exact = TRUE),
-      attr(yfit, ".np.empty.rows", exact = TRUE))
-    neval <- nrow(exdat)
-    resx.eval <- matrix(0.0, nrow = neval, ncol = ncol(xdat))
-    x.err.sq <- numeric(neval)
-
-    for (j in seq_len(ncol(xdat))) {
-      xfit <- npreg(
-        txdat = zdat,
-        tydat = xdat[, j],
-        exdat = ezdat,
-        bws = bws$bw[[j + 1L]],
-        se = TRUE,
-        .np.defer.empty.rows = TRUE
-      )
-      empty.rows <- .npreg_merge_empty_rows(
-        empty.rows, attr(xfit, ".np.empty.rows", exact = TRUE))
-
-      if (is.factor(xdat[1L, j])) {
-        tmp.eval <- adjustLevels(exdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati, allowNewCells = TRUE)
-        x.num.eval <- (bws$bw[[j + 1L]]$ydati$all.dlev[[1L]])[as.integer(tmp.eval[, 1L])]
-      } else {
-        x.num.eval <- as.double(exdat[, j])
-      }
-
-      resx.eval[, j] <- x.num.eval - xfit$mean
-      x.err.sq <- x.err.sq + (fit$xcoef[j]^2) * (as.double(xfit$merr)^2)
+    empty.rows <- attr(fit, ".np.empty.rows", exact = TRUE)
+    valid <- is.finite(fit$mean)
+    if (joint && !all(valid))
+      stop("joint variability bands require identified finite uncertainty at every grid point",
+           call. = FALSE)
+    fit$merr <- rep(NA_real_, nrow(exdat))
+    if (any(valid)) {
+      influence <- .np_plot_plreg_influence(bws, xdat, ydat, zdat,
+        exdat[valid, , drop = FALSE], ezdat[valid, , drop = FALSE], factor = joint)
+      if (any(!is.finite(influence$mean)) ||
+          any(abs(influence$mean - fit$mean[valid]) > 1e-9 * pmax(1, abs(fit$mean[valid]))))
+        stop("joint influence map does not reproduce the partially linear fitted mean", call. = FALSE)
+      fit$merr[valid] <- influence$se
+      if (joint) fit[[".np.plot.influence"]] <- influence$influence
     }
-
-    beta.vcov.term <- rowSums((resx.eval %*% fit$xcoefvcov) * resx.eval)
-    fit$merr <- sqrt(pmax(as.double(yfit$merr)^2 + x.err.sq + beta.vcov.term, 0.0))
     .npreg_publish_plot_rows(fit, empty.rows, report = .np.empty.report,
       omitted = which(!keep.eval), owner = "plot.npplreg", row.labels = row.names(exdat))
   }

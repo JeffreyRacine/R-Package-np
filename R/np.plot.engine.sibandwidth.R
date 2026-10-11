@@ -87,7 +87,7 @@
         stop("asymptotic joint bands require coordinator context in an active session or attach pool; they cannot run inside mpi.bcast.cmd(...)",
              call. = FALSE)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
-      joint.eligible <- identical(bws$type, "fixed") &&
+      joint.eligible <- bws[["type", exact = TRUE]] %in% c("fixed", "generalized_nn", "adaptive_nn") &&
         bws$ckertype %in% c("gaussian", "epanechnikov") &&
         identical(as.integer(bws$ckerorder), 2L)
     }

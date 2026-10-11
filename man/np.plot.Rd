@@ -485,14 +485,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   of \eqn{\alpha}.
 
   Regression, single-index and smooth-coefficient mean and gradient curves support asymptotic Gaussian simultaneous variability
-  bands within each panel's finite evaluation grid. This requires fixed
-  bandwidths and second-order Gaussian or Epanechnikov kernels, with the
+  bands within each panel's finite evaluation grid. This supports fixed, generalized nearest-neighbor and adaptive nearest-neighbor
+  bandwidths with second-order Gaussian or Epanechnikov kernels and the
   existing LC, LL or LP specification. Continuous slices may include mixed
-  training covariates. Regression and smooth-coefficient mean surfaces support
+  training covariates. Regression, partially linear and smooth-coefficient mean surfaces support
   the same bands with both perspective and \code{renderer="rgl"} rendering.
   Gradients retain their slice plots; single-index plots retain their existing
-  scalar-index geometry. Categorical slice panels, nearest-neighbor
-  bandwidths and other kernels retain a warning and unavailable simultaneous
+  scalar-index geometry. Categorical slice panels and other kernels retain a warning and unavailable simultaneous
   limits. With \code{band="all"}, supported curves retain the pointwise and
   Bonferroni families and add the Gaussian simultaneous family.
 
@@ -513,7 +512,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   report completed draws, elapsed time and estimated time remaining during
   interactive computation. It uses a conservative 64 MiB workspace budget;
   reduce \code{neval} or \code{gaussian.draws} if the workspace is too large.
-  Slice covariance calibration is limited to 512 grid points. Surfaces instead
+  Regression, single-index and smooth-coefficient slice covariance calibration
+  is limited to 512 grid points. Surfaces and partially linear plots instead
   use observation-level influence factors, avoiding a grid-by-grid covariance
   matrix and that grid-size limit.
 
@@ -545,8 +545,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Single-index bands additionally condition on the fitted index coefficients;
   gradient panels multiply the scalar-index derivative by the corresponding
   fitted index coefficient and its widths by that coefficient's absolute value.
-  They retain the scalar-index regression standard-error convention. Partially
-  linear joint bands are not provided. Smooth-coefficient bands describe the
+  They retain the scalar-index regression standard-error convention. Smooth-coefficient bands describe the
   noniterated plotted mean or existing slope-coefficient gradient selected by
   \code{coef.index}, and use fitted raw training residuals in place
   of the normalized residuals above. These gradients hold the smoothing
@@ -555,7 +554,30 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   The separate \code{coef=TRUE} display remains excluded. A joint
   request fails explicitly if its influence map cannot reproduce the incumbent
   plotted target and standard errors, including incompatible locally deficient
-  solve configurations. Existing pointwise intervals are unchanged.
+  solve configurations. These three families retain their existing pointwise intervals.
+
+  Partially linear mean plots use the complete response map of the fitted
+  estimator, including coefficient estimation. Write \eqn{R=X-S_xX} and
+  \eqn{R_e=X_e-L_xX}, with each column using its own nuisance smoother, and
+  let \eqn{K=R^+(I-S_y)}. The evaluation map is \eqn{H=L_y+R_eK}; the training
+  map is \eqn{S=S_y+RK}. The plot covariance is
+  \eqn{H\operatorname{diag}(z_i^2)H^\mathsf{T}}, using the complete training
+  map in the normalized-residual formula above. Thus the shared-observation
+  cross-covariances are retained. This corrects the previous partially linear
+  plot helper, which added component variances separately; its pointwise and
+  Bonferroni plot widths consequently change as well. Coefficient estimates
+  and their reported covariance are unchanged. With raw residuals in place of
+  normalized residuals, this response map gives exactly the conditional
+  covariance of independent fixed-design wild-bootstrap multipliers.
+  Partially linear curves and surfaces use influence-factor calibration.
+
+  Nearest-neighbor radii are held at the fitted design for this conditional
+  asymptotic calculation. Training residuals retain the estimator's training
+  evaluation convention, which can differ from explicit evaluation at the
+  same coordinates. A blocked response-map calculation preserves that
+  distinction without retaining a full training smoother. This can add
+  computation for NN and partially linear asymptotic bands; it does not repeat
+  bandwidth selection or propagate its sampling variability.
 
   Bandwidths and the polynomial specification are held fixed. This construction
   neither corrects smoothing bias nor guarantees finite-sample confidence
@@ -565,7 +587,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Surface widths follow the flattened evaluation-grid order. For a single-index
   gradient object, each width family is an evaluation-point by bound by
   coefficient array, aligned with the returned gradient columns. Factor-based
-  surface calibration reports \code{rank=NA} because no eigendecomposition is
+  calibration reports \code{rank=NA} because no eigendecomposition is
   computed.
 
   Joint Gaussian bands must be requested from the coordinator in an active

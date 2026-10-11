@@ -173,6 +173,8 @@
              output = "matrix", .np.require.finite = TRUE)
   }
   z <- residual
+  if (is.null(z) && bws[["type", exact = TRUE]] %in% c("generalized_nn", "adaptive_nn"))
+    z <- .np_plot_response_residuals(bws, xdat, ydat, rows)$residual
   if (is.null(z)) {
   z <- numeric(n)
   for (start in seq.int(1L, n, by = rows)) {
@@ -235,7 +237,7 @@
 }
 
 .np_plot_regression_joint_supported <- function(bws) {
-  identical(bws[["type", exact = TRUE]], "fixed") &&
+  bws[["type", exact = TRUE]] %in% c("fixed", "generalized_nn", "adaptive_nn") &&
     bws[["ckertype", exact = TRUE]] %in% c("gaussian", "epanechnikov") &&
     identical(as.integer(bws[["ckerorder", exact = TRUE]]), 2L) &&
     isTRUE(bws[["ncon", exact = TRUE]] > 0L)
@@ -327,4 +329,111 @@
   }
   list(covariance = covariance, residual = z, block.rows = rows,
        mean = mean, influence = influence)
+}
+
+.np_plot_response_residuals <- function(bws, xdat, ydat, rows,
+                                          resx = NULL, projection = NULL) {
+  n <- nrow(xdat)
+  partial <- !is.null(projection)
+  K <- if (partial) matrix(0, nrow(projection), n) else NULL
+  score <- square <- scale <- numeric(n)
+  spec <- npValidatedConditionalRegSpec(bws, where = "plot response influence", ncon.field = "ncon")
+  progress <- .np_plot_bootstrap_progress_begin(n, "Computing plot training influence", unit = "column")
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+  # Response-column blocks retain implicit training-evaluation radii. External
+  # evaluation at the same coordinates is different for generalized NN.
+  for (start in seq.int(1L, n, by = rows)) {
+    index <- seq.int(start, min(n, start + rows - 1L))
+    response <- matrix(0, n, length(index))
+    response[cbind(index, seq_along(index))] <- 1
+    # Use the unchanged batched owner's declared capability. Other training
+    # maps use canonical scalar response fits, keeping workspace bounded even
+    # where the generic hat API would materialize a full training matrix.
+    if (.npreghat_native_lp_mean_capability(bws, spec$regtype.engine,
+        spec$degree.engine, spec$basis.engine, spec$bernstein.basis.engine,
+        integer(bws[["ncon", exact = TRUE]]), FALSE)) {
+      Sy <- .npreghat_exact_lp_apply_from_regression_core(bws, txdat = xdat,
+        y = response, basis = spec$basis.engine, degree = spec$degree.engine,
+        bernstein.basis = spec$bernstein.basis.engine)
+    } else {
+      Sy <- vapply(seq_along(index), function(j)
+        .np_regression_direct(bws, txdat = xdat, tydat = response[, j])$mean,
+        numeric(n))
+    }
+    Sy <- matrix(Sy, n, length(index))
+    E <- -Sy
+    if (partial) {
+      K[, index] <- projection[, index, drop = FALSE] - projection %*% Sy
+      E <- E - resx %*% K[, index, drop = FALSE]
+    }
+    E[cbind(index, seq_along(index))] <- 1 + E[cbind(index, seq_along(index))]
+    next.scale <- pmax(scale, apply(abs(E), 1L, max))
+    divisor <- ifelse(next.scale > 0, next.scale, 1)
+    E <- E / divisor
+    score <- score * (scale / divisor) + drop(E %*% ydat[index])
+    square <- square * (scale / divisor)^2 + rowSums(E^2)
+    scale <- next.scale
+    progress <- .np_plot_progress_tick(progress, max(index))
+  }
+  if (any(!is.finite(square)) || any(square == 0))
+    stop("plot covariance has unidentified training residual information", call. = FALSE)
+  list(residual = score / sqrt(square), coefficient.map = K)
+}
+
+.np_plot_plreg_influence <- function(bws, xdat, ydat, zdat, exdat, ezdat,
+                                     factor = FALSE, block.bytes = 4 * 1024^2,
+                                     max.bytes = 64 * 1024^2) {
+  n <- nrow(xdat); p <- ncol(xdat); g <- nrow(exdat)
+  ydat <- .np_hat_response(ydat, bws[["ydati", exact = TRUE]])
+  if (any(!is.finite(c(block.bytes, max.bytes))) ||
+      length(block.bytes) != 1L || length(max.bytes) != 1L ||
+      block.bytes <= 0 || max.bytes <= 0)
+    stop("partially linear plot memory budgets must be positive and finite", call. = FALSE)
+  widths <- vapply(bws$bw, function(bw) {
+    spec <- npValidatedConditionalRegSpec(bw, where = "partially linear plot influence", ncon.field = "ncon")
+    if (identical(spec$regtype.engine, "lc")) 1 else npLpBasisNcol(spec$basis.engine, spec$degree.engine)
+  }, numeric(1L))
+  width <- max(widths)
+  setup <- 64 * n * (width + p + ncol(zdat) + 1) + 128 * (width^2 + p^2) + 64 * g * (p + 1)
+  retained <- if (factor) 16 * as.double(g) * n else 0
+  rows <- min(n, g, floor(min(block.bytes, max.bytes - setup - retained) / (64 * as.double(n))))
+  if (n < 2L || p < 1L || g < 1L || rows < 1 ||
+      length(ydat) != n || any(!is.finite(ydat)))
+    stop("partially linear plot influence exceeds its data or memory budget", call. = FALSE)
+  xnum <- function(dat, j, evaluation = FALSE) {
+    if (!is.factor(dat[[j]])) return(as.double(dat[[j]]))
+    yi <- bws$bw[[j + 1L]][["ydati", exact = TRUE]]
+    adjusted <- .np_regression_response_levels(dat[, j, drop = FALSE], yi, allowNewCells = evaluation)
+    yi$all.dlev[[1L]][as.integer(adjusted[[1L]])]
+  }
+  rx <- matrix(0, n, p); re <- matrix(0, g, p); formation <- numeric(p)
+  for (j in seq_len(p)) {
+    x <- xnum(xdat, j)
+    sx <- .np_regression_direct(bws$bw[[j + 1L]], txdat = zdat, tydat = x)$mean
+    lx <- .np_regression_direct(bws$bw[[j + 1L]], txdat = zdat, exdat = ezdat, tydat = x)$mean
+    rx[, j] <- x - sx; re[, j] <- xnum(exdat, j, TRUE) - lx
+    formation[j] <- .np_plreg_residual_formation_error(x, sx)
+  }
+  qrR <- qr(rx, tol = .Machine$double.eps)
+  .np_plreg_check_residualized_rank(qrR, p, "partially linear plot influence", formation)
+  # R^+ without an n-by-n identity or normal-equation inversion.
+  B <- matrix(0, p, n)
+  B[qrR$pivot, ] <- backsolve(qr.R(qrR), t(qr.Q(qrR)))
+  training <- .np_plot_response_residuals(bws$bw[["yzbw", exact = TRUE]],
+                                         zdat, ydat, rows, rx, B)
+  K <- training$coefficient.map
+  z <- training$residual
+  operator <- function(evaluation) .npreghat_complete(
+    bws$bw[["yzbw", exact = TRUE]], txdat = zdat, exdat = evaluation, output = "matrix")
+  influence <- if (factor) matrix(0, g, n) else NULL
+  se <- mean <- numeric(g)
+  for (start in seq.int(1L, g, by = rows)) {
+    index <- seq.int(start, min(g, start + rows - 1L))
+    H <- operator(ezdat[index, , drop = FALSE]) + re[index, , drop = FALSE] %*% K
+    mean[index] <- drop(H %*% ydat)
+    A <- sweep(H, 2L, z, "*")
+    se[index] <- sqrt(rowSums(A^2))
+    if (factor) influence[index, ] <- A
+  }
+  list(mean = mean, se = se, influence = influence, residual = z, block.rows = rows)
 }

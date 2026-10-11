@@ -1,5 +1,14 @@
 # npRmpi 0.80-1
 
+- Gaussian simultaneous plot bands also support generalized and adaptive
+  nearest-neighbor bandwidths. Training residual normalization preserves the
+  estimator's training-radius convention. Partially linear mean curves and
+  surfaces now use a complete response influence map, including coefficient
+  estimation and all shared-observation cross-covariances. This corrects their
+  pointwise and Bonferroni plot SEs as well; fitted values, coefficient vcov
+  and bootstrap procedures are unchanged. The additional computation is
+  confined to requested asymptotic plot uncertainty.
+
 - Asymptotic Gaussian simultaneous bands now include supported regression,
   single-index and smooth-coefficient gradients, and regression and
   smooth-coefficient mean surfaces in perspective and rgl plots. Surface

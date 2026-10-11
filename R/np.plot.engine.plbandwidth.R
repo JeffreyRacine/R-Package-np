@@ -54,7 +54,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, .np.empty.report = NULL){
+           random.seed, .np.empty.report = NULL, gaussian.draws = 99999L){
 
     sub.supplied <- !missing(sub)
 
@@ -150,6 +150,43 @@
       )
     }
     
+    error.request <- .np_plot_normalize_error_request(plot.errors.method,
+                                                      plot.errors.type)
+    joint.request <- identical(error.request$method, "asymptotic") &&
+      error.request$type %in% c("simultaneous", "all")
+    if (!missing(gaussian.draws) && !joint.request)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
+    joint.eligible <- FALSE
+    joint.calibration <- NULL
+    if (joint.request) {
+      if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+        stop("asymptotic joint bands require coordinator context in an active session or attach pool; they cannot run inside mpi.bcast.cmd(...)",
+             call. = FALSE)
+      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+      joint.eligible <- !coef && all(vapply(bws$bw,
+        .np_plot_regression_joint_supported, logical(1L)))
+    }
+    joint_update <- function(interval, fit, categorical = FALSE) {
+      joint.calibration <<- NULL
+      if (!joint.eligible) return(interval)
+      if (categorical) {
+        .np_warning("asymptotic simultaneous variability intervals are unavailable for categorical panels; returning NA simultaneous limits")
+        return(interval)
+      }
+      if (any(!is.finite(fit$merr)))
+        stop("joint variability bands require identified finite uncertainty at every grid point",
+             call. = FALSE)
+      joint.calibration <<- .np_plot_activity_run("Calibrating Gaussian partially linear maximum",
+        .np_plot_gaussian_factor_calibrate(fit[[".np.plot.influence", exact = TRUE]],
+          alpha = plot.errors.alpha, draws = gaussian.draws))
+      joint.calibration$conditioning <<- "fixed design and fitted smoothing specification; includes coefficient estimation"
+      simultaneous <- cbind(fit$merr, fit$merr, deparse.level = 0L) * joint.calibration$critical
+      if (identical(plot.errors.type, "all"))
+        interval$all.err$simultaneous <- simultaneous
+      else
+        interval$err <- simultaneous
+      interval
+    }
     normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
@@ -165,7 +202,8 @@
       xdat = xdat,
       common.scale = common.scale,
       ylim = ylim,
-      allow_asymptotic_quantile = FALSE
+      allow_asymptotic_quantile = FALSE,
+      allow_asymptotic_simultaneous = joint.eligible
     )
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
@@ -331,7 +369,8 @@
           zdat = zdat,
           exdat = x.eval[,1, drop = FALSE],
           ezdat = x.eval[,2, drop = FALSE],
-          .np.empty.report = .np.empty.report
+          .np.empty.report = .np.empty.report,
+          joint = joint.eligible
         )
       } else {
         .np_plot_plreg_local_fit(
@@ -360,6 +399,7 @@
           band.type = plot.errors.type,
           m = nrow(x.eval)
         )
+        terr.obj <- joint_update(terr.obj, tobj)
         terr[,1:2] <- terr.obj$err
         terr.all <- terr.obj$all.err
         lerr = matrix(data = tobj$mean - terr[,1],
@@ -443,6 +483,10 @@
         if (.np_plot_center_is_bias_corrected(plot.errors.center))
           r1 <- .np_plot_add_bias_fields(r1, tobj$mean, terr[,3])
 
+        if (!is.null(joint.calibration)) {
+          r1$band.calibration <- joint.calibration
+          if (identical(plot.errors.type, "all")) r1$band.errors <- terr.all
+        }
         if (plot.behavior == "data")
           return ( list(r1 = r1) )
 
@@ -720,7 +764,8 @@
             zdat = zdat,
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
-            .np.empty.report = .np.empty.report
+            .np.empty.report = .np.empty.report,
+          joint = joint.eligible && !xi.factor
           )
         } else {
           .np_plot_plreg_local_fit(
@@ -745,6 +790,7 @@
               band.type = plot.errors.type,
               m = xi.neval
             )
+            asym.obj <- joint_update(asym.obj, tobj, xi.factor)
             temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
             temp.all.err <- asym.obj$all.err
           } else if (plot.errors.method == "bootstrap"){
@@ -992,6 +1038,11 @@
                 temp.err[eval.rows, 3]
               )
             plot.out[[plot.index]]$bxp = temp.boot
+            if (!is.null(joint.calibration)) {
+              plot.out[[plot.index]]$band.calibration <- joint.calibration
+              if (identical(plot.errors.type, "all"))
+                plot.out[[plot.index]]$band.errors <- temp.all.err
+            }
           }
         }
       }
@@ -1028,7 +1079,8 @@
             zdat = zdat,
             exdat = exdat[seq_len(xi.neval),, drop = FALSE],
             ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-            .np.empty.report = .np.empty.report
+            .np.empty.report = .np.empty.report,
+          joint = joint.eligible && !xi.factor
           )
         } else {
           .np_plot_plreg_local_fit(
@@ -1053,6 +1105,7 @@
               band.type = plot.errors.type,
               m = xi.neval
             )
+            asym.obj <- joint_update(asym.obj, tobj, xi.factor)
             temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
             temp.all.err <- asym.obj$all.err
           } else if (plot.errors.method == "bootstrap"){
@@ -1244,6 +1297,11 @@
                 temp.err[eval.rows, 3]
               )
             plot.out[[plot.index]]$bxp = temp.boot
+            if (!is.null(joint.calibration)) {
+              plot.out[[plot.index]]$band.calibration <- joint.calibration
+              if (identical(plot.errors.type, "all"))
+                plot.out[[plot.index]]$band.errors <- temp.all.err
+            }
           }
         }
       }
