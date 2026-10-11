@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+- Gaussian simultaneous plot intervals now include unordered and ordered
+  categorical panels for regression, smooth-coefficient and partially linear
+  means, and the existing supported gradients. Regression categorical
+  gradients retain endpoint cross-covariances and the established reference
+  or adjacent-level contrast convention. All-categorical local-constant
+  smoothing is included; default, pointwise and bootstrap behavior is unchanged.
+
 - Gaussian simultaneous plot bands also support generalized and adaptive
   nearest-neighbor bandwidths. Training residual normalization preserves the
   estimator's training-radius convention. Partially linear mean curves and
