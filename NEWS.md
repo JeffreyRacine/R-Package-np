@@ -1,5 +1,13 @@
 # np 0.80-1
 
+- Regression, single-index and smooth-coefficient mean plots now offer asymptotic Gaussian simultaneous variability
+  bands over each panel's finite grid for fixed-bandwidth LC/LL/LP fits with
+  second-order Gaussian or Epanechnikov kernels. `gaussian.draws` controls the
+  Gaussian calibration separately from bootstrap `B`; joint requests report
+  unavailable residual information explicitly. Single-index bands condition on
+  the fitted index coefficients; smooth-coefficient bands use the noniterated
+  mean and accepted raw residuals, with explicit reconstruction checks.
+
 - `predict()` for location-scale quantile fits now accepts named `tau` to
   select stored quantiles in the requested order, with aligned standard errors
   and training scores. Omitted or NULL `tau` retains the original behavior;

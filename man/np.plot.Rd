@@ -456,8 +456,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bootstrap    all              all three bootstrap quantile/rank families
   asymptotic   pmzsd/pointwise  center +/- z_(1-alpha/2) * asymptotic SE
   asymptotic   bonferroni       normal rule with alpha replaced by alpha/m
-  asymptotic   simultaneous     unavailable (NA bounds)
-  asymptotic   all              finite pointwise-normal and Bonferroni-normal families
+  asymptotic   simultaneous     finite-grid Gaussian rule for supported means
+  asymptotic   all              marginal families plus Gaussian where supported
   }
   where \eqn{m} is the number of evaluation points used in the plotted
   curve/surface (\eqn{m=\texttt{neval}}{m=neval} for univariate curves,
@@ -480,11 +480,60 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \eqn{\widehat{se}(x)} its asymptotic standard error. Both use
   \eqn{T(x)\pm z_{1-\alpha/2}\widehat{se}(x)}{T(x) +/- z_(1-alpha/2) se(x)}.
   \code{"bonferroni"} applies the same rule with \eqn{\alpha/m} in place
-  of \eqn{\alpha}. Asymptotic simultaneous bands are not generally
-  available for the kernel estimators in this package, so
-  \code{errors="asymptotic", band="simultaneous"} returns \code{NA}
-  bounds; \code{band="all"} therefore has finite pointwise-normal and
-  Bonferroni-normal families only.
+  of \eqn{\alpha}.
+
+  Regression, single-index and smooth-coefficient mean curves support asymptotic Gaussian simultaneous variability
+  bands within each panel's finite evaluation grid. This requires fixed
+  bandwidths and second-order Gaussian or Epanechnikov kernels, with the
+  existing LC, LL or LP specification. Continuous slices may include mixed
+  training covariates. Surfaces, derivatives, categorical panels, nearest-neighbor
+  bandwidths and other kernels retain a warning and unavailable simultaneous
+  limits. With \code{band="all"}, supported curves retain the pointwise and
+  Bonferroni families and add the Gaussian simultaneous family.
+
+  The separately named plot argument \code{gaussian.draws} defaults to 50000
+  and must be an integer from 1 to 1000000. It applies only to asymptotic
+  simultaneous/all requests; \code{B} remains bootstrap-only. The usual
+  \code{random.seed} (default 42) controls calibration without changing the
+  caller's random-number state. Simulation uses bounded blocks. The joint
+  request is limited to 512 grid points and a conservative 64 MiB workspace
+  budget; reduce \code{neval} if the requested workspace is too large.
+
+  Write \eqn{S} for the training smoother and \eqn{L} for its evaluation
+  influence map. The covariance is
+  \eqn{L\operatorname{diag}(z_i^2)L^\mathsf{T}}, where
+  \eqn{z_i=((I-S)y)_i/\sqrt{\sum_j(\delta_{ij}-S_{ij})^2}}.
+  A simulated maximum of the absolute standardized joint Gaussian coordinates
+  supplies one multiplier for the existing standard errors. Invalid covariance
+  or unavailable residual information causes an explicit error for an admitted
+  joint request; no alternative interval method is substituted.
+
+  This Gaussian/multiplier connection follows the framework developed by
+  Victor Chernozhukov, Denis Chetverikov and Kengo Kato (2013); see also their
+  Gaussian comparison and anti-concentration results (2015). Conditional on
+  the data and the fitted smoothing specification, simulating this covariance
+  has the same Gaussian law as applying independent standard normal multipliers
+  to the observation-level influence contributions. The covariance is assembled
+  once per panel, so calibration requires no repeated estimator fits. These
+  references concern the Gaussian approximation and multiplier framework;
+  the covariance above retains this package's estimator-specific standard-error
+  convention and does not by itself establish bias correction or honest
+  confidence coverage.
+
+  Single-index bands additionally condition on the fitted index coefficients;
+  they retain the scalar-index regression standard-error convention. Partially
+  linear joint bands are not provided. Smooth-coefficient bands describe the
+  noniterated plotted mean and use the fitted raw training residuals in place
+  of the normalized residuals above. Coefficient panels are excluded. A joint
+  request fails explicitly if its influence map cannot reproduce the incumbent
+  fitted mean and standard errors, including incompatible locally deficient
+  solve configurations. Existing pointwise intervals are unchanged.
+
+  Bandwidths and the polynomial specification are held fixed. This construction
+  neither corrects smoothing bias nor guarantees finite-sample confidence
+  coverage. It does not cover points between the grid or jointly cover different
+  panels. Returned data include compact \code{band.calibration} metadata;
+  \code{band="all"} also returns the three width matrices in \code{band.errors}.
 
   On an eligible single-panel plot rendered by base graphics,
   a missing \code{sub} argument allows the plot method to add a concise
@@ -817,6 +866,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Cao-Abad, R. (1991), \dQuote{Rate of convergence for the wild
     bootstrap in nonparametric regression,} The Annals of Statistics,
   19, 2226-2231.
+
+  Chernozhukov, Victor, Denis Chetverikov and Kengo Kato (2013),
+  \dQuote{Gaussian approximations and multiplier bootstrap for maxima of sums
+    of high-dimensional random vectors,} The Annals of Statistics, 41(6),
+  2786-2819. \doi{10.1214/13-AOS1161}.
+
+  Chernozhukov, Victor, Denis Chetverikov and Kengo Kato (2015),
+  \dQuote{Comparison and anti-concentration bounds for maxima of Gaussian
+    random vectors,} Probability Theory and Related Fields, 162, 47-70.
+  \doi{10.1007/s00440-014-0565-9}.
 
   Hall, P. and J.S. Racine and Q. Li (2004), \dQuote{Cross-validation and the
     estimation of conditional probability densities,} Journal of the

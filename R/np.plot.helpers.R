@@ -580,7 +580,10 @@
       sprintf("%s Bonferroni asymptotic band: adjusted z \u00d7 SE", level),
       sprintf("%s Bonferroni z \u00d7 SE band", level)
     ),
-    "asymptotic:simultaneous" = character(),
+    "asymptotic:simultaneous" = c(
+      sprintf("%s asymptotic Gaussian simultaneous variability band; finite grid within panel", level),
+      sprintf("%s Gaussian simultaneous band; finite grid within panel", level)
+    ),
     "asymptotic:all" = c(
       sprintf("%s asymptotic variability bands", level),
       sprintf("%s asymptotic bands", level)
@@ -8244,7 +8247,7 @@ plotFactor <- function(f, y, ...){
       bonferroni = "Bonferroni (quantiles)")
   } else {
     c(pointwise = "Pointwise (z \u00d7 SE)",
-      simultaneous = "Simultaneous",
+      simultaneous = "Simultaneous (Gaussian, finite grid)",
       bonferroni = "Bonferroni (adjusted z \u00d7 SE)")
   }
 }
@@ -10907,7 +10910,8 @@ compute.default.error.range <- function(center, err) {
                                              xdat,
                                              common.scale,
                                              ylim,
-                                             allow_asymptotic_quantile = TRUE) {
+                                             allow_asymptotic_quantile = TRUE,
+                                             allow_asymptotic_simultaneous = FALSE) {
   scalar_choice <- function(value, default) {
     if (is.null(value) || length(value) < 1L || is.na(value[1L])) default else value[1L]
   }
@@ -10962,9 +10966,9 @@ compute.default.error.range <- function(center, err) {
   }
 
   if (allow_asymptotic_quantile && plot.errors.method == "asymptotic") {
-    if (plot.errors.type == "simultaneous")
+    if (!allow_asymptotic_simultaneous && plot.errors.type == "simultaneous")
       .np_warning("asymptotic simultaneous confidence bands are unavailable here; returning NA interval limits")
-    if (plot.errors.type == "all")
+    if (!allow_asymptotic_simultaneous && plot.errors.type == "all")
       .np_warning("asymptotic simultaneous confidence bands are unavailable here; 'all' returns pointwise/bonferroni and NA simultaneous")
 
     if (.np_plot_center_is_bias_corrected(plot.errors.center)) {

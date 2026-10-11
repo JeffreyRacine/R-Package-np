@@ -55,7 +55,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed){
+           random.seed, gaussian.draws = 50000L){
 
     sub.supplied <- !missing(sub)
     coef.index <- .np_plot_match_coef_index(coef.index)
@@ -207,6 +207,24 @@
         call. = FALSE
       )
     }
+    joint.request <- identical(as.character(plot.errors.method)[1L], "asymptotic") &&
+      as.character(plot.errors.type)[1L] %in% c("simultaneous", "all")
+    if (!missing(gaussian.draws) && !joint.request)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
+    joint.eligible <- FALSE
+    joint.residual <- NULL
+    joint.calibration <- NULL
+    if (joint.request) {
+      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws", 1000000L)
+      joint.surface <- isTRUE(perspective) &&
+        sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord)) == 2 &&
+        sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0 &&
+        !any(xor(c(bws$xdati$iord, bws$zdati$iord),
+                 c(bws$xdati$inumord, bws$zdati$inumord)))
+      joint.eligible <- !coef && !joint.surface &&
+        .np_plot_regression_joint_supported(bws, gradients)
+    }
+
     normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
@@ -221,7 +239,8 @@
       plot.errors.bar = plot.errors.bar,
       xdat = xdat,
       common.scale = common.scale,
-      ylim = ylim
+      ylim = ylim,
+      allow_asymptotic_simultaneous = joint.eligible
     )
 
     plot.behavior <- normalized.opts$plot.behavior
@@ -729,6 +748,8 @@
             se = (plot.errors && identical(plot.errors.method, "asymptotic")),
             betas = coef
           )
+          if (joint.eligible)
+            tx.args$residuals <- TRUE
           if (!miss.z) {
             tx.args$tzdat <- zdat
             tx.args$ezdat <- ez.slice
@@ -752,6 +773,45 @@
           mean = as.vector(do.call(npscoefhat, hat.args)),
           merr = rep_len(NA_real_, nrow(ex.slice))
         )
+      }
+
+      if (joint.eligible) {
+        joint_update <- function(asym.obj, tobj, ex.slice, ez.slice, categorical) {
+          joint.calibration <<- NULL
+          if (categorical) {
+            .np_warning("asymptotic simultaneous variability intervals are unavailable for categorical panels; returning NA simultaneous limits")
+            return(asym.obj)
+          }
+          if (any(!is.finite(tobj$merr)) || any(!is.finite(tobj$mean)))
+            stop("joint variability bands require identified finite uncertainty at every grid point",
+                 call. = FALSE)
+          if (is.null(joint.residual))
+            joint.residual <<- tobj[["resid", exact = TRUE]]
+          if (is.null(joint.residual))
+            stop("joint covariance requires the fitted training residuals", call. = FALSE)
+          joint <- .np_plot_activity_run("Computing joint smooth-coefficient plot covariance",
+            .np_plot_scoef_joint_covariance(bws, xdat, ydat,
+              if (miss.z) NULL else zdat, ex.slice, ez.slice,
+              residual = joint.residual))
+          joint.residual <<- joint$residual
+          if (any(abs(joint$mean - tobj$mean) > 1e-9 * pmax(1, abs(tobj$mean))))
+            stop("joint influence map does not reproduce the smooth-coefficient fitted mean",
+                 call. = FALSE)
+          if (any(abs(sqrt(diag(joint$covariance)) - tobj$merr) >
+                  1e-9 * pmax(1, abs(tobj$merr))))
+            stop("joint covariance does not reproduce the smooth-coefficient standard errors",
+                 call. = FALSE)
+          joint.calibration <<- .np_plot_activity_run("Calibrating Gaussian plot maximum",
+            .np_plot_gaussian_calibrate(joint$covariance,
+              alpha = plot.errors.alpha, draws = gaussian.draws))
+          joint.calibration$conditioning <<- "noniterated plotted mean and smoothing specification"
+          simultaneous <- cbind(tobj$merr, tobj$merr) * joint.calibration$critical
+          if (identical(plot.errors.type, "all"))
+            asym.obj$all.err$simultaneous <- simultaneous
+          else
+            asym.obj$err <- simultaneous
+          asym.obj
+        }
       }
 
       plot.index = 0
@@ -794,6 +854,8 @@
               band.type = plot.errors.type,
               m = xi.neval
             )
+            if (joint.eligible)
+              asym.obj <- joint_update(asym.obj, tobj, ex.slice, ez.slice, xi.factor)
             temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
             temp.all.err <- asym.obj$all.err
           } else if (plot.errors.method == "bootstrap"){
@@ -1050,6 +1112,11 @@
                 temp.err[eval.rows, 3]
               )
             plot.out[[plot.index]]$bxp = temp.boot
+            if (!is.null(joint.calibration)) {
+              plot.out[[plot.index]]$band.calibration <- joint.calibration
+              if (identical(plot.errors.type, "all"))
+                plot.out[[plot.index]]$band.errors <- temp.all.err
+            }
           } else {
             eval.obj <- if (miss.z) {
               subcol(exdat, ei, i)[seq_len(xi.neval),, drop = FALSE]
@@ -1080,6 +1147,11 @@
                 temp.err[eval.rows, 3]
               )
             plot.out[[plot.index]]$bxp = temp.boot
+            if (!is.null(joint.calibration)) {
+              plot.out[[plot.index]]$band.calibration <- joint.calibration
+              if (identical(plot.errors.type, "all"))
+                plot.out[[plot.index]]$band.errors <- temp.all.err
+            }
           }
         }
       }
@@ -1123,6 +1195,8 @@
                 band.type = plot.errors.type,
                 m = xi.neval
               )
+              if (joint.eligible)
+                asym.obj <- joint_update(asym.obj, tobj, ex.slice, ez.slice, xi.factor)
               temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
               temp.all.err <- asym.obj$all.err
             } else if (plot.errors.method == "bootstrap"){
@@ -1370,6 +1444,11 @@
                   temp.err[eval.rows, 3]
                 )
               plot.out[[plot.index]]$bxp = temp.boot
+              if (!is.null(joint.calibration)) {
+                plot.out[[plot.index]]$band.calibration <- joint.calibration
+                if (identical(plot.errors.type, "all"))
+                  plot.out[[plot.index]]$band.errors <- temp.all.err
+              }
             } else {
               plot.out[[plot.index]] =
                 smoothcoefficient(bws = bws, 
@@ -1395,6 +1474,11 @@
                   temp.err[eval.rows, 3]
                 )
               plot.out[[plot.index]]$bxp = temp.boot
+              if (!is.null(joint.calibration)) {
+                plot.out[[plot.index]]$band.calibration <- joint.calibration
+                if (identical(plot.errors.type, "all"))
+                  plot.out[[plot.index]]$band.errors <- temp.all.err
+              }
             }
           }
         }
