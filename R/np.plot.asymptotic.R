@@ -337,6 +337,37 @@
   partial <- !is.null(projection)
   K <- if (partial) matrix(0, nrow(projection), n) else NULL
   score <- square <- scale <- numeric(n)
+  if (bws[["type", exact = TRUE]] %in% c("fixed", "adaptive_nn")) {
+    # These geometries use the same weights at training coordinates whether
+    # evaluation is implicit or explicit. Generalized NN does not.
+    operator <- function(index) .npreghat_complete(bws, txdat = xdat,
+      exdat = xdat[index, , drop = FALSE], output = "matrix")
+    progress <- .np_plot_bootstrap_progress_begin(n * (1L + as.integer(partial)),
+      "Computing plot training influence", unit = "row")
+    on.exit(.np_plot_progress_end(progress), add = TRUE)
+    if (partial) {
+      K <- projection
+      for (start in seq.int(1L, n, by = rows)) {
+        index <- seq.int(start, min(n, start + rows - 1L))
+        K <- K - projection[, index, drop = FALSE] %*% operator(index)
+        progress <- .np_plot_progress_tick(progress, max(index))
+      }
+    }
+    z <- numeric(n)
+    for (start in seq.int(1L, n, by = rows)) {
+      index <- seq.int(start, min(n, start + rows - 1L))
+      E <- -operator(index)
+      if (partial) E <- E - resx[index, , drop = FALSE] %*% K
+      E[cbind(seq_along(index), index)] <- 1 + E[cbind(seq_along(index), index)]
+      scale <- apply(abs(E), 1L, max)
+      if (any(!is.finite(scale)) || any(scale == 0))
+        stop("plot covariance has unidentified training residual information", call. = FALSE)
+      E <- E / scale
+      z[index] <- drop(E %*% ydat) / sqrt(rowSums(E^2))
+      progress <- .np_plot_progress_tick(progress, n * as.integer(partial) + max(index))
+    }
+    return(list(residual = z, coefficient.map = K))
+  }
   spec <- npValidatedConditionalRegSpec(bws, where = "plot response influence", ncon.field = "ncon")
   progress <- .np_plot_bootstrap_progress_begin(n, "Computing plot training influence", unit = "column")
   on.exit(.np_plot_progress_end(progress), add = TRUE)
@@ -384,12 +415,13 @@
                                      factor = FALSE, block.bytes = 4 * 1024^2,
                                      max.bytes = 64 * 1024^2) {
   n <- nrow(xdat); p <- ncol(xdat); g <- nrow(exdat)
+  bandwidths <- bws[["bw", exact = TRUE]]
   ydat <- .np_hat_response(ydat, bws[["ydati", exact = TRUE]])
   if (any(!is.finite(c(block.bytes, max.bytes))) ||
       length(block.bytes) != 1L || length(max.bytes) != 1L ||
       block.bytes <= 0 || max.bytes <= 0)
     stop("partially linear plot memory budgets must be positive and finite", call. = FALSE)
-  widths <- vapply(bws$bw, function(bw) {
+  widths <- vapply(bandwidths, function(bw) {
     spec <- npValidatedConditionalRegSpec(bw, where = "partially linear plot influence", ncon.field = "ncon")
     if (identical(spec$regtype.engine, "lc")) 1 else npLpBasisNcol(spec$basis.engine, spec$degree.engine)
   }, numeric(1L))
@@ -402,15 +434,15 @@
     stop("partially linear plot influence exceeds its data or memory budget", call. = FALSE)
   xnum <- function(dat, j, evaluation = FALSE) {
     if (!is.factor(dat[[j]])) return(as.double(dat[[j]]))
-    yi <- bws$bw[[j + 1L]][["ydati", exact = TRUE]]
+    yi <- bandwidths[[j + 1L]][["ydati", exact = TRUE]]
     adjusted <- .np_regression_response_levels(dat[, j, drop = FALSE], yi, allowNewCells = evaluation)
     yi$all.dlev[[1L]][as.integer(adjusted[[1L]])]
   }
   rx <- matrix(0, n, p); re <- matrix(0, g, p); formation <- numeric(p)
   for (j in seq_len(p)) {
     x <- xnum(xdat, j)
-    sx <- .np_regression_direct(bws$bw[[j + 1L]], txdat = zdat, tydat = x)$mean
-    lx <- .np_regression_direct(bws$bw[[j + 1L]], txdat = zdat, exdat = ezdat, tydat = x)$mean
+    sx <- .np_regression_direct(bandwidths[[j + 1L]], txdat = zdat, tydat = x)$mean
+    lx <- .np_regression_direct(bandwidths[[j + 1L]], txdat = zdat, exdat = ezdat, tydat = x)$mean
     rx[, j] <- x - sx; re[, j] <- xnum(exdat, j, TRUE) - lx
     formation[j] <- .np_plreg_residual_formation_error(x, sx)
   }
@@ -419,12 +451,12 @@
   # R^+ without an n-by-n identity or normal-equation inversion.
   B <- matrix(0, p, n)
   B[qrR$pivot, ] <- backsolve(qr.R(qrR), t(qr.Q(qrR)))
-  training <- .np_plot_response_residuals(bws$bw[["yzbw", exact = TRUE]],
+  training <- .np_plot_response_residuals(bandwidths[["yzbw", exact = TRUE]],
                                          zdat, ydat, rows, rx, B)
   K <- training$coefficient.map
   z <- training$residual
   operator <- function(evaluation) .npreghat_complete(
-    bws$bw[["yzbw", exact = TRUE]], txdat = zdat, exdat = evaluation, output = "matrix")
+    bandwidths[["yzbw", exact = TRUE]], txdat = zdat, exdat = evaluation, output = "matrix")
   influence <- if (factor) matrix(0, g, n) else NULL
   se <- mean <- numeric(g)
   for (start in seq.int(1L, g, by = rows)) {
