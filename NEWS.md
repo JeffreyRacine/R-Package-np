@@ -1,5 +1,8 @@
 # np 0.80-1
 
+- Plot joint-band admission now honors the existing legacy argument
+  abbreviations consistently with full method and band names.
+
 - Regression, single-index and smooth-coefficient mean plots now offer asymptotic Gaussian simultaneous variability
   bands over each panel's finite grid for fixed-bandwidth LC/LL/LP fits with
   second-order Gaussian or Epanechnikov kernels. `gaussian.draws` controls the
