@@ -53,11 +53,11 @@ test_that("scaled copula samples, grids, uncertainty and bootstrap match physica
                            plot(b, view = "all", output = "data"))
         set.seed(1702)
         expect_warning(pa <- plot(a, errors = "bootstrap", B = 9,
-          band = "all", output = "data"), "B=9 is too small", fixed = TRUE)
+          band = "all", output = "data"), "B=9 is below the recommended tail-resolution floor", fixed = TRUE)
         seed <- .Random.seed
         set.seed(1702)
         expect_warning(pb <- plot(b, errors = "bootstrap", B = 9,
-          band = "all", output = "data"), "B=9 is too small", fixed = TRUE)
+          band = "all", output = "data"), "B=9 is below the recommended tail-resolution floor", fixed = TRUE)
         expect_identical(pa, pb)
         expect_identical(.Random.seed, seed)
       }

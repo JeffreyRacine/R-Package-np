@@ -38,7 +38,7 @@ test_that("RLY categorical bootstrap profiles preserve fixed-draw plot bands", {
       options(np.categorical.compress=compress);set.seed(831)
       expect_warning(results[[as.character(compress)]]<-plot(fit,plot.behavior="data",
         gradients=grad,errors="bootstrap",plot.errors.boot.method="inid",
-        plot.errors.boot.num=9L,band="all"),"B=9 is too small")
+        plot.errors.boot.num=9L,band="all"),"B=9 is below the recommended tail-resolution floor")
       seeds[[as.character(compress)]]<-.Random.seed
     }
     expect_equal(results[["TRUE"]][[1]]$mean,results[["FALSE"]][[1]]$mean,tolerance=2e-12)
