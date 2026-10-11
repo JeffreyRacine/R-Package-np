@@ -1,3 +1,13 @@
+# These route fixtures deliberately use small explicit draw counts. Precision
+# guidance itself is tested below; other warnings remain visible.
+local({
+  low_budget <- function(w) {
+    if (grepl("below the recommended Monte Carlo precision count", conditionMessage(w), fixed = TRUE))
+      invokeRestart("muffleWarning")
+  }
+  test_that <- function(desc, code) {
+    testthat::test_that(desc, withCallingHandlers(force(code), warning = low_budget))
+  }
 test_that("Gaussian plot calibration supports singularity and canonical draw blocks", {
   C <- matrix(c(1, .6, .6, 1), 2L)
   a <- .np_with_seed(412L, .np_plot_gaussian_calibrate(C, draws = 199L, block = 1L))
@@ -10,10 +20,10 @@ test_that("Gaussian plot calibration supports singularity and canonical draw blo
   expect_error(.np_plot_gaussian_calibrate(matrix(c(1, 2, 2, 1), 2)), "indefinite")
   expect_error(.np_plot_gaussian_calibrate(C, draws = 1.5), "integer")
   expect_error(.np_plot_gaussian_calibrate(C, max.bytes = 1), "budget")
-  expect_identical(formals(.np_plot_gaussian_calibrate)$draws, 99999L)
+  expect_identical(formals(.np_plot_gaussian_calibrate)$draws, 9999L)
   expect_identical(.np_plot_gaussian_draws(99999L, .05, 2500L), 99999L)
   expect_warning(expect_identical(.np_plot_gaussian_draws(99L, .05, 50L), 99L),
-                 "1999.*retaining")
+                 "7299.*retaining")
   expect_identical(.np_plot_gaussian_draws(1000001L, .05, 50L), 1000001L)
   A <- matrix(c(1, 2, 0, 1, 0, 0), 2L)
   a <- .np_with_seed(412L, .np_plot_gaussian_factor_calibrate(A, draws = 199L, block = 1L))
@@ -265,4 +275,32 @@ test_that("categorical joint bands retain endpoint covariance and level semantic
   expect_equal(grad[[1L]]$band.errors$simultaneous[1L, ], c(0, 0))
   expect_equal(grad[[2L]]$band.errors$simultaneous[1L, ],
                grad[[2L]]$band.errors$simultaneous[2L, ])
+})
+
+})
+
+test_that("Gaussian calibration has the independent maximum probability", {
+  B <- 9999L
+  m <- 4L
+  result <- .np_with_seed(71L, .np_plot_gaussian_calibrate(diag(m), draws = B))
+  # For independent standard normals P(max |Z_j| <= c) = (2 Phi(c)-1)^m.
+  # The empirical type-1 quantile has an exact beta law on that CDF scale.
+  probability <- (2 * pnorm(result$critical) - 1)^m
+  k <- ceiling(.95 * B)
+  limits <- qbeta(c(.0005, .9995), k, B + 1L - k)
+  expect_gt(probability, limits[1L])
+  expect_lt(probability, limits[2L])
+  expect_lt((2 * pnorm(qnorm(.975)) - 1)^m, limits[1L])
+  expect_lt((2 * pnorm(result$critical / 2) - 1)^m, limits[1L])
+})
+
+test_that("joint unavailability preserves only the declared compatibility boundary", {
+  expect_warning(expect_null(.np_plot_joint_try(
+    .np_plot_joint_unavailable("identified limitation"))), "NA simultaneous")
+  expect_error(.np_plot_joint_try(stop("unexpected failure")), "unexpected failure")
+  expect_error(.np_plot_joint_try(.np_plot_gaussian_calibrate(
+    matrix(c(1, 2, 2, 1), 2))), "indefinite")
+  expect_warning(expect_identical(.np_plot_gaussian_draws(7298L, .05, 2500L), 7298L), "7299")
+  expect_warning(.np_plot_gaussian_draws(9999L, .01, 50L), "38031")
+  expect_warning(.np_plot_gaussian_draws(7299L, .05, 2500L), NA)
 })

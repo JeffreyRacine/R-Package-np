@@ -726,7 +726,7 @@ np_render_control <- function(style = c("band", "bar"),
                                   band = "pointwise",
                                   center = "estimate",
                                   bootstrap = "inid",
-                                  B = 399L,
+                                  B = 9999L,
                                   blocklen = NULL) {
   lev <- if (!is.null(object$probability.levels)) {
     as.character(object$probability.levels)
@@ -1314,7 +1314,7 @@ np_render_control <- function(style = c("band", "bar"),
                                        band = "pointwise",
                                        center = "estimate",
                                        bootstrap = "inid",
-                                       B = 399L,
+                                       B = 9999L,
                                        blocklen = NULL) {
   if (!isTRUE(gradients) && is.null(object$probabilities))
     stop("class probabilities are not available: fit with probabilities=TRUE or gradients=TRUE",
@@ -1909,7 +1909,7 @@ np_render_control <- function(style = c("band", "bar"),
     .np_plot_scalar_match(dots$plot.errors.boot.method,
                           c("wild", "inid", "fixed", "geom"),
                           "plot.errors.boot.method")
-  B <- if (is.null(dots$plot.errors.boot.num)) 399L else
+  B <- if (is.null(dots$plot.errors.boot.num)) 9999L else
     dots$plot.errors.boot.num
   if (!is.numeric(B) || length(B) != 1L || is.na(B) || B < 1)
     stop("plot.errors.boot.num must be a positive numeric scalar",

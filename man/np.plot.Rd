@@ -497,18 +497,21 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Bonferroni families and add the Gaussian simultaneous family.
 
   The separately named plot argument \code{gaussian.draws} has a fixed default
-  of 99999 and accepts positive integer counts subject to representability and
+  of 9999 and accepts positive integer counts subject to representability and
   workspace limits, without a fixed one-million upper cap. It applies only to asymptotic
   simultaneous/all requests; \code{B} remains bootstrap-only. The usual
   \code{random.seed} (default 42) controls calibration without changing the
   caller's random-number state. A count below
-  \code{ceiling(2*m/alpha - 1)} produces a warning and is used unchanged;
-  it is never increased silently. Here \code{m} is the actual number of points
-  in the panel, including \code{neval^2} for a full perspective/rgl grid.
-  Thus the default meets this recommendation for 50 by 50 points at
-  \code{alpha=0.05}. This is the package's bootstrap-inspired conservative
-  tail-resolution recommendation, not a finite-simulation accuracy guarantee
-  or a draw-count prescription in Chernozhukov, Chetverikov and Kato (2013).
+  \code{ceiling(qnorm(.975)^2 * (1-alpha) / (.1^2 * alpha))} warns and is used
+  unchanged. This is an approximate 95 percent Monte Carlo target for relative
+  error within 10 percent in the simulated maximum's upper-tail probability.
+  It is about 7299 draws at \code{alpha=0.05} and 38031 at \code{alpha=0.01}.
+  The maximum's tail probability is \eqn{\alpha} for either a slice or a full
+  \code{neval^2} perspective/rgl grid; the number of points affects the maximum
+  distribution and computational cost, but does not divide this tail probability.
+  This recommendation does not guarantee critical-value accuracy or statistical
+  coverage and is not a draw-count prescription in Chernozhukov, Chetverikov and
+  Kato (2013). Explicit counts are never increased silently.
   Simulation uses bounded blocks and the bootstrap progress mechanism to
   report completed draws, elapsed time and estimated time remaining during
   interactive computation. It uses a conservative 64 MiB workspace budget;
@@ -534,9 +537,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   all displayed levels. Simultaneity remains within each panel, not across
   separate panels.
   A simulated maximum of the absolute standardized joint Gaussian coordinates
-  supplies one multiplier for the existing standard errors. Invalid covariance
-  or unavailable residual information causes an explicit error for an admitted
-  joint request; no alternative interval method is substituted.
+  supplies one multiplier for the existing standard errors. If the joint
+  calculation cannot reproduce the plotted target or standard errors, has
+  unidentified residual information, or exceeds its workspace/grid budget,
+  the plot warns and returns unavailable (NA) simultaneous limits.
+  With \code{band="all"}, pointwise and Bonferroni intervals are retained.
+  This can occur in sparse, locally ridged tails even after bandwidth selection.
+  Invalid arguments, invalid covariance objects and unexpected computation
+  errors still fail explicitly.
 
   This Gaussian/multiplier connection follows the framework developed by
   Victor Chernozhukov, Denis Chetverikov and Kengo Kato (2013); see also their
@@ -560,9 +568,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   coordinates fixed, including when explanatory and smoothing variables
   overlap; they are not total derivatives through those coordinates.
   The separate \code{coef=TRUE} display remains excluded. A joint
-  request fails explicitly if its influence map cannot reproduce the incumbent
-  plotted target and standard errors, including incompatible locally deficient
-  solve configurations. These three families retain their existing pointwise intervals.
+  request reports unavailable simultaneous limits if its influence map cannot
+  reproduce the incumbent plotted target and standard errors, including
+  incompatible locally deficient solve configurations. These three families
+  retain their existing pointwise intervals.
 
   Partially linear mean plots use the complete response map of the fitted
   estimator, including coefficient estimation. Write \eqn{R=X-S_xX} and
@@ -873,17 +882,23 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   error for the bootstrap estimate of the variance of the empirical mean
   is minimized.
 
-  The default bootstrap replication count is
-  \code{B=1999}. For pointwise tails, ensure
-  \eqn{B \ge \lceil 2/\alpha - 1 \rceil}{B >= ceiling(2/alpha - 1)} so
-  \eqn{\alpha(B+1)} is feasible on the bootstrap rank grid. For interval
-  types \code{"bonferroni"}, \code{"simultaneous"}, and \code{"all"},
-  the minimum recommended count is
-  \eqn{B_{\min}=\lceil 2m/\alpha-1 \rceil}{Bmin=ceiling(2*m/alpha-1)},
-  where \eqn{m} is the number of evaluation points used by the plotted
-  curve/surface. For full 2D perspective grids this is typically
-  \eqn{m=\texttt{neval}^2}{m=neval^2}. When \code{B} is below these
-  thresholds, plotting proceeds but warning guidance is reported.
+  The default bootstrap replication count is \code{B=9999} for every plot
+  method, including class-probability and copula plots. Estimator and test
+  bootstrap defaults are separate. For pointwise percentile intervals the bare
+  tail-resolution reference is
+  \eqn{B \ge \lceil 2/\alpha - 1 \rceil}{B >= ceiling(2/alpha - 1)}.
+  For \code{"bonferroni"}, \code{"simultaneous"}, and \code{"all"}, the warning
+  uses \eqn{B_{\min}=\lceil 2m/\alpha-1 \rceil}{Bmin=ceiling(2*m/alpha-1)},
+  where \eqn{m} is the actual within-panel evaluation count, including
+  \eqn{m=\texttt{neval}^2}{m=neval^2} on a full perspective grid. For rank-based
+  simultaneous intervals this is a conservative Bonferroni reference.
+  These are bare rank-scale floors, not integrality requirements, Monte Carlo
+  precision targets or coverage guarantees. Meeting a floor may still leave
+  noisy endpoints; larger \code{B} can stabilize them. At \code{alpha=0.05},
+  a 50-point curve has a floor of 1999, while a 50 by 50 surface has a floor of
+  99999. Below the floor the plot warns and uses the requested count unchanged.
+  Bootstrap standard-deviation bands (\code{"pmzsd"}) do not estimate empirical
+  tail quantiles and are not subject to this tail-resolution warning.
 
   Typical plotting calls:
   \preformatted{

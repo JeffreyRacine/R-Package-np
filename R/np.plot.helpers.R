@@ -9065,9 +9065,6 @@ plotFactor <- function(f, y, ...){
 
     empty.rows <- attr(fit, ".np.empty.rows", exact = TRUE)
     valid <- is.finite(fit$mean)
-    if (joint && !all(valid))
-      stop("joint variability bands require identified finite uncertainty at every grid point",
-           call. = FALSE)
     fit$merr <- rep(NA_real_, nrow(exdat))
     if (any(valid)) {
       influence <- .np_plot_plreg_influence(bws, xdat, ydat, zdat,
@@ -9076,7 +9073,10 @@ plotFactor <- function(f, y, ...){
           any(abs(influence$mean - fit$mean[valid]) > 1e-9 * pmax(1, abs(fit$mean[valid]))))
         stop("joint influence map does not reproduce the partially linear fitted mean", call. = FALSE)
       fit$merr[valid] <- influence$se
-      if (joint) fit[[".np.plot.influence"]] <- influence$influence
+      if (joint) {
+        fit[[".np.plot.influence"]] <- influence$influence
+        fit[[".np.plot.joint.unavailable"]] <- influence$joint.unavailable
+      }
     }
     .npreg_publish_plot_rows(fit, empty.rows, report = .np.empty.report,
       omitted = which(!keep.eval), owner = "plot.npplreg", row.labels = row.names(exdat))
@@ -10411,10 +10411,12 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
       sprintf("m=n.eval=%d (Bonferroni-conservative tails)", neval)
     }
     .np_warning(sprintf(
-      paste0("B=%d is too small for band=\"%s\" ",
+      paste0("B=%d is below the recommended tail-resolution floor for band=\"%s\" ",
              "(alpha=%g). Minimum recommended is %d using ",
              "B >= ceiling(2*m/alpha - 1), with %s. ",
-             "For 2D perspective plots on a full neval x neval grid, m=neval^2."),
+             "This bare rank-scale floor is not a Monte Carlo precision or coverage guarantee. ",
+             "Increase B to stabilize interval endpoints, especially simultaneous and Bonferroni bands. ",
+             "For a full neval x neval perspective grid, m=neval^2. Retaining the requested count."),
       B, band.type, alpha, min.B, m.desc
     ), call. = FALSE)
   }

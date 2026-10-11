@@ -60,7 +60,7 @@ npcopula(bws, \dots)
               "simultaneous", "all"),
      alpha = 0.05,
      bootstrap = c("inid", "fixed", "geom"),
-     B = 1999,
+     B = 9999,
      center = c("estimate", "bias-corrected"),
      boot.control = np_boot_control(),
      output = c("plot", "data", "plot-data", "both"),

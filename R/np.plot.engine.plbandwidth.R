@@ -41,7 +41,7 @@
            plot.errors.boot.nonfixed = c("exact", "frozen"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
-           plot.errors.boot.num = 1999,
+           plot.errors.boot.num = 9999,
            plot.errors.center = c("estimate", "bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
@@ -54,7 +54,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, .np.empty.report = NULL, gaussian.draws = 99999L){
+           random.seed, .np.empty.report = NULL, gaussian.draws = 9999L){
 
     sub.supplied <- !missing(sub)
 
@@ -167,10 +167,13 @@
         .np_plot_regression_joint_supported, logical(1L)))
     }
     joint_update <- function(interval, fit) {
+      .np_plot_joint_try({
       joint.calibration <<- NULL
       if (!joint.eligible) return(interval)
+      reason <- fit[[".np.plot.joint.unavailable", exact = TRUE]]
+      if (!is.null(reason)) .np_plot_joint_unavailable(reason)
       if (any(!is.finite(fit$merr)))
-        stop("joint variability bands require identified finite uncertainty at every grid point",
+        .np_plot_joint_unavailable("joint variability bands require identified finite uncertainty at every grid point",
              call. = FALSE)
       joint.calibration <<- .np_plot_activity_run("Calibrating Gaussian partially linear maximum",
         .np_plot_gaussian_factor_calibrate(fit[[".np.plot.influence", exact = TRUE]],
@@ -182,6 +185,7 @@
       else
         interval$err <- simultaneous
       interval
+          }, unavailable = interval)
     }
     normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
