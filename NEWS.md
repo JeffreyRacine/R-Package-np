@@ -1,4 +1,17 @@
 # np 0.80-1
+- Density and distribution plots now offer Gaussian simultaneous variability
+  bands for supported fixed and nearest-neighbor specifications, conditional
+  LP/gradient panels, and level surfaces. Existing marginal standard errors
+  are retained; Gaussian simulation uses 9,999 draws by default. Proper
+  projections and quantiles retain their previous uncertainty contracts.
+- Correct conditional density/distribution Bonferroni surface multiplicity to
+  use the full evaluation grid; previously a vector row count reduced it to one.
+
+
+- Partially linear asymptotic plots warn when the fitted curve is numerically
+  unstable at evaluation points. Their marginal limits are NA at those points,
+  and simultaneous limits are NA for the affected panel; other points and
+  panels retain their available uncertainty. The fitted curve is preserved.
 
 - Partially linear asymptotic plots reuse their nuisance fits' accepted local
   factorization for influence calculations, preserving fitted values and ridge

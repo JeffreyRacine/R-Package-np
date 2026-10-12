@@ -54,7 +54,7 @@
            proper.method = c("project"),
            proper.control = list(),
            ...,
-           random.seed, .np.empty.report = NULL){
+           random.seed, .np.empty.report = NULL, gaussian.draws = 9999L){
 
     sub.supplied <- !missing(sub)
 
@@ -176,6 +176,15 @@
       )
     }
     
+    error.request <- .np_plot_normalize_error_request(plot.errors.method,
+                                                      plot.errors.type)
+    joint.request <- identical(error.request$method, "asymptotic") &&
+      error.request$type %in% c("simultaneous", "all")
+    if (!missing(gaussian.draws) && !joint.request)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
+    joint.eligible <- joint.request && !quantreg && !isTRUE(proper)
+    if (joint.request)
+      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
     normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
@@ -189,7 +198,9 @@
       plot.errors.bar = plot.errors.bar,
       xdat = xdat,
       common.scale = common.scale,
-      ylim = ylim
+      ylim = ylim,
+      allow_asymptotic_simultaneous = joint.eligible,
+      error.request = error.request
     )
 
     plot.behavior <- normalized.opts$plot.behavior
@@ -381,8 +392,14 @@
           se = tcerr,
           alpha = plot.errors.alpha,
           band.type = plot.errors.type,
-          m = nrow(tex)
+          m = length(tcomp)
         )
+        if (joint.eligible)
+          terr.obj <- .np_plot_density_interval(terr.obj,
+            bws, xdat, x.eval[, 1L, drop = FALSE], tcerr, tcomp,
+            y = ydat, ey = x.eval[, 2L, drop = FALSE], cdf = cdf,
+            alpha = plot.errors.alpha, band.type = plot.errors.type,
+            gaussian.draws = gaussian.draws)
         terr[,1:2] <- terr.obj$err
         terr.all <- terr.obj$all.err
         center.val <- tcomp
@@ -406,8 +423,10 @@
                   if (plot.errors.type == "all" && !is.null(lerr.all))
                     .np_plot_all_surface_range(tcomp, lerr, herr,
                                                lerr.all, herr.all)
+                  else if (joint.eligible && identical(plot.errors.type, "simultaneous"))
+                    .np_plot_joint_panel_range(tcomp, terr)
                   else
-                    c(min(lerr),max(herr))
+                    c(min(lerr), max(herr))
               } else
                 c(min(tcomp),max(tcomp))
       }
@@ -439,6 +458,8 @@
           ret.args$proper.info <- tobj$proper.info
         }
         cd1 <- do.call(ret.fun, ret.args)
+        if (joint.eligible)
+          cd1 <- .np_plot_density_band_fields(cd1, terr.obj)
         cd1$bias = NA
         cd1$bias.corrected = NA
 
@@ -797,6 +818,18 @@
                 band.type = plot.errors.type,
                 m = xi.neval
               )
+              if (joint.eligible) {
+                asym.obj <- .np_plot_density_interval(asym.obj,
+                  bws, xdat, subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                  terr.j, temp.dens[seq_len(xi.neval)],
+                  y = ydat, ey = eydat[seq_len(xi.neval),, drop = FALSE],
+                  cdf = cdf, gradient = if (gradients) j else NULL,
+                  gradient.order = gradient.order, alpha = plot.errors.alpha,
+                  band.type = plot.errors.type, gaussian.draws = gaussian.draws)
+                if (plot.behavior != "plot")
+                  plot.out[[plot.index]] <- .np_plot_density_band_fields(
+                    plot.out[[plot.index]], asym.obj, gradients, j)
+              }
               temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
               temp.all.err <- asym.obj$all.err
             }
@@ -968,7 +1001,9 @@
             bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
             corrected.name <- if (gradients) paste("gc", j, "bias.corrected", sep = "") else "bias.corrected"
             plot.out[[plot.index]][[err.name]] <- if (component.available) {
-              na.omit(cbind(-temp.err[, 1], temp.err[, 2]))
+              .np_plot_joint_interval_rows(
+                cbind(-temp.err[, 1], temp.err[, 2]), temp.dens,
+                joint.eligible, plot.errors.type)
             } else {
               cbind(-temp.err[seq_len(xi.neval), 1],
                     temp.err[seq_len(xi.neval), 2])
@@ -1087,6 +1122,18 @@
                   band.type = plot.errors.type,
                   m = xi.neval
                 )
+                if (joint.eligible) {
+                  asym.obj <- .np_plot_density_interval(asym.obj,
+                    bws, xdat, exdat[seq_len(xi.neval),, drop = FALSE],
+                    terr.j, temp.dens[seq_len(xi.neval)],
+                    y = ydat, ey = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                    cdf = cdf, gradient = if (gradients) j else NULL,
+                    gradient.order = gradient.order, alpha = plot.errors.alpha,
+                    band.type = plot.errors.type, gaussian.draws = gaussian.draws)
+                  if (plot.behavior != "plot")
+                    plot.out[[plot.index]] <- .np_plot_density_band_fields(
+                      plot.out[[plot.index]], asym.obj, gradients, j)
+                }
                 temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
                 temp.all.err <- asym.obj$all.err
               }
@@ -1261,7 +1308,9 @@
               bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
               corrected.name <- if (gradients) paste("gc", j, "bias.corrected", sep = "") else "bias.corrected"
               plot.out[[plot.index]][[err.name]] <- if (component.available) {
-                na.omit(cbind(-temp.err[, 1], temp.err[, 2]))
+                .np_plot_joint_interval_rows(
+                cbind(-temp.err[, 1], temp.err[, 2]), temp.dens,
+                joint.eligible, plot.errors.type)
               } else {
                 cbind(-temp.err[seq_len(xi.neval), 1],
                       temp.err[seq_len(xi.neval), 2])

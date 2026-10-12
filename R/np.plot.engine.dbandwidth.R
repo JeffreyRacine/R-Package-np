@@ -45,7 +45,7 @@
            plot.par.mfrow = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed){
+           random.seed, gaussian.draws = 9999L){
 
     sub.supplied <- !missing(sub)
 
@@ -98,6 +98,15 @@
         call. = FALSE
       )
     }
+    error.request <- .np_plot_normalize_error_request(plot.errors.method,
+                                                      plot.errors.type)
+    joint.request <- identical(error.request$method, "asymptotic") &&
+      error.request$type %in% c("simultaneous", "all")
+    if (!missing(gaussian.draws) && !joint.request)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
+    joint.eligible <- joint.request
+    if (joint.request)
+      gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
     normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
@@ -111,7 +120,9 @@
       plot.errors.bar = plot.errors.bar,
       xdat = xdat,
       common.scale = common.scale,
-      ylim = ylim
+      ylim = ylim,
+      allow_asymptotic_simultaneous = joint.eligible,
+      error.request = error.request
     )
 
     plot.behavior <- normalized.opts$plot.behavior
@@ -230,6 +241,12 @@
         }
       )
 
+      if (joint.eligible)
+        terr.payload <- .np_plot_density_interval(terr.payload,
+          bws, xdat, x.eval, tobj$derr, tobj$dist, cdf = TRUE,
+          alpha = plot.errors.alpha, band.type = plot.errors.type,
+          gaussian.draws = gaussian.draws)
+
       terr <- terr.payload$err
       terr.all <- terr.payload$all.err
       center.val <- terr.payload$center
@@ -258,8 +275,10 @@
                   if (plot.errors.type == "all" && !is.null(lerr.all))
                   .np_plot_all_surface_range(tobj$dist, lerr, herr,
                                              lerr.all, herr.all)
+                  else if (joint.eligible && identical(plot.errors.type, "simultaneous"))
+                      .np_plot_joint_panel_range(tobj$dist, terr)
                   else
-                      c(min(lerr),max(herr))
+                      c(min(lerr), max(herr))
               } else
                   c(min(tobj$dist),max(tobj$dist))
       }
@@ -268,6 +287,8 @@
         d1 <- npdistribution(bws = bws, eval = x.eval,
                              dist = tobj$dist, derr = terr[,1:2],
                              ntrain = nrow(xdat), se = plot.errors)
+        if (joint.eligible)
+          d1 <- .np_plot_density_band_fields(d1, terr.payload)
         d1$bias = NA
         d1$bias.corrected = NA
 
@@ -533,6 +554,11 @@
               NULL
             }
           )
+          if (joint.eligible)
+            temp.payload <- .np_plot_density_interval(temp.payload,
+              bws, xdat, eval.slice, tobj$derr, tobj$dist, cdf = TRUE,
+              alpha = plot.errors.alpha, band.type = plot.errors.type,
+              gaussian.draws = gaussian.draws)
           temp.err[seq_len(xi.neval),] <- temp.payload$err
           temp.all.err <- temp.payload$all.err
           temp.boot <- temp.payload$bxp
@@ -660,7 +686,9 @@
             bws = bws,
             eval = eval.slice,
             dist = na.omit(temp.dens),
-            derr = na.omit(cbind(-temp.err[,1], temp.err[,2])),
+            derr = .np_plot_joint_interval_rows(
+              cbind(-temp.err[,1], temp.err[,2]), temp.dens,
+              joint.eligible, plot.errors.type),
             ntrain = bws$nobs, se = plot.errors
           )
           plot.out[[i]]$bias = NA
@@ -672,6 +700,8 @@
               temp.err[,3]
             )
           plot.out[[i]]$bxp = temp.boot
+          if (joint.eligible)
+            plot.out[[i]] <- .np_plot_density_band_fields(plot.out[[i]], temp.payload)
         }
       }
       

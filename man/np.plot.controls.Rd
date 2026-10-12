@@ -35,6 +35,14 @@ np_render_control(style = c("band", "bar"),
   \item{bar.num}{Optional number of bars.}
 }
 \details{
+Gaussian simultaneous variability bands use the Gaussian-multiplier framework
+of Chernozhukov, Chetverikov and Kato (2013, 2015). For the density/distribution
+families, related simultaneous-inference research is due to Cattaneo, Jansson
+and Ma (2024) and Cattaneo, Chandak, Jansson and Ma (2024). See
+\code{\link{plot.np}} for the full published references, implementation scope
+and estimator-specific qualifications.
+
+
   These helpers validate names and values early. Raw lists are deliberately not
   accepted as substitutes, so misspelled detailed controls fail before plot
   computation begins.
@@ -44,6 +52,13 @@ np_render_control(style = c("band", "bar"),
   controls such as \code{data.overlay}, \code{data.rug}, \code{layout}, and
   \code{output} are supplied directly to \code{plot(...)} rather than through
   \code{np_render_control()}.
+
+  Gaussian simultaneous variability bands use the direct plot argument
+  \code{gaussian.draws} (default 9999), including supported density and
+  distribution plots. This controls Gaussian calibration only; \code{B} and
+  \code{np_boot_control()} continue to control bootstrap resampling. See
+  \code{\link{plot.np}} for supported targets, covariance contracts and
+  the references to Chernozhukov, Chetverikov and Kato (2013, 2015).
 
   Conditional density and distribution level bootstraps permit different
   supported continuous kernel families and orders on the X and Y sides,
