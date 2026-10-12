@@ -372,7 +372,9 @@ prediction/evaluation route, or plot route as appropriate.
     standard errors as projected-probability standard errors. Bootstrap
     intervals are available for one-dimensional \code{view="sample"} and
     \code{view="fixed"} probability plots and use the stored bandwidth object
-    without recomputing bandwidths. Surface asymptotic intervals are available
+    without recomputing bandwidths. Class-probability bootstrap plots default
+    to \code{B=399}; an explicit \code{B} overrides this count.
+    Surface asymptotic intervals are available
     as \code{output="data"} payload columns; surface band rendering and
     surface bootstrap intervals are intentionally deferred.
     See \code{\link{npcdensbw}} and \code{\link{plot.np}} for the complete

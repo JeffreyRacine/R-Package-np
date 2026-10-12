@@ -888,9 +888,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   error for the bootstrap estimate of the variance of the empirical mean
   is minimized.
 
-  The default bootstrap replication count is \code{B=9999} for every plot
-  method, including class-probability and copula plots. Estimator and test
-  bootstrap defaults are separate. For pointwise percentile intervals the bare
+  The default bootstrap replication count is \code{B=9999}, including
+  copula plots. Class-probability plots retain their default \code{B=399}.
+  Estimator and test bootstrap defaults are separate. For pointwise percentile intervals the bare
   tail-resolution reference is
   \eqn{B \ge \lceil 2/\alpha - 1 \rceil}{B >= ceiling(2/alpha - 1)}.
   For \code{"bonferroni"}, \code{"simultaneous"}, and \code{"all"}, the warning

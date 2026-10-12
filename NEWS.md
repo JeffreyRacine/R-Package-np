@@ -10,8 +10,9 @@
   still fail explicitly. The estimator, ridge policy and reconstruction
   tolerances are unchanged.
 
-- All plot bootstrap defaults are now `B=9999`, including class-probability
-  and copula plots. Gaussian simultaneous calibration defaults to 9,999 draws.
+- Plot bootstrap defaults previously set to `B=1999` are now `B=9999`,
+  including copula plots. Class-probability plots retain `B=399`. Gaussian
+  simultaneous calibration defaults to 9,999 draws.
   Bootstrap warnings distinguish bare tail resolution from endpoint precision;
   Gaussian warnings use an alpha-dependent Monte Carlo precision target for
   the maximum probability. Explicit counts remain unchanged, and estimator
