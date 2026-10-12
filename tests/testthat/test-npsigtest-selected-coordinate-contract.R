@@ -26,8 +26,8 @@ test_that("selected-coordinate attribute is protected across allocating native c
   expect_length(protected, 1L)
   expect_lt(protected, min(grep("coerceVector(", wrapper, fixed = TRUE)))
   # Count actual PROTECT tokens, including inline assignments but excluding
-  # UNPROTECT. There are 27 unconditional protections and two guarded outputs.
-  expect_length(grep("\\bPROTECT\\(", wrapper, perl = TRUE), 29L)
+  # UNPROTECT. There are 27 unconditional protections and five guarded protections.
+  expect_length(grep("\\bPROTECT\\(", wrapper, perl = TRUE), 32L)
   empty.start <- grep("PROTECT(empty_flags = allocVector(INTSXP, en));",
                       wrapper, fixed = TRUE)
   certificate.start <- grep("SEXP certificate = PROTECT(allocVector(LGLSXP, gsize));",
@@ -45,7 +45,18 @@ test_that("selected-coordinate attribute is protected across allocating native c
   expect_lt(certificate.start,
     grep('setAttrib(out, install(".np.gradient.structural.zero"), certificate);',
          wrapper, fixed = TRUE))
-  expect_length(grep("++extra_protect;", wrapper, fixed = TRUE), 2L)
+  expect_length(grep("++extra_protect;", wrapper, fixed = TRUE), 3L)
+  # Plot projection protects its two matrices and returned container separately.
+  projection.start <- grep("PROTECT(projection_basis = allocMatrix(REALSXP, num_train, width));",
+                            wrapper, fixed = TRUE)
+  expect_length(projection.start, 1L)
+  expect_identical(trimws(wrapper[projection.start + 1L]),
+                   "PROTECT(projection_rows = allocMatrix(REALSXP, en, width));")
+  expect_identical(trimws(wrapper[projection.start + 2L]), "extra_protect += 2;")
+  result.start <- grep("SEXP projection_result = PROTECT(allocVector(VECSXP, 3));",
+                       wrapper, fixed = TRUE)
+  expect_length(result.start, 1L)
+  expect_identical(trimws(wrapper[result.start + 1L]), "++extra_protect;")
   expect_length(grep("UNPROTECT(27 + extra_protect);", wrapper, fixed = TRUE), 1L)
   expect_length(grep("return out;", wrapper, fixed = TRUE), 1L)
 })

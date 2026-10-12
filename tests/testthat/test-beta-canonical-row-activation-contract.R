@@ -667,7 +667,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_match(
     public_regression,
     paste0("active_route, active_diagnostics, categorical_compress, empty_rows_ptr,",
-           "[[:space:]]*gradient_request_ptr, &variance_unavailable, &gradient_zero_out\\);")
+           "[[:space:]]*gradient_request_ptr, &variance_unavailable, &gradient_zero_out, fit_projection_ptr\\);")
   )
   expect_match(public_regression,
                "const NPRegressionGradientRequest *gradient_request_ptr = NULL;",
@@ -703,7 +703,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
       "                                                   &nn_geometry_context,\n",
       "                                                   ordinary_hc0_active ?\n",
       "                                                     &ordinary_hc0_context : NULL,\n",
-      "                                                   call->empty_rows, NULL, NULL, NULL, NULL, NULL);"
+      "                                                   call->empty_rows, NULL, NULL, NULL, NULL, NULL, call->fit_projection);"
     ),
     fixed = TRUE
   )
@@ -1511,7 +1511,7 @@ test_that("every beta side enters the common conditional regression owner", {
       "                                                               variance_metadata != NULL ? &variance_one : NULL,\n",
       "                                                                 &row_failure, &conditional_design,\n",
       "                                                                 ann_fit_batch == NULL ? NULL :\n",
-      "                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1));"
+      "                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1), NULL);"
     ),
     fixed = TRUE
   )

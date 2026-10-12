@@ -51,7 +51,10 @@ test_that("response and adjoint LP owners retain validated factorizations", {
   # owner has the categorical SE-off base-adjoint call.
   expect_identical(vapply(owner.bodies, count.calls, integer(1L),
                           name = adjoint.name),
-                   setNames(c(1L, 1L, 5L), owner.names))
+                   setNames(c(1L, 1L, 6L), owner.names))
+  # The opt-in plot projection reuses the accepted factor for one more adjoint.
+  # Ordinary fitted calls leave fit_projection NULL.
+  expect_match(owner.bodies[[3L]], "if(call->fit_projection != NULL)", fixed = TRUE)
   conditional <- owner.bodies[[1L]]
   frame <- owner.bodies[[2L]]
   fit <- owner.bodies[[3L]]
