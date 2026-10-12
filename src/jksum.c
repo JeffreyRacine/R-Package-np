@@ -29082,8 +29082,43 @@ const double *np_ann_fit_batch_row(NPANNFitBatch *b, int row, int stop, int stri
     b->row[donor]=b->weights[(size_t)donor*b->count+position];
   return b->row;
 }
+/* Copy compact influence ingredients in canonical observation order.
+ * The projection is taken only after the scalar response fit has accepted its
+ * factor/ridge policy. Ordinary fits do not request these buffers. */
+static void np_fit_projection_basis(NPRegressionFitProjection *out,
+                                    double **basis, int width)
+{
+  if(out->width != width) error("plot fit projection basis width mismatch");
+  for(int k = 0; k < width; ++k)
+    for(int i = 0; i < out->ntrain; ++i)
+      out->basis[(size_t)k*out->ntrain + out->donor_map[i]] = basis[k][i];
+}
+
+static void np_fit_projection_row(NPRegressionFitProjection *out,
+                                  const double *projection, int row)
+{
+  for(int k = 0; k < out->width; ++k)
+    out->projection[(size_t)k*out->neval + out->eval_map[row]] = projection[k];
+  ++out->emitted;
+}
+
+static void np_fit_projection_inverse(NPRegressionFitProjection *out,
+                                      const double *inverse, const double *eval,
+                                      int stride, int row)
+{
+  /* inverse is the exact column-major inverse used by the scalar shortcut. */
+  for(int k = 0; k < out->width; ++k) {
+    double value = 0.0;
+    for(int l = 0; l < out->width; ++l)
+      value += eval[(size_t)l*stride] * inverse[l + (size_t)k*out->width];
+    out->projection[(size_t)k*out->neval + out->eval_map[row]] = value;
+  }
+  ++out->emitted;
+}
+
 typedef struct {
   const double *prepared_ann_row;
+  NPRegressionFitProjection *fit_projection;
   int *kernel_c;
   int *kernel_u;
   int *kernel_o;
@@ -30014,6 +30049,9 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
                                 owner->basis);
   }
 
+  if(call->fit_projection != NULL)
+    np_fit_projection_basis(call->fit_projection, owner->basis, owner->nterms);
+
   if(call->prepared_design != NULL)
     owner->active_design = call->prepared_design;
   if(owner->active_design->n == 0)
@@ -30709,6 +30747,16 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       for(i = 0; i < owner->nterms; ++i)
         call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];
     }
+    if(call->fit_projection != NULL) {
+      for(i = 0; i < owner->nterms; ++i)
+        owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
+      if(np_lp_solve_workspace_solve_adjoint_factored(
+           &owner->solve_workspace, owner->nterms, 1,
+           pristine_anchor, &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK)
+        error("accepted fit projection solve failed");
+      np_fit_projection_row(call->fit_projection,
+                            owner->solve_workspace.rhs_work, j);
+    }
     if(hc0_residual_preparing) {
       for(i = 0; i < owner->nterms; ++i)
         owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
@@ -31328,7 +31376,8 @@ const NPConditionalLPFirstSERequest *first_se_request,
 double *conditional_variance,
 NPRegressionFailure *failure,
 NPLPDesignSupport *prepared_design,
-const double *prepared_ann_row){
+const double *prepared_ann_row,
+NPRegressionFitProjection *fit_projection){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -32300,6 +32349,11 @@ const double *prepared_ann_row){
               }
             }
 
+            if(fit_projection != NULL) {
+              np_fit_projection_basis(fit_projection, basis, glp_nterms);
+              fit_projection->constant = 1;
+            }
+
             if(residual_preparing && residual_gram != NULL &&
                residual_workspace != NULL) {
               const NPRegressionAllLargeResidualCall residual_call = {
@@ -32371,6 +32425,9 @@ const double *prepared_ann_row){
                       q += eval_basis_block[j*eval_block_rows + row] *
                         projection_block[j*nblock + row];
                   mean[i + row] = yhat_block[row];
+                  if(fit_projection != NULL)
+                    np_fit_projection_inverse(fit_projection, inverse_workspace.gram,
+                      eval_basis_block + row, eval_block_rows, i + row);
                   if(shortcut_do_merr) {
                     const double mv = sigma2hat*q;
                     mean_stderr[i + row] = covariance_ridged ?
@@ -32423,6 +32480,9 @@ const double *prepared_ann_row){
                   }
 
                 mean[i] = yhat;
+                if(fit_projection != NULL)
+                  np_fit_projection_inverse(fit_projection, inverse_workspace.gram,
+                                            eval_basis, 1, i);
                 if(shortcut_do_merr) {
                   const double mv = sigma2hat*q;
                   mean_stderr[i] = covariance_ridged ?
@@ -32623,6 +32683,7 @@ const double *prepared_ann_row){
         NP_TREE_FALSE : int_TREE_X;
     const NPRegressionGeneralLPFitCall general_lp_call = {
       .prepared_ann_row = prepared_ann_row,
+      .fit_projection = fit_projection,
       .kernel_c = kernel_c,
       .kernel_u = kernel_u,
       .kernel_o = kernel_o,

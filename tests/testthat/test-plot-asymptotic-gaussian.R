@@ -207,6 +207,39 @@ test_that("NN joint normalization retains training radii", {
   }
 })
 
+# Unique contract: practical reconstruction tolerance is tied to uncertainty,
+# with response-unit invariance and material/nonfinite failures kept explicit.
+test_that("partially linear reconstruction uses the plotted uncertainty scale", {
+  check <- .np_plot_plreg_check_reconstruction
+  for (scale in c(1e-12, 1, 1e12)) {
+    expect_no_error(check(scale * c(0, 2), scale * c(1e-5, 2.005),
+                          scale * c(.1, 1)))
+    expect_error(check(scale * c(0, 2), scale * c(1e-5, 2.02),
+                       scale * c(.1, 1)), "materially differs")
+  }
+  expect_no_error(check(c(0, 2), c(0, 2), c(0, 0)))
+  expect_no_error(check(2, 2 + .Machine$double.eps * 4, 0))
+  expect_error(check(0, 1e-8, 0), "materially differs")
+  expect_error(check(0, 0, -1), "invalid fitted values or standard errors")
+  expect_error(check(0, Inf, 1), "invalid fitted values or standard errors")
+  expect_error(check(c(0, 1), 0, 1), "invalid fitted values or standard errors")
+})
+
+test_that("partially linear categorical influence uses the fitted mean owner", {
+  old <- options(np.messages = FALSE, np.categorical.compress = TRUE)
+  on.exit(options(old), add = TRUE)
+  z <- data.frame(z = factor(rep(letters[1:4], 9L)))
+  x <- data.frame(x = sin(seq_len(36L)) + as.integer(z$z))
+  y <- .5 * x$x + cos(seq_len(36L))
+  bw <- npplregbw(xdat = x, ydat = y, zdat = z,
+                  bws = matrix(c(.35, .7425), 2L),
+                  regtype = "lc", bandwidth.compute = FALSE)
+  ex <- x[1:4, , drop = FALSE]; ez <- z[1:4, , drop = FALSE]
+  influence <- .np_plot_plreg_influence(bw, x, y, z, ex, ez, factor = TRUE)
+  fit <- npplreg(bw, txdat = x, tydat = y, tzdat = z, exdat = ex, ezdat = ez)
+  expect_equal(influence$mean, fit$mean, tolerance = 1e-12)
+})
+
 test_that("partially linear plots include shared-response covariance", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
@@ -324,5 +357,64 @@ test_that("unavailable joint limits retain rows and render fitted centers", {
     limits <- if (gradient) out$gerr else out$merr
     expect_identical(dim(limits), c(513L, 2L))
     expect_true(all(is.na(limits)))
+  }
+})
+
+local({
+test_that("Gaussian Monte Carlo critical values retain analytical nesting", {
+  low <- qnorm(.025, lower.tail = FALSE)
+  high <- qnorm(.025 / 2, lower.tail = FALSE)
+  expect_identical(.np_plot_gaussian_critical(0, .05, 2), low)
+  expect_identical(.np_plot_gaussian_critical(100, .05, 2), high)
+  expect_identical(.np_plot_gaussian_critical(2, .05, 2), 2)
+  withr::local_seed(4L)
+  out <- .np_plot_gaussian_factor_calibrate(matrix(1, 2, 1))
+  state <- .Random.seed
+  set.seed(4L)
+  invisible(rnorm(9999L))
+  expect_identical(.Random.seed, state)
+  expect_lt(out$critical.raw, low)
+  expect_identical(out$critical, low)
+  expect_identical(.np_plot_gaussian_factor_calibrate(matrix(0, 2, 1))$critical, 0)
+})
+
+test_that("PL influence retains the fitted scalar ridge decision", {
+  withr::local_options(list(np.tree = FALSE, np.macMseries.accelerate = FALSE,
+                           np.messages = FALSE))
+  data(wage1, package = "np", envir = environment())
+  z <- wage1["tenure"]; y <- wage1$lwage
+  bw <- npregbw(xdat = z, ydat = y, bws = 0.42347409342680487,
+    regtype = "lp", degree = 2L, bernstein.basis = FALSE,
+    bandwidth.compute = FALSE)
+  ez <- data.frame(tenure = 42.204081632653065)
+  before <- .np_regression_direct(bw, z, y, ez)$mean
+  operator <- .np_plot_plreg_operator(bw, z, y, ez)
+  H <- operator(1L)
+  withr::local_seed(1003L)
+  perturbations <- matrix(sample(c(-1, 1), length(y) * 19L, TRUE), length(y))
+  direct <- vapply(seq_len(ncol(perturbations)), function(j)
+    .np_regression_direct(bw, z, y + perturbations[, j], ez)$mean - before,
+    numeric(1L))
+  reference.sd <- sd(direct)
+  expect_lt(abs(drop(H %*% y) - before), .01 * reference.sd)
+  expect_lt(sd(direct - drop(H %*% perturbations)), .01 * reference.sd)
+  after <- .np_regression_direct(bw, z, y, ez, fit.projection = TRUE)
+  expect_identical(after$mean, before)
+})
+})
+
+
+test_that("PL plot projections retain the canonical degree-zero owner", {
+  withr::local_options(list(np.messages = FALSE, np.tree = FALSE))
+  withr::local_seed(661L)
+  n <- 40L
+  z <- data.frame(z = runif(n)); y <- sin(z$z) + rnorm(n)
+  for (type in c("fixed", "adaptive_nn", "generalized_nn")) {
+    bw <- npregbw(xdat = z, ydat = y, bws = if (type == "fixed") .3 else 25L,
+      bwtype = type, regtype = "lp", degree = 0L, bandwidth.compute = FALSE)
+    operator <- .np_plot_plreg_operator(bw, z, y)
+    H <- do.call(rbind, lapply(split(seq_len(n), ceiling(seq_len(n) / 7)), operator))
+    fitted <- .np_regression_direct(bw, z, y)$mean
+    expect_equal(drop(H %*% y), fitted, tolerance = 1e-10)
   }
 })

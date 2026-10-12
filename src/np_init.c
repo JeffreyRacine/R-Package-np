@@ -76,7 +76,10 @@ extern SEXP C_np_reset_native_estimator_state(void);
 extern SEXP C_np_set_seed(SEXP);
 extern SEXP C_np_release_static_buffers(void);
 
+extern SEXP C_np_plot_projection_apply(SEXP, SEXP, SEXP);
+
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_plot_projection_apply", (DL_FUNC) &C_np_plot_projection_apply, 3},
     {"C_np_nomad_condition_raise", (DL_FUNC) &C_np_nomad_condition_raise, 1},
     {"C_np_ordered_rly_matrix", (DL_FUNC) &C_np_ordered_rly_matrix, 4},
     {"C_np_dim_basis",                 (DL_FUNC) &C_np_dim_basis,                  6},

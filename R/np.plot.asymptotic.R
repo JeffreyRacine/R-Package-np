@@ -56,6 +56,14 @@
   draws
 }
 
+# An exact standardized Gaussian maximum lies between the pointwise and
+# Bonferroni critical values. Enforce those bounds on its Monte Carlo estimate;
+# retain the raw estimate for diagnostics. This does not repair covariance.
+.np_plot_gaussian_critical <- function(raw, alpha, m) {
+  min(qnorm(alpha / (2 * m), lower.tail = FALSE),
+      max(qnorm(alpha / 2, lower.tail = FALSE), raw))
+}
+
 # Surface grids use the observation-level factor directly: A %*% e has
 # covariance A %*% t(A), without allocating or diagonalizing a g-by-g matrix.
 .np_plot_gaussian_factor_calibrate <- function(influence, alpha = 0.05,
@@ -102,7 +110,8 @@
     maxima[start:last] <- apply(abs(simulated), 2L, max)
     progress <- .np_plot_progress_tick(progress, last)
   }
-  metadata$critical <- unname(quantile(maxima, 1 - alpha, type = 1L))
+  metadata$critical.raw <- unname(quantile(maxima, 1 - alpha, type = 1L))
+  metadata$critical <- .np_plot_gaussian_critical(metadata$critical.raw, alpha, g)
   metadata
 }
 
@@ -168,7 +177,8 @@
     maxima[start:last] <- apply(abs(simulated), 2L, max)
     progress <- .np_plot_progress_tick(progress, last)
   }
-  metadata$critical <- unname(quantile(maxima, 1 - alpha, type = 1L))
+  metadata$critical.raw <- unname(quantile(maxima, 1 - alpha, type = 1L))
+  metadata$critical <- .np_plot_gaussian_critical(metadata$critical.raw, alpha, g)
   metadata$rank <- sum(values > tolerance)
   metadata
 }
@@ -382,16 +392,19 @@
 }
 
 .np_plot_response_residuals <- function(bws, xdat, ydat, rows,
-                                          resx = NULL, projection = NULL) {
+                                          resx = NULL, projection = NULL,
+                                          training.operator = NULL) {
   n <- nrow(xdat)
   partial <- !is.null(projection)
   K <- if (partial) matrix(0, nrow(projection), n) else NULL
   score <- square <- scale <- numeric(n)
-  if (bws[["type", exact = TRUE]] %in% c("fixed", "adaptive_nn")) {
+  if (!is.null(training.operator) ||
+      bws[["type", exact = TRUE]] %in% c("fixed", "adaptive_nn")) {
     # These geometries use the same weights at training coordinates whether
     # evaluation is implicit or explicit. Generalized NN does not.
-    operator <- function(index) .npreghat_complete(bws, txdat = xdat,
-      exdat = xdat[index, , drop = FALSE], output = "matrix")
+    operator <- if (!is.null(training.operator)) training.operator else
+      function(index) .npreghat_complete(bws, txdat = xdat,
+        exdat = xdat[index, , drop = FALSE], output = "matrix")
     progress <- .np_plot_bootstrap_progress_begin(n * (1L + as.integer(partial)),
       "Computing plot training influence", unit = "row")
     on.exit(.np_plot_progress_end(progress), add = TRUE)
@@ -461,9 +474,74 @@
   list(residual = score / sqrt(square), coefficient.map = K)
 }
 
+.np_plot_plreg_check_reconstruction <- function(fitted, reconstructed, se) {
+  if (length(reconstructed) != length(fitted) || length(se) != length(fitted) ||
+      any(!is.finite(c(fitted, reconstructed, se))) || any(se < 0))
+    stop("partially linear plot influence has invalid fitted values or standard errors", call. = FALSE)
+  # A reconstruction difference below 1% of one SE is immaterial on the
+  # interval scale. Keep only a representation-level allowance when SE is zero.
+  tolerance <- 0.01 * se + 64 * .Machine$double.eps *
+    pmax(abs(fitted), abs(reconstructed))
+  if (any(abs(reconstructed - fitted) > tolerance))
+    stop("joint influence map materially differs from the partially linear fitted mean (more than 1% of a standard error)", call. = FALSE)
+  invisible(NULL)
+}
+
+.np_plot_plreg_lc_training_operator <- function(bws, xdat) {
+  spec <- npValidatedConditionalRegSpec(bws,
+    where = "partially linear plot training influence", ncon.field = "ncon")
+  if (!identical(bws[["type", exact = TRUE]], "generalized_nn") ||
+      !npIsCanonicalLp0Spec(spec, bws[["ncon", exact = TRUE]]) || bws[["ncon", exact = TRUE]] < 1L)
+    return(NULL)
+  function(index) {
+    # The occurrence map preserves implicit-training NN radii in row blocks.
+    out <- npksum(bws, txdat = xdat, exdat = xdat[index, , drop = FALSE],
+      return.kernel.weights = TRUE, bandwidth.divide = TRUE,
+      .np.internal.bandwidth.divide.weights = TRUE,
+      .np.internal.eval.train.index = as.integer(index))
+    .np_lc_hat_normalize(out$kw, colSums(out$kw))
+  }
+}
+
+# Compact projections preserve the scalar fit's accepted rank/ridge decision.
+# Training fits remain implicit; only their kernel rows are consumed in blocks.
+.np_plot_plreg_operator <- function(bws, xdat, ydat, exdat = NULL) {
+  spec <- npValidatedConditionalRegSpec(bws,
+    where = "partially linear plot influence", ncon.field = "ncon")
+  training <- is.null(exdat)
+  evaluation <- if (training) xdat else exdat
+  if (npIsCanonicalLp0Spec(spec, bws[["ncon", exact = TRUE]]) || bws[["ncon", exact = TRUE]] < 1L) {
+    native.training <- if (training) .np_plot_plreg_lc_training_operator(bws, xdat) else NULL
+    return(function(index) {
+      if (!is.null(native.training)) return(native.training(index))
+      .npreghat_complete(bws, txdat = xdat,
+        exdat = evaluation[index, , drop = FALSE], output = "matrix")
+    })
+  }
+  fit <- .np_regression_direct(bws, txdat = xdat, tydat = ydat,
+                              exdat = exdat, fit.projection = TRUE)
+  ingredients <- fit$fit.projection
+  if (!is.list(ingredients) || length(ingredients) != 3L)
+    stop("accepted plot fit projection is missing", call. = FALSE)
+  function(index) {
+    kw <- NULL
+    if (!isTRUE(ingredients[[3L]])) {
+      args <- list(bws = bws, txdat = xdat,
+        exdat = evaluation[index, , drop = FALSE],
+        return.kernel.weights = TRUE, bandwidth.divide = TRUE,
+        .np.internal.bandwidth.divide.weights = TRUE)
+      if (training && identical(bws[["type", exact = TRUE]], "generalized_nn"))
+        args$.np.internal.eval.train.index <- as.integer(index)
+      kw <- do.call(npksum, args)$kw
+    }
+    .Call("C_np_plot_projection_apply", ingredients[[1L]],
+      ingredients[[2L]][index, , drop = FALSE], kw, PACKAGE = "np")
+  }
+}
+
 .np_plot_plreg_influence <- function(bws, xdat, ydat, zdat, exdat, ezdat,
                                      factor = FALSE, block.bytes = 4 * 1024^2,
-                                     max.bytes = 64 * 1024^2) {
+                                     max.bytes = 64 * 1024^2, cache = NULL) {
   n <- nrow(xdat); p <- ncol(xdat); g <- nrow(exdat)
   bandwidths <- bws[["bw", exact = TRUE]]
   ydat <- .np_hat_response(ydat, bws[["ydati", exact = TRUE]])
@@ -476,7 +554,7 @@
     if (identical(spec$regtype.engine, "lc")) 1 else npLpBasisNcol(spec$basis.engine, spec$degree.engine)
   }, numeric(1L))
   width <- max(widths)
-  setup <- 64 * n * (width + p + ncol(zdat) + 1) + 128 * (width^2 + p^2) + 64 * g * (p + 1)
+  setup <- 64 * n * (width + p + ncol(zdat) + 1) + 128 * (width^2 + p^2) + 64 * g * (p + width + 1)
   retained <- if (factor) 16 * as.double(g) * n else 0
   joint.unavailable <- NULL
   if (factor && max.bytes - setup - retained < 64 * as.double(n)) {
@@ -484,40 +562,60 @@
     retained <- 0
     joint.unavailable <- "partially linear joint influence exceeds the plot memory budget"
   }
-  rows <- min(n, g, floor(min(block.bytes, max.bytes - setup - retained) / (64 * as.double(n))))
+  rows <- min(n, floor((max.bytes - setup - retained) / (64 * as.double(n))),
+              max(1, floor(block.bytes / (64 * as.double(n)))))
   if (n < 2L || p < 1L || g < 1L || rows < 1 ||
       length(ydat) != n || any(!is.finite(ydat)))
     stop("partially linear plot influence exceeds its data or memory budget", call. = FALSE)
+  nuisance.mean <- function(bw, response, evaluation = NULL) {
+    # Match the fitted PL estimator's existing categorical-profile owner.
+    out <- .np_regression_cat_profile_mean(bw, zdat, response, evaluation)
+    if (!is.null(out)) return(as.vector(out))
+    .np_regression_direct(bw, txdat = zdat, tydat = response,
+                          exdat = evaluation)$mean
+  }
   xnum <- function(dat, j, evaluation = FALSE) {
     if (!is.factor(dat[[j]])) return(as.double(dat[[j]]))
     yi <- bandwidths[[j + 1L]][["ydati", exact = TRUE]]
     adjusted <- .np_regression_response_levels(dat[, j, drop = FALSE], yi, allowNewCells = evaluation)
     yi$all.dlev[[1L]][as.integer(adjusted[[1L]])]
   }
-  rx <- matrix(0, n, p); re <- matrix(0, g, p); formation <- numeric(p)
+  cached <- if (is.null(cache)) NULL else cache$training
+  rx <- if (is.null(cached)) matrix(0, n, p) else cached$rx
+  re <- matrix(0, g, p); formation <- numeric(p)
   for (j in seq_len(p)) {
     x <- xnum(xdat, j)
-    sx <- .np_regression_direct(bandwidths[[j + 1L]], txdat = zdat, tydat = x)$mean
-    lx <- .np_regression_direct(bandwidths[[j + 1L]], txdat = zdat, exdat = ezdat, tydat = x)$mean
-    rx[, j] <- x - sx; re[, j] <- xnum(exdat, j, TRUE) - lx
-    formation[j] <- .np_plreg_residual_formation_error(x, sx)
+    if (is.null(cached)) {
+      sx <- nuisance.mean(bandwidths[[j + 1L]], x)
+      rx[, j] <- x - sx
+      formation[j] <- .np_plreg_residual_formation_error(x, sx)
+    }
+    lx <- nuisance.mean(bandwidths[[j + 1L]], x, ezdat)
+    re[, j] <- xnum(exdat, j, TRUE) - lx
   }
-  qrR <- qr(rx, tol = .Machine$double.eps)
-  .np_plreg_check_residualized_rank(qrR, p, "partially linear plot influence", formation)
-  # R^+ without an n-by-n identity or normal-equation inversion.
-  B <- matrix(0, p, n)
-  B[qrR$pivot, ] <- backsolve(qr.R(qrR), t(qr.Q(qrR)))
-  training <- .np_plot_response_residuals(bandwidths[["yzbw", exact = TRUE]],
-                                         zdat, ydat, rows, rx, B)
-  K <- training$coefficient.map
-  z <- training$residual
-  operator <- function(evaluation) .npreghat_complete(
-    bandwidths[["yzbw", exact = TRUE]], txdat = zdat, exdat = evaluation, output = "matrix")
+  if (is.null(cached)) {
+    qrR <- qr(rx, tol = .Machine$double.eps)
+    .np_plreg_check_residualized_rank(qrR, p, "partially linear plot influence", formation)
+    # R^+ without an n-by-n identity or normal-equation inversion.
+    B <- matrix(0, p, n)
+    B[qrR$pivot, ] <- backsolve(qr.R(qrR), t(qr.Q(qrR)))
+    yz <- bandwidths[["yzbw", exact = TRUE]]
+    training <- .np_plot_response_residuals(yz, zdat, ydat, rows, rx, B,
+      training.operator = .np_plot_plreg_operator(yz, zdat, ydat))
+    K <- training$coefficient.map
+    z <- training$residual
+    if (!is.null(cache)) cache$training <- list(rx = rx, K = K, z = z)
+  } else {
+    K <- cached$K
+    z <- cached$z
+  }
+  operator <- .np_plot_plreg_operator(
+    bandwidths[["yzbw", exact = TRUE]], zdat, ydat, ezdat)
   influence <- if (factor) matrix(0, g, n) else NULL
   se <- mean <- numeric(g)
   for (start in seq.int(1L, g, by = rows)) {
     index <- seq.int(start, min(g, start + rows - 1L))
-    H <- operator(ezdat[index, , drop = FALSE]) + re[index, , drop = FALSE] %*% K
+    H <- operator(index) + re[index, , drop = FALSE] %*% K
     mean[index] <- drop(H %*% ydat)
     A <- sweep(H, 2L, z, "*")
     se[index] <- sqrt(rowSums(A^2))

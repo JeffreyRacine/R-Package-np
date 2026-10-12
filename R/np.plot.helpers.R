@@ -9019,7 +9019,7 @@ plotFactor <- function(f, y, ...){
            zdat,
            exdat,
            ezdat,
-           .np.empty.report = NULL, joint = FALSE) {
+           .np.empty.report = NULL, joint = FALSE, .training.cache = NULL) {
     activity <- .np_plot_activity_begin("Computing partially linear plot asymptotic fit")
     on.exit(.np_plot_activity_end(activity), add = TRUE)
 
@@ -9068,10 +9068,10 @@ plotFactor <- function(f, y, ...){
     fit$merr <- rep(NA_real_, nrow(exdat))
     if (any(valid)) {
       influence <- .np_plot_plreg_influence(bws, xdat, ydat, zdat,
-        exdat[valid, , drop = FALSE], ezdat[valid, , drop = FALSE], factor = joint)
-      if (any(!is.finite(influence$mean)) ||
-          any(abs(influence$mean - fit$mean[valid]) > 1e-9 * pmax(1, abs(fit$mean[valid]))))
-        stop("joint influence map does not reproduce the partially linear fitted mean", call. = FALSE)
+        exdat[valid, , drop = FALSE], ezdat[valid, , drop = FALSE], factor = joint,
+        cache = .training.cache)
+      .np_plot_plreg_check_reconstruction(fit$mean[valid], influence$mean,
+                                           influence$se)
       fit$merr[valid] <- influence$se
       if (joint) {
         fit[[".np.plot.influence"]] <- influence$influence

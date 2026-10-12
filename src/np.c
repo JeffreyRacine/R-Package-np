@@ -7689,7 +7689,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    int categorical_compress,
                    NPRegressionLPEmptyRows *empty_rows,
                    const NPRegressionGradientRequest *gradient_request,
-                   int *variance_unavailable, int **gradient_zero_out);
+                   int *variance_unavailable, int **gradient_zero_out,
+                   NPRegressionFitProjection *fit_projection);
 
 void np_density(double * tuno, double * tord, double * tcon,
                 double * euno, double * eord, double * econ,
@@ -8875,6 +8876,9 @@ SEXP C_np_regression(SEXP tuno,
   SEXP empty_flags = R_NilValue;
   NPRegressionLPEmptyRows empty_rows = {NULL, 0, NULL, NULL, NULL};
   NPRegressionLPEmptyRows *empty_rows_ptr = NULL;
+  NPRegressionFitProjection fit_projection = {0};
+  NPRegressionFitProjection *fit_projection_ptr = NULL;
+  SEXP projection_basis = R_NilValue, projection_rows = R_NilValue;
   int extra_protect = 0;
   int do_merr;
   int do_grad;
@@ -9044,7 +9048,26 @@ SEXP C_np_regression(SEXP tuno,
     active_diagnostics = &beta_diagnostics;
   }
 
-  if(TYPEOF(output_request) == INTSXP && XLENGTH(output_request) == 2 &&
+  if(TYPEOF(output_request) == INTSXP && XLENGTH(output_request) == 3) {
+    const int width = INTEGER(output_request)[2];
+    if(width < 1 || do_merr || do_grad || ncon < 1 || num_train < 1 ||
+       num_eval != en || INTEGER(myopti_i)[REG_LL] != NP_LP_ENGINE_GENERAL ||
+       (double)width * ((double)num_train + en) > 8 * 1024 * 1024)
+      error("invalid or oversized plot fit projection request");
+#ifdef MPI2
+    if(!np_mpi_local_regression_active() && iNum_Processors > 1)
+      error("plot fit projection requires an explicit local regression scope");
+#endif
+    PROTECT(projection_basis = allocMatrix(REALSXP, num_train, width));
+    PROTECT(projection_rows = allocMatrix(REALSXP, en, width));
+    extra_protect += 2;
+    fit_projection = (NPRegressionFitProjection){
+      .ntrain = num_train, .neval = en, .width = width,
+      .basis = REAL(projection_basis), .projection = REAL(projection_rows)};
+    fit_projection_ptr = &fit_projection;
+  }
+
+  if(TYPEOF(output_request) == INTSXP && XLENGTH(output_request) >= 2 &&
      INTEGER(output_request)[1] == 1 && !train_is_eval) {
     PROTECT(empty_flags = allocVector(INTSXP, en));
     ++extra_protect;
@@ -9064,7 +9087,7 @@ SEXP C_np_regression(SEXP tuno,
                 do_gerr ? REAL(out_gerr) : NULL,
                 REAL(out_xtra), ckerlb_p, ckerub_p,
                 active_route, active_diagnostics, categorical_compress, empty_rows_ptr,
-                gradient_request_ptr, &variance_unavailable, &gradient_zero_out);
+                gradient_request_ptr, &variance_unavailable, &gradient_zero_out, fit_projection_ptr);
 
   if(gradient_request_ptr != NULL) {
     for(int column = 0; column < nc; ++column)
@@ -9099,6 +9122,16 @@ SEXP C_np_regression(SEXP tuno,
     ++extra_protect;
     memcpy(LOGICAL(certificate), gradient_zero_out, (size_t)gsize*sizeof(int));
     setAttrib(out, install(".np.gradient.structural.zero"), certificate);
+  }
+  if(fit_projection_ptr != NULL) {
+    if(fit_projection.emitted != en)
+      error("plot fit projection did not visit every fitted row");
+    SEXP projection_result = PROTECT(allocVector(VECSXP, 3));
+    ++extra_protect;
+    SET_VECTOR_ELT(projection_result, 0, projection_basis);
+    SET_VECTOR_ELT(projection_result, 1, projection_rows);
+    SET_VECTOR_ELT(projection_result, 2, ScalarLogical(fit_projection.constant));
+    setAttrib(out, install(".np.fit.projection"), projection_result);
   }
   UNPROTECT(27 + extra_protect);
   return out;
@@ -20299,7 +20332,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                variance_metadata != NULL ? &variance_one : NULL,
                                                                  &row_failure, &conditional_design,
                                                                  ann_fit_batch == NULL ? NULL :
-                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1));
+                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1), NULL);
 
       if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
         do {
@@ -22295,6 +22328,7 @@ typedef struct {
   const NPRegressionGradientRequest *gradient_request;
   int *variance_unavailable;
   int **gradient_zero_out;
+  NPRegressionFitProjection *fit_projection;
 } NPRegressionFittedCall;
 
 static SEXP np_regression_fitted_execute(void *data)
@@ -22716,7 +22750,7 @@ static SEXP np_regression_fitted_execute(void *data)
       1, /* ordinary regression response, including SE preparation */
       NULL,
       &training_geometry_context,
-      &residual_preparation_context, NULL, NULL, NULL, NULL, NULL, NULL);
+      &residual_preparation_context, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
     if(temporary_training_tree) {
       kdt_extern_X = outer_evaluation_kdt;
@@ -22858,6 +22892,10 @@ static SEXP np_regression_fitted_execute(void *data)
     }
   }
 
+  if(call->fit_projection != NULL) {
+    call->fit_projection->donor_map = ipt;
+    call->fit_projection->eval_map = ipe;
+  }
   if(call->empty_rows != NULL)
     call->empty_rows->row_map = ipe;
   kernel_estimate_regression_categorical_tree_np(np_lp_engine_extern,
@@ -22902,7 +22940,7 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
                                                      &ordinary_hc0_context : NULL,
-                                                   call->empty_rows, NULL, NULL, NULL, NULL, NULL);
+                                                   call->empty_rows, NULL, NULL, NULL, NULL, NULL, call->fit_projection);
 
 
   if(ordinary_hc0_active && ordinary_hc0_context.unknown_count > 0) {
@@ -23005,7 +23043,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    int categorical_compress,
                    NPRegressionLPEmptyRows *empty_rows,
                    const NPRegressionGradientRequest *gradient_request,
-                   int *variance_unavailable, int **gradient_zero_out){
+                   int *variance_unavailable, int **gradient_zero_out,
+                   NPRegressionFitProjection *fit_projection){
   NPRegressionFittedCall call = {0};
   call.tuno = tuno;
   call.tord = tord;
@@ -23040,6 +23079,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   call.gradient_request = gradient_request;
   call.variance_unavailable = variance_unavailable;
   call.gradient_zero_out = gradient_zero_out;
+  call.fit_projection = fit_projection;
   call.owner.x_columns[0] = myopti[REG_NUNOI];
   call.owner.x_columns[1] = myopti[REG_NORDI];
   call.owner.x_columns[2] = myopti[REG_NCONI];

@@ -128,6 +128,14 @@ typedef struct {
   int *component_flags; /* optional one-row categorical output causes */
 } NPRegressionLPEmptyRows;
 
+/* Opt-in plot output, owned by the enclosing .Call. No solver state escapes. */
+typedef struct {
+  int ntrain, neval, width, emitted, constant;
+  double *basis, *projection;
+  const int *donor_map, *eval_map;
+} NPRegressionFitProjection;
+
+
 static inline void np_regression_empty_row_mark(
   NPRegressionLPEmptyRows *rows, int row, int categorical)
 {
@@ -576,7 +584,7 @@ NPANNFitBatch *np_ann_fit_batch_create(int kernel, int n, int m, int p,
   double **train, double **evaluation, double **radius);
 const double *np_ann_fit_batch_row(NPANNFitBatch *batch, int row, int stop, int stride);
 
-int kernel_estimate_regression_categorical_tree_np(int lp_engine,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_Y_eval,double *vector_scale_factor,int *num_categories, double ** matrix_categorical_vals, double *mean,double **gradient,double *mean_stderr,double **gradient_stderr,double *R_squared,double *MSE,double *MAE,double *MAPE,double *CORR,double *SIGN,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,NPRegressionStandardErrorMode standard_error_mode,int ordinary_response,const NPContinuousPreparedBandwidthView *prepared_bandwidth,const NPNNGeometryContext *nn_geometry_context,const NPRegressionHC0Context *hc0_context, NPRegressionLPEmptyRows *empty_rows, const NPConditionalLPFirstSERequest *first_se_request, double *conditional_variance,NPRegressionFailure *failure,NPLPDesignSupport *prepared_design, const double *prepared_ann_row);
+int kernel_estimate_regression_categorical_tree_np(int lp_engine,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_Y_eval,double *vector_scale_factor,int *num_categories, double ** matrix_categorical_vals, double *mean,double **gradient,double *mean_stderr,double **gradient_stderr,double *R_squared,double *MSE,double *MAE,double *MAPE,double *CORR,double *SIGN,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,NPRegressionStandardErrorMode standard_error_mode,int ordinary_response,const NPContinuousPreparedBandwidthView *prepared_bandwidth,const NPNNGeometryContext *nn_geometry_context,const NPRegressionHC0Context *hc0_context, NPRegressionLPEmptyRows *empty_rows, const NPConditionalLPFirstSERequest *first_se_request, double *conditional_variance,NPRegressionFailure *failure,NPLPDesignSupport *prepared_design, const double *prepared_ann_row, NPRegressionFitProjection *fit_projection);
 
 double func_con_density_quantile(double *quantile);
 
