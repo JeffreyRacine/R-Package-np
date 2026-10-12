@@ -169,7 +169,10 @@ extern SEXP np_mpi_fanout_poll(SEXP);
 extern SEXP np_mpi_fanout_finish(SEXP);
 extern SEXP np_mpi_fanout_owner(SEXP);
 
+extern SEXP C_np_plot_projection_apply(SEXP, SEXP, SEXP);
+
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_plot_projection_apply", (DL_FUNC) &C_np_plot_projection_apply, 3},
     {"C_np_nomad_condition_raise", (DL_FUNC) &C_np_nomad_condition_raise, 1},
     {"C_np_ordered_rly_matrix", (DL_FUNC) &C_np_ordered_rly_matrix, 4},
     {"np_mpi_fanout_begin", (DL_FUNC) &np_mpi_fanout_begin, 2},

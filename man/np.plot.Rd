@@ -539,7 +539,12 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   all displayed levels. Simultaneity remains within each panel, not across
   separate panels.
   A simulated maximum of the absolute standardized joint Gaussian coordinates
-  supplies one multiplier for the existing standard errors. If the joint
+  supplies one multiplier for the existing standard errors. Its simulated
+  critical value is bounded by the analytical pointwise and Bonferroni critical
+  values, ensuring that these three band widths remain ordered despite Monte
+  Carlo variation. The raw simulated critical value is retained as
+  \code{critical.raw} in the calibration metadata for nonzero-variance panels.
+  For regression, single-index and smooth-coefficient plots, if the joint
   calculation cannot reproduce the plotted target or standard errors, has
   unidentified residual information, or exceeds its workspace/grid budget,
   the plot warns and returns unavailable (NA) simultaneous limits.
@@ -589,6 +594,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   normalized residuals, this response map gives exactly the conditional
   covariance of independent fixed-design wild-bootstrap multipliers.
   Partially linear curves and surfaces use influence-factor calibration.
+  Their nuisance influence projections reuse the scalar fit's accepted local
+  factorization or global inverse; the fitted estimator and its ridge policy
+  are unchanged. Reconstruction differences below one percent of a plotted
+  standard error are treated as negligible on the interval scale. Material
+  discrepancies raise an error.
 
   Nearest-neighbor radii are held at the fitted design for this conditional
   asymptotic calculation. Training residuals retain the estimator's training

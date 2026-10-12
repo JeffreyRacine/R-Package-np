@@ -208,6 +208,9 @@
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
+    # Private to this asymptotic plot; no retained objects or cross-call cache.
+    training.cache <- if (identical(plot.errors.method, "asymptotic"))
+      new.env(parent = emptyenv()) else NULL
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.nonfixed <- normalized.opts$plot.errors.boot.nonfixed
     plot.errors.boot.wild <- normalized.opts$plot.errors.boot.wild
@@ -370,7 +373,7 @@
           exdat = x.eval[,1, drop = FALSE],
           ezdat = x.eval[,2, drop = FALSE],
           .np.empty.report = .np.empty.report,
-          joint = joint.eligible
+          joint = joint.eligible, .training.cache = training.cache
         )
       } else {
         .np_plot_plreg_local_fit(
@@ -765,7 +768,7 @@
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
             .np.empty.report = .np.empty.report,
-            joint = joint.eligible
+            joint = joint.eligible, .training.cache = training.cache
           )
         } else {
           .np_plot_plreg_local_fit(
@@ -1082,7 +1085,7 @@
             exdat = exdat[seq_len(xi.neval),, drop = FALSE],
             ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             .np.empty.report = .np.empty.report,
-            joint = joint.eligible
+            joint = joint.eligible, .training.cache = training.cache
           )
         } else {
           .np_plot_plreg_local_fit(

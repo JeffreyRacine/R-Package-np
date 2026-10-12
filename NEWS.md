@@ -1,11 +1,22 @@
 # npRmpi 0.80-1
 
+- Partially linear asymptotic plots reuse their nuisance fits' accepted local
+  factorization for influence calculations, preserving fitted values and ridge
+  policy. Reconstruction is checked on the plotted SE scale. Training work is
+  reused within a plot and consumed in bounded blocks, including nearest-neighbor
+  geometry. Pointwise, simultaneous and Bonferroni bands share the corrected SEs.
+
+- Simulated Gaussian critical values are bounded by the analytical pointwise
+  and Bonferroni critical values, preserving band nesting despite Monte Carlo
+  variation. Calibration metadata retains the raw simulated critical value.
+
+
 - Unavailable simultaneous-only plot limits retain their NA rows, aligned with
   retained fitted centers. Smooth-coefficient and partially linear displays
   retain a finite axis range when the requested joint limits are unavailable.
 
-- Joint-band reconstruction, residual-information and workspace limitations
-  now produce a warning and NA simultaneous limits; `band="all"` retains its
+- Regression, single-index and smooth-coefficient joint-band reconstruction,
+  residual-information and workspace limitations now produce a warning and NA simultaneous limits; `band="all"` retains its
   pointwise and Bonferroni bands. Invalid arguments and unexpected errors
   still fail explicitly. The estimator, ridge policy and reconstruction
   tolerances are unchanged.

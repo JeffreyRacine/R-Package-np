@@ -1616,7 +1616,8 @@ npreghat <-
                                   gradients = FALSE,
                                   gradient.order = 1L,
                                   local.mode = FALSE, allow.empty.rows = FALSE,
-                                  gradient.coordinate = NULL) {
+                                  gradient.coordinate = NULL,
+                                  fit.projection = FALSE) {
   no.ex <- is.null(exdat)
   se <- npValidateScalarLogical(se, "se")
   gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -1877,6 +1878,12 @@ npreghat <-
   output.request <- c(
     .np_regression_output_request(se = se, gradients = do.compiled.gradients),
     as.integer(isTRUE(allow.empty.rows) && !no.ex && regtype.engine %in% c("ll", "lp")))
+  if (isTRUE(fit.projection)) {
+    if (se || gradients || !regtype.engine %in% c("ll", "lp"))
+      stop("fit projection requires a mean-only local-polynomial fit", call. = FALSE)
+    output.request <- c(output.request,
+      as.integer(npLpBasisNcol(reg.spec$basis.engine, degree.c)))
+  }
   if (!is.null(gradient.coordinate))
     attr(output.request, ".np.gradient.coordinate") <- as.integer(match(
       gradient.coordinate, c(which(bws[["icon", exact = TRUE]]),
@@ -1915,6 +1922,8 @@ npreghat <-
 
   .npreg_report_variance_unavailable(myout)
   out <- list(mean = mean.out)
+  if (isTRUE(fit.projection))
+    out$fit.projection <- attr(myout, ".np.fit.projection", exact = TRUE)
 
   if (se)
     out$merr <- as.double(myout$merr)
