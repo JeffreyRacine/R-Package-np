@@ -9070,8 +9070,19 @@ plotFactor <- function(f, y, ...){
       influence <- .np_plot_plreg_influence(bws, xdat, ydat, zdat,
         exdat[valid, , drop = FALSE], ezdat[valid, , drop = FALSE], factor = joint,
         cache = .training.cache)
-      .np_plot_plreg_check_reconstruction(fit$mean[valid], influence$mean,
-                                           influence$se)
+      unreliable <- .np_plot_plreg_check_reconstruction(
+        fit$mean[valid], influence$mean, influence$se)
+      if (any(unreliable)) {
+        influence$se[unreliable] <- NA_real_
+        influence$joint.unavailable <- paste0(
+          "the partially linear fitted curve is numerically unstable at some evaluation points; ",
+          "joint uncertainty is unavailable for this panel")
+        .np_warning(sprintf(paste0(
+          "the partially linear fitted curve is numerically unstable at %d of %d evaluation points ",
+          "(influence reconstruction differs by more than 1%% of a standard error); ",
+          "returning NA marginal limits at those points"),
+          sum(unreliable), length(unreliable)))
+      }
       fit$merr[valid] <- influence$se
       if (joint) {
         fit[[".np.plot.influence"]] <- influence$influence
