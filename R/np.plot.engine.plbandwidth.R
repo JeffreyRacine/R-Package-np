@@ -486,10 +486,9 @@
         if (.np_plot_center_is_bias_corrected(plot.errors.center))
           r1 <- .np_plot_add_bias_fields(r1, tobj$mean, terr[,3])
 
-        if (!is.null(joint.calibration)) {
-          r1$band.calibration <- joint.calibration
-          if (identical(plot.errors.type, "all")) r1$band.errors <- terr.all
-        }
+        if (joint.request)
+          r1 <- .np_plot_joint_band_fields(r1, joint.calibration,
+            if (identical(plot.errors.type, "all")) terr.all else NULL)
         if (plot.behavior == "data")
           return ( list(r1 = r1) )
 
@@ -1043,11 +1042,10 @@
                 temp.err[eval.rows, 3]
               )
             plot.out[[plot.index]]$bxp = temp.boot
-            if (!is.null(joint.calibration)) {
-              plot.out[[plot.index]]$band.calibration <- joint.calibration
-              if (identical(plot.errors.type, "all"))
-                plot.out[[plot.index]]$band.errors <- temp.all.err
-            }
+            if (joint.request)
+              plot.out[[plot.index]] <- .np_plot_joint_band_fields(
+                plot.out[[plot.index]], joint.calibration,
+                if (identical(plot.errors.type, "all")) temp.all.err else NULL)
           }
         }
       }
@@ -1304,11 +1302,10 @@
                 temp.err[eval.rows, 3]
               )
             plot.out[[plot.index]]$bxp = temp.boot
-            if (!is.null(joint.calibration)) {
-              plot.out[[plot.index]]$band.calibration <- joint.calibration
-              if (identical(plot.errors.type, "all"))
-                plot.out[[plot.index]]$band.errors <- temp.all.err
-            }
+            if (joint.request)
+              plot.out[[plot.index]] <- .np_plot_joint_band_fields(
+                plot.out[[plot.index]], joint.calibration,
+                if (identical(plot.errors.type, "all")) temp.all.err else NULL)
           }
         }
       }

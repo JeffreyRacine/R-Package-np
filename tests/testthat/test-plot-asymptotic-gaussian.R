@@ -230,14 +230,14 @@ test_that("NN joint normalization retains training radii", {
 test_that("partially linear reconstruction uses the plotted uncertainty scale", {
   check <- .np_plot_plreg_check_reconstruction
   for (scale in c(1e-12, 1, 1e12)) {
-    expect_no_error(check(scale * c(0, 2), scale * c(1e-5, 2.005),
-                          scale * c(.1, 1)))
-    expect_error(check(scale * c(0, 2), scale * c(1e-5, 2.02),
-                       scale * c(.1, 1)), "materially differs")
+    expect_identical(check(scale * c(0, 2), scale * c(1e-5, 2.005),
+                           scale * c(.1, 1)), c(FALSE, FALSE))
+    expect_identical(check(scale * c(0, 2), scale * c(1e-5, 2.02),
+                           scale * c(.1, 1)), c(FALSE, TRUE))
   }
-  expect_no_error(check(c(0, 2), c(0, 2), c(0, 0)))
-  expect_no_error(check(2, 2 + .Machine$double.eps * 4, 0))
-  expect_error(check(0, 1e-8, 0), "materially differs")
+  expect_identical(check(c(0, 2), c(0, 2), c(0, 0)), c(FALSE, FALSE))
+  expect_false(check(2, 2 + .Machine$double.eps * 4, 0))
+  expect_true(check(0, 1e-8, 0))
   expect_error(check(0, 0, -1), "invalid fitted values or standard errors")
   expect_error(check(0, Inf, 1), "invalid fitted values or standard errors")
   expect_error(check(c(0, 1), 0, 1), "invalid fitted values or standard errors")
@@ -406,6 +406,9 @@ test_that("Gaussian Monte Carlo critical values retain analytical nesting", {
 })
 
 test_that("PL influence retains the fitted scalar ridge decision", {
+  skip_on_cran()
+  skip_if_not(spawn_mpi_slaves())
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   withr::local_options(list(np.tree = FALSE, np.macMseries.accelerate = FALSE,
                            np.messages = FALSE))
   data(wage1, package = "npRmpi", envir = environment())
@@ -432,6 +435,9 @@ test_that("PL influence retains the fitted scalar ridge decision", {
 
 
 test_that("PL plot projections retain the canonical degree-zero owner", {
+  skip_on_cran()
+  skip_if_not(spawn_mpi_slaves())
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   withr::local_options(list(np.messages = FALSE, np.tree = FALSE))
   withr::local_seed(661L)
   n <- 40L

@@ -482,9 +482,8 @@
   # interval scale. Keep only a representation-level allowance when SE is zero.
   tolerance <- 0.01 * se + 64 * .Machine$double.eps *
     pmax(abs(fitted), abs(reconstructed))
-  if (any(abs(reconstructed - fitted) > tolerance))
-    stop("joint influence map materially differs from the partially linear fitted mean (more than 1% of a standard error)", call. = FALSE)
-  invisible(NULL)
+  # Plot callers preserve the curve but withhold uncertainty at unreliable rows.
+  abs(reconstructed - fitted) > tolerance
 }
 
 .np_plot_plreg_lc_training_operator <- function(bws, xdat) {
@@ -623,4 +622,18 @@
   }
   list(mean = mean, se = se, influence = influence, residual = z, block.rows = rows,
        joint.unavailable = joint.unavailable)
+}
+
+# Calibration can be unavailable while some requested marginal bands still exist.
+# Used by the density integration and partially linear availability contract.
+.np_plot_joint_band_fields <- function(object, calibration = NULL, errors = NULL,
+                                       component = NULL) {
+  if (is.null(component)) {
+    if (!is.null(calibration)) object$band.calibration <- calibration
+    if (!is.null(errors)) object$band.errors <- errors
+  } else {
+    if (!is.null(calibration)) object$band.calibration[[component]] <- calibration
+    if (!is.null(errors)) object$band.errors[[component]] <- errors
+  }
+  object
 }

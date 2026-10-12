@@ -13706,11 +13706,23 @@ plotFactor <- function(f, y, ...){
     valid <- is.finite(fit$mean)
     fit$merr <- rep(NA_real_, nrow(exdat))
     if (any(valid)) {
-      influence <- .np_plot_plreg_influence(bws, xdat, ydat, zdat,
-        exdat[valid, , drop = FALSE], ezdat[valid, , drop = FALSE], factor = joint,
-        cache = .training.cache)
-      .np_plot_plreg_check_reconstruction(fit$mean[valid], influence$mean,
-                                           influence$se)
+      # Keep LC hat-row blocks local too; LP projections already use this scope.
+      influence <- .npRmpi_with_local_regression(.np_plot_plreg_influence(
+        bws, xdat, ydat, zdat, exdat[valid, , drop = FALSE],
+        ezdat[valid, , drop = FALSE], factor = joint, cache = .training.cache))
+      unreliable <- .np_plot_plreg_check_reconstruction(
+        fit$mean[valid], influence$mean, influence$se)
+      if (any(unreliable)) {
+        influence$se[unreliable] <- NA_real_
+        influence$joint.unavailable <- paste0(
+          "the partially linear fitted curve is numerically unstable at some evaluation points; ",
+          "joint uncertainty is unavailable for this panel")
+        .np_warning(sprintf(paste0(
+          "the partially linear fitted curve is numerically unstable at %d of %d evaluation points ",
+          "(influence reconstruction differs by more than 1%% of a standard error); ",
+          "returning NA marginal limits at those points"),
+          sum(unreliable), length(unreliable)))
+      }
       fit$merr[valid] <- influence$se
       if (joint) {
         fit[[".np.plot.influence"]] <- influence$influence
