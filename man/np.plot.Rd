@@ -458,7 +458,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bootstrap    all              all three bootstrap quantile/rank families
   asymptotic   pmzsd/pointwise  center +/- z_(1-alpha/2) * asymptotic SE
   asymptotic   bonferroni       normal rule with alpha replaced by alpha/m
-  asymptotic   simultaneous     finite-grid Gaussian rule for supported means
+  asymptotic   simultaneous     finite-grid Gaussian rule for supported targets
   asymptotic   all              marginal families plus Gaussian where supported
   }
   where \eqn{m} is the number of evaluation points used in the plotted
@@ -498,6 +498,58 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   unavailable simultaneous limits. With \code{band="all"}, supported curves retain the pointwise and
   Bonferroni families and add the Gaussian simultaneous family.
 
+  For partially linear plots, a material influence reconstruction discrepancy
+  (more than 1\% of a standard error, with a roundoff allowance) signals
+  numerical instability in the plotted fit. A warning identifies the affected
+  points. Pointwise and Bonferroni limits are NA only at those points, and
+  simultaneous limits are NA for the entire affected panel. The fitted curve
+  is preserved; other panels retain their available bands.
+
+  Density and distribution plots (\code{npudens}, \code{npudist},
+  \code{npcdens} and \code{npcdist}) also support Gaussian simultaneous
+  variability bands for ordinary panels and complete perspective/rgl level
+  grids. Supported specifications include fixed, generalized nearest-neighbor
+  and adaptive nearest-neighbor bandwidths with second-order Gaussian or
+  Epanechnikov kernels. Conditional LC, LL and LP fits retain their selected
+  degree and basis. Available conditional continuous derivatives and categorical
+  first differences are supported in slice plots; higher generalized-NN
+  derivatives retain their existing restrictions. Unconditional adaptive-NN
+  uniform kernels are supported on regular spacing and support-face domains.
+  Fixed continuous conditional LC specifications also support beta kernels.
+  Proper-projected densities/CDFs, conditional quantiles and other continuous
+  kernel specifications retain unavailable simultaneous limits.
+
+  These density-family bands use the incumbent marginal standard errors and
+  the correlation of centered observation-level empirical influence rows.
+  Writing \eqn{D} for the diagonal matrix of those standard errors and
+  \eqn{R} for that correlation, the working covariance is \eqn{D R D}.
+  The conditional ratio includes numerator-denominator dependence; LP uses
+  the accepted local solve, including smooth ridge-scale and intercept
+  compensation terms. Categorical contrasts subtract endpoint influence rows
+  before computing covariance. Conditional NN geometry is held fixed, and
+  unconditional generalized-NN uses its frozen-query-radius approximation;
+  unconditional adaptive-NN includes the same-sample random-radius contribution.
+  All three band families share the same marginal scale. Simultaneity is within
+  the complete displayed panel/grid, not across separate panels.
+
+  The Gaussian-multiplier calibration is based on the framework developed by
+  Victor Chernozhukov, Denis Chetverikov and Kengo Kato (2013, 2015).
+  Related Gaussian-process and simultaneous-inference results for local
+  regression distribution estimators are due to Matias D. Cattaneo,
+  Michael Jansson and Xinwei Ma (2024); for local polynomial conditional
+  density estimators, see Matias D. Cattaneo, Rajita Chandak, Michael Jansson
+  and Xinwei Ma (2024). These works provide the related methodological
+  foundation; the implementations here retain this package's kernel
+  estimators, marginal standard errors and density-specific influence
+  contracts described above. They do not implement the distinct estimators
+  or robust bias-correction procedures in those papers.
+  This is finite-grid variability conditional on the selected model and
+  smoothing specification, not bias correction, bandwidth-search uncertainty
+  or honest continuous-domain confidence coverage. Nonregular ANN geometry,
+  unavailable marginal uncertainty and resource limits produce a warning and
+  NA simultaneous limits, preserving other available bands. Unexpected
+  calculation errors and material target reconstruction failures remain errors.
+
   The separately named plot argument \code{gaussian.draws} has a fixed default
   of 9999 and accepts positive integer counts subject to representability and
   workspace limits, without a fixed one-million upper cap. It applies only to asymptotic
@@ -519,7 +571,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   interactive computation. It uses a conservative 64 MiB workspace budget;
   reduce \code{neval} or \code{gaussian.draws} if the workspace is too large.
   Regression, single-index and smooth-coefficient slice covariance calibration
-  is limited to 512 grid points. Surfaces and partially linear plots instead
+  is limited to 512 grid points. Density-family plots switch to an
+  observation-level factor above 512 points and budget up to 128 MiB for
+  influence construction. Surfaces and partially linear plots instead
   use observation-level influence factors, avoiding a grid-by-grid covariance
   matrix and that grid-size limit.
 
@@ -564,6 +618,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   the covariance above retains this package's estimator-specific standard-error
   convention and does not by itself establish bias correction or honest
   confidence coverage.
+
+  Density-family output objects retain \code{band.calibration} and, for
+  \code{band="all"}, \code{band.errors}. With conditional gradients these
+  are lists indexed by the explanatory-variable component. Calibration records
+  the draw count, grid size, critical value and working dependence contract.
 
   Single-index bands additionally condition on the fitted index coefficients;
   gradient panels multiply the scalar-index derivative by the corresponding
@@ -960,6 +1019,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Cao-Abad, R. (1991), \dQuote{Rate of convergence for the wild
     bootstrap in nonparametric regression,} The Annals of Statistics,
   19, 2226-2231.
+
+  Cattaneo, Matias D., Rajita Chandak, Michael Jansson and Xinwei Ma (2024),
+  \dQuote{Boundary adaptive local polynomial conditional density estimators,}
+  Bernoulli, 30(4), 3193-3223. \doi{10.3150/23-BEJ1711}.
+
+  Cattaneo, Matias D., Michael Jansson and Xinwei Ma (2024),
+  \dQuote{Local regression distribution estimators,} Journal of Econometrics,
+  240(2), 105074. \doi{10.1016/j.jeconom.2021.01.006}.
 
   Chernozhukov, Victor, Denis Chetverikov and Kengo Kato (2013),
   \dQuote{Gaussian approximations and multiplier bootstrap for maxima of sums
