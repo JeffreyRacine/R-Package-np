@@ -334,7 +334,9 @@ prediction/evaluation route, or plot route as appropriate.
   This corresponds to the quantile variance expression in Li, Lin and
   Racine (2013).
 
-  For regular fixed-bandwidth level curves, asymptotic
+  Positive-degree conditional simultaneous bands are not yet qualified;
+    pointwise and Bonferroni intervals retain their existing support.
+    For regular fixed-bandwidth local-constant level curves, asymptotic
   \code{plot(..., band="simultaneous")} calibrates the Gaussian maximum of
   inverse-CDF influence rows evaluated at each fitted quantile. Continuous
   kernels must be second-order Gaussian or Epanechnikov. Each density slope
