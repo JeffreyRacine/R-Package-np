@@ -1,4 +1,17 @@
 # npRmpi 0.80-1
+- Quantile, least-squares quantile, class-probability and copula plots now
+  offer Gaussian simultaneous variability bands over each requested finite
+  panel grid. Supported local-constant/local-polynomial, continuous-gradient,
+  categorical-effect and nearest-neighbor routes follow each estimator's
+  existing API. Joint inference retains shared-observation covariance and
+  reports unavailable limits for nonregular or uncertified configurations.
+  These are variability bands conditional on the documented fitted smoothing
+  state, not smoothing-bias-corrected population confidence bands. Existing
+  pointwise and Bonferroni contracts are retained.
+- Preserve the accepted conditional-CDF arithmetic for all-large ridge maps
+  and bounded beta-kernel deleted fits. Response translation is now confined
+  to constant-reproducing, numerically suitable conditional owners; the
+  estimator's existing objective, solve and fixed-regression paths are unchanged.
 - Stabilize conditional local-polynomial distribution fits for saturated
   responses without changing the basis or accepted solver. Conditional
   categorical-response gradient uncertainty and simultaneous plots now use
@@ -12,7 +25,8 @@
   bands for supported fixed and nearest-neighbor specifications, conditional
   LP/gradient panels, and level surfaces. Existing marginal standard errors
   are retained; Gaussian simulation uses 9,999 draws by default. Proper
-  projections and quantiles retain their previous uncertainty contracts.
+  projections retain their previous marginal uncertainty contracts; the
+  additional four-family joint bands are described above.
 - Correct conditional density/distribution Bonferroni surface multiplicity to
   use the full evaluation grid; previously a vector row count reduced it to one.
 
