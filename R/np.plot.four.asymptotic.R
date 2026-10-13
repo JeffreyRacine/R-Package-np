@@ -121,8 +121,13 @@
       identical(bws[["cykertype", exact = TRUE]], "beta"))
     .np_plot_joint_unavailable(paste(family, "joint bands require qualified second-order Gaussian/Epanechnikov kernels"))
   spec <- npConditionalRegEngineSpec(bws, where = "four-family joint plot")
-  if (all(spec$degree.engine == 0L)) 1L else
-    npLpBasisNcol(spec$basis.engine, spec$degree.engine)
+  # The plot-local and native positive-degree solvers do not expose the same
+  # ridge/owner certificate. A plot-local zero ridge cannot qualify a native
+  # all-large solve. Keep this new feature local-constant until that ownership
+  # contract is independently resolved; incumbent intervals are unaffected.
+  if (any(spec$degree.engine != 0L))
+    .np_plot_joint_unavailable(paste(family, "joint bands currently require local-constant conditional fits; positive-degree owner covariance is not qualified"))
+  1L
 }
 
 .np_plot_qreg_influence <- function(bws, x, y, ex, tau, quantile, se) {
@@ -320,4 +325,49 @@
     result
   })
   .np_plot_four_interval(interval, cal, se, band.type)
+}
+
+
+.np_plot_conmode_all_panel <- function(dat, ..., legend = TRUE) {
+  args <- list(...)
+  # An unordered sample panel is an incumbent distributional boxplot, not a
+  # curve at fixed covariates. Preserve that renderer and its interpretation.
+  if (is.factor(dat$x) && !is.ordered(dat$x) &&
+      !identical(dat$view[1L], "fixed"))
+    return(do.call(.np_plot_conmode_panel, c(list(dat = dat), args)))
+  bands <- c("bonferroni", "simultaneous", "pointwise")
+  columns <- unlist(lapply(bands, function(b) paste0(b, c(".lower", ".upper"))))
+  if (!all(columns %in% names(dat)))
+    stop("missing conmode joint interval columns", call. = FALSE)
+  annotation <- args$annotation
+  args$annotation <- NULL
+  if (is.null(args$plot.user.args$ylim) && is.null(args$line.user.args$ylim))
+    args$plot.user.args$ylim <- range(c(dat$probability, unlist(dat[columns])), finite = TRUE)
+  # Let the unchanged legacy panel own the central curve and axes. Supply no
+  # legacy interval so it cannot overdraw one band with an ambiguous style.
+  central <- dat
+  central$lower <- central$upper <- NULL
+  do.call(.np_plot_conmode_panel, c(list(dat = central), args))
+  x <- if (is.factor(dat$x)) as.numeric(dat$x) else dat$x
+  ord <- order(x)
+  colors <- .np_plot_all_band_colors()
+  for (band in bands) {
+    lower <- dat[[paste0(band, ".lower")]][ord]
+    upper <- dat[[paste0(band, ".upper")]][ord]
+    if (is.factor(dat$x) && !is.ordered(dat$x))
+      graphics::segments(x[ord], lower, x[ord], upper, col = colors[[band]],
+                         lty = .np_plot_lty("solid"), lwd = .np_plot_lwd("band_all_1d")) else {
+      graphics::lines(x[ord], lower, col = colors[[band]],
+                      lty = .np_plot_lty("solid"), lwd = .np_plot_lwd("band_all_1d"))
+      graphics::lines(x[ord], upper, col = colors[[band]],
+                      lty = .np_plot_lty("solid"), lwd = .np_plot_lwd("band_all_1d"))
+    }
+  }
+  if (!is.null(annotation)) {
+    annotation$continuous <- !is.factor(dat$x)
+    .np_plot_draw_variability_annotation(annotation)
+  }
+  .np_plot_draw_all_band_legend(legend = legend,
+    plot.errors.method = "asymptotic", drawn = c(pointwise = TRUE, simultaneous = TRUE, bonferroni = TRUE))
+  invisible(NULL)
 }

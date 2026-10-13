@@ -2108,7 +2108,11 @@ np_render_control <- function(style = c("band", "bar"),
     panel.dots <- plot.user.args
     if (!is.null(dots$main) && length(plot.data) > 1L)
       panel.dots$main <- paste(dots$main, names(plot.data)[i], sep = ": ")
-    .np_plot_conmode_panel(
+    joint.all <- identical(errors, "asymptotic") && identical(band, "all") &&
+      !is.null(attr(plot.data[[i]], "band.calibration", exact = TRUE))
+    panel <- if (joint.all) function(...) .np_plot_conmode_all_panel(..., legend = legend) else
+      .np_plot_conmode_panel
+    panel(
       plot.data[[i]],
       gradients = gradients,
       level = level,

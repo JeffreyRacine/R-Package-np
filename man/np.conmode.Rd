@@ -375,7 +375,9 @@ prediction/evaluation route, or plot route as appropriate.
     \code{view="fixed"} probability plots and use the stored bandwidth object
     without recomputing bandwidths. Class-probability bootstrap plots default
     to \code{B=399}; an explicit \code{B} overrides this count.
-    For regular fixed-bandwidth class probabilities,
+    Positive-degree conditional simultaneous bands are not yet qualified;
+    pointwise and Bonferroni intervals retain their existing support.
+    For regular fixed-bandwidth local-constant class probabilities,
     \code{band="simultaneous"} uses a joint Gaussian maximum for one named
     response level on the declared finite grid within each panel. The
     complete response support enters any smooth proper-normalization

@@ -37,12 +37,18 @@ test_that("quantile raw covariance uses the shared inverse-CDF observation rows"
   n <- 48L; x <- data.frame(x = seq(-1, 1, length.out = n))
   y <- sin(x$x) + rnorm(n, sd = .3); ex <- x[c(7, 17, 29, 41), , drop = FALSE]
   b <- npcdistbw(xdat = x, ydat = y, bws = c(.25, .4),
-    bandwidth.compute = FALSE, regtype = "lp", degree = 2L)
+    bandwidth.compute = FALSE, regtype = "lc")
+  for (degree in 1:2) {
+    positive <- npcdistbw(xdat = x, ydat = y, bws = c(.25, .4),
+      bandwidth.compute = FALSE, regtype = "lp", degree = degree)
+    expect_error(.np_plot_four_conditional_admit(positive, "quantile"),
+      "positive-degree owner covariance is not qualified")
+  }
   fit <- npqreg(bws = b, txdat = x, tydat = y, exdat = ex, tau = .4, se = TRUE)
   q <- fitted(fit); actual <- .np_plot_qreg_influence(b, x, data.frame(y = y),
     ex, .4, q, as.numeric(se(fit)))
   # Independent monomial least squares; no package basis/influence owner.
-  W <- outer(x$x, 0:2, "^"); E <- outer(ex$x, 0:2, "^")
+  W <- outer(x$x, 0, "^"); E <- outer(ex$x, 0, "^")
   oracle <- matrix(0, nrow(ex), n)
   for (j in seq_len(nrow(ex))) {
     w <- dnorm((x$x - ex$x[j]) / .4)
