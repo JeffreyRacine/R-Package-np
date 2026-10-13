@@ -334,6 +334,13 @@ prediction/evaluation route, or plot route as appropriate.
   This corresponds to the quantile variance expression in Li, Lin and
   Racine (2013).
 
+  Conditional-quantile plots support first derivatives only. The default
+  and explicit \code{gradient.order=1} retain that target; other derivative
+  orders are rejected before plot fitting or drawing. Higher polynomial
+  degrees in the fitted bandwidth object do not add higher-order quantile
+  derivatives. This restriction does not apply to \code{nplsqreg} or
+  conditional-distribution gradient plots.
+
   Asymptotic \code{plot(..., band="simultaneous")} calibrates a joint
   Gaussian maximum over the retained grid within one panel and one
   \code{tau}; calibration is not joint across quantiles or panels. Levels

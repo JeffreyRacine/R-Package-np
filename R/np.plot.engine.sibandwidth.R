@@ -47,7 +47,6 @@
       where = "plot.sibandwidth"
     )
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
-    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
 
     miss.xy = c(missing(xdat),missing(ydat))
@@ -112,6 +111,9 @@
     )
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
+    # Data-only evaluation does not own the caller's graphics state.
+    if (plot.behavior != "data")
+      on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.errors.method <- normalized.opts$plot.errors.method
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.nonfixed <- normalized.opts$plot.errors.boot.nonfixed
@@ -327,14 +329,23 @@
       out
     }
 
+    singleindex_gradient_errors <- function(err, beta.i, idx) {
+      if (is.null(err)) return(NULL)
+      # A negative index coefficient reverses the endpoints of asymmetric
+      # bootstrap intervals, so lower and upper widths exchange roles.
+      columns <- if (beta.i < 0) c(2L, 1L) else c(1L, 2L)
+      out <- abs(beta.i) * err[idx, columns, drop = FALSE]
+      colnames(out) <- colnames(err)
+      out
+    }
+
     singleindex_gradient_component_range <- function(beta.i, idx = seq_along(temp.mean)) {
       estimate.i <- beta.i * temp.mean[idx]
       if (plot.errors && plot.errors.type == "all" && !is.null(temp.all.err)) {
         center.base <- if (plot.errors.center == "estimate") temp.mean[idx] else temp.err[idx, 3L]
         center.i <- beta.i * center.base
         scaled.all.err <- lapply(temp.all.err, function(err) {
-          if (is.null(err)) return(NULL)
-          abs(beta.i) * err[idx,,drop = FALSE]
+          singleindex_gradient_errors(err, beta.i, idx)
         })
         yr <- compute.all.error.range(center.i, scaled.all.err)
         vals <- c(estimate.i, yr)
@@ -532,10 +543,11 @@
             plot.out[[1]]$band.calibration <- joint.calibration
             if (identical(plot.errors.type, "all"))
               plot.out[[1]]$band.errors <- lapply(temp.all.err, function(err) {
-                out <- array(rep(err[i.sort, , drop = FALSE], ncol(xdat)),
-                  dim = c(maxneval, 2L, ncol(xdat)),
+                out <- array(NA_real_, dim = c(maxneval, 2L, ncol(xdat)),
                   dimnames = list(NULL, c("lower", "upper"), bws$xnames))
-                sweep(out, 3L, abs(bws$beta), "*")
+                for (j in seq_len(ncol(xdat)))
+                  out[, , j] <- singleindex_gradient_errors(err, bws$beta[j], i.sort)
+                out
               })
           }
           if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
@@ -604,8 +616,7 @@
               )
               if (plot.errors.type == "all") {
                 scaled.all.err <- lapply(temp.all.err, function(err) {
-                  if (is.null(err)) return(NULL)
-                  abs(bws$beta[i]) * err[i.sort,,drop = FALSE]
+                  singleindex_gradient_errors(err, bws$beta[i], i.sort)
                 })
                 draw.all.error.types(
                   ex = na.omit(tobj$index[i.sort]),

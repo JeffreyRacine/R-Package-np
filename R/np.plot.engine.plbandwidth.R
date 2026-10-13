@@ -59,7 +59,6 @@
     sub.supplied <- !missing(sub)
 
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
-    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
     scalar_default <- .np_plot_scalar_default
 
@@ -207,6 +206,9 @@
     )
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
+    # Data-only evaluation does not own the caller's graphics state.
+    if (plot.behavior != "data")
+      on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.errors.method <- normalized.opts$plot.errors.method
     # Private to this asymptotic plot; no retained objects or cross-call cache.
     training.cache <- if (identical(plot.errors.method, "asymptotic"))
