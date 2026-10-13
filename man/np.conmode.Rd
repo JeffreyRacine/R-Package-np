@@ -506,9 +506,15 @@ prediction/evaluation route, or plot route as appropriate.
   probability surface for one selected response level over two continuous
   conditioning variables, and \code{renderer="rgl"} for the corresponding
   interactive surface. Use \code{errors="asymptotic"} for probability-level
-  standard errors and intervals in one-dimensional plots, or with
-  \code{output="data"} for surface interval payloads. Bootstrap intervals and
-  surface band rendering are not yet implemented for \code{plot.conmode}.
+  standard errors and intervals in one-dimensional plots and fixed surfaces.
+  Surface \code{band="all"} draws the pointwise, simultaneous and Bonferroni
+  endpoints already present in \code{output="data"}; coverage remains for
+  the selected response level on the declared evaluation grid, not jointly
+  across response levels. Automatic surface limits include finite interval
+  endpoints without truncating them to \eqn{[0,1]}. Explicit \code{zlim}
+  controls drawing only and does not alter returned endpoints. Unavailable
+  interval cells remain missing. Surface bootstrap intervals and gradient
+  surfaces are not implemented.
 }
 \section{Book And Method Pointers}{
   The conditional-mode target is

@@ -335,6 +335,18 @@ prediction/evaluation route, or plot route as appropriate.
   derivatives. This restriction does not apply to \code{nplsqreg} or
   conditional-distribution gradient plots.
 
+  A scalar quantile can be displayed as a surface by explicitly supplying
+  \code{perspective=TRUE} when there are two continuous or numeric-labelled
+  ordered conditioning variables. Omitting \code{perspective}, or supplying
+  \code{perspective=FALSE}, retains the usual slice layout. Vector quantiles
+  and gradient plots also retain their slice layout. Surface uncertainty is
+  calibrated over the complete displayed grid for that one \code{tau}.
+  Both the base renderer and \code{renderer="rgl", view="fixed"} support
+  level surfaces and their interval meshes. Returned evaluation rows retain
+  the trained predictor names and ordered-factor support; numeric axis
+  coordinates are used only for drawing. The data overlay can be disabled
+  with \code{data.overlay=FALSE}.
+
   Asymptotic \code{plot(..., band="simultaneous")} calibrates a joint
   Gaussian maximum over the retained grid within one panel and one
   \code{tau}; calibration is not joint across quantiles or panels. Levels

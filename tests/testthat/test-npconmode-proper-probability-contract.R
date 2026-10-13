@@ -359,9 +359,14 @@ test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
                    errors = "asymptotic", level = surf$level)
   expect_true(all(c("stderr", "lower", "upper") %in% names(surf.err$surface)))
   expect_true(any(is.finite(surf.err$surface$stderr)))
-  expect_error(plot(fit, view = "fixed", perspective = TRUE,
-                    neval = 5L, errors = "asymptotic"),
-               "output=\"data\" only", fixed = TRUE)
+  surface.device <- tempfile(fileext = ".pdf")
+  grDevices::pdf(surface.device)
+  surf.drawn <- tryCatch(
+    plot(fit, view = "fixed", perspective = TRUE, neval = 5L,
+         errors = "asymptotic", level = surf$level, output = "plot-data"),
+    finally = { grDevices::dev.off(); unlink(surface.device) }
+  )
+  expect_identical(surf.drawn, surf.err)
   expect_error(plot(fit, view = "fixed", perspective = TRUE,
                     neval = 5L, errors = "bootstrap", output = "data",
                     B = 39L),

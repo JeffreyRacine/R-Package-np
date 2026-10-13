@@ -940,7 +940,7 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
   tau <- if (is.null(tau)) {
     x$tau
   } else {
-    .nplsqreg_validate_tau_values(tau, allow.duplicates = TRUE)
+    .nplsqreg_validate_tau_values(tau, allow.duplicates = FALSE)
   }
 
   if (is.null(plot.data.overlay)) {

@@ -1676,6 +1676,43 @@ np_render_control <- function(style = c("band", "bar"),
   matrix(payload$surface$probability, nrow = dims[1L], ncol = dims[2L])
 }
 
+.np_plot_conmode_surface_intervals <- function(payload, band) {
+  dims <- payload$grid$dims
+  surface <- payload$surface
+  if (!is.numeric(dims) || length(dims) != 2L || anyNA(dims) ||
+      any(!is.finite(dims)) || any(dims < 1 | dims != floor(dims)) ||
+      prod(dims) != nrow(surface))
+    stop("conmode surface interval grid is incompatible with its payload", call. = FALSE)
+  i <- surface$grid_index1
+  j <- surface$grid_index2
+  if (!is.numeric(i) || !is.numeric(j) || length(i) != nrow(surface) ||
+      length(j) != nrow(surface) || anyNA(i) || anyNA(j) ||
+      any(!is.finite(i)) || any(!is.finite(j)) ||
+      any(i < 1 | i > dims[1L] | i != floor(i)) ||
+      any(j < 1 | j > dims[2L] | j != floor(j)))
+    stop("conmode surface interval indices are invalid", call. = FALSE)
+  cell <- i + dims[1L] * (j - 1)
+  if (anyDuplicated(cell))
+    stop("conmode surface interval grid has duplicated cells", call. = FALSE)
+  row.order <- order(cell)
+  as.surface <- function(name) {
+    values <- surface[[name]]
+    if (!is.numeric(values) || length(values) != nrow(surface))
+      stop("conmode surface interval column is missing or incompatible: ", name,
+           call. = FALSE)
+    matrix(values[row.order], nrow = dims[1L], ncol = dims[2L])
+  }
+  out <- list(z = as.surface("probability"),
+              lower = as.surface("lower"), upper = as.surface("upper"),
+              lower.all = NULL, upper.all = NULL)
+  if (identical(band, "all")) {
+    bands <- c("pointwise", "simultaneous", "bonferroni")
+    out$lower.all <- setNames(lapply(paste0(bands, ".lower"), as.surface), bands)
+    out$upper.all <- setNames(lapply(paste0(bands, ".upper"), as.surface), bands)
+  }
+  out
+}
+
 .np_plot_conmode_validate_zlim <- function(zlim) {
   if (is.null(zlim))
     return(NULL)
@@ -1686,14 +1723,20 @@ np_render_control <- function(style = c("band", "bar"),
   zlim
 }
 
-.np_plot_conmode_surface_panel <- function(payload, dots, renderer = "base") {
+.np_plot_conmode_surface_panel <- function(payload, dots, renderer = "base",
+                                            errors = "none", band = "pointwise",
+                                            alpha = 0.05, legend = TRUE) {
   vars <- payload$grid$variables
   x1 <- payload$grid$values[[1L]]
   x2 <- payload$grid$values[[2L]]
-  z <- .np_plot_conmode_surface_matrix(payload)
+  intervals <- if (identical(errors, "none")) NULL else
+    .np_plot_conmode_surface_intervals(payload, band)
+  z <- if (is.null(intervals)) .np_plot_conmode_surface_matrix(payload) else intervals$z
   zlim <- .np_plot_conmode_validate_zlim(dots$zlim)
-  if (is.null(zlim))
-    zlim <- c(0, 1)
+  if (is.null(zlim)) {
+    zlim <- if (is.null(intervals)) c(0, 1) else
+      range(c(0, 1, unlist(intervals, use.names = FALSE)), finite = TRUE)
+  }
 
   theta <- .np_plot_scalar_default(dots$theta, 0)
   phi <- .np_plot_scalar_default(dots$phi, 20)
@@ -1708,7 +1751,8 @@ np_render_control <- function(style = c("band", "bar"),
 
   if (identical(renderer, "rgl")) {
     rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
-    rgl.controls <- .np_plot_rgl_controls(dots)
+    rgl.controls <- if (is.null(intervals)) .np_plot_rgl_controls(dots) else
+      .np_plot_rgl_controls(dots, legend = legend)
     return(.np_plot_render_surface_rgl(
       x = x1,
       y = x2,
@@ -1726,7 +1770,17 @@ np_render_control <- function(style = c("band", "bar"),
       view3d.args = rgl.controls$view3d,
       persp3d.args = rgl.controls$persp3d,
       grid3d.args = rgl.controls$grid3d,
-      widget.args = rgl.controls$widget
+      widget.args = rgl.controls$widget,
+      draw.extras = if (is.null(intervals)) NULL else function() {
+        .np_plot_error_surfaces_rgl(
+          x = x1, y = x2, plot.errors.type = band,
+          plot.errors.method = errors,
+          lerr = intervals$lower, herr = intervals$upper,
+          lerr.all = intervals$lower.all, herr.all = intervals$upper.all,
+          surface3d.args = rgl.controls$surface3d,
+          legend3d.args = rgl.controls$legend3d
+        )
+      }
     ))
   }
 
@@ -1752,12 +1806,34 @@ np_render_control <- function(style = c("band", "bar"),
     persp.args,
     .np_plot_user_args(dots, "persp")
   )
-  .np_plot_render_surface_base_frame(
+  if (!is.null(intervals) && "sub" %in% names(dots))
+    persp.args$sub <- dots$sub
+  persp.mat <- .np_plot_render_surface_base_frame(
     persp.args = persp.args,
     xlim = range(x1, finite = TRUE),
     ylim = range(x2, finite = TRUE),
     zlim = zlim
   )
+  if (!is.null(intervals)) {
+    .np_plot_draw_error_wireframes_persp(
+      x = x1, y = x2, persp.mat = persp.mat, plot.errors.type = band,
+      lerr = intervals$lower, herr = intervals$upper,
+      lerr.all = intervals$lower.all, herr.all = intervals$upper.all,
+      border = .np_plot_color("context_wire"),
+      lwd = .np_plot_scalar_default(dots$lwd, graphics::par()$lwd),
+      annotation = .np_plot_variability_annotation_spec(
+        plot.errors.method = errors, plot.errors.type = band,
+        plot.errors.alpha = alpha, plot.errors.center = "estimate",
+        sub.supplied = "sub" %in% names(dots), plot.args = persp.args,
+        continuous = TRUE, fixed = TRUE
+      )
+    )
+    if (identical(band, "all"))
+      .np_plot_draw_all_band_legend(
+        legend = legend, x = "topright", plot.errors.method = errors,
+        lerr.all = intervals$lower.all, herr.all = intervals$upper.all
+      )
+  }
   invisible(NULL)
 }
 
@@ -2022,12 +2098,8 @@ np_render_control <- function(style = c("band", "bar"),
   if (identical(output, "both"))
     output <- "plot-data"
   output <- .np_plot_scalar_match(output, c("plot", "data", "plot-data"), "output")
-  if (!identical(errors, "none") && isTRUE(perspective) &&
-      !identical(output, "data"))
-    stop("surface probability intervals are available as output=\"data\" only; surface band rendering is not yet implemented for plot.conmode",
-         call. = FALSE)
   if (identical(errors, "bootstrap") && isTRUE(perspective))
-    stop("surface bootstrap intervals are not yet implemented for plot.conmode; use one-dimensional views or errors=\"asymptotic\" with output=\"data\"",
+    stop("surface bootstrap intervals are not yet implemented for plot.conmode; use one-dimensional views or errors=\"asymptotic\"",
          call. = FALSE)
   plot.user.args <- .np_plot_user_args(dots, "plot")
   line.user.args <- .np_plot_user_args(dots, "lines")
@@ -2086,7 +2158,9 @@ np_render_control <- function(style = c("band", "bar"),
     if (identical(output, "data"))
       return(plot.data)
     render.out <- .np_plot_conmode_surface_panel(plot.data, dots,
-                                                 renderer = renderer)
+                                                 renderer = renderer,
+                                                 errors = errors, band = band,
+                                                 alpha = alpha, legend = legend)
     if (identical(renderer, "rgl"))
       return(.np_plot_rgl_finalize(
         rgl.out = render.out,

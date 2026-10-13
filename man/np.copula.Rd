@@ -160,7 +160,14 @@ estimated and where it is evaluated.
     \code{expand.grid(u)}. For two-dimensional displays, the clearest
     spelling is often \code{data.frame(u1 = u1.seq, u2 = u2.seq)};
     names matching the original variables are also accepted here because
-    \code{u} explicitly denotes probability coordinates. If omitted with a formula route and
+    \code{u} explicitly denotes probability coordinates. Repeated axis values
+    retain all original evaluation rows and the original interval-calibration
+    family. A surface draws one representative of each repeated coordinate
+    only when the corresponding points and drawn interval endpoints agree
+    exactly, including missingness; conflicting duplicates are rejected
+    rather than averaged. Surface drawing requires at least two distinct
+    values on each axis, whereas \code{output="data"} also retains
+    singleton-axis grids. If omitted with a formula route and
     \code{evaluation="grid"}, a two-dimensional grid is generated
     automatically.
   }
@@ -444,16 +451,17 @@ prediction/evaluation route, or graphics renderer as appropriate.
   from the marginal quasi-inverse transform. \code{band="simultaneous"}
   calibrates a joint Gaussian maximum over the declared grid. Distribution
   copulas use the selected joint-CDF influence. Fixed-bandwidth density
-  copulas use the complete same-sample ratio influence. Nearest-neighbor
-  density copulas retain the numerator-density uncertainty divided by the
-  fitted positive marginal-density product; adaptive-neighbor factors retain
-  the numerator's random-radius contribution. The fitted inverse coordinates
-  and denominator are held fixed for this nearest-neighbor working target.
-  Marginal-density uncertainty is lower order in the usual regular
-  multidimensional shrinking-bandwidth regime when, for each margin, the
-  product of the other continuous bandwidths tends to zero. One-continuous-
-  margin, discrete or nonshrinking settings retain only the stated working
-  target, without that unconditional leading-order justification.
+  copulas use the complete same-sample ratio influence.
+  Nearest-neighbor density simultaneous bands also combine the joint-density
+  and all estimated marginal-density influences on the same observations,
+  including their covariance in the density ratio. Generalized-neighbor
+  factors retain the selected query radii as fixed; adaptive-neighbor factors
+  include the existing random-radius contributions in both joint and marginal
+  densities. The fitted inverse coordinates remain fixed for these working
+  targets. A one-dimensional density ratio has exactly zero simultaneous
+  variability when its positive numerator and sole marginal are the same
+  canonical primitive. These new simultaneous scales do not replace the
+  existing nearest-neighbor pointwise or Bonferroni scales.
 
   These are finite-grid selected-smoothing variability bands, not
   bias-corrected population or continuum confidence bands. Unavailable

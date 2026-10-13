@@ -280,10 +280,25 @@ npcopula <- function(bws, ...) {
   do.call(if (identical(target, "density")) npudensbw else npudistbw, args)
 }
 
-.npcopula_grid_matrix <- function(values, grid) {
+.npcopula_display_values <- function(values, grid) {
   if (length(values) != length(grid$row.order))
     stop("npcopula surface values are incompatible with the rendering grid")
-  matrix(values[grid$row.order], nrow = length(grid$u1), ncol = length(grid$u2))
+  selected <- values[grid$display.rows]
+  if (!identical(unname(values), unname(selected[grid$display.cell])))
+    stop("npcopula duplicate grid coordinates have conflicting surface values or interval endpoints",
+         call. = FALSE)
+  selected
+}
+
+.npcopula_grid_matrix <- function(values, grid) {
+  if (is.null(grid$display.rows)) {
+    if (length(values) != length(grid$row.order))
+      stop("npcopula surface values are incompatible with the rendering grid")
+    values <- values[grid$row.order]
+  } else {
+    values <- .npcopula_display_values(values, grid)
+  }
+  matrix(values, nrow = length(grid$u1), ncol = length(grid$u2))
 }
 
 .npcopula_grid_eval <- function(x) {
@@ -304,10 +319,11 @@ npcopula <- function(bws, ...) {
   }
   u1 <- sort(unique(ugrid[[1L]]))
   u2 <- sort(unique(ugrid[[2L]]))
-  if (length(u1) != grid.dim[1L] || length(u2) != grid.dim[2L])
+  if (length(u1) > grid.dim[1L] || length(u2) > grid.dim[2L])
     stop("npcopula grid output is not rectangular")
   cell <- match(ugrid[[1L]], u1) + length(u1) * (match(ugrid[[2L]], u2) - 1L)
-  if (anyDuplicated(cell))
+  duplicated.cells <- anyDuplicated(cell) > 0L
+  if (length(unique(cell)) != length(u1) * length(u2))
     stop("npcopula grid output is not rectangular")
   xgrid <- .npcopula_eval_xgrid(x)
   grid <- list(
@@ -317,6 +333,12 @@ npcopula <- function(bws, ...) {
     # Only display matrices change order; estimation and returned rows do not.
     row.order = order(cell)
   )
+  if (duplicated.cells) {
+    # The statistical grid above retains every original row. Only the display
+    # selects representatives, after exact within-cell payload agreement.
+    grid$display.rows <- match(seq_len(length(u1) * length(u2)), cell)
+    grid$display.cell <- cell
+  }
   grid$z <- .npcopula_grid_matrix(dat$copula, grid)
   grid
 }
@@ -1084,6 +1106,9 @@ plot.npcopula <- function(x,
   grid <- .npcopula_grid_eval(x)
   u1 <- grid$u1
   u2 <- grid$u2
+  if (!identical(output, "data") && (length(u1) < 2L || length(u2) < 2L))
+    stop("npcopula surface displays require at least two distinct values on each probability axis; use output=\"data\" for a singleton axis",
+         call. = FALSE)
   z <- grid$z
   z.display <- .npcopula_clip_z_for_display(z, zlim)
   interval.compute <- function() .np_plot_progress_run(.npcopula_interval_payload(
@@ -1104,6 +1129,8 @@ plot.npcopula <- function(x,
 
   lerr <- herr <- lerr.all <- herr.all <- NULL
   if (!is.null(payload)) {
+    if (!is.null(grid$display.rows))
+      .npcopula_display_values(payload$center, grid)
     lerr <- .npcopula_grid_matrix(payload$center - payload$err[, 1L], grid)
     herr <- .npcopula_grid_matrix(payload$center + payload$err[, 2L], grid)
     if (identical(band, "all") && !is.null(payload$all.err)) {

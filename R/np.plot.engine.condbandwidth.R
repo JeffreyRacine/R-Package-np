@@ -60,6 +60,10 @@
            random.seed, .np.empty.report = NULL,
            tol = 1.490116e-04, small = 1.490116e-05, itmax = 10000, gaussian.draws = 9999L){
 
+    # Preserve historical quantile slices unless the caller selects a surface.
+    # Capture presence before argument forwarding or local assignments.
+    perspective.supplied <- !missing(perspective)
+
     if (!isTRUE(quantreg) && (!missing(tol) || !missing(small) || !missing(itmax)))
       stop("'tol', 'small', and 'itmax' apply only to quantile plots", call. = FALSE)
 
@@ -255,7 +259,8 @@
     surface.supported <- isTRUE((bws$xncon + bws$xnord + bws$yncon + bws$ynord - quantreg == 2) &&
                                 (bws$xnuno + bws$ynuno == 0) &&
                                 !any(xor(bws$xdati$iord, bws$xdati$inumord)) &&
-                                !isTRUE(quantreg))
+                                (!isTRUE(quantreg) ||
+                                 (perspective.supplied && isTRUE(perspective) && !multi.tau)))
     renderer <- .np_plot_validate_renderer_request(
       renderer = renderer,
       route = "plot.condbandwidth()",
@@ -323,6 +328,7 @@
       }
 
       x.eval <- expand.grid(x1.eval, x2.eval)
+      if (quantreg) names(x.eval) <- bws$xnames
 
       if (bws$xdati$iord[1])
         x1.eval <- (bws$xdati$all.dlev[[1]])[as.integer(x1.eval)]
@@ -464,10 +470,21 @@
                                          lerr.all, herr.all)
             else if ((joint.eligible || quantile.joint) && identical(plot.errors.type, "simultaneous"))
               .np_plot_joint_panel_range(tcomp, terr)
+            else if (quantreg)
+              .np_plot_finite_range(c(tcomp, lerr, herr))
             else
               c(min(lerr), max(herr))
-          } else
+          } else if (quantreg)
+            .np_plot_finite_range(tcomp) else
                 c(min(tcomp),max(tcomp))
+        # A clamped quantile can be constant while every interval is NA.
+        # Expand only automatic display limits; retain the fitted surface.
+        if (isTRUE(quantreg) && zlim[1L] == zlim[2L]) {
+          zpad <- .04 * max(1, abs(zlim[1L]))
+          expanded <- zlim + c(-zpad, zpad)
+          expanded[!is.finite(expanded)] <- zlim[!is.finite(expanded)]
+          zlim <- expanded
+        }
       }
 
       if (plot.behavior != "plot"){
@@ -517,8 +534,19 @@
       # cols = constant x1
 
       xlab.val <- scalar_default(xlab, gen.label(names(xdat)[1], "X"))
-      ylab.val <- scalar_default(ylab, gen.label(names(ydat)[1], "Y"))
-      zlab.val <- scalar_default(zlab, paste("Conditional", if (cdf) "Distribution" else "Density"))
+      ylab.val <- scalar_default(ylab, if (quantreg)
+        gen.label(names(xdat)[2], "X2") else gen.label(names(ydat)[1], "Y"))
+      zlab.val <- scalar_default(zlab, if (quantreg) paste(tau, "quantile") else
+        paste("Conditional", if (cdf) "Distribution" else "Density"))
+      surface.overlay <- isTRUE(quantreg) && isTRUE(plot.data.overlay)
+      if (surface.overlay) {
+        overlay.x1 <- xdat[[1L]]; overlay.x2 <- xdat[[2L]]
+        if (is.ordered(overlay.x1))
+          overlay.x1 <- bws$xdati$all.dlev[[1L]][as.integer(overlay.x1)]
+        if (is.ordered(overlay.x2))
+          overlay.x2 <- bws$xdati$all.dlev[[2L]][as.integer(overlay.x2)]
+        overlay.points.args <- .np_plot_user_args(dots, "points")
+      }
 
       if (identical(renderer, "rgl")) {
         rgl.first.render <- .np_plot_first_render_state()
@@ -545,6 +573,8 @@
           grid3d.args = rgl.controls$grid3d,
           widget.args = rgl.controls$widget,
           draw.extras = function() {
+            if (surface.overlay)
+              .np_plot_overlay_points_rgl(overlay.x1, overlay.x2, ydat[[1L]])
             if (plot.rug) {
               .np_plot_draw_floor_rug_rgl(
                 x1 = xdat[,1],
@@ -674,6 +704,11 @@
               )
             }
           }
+
+          if (surface.overlay)
+            do.call(.np_plot_overlay_points_persp,
+              c(list(x1 = overlay.x1, x2 = overlay.x2, y = ydat[[1L]],
+                     persp.mat = persp.mat), overlay.points.args))
 
           rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)
           Sys.sleep(if (isTRUE(rotate)) rotate.defaults$sleep else 0.5)
