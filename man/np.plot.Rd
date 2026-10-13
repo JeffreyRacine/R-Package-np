@@ -545,7 +545,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   or robust bias-correction procedures in those papers.
   This is finite-grid variability conditional on the selected model and
   smoothing specification, not bias correction, bandwidth-search uncertainty
-  or honest continuous-domain confidence coverage. Nonregular ANN geometry,
+  or honest continuous-domain confidence coverage. Gaussian approximation can
+  be poor with small nearest-neighbor neighborhoods or sparse evaluation points,
+  including grids extending to sample extremes. Increasing the number of
+  Gaussian draws reduces simulation error but does not correct these limitations.
+  Nonregular ANN geometry,
   unavailable marginal uncertainty and resource limits produce a warning and
   NA simultaneous limits, preserving other available bands. Unexpected
   calculation errors and material target reconstruction failures remain errors.
@@ -573,7 +577,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Regression, single-index and smooth-coefficient slice covariance calibration
   is limited to 512 grid points. Density-family plots switch to an
   observation-level factor above 512 points and budget up to 128 MiB for
-  influence construction. Surfaces and partially linear plots instead
+  influence construction. This admission accounts for training size as well as
+  grid size and LP workspaces: with the default 50 by 50 density-family surface,
+  the factor/calibration allowance alone limits admission to about 1677 training
+  observations; additional workspaces can lower that limit. Reducing
+  \code{neval} reduces the surface grid quadratically. An over-budget request
+  warns and retains the available marginal bands with NA simultaneous limits.
+  Surfaces and partially linear plots instead
   use observation-level influence factors, avoiding a grid-by-grid covariance
   matrix and that grid-size limit.
 
