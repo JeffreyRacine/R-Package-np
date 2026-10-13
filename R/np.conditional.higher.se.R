@@ -6,7 +6,16 @@
     rbw, ymcv, ypadnum, xmcv, xpadnum, nconfac, ncatfac,
     mysd, myopti, enrow, xndim, ckerlbx, ckerubx, ckerlby, ckeruby,
     regtype, glp_degree, glp_bernstein, glp_basis, first_se, cat_se_request, se_request,
-    allow.external = FALSE) {
+    allow.external = FALSE, projection.request = NULL) {
+  if (!is.null(projection.request))
+    return(.Call("C_np_density_conditional_projection",
+          tyuno, tyord, tycon, txuno, txord, txcon,
+          eyuno, eyord, eycon, exuno, exord, excon,
+          rbw, ymcv, ypadnum, xmcv, xpadnum, nconfac, ncatfac,
+          mysd, myopti, enrow, xndim, ckerlbx, ckerubx, ckerlby, ckeruby,
+          regtype, glp_degree, glp_bernstein, glp_basis, first_se, cat_se_request, se_request,
+          allow.external, as.integer(c(projection.request, !is.null(higher.se.request))),
+          PACKAGE = "npRmpi"))
   # Fixed signatures keep registration/count checks effective for both entries.
   if (is.null(higher.se.request))
     .Call("C_np_density_conditional",

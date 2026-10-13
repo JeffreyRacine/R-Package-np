@@ -135,6 +135,19 @@ typedef struct {
   const int *donor_map, *eval_map;
 } NPRegressionFitProjection;
 
+/* Request-owned conditional inference only. Never installed by regression. */
+typedef struct {
+  int n, m, width, slots, row, failed;
+  const int *donor_map;
+  double *weights, *directions, *adjoints, *responses, *response_logscale;
+  double *scratch_weights, *scratch_moments;
+  double **scratch_columns;
+  int *captured, *coordinate, *order, *donor_order;
+} NPConditionalPlotCapture;
+NPConditionalPlotCapture *np_conditional_plot_capture_swap(NPConditionalPlotCapture *);
+void np_plot_validate_basis_request(int, const int *, int, int);
+
+
 
 static inline void np_regression_empty_row_mark(
   NPRegressionLPEmptyRows *rows, int row, int categorical)

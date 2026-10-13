@@ -268,15 +268,26 @@ selection, prediction, or plotting route.
   after fitting.
 
   Asymptotic \code{plot(..., band="simultaneous")} and \code{band="all"}
-  use the unchanged regression influence construction for each fitted
-  transformed-response curve. Calibration is over the retained finite grid
-  within one panel and one \code{tau}; it is not joint over taus or panels.
-  Existing qualified regression kernels, bandwidth types and derivative
-  operators are retained. \code{gaussian.draws} controls the Gaussian maximum
-  simulation and \code{random.seed} preserves reproducibility without changing
-  the caller's RNG state. The bands are variability bands under the frozen
-  transformation convention below; they do not account for transformation
-  selection, smoothing bias, or coverage between grid points.
+  use the accepted local regression response maps for each fitted
+  transformed-response curve. Level, continuous-derivative and paired
+  categorical-effect factors retain common observation columns, the selected
+  local-constant or local-polynomial specification, and the actual native
+  moment/ridge convention. Residual normalization uses the training fit map;
+  reconstruction checks reject numerically unidentifiable maps instead of
+  changing the fitted estimator. The fixed-regression fitting and bandwidth
+  selection algorithms are unchanged.
+
+  Calibration is over the retained finite grid within one panel and one
+  \code{tau}; it is not joint over taus or panels. \code{gaussian.draws}
+  controls the Gaussian maximum simulation, and \code{random.seed} preserves
+  reproducibility without changing the caller's RNG state. These are
+  variability bands under the frozen transformation convention below; they
+  do not add uncertainty from transformation selection or remove smoothing
+  bias, and do not cover points between the declared grid. Coverage requires
+  a valid joint Gaussian approximation and consistent local marginal scales;
+  arbitrary growing or data-dependent grids do not carry a uniform-coverage
+  guarantee. Unavailable marginal errors, unidentified influences or resource
+  limits produce a specific unavailable joint-band notice.
 
   Standard errors are the asymptotic standard errors from that final
   transformed-response regression, conditional on the selected

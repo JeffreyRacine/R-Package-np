@@ -374,24 +374,37 @@ prediction/evaluation route, or plot route as appropriate.
     \code{view="fixed"} probability plots and use the stored bandwidth object
     without recomputing bandwidths. Class-probability bootstrap plots default
     to \code{B=399}; an explicit \code{B} overrides this count.
-    Positive-degree conditional simultaneous bands are not yet qualified;
-    pointwise and Bonferroni intervals retain their existing support.
-    For regular fixed-bandwidth local-constant class probabilities,
-    \code{band="simultaneous"} uses a joint Gaussian maximum for one named
-    response level on the declared finite grid within each panel. The
-    complete response support enters any smooth proper-normalization
-    Jacobian. Qualified second-order Gaussian/Epanechnikov continuous
-    kernels are required. Projected/clipped probabilities, unavailable
-    marginal uncertainty and unqualified bandwidth types retain NA joint
-    limits with a notice. No claim is made for the winning class, all classes
-    jointly, smoothing bias or coverage between grid points. The calibration
-    is a Gaussian approximation on the declared grid. A growing or
-    data-dependent sample grid additionally requires uniform linearization,
-    non-dominating influences and a valid Gaussian-maximum approximation;
-    arbitrary sample grids do not carry a uniform-coverage guarantee.
-    \code{gaussian.draws} (default 9999) and \code{random.seed} control
-    reproducible Gaussian calibration; other requested interval components
-    remain unchanged.
+    Asymptotic joint bands are available for regular local-constant and
+    local-polynomial probability and first-gradient/effect routes. A joint
+    Gaussian maximum is calibrated for one named response level on the
+    declared grid within each panel. The complete response support enters
+    the proper-probability Jacobian, including smooth positive normalization,
+    clipping with a stable sign pattern, and projection onto a stable simplex
+    face. Branch seams or unidentified zero-variance rows remain unavailable.
+    Proper probability bands use standard errors from that transformed
+    influence; existing pointwise and Bonferroni probability bands retain
+    their own convention in \code{band="all"}.
+
+    Continuous gradient plots retain the raw underlying conditional-density
+    derivative documented above, including when \code{proper=TRUE}; the
+    derivative is not silently changed to a normalized-probability
+    derivative. Categorical effects retain the existing view/engine policy:
+    fixed-view and positive-degree sample effects difference endpoint
+    probabilities, while local-constant and degree-zero sample effects retain
+    their native raw contrast. New asymptotic gradient intervals use the
+    covariance and marginal scale of that particular target. Bootstrap
+    gradient intervals remain unsupported.
+
+    These are selected-smoothing variability approximations for the named
+    level, not confidence bands for the winning class, all classes jointly,
+    smoothing bias or values between grid points. Independent observations,
+    regular local neighborhoods and valid covariance/marginal approximations
+    are required. A growing or data-dependent sample grid additionally needs
+    uniform linearization, non-dominating influences and a Gaussian-maximum
+    approximation; arbitrary sample grids do not carry a uniform-coverage
+    guarantee. \code{gaussian.draws} (default 9999) and \code{random.seed}
+    control reproducible joint calibration; pointwise and Bonferroni-only
+    gradient requests need no Gaussian simulation.
     Surface asymptotic intervals are available
     as \code{output="data"} payload columns; surface band rendering and
     surface bootstrap intervals are intentionally deferred.

@@ -334,23 +334,44 @@ prediction/evaluation route, or plot route as appropriate.
   This corresponds to the quantile variance expression in Li, Lin and
   Racine (2013).
 
-  Positive-degree conditional simultaneous bands are not yet qualified;
-    pointwise and Bonferroni intervals retain their existing support.
-    For regular fixed-bandwidth local-constant level curves, asymptotic
-  \code{plot(..., band="simultaneous")} calibrates the Gaussian maximum of
-  inverse-CDF influence rows evaluated at each fitted quantile. Continuous
-  kernels must be second-order Gaussian or Epanechnikov. Each density slope
-  must be finite and positive, roots must be interior and unclamped, and
-  inversion error must be negligible relative
-  to the marginal uncertainty. The scope is the retained finite grid within
-  one panel and one \code{tau}, not jointly across quantiles or panels.
-  \code{band="all"} preserves the existing pointwise/Bonferroni intervals.
-  \code{gaussian.draws} controls simulation precision; \code{random.seed}
-  restores the caller's RNG state. These variability bands retain the existing
-  plug-in SE approximation and do not remove smoothing bias or account for
-  bandwidth selection. Quantile-gradient and nearest-neighbor simultaneous
-  asymptotic bands are not yet qualified and retain unavailable limits with
-  a notice; their existing marginal intervals are unchanged.
+  Asymptotic \code{plot(..., band="simultaneous")} calibrates a joint
+  Gaussian maximum over the retained grid within one panel and one
+  \code{tau}; calibration is not joint across quantiles or panels. Levels
+  use inverse-CDF influence rows at their own fitted quantiles. Continuous
+  gradients use the selected CDF-derivative influence and the existing
+  leading plug-in standard error. Positive-degree categorical effects use
+  paired own-quantile endpoint influences with shared observation columns.
+  Local-constant and degree-zero categorical effects retain their different
+  public target, the same-root CDF contrast divided by the selected density:
+  their joint bands include density and root-evaluation terms in a full local
+  delta calculation, with separately computed joint-band standard errors.
+  \code{band="all"} retains existing pointwise and Bonferroni widths even
+  when the simultaneous calculation uses this different scale.
+
+  Local-constant and local-polynomial routes retain the fitted kernel,
+  bandwidth type, degree and basis. Quantile inversion still requires a
+  second-order response kernel. A valid joint grid requires finite positive
+  slopes, interior unclamped quantiles, negligible inversion residuals,
+  identifiable local influence and regular kernel/support geometry. The
+  nearest-neighbor same-root calculation holds the realized neighbor counts
+  and geometry fixed in its empirical-mass approximation, while retaining
+  movement of a generalized-neighbor query radius when differentiating in
+  the response coordinate. It does not claim an unconditional law for
+  estimating the counts or radii.
+
+  These are selected-smoothing variability approximations, not smoothing-bias
+  corrections or continuum confidence bands. An asymptotic coverage
+  interpretation additionally requires independent observations, consistent
+  local covariance and marginal scales, negligible smoothing/ridge bias and
+  non-dominating influence rows. The continuous-gradient leading
+  approximation requires shrinking explanatory bandwidth \eqn{h_x}, with
+  \eqn{h_x^2/h_y\longrightarrow0}, and sufficient local derivative sample
+  size; fixed nonshrinking smoothing retains a working approximation.
+  A growing or data-dependent grid needs a corresponding uniform
+  linearization and Gaussian-maximum approximation. Unsupported or
+  nonregular grids receive a specific unavailable-band notice.
+  \code{gaussian.draws} controls simulation precision and
+  \code{random.seed} restores the caller's RNG state.
 
   If \code{gradients=TRUE}, \code{npqreg} also computes gradients of
   the conditional quantile with respect to the conditioning variables
