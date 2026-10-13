@@ -90,7 +90,7 @@ test_that("density plot factors follow the incumbent level and contrast owners",
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.largelambda = TRUE)
-  on.exit(options(old))
+  on.exit(options(old), add = TRUE)
   set.seed(1060)
   x <- data.frame(x = rnorm(100), f = factor(rep(letters[1:3], length.out = 100)))
   ex <- x[c(15, 30, 45), , drop = FALSE]
@@ -151,7 +151,7 @@ test_that("ordered distribution influence follows the native integral owner", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.largelambda = TRUE)
-  on.exit(options(old))
+  on.exit(options(old), add = TRUE)
   set.seed(516)
   x <- data.frame(x = rnorm(140), o = ordered(rep(1:3, length.out = 140)))
   ex <- x[1:7, , drop = FALSE]
