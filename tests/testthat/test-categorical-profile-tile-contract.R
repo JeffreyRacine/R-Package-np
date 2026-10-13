@@ -486,8 +486,23 @@ test_that("categorical profile implementation and native sink are bounded", {
   production_r <- production_r[
     basename(production_r) != "np.categorical.profile.tile.R"
   ]
+  # Plot factor corrections reuse the native kernel owner. Keep that exception
+  # confined to its approved function, not to the whole plot source file.
+  plot_file <- file.path(source_root, "R", "np.plot.density.asymptotic.R")
+  plot_code <- parse(plot_file, keep.source = FALSE)
+  plot_owner <- vapply(plot_code, function(expr) {
+    is.call(expr) && length(expr) == 3L && identical(expr[[1L]], as.name("<-")) &&
+      identical(expr[[2L]], as.name(".np_plot_density_factor_weights")) &&
+      is.call(expr[[3L]]) && identical(expr[[3L]][[1L]], as.name("function"))
+  }, logical(1))
+  expect_identical(sum(plot_owner), 1L)
+  owner_text <- paste(deparse(plot_code[plot_owner]), collapse = "\n")
+  owner_uses <- gregexpr(".np_categorical_profile_kernel_tile", owner_text,
+                        fixed = TRUE)[[1L]]
+  expect_identical(sum(owner_uses > 0L), 2L)
   production_text <- paste(
-    unlist(lapply(production_r, readLines, warn = FALSE)),
+    c(unlist(lapply(production_r[production_r != plot_file], readLines,
+                    warn = FALSE)), deparse(plot_code[!plot_owner])),
     collapse = "\n"
   )
 
