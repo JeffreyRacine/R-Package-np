@@ -31,7 +31,10 @@
 # Some density fitting owners use native near-upper categorical shortcuts;
 # generic kernel matrices deliberately retain raw kernels. Match that owner only
 # where requested by the density plot policy, without changing shared kernels.
-.np_plot_density_factor_weights <- function(K, kbw, x, ex, operator, ordered = TRUE) {
+.np_plot_density_factor_weights <- function(K, kbw, x, ex, operator, ordered = TRUE,
+  constant.response = FALSE) {
+  constant <- if (constant.response && all(kbw[["iuno", exact = TRUE]] &
+    operator == "normal")) 1 else NA_real_
   for (j in which(kbw[["iuno", exact = TRUE]] & operator == "normal")) {
     nc <- length(kbw[["xdati", exact = TRUE]]$all.dlev[[j]])
     if (nc < 2L)
@@ -42,6 +45,8 @@
     empty <- matrix(numeric(), 2L, 0L)
     effective <- .np_categorical_profile_kernel_tile(probe, empty, probe, empty,
       ku, integer(), 0L, lambda, nc, list(NULL))[1L, ]
+    if (is.finite(constant))
+      constant <- if (effective[1L] == effective[2L]) constant * effective[1L] else NA_real_
     # Literal normalized kernels, used solely to remove their factor from K.
     # The native tile owns the shortcut predicate, options and effective values.
     raw <- if (ku == 0L) c(1 - lambda, lambda/(nc - 1L)) else
@@ -56,6 +61,10 @@
     different <- outer(as.integer(ex[[j]]), match(x[[j]], levels(ex[[j]])), "!=")
     K <- K * matrix(ratio[1L + different], nrow(K), ncol(K))
   }
+  # Reproduce a certified donor-independent response exactly, avoiding the
+  # roundoff introduced by removing raw factors and multiplying them back.
+  if (is.finite(constant))
+    K[,] <- constant
   ordered <- if (ordered) which(kbw[["iord", exact = TRUE]] &
     operator %in% c("normal", "integral")) else integer()
   if (length(ordered) && !identical(kbw[["okertype", exact = TRUE]], "wangvanryzin") &&
@@ -256,8 +265,20 @@
   if (!identical(factor.owner, "none"))
     K <- .np_plot_density_factor_weights(K, xb, x, ex, rep("normal", ncol(x)),
       ordered = identical(factor.owner, "all"))
+  if (lc.gradient) {
+    yop <- rep(if (cdf) "integral" else "normal", ncol(y))
+    # Unordered CDF factors use the normal categorical kernel, as in the
+    # native OP_UFUN_OFFSETS[OP_INTEGRAL] == 0 contract.
+    yop[yb[["iuno", exact = TRUE]]] <- "normal"
+    Y <- .np_plot_density_factor_weights(Y, yb, y, ey, yop,
+      ordered = FALSE, constant.response = TRUE)
+  }
   if (lc) {
     den <- rowSums(K)
+    # Translation cancels from a ratio derivative. For categorical responses
+    # it also preserves exact zero influence when the effective Y is constant.
+    if (lc.gradient && any(yb[["iuno", exact = TRUE]]))
+      Y <- Y - Y[, 1L]
     mu <- rowSums(K * Y)/den
     A <- K * (Y - mu)/den
     if (!is.null(gradient)) {

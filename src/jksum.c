@@ -8635,6 +8635,9 @@ typedef struct {
   double * const *eval_u, * const *eval_o, * const *eval_c;
   double **catvals, **bandwidth;
   const double *lambda, *numerator;
+  const int *response_uno_constant;
+  const double *response_uno_value;
+  int response_constant;
   double *sum;
 } NPConditionalLeadingRatioCtx;
 
@@ -8645,7 +8648,8 @@ static double np_conditional_leading_response_category(
     observation, evaluation, ctx->ynuno, ctx->ynord, ctx->yku, ctx->yko,
     ctx->train_u, ctx->train_o, ctx->eval_u, ctx->eval_o,
     ctx->lambda, ctx->categories, ctx->catvals,
-    NULL, NULL, NULL, NULL, 0, NULL, NULL,
+    ctx->response_uno_constant, ctx->response_uno_value,
+    NULL, NULL, 0, NULL, NULL,
     OP_UFUN_OFFSETS[ctx->yop], OP_OFUN_OFFSETS[ctx->yop]);
 }
 
@@ -8704,6 +8708,12 @@ static void np_conditional_leading_ratio_row(
     ctx->sum[evaluation] = NA_REAL;
     return;
   }
+  /* This is an exact operator certificate, not a small-variance cutoff:
+   * a donor-independent response has no conditional ratio variation. */
+  if(ctx->response_constant) {
+    ctx->sum[evaluation] = 0.0;
+    return;
+  }
   const int blocks = nodes == NULL ? 1 : nodes->n;
   for(int block = 0; block < blocks; ++block) {
     const int first = nodes == NULL ? 0 : nodes->istart[block];
@@ -8733,6 +8743,7 @@ static double np_conditional_leading_category_se(
   double sum = 0.0;
   if(!R_FINITE(mean) || !R_FINITE(denominator) || denominator == 0.0)
     return NA_REAL;
+  if(ctx->response_constant) return 0.0;
   for(int g = 0; g < n; ++g) {
     const int i = representative == NULL ? g : representative[g];
     const double factor = np_categorical_leading_factor(
@@ -52299,6 +52310,9 @@ NPRegressionLPEmptyRows *empty_rows
   double ** matrix_bandwidth_X = NULL;
   double ** matrix_bandwidth_XY = NULL;
   double *lambda_XY = NULL, *lambda_X = NULL;
+  int *response_uno_constant = NULL;
+  double *response_uno_value = NULL;
+  int response_constant = 0;
   const int ordinary_joint_gnn_prepared =
     (BANDWIDTH_den == BW_GEN_NN) && (num_cXY > 0);
   const int ordinary_x_gnn_prepared =
@@ -52599,6 +52613,33 @@ NPRegressionLPEmptyRows *empty_rows
   NPCategoricalLeadingMomentCtx leading_moment = {
     .sum = kdf_stderr, .cdf = 0, .conditional_base_row = 1
   };
+  /* The permutation owner gates unordered Y factors in the point row too.
+   * Reconstruct that same response for conditional ratio uncertainty, rather
+   * than combining its effective point value with raw categorical weights.
+   * Cache once per call; the generic kernel owners and selectors are intact. */
+  if(do_grad && do_merr && num_Y_unordered > 0 &&
+     (leading_ratio || ann_uncertainty || num_cXY == 0)) {
+    response_uno_constant = (int *)np_jksum_malloc_array_or_die(
+      (size_t)num_Y_unordered, sizeof(int), "conditional response gate flags");
+    response_uno_value = (double *)np_jksum_malloc_array_or_die(
+      (size_t)num_Y_unordered, sizeof(double), "conditional response gate values");
+    double (* const uk[])(int, double, int) = {
+      np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
+      np_score_uaa, np_score_unli_racine
+    };
+    response_constant = num_Y_continuous == 0 && num_Y_ordered == 0;
+    for(int response = 0; response < num_Y_unordered; ++response) {
+      const int kernel = kernel_uXY[num_X_unordered+response] + OP_UFUN_OFFSETS[yop];
+      const double same = uk[kernel](1, lambda[response], num_categories[response]);
+      const double different = uk[kernel](0, lambda[response], num_categories[response]);
+      response_uno_constant[response] =
+        np_disc_near_upper(kernel, lambda[response], num_categories[response]) &&
+        np_disc_near_const_kernel(same, different);
+      response_uno_value[response] = 0.5*(same+different);
+      response_constant = response_constant &&
+        (response_uno_constant[response] || same == different);
+    }
+  }
   NPConditionalLeadingRatioCtx ratio_moment = {
     .bw = BANDWIDTH_den, .xncon = num_X_continuous,
     .yncon = num_Y_continuous, .ynuno = num_Y_unordered,
@@ -52614,6 +52655,9 @@ NPRegressionLPEmptyRows *empty_rows
     .eval_o = num_Y_ordered ? matrix_XY_ordered_eval+num_X_ordered : NULL,
     .eval_c = num_Y_continuous ? matrix_XY_continuous_eval+num_X_continuous : NULL,
     .bandwidth = matrix_bandwidth_Y, .lambda = lambda,
+    .response_uno_constant = response_uno_constant,
+    .response_uno_value = response_uno_value,
+    .response_constant = response_constant,
     .numerator = ksn, .sum = kdf_stderr
   };
 #ifdef NP_ANN_DIRECT_DIAGNOSTIC
@@ -53157,12 +53201,13 @@ NPRegressionLPEmptyRows *empty_rows
       const int point_valid=R_FINITE(kdf[i]) && R_FINITE(ksd[i]) && ksd[i] != 0.0;
       const int valid=point_valid &&
         np_ann_direct_finish(direct.level+i,(size_t)num_obs_train,&value);
-      kdf_stderr[i]=valid ? value : NA_REAL;
+      kdf_stderr[i]=valid ? (response_constant ? 0.0 : value) : NA_REAL;
       for(l=0;l<directions;++l) {
         const size_t li=(size_t)l*num_obs_eval+i;
         const int derivative_valid=point_valid && R_FINITE(kdf_deriv[l][i]) &&
           np_ann_direct_finish(direct.derivative+li,(size_t)num_obs_train,&value);
-        kdf_deriv_stderr[l][i]=derivative_valid ? value : NA_REAL;
+        kdf_deriv_stderr[l][i]=derivative_valid ?
+          (response_constant ? 0.0 : value) : NA_REAL;
       }
     }
 #ifdef NP_ANN_DIRECT_DIAGNOSTIC
@@ -53217,6 +53262,8 @@ NPRegressionLPEmptyRows *empty_rows
   }
 
 cleanup_con_dens_dist_categorical:
+  free(response_uno_constant);
+  free(response_uno_value);
   free(operator_XY);
   free(operator_X);
 

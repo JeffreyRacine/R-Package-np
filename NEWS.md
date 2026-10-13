@@ -1,4 +1,9 @@
 # np 0.80-1
+- Stabilize conditional local-polynomial distribution fits for saturated
+  responses without changing the basis or accepted solver. Conditional
+  categorical-response gradient uncertainty and simultaneous plots now use
+  the fitted operator's effective category weights, including exact zero
+  uncertainty for a constant effective response.
 - Conditional LC density/distribution gradient bands now reconstruct unordered
   explanatory-factor weights from the estimator's effective native kernel
   owner, including weights near their upper bound. Fitted gradients, marginal
