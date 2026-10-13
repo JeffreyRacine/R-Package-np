@@ -75,3 +75,71 @@ test_that("unconditional NN Gaussian plots and unavailable grids keep their shap
   expect_equal(nrow(out[[1L]]$derr), 7L)
   expect_true(all(is.na(out[[1L]]$derr)))
 })
+
+test_that("density plot factors follow the incumbent level and contrast owners", {
+  old <- options(np.largelambda = TRUE)
+  on.exit(options(old))
+  set.seed(1060)
+  x <- data.frame(x = rnorm(100), f = factor(rep(letters[1:3], length.out = 100)))
+  ex <- x[c(15, 30, 45), , drop = FALSE]
+  b <- npudensbw(dat = x, bws = c(.45, .66), bandwidth.compute = FALSE)
+  actual <- npudens(bws = b, tdat = x, edat = ex)
+  joint <- .np_plot_density_unconditional(b, x, ex)
+  expect_equal(joint$estimate, fitted(actual), tolerance = 1e-12)
+  y <- data.frame(y = sin(x$x))
+  ey <- y[c(15, 30, 45), , drop = FALSE]
+  for (degree in c(0L, 2L)) {
+    b <- npcdistbw(xdat = x, ydat = y, bws = c(.4, .45, .66),
+      bandwidth.compute = FALSE, regtype = "lp", degree = degree)
+    actual <- npcdist(bws = b, txdat = x, tydat = y, exdat = ex, eydat = ey,
+      gradients = TRUE)
+    joint <- .np_plot_density_conditional(b, x, y, ex, ey, cdf = TRUE, gradient = 2L)
+    expect_equal(joint$estimate, gradients(actual)[, 2L], tolerance = 1e-10)
+  }
+})
+
+test_that("centered density LP influence preserves constant response equivariance", {
+  W <- outer(seq(.1, .9, length.out = 60), 0:2, "^")
+  w <- rep(0, 60)
+  w[c(12, 45)] <- 1
+  identity <- .np_inid_lp_design_identity(W)
+  response <- cbind(seq_len(60)/60, rep(1, 60))
+  a <- .np_plot_density_lp_score(W, w, response, c(1, .5, .25), 60, identity)
+  shifted <- .np_plot_density_lp_score(W, w, response + 1, c(1, .5, .25), 60, identity)
+  expect_true(all(a$ridge > 0))
+  expect_equal(shifted$estimate, a$estimate + 1, tolerance = 1e-12)
+  expect_equal(shifted$score, a$score, tolerance = 1e-12)
+  expect_equal(a$score[2L, ], rep(0, 60), tolerance = 0)
+})
+
+test_that("density reconstruction allows rounding without inflating zero SEs", {
+  x <- data.frame(x = seq(-1, 1, length.out = 80))
+  ex <- data.frame(x = c(-20, 20))
+  bw <- npudistbw(dat = x, bws = .5, bandwidth.compute = FALSE)
+  target <- .np_plot_density_unconditional(bw, x, ex, cdf = TRUE)$estimate
+  actual <- .np_plot_density_joint(bw, x, ex, se = c(0, 0), cdf = TRUE,
+    estimate = target + 1e-13)
+  expect_true(is.finite(actual$critical))
+  expect_error(.np_plot_density_joint(bw, x, ex, se = c(0, 0), cdf = TRUE,
+    estimate = target + 1e-7), "does not reproduce")
+  scaled <- .np_plot_density_rescale(matrix(0, 2, 80), c(0, 0))
+  expect_identical(scaled$se, c(0, 0))
+  expect_identical(scaled$factor, matrix(0, 2, 80))
+})
+
+
+test_that("ordered distribution influence follows the native integral owner", {
+  old <- options(np.largelambda = TRUE)
+  on.exit(options(old))
+  set.seed(516)
+  x <- data.frame(x = rnorm(140), o = ordered(rep(1:3, length.out = 140)))
+  ex <- x[1:7, , drop = FALSE]
+  for (type in c("fixed", "generalized_nn", "adaptive_nn")) {
+    h <- if (type == "fixed") .4 else 40
+    bw <- npudistbw(dat = x, bws = c(h, .995), bwtype = type,
+      okertype = "liracine", bandwidth.compute = FALSE)
+    actual <- npudist(bws = bw, tdat = x, edat = ex)
+    joint <- .np_plot_density_unconditional(bw, x, ex, cdf = TRUE)
+    expect_equal(joint$estimate, fitted(actual), tolerance = 1e-12)
+  }
+})
