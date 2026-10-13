@@ -21121,6 +21121,16 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         lp_error = "np_density_conditional: y-kernel response construction failed in LP path";
       }
 
+      /* Translate only the conditional LP CDF response. The unchanged
+       * intercept-corrected ridge solve reproduces constants, so restoring
+       * the anchor preserves the estimator while saturated CDF rows avoid
+       * subtracting nearly equal, ill-conditioned uncentered solutions. */
+      const double response_anchor =
+        status == 0 && dens_or_dist == NP_DO_DIST &&
+        lp_engine_eff != NP_LP_ENGINE_SCALAR ? ykw[0] : 0.0;
+      if(response_anchor != 0.0)
+        for(int observation = 0; observation < num_obs_train_extern; ++observation)
+          ykw[observation] -= response_anchor;
       y_eval_one[0] = ykw[0];
 
       int_cker_bound_extern = int_cxker_bound_extern;
@@ -21188,6 +21198,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
       if(status != 0)
         break;
+
+      mean_one[0] += response_anchor;
 
       if(empty_rows != NULL && row_empty.count > empty_rows->count)
         empty_rows->count = row_empty.count;
