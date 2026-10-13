@@ -998,9 +998,9 @@
                 annotation = panel.annotation)
             } else {
               draw.args <- list(
-                ex = as.numeric(na.omit(ei)),
-                ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
-                ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
+                ex = as.numeric(ei),
+                ely = if (plotOnEstimate) temp.mean - temp.err[,1] else temp.err[,3] - temp.err[,1],
+                ehy = if (plotOnEstimate) temp.mean + temp.err[,2] else temp.err[,3] + temp.err[,2],
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
@@ -1256,9 +1256,9 @@
                 annotation = panel.annotation)
             } else {
               draw.args <- list(
-                ex = as.numeric(na.omit(ei)),
-                ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
-                ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
+                ex = as.numeric(ei),
+                ely = if (plotOnEstimate) temp.mean - temp.err[,1] else temp.err[,3] - temp.err[,1],
+                ehy = if (plotOnEstimate) temp.mean + temp.err[,2] else temp.err[,3] + temp.err[,2],
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
@@ -1341,12 +1341,12 @@
         } else {
           jj = seq_len(bws$xndim + bws$zndim)*3
           if (plot.errors.center == "estimate" || !plot.errors) {
-            y.max = max(na.omit(as.double(data.eval)) +
-              if (plot.errors) na.omit(as.double(data.err[,jj-1]))
-              else 0)
-            y.min = min(na.omit(as.double(data.eval)) -
-              if (plot.errors) na.omit(as.double(data.err[,jj-2]))
-              else 0)
+            y.max = max(na.omit(as.double(data.eval) +
+              if (plot.errors) as.double(data.err[,jj-1])
+              else 0))
+            y.min = min(na.omit(as.double(data.eval) -
+              if (plot.errors) as.double(data.err[,jj-2])
+              else 0))
           } else if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
             y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
             y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
@@ -1523,9 +1523,9 @@
                 annotation = panel.annotation)
             } else {
               draw.args <- list(
-                ex = as.numeric(na.omit(allei[,plot.index])),
-                ely = if (plotOnEstimate) na.omit(data.eval[,plot.index] - data.err[,3*plot.index-2]) else na.omit(data.err[,3*plot.index] - data.err[,3*plot.index-2]),
-                ehy = if (plotOnEstimate) na.omit(data.eval[,plot.index] + data.err[,3*plot.index-1]) else na.omit(data.err[,3*plot.index] + data.err[,3*plot.index-1]),
+                ex = as.numeric(allei[,plot.index]),
+                ely = if (plotOnEstimate) data.eval[,plot.index] - data.err[,3*plot.index-2] else data.err[,3*plot.index] - data.err[,3*plot.index-2],
+                ehy = if (plotOnEstimate) data.eval[,plot.index] + data.err[,3*plot.index-1] else data.err[,3*plot.index] + data.err[,3*plot.index-1],
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,

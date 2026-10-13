@@ -1122,9 +1122,9 @@
                 annotation = panel.annotation)
             } else {
               draw.args <- list(
-                ex = as.numeric(na.omit(ei)),
-                ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
-                ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
+                ex = as.numeric(ei),
+                ely = if (plotOnEstimate) temp.mean - temp.err[,1] else temp.err[,3] - temp.err[,1],
+                ehy = if (plotOnEstimate) temp.mean + temp.err[,2] else temp.err[,3] + temp.err[,2],
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
@@ -1412,9 +1412,9 @@
                 annotation = panel.annotation)
             } else {
               draw.args <- list(
-                ex = as.numeric(na.omit(allei[,i])),
-                ely = if (plotOnEstimate) na.omit(data.eval[,i] - data.err[,3*i-2]) else na.omit(data.err[,3*i] - data.err[,3*i-2]),
-                ehy = if (plotOnEstimate) na.omit(data.eval[,i] + data.err[,3*i-1]) else na.omit(data.err[,3*i] + data.err[,3*i-1]),
+                ex = as.numeric(allei[,i]),
+                ely = if (plotOnEstimate) data.eval[,i] - data.err[,3*i-2] else data.err[,3*i] - data.err[,3*i-2],
+                ehy = if (plotOnEstimate) data.eval[,i] + data.err[,3*i-1] else data.err[,3*i] + data.err[,3*i-1],
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,

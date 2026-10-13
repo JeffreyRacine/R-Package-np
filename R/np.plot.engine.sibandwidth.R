@@ -427,9 +427,9 @@
               legend = plot.legend,
               annotation = panel.annotation)
           } else if (plot.errors.center == "estimate") {
-            draw.errors(ex = na.omit(tobj$index[i.sort]),
-                        ely = na.omit(temp.mean[i.sort] - temp.err[i.sort,1]),
-                        ehy = na.omit(temp.mean[i.sort] + temp.err[i.sort,2]),
+            draw.errors(ex = tobj$index[i.sort],
+                        ely = temp.mean[i.sort] - temp.err[i.sort,1],
+                        ehy = temp.mean[i.sort] + temp.err[i.sort,2],
                         plot.errors.style = plot.errors.style,
                         plot.errors.bar = plot.errors.bar,
                         plot.errors.bar.num = plot.errors.bar.num,
@@ -437,9 +437,9 @@
                         annotation = panel.annotation)
           } else if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
             lines(na.omit(tobj$index[i.sort]), na.omit(temp.err[i.sort,3]), lty = .np_plot_lty("center"))
-            draw.errors(ex = na.omit(tobj$index[i.sort]),
-                        ely = na.omit(temp.err[i.sort,3] - temp.err[i.sort,1]),
-                        ehy = na.omit(temp.err[i.sort,3] + temp.err[i.sort,2]),
+            draw.errors(ex = tobj$index[i.sort],
+                        ely = temp.err[i.sort,3] - temp.err[i.sort,1],
+                        ehy = temp.err[i.sort,3] + temp.err[i.sort,2],
                         plot.errors.style  = plot.errors.style,
                         plot.errors.bar = plot.errors.bar,
                         plot.errors.bar.num = plot.errors.bar.num,
@@ -621,9 +621,9 @@
               } else if (plot.errors.center == "estimate") {
                 lo.i <- bws$beta[i] * (temp.mean[i.sort] - temp.err[i.sort,1])
                 hi.i <- bws$beta[i] * (temp.mean[i.sort] + temp.err[i.sort,2])
-                draw.errors(ex = na.omit(tobj$index[i.sort]),
-                            ely = na.omit(pmin(lo.i, hi.i)),
-                            ehy = na.omit(pmax(lo.i, hi.i)),
+                draw.errors(ex = tobj$index[i.sort],
+                            ely = pmin(lo.i, hi.i),
+                            ehy = pmax(lo.i, hi.i),
                             plot.errors.style = plot.errors.style,
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
@@ -633,9 +633,9 @@
                 lo.i <- bws$beta[i] * (temp.err[i.sort,3] - temp.err[i.sort,1])
                 hi.i <- bws$beta[i] * (temp.err[i.sort,3] + temp.err[i.sort,2])
                 lines(na.omit(tobj$index[i.sort]), na.omit(bws$beta[i] * temp.err[i.sort,3]), lty = .np_plot_lty("center"))
-                draw.errors(ex = na.omit(tobj$index[i.sort]),
-                            ely = na.omit(pmin(lo.i, hi.i)),
-                            ehy = na.omit(pmax(lo.i, hi.i)),
+                draw.errors(ex = tobj$index[i.sort],
+                            ely = pmin(lo.i, hi.i),
+                            ehy = pmax(lo.i, hi.i),
                             plot.errors.style  = plot.errors.style,
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
