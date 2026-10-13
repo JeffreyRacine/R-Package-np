@@ -1,4 +1,15 @@
 # np 0.80-1
+- Correct single-index gradient plots with asymmetric bootstrap bands when
+  an index coefficient is negative: lower and upper widths now exchange
+  roles before scaling, including all-band data and rendering.
+- Preserve the caller's graphics state during data-only density,
+  distribution, conditional, single-index, smooth-coefficient and partially
+  linear plots. Rendered plots retain their existing cleanup behavior.
+- Class-probability gradient plots now render the legacy `band="pmzsd"`
+  pointwise alias with the correct palette.
+- Conditional-quantile plots reject unsupported derivative orders instead
+  of labelling first derivatives as higher derivatives. First derivatives,
+  LSQ and conditional-distribution derivative contracts are unchanged.
 - Quantile, least-squares quantile, class-probability and copula plots now
   offer Gaussian simultaneous variability bands over each requested finite
   panel grid. Supported local-constant/local-polynomial, continuous-gradient,

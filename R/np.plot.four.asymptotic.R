@@ -562,6 +562,8 @@
   x <- if (is.factor(dat$x)) as.numeric(dat$x) else dat$x
   ord <- order(x)
   colors <- .np_plot_all_band_colors()
+  # The accepted normal-band alias uses the same palette role as pointwise.
+  colors[["pmzsd"]] <- colors[["pointwise"]]
   for (band in bands) {
     lower <- dat[[if(length(bands)==1L)"lower" else paste0(band, ".lower")]][ord]
     upper <- dat[[if(length(bands)==1L)"upper" else paste0(band, ".upper")]][ord]

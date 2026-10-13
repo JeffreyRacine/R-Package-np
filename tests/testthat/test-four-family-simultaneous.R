@@ -40,9 +40,33 @@ test_that("quantile raw covariance uses the shared inverse-CDF observation rows"
     bandwidth.compute = FALSE, regtype = "lc")
   for (degree in 1:2) {
     positive <- npcdistbw(xdat = x, ydat = y, bws = c(.25, .4),
-      bandwidth.compute = FALSE, regtype = "lp", degree = degree)
-    expect_error(.np_plot_four_conditional_admit(positive, "quantile"),
-      "positive-degree owner covariance is not qualified")
+      bandwidth.compute = FALSE, regtype = "lp", degree = degree,
+      bernstein.basis = FALSE)
+    expect_equal(.np_plot_four_conditional_admit(positive, "quantile"),
+      degree + 1L)
+    positive.fit <- npqreg(bws = positive, txdat = x, tydat = y,
+      exdat = ex, tau = .4, se = TRUE)
+    positive.q <- as.numeric(fitted(positive.fit))
+    positive.actual <- .np_plot_qreg_influence(positive, x,
+      data.frame(y = y), ex, .4, positive.q, as.numeric(se(positive.fit)))
+    # Independent unpenalized monomial maps on this regular Gaussian fixture.
+    # LP response covariance uses local conditional response moments, not
+    # regression residuals around the polynomial fitted response.
+    W.lp <- outer(x$x, 0:degree, "^")
+    E.lp <- outer(ex$x, 0:degree, "^")
+    positive.oracle <- matrix(0, nrow(ex), n)
+    for (j in seq_len(nrow(ex))) {
+      w <- dnorm((x$x - ex$x[j]) / .4)
+      M <- crossprod(W.lp, w * W.lp)
+      H <- w * drop(W.lp %*% solve(M, E.lp[j, ]))
+      response <- pnorm((positive.q[j] - y) / .25)
+      mu <- sum(w * response) / sum(w)
+      slope <- sum(H * dnorm((positive.q[j] - y) / .25) / .25)
+      positive.oracle[j, ] <- -H * (response - mu) / slope
+    }
+    expect_lt(max(abs(positive.actual$A - positive.oracle)), 2e-11)
+    expect_lt(max(abs(tcrossprod(positive.actual$A) -
+      tcrossprod(positive.oracle))), 2e-11)
   }
   fit <- npqreg(bws = b, txdat = x, tydat = y, exdat = ex, tau = .4, se = TRUE)
   q <- fitted(fit); actual <- .np_plot_qreg_influence(b, x, data.frame(y = y),

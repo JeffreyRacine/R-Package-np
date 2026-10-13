@@ -63,6 +63,16 @@
     if (!isTRUE(quantreg) && (!missing(tol) || !missing(small) || !missing(itmax)))
       stop("'tol', 'small', and 'itmax' apply only to quantile plots", call. = FALSE)
 
+    # Conditional quantiles expose first derivatives only. The shared engine
+    # also serves LSQ and conditional-CDF plots, whose derivative orders remain
+    # owned by their existing contracts.
+    if (isTRUE(quantreg) && !inherits(bws, "lsqregressionbandwidth") &&
+        (!is.numeric(gradient.order) || !length(gradient.order) ||
+         anyNA(gradient.order) || any(!is.finite(gradient.order)) ||
+         any(gradient.order != 1)))
+      stop("conditional-quantile plots support only first derivatives ('gradient.order = 1')",
+           call. = FALSE)
+
     sub.supplied <- !missing(sub)
 
     plot.gradient.available <- rep.int(TRUE, bws$xndim)
@@ -105,7 +115,6 @@
     }
 
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
-    on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
 
     scalar_default <- function(value, default) {
@@ -211,6 +220,9 @@
     )
 
     plot.behavior <- normalized.opts$plot.behavior
+    # Data-only evaluation does not own the caller's graphics state.
+    if (plot.behavior != "data")
+      on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.errors.method <- normalized.opts$plot.errors.method
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.nonfixed <- normalized.opts$plot.errors.boot.nonfixed

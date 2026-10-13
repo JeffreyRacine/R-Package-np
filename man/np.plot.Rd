@@ -71,8 +71,12 @@ Named options passed via \code{\dots} include:
         the number of evaluation points used for each plotted continuous
         margin, defaulting to \code{50L}. Continuous numeric variables use
         this grid even when their observed values are integers or have few
-        distinct values. Categorical margins use their levels. A surface
-        with two continuous margins has \code{neval^2} evaluation points.
+        distinct values. Categorical margins use their levels. For
+        \code{npudens}/\code{npudist} perspective surfaces with numeric
+        ordered margins, the grid uses the ordered levels observed in the
+        training data. Their one-dimensional categorical slices use all
+        declared levels, including unused levels. A surface with two
+        continuous margins has \code{neval^2} evaluation points.
       }
       \item{\code{xdat}, \code{ydat}, \code{zdat}}{
         training data used when plotting bandwidth objects. \code{xdat}
@@ -634,7 +638,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   Single-index bands additionally condition on the fitted index coefficients;
   gradient panels multiply the scalar-index derivative by the corresponding
-  fitted index coefficient and its widths by that coefficient's absolute value.
+  fitted index coefficient and its widths by that coefficient's absolute value;
+  negative coefficients exchange lower and upper widths for asymmetric
+  bootstrap intervals before scaling.
   They retain the scalar-index regression standard-error convention. Smooth-coefficient bands describe the
   noniterated plotted mean or existing slope-coefficient gradient selected by
   \code{coef.index}, and use fitted raw training residuals in place
