@@ -267,6 +267,17 @@ selection, prediction, or plotting route.
   rejects any different requested order; it does not recompute derivatives
   after fitting.
 
+  Asymptotic \code{plot(..., band="simultaneous")} and \code{band="all"}
+  use the unchanged regression influence construction for each fitted
+  transformed-response curve. Calibration is over the retained finite grid
+  within one panel and one \code{tau}; it is not joint over taus or panels.
+  Existing qualified regression kernels, bandwidth types and derivative
+  operators are retained. \code{gaussian.draws} controls the Gaussian maximum
+  simulation and \code{random.seed} preserves reproducibility without changing
+  the caller's RNG state. The bands are variability bands under the frozen
+  transformation convention below; they do not account for transformation
+  selection, smoothing bias, or coverage between grid points.
+
   Standard errors are the asymptotic standard errors from that final
   transformed-response regression, conditional on the selected
   bandwidths, pilot scale, and \eqn{\delta}{delta}. They inherit the

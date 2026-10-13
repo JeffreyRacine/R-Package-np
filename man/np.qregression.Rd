@@ -334,6 +334,22 @@ prediction/evaluation route, or plot route as appropriate.
   This corresponds to the quantile variance expression in Li, Lin and
   Racine (2013).
 
+  For regular fixed-bandwidth level curves, asymptotic
+  \code{plot(..., band="simultaneous")} calibrates the Gaussian maximum of
+  inverse-CDF influence rows evaluated at each fitted quantile. Continuous
+  kernels must be second-order Gaussian or Epanechnikov. Each density slope
+  must be finite and positive, roots must be interior and unclamped, and
+  inversion error must be negligible relative
+  to the marginal uncertainty. The scope is the retained finite grid within
+  one panel and one \code{tau}, not jointly across quantiles or panels.
+  \code{band="all"} preserves the existing pointwise/Bonferroni intervals.
+  \code{gaussian.draws} controls simulation precision; \code{random.seed}
+  restores the caller's RNG state. These variability bands retain the existing
+  plug-in SE approximation and do not remove smoothing bias or account for
+  bandwidth selection. Quantile-gradient and nearest-neighbor simultaneous
+  asymptotic bands are not yet qualified and retain unavailable limits with
+  a notice; their existing marginal intervals are unchanged.
+
   If \code{gradients=TRUE}, \code{npqreg} also computes gradients of
   the conditional quantile with respect to the conditioning variables
   for which gradients are defined. Differentiating
