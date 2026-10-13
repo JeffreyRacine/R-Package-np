@@ -1,6 +1,9 @@
 # Small public-contract sentinels. Broad LP/NN/kernel/renderer matrices and timing
 # evidence live in the external integration campaign, not the default test lane.
 test_that("density joint calibration retains independently computed dependence", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   x <- data.frame(x = seq(-3, 3, length.out = 120L))
   ex <- data.frame(x = seq(-.4, .4, length.out = 7L))
   bw <- npudensbw(dat = x, bws = .65, bandwidth.compute = FALSE)
@@ -28,6 +31,9 @@ test_that("density joint calibration retains independently computed dependence",
 })
 
 test_that("density Gaussian plots preserve marginal bands, seed and grid size", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   set.seed(834)
   x <- data.frame(x = rnorm(80))
   y <- data.frame(y = .3 * x$x + rnorm(80))
@@ -59,6 +65,9 @@ test_that("density Gaussian plots preserve marginal bands, seed and grid size", 
 })
 
 test_that("unconditional NN Gaussian plots and unavailable grids keep their shape", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   set.seed(835)
   x <- data.frame(x = rnorm(80))
   bw <- npudistbw(dat = x, bws = 25, bwtype = "adaptive_nn",
@@ -77,6 +86,9 @@ test_that("unconditional NN Gaussian plots and unavailable grids keep their shap
 })
 
 test_that("density plot factors follow the incumbent level and contrast owners", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.largelambda = TRUE)
   on.exit(options(old))
   set.seed(1060)
@@ -99,6 +111,9 @@ test_that("density plot factors follow the incumbent level and contrast owners",
 })
 
 test_that("centered density LP influence preserves constant response equivariance", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   W <- outer(seq(.1, .9, length.out = 60), 0:2, "^")
   w <- rep(0, 60)
   w[c(12, 45)] <- 1
@@ -113,6 +128,9 @@ test_that("centered density LP influence preserves constant response equivarianc
 })
 
 test_that("density reconstruction allows rounding without inflating zero SEs", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   x <- data.frame(x = seq(-1, 1, length.out = 80))
   ex <- data.frame(x = c(-20, 20))
   bw <- npudistbw(dat = x, bws = .5, bandwidth.compute = FALSE)
@@ -129,6 +147,9 @@ test_that("density reconstruction allows rounding without inflating zero SEs", {
 
 
 test_that("ordered distribution influence follows the native integral owner", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.largelambda = TRUE)
   on.exit(options(old))
   set.seed(516)
