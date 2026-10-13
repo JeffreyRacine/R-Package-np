@@ -695,7 +695,8 @@ npcopula <- function(bws, ...) {
                                        plot.errors.center,
                                        plot.errors.boot.method,
                                        plot.errors.boot.num,
-                                       plot.errors.boot.blocklen) {
+                                       plot.errors.boot.blocklen,
+                                       gaussian.draws = 9999L) {
   .np_plot_progress_plan(1L)
   progress.target <- .np_plot_progress_target_begin()
   on.exit(.np_plot_progress_target_end(progress.target), add = TRUE)
@@ -750,7 +751,7 @@ npcopula <- function(bws, ...) {
   } else {
     NULL
   }
-  .np_plot_interval_payload(
+  interval <- .np_plot_interval_payload(
     estimate = x$copula,
     se = se,
     plot.errors.method = plot.errors.method,
@@ -759,6 +760,11 @@ npcopula <- function(bws, ...) {
     plot.errors.center = plot.errors.center,
     bootstrap_raw = boot.raw
   )
+  if (identical(plot.errors.method, "asymptotic") &&
+      plot.errors.type %in% c("simultaneous", "all"))
+    interval <- .np_plot_copula_interval(interval, x, data, grid$xgrid, se,
+      plot.errors.alpha, plot.errors.type, gaussian.draws)
+  interval
 }
 
 .npcopula_add_interval_columns <- function(x, payload) {
@@ -774,6 +780,7 @@ npcopula <- function(bws, ...) {
       x[[paste0(nm, ".upper")]] <- payload$center + payload$all.err[[nm]][, 2L]
     }
   }
+  if (!is.null(payload$calibration)) attr(x, "band.calibration") <- payload$calibration
   x
 }
 
@@ -948,6 +955,8 @@ plot.npcopula <- function(x,
                           col = NULL,
                           border = .np_plot_color("surface_border"),
                           zlim = NULL,
+                          gaussian.draws = 9999L,
+                          random.seed = 42L,
                           ...) {
   .np_plot_reject_retired_spelling(substitute(list(...))[-1L], "boot.control")
   .np_plot_stop_unused_args(
@@ -962,6 +971,13 @@ plot.npcopula <- function(x,
   renderer <- .np_plot_match_renderer(renderer)
   errors <- match.arg(errors)
   band <- match.arg(band)
+  joint.request <- identical(errors, "asymptotic") && band %in% c("simultaneous", "all")
+  if ((!missing(gaussian.draws) || !missing(random.seed)) && !joint.request)
+    stop("Gaussian controls require asymptotic simultaneous or all bands", call. = FALSE)
+  if (joint.request) {
+    gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+    npValidateNonNegativeInteger(random.seed, "random.seed")
+  }
   bootstrap <- match.arg(bootstrap)
   center <- match.arg(center)
   output <- match.arg(output)
@@ -1070,7 +1086,7 @@ plot.npcopula <- function(x,
   u2 <- grid$u2
   z <- grid$z
   z.display <- .npcopula_clip_z_for_display(z, zlim)
-  payload <- .np_plot_progress_run(.npcopula_interval_payload(
+  interval.compute <- function() .np_plot_progress_run(.npcopula_interval_payload(
     x = x,
     plot.errors.method = errors,
     plot.errors.alpha = alpha,
@@ -1078,8 +1094,10 @@ plot.npcopula <- function(x,
     plot.errors.center = center,
     plot.errors.boot.method = bootstrap,
     plot.errors.boot.num = as.integer(B),
-    plot.errors.boot.blocklen = boot.control$blocklen
+    plot.errors.boot.blocklen = boot.control$blocklen,
+    gaussian.draws = gaussian.draws
   ), enabled = identical(errors, "bootstrap"))
+  payload <- if (joint.request) .np_with_seed(random.seed, interval.compute()) else interval.compute()
   plot.data <- .npcopula_add_interval_columns(x, payload)
   if (identical(output, "data"))
     return(plot.data)

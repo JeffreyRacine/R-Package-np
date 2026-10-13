@@ -74,6 +74,8 @@ npcopula(bws, \dots)
      col = NULL,
      border = .np_plot_color("surface_border"),
      zlim = NULL,
+     gaussian.draws = 9999L,
+     random.seed = 42L,
      \dots)
 }
 
@@ -305,6 +307,12 @@ surface plots.
     bootstrap bias-correction combinations fail clearly.
   }
 
+  \item{gaussian.draws, random.seed}{
+    Gaussian maximum simulation count and reproducible seed for asymptotic
+    \code{band="simultaneous"} or \code{band="all"}. The caller's RNG state is
+    restored. These controls do not change bootstrap replication counts.
+  }
+
   \item{errors}{
     interval route for \code{plot.npcopula}: \code{"none"},
     \code{"asymptotic"}, or \code{"bootstrap"}. Intervals are available
@@ -433,8 +441,17 @@ prediction/evaluation route, or graphics renderer as appropriate.
   by the fixed-bandwidth correction. Bootstrap intervals resample
   rows and recompute the plotted copula surface on the same probability
   grid. These interval conventions do not fully propagate uncertainty
-  from the marginal quasi-inverse transform; \code{band="all"} overlays transparent pointwise,
-  simultaneous, and Bonferroni wireframes.
+  from the marginal quasi-inverse transform. For fixed bandwidths,
+  \code{band="simultaneous"} calibrates a joint Gaussian maximum on the declared
+  grid, using the joint CDF influence for distribution copulas and the complete
+  same-sample ratio influence for density copulas. Distribution bands require
+  qualified second-order Gaussian or Epanechnikov continuous kernels. These
+  are finite-grid variability bands holding the selected smoothing and fitted
+  inverse coordinates fixed in the variability approximation. They are not
+  bias-corrected population or continuum confidence bands. Nearest-neighbor simultaneous asymptotic bands remain unavailable.
+  A nonregular or memory-limited declared grid retains NA simultaneous limits
+  with a specific notice. \code{band="all"} retains pointwise and Bonferroni
+  intervals and adds the qualified simultaneous wireframe.
 }
 
 \value{

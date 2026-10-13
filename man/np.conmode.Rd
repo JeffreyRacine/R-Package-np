@@ -375,6 +375,22 @@ prediction/evaluation route, or plot route as appropriate.
     \code{view="fixed"} probability plots and use the stored bandwidth object
     without recomputing bandwidths. Class-probability bootstrap plots default
     to \code{B=399}; an explicit \code{B} overrides this count.
+    For regular fixed-bandwidth class probabilities,
+    \code{band="simultaneous"} uses a joint Gaussian maximum for one named
+    response level on the declared finite grid within each panel. The
+    complete response support enters any smooth proper-normalization
+    Jacobian. Qualified second-order Gaussian/Epanechnikov continuous
+    kernels are required. Projected/clipped probabilities, unavailable
+    marginal uncertainty and unqualified bandwidth types retain NA joint
+    limits with a notice. No claim is made for the winning class, all classes
+    jointly, smoothing bias or coverage between grid points. The calibration
+    is a Gaussian approximation on the declared grid. A growing or
+    data-dependent sample grid additionally requires uniform linearization,
+    non-dominating influences and a valid Gaussian-maximum approximation;
+    arbitrary sample grids do not carry a uniform-coverage guarantee.
+    \code{gaussian.draws} (default 9999) and \code{random.seed} control
+    reproducible Gaussian calibration; other requested interval components
+    remain unchanged.
     Surface asymptotic intervals are available
     as \code{output="data"} payload columns; surface band rendering and
     surface bootstrap intervals are intentionally deferred.

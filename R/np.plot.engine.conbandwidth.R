@@ -183,6 +183,7 @@
     if (!missing(gaussian.draws) && !joint.request)
       stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- joint.request && !quantreg && !isTRUE(proper)
+    quantile.joint <- joint.request && isTRUE(quantreg)
     if (joint.request)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
     normalized.opts <- .np_plot_normalize_common_options(
@@ -199,7 +200,7 @@
       xdat = xdat,
       common.scale = common.scale,
       ylim = ylim,
-      allow_asymptotic_simultaneous = joint.eligible,
+      allow_asymptotic_simultaneous = joint.eligible || quantile.joint,
       error.request = error.request
     )
 
@@ -394,6 +395,11 @@
           band.type = plot.errors.type,
           m = length(tcomp)
         )
+        if (quantile.joint)
+          terr.obj <- .np_plot_quantile_interval(terr.obj,
+            bws, xdat, ydat, x.eval, tau, tcomp, tcerr,
+            alpha = plot.errors.alpha, band.type = plot.errors.type,
+            gaussian.draws = gaussian.draws)
         if (joint.eligible)
           terr.obj <- .np_plot_density_interval(terr.obj,
             bws, xdat, x.eval[, 1L, drop = FALSE], tcerr, tcomp,
@@ -423,7 +429,7 @@
                   if (plot.errors.type == "all" && !is.null(lerr.all))
                     .np_plot_all_surface_range(tcomp, lerr, herr,
                                                lerr.all, herr.all)
-                  else if (joint.eligible && identical(plot.errors.type, "simultaneous"))
+                  else if ((joint.eligible || quantile.joint) && identical(plot.errors.type, "simultaneous"))
                     .np_plot_joint_panel_range(tcomp, terr)
                   else
                     c(min(lerr), max(herr))
@@ -458,7 +464,7 @@
           ret.args$proper.info <- tobj$proper.info
         }
         cd1 <- do.call(ret.fun, ret.args)
-        if (joint.eligible)
+        if (joint.eligible || quantile.joint)
           cd1 <- .np_plot_density_band_fields(cd1, terr.obj)
         cd1$bias = NA
         cd1$bias.corrected = NA
@@ -818,6 +824,17 @@
                 band.type = plot.errors.type,
                 m = xi.neval
               )
+              if (quantile.joint) {
+                asym.obj <- .np_plot_quantile_interval(asym.obj,
+                  bws, xdat, ydat, subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                  tau, temp.dens[seq_len(xi.neval)], terr.j,
+                  gradient = if (gradients) j else NULL,
+                  gradient.order = gradient.order, alpha = plot.errors.alpha,
+                  band.type = plot.errors.type, gaussian.draws = gaussian.draws)
+                if (plot.behavior != "plot")
+                  plot.out[[plot.index]] <- .np_plot_quantile_band_fields(
+                    plot.out[[plot.index]], asym.obj, if (gradients) j else NULL)
+              }
               if (joint.eligible) {
                 asym.obj <- .np_plot_density_interval(asym.obj,
                   bws, xdat, subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
@@ -1003,7 +1020,7 @@
             plot.out[[plot.index]][[err.name]] <- if (component.available) {
               .np_plot_joint_interval_rows(
                 cbind(-temp.err[, 1], temp.err[, 2]), temp.dens,
-                joint.eligible, plot.errors.type)
+                joint.eligible || quantile.joint, plot.errors.type)
             } else {
               cbind(-temp.err[seq_len(xi.neval), 1],
                     temp.err[seq_len(xi.neval), 2])
@@ -1310,7 +1327,7 @@
               plot.out[[plot.index]][[err.name]] <- if (component.available) {
                 .np_plot_joint_interval_rows(
                 cbind(-temp.err[, 1], temp.err[, 2]), temp.dens,
-                joint.eligible, plot.errors.type)
+                joint.eligible || quantile.joint, plot.errors.type)
               } else {
                 cbind(-temp.err[seq_len(xi.neval), 1],
                       temp.err[seq_len(xi.neval), 2])

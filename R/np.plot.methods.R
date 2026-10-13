@@ -727,7 +727,8 @@ np_render_control <- function(style = c("band", "bar"),
                                   center = "estimate",
                                   bootstrap = "inid",
                                   B = 399L,
-                                  blocklen = NULL) {
+                                  blocklen = NULL,
+                                       gaussian.draws = 9999L) {
   lev <- if (!is.null(object$probability.levels)) {
     as.character(object$probability.levels)
   } else if (!is.null(object$probability.gradient.level)) {
@@ -844,6 +845,18 @@ np_render_control <- function(style = c("band", "bar"),
         center = center,
         bootstrap_raw = boot.raw
       )
+      if (identical(errors, "asymptotic") && band %in% c("simultaneous", "all")) {
+        if (j == 1L) {
+          training <- .np_plot_conmode_training_data(object)
+          out[[j]] <- .np_plot_conmode_joint_columns(out[[j]], object,
+            training$xtrain, training$ytrain, xeval, level, lev, se,
+            alpha, band, gaussian.draws)
+        } else {
+          fields <- if (identical(band, "all")) c("simultaneous.lower", "simultaneous.upper") else c("lower", "upper")
+          out[[j]][fields] <- out[[1L]][fields]
+          attr(out[[j]], "band.calibration") <- attr(out[[1L]], "band.calibration", exact = TRUE)
+        }
+      }
     }
   }
   names(out) <- xnames
@@ -1315,7 +1328,8 @@ np_render_control <- function(style = c("band", "bar"),
                                        center = "estimate",
                                        bootstrap = "inid",
                                        B = 399L,
-                                       blocklen = NULL) {
+                                       blocklen = NULL,
+                                       gaussian.draws = 9999L) {
   if (!isTRUE(gradients) && is.null(object$probabilities))
     stop("class probabilities are not available: fit with probabilities=TRUE or gradients=TRUE",
          call. = FALSE)
@@ -1482,6 +1496,9 @@ np_render_control <- function(style = c("band", "bar"),
           center = center,
           bootstrap_raw = boot.raw
         )
+        if (identical(errors, "asymptotic") && band %in% c("simultaneous", "all"))
+          dat <- .np_plot_conmode_joint_columns(dat, object, xtrain, ytrain,
+            exdat, level, lev, se, alpha, band, gaussian.draws)
       }
       out[[j]] <- dat
     }
@@ -1525,7 +1542,8 @@ np_render_control <- function(style = c("band", "bar"),
                                           plot.vars = NULL,
                                           errors = "none",
                                           alpha = 0.05,
-                                          band = "pointwise") {
+                                          band = "pointwise",
+                                          gaussian.draws = 9999L) {
   if (is.null(object$probabilities))
     stop("class probabilities are not available: fit with probabilities=TRUE or gradients=TRUE",
          call. = FALSE)
@@ -1621,6 +1639,9 @@ np_render_control <- function(style = c("band", "bar"),
       alpha = alpha,
       band = band
     )
+    if (identical(errors, "asymptotic") && band %in% c("simultaneous", "all"))
+      surface <- .np_plot_conmode_joint_columns(surface, object, xtrain, ytrain,
+        exdat, level, lev, se, alpha, band, gaussian.draws)
   }
   held.vars <- setdiff(xnames, plot.vars)
   held <- if (length(held.vars)) base[, held.vars, drop = FALSE] else data.frame()
@@ -1843,7 +1864,7 @@ np_render_control <- function(style = c("band", "bar"),
   if (any(!nzchar(dot.names)))
     stop("unnamed plot arguments are not supported for plot.conmode",
          call. = FALSE)
-  interval.args <- c("errors", "band", "alpha", "bootstrap", "B", "center",
+  interval.args <- c("errors", "band", "alpha", "gaussian.draws", "bootstrap", "B", "center",
                      "render.control",
                      "boot.control", "plot.errors.method", "plot.errors.type",
                      "plot.errors.alpha", "plot.errors.boot.method",
@@ -1896,6 +1917,13 @@ np_render_control <- function(style = c("band", "bar"),
                           c("pmzsd", "pointwise", "bonferroni",
                             "simultaneous", "all"),
                           "plot.errors.type")
+  joint.request <- identical(errors, "asymptotic") && band %in% c("simultaneous", "all")
+  gaussian.draws <- if (is.null(dots$gaussian.draws)) 9999L else dots$gaussian.draws
+  if (!is.null(dots$gaussian.draws) && !joint.request)
+    stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
+  if (joint.request)
+    gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+  dots$gaussian.draws <- NULL
   alpha <- if (is.null(dots$plot.errors.alpha)) 0.05 else
     dots$plot.errors.alpha
   center <- if (is.null(dots$plot.errors.center)) "estimate" else
@@ -2008,7 +2036,8 @@ np_render_control <- function(style = c("band", "bar"),
         plot.vars = dots$plot.vars,
         errors = errors,
         alpha = alpha,
-        band = band
+        band = band,
+        gaussian.draws = gaussian.draws
       )
     } else if (identical(view, "fixed")) {
       .np_plot_conmode_grid_data(
@@ -2024,7 +2053,8 @@ np_render_control <- function(style = c("band", "bar"),
         center = center,
         bootstrap = bootstrap,
         B = B,
-        blocklen = boot.blocklen
+        blocklen = boot.blocklen,
+        gaussian.draws = gaussian.draws
       )
     } else {
       .np_plot_conmode_data(
@@ -2037,7 +2067,8 @@ np_render_control <- function(style = c("band", "bar"),
         center = center,
         bootstrap = bootstrap,
         B = B,
-        blocklen = boot.blocklen
+        blocklen = boot.blocklen,
+        gaussian.draws = gaussian.draws
       )
     }
   })
