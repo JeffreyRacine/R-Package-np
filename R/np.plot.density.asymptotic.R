@@ -28,6 +28,83 @@
 .np_plot_density_matrix <- function(kbw, x, ex, operator) {
   .npcdhat_make_kernel_matrix(kbw, x, ex, operator = operator)
 }
+# Some density fitting owners use native near-upper categorical shortcuts;
+# generic kernel matrices deliberately retain raw kernels. Match that owner only
+# where requested by the density plot policy, without changing shared kernels.
+.np_plot_density_factor_weights <- function(K, kbw, x, ex, operator, ordered = TRUE) {
+  for (j in which(kbw[["iuno", exact = TRUE]] & operator == "normal")) {
+    nc <- length(kbw[["xdati", exact = TRUE]]$all.dlev[[j]])
+    if (nc < 2L)
+      next
+    lambda <- kbw[["bw", exact = TRUE]][j]
+    ku <- if (identical(kbw[["ukertype", exact = TRUE]], "aitchisonaitken")) 0L else 1L
+    probe <- matrix(c(1, 2), 2L, 1L)
+    empty <- matrix(numeric(), 2L, 0L)
+    effective <- .np_categorical_profile_kernel_tile(probe, empty, probe, empty,
+      ku, integer(), 0L, lambda, nc, list(NULL))[1L, ]
+    # Literal normalized kernels, used solely to remove their factor from K.
+    # The native tile owns the shortcut predicate, options and effective values.
+    raw <- if (ku == 0L) c(1 - lambda, lambda/(nc - 1L)) else
+      c(1, lambda)/(1 + (nc - 1L) * lambda)
+    if (identical(effective, raw))
+      next
+    if (any(raw == 0 & effective != 0))
+      stop("Unavailable categorical kernel correction")
+    ratio <- rep(1, 2L)
+    active <- raw != 0
+    ratio[active] <- effective[active]/raw[active]
+    different <- outer(as.integer(ex[[j]]), match(x[[j]], levels(ex[[j]])), "!=")
+    K <- K * matrix(ratio[1L + different], nrow(K), ncol(K))
+  }
+  ordered <- if (ordered) which(kbw[["iord", exact = TRUE]] &
+    operator %in% c("normal", "integral")) else integer()
+  if (length(ordered) && !identical(kbw[["okertype", exact = TRUE]], "wangvanryzin") &&
+      npLogicalOption("np.largelambda", TRUE)) {
+    tol <- npDiscUpperRelTol()
+    for (j in ordered) {
+      lambda <- kbw[["bw", exact = TRUE]][j]
+      # Match the existing product-owner certificate in jksum.c:
+      # np_disc_ordered_near_upper / np_disc_near_const_kernel.
+      # The scalar ordered tile exposes raw values, not that product shortcut.
+      if (abs(lambda - 1) > max(tol, 16 * .Machine$double.eps))
+        next
+      cats <- as.double(kbw[["xdati", exact = TRUE]]$all.dlev[[j]])
+      nc <- length(cats)
+      ko <- if (identical(kbw[["okertype", exact = TRUE]], "racineliyan")) 3L else 2L
+      op <- if (operator[j] == "integral") 3L else 0L
+      tile <- if (ko == 3L && op == 0L) function(train, eval)
+        t(.Call(C_np_ordered_rly_matrix, as.double(train), as.double(eval),
+          as.double(lambda), cats)) else function(train, eval)
+        .np_categorical_profile_kernel_tile(
+          matrix(numeric(), length(train), 0L), matrix(train, ncol = 1L),
+          matrix(numeric(), length(eval), 0L), matrix(eval, ncol = 1L),
+          integer(), ko, op, lambda, nc, list(cats))
+      if (ko == 3L && op == 3L) {
+        # With >=2 categories the retained-support CDF range is at least 1/2:
+        # the last-donor mass at the first category is <=1/nc, while F(last)=1.
+        # The canonical tolerance is strictly <1/2, so no shortcut is possible.
+        # With one category the raw kernel already equals its constant value.
+        next
+      } else if (ko == 3L) {
+        # The native range certificate uses each donor's farthest endpoint
+        # and diagonal. Reuse the cached-normalizer bridge, in bounded tiles,
+        # avoiding a cubic scan of all donor/evaluation/support triples.
+        bounds <- c(min(tile(cats, cats[c(1L, nc)])), -Inf)
+        for (first in seq.int(1L, nc, by = 512L)) {
+          ix <- seq.int(first, min(nc, first + 511L))
+          bounds[2L] <- max(bounds[2L], diag(tile(cats[ix], cats[ix])))
+        }
+      } else bounds <- as.vector(tile(cats[1L], cats[c(1L, nc)]))
+      if (abs(diff(bounds)) > tol * max(1, abs(bounds)) || bounds[1L] == bounds[2L])
+        next
+      tx <- as.double(toMatrix(x[j]))
+      eq <- as.double(toMatrix(ex[j]))
+      raw <- t(tile(tx, eq))
+      K <- K * (mean(bounds)/raw)
+    }
+  }
+  K
+}
 # Query/donor NN normalization differs. Recover GNN physical scaling using a positive
 # native contraction, never a possibly cancelling derivative sum.
 .np_plot_density_derivative_matrix <- function(kbw, x, ex, index) {
@@ -81,71 +158,61 @@
   }
   list(factor = F, se = se, empirical.se = norm)
 }
-# Obtain the accepted inverse and its response-intercept correction through the
-# existing canonical ranked native solve. No new ridge/rank policy is selected.
-.np_plot_density_lp_system <- function(W, w, n) {
-  p <- ncol(W)
+# Batch direct response and adjoint solves through the unchanged canonical
+# ranked owner; do not form an inverse and multiply it by response moments.
+.np_plot_density_lp_score <- function(W, w, R, e, n, identity) {
+  p <- ncol(W); R <- as.matrix(R); nr <- ncol(R)
   M <- crossprod(W, w * W)
-  packed <- unlist(lapply(seq_len(p), function(a) M[a, a:p]))
-  identity <- .np_inid_lp_design_identity(W)
+  packed <- matrix(unlist(lapply(seq_len(p), function(a) M[a, a:p])), 1L)
   rank <- .np_inid_lp_rank_bounds(w, p, identity = identity)
-  Z <- lapply(seq_len(p), function(a) matrix(diag(p)[a, ], 1L, p))
-  V <- matrix(NA_real_, p, p)
+  # Intercept equivariance holds also for the accepted ridge correction:
+  # C0 W' diag(w) (r+c) = C0 W' diag(w) r + c (M+ridge I) e1.
+  # Centering preserves that estimator and avoids cancellation at CDF endpoints.
+  center <- R[which.max(w), ]
+  R <- R - rep(center, each = n)
+  B <- crossprod(W, w * R)
+  U <- diag(p)
+  Z <- cbind(B, e, U[, 1L])
+  Z <- lapply(seq_len(p), function(a) matrix(Z[a, ], 1L))
+  C <- matrix(NA_real_, p, nr + 2L)
   ridge <- steps <- NULL
   for (a in seq_len(p)) {
-    out <- .np_inid_lp_batch_project(matrix(packed, 1L), Z, diag(p)[a, ], n, diagnostics = TRUE,
-      rank.bounds = rank)
-    V[a, ] <- out$values[1L, ]
+    ans <- .np_inid_lp_batch_project(packed, Z, U[a, ], n, TRUE, rank)
+    C[a, ] <- ans$values[1L, ]
     if (a == 1L) {
-      ridge <- out$ridge_total[1L]
-      steps <- out$ridge_steps[1L]
-    } else stopifnot(identical(out$ridge_total[1L], ridge), identical(out$ridge_steps[1L],
-      steps))
+      ridge <- ans$ridge_total[1L]; steps <- ans$ridge_steps[1L]
+    } else stopifnot(identical(ans$ridge_total[1L], ridge),
+                     identical(ans$ridge_steps[1L], steps))
   }
   anchor <- M[1L, 1L]
-  c0 <- if (ridge == 0)
-    1 else 1 + ridge/anchor
-  inverse <- V
-  inverse[, 1L] <- inverse[, 1L]/c0
+  c0 <- if (ridge == 0) 1 else 1 + ridge / anchor
+  theta <- C[, seq_len(nr), drop = FALSE]
+  v <- C[, nr + 1L] - (1 - 1 / c0) * e[1L] * C[, nr + 2L]
+  # The existing plot-only derivative of the accepted ridge scale, unchanged.
   dr <- numeric(n)
   if (ridge > 0) {
-    d <- abs(diag(M))
-    mask <- diag(p) == 1
-    mx <- max(d)
-    if (mx == 0) {
-      d <- abs(M)
-      mask <- matrix(TRUE, p, p)
-      mx <- max(d)
-    }
+    d <- abs(diag(M)); mask <- diag(p) == 1; mx <- max(d)
+    if (mx == 0) { d <- abs(M); mask <- matrix(TRUE, p, p); mx <- max(d) }
     ix <- which(abs(M) == mx & mask, arr.ind = TRUE)
-    if (!nrow(ix))
-      stop("Unidentified ridge scale")
+    if (!nrow(ix)) stop("Unidentified ridge scale")
     da <- sign(M[ix[1, 1], ix[1, 2]]) * w * W[, ix[1, 1]] * W[, ix[1, 2]]
-    for (k in seq_len(nrow(ix))) if (any(da != sign(M[ix[k, 1], ix[k, 2]]) * w * W[,
-      ix[k, 1]] * W[, ix[k, 2]]))
-      stop("Nonsmooth accepted ridge scale; influence not defined")
-    dr <- steps/n * da
+    for (k in seq_len(nrow(ix)))
+      if (any(da != sign(M[ix[k, 1], ix[k, 2]]) * w * W[, ix[k, 1]] * W[, ix[k, 2]]))
+        stop("Nonsmooth accepted ridge scale; influence not defined")
+    dr <- steps / n * da
   }
-  list(M = M, response.inverse = V, inverse = inverse, ridge = ridge, steps = steps, dr = dr,
-    anchor = anchor)
-}
-.np_plot_density_lp_score <- function(sys, W, w, r, e) {
-  b <- drop(crossprod(W, w * r))
-  theta <- drop(sys$response.inverse %*% b)
-  v <- drop(t(sys$inverse) %*% e)
-  vz <- drop(W %*% v)
-  zt <- drop(W %*% theta)
-  a <- w * vz * (r - zt)
-  if (sys$ridge > 0) {
-    rho <- sys$ridge/sys$anchor
-    da <- w * W[, 1L]^2
-    a <- a + w * v[1L] * rho * W[, 1L] * r + v[1L] * b[1L] * (sys$dr/sys$anchor - rho *
-      da/sys$anchor) - sys$dr * sum(v * theta)
+  vz <- drop(W %*% v); zt <- W %*% theta
+  A <- (w * vz) * (R - zt)
+  if (ridge > 0) {
+    rho <- ridge / anchor; da <- w * W[, 1L]^2
+    A <- A + (w * v[1L] * rho * W[, 1L]) * R +
+      outer(v[1L] * (dr / anchor - rho * da / anchor), B[1L, ]) -
+      outer(dr, drop(crossprod(v, theta)))
   }
-  list(estimate = sum(e * theta), score = a, theta = theta, ridge = sys$ridge)
+  list(estimate = drop(crossprod(e, theta)) + center * e[1L], score = t(A), ridge = rep(ridge, nr))
 }
 .np_plot_density_conditional <- function(bws, x, y, ex, ey, cdf = FALSE, gradient = NULL,
-  order = 1L) {
+  order = 1L, factor.owner = NULL) {
   n <- nrow(x)
   m <- nrow(ex)
   if (nrow(y) != n || nrow(ey) != m || n < 2L || !m)
@@ -159,8 +226,15 @@
       if (order != 1L)
         stop("Categorical gradients require first differences")
       frames <- npCategoricalFirstDifferenceFrames(ex, index = gradient, where = "Gaussian density plot")
-      u <- .np_plot_density_conditional(bws, x, y, frames$upper, ey, cdf)
-      l <- .np_plot_density_conditional(bws, x, y, frames$lower, ey, cdf)
+      spec <- npConditionalRegEngineSpec(bws, where = "Gaussian density contrast")
+      # Match npcdhat's current owner: LC contrasts gate unordered weights;
+      # LP hats use raw weights except GNN degree > 1, which uses the core.
+      # These need not equal differences of the ordinary gated LP level fits.
+      gated <- if (identical(spec$reg.engine, "lc") || all(spec$degree.engine == 0L))
+        "unordered" else if (identical(bws[["type", exact = TRUE]], "generalized_nn") &&
+          any(spec$degree.engine > 1L)) "all" else "none"
+      u <- .np_plot_density_conditional(bws, x, y, frames$upper, ey, cdf, factor.owner = gated)
+      l <- .np_plot_density_conditional(bws, x, y, frames$lower, ey, cdf, factor.owner = gated)
       return(list(estimate = u$estimate - l$estimate, A = u$A - l$A, target = "paired endpoint empirical-mass contrast; realized geometry",
         ridge = c(u$ridge, l$ridge)))
     }
@@ -171,6 +245,11 @@
   Y <- .np_plot_density_matrix(yb, y, ey, rep(if (cdf) "integral" else "normal", ncol(y)))
   spec <- npConditionalRegEngineSpec(bws, where = "Gaussian density plot")
   lc <- identical(spec$reg.engine, "lc") || all(spec$degree.engine == 0)
+  if (is.null(factor.owner))
+    factor.owner <- if (lc) "none" else "all"
+  if (!identical(factor.owner, "none"))
+    K <- .np_plot_density_factor_weights(K, xb, x, ex, rep("normal", ncol(x)),
+      ordered = identical(factor.owner, "all"))
   if (lc) {
     den <- rowSums(K)
     mu <- rowSums(K * Y)/den
@@ -201,19 +280,17 @@
   basisargs <- list(xdat = x[, cont, drop = FALSE], degree = spec$degree.engine, basis = spec$basis.engine,
     bernstein.basis = spec$bernstein.engine)
   W <- as.matrix(do.call(W.lp, basisargs))
+  identity <- .np_inid_lp_design_identity(W)
   E <- as.matrix(do.call(W.lp, c(basisargs, list(exdat = ex[, cont, drop = FALSE], gradient.vec = grad))))
   groups <- .np_plot_exact_row_groups(ex)$groups
   A <- matrix(NA_real_, m, n)
   mu <- ridge <- numeric(m)
   for (ix in groups) {
     w <- K[ix[1L], ]
-    sys <- .np_plot_density_lp_system(W, w, n)
-    for (q in ix) {
-      v <- .np_plot_density_lp_score(sys, W, w, Y[q, ], E[q, ])
-      mu[q] <- v$estimate
-      A[q, ] <- v$score
-      ridge[q] <- v$ridge
-    }
+    v <- .np_plot_density_lp_score(W, w, t(Y[ix, , drop = FALSE]), E[ix[1L], ], n, identity)
+    mu[ix] <- v$estimate
+    A[ix, ] <- v$score
+    ridge[ix] <- v$ridge
   }
   list(estimate = mu, A = .np_plot_density_center(A), target = "LP empirical mass including smooth accepted ridge; realized geometry",
     ridge = ridge)
@@ -235,8 +312,14 @@
   # The ANN native kernel owner returns physically normalized weights. Use its
   # object-fed local entry, including for zero derivative row sums; avoid
   # reconstructing normalization from a sum that may legitimately be zero.
-  local.matrix <- function(op) .np_local_operator_ksum(kb, x, ex, op, matrix(1, n, 1L),
-    return.kernel.weights = TRUE, where = "ANN plot influence")$kernel.weights
+  local.matrix <- function(op) {
+    value <- .np_local_operator_ksum(kb, x, ex, op, matrix(1, n, 1L),
+      return.kernel.weights = TRUE, where = "ANN plot influence")$kernel.weights
+    if (any(kb[["iuno", exact = TRUE]] & op == "normal") ||
+        any(kb[["iord", exact = TRUE]] & op %in% c("normal", "integral")))
+      value <- t(.np_plot_density_factor_weights(t(value), kb, x, ex, op))
+    value
+  }
   op <- rep(if (pdf) "normal" else "integral", ncol(x))
   K <- local.matrix(op)
   D <- array(NA_real_, c(n, m, p))
@@ -296,7 +379,10 @@
   if (identical(bws[["type", exact = TRUE]], "adaptive_nn") && any(bws[["icon", exact = TRUE]]))
     return(.np_plot_density_ann(bws, x, ex, !cdf))
   kb <- .np_make_kbandwidth_unconditional(bws, x)
-  K <- .np_plot_density_matrix(kb, x, ex, rep(if (cdf) "integral" else "normal", ncol(x)))/nrow(x)
+  op <- rep(if (cdf) "integral" else "normal", ncol(x))
+  K <- .np_plot_density_matrix(kb, x, ex, op)
+  K <- .np_plot_density_factor_weights(K, kb, x, ex, op)
+  K <- K/nrow(x)
   list(estimate = rowSums(K), A = .np_plot_density_center(K), target = "kernel empirical mass; fixed or frozen-query geometry",
     ridge = 0)
 }
@@ -317,11 +403,13 @@
   # Preparation retains A plus a bounded kernel tile; rescaling has at most three
   # factor-sized arrays. Calibration separately budgets its factor.
   lp.bytes <- 0
+  lp <- FALSE
   if (!is.null(y) && bws[["xncon", exact = TRUE]] > 0L) {
     spec <- npConditionalRegEngineSpec(bws, where = "Gaussian density plot memory")
     if (!all(spec$degree.engine == 0L)) {
+      lp <- TRUE
       width <- as.double(npLpBasisNcol(spec$basis.engine, spec$degree.engine))
-      # Basis copies, packed systems, accepted inverses and native solve workspace.
+      # Basis copies, packed systems, batched response/adjoint and native solve workspace.
       lp.bytes <- 64 * (n + tile) * width + 256 * width^2
     }
   }
@@ -338,21 +426,31 @@
   progress <- .np_plot_bootstrap_progress_begin(m, "Computing density plot influence",
     unit = "row")
   on.exit(.np_plot_progress_end(progress), add = TRUE)
+  # Surfaces revisit the same X at many Y values. Group before bounded tiling
+  # so each solve can handle several responses, then scatter to the original grid.
+  schedule <- if (lp) unlist(.np_plot_exact_row_groups(ex)$groups, use.names = FALSE) else seq_len(m)
   for (first in seq.int(1L, m, by = tile)) {
-    ix <- seq.int(first, min(m, first + tile - 1L))
+    last <- min(m, first + tile - 1L)
+    ix <- schedule[seq.int(first, last)]
     value <- if (is.null(y))
       .np_plot_density_unconditional(bws, x, ex[ix, , drop = FALSE], cdf) else .np_plot_density_conditional(bws, x, y, ex[ix, , drop = FALSE], ey[ix, , drop = FALSE],
       cdf, gradient, order)
     A[ix, ] <- value$A
     estimate[ix] <- value$estimate
     target <- value$target
-    progress <- .np_plot_progress_tick(progress, max(ix))
+    progress <- .np_plot_progress_tick(progress, last)
   }
   value <- NULL
   if (!is.null(incumbent)) {
-    tolerance <- 0.01 * se + 128 * .Machine$double.eps * pmax(1, abs(incumbent))
-    if (length(incumbent) != m || any(!is.finite(estimate)) || any(abs(estimate - incumbent) >
-      tolerance))
+    if (length(incumbent) != m || any(!is.finite(incumbent)) || any(!is.finite(estimate)))
+      stop("Invalid density plot target", call. = FALSE)
+    # Accumulated rounding is independent of sampling uncertainty. In particular,
+    # CDF endpoint SEs can be zero. This allowance changes only the comparison,
+    # never the incumbent curve, SEs, influence rows or calibrated covariance.
+    roundoff <- max(128, 8 * as.double(n)) * .Machine$double.eps *
+      pmax(1, abs(incumbent), abs(estimate))
+    tolerance <- 0.01 * se + roundoff
+    if (any(abs(estimate - incumbent) > tolerance))
       stop("density influence does not reproduce the plotted target within 1% of its SE",
         call. = FALSE)
   }
