@@ -245,8 +245,14 @@
   Y <- .np_plot_density_matrix(yb, y, ey, rep(if (cdf) "integral" else "normal", ncol(y)))
   spec <- npConditionalRegEngineSpec(bws, where = "Gaussian density plot")
   lc <- identical(spec$reg.engine, "lc") || all(spec$degree.engine == 0)
+  # LC continuous gradients use the native permutation owner. Its unordered
+  # explanatory factors are gated in both numerator and denominator (including
+  # derivative products); ordered factors retain their literal kernel values.
+  # The tile bridge observes that owner's effective native state, including
+  # its cached options; it does not create a second selection policy.
+  lc.gradient <- lc && !is.null(gradient)
   if (is.null(factor.owner))
-    factor.owner <- if (lc) "none" else "all"
+    factor.owner <- if (lc.gradient) "unordered" else if (lc) "none" else "all"
   if (!identical(factor.owner, "none"))
     K <- .np_plot_density_factor_weights(K, xb, x, ex, rep("normal", ncol(x)),
       ordered = identical(factor.owner, "all"))
@@ -258,6 +264,8 @@
       if (order != 1L)
         stop("LC supports first continuous derivatives only")
       D <- .np_plot_density_derivative_matrix(xb, x, ex, gradient)
+      dop <- rep("normal", ncol(x)); dop[gradient] <- "derivative"
+      D <- .np_plot_density_factor_weights(D, xb, x, ex, dop, ordered = FALSE)
       H <- D/den - (K/den) * (rowSums(D)/den)
       deriv <- rowSums(H * Y)
       A <- H * (Y - mu) - (K/den) * deriv

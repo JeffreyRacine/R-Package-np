@@ -1,4 +1,8 @@
 # np 0.80-1
+- Conditional LC density/distribution gradient bands now reconstruct unordered
+  explanatory-factor weights from the estimator's effective native kernel
+  owner, including weights near their upper bound. Fitted gradients, marginal
+  standard errors, bandwidth selection and other plot routes are unchanged.
 - Density and distribution plots now offer Gaussian simultaneous variability
   bands for supported fixed and nearest-neighbor specifications, conditional
   LP/gradient panels, and level surfaces. Existing marginal standard errors
