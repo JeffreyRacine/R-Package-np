@@ -441,17 +441,38 @@ prediction/evaluation route, or graphics renderer as appropriate.
   by the fixed-bandwidth correction. Bootstrap intervals resample
   rows and recompute the plotted copula surface on the same probability
   grid. These interval conventions do not fully propagate uncertainty
-  from the marginal quasi-inverse transform. For fixed bandwidths,
-  \code{band="simultaneous"} calibrates a joint Gaussian maximum on the declared
-  grid, using the joint CDF influence for distribution copulas and the complete
-  same-sample ratio influence for density copulas. Distribution bands require
-  qualified second-order Gaussian or Epanechnikov continuous kernels. These
-  are finite-grid variability bands holding the selected smoothing and fitted
-  inverse coordinates fixed in the variability approximation. They are not
-  bias-corrected population or continuum confidence bands. Nearest-neighbor simultaneous asymptotic bands remain unavailable.
-  A nonregular or memory-limited declared grid retains NA simultaneous limits
-  with a specific notice. \code{band="all"} retains pointwise and Bonferroni
-  intervals and adds the qualified simultaneous wireframe.
+  from the marginal quasi-inverse transform. \code{band="simultaneous"}
+  calibrates a joint Gaussian maximum over the declared grid. Distribution
+  copulas use the selected joint-CDF influence. Fixed-bandwidth density
+  copulas use the complete same-sample ratio influence. Nearest-neighbor
+  density copulas retain the numerator-density uncertainty divided by the
+  fitted positive marginal-density product; adaptive-neighbor factors retain
+  the numerator's random-radius contribution. The fitted inverse coordinates
+  and denominator are held fixed for this nearest-neighbor working target.
+  Marginal-density uncertainty is lower order in the usual regular
+  multidimensional shrinking-bandwidth regime when, for each margin, the
+  product of the other continuous bandwidths tends to zero. One-continuous-
+  margin, discrete or nonshrinking settings retain only the stated working
+  target, without that unconditional leading-order justification.
+
+  These are finite-grid selected-smoothing variability bands, not
+  bias-corrected population or continuum confidence bands. Unavailable
+  incumbent uncertainty, nonregular support/radius geometry and memory-limited
+  grids retain NA simultaneous limits with a specific notice. Adaptive-neighbor
+  density and distribution bands include regular finite-bound and beta-kernel
+  routes through a separate simultaneous influence scale. The existing
+  \code{se()}, pointwise and Bonferroni values are unchanged, including their
+  \code{NA} values where marginal errors are not implemented. Thus
+  \code{band="all"} may contain finite simultaneous limits together with
+  unavailable marginal limits. Ordinary fractional neighbor counts use the
+  point estimator's canonical rounding. Extended maximum-radius counts require
+  a separate endpoint or tail law and remain unavailable for these bands.
+  Numerical precision checks can also make a requested band unavailable;
+  they never replace the fitted point estimates. Beta checks compare the same
+  shape with an independent PDF implementation and propagate the discrepancy;
+  this is a numerical agreement check, not a rigorous special-function bound.
+  \code{band="all"} retains pointwise and Bonferroni intervals and adds the
+  qualified simultaneous wireframe.
 }
 
 \value{

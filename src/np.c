@@ -7725,7 +7725,9 @@ void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             const int *cat_se_mask,
                             double *variance_metadata,
                             NPRegressionLPEmptyRows *empty_rows,
-                            int gnn_lp_fit_tree);
+                            int gnn_lp_fit_tree,
+                            NPRegressionFitProjection *fit_projection,
+                            int *projection_constant, NPConditionalPlotCapture *plot_capture);
 void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
@@ -9934,7 +9936,7 @@ static SEXP np_density_conditional_call(SEXP tyuno,
                               SEXP cat_se_request,
                               SEXP se_request,
                               SEXP allow_external,
-                              int export_variance)
+                              int export_variance, SEXP projection_request)
 {
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
@@ -9947,6 +9949,16 @@ static SEXP np_density_conditional_call(SEXP tyuno,
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_cond=R_NilValue, out_cderr=R_NilValue, out_grad=R_NilValue, out_gerr=R_NilValue, out_ll=R_NilValue;
   SEXP out_variance=R_NilValue;
+  SEXP projection_basis=R_NilValue, projection_rows=R_NilValue;
+  SEXP projection_constant=R_NilValue, projection_result=R_NilValue;
+  SEXP projection_names=R_NilValue;
+  NPRegressionFitProjection fit_projection = {0};
+  NPConditionalPlotCapture plot_capture = {0};
+  SEXP capture_weights=R_NilValue, capture_directions=R_NilValue, capture_adjoints=R_NilValue;
+  SEXP capture_count=R_NilValue, capture_coordinate=R_NilValue, capture_order=R_NilValue;
+  SEXP capture_donor=R_NilValue, capture_response=R_NilValue, capture_logscale=R_NilValue;
+  NPRegressionFitProjection *fit_projection_ptr = NULL;
+  int projection_protected = 0;
   SEXP empty_flags=R_NilValue, empty_base=R_NilValue;
   NPRegressionLPEmptyRows external_rows = {NULL, 0, NULL, NULL, NULL};
   const int allow_empty = asLogical(allow_external);
@@ -10191,6 +10203,67 @@ static SEXP np_density_conditional_call(SEXP tyuno,
     memset(REAL(out_variance), 0, (size_t)en * 4 * sizeof(double));
   }
 
+  if(projection_request != R_NilValue) {
+    const int width = INTEGER(projection_request)[0];
+    const int ntrain = INTEGER(myopti_i)[CD_TNOBSI];
+    if(width < 1 || ntrain < 1 || en < 1 || ncon_x < 1 ||
+       np_lp_engine_extern != NP_LP_ENGINE_GENERAL ||
+       (double)width*((double)ntrain + en) > 8*1024*1024)
+      error("invalid or oversized conditional plot projection request");
+    if(XLENGTH(glp_degree_i)!=ncon_x || XLENGTH(glp_basis_i)!=1)
+      error("invalid conditional plot projection degree shape");
+    np_plot_validate_basis_request(ncon_x,INTEGER(glp_degree_i),
+      INTEGER(glp_basis_i)[0],width);
+    const int slots=ncon_x+1;
+    /* Integer metadata and pointer scratch are conservatively charged as doubles. */
+    const double capture_cells=64 + 2.0*ntrain*en +
+      2.0*en*slots*width + ntrain + (double)width*(width+2) + width+2 +
+      2.0*en*slots + 2.0*en + ntrain;
+    if(en > INT_MAX/slots || !R_FINITE(capture_cells) ||
+       capture_cells + ((double)ntrain+en)*width > 8*1024*1024)
+      error("conditional plot capture exceeds its total native budget");
+#ifdef MPI2
+    if(!np_mpi_local_regression_active() && iNum_Processors > 1)
+      error("conditional plot projection requires an explicit local regression scope");
+#endif
+    PROTECT(projection_basis = allocMatrix(REALSXP, ntrain, width));
+    PROTECT(projection_rows = allocMatrix(REALSXP, en, width));
+    PROTECT(projection_constant = allocVector(INTSXP, en));
+    projection_protected += 3;
+    for(int row = 0; row < en; ++row) INTEGER(projection_constant)[row] = -1;
+    fit_projection = (NPRegressionFitProjection){
+      .ntrain = ntrain, .neval = en, .width = width,
+      .basis = REAL(projection_basis), .projection = REAL(projection_rows)};
+    fit_projection_ptr = &fit_projection;
+    PROTECT(capture_weights=allocMatrix(REALSXP,ntrain,en)); ++projection_protected;
+    PROTECT(capture_directions=allocMatrix(REALSXP,width,en*slots)); ++projection_protected;
+    PROTECT(capture_adjoints=allocMatrix(REALSXP,width,en*slots)); ++projection_protected;
+    PROTECT(capture_count=allocVector(INTSXP,en)); ++projection_protected;
+    PROTECT(capture_coordinate=allocMatrix(INTSXP,slots,en)); ++projection_protected;
+    PROTECT(capture_order=allocMatrix(INTSXP,slots,en)); ++projection_protected;
+    PROTECT(capture_donor=allocVector(INTSXP,ntrain)); ++projection_protected;
+    PROTECT(capture_response=allocMatrix(REALSXP,ntrain,en)); ++projection_protected;
+    PROTECT(capture_logscale=allocVector(REALSXP,en)); ++projection_protected;
+    for(R_xlen_t k=0;k<XLENGTH(capture_weights);++k) REAL(capture_weights)[k]=NA_REAL;
+    for(R_xlen_t k=0;k<XLENGTH(capture_directions);++k) {
+      REAL(capture_directions)[k]=NA_REAL; REAL(capture_adjoints)[k]=NA_REAL;
+    }
+    memset(INTEGER(capture_count),0,(size_t)en*sizeof(int));
+    for(R_xlen_t k=0;k<XLENGTH(capture_coordinate);++k) {
+      INTEGER(capture_coordinate)[k]=-1; INTEGER(capture_order)[k]=-1;
+    }
+    plot_capture=(NPConditionalPlotCapture){.n=ntrain,.m=en,.width=width,.slots=slots,.row=-1,
+      .weights=REAL(capture_weights),.directions=REAL(capture_directions),
+      .responses=REAL(capture_response),.response_logscale=REAL(capture_logscale),
+      .adjoints=REAL(capture_adjoints),.captured=INTEGER(capture_count),
+      .coordinate=INTEGER(capture_coordinate),.order=INTEGER(capture_order),
+      .donor_order=INTEGER(capture_donor),
+      .scratch_weights=(double *)R_alloc((size_t)ntrain,sizeof(double)),
+      .scratch_moments=(double *)R_alloc((size_t)width*(width+2),sizeof(double)),
+      .scratch_columns=(double **)R_alloc((size_t)width+2,sizeof(double *))};
+    np_conditional_plot_capture_swap(&plot_capture);
+  }
+
   np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r),
                            REAL(txuno_r), REAL(txord_r), REAL(txcon_r),
                            REAL(eyuno_r), REAL(eyord_r), REAL(eycon_r),
@@ -10208,7 +10281,9 @@ static SEXP np_density_conditional_call(SEXP tyuno,
                            cat_se_mask,
                            export_variance ? REAL(out_variance) : NULL,
                            allow_empty ? &external_rows : NULL,
-                           gnn_lp_fit_tree);
+                           gnn_lp_fit_tree, fit_projection_ptr,
+                           fit_projection_ptr != NULL ? INTEGER(projection_constant) : NULL,
+                           fit_projection_ptr != NULL ? &plot_capture : NULL);
 
   PROTECT(out = allocVector(VECSXP, export_variance ? 6 : 5));
   SET_VECTOR_ELT(out, 0, out_cond);
@@ -10227,6 +10302,39 @@ static SEXP np_density_conditional_call(SEXP tyuno,
   if(export_variance)
     SET_STRING_ELT(out_names, 5, mkChar("variance_metadata"));
   setAttrib(out, R_NamesSymbol, out_names);
+  if(fit_projection_ptr != NULL) {
+    if(fit_projection.emitted != en)
+      error("conditional plot projection returned incomplete rows");
+    PROTECT(projection_result = allocVector(VECSXP, 12));
+    PROTECT(projection_names = allocVector(STRSXP, 12));
+    projection_protected += 2;
+    SET_VECTOR_ELT(projection_result, 0, projection_basis);
+    SET_VECTOR_ELT(projection_result, 1, projection_rows);
+    SET_VECTOR_ELT(projection_result, 2, projection_constant);
+    SET_STRING_ELT(projection_names, 0, mkChar("basis"));
+    SET_STRING_ELT(projection_names, 1, mkChar("projection"));
+    SET_STRING_ELT(projection_names, 2, mkChar("constant"));
+    setAttrib(projection_result, R_NamesSymbol, projection_names);
+        SET_VECTOR_ELT(projection_result,3,capture_weights);
+    SET_VECTOR_ELT(projection_result,4,capture_directions);
+    SET_VECTOR_ELT(projection_result,5,capture_adjoints);
+    SET_VECTOR_ELT(projection_result,6,capture_count);
+    SET_VECTOR_ELT(projection_result,7,capture_coordinate);
+    SET_VECTOR_ELT(projection_result,8,capture_order);
+    SET_VECTOR_ELT(projection_result,9,capture_donor);
+    SET_VECTOR_ELT(projection_result,10,capture_response);
+    SET_VECTOR_ELT(projection_result,11,capture_logscale);
+    SET_STRING_ELT(projection_names,3,mkChar("weights"));
+    SET_STRING_ELT(projection_names,4,mkChar("directions"));
+    SET_STRING_ELT(projection_names,5,mkChar("adjoints"));
+    SET_STRING_ELT(projection_names,6,mkChar("captured"));
+    SET_STRING_ELT(projection_names,7,mkChar("coordinate"));
+    SET_STRING_ELT(projection_names,8,mkChar("order"));
+    SET_STRING_ELT(projection_names,9,mkChar("donor.order"));
+    SET_STRING_ELT(projection_names,10,mkChar("responses"));
+    SET_STRING_ELT(projection_names,11,mkChar("response.logscale"));
+    setAttrib(out, install(".np.conditional.projection"), projection_result);
+  }
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
@@ -10242,7 +10350,7 @@ static SEXP np_density_conditional_call(SEXP tyuno,
     if(any_empty) setAttrib(out, install(".np.empty.rows"), empty_flags);
     if(any_base) setAttrib(out, install(".np.empty.base.rows"), empty_base);
   }
-  UNPROTECT(36 + first_se_protected + export_variance + 2*allow_empty);
+  UNPROTECT(36 + first_se_protected + export_variance + 2*allow_empty + projection_protected);
   return out;
 }
 
@@ -10287,7 +10395,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
     exuno, exord, excon, rbw, ymcv, ypadnum, xmcv, xpadnum,
     nconfac, ncatfac, mysd, myopti, enrow, xndim,
     ckerlbx, ckerubx, ckerlby, ckeruby, regtype, glp_degree,
-    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, allow_external, 0);
+    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, allow_external, 0, R_NilValue);
 }
 
 SEXP C_np_density_conditional_variance(SEXP tyuno,
@@ -10331,7 +10439,84 @@ SEXP C_np_density_conditional_variance(SEXP tyuno,
     exuno, exord, excon, rbw, ymcv, ypadnum, xmcv, xpadnum,
     nconfac, ncatfac, mysd, myopti, enrow, xndim,
     ckerlbx, ckerubx, ckerlby, ckeruby, regtype, glp_degree,
-    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, allow_external, 1);
+    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, allow_external, 1, R_NilValue);
+}
+
+typedef struct {
+  SEXP args[36];
+  NPConditionalPlotCapture *previous;
+  int previous_engine, previous_bernstein, previous_basis;
+  int *previous_degree, *previous_gradient_order;
+} NPConditionalProjectionCall;
+static SEXP np_conditional_projection_body(void *data)
+{
+  NPConditionalProjectionCall *call=(NPConditionalProjectionCall *)data;
+  return np_density_conditional_call(
+    call->args[0], call->args[1], call->args[2], call->args[3], call->args[4], call->args[5], call->args[6], call->args[7], call->args[8], call->args[9], call->args[10], call->args[11], call->args[12], call->args[13], call->args[14], call->args[15], call->args[16], call->args[17], call->args[18], call->args[19], call->args[20], call->args[21], call->args[22], call->args[23], call->args[24], call->args[25], call->args[26], call->args[27], call->args[28], call->args[29], call->args[30], call->args[31], call->args[32], call->args[33], call->args[34], INTEGER(call->args[35])[1], call->args[35]);
+}
+static void np_conditional_projection_cleanup(void *data, Rboolean jump)
+{
+  NPConditionalProjectionCall *call=(NPConditionalProjectionCall *)data;
+  (void)jump;
+  np_conditional_plot_capture_swap(call->previous);
+  /* Only the opt-in plot request owns this scope. Restore even when validation
+   * fails after the conditional wrapper installs temporary GLP pointers. */
+  np_lp_engine_extern = call->previous_engine;
+  vector_glp_degree_extern = call->previous_degree;
+  vector_glp_gradient_order_extern = call->previous_gradient_order;
+  int_glp_bernstein_extern = call->previous_bernstein;
+  int_glp_basis_extern = call->previous_basis;
+}
+SEXP C_np_density_conditional_projection(SEXP tyuno,
+                              SEXP tyord,
+                              SEXP tycon,
+                              SEXP txuno,
+                              SEXP txord,
+                              SEXP txcon,
+                              SEXP eyuno,
+                              SEXP eyord,
+                              SEXP eycon,
+                              SEXP exuno,
+                              SEXP exord,
+                              SEXP excon,
+                              SEXP rbw,
+                              SEXP ymcv,
+                              SEXP ypadnum,
+                              SEXP xmcv,
+                              SEXP xpadnum,
+                              SEXP nconfac,
+                              SEXP ncatfac,
+                              SEXP mysd,
+                              SEXP myopti,
+                              SEXP enrow,
+                              SEXP xndim,
+                              SEXP ckerlbx,
+                              SEXP ckerubx,
+                              SEXP ckerlby,
+                              SEXP ckeruby,
+                              SEXP regtype,
+                              SEXP glp_degree,
+                              SEXP glp_bernstein,
+                              SEXP glp_basis,
+                              SEXP first_se,
+                              SEXP cat_se_request,
+                              SEXP se_request,
+                              SEXP allow_external,
+                              SEXP projection_request)
+{
+  if(TYPEOF(projection_request) != INTSXP || XLENGTH(projection_request) != 2 ||
+     INTEGER(projection_request)[0] == NA_INTEGER ||
+     (INTEGER(projection_request)[1] != 0 && INTEGER(projection_request)[1] != 1))
+    error("invalid conditional plot projection request");
+  NPConditionalProjectionCall call={.args={tyuno, tyord, tycon, txuno, txord, txcon, eyuno, eyord, eycon, exuno, exord, excon, rbw, ymcv, ypadnum, xmcv, xpadnum, nconfac, ncatfac, mysd, myopti, enrow, xndim, ckerlbx, ckerubx, ckerlby, ckeruby, regtype, glp_degree, glp_bernstein, glp_basis, first_se, cat_se_request, se_request, allow_external, projection_request},
+    .previous=np_conditional_plot_capture_swap(NULL),
+    .previous_engine=np_lp_engine_extern,
+    .previous_degree=vector_glp_degree_extern,
+    .previous_gradient_order=vector_glp_gradient_order_extern,
+    .previous_bernstein=int_glp_bernstein_extern,
+    .previous_basis=int_glp_basis_extern};
+  return R_UnwindProtect(np_conditional_projection_body,&call,
+    np_conditional_projection_cleanup,&call,NULL);
 }
 
 static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
@@ -19400,7 +19585,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             const int *cat_se_mask,
                             double *variance_metadata,
                             NPRegressionLPEmptyRows *empty_rows,
-                            int gnn_lp_fit_tree){
+                            int gnn_lp_fit_tree,
+                            NPRegressionFitProjection *fit_projection,
+                            int *projection_constant, NPConditionalPlotCapture *plot_capture){
   /* Likelihood bandwidth selection for density estimation */
   int cat_se_status = 0;
   NPRegressionFailure row_failure = {0};
@@ -20286,6 +20473,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           goto cleanup_conditional_lp;
         } while(0);
 
+      if(plot_capture != NULL && status == 0) {
+        const int row=ipe_XY[j];
+        for(int ii=0;ii<plot_capture->n;++ii)
+          plot_capture->responses[(size_t)row*plot_capture->n+ipt_XY[ii]]=ykw[ii];
+        plot_capture->response_logscale[row]=beta_y_active ? beta_y_log_scale : 0.0;
+      }
+
       /* Certified ordinary GENERAL maps reproduce constants.  Inconclusive
        * and all-large maps retain the accepted uncentered response instead. */
       const double response_anchor = translate_cdf ? ykw[0] : 0.0;
@@ -20303,6 +20497,19 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         row_empty = *empty_rows;
         row_empty.row_map = ipe_XY + j;
         row_empty.component_flags = empty_components;
+      }
+      NPRegressionFitProjection row_projection = {0};
+      NPRegressionFitProjection *row_projection_ptr = NULL;
+      if(fit_projection != NULL) {
+        row_projection = *fit_projection;
+        row_projection.donor_map = ipt_XY;
+        row_projection.eval_map = &ipe_XY[j];
+        row_projection.emitted = 0;
+        row_projection.constant = 0;
+        row_projection_ptr = &row_projection;
+        plot_capture->row=ipe_XY[j];
+        plot_capture->donor_map=ipt_XY;
+        for(int ii=0;ii<plot_capture->n;++ii) plot_capture->donor_order[ii]=ipt_XY[ii];
       }
       status = kernel_estimate_regression_categorical_tree_np(lp_engine_eff,
                                                                KERNEL_reg_extern,
@@ -20348,7 +20555,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                variance_metadata != NULL ? &variance_one : NULL,
                                                                  &row_failure, &conditional_design,
                                                                  ann_fit_batch == NULL ? NULL :
-                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1), NULL);
+                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1), row_projection_ptr);
 
       if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
         do {
@@ -20367,6 +20574,17 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           goto cleanup_conditional_lp;
         } while(0);
 
+      if(fit_projection != NULL) {
+        if(row_projection.emitted != 1 || plot_capture->failed) {
+          np_regression_failure_message(&row_failure,
+            NP_REGRESSION_FAILURE_CONDITIONAL, 1,
+            "conditional plot projection did not return its requested row");
+          status = NP_REGRESSION_FIT_ERR_DEFERRED;
+          goto cleanup_conditional_lp;
+        }
+        projection_constant[ipe_XY[j]] = row_projection.constant;
+        ++fit_projection->emitted;
+      }
       mean_one[0] += response_anchor;
 
       if(empty_rows != NULL && row_empty.count > empty_rows->count)
@@ -24280,3 +24498,39 @@ void np_quantile_conditional(double * tc_con,
 
   return ;
 }
+
+/* Private plot inference: new np.c entry, after its existing support/matrix parsers.
+ * Reuses np_categorical_support_parse without changing that shared parser.
+ * The numerical/gate scope and unwind cleanup remain owned by jksum.c.
+ */
+extern SEXP np_plot_gate_dispatch_native(SEXP, SEXP, SEXP, int,
+                                        const int *, const double *const *);
+
+SEXP C_np_plot_gate_dispatch(SEXP kind, SEXP native_args, SEXP geometry)
+{
+  if(TYPEOF(geometry) != VECSXP || XLENGTH(geometry) != 6)
+    error("plot gate geometry must have exactly six fields");
+  SEXP train = VECTOR_ELT(geometry, 0), support = VECTOR_ELT(geometry, 3);
+  if(TYPEOF(train) != VECSXP || XLENGTH(train) != 3)
+    error("plot gate training geometry must have exactly three groups");
+  int n = 0, dimensions[4] = {0, 0, 0, 0};
+  SEXP data[4] = {R_NilValue, R_NilValue, VECTOR_ELT(train, 0), VECTOR_ELT(train, 1)};
+  for(int group = 0; group < 3; ++group) {
+    int rows = 0, columns = 0;
+    SEXP x = VECTOR_ELT(train, group);
+    np_matrix_dims_or_zero(x, &rows, &columns);
+    if(TYPEOF(x) != REALSXP || rows <= 0 || columns < 0 ||
+       XLENGTH(x) != (R_xlen_t)rows*columns || (group > 0 && rows != n))
+      error("plot gate complete training geometry dimensions differ");
+    n = rows;
+    if(group < 2) dimensions[group+2] = columns;
+  }
+  const NPCategoricalSupport parsed =
+    np_categorical_support_parse(support, n, dimensions, data);
+  return np_plot_gate_dispatch_native(kind, native_args, geometry,
+    parsed.columns, parsed.counts, parsed.values);
+}
+
+#include "np_plot_regression_gradient_projection.h"
+
+#include "np_plot_beta_moment_entry.h"

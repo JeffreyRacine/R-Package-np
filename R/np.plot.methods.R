@@ -859,6 +859,12 @@ np_render_control <- function(style = c("band", "bar"),
       }
     }
   }
+  if (isTRUE(gradients) && identical(errors,"asymptotic")) {
+    training <- .np_plot_conmode_training_data(object)
+    for(j in seq_len(p)) out[[j]] <- .np_plot_conmode_joint_columns(
+      out[[j]],object,training$xtrain,training$ytrain,xeval,level,lev,
+      rep(NA_real_,nrow(xeval)),alpha,band,gaussian.draws)
+  }
   names(out) <- xnames
   out
 }
@@ -1429,6 +1435,9 @@ np_render_control <- function(style = c("band", "bar"),
         view = "fixed",
         stringsAsFactors = FALSE
       )
+      if (identical(errors,"asymptotic")) out[[j]] <- .np_plot_conmode_joint_columns(
+        out[[j]],object,xtrain,ytrain,exdat,level,lev,
+        rep(NA_real_,nrow(exdat)),alpha,band,gaussian.draws)
     } else {
       pmat <- matrix(NA_real_, nrow(exdat), length(lev),
                      dimnames = list(NULL, lev))
@@ -1955,8 +1964,8 @@ np_render_control <- function(style = c("band", "bar"),
     stop("plot.conmode probability intervals currently use simple asymptotic line/error-bar rendering; render.control/style arguments are not yet implemented",
          call. = FALSE)
   gradients <- npValidateScalarLogical(gradients, "gradients")
-  if (!identical(errors, "none") && isTRUE(gradients))
-    stop("plot.conmode intervals are available for class probabilities, not probability gradients/effects",
+  if (identical(errors, "bootstrap") && isTRUE(gradients))
+    stop("plot.conmode gradient/effect intervals currently require errors=\"asymptotic\"",
          call. = FALSE)
   data.rug <- npValidateScalarLogical(data.rug, "data.rug")
   renderer <- "base"
@@ -2108,9 +2117,9 @@ np_render_control <- function(style = c("band", "bar"),
     panel.dots <- plot.user.args
     if (!is.null(dots$main) && length(plot.data) > 1L)
       panel.dots$main <- paste(dots$main, names(plot.data)[i], sep = ": ")
-    joint.all <- identical(errors, "asymptotic") && identical(band, "all") &&
+    joint.all <- identical(errors, "asymptotic") && (identical(band, "all") || isTRUE(gradients)) &&
       !is.null(attr(plot.data[[i]], "band.calibration", exact = TRUE))
-    panel <- if (joint.all) function(...) .np_plot_conmode_all_panel(..., legend = legend) else
+    panel <- if (joint.all) function(...) .np_plot_conmode_all_panel(..., legend = legend, band = band) else
       .np_plot_conmode_panel
     panel(
       plot.data[[i]],

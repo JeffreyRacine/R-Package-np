@@ -9815,7 +9815,8 @@ plotFactor <- function(f, y, ...){
                                           lp.higher.se.demand = NULL,
                                       allow.external = FALSE,
                                       .np.defer.empty.rows = TRUE,
-                                      gradient.target = NULL) {
+                                      gradient.target = NULL,
+                                      projection.request = NULL) {
   allow.external <- npValidateScalarLogical(allow.external, "allow.external")
   .np.defer.empty.rows <- npValidateScalarLogical(.np.defer.empty.rows, ".np.defer.empty.rows")
   se <- npValidateScalarLogical(se, "se")
@@ -10070,7 +10071,7 @@ plotFactor <- function(f, y, ...){
     basis.code,
     first.se.request,
     cat.se.request,
-    se, allow.external
+    se, allow.external, projection.request = projection.request
   )
 
   empty.rows <- attr(myout, ".np.empty.rows", exact = TRUE)
@@ -10268,6 +10269,9 @@ plotFactor <- function(f, y, ...){
     }
   }
   if (!is.null(base.rows)) attr(out, ".np.empty.base.rows") <- base.rows
+  if (!is.null(projection.request))
+    attr(out, ".np.conditional.projection") <-
+      attr(myout, ".np.conditional.projection", exact = TRUE)
   empty.rows <- .npreg_merge_empty_rows(empty.rows,
     attr(out, ".np.empty.rows", exact = TRUE))
   .npreg_finish_empty_rows(out, empty.rows, defer = .np.defer.empty.rows,

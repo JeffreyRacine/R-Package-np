@@ -23,6 +23,7 @@ extern SEXP C_np_density_conditional_prepared_native_search(SEXP, SEXP, SEXP, SE
 extern SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_destroy(void);
 extern SEXP C_np_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_density_conditional_projection(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_variance(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_conditional_count_levels(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -76,9 +77,29 @@ extern SEXP C_np_reset_native_estimator_state(void);
 extern SEXP C_np_set_seed(SEXP);
 extern SEXP C_np_release_static_buffers(void);
 
+extern SEXP C_np_plot_alllarge_derivative(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_gate_dispatch(SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_projection_apply(SEXP, SEXP, SEXP);
 
+extern SEXP C_np_plot_regression_gradient_projection(SEXP);
+extern SEXP C_np_plot_beta_moment_weights(SEXP);
+extern SEXP C_np_plot_lsq_precision_propagate(SEXP, SEXP);
+extern SEXP C_np_plot_ann_kernel_terms(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_ann_cdf_terms(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_nn_response_jet(SEXP,SEXP,SEXP,SEXP,SEXP,SEXP,SEXP);
+
+extern SEXP C_np_plot_ann_rank_decode(SEXP, SEXP);
+
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_plot_ann_rank_decode", (DL_FUNC) &C_np_plot_ann_rank_decode, 2},
+    {"C_np_plot_regression_gradient_projection", (DL_FUNC) &C_np_plot_regression_gradient_projection, 1},
+    {"C_np_plot_beta_moment_weights", (DL_FUNC) &C_np_plot_beta_moment_weights, 1},
+    {"C_np_plot_lsq_precision_propagate", (DL_FUNC) &C_np_plot_lsq_precision_propagate, 2},
+    {"C_np_plot_ann_kernel_terms", (DL_FUNC) &C_np_plot_ann_kernel_terms, 6},
+    {"C_np_plot_ann_cdf_terms", (DL_FUNC) &C_np_plot_ann_cdf_terms, 6},
+    {"C_np_plot_nn_response_jet", (DL_FUNC) &C_np_plot_nn_response_jet, 7},
+    {"C_np_plot_alllarge_derivative", (DL_FUNC) &C_np_plot_alllarge_derivative, 10},
+    {"C_np_plot_gate_dispatch", (DL_FUNC) &C_np_plot_gate_dispatch, 3},
     {"C_np_plot_projection_apply", (DL_FUNC) &C_np_plot_projection_apply, 3},
     {"C_np_nomad_condition_raise", (DL_FUNC) &C_np_nomad_condition_raise, 1},
     {"C_np_ordered_rly_matrix", (DL_FUNC) &C_np_ordered_rly_matrix, 4},
@@ -94,6 +115,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_density_conditional_prepared_fixed_native_search",(DL_FUNC) &C_np_density_conditional_prepared_fixed_native_search,12},
     {"C_np_density_conditional_prepared_destroy",(DL_FUNC) &C_np_density_conditional_prepared_destroy,0},
     {"C_np_density_conditional",       (DL_FUNC) &C_np_density_conditional,       35},
+    {"C_np_density_conditional_projection",       (DL_FUNC) &C_np_density_conditional_projection,       36},
     {"C_np_density_conditional_variance",(DL_FUNC) &C_np_density_conditional_variance,35},
     {"C_np_conditional_count_levels",  (DL_FUNC) &C_np_conditional_count_levels,  22},
     {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,24},
