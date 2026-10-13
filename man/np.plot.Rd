@@ -520,8 +520,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   derivatives retain their existing restrictions. Unconditional adaptive-NN
   uniform kernels are supported on regular spacing and support-face domains.
   Fixed continuous conditional LC specifications also support beta kernels.
-  Proper-projected densities/CDFs, conditional quantiles and other continuous
-  kernel specifications retain unavailable simultaneous limits.
+  Proper-projected density/CDF plots and other continuous kernel
+  specifications retain their documented simultaneous-band restrictions.
+  Conditional quantile plots have a separate finite-grid influence
+  construction; see \code{\link{npqreg}} for its supported level and
+  gradient targets and conditioning assumptions.
 
   These density-family bands use the incumbent marginal standard errors and
   the correlation of centered observation-level empirical influence rows.

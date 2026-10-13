@@ -446,6 +446,10 @@
 
 .np_plot_copula_influence <- function(object, data, ex, se) {
   bws <- object[["bws", exact = TRUE]]
+  if (identical(object[["target", exact = TRUE]], "density") &&
+      bws[["type", exact = TRUE]] %in% c("generalized_nn", "adaptive_nn"))
+    return(.np_plot_copula_ratio_influence(object, data, ex, se,
+      owner = environment(.np_plot_copula_influence)))
   if (identical(bws[["type", exact = TRUE]], "adaptive_nn")) {
     # New simultaneous inference owns its scale; legacy marginal fields may
     # remain NA. Native point owners and old interval requests are untouched.
@@ -1574,7 +1578,7 @@
   mb<-lapply(seq_len(p),function(j)f('.npcopula_marginal_bw')(bws,data,j,target='density',kbandwidth=TRUE))
   train<-lapply(seq_len(p),function(j)f('.npcopula_marginal_data')(bws,data,j))
   evaluate<-lapply(seq_len(p),function(j)f('.npcopula_marginal_eval_data')(bws,evaluation,j))
-  A<-error.A<-matrix(NA_real_,m,n);estimate<-denominator<-numeric(m);face.record<-list()
+  A<-error.A<-matrix(NA_real_,m,n);estimate<-denominator<-point.error<-numeric(m);face.record<-list()
   for(start in seq.int(1L,m,by=tile)) {
     rows<-seq.int(start,min(m,start+tile-1L));nr<-length(rows)
     ev<-as.matrix(evaluation[rows,con,drop=FALSE]);storage.mode(ev)<-'double'
@@ -1668,12 +1672,17 @@
       error.A[rows[q],]<-positive.div(ue,D[q]-DE[q])+positive.div(positive.mul(abs(unscaled),DE[q]),D[q]*(D[q]-DE[q]))
     }
     estimate[rows]<-colMeans(K)/D;denominator[rows]<-D
+    # Expose the existing primitive amplitude disagreement for the new
+    # full ratio composition. Canonical points and geometry are unchanged.
+    point.error[rows]<-positive.div(positive.div(colSums(KE),n),D-DE)+
+      positive.div(positive.mul(abs(colMeans(K)),DE),positive.mul(D,D-DE))
   }
   if(any(!is.finite(c(A,estimate,denominator))))stop('np_plot_ann_unavailable: ANN copula factor is not representable')
   scale<-f('.np_plot_four_factor_se')(A);bound<-f('.np_plot_four_factor_se')(error.A)
   ratio<-ifelse(scale>0,bound/scale,ifelse(bound==0,0,Inf))
   if(any(!is.finite(ratio))||any(ratio>1e-8))stop('np_plot_beta_numerical_unavailable: factor-relative amplitude disagreement')
   list(A=A,estimate=estimate,denominator=denominator,
+    point.absolute.discrepancy=point.error,
     simultaneous.se=scale,exact.diagonal=TRUE,
     factor.absolute.discrepancy=error.A,factor.discrepancy.norm=bound,factor.discrepancy.ratio=ratio,
     numerical.contract='same-shape canonical PDF versus independent Rmath agreement; not rigorous special-function enclosure',
