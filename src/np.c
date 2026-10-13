@@ -20132,6 +20132,16 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         prepared_x_bandwidth.bandwidth_train);
     }
 
+    /* Beta response scaling retains its pre-translation arithmetic.  Only a
+     * conditional-only certificate can admit the ordinary CDF translation. */
+    const int translate_cdf =
+      dens_or_dist == NP_DO_DIST && lp_engine_eff != NP_LP_ENGINE_SCALAR &&
+      kernel_route == NULL && response_kernel_route == NULL &&
+      np_conditional_cdf_translation_safe(
+        KERNEL_reg_extern, BANDWIDTH_den_extern, num_obs_train_extern,
+        num_reg_continuous_extern, num_reg_unordered_extern,
+        num_reg_ordered_extern, vsf_x, matrix_XY_continuous_train_extern);
+
     saved_cker_bound = int_cker_bound_extern;
     saved_ckerlb = vector_ckerlb_extern;
     saved_ckerub = vector_ckerub_extern;
@@ -20276,13 +20286,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           goto cleanup_conditional_lp;
         } while(0);
 
-      /* Translate only the conditional LP CDF response. The unchanged
-       * intercept-corrected ridge solve reproduces constants, so restoring
-       * the anchor preserves the estimator while saturated CDF rows avoid
-       * subtracting nearly equal, ill-conditioned uncentered solutions. */
-      const double response_anchor =
-        dens_or_dist == NP_DO_DIST && lp_engine_eff != NP_LP_ENGINE_SCALAR ?
-          ykw[0] : 0.0;
+      /* Certified ordinary GENERAL maps reproduce constants.  Inconclusive
+       * and all-large maps retain the accepted uncentered response instead. */
+      const double response_anchor = translate_cdf ? ykw[0] : 0.0;
       if(response_anchor != 0.0)
         for(int observation = 0; observation < num_obs_train_extern; ++observation)
           ykw[observation] -= response_anchor;

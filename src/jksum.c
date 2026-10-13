@@ -3800,6 +3800,60 @@ static int np_cont_largeh_build_params(const int num_obs_train,
   return 0;
 }
 
+/* Conditional CDF response translation needs an affine accepted owner.  The
+ * all-large GENERAL shortcut deliberately lacks the ordinary intercept
+ * correction.  A training-span exclusion is sufficient for every evaluation
+ * row and does not select, disable, or duplicate a computational owner. */
+int np_conditional_cdf_translation_safe(
+  const int kernel, const int bandwidth_mode, const int ntrain,
+  const int ncontinuous, const int nunordered, const int nordered,
+  double *scale_factors, double **x_train)
+{
+  if(bandwidth_mode == BW_GEN_NN || bandwidth_mode == BW_ADAP_NN)
+    return 1; /* The existing all-large owner is fixed-bandwidth only. */
+  if(bandwidth_mode != BW_FIXED || ntrain <= 0 || ncontinuous <= 0)
+    return 0;
+
+  /* The shared owner refreshes these options later in this invocation.  Read
+   * that same current option snapshot here, never a previous call's values.
+   * This does not populate or alter the continuous large-h geometry cache. */
+  np_refresh_runtime_tolerances();
+  if(!np_largeh_enabled())
+    return 1;
+
+  int *kernel_codes = (int *)R_alloc((size_t)ncontinuous, sizeof(int));
+  double **bandwidth = (double **)R_alloc((size_t)ncontinuous, sizeof(double *));
+  double *bandwidth_values = (double *)R_alloc((size_t)ncontinuous, sizeof(double));
+  double *lambda = (double *)R_alloc((size_t)MAX(1, nunordered + nordered), sizeof(double));
+  for(int j = 0; j < ncontinuous; ++j) {
+    kernel_codes[j] = kernel;
+    bandwidth[j] = bandwidth_values + j;
+  }
+  if(kernel_bandwidth_mean_ctx(kernel, BW_FIXED, ntrain, 0,
+       0, 0, 0, ncontinuous, nunordered, nordered, 1, scale_factors,
+       NULL, NULL, x_train, x_train, NULL, bandwidth, lambda,
+       NULL, NULL, NULL) != 0)
+    return 0;
+
+  int *ok = NULL;
+  double *hmin = NULL, *k0 = NULL;
+  if(!np_cont_largeh_build_params(ntrain, 0, ncontinuous, kernel_codes,
+       x_train, x_train, np_cont_largeh_rel_tol(), &ok, &hmin, &k0))
+    return 0;
+  int safe = 0;
+  for(int j = 0; j < ncontinuous; ++j) {
+    if(!ok[j] || (isfinite(bandwidth_values[j]) &&
+                   fabs(bandwidth_values[j]) < hmin[j])) {
+      safe = 1;
+      break;
+    }
+  }
+  free(ok);
+  free(hmin);
+  free(k0);
+  return safe;
+}
+
 static int np_cont_largeh_cache_match(const int num_obs_train,
                                       const int num_obs_eval,
                                       const int num_reg_continuous,
