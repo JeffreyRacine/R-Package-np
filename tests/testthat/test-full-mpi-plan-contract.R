@@ -110,3 +110,37 @@ test_that("measured formula workloads have separate bounded MPI units", {
   for (file in required)
     expect_equal(sum(vapply(plan, identical, TRUE, file)), 1L, info = file)
 })
+
+test_that("measured conmode probability plots have an independent MPI budget", {
+  helper <- testthat::test_path("..", "validation", "full_mpi_test_plan.R")
+  skip_if_not(file.exists(helper), "source plan helper unavailable")
+  scope <- new.env(parent = globalenv())
+  sys.source(helper, envir = scope)
+  # Independent of the registry so accidental removal is a real failure.
+  required <- "test-npconmode-proper-probability-contract.R"
+  files <- sort(list.files(testthat::test_path(), "^test-.*\\.[rR]$"))
+  expect_true(required %in% files)
+  expect_true(required %in% scope$npRmpi_full_test_singleton_files())
+  before <- c("test-npconmode-proper-probability-contract-before1.R",
+              "test-npconmode-proper-probability-contract-before2.R")
+  after <- c("test-npconmode-proper-probability-contract0.R",
+             "test-npconmode-proper-probability-contract1.R")
+  synthetic <- sort(unique(c(scope$npRmpi_full_test_singleton_files(),
+                            required, before, after)))
+  position <- match(required, synthetic)
+  expect_true(position > 1L && position < length(synthetic))
+  for (inventory in list(files, synthetic)) {
+    for (size in c(1L, 3L, 10L, length(inventory) + 1L)) {
+      plan <- scope$npRmpi_full_test_plan(inventory, size)
+      expect_identical(unlist(plan, use.names = FALSE), inventory)
+      expect_true(all(lengths(plan) >= 1L & lengths(plan) <= size))
+      singleton <- which(vapply(plan, identical, logical(1L), required))
+      expect_length(singleton, 1L)
+      if (identical(inventory, synthetic) && length(singleton) == 1L) {
+        at <- singleton[[1L]]
+        expect_identical(tail(plan[[at - 1L]], 1L), synthetic[position - 1L])
+        expect_identical(head(plan[[at + 1L]], 1L), synthetic[position + 1L])
+      }
+    }
+  }
+})
