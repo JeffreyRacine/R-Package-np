@@ -114,7 +114,8 @@ SEXP C_np_plot_ann_cdf_terms(SEXP train,SEXP query,SEXP bandwidth,
   SEXP dims=PROTECT(allocVector(INTSXP,3));INTEGER(dims)[0]=n;INTEGER(dims)[1]=m;INTEGER(dims)[2]=p;
   for(int z=0;z<3;++z) {SEXP v=PROTECT(allocVector(REALSXP,(R_xlen_t)count));setAttrib(v,R_DimSymbol,dims);SET_VECTOR_ELT(out,z,v);UNPROTECT(1);}
   SET_VECTOR_ELT(out,3,ScalarReal(forecast));
-  for(int z=0;z<4;++z)SET_STRING_ELT(names,z,mkChar(keys[z]));setAttrib(out,R_NamesSymbol,names);
+  for(int z=0;z<4;++z)SET_STRING_ELT(names,z,mkChar(keys[z]));
+  setAttrib(out,R_NamesSymbol,names);
   double *work=(double *)R_alloc(1024,sizeof(double));int *iwork=(int *)R_alloc(256,sizeof(int));
   for(int j=0;j<p;++j)for(int i=0;i<n;++i) {
     size_t ij=i+(size_t)n*j;

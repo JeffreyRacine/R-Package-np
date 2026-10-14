@@ -9,7 +9,8 @@ SEXP C_np_plot_ann_rank_decode(SEXP requested,SEXP nobs)
   SEXP out=PROTECT(allocVector(VECSXP,3)),names=PROTECT(allocVector(STRSXP,3));
   SET_VECTOR_ELT(out,0,allocVector(INTSXP,p));SET_VECTOR_ELT(out,1,allocVector(REALSXP,p));SET_VECTOR_ELT(out,2,allocVector(LGLSXP,p));
   const char *keys[]={"lookup","distance.scale","extended"};
-  for(int j=0;j<3;++j)SET_STRING_ELT(names,j,mkChar(keys[j]));setAttrib(out,R_NamesSymbol,names);
+  for(int j=0;j<3;++j)SET_STRING_ELT(names,j,mkChar(keys[j]));
+  setAttrib(out,R_NamesSymbol,names);
   for(int j=0;j<p;++j) {
     int k=0,extended=0;double scale=NA_REAL;
     if(np_nn_lookup_from_scale(n,1,REAL(requested)[j],&k,&scale,&extended))

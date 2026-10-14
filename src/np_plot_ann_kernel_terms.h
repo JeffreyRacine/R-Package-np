@@ -114,7 +114,8 @@ SEXP C_np_plot_ann_kernel_terms(SEXP train,SEXP query,SEXP bandwidth,
   for(int z=2;z<4;++z)SET_VECTOR_ELT(out,z,allocMatrix(REALSXP,n,p));
   for(int z=4;z<6;++z) {SEXP v=PROTECT(allocVector(REALSXP,(R_xlen_t)count));setAttrib(v,R_DimSymbol,dims);SET_VECTOR_ELT(out,z,v);UNPROTECT(1);}
   SET_VECTOR_ELT(out,6,ScalarReal(forecast));
-  for(int z=0;z<7;++z)SET_STRING_ELT(names,z,mkChar(keys[z]));setAttrib(out,R_NamesSymbol,names);
+  for(int z=0;z<7;++z)SET_STRING_ELT(names,z,mkChar(keys[z]));
+  setAttrib(out,R_NamesSymbol,names);
   for(int j=0;j<p;++j)for(int i=0;i<n;++i) {
     R_CheckUserInterrupt();size_t ij=i+(size_t)n*j;
     double y=REAL(train)[ij],h=REAL(bandwidth)[ij],lb=REAL(bounds)[2*j],ub=REAL(bounds)[2*j+1];
