@@ -221,7 +221,7 @@
   list(estimate = drop(crossprod(e, theta)) + center * e[1L], score = t(A), ridge = rep(ridge, nr))
 }
 .np_plot_density_conditional <- function(bws, x, y, ex, ey, cdf = FALSE, gradient = NULL,
-  order = 1L, factor.owner = NULL) {
+  order = 1L) {
   n <- nrow(x)
   m <- nrow(ex)
   if (nrow(y) != n || nrow(ey) != m || n < 2L || !m)
@@ -235,44 +235,20 @@
       if (order != 1L)
         stop("Categorical gradients require first differences")
       frames <- npCategoricalFirstDifferenceFrames(ex, index = gradient, where = "Gaussian density plot")
-      spec <- npConditionalRegEngineSpec(bws, where = "Gaussian density contrast")
-      # Match npcdhat's current owner: LC contrasts gate unordered weights;
-      # LP hats use raw weights except GNN degree > 1, which uses the core.
-      # These need not equal differences of the ordinary gated LP level fits.
-      gated <- if (identical(spec$reg.engine, "lc") || all(spec$degree.engine == 0L))
-        "unordered" else if (identical(bws[["type", exact = TRUE]], "generalized_nn") &&
-          any(spec$degree.engine > 1L)) "all" else "none"
-      u <- .np_plot_density_conditional(bws, x, y, frames$upper, ey, cdf, factor.owner = gated)
-      l <- .np_plot_density_conditional(bws, x, y, frames$lower, ey, cdf, factor.owner = gated)
+      u <- .np_plot_density_conditional(bws, x, y, frames$upper, ey, cdf)
+      l <- .np_plot_density_conditional(bws, x, y, frames$lower, ey, cdf)
       return(list(estimate = u$estimate - l$estimate, A = u$A - l$A, target = "paired endpoint empirical-mass contrast; realized geometry",
         ridge = c(u$ridge, l$ridge)))
     }
   }
   xb <- .npcdhat_make_xkbw(bws, x)
   yb <- .npcdhat_make_ybw(bws, y)
-  K <- .np_plot_density_matrix(xb, x, ex, rep("normal", ncol(x)))
-  Y <- .np_plot_density_matrix(yb, y, ey, rep(if (cdf) "integral" else "normal", ncol(y)))
+  K <- .np_conditional_literal_density_matrix(xb, x, ex, rep("normal", ncol(x)))
+  Y <- .np_conditional_literal_density_matrix(yb, y, ey, rep(if (cdf) "integral" else "normal", ncol(y)))
   spec <- npConditionalRegEngineSpec(bws, where = "Gaussian density plot")
   lc <- identical(spec$reg.engine, "lc") || all(spec$degree.engine == 0)
-  # LC continuous gradients use the native permutation owner. Its unordered
-  # explanatory factors are gated in both numerator and denominator (including
-  # derivative products); ordered factors retain their literal kernel values.
-  # The tile bridge observes that owner's effective native state, including
-  # its cached options; it does not create a second selection policy.
+  # Every conditional recipe uses literal categorical factors on both sides.
   lc.gradient <- lc && !is.null(gradient)
-  if (is.null(factor.owner))
-    factor.owner <- if (lc.gradient) "unordered" else if (lc) "none" else "all"
-  if (!identical(factor.owner, "none"))
-    K <- .np_plot_density_factor_weights(K, xb, x, ex, rep("normal", ncol(x)),
-      ordered = identical(factor.owner, "all"))
-  if (lc.gradient) {
-    yop <- rep(if (cdf) "integral" else "normal", ncol(y))
-    # Unordered CDF factors use the normal categorical kernel, as in the
-    # native OP_UFUN_OFFSETS[OP_INTEGRAL] == 0 contract.
-    yop[yb[["iuno", exact = TRUE]]] <- "normal"
-    Y <- .np_plot_density_factor_weights(Y, yb, y, ey, yop,
-      ordered = FALSE, constant.response = TRUE)
-  }
   if (lc) {
     den <- rowSums(K)
     # Translation cancels from a ratio derivative. For categorical responses
@@ -284,9 +260,7 @@
     if (!is.null(gradient)) {
       if (order != 1L)
         stop("LC supports first continuous derivatives only")
-      D <- .np_plot_density_derivative_matrix(xb, x, ex, gradient)
-      dop <- rep("normal", ncol(x)); dop[gradient] <- "derivative"
-      D <- .np_plot_density_factor_weights(D, xb, x, ex, dop, ordered = FALSE)
+      D <- .np_conditional_literal_derivative_matrix(xb, x, ex, gradient)
       H <- D/den - (K/den) * (rowSums(D)/den)
       deriv <- rowSums(H * Y)
       A <- H * (Y - mu) - (K/den) * deriv

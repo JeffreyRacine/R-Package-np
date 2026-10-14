@@ -721,6 +721,7 @@ npconmode.conbandwidth <-
     if (!(no.ey && !no.ex))
       cm.args$yeval <- if (no.ey) tydat else eydat
     con.mode <- do.call(conmode, cm.args)
+    con.mode <- .np_conditional_policy_stamp(con.mode)
     
     score.y <- if (no.ex) tydat[,1] else if (!no.ey) eydat[,1] else NULL
     score.keep <- if (is.null(score.y)) rep_len(FALSE, enrow) else

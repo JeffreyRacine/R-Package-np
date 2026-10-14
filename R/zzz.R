@@ -230,6 +230,8 @@
   if (!is.loaded("mpi_initialize"))
     stop("Probably npRmpi has been detached. Please quit R.")
 
+  .np_conditional_literal_initialize(pkg)
+
   # On macOS with MPICH, repeated spawn/close cycles have been observed to
   # destabilize subsequent MPI collectives. Default to reusing spawned slaves
   # (keep them alive) unless the user explicitly disables it.

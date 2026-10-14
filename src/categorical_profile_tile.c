@@ -1,3 +1,9 @@
+/* Compile-time categorical policy; incumbent expansion is unchanged. */
+#define NP_CF316_LITERAL 0
+#define NP_CF316_DISC_UPPER np_disc_near_upper
+#define NP_CF316_DISC_ORDERED_UPPER np_disc_ordered_near_upper
+#define NP_CF316_DISC_CONSTANT np_disc_near_const_kernel
+#define NP_CF316_SKIP_UPPER(x) x
 #include <math.h>
 #include <limits.h>
 #include <stddef.h>
@@ -209,61 +215,14 @@ np_categorical_profile_tile_bytes(size_t ntrain,
   return NP_PROFILE_TILE_OK;
 }
 
-static void np_categorical_profile_coordinate_fill_prevalidated(
+#include "conditional_literal/jksum_np_categorical_profile_coordinate_fill_prevalidated.inc"
+
+static void np_categorical_profile_coordinate_fill_prevalidated_conditional_literal(
   const NPCategoricalProfileKernelSpec *spec,
   int eval_index,
   int coordinate,
   int multiply,
-  double *output)
-{
-  if(coordinate < spec->nunordered) {
-    const int kernel = spec->kernel_unordered[coordinate] +
-      OP_UFUN_OFFSETS[spec->operator_code[coordinate]];
-
-    np_ukernelv(kernel,
-                spec->train_unordered[coordinate],
-                spec->ntrain,
-                multiply,
-                spec->eval_unordered[coordinate][eval_index],
-                spec->lambda[coordinate],
-                spec->num_categories[coordinate],
-                output,
-                NULL,
-                0);
-  } else {
-    const int ordered_coordinate = coordinate - spec->nunordered;
-    const int base_kernel = spec->kernel_ordered[ordered_coordinate];
-    const int operator_code = spec->operator_code[coordinate];
-
-    /* Preserve the incumbent ordered Li--Racine convolution owner. */
-    if(operator_code == OP_CONVOLUTION && base_kernel == 1) {
-      np_convol_okernelv(base_kernel,
-                         spec->train_ordered[ordered_coordinate],
-                         spec->ntrain,
-                         multiply,
-                         spec->eval_ordered[ordered_coordinate][eval_index],
-                         spec->lambda[coordinate],
-                         spec->num_categories[coordinate],
-                         spec->category_values[coordinate],
-                         output,
-                         0);
-    } else {
-      const int kernel = base_kernel + OP_OFUN_OFFSETS[operator_code];
-
-      np_okernelv(kernel,
-                  spec->train_ordered[ordered_coordinate],
-                  spec->ntrain,
-                  multiply,
-                  spec->eval_ordered[ordered_coordinate][eval_index],
-                  spec->lambda[coordinate],
-                  spec->category_values[coordinate],
-                  spec->num_categories[coordinate],
-                  output,
-                  NULL,
-                  0);
-    }
-  }
-}
+  double *output);
 
 NPCategoricalProfileTileStatus
 np_categorical_profile_tile_fill_prevalidated(
@@ -315,65 +274,17 @@ np_categorical_profile_tile_fill_prevalidated(
   return NP_PROFILE_TILE_OK;
 }
 
+#include "conditional_literal/jksum_np_categorical_profile_log_row_fill_prevalidated.inc"
+
 NPCategoricalProfileTileStatus
-np_categorical_profile_log_row_fill_prevalidated(
+np_categorical_profile_log_row_fill_prevalidated_conditional_literal(
   const NPCategoricalProfileKernelSpec *spec,
   int eval_index,
   int omitted_observation,
   double *scratch,
   size_t scratch_elements,
   double *log_absolute,
-  signed char *sign)
-{
-  NPCategoricalProfileTileStatus status;
-  int coordinate;
-  int observation;
-
-  if(spec == NULL || scratch == NULL || log_absolute == NULL || sign == NULL)
-    return NP_PROFILE_TILE_ERR_ARGUMENT;
-  if(eval_index < 0 || eval_index >= spec->neval ||
-     omitted_observation < -1 || omitted_observation >= spec->ntrain)
-    return NP_PROFILE_TILE_ERR_RANGE;
-  if(scratch_elements < (size_t)spec->ntrain)
-    return NP_PROFILE_TILE_ERR_CAPACITY;
-  status = np_categorical_profile_evaluation_data_validate(
-    spec, eval_index, 1);
-  if(status != NP_PROFILE_TILE_OK)
-    return status;
-
-  for(observation = 0; observation < spec->ntrain; ++observation) {
-    log_absolute[observation] =
-      observation == omitted_observation ? -INFINITY : 0.0;
-    sign[observation] = observation == omitted_observation ? 0 : 1;
-  }
-  for(coordinate = 0;
-      coordinate < spec->nunordered + spec->nordered;
-      ++coordinate) {
-    np_categorical_profile_coordinate_fill_prevalidated(
-      spec, eval_index, coordinate, 0, scratch);
-    for(observation = 0; observation < spec->ntrain; ++observation) {
-      const double factor = scratch[observation];
-
-      if(observation == omitted_observation)
-        continue;
-      if(!isfinite(factor))
-        return NP_PROFILE_TILE_ERR_NONFINITE;
-      if(sign[observation] == 0)
-        continue;
-      if(factor == 0.0) {
-        log_absolute[observation] = -INFINITY;
-        sign[observation] = 0;
-      } else {
-        log_absolute[observation] += log(fabs(factor));
-        sign[observation] =
-          (signed char)(sign[observation] * (factor < 0.0 ? -1 : 1));
-        if(!isfinite(log_absolute[observation]))
-          return NP_PROFILE_TILE_ERR_NONFINITE;
-      }
-    }
-  }
-  return NP_PROFILE_TILE_OK;
-}
+  signed char *sign);
 
 NPCategoricalProfileTileStatus
 np_categorical_profile_tile_fill(
@@ -421,3 +332,112 @@ const char *np_categorical_profile_tile_status_message(
     return "unknown categorical-profile tile status";
   }
 }
+
+/* Explicit conditional literal instantiation of the canonical bodies. */
+#undef NP_CF316_LITERAL
+#undef NP_CF316_DISC_UPPER
+#undef NP_CF316_DISC_ORDERED_UPPER
+#undef NP_CF316_DISC_CONSTANT
+#undef NP_CF316_SKIP_UPPER
+#define NP_CF316_LITERAL 1
+#define NP_CF316_DISC_UPPER np_conditional_literal_unordered_upper
+#define NP_CF316_DISC_ORDERED_UPPER np_conditional_literal_ordered_upper
+#define NP_CF316_DISC_CONSTANT np_conditional_literal_constant
+#define NP_CF316_SKIP_UPPER(x) 1
+#define np_p_ukernelv np_p_ukernelv_conditional_literal
+#define kernel_weighted_sum_np_ctx_ex kernel_weighted_sum_np_ctx_ex_conditional_literal
+#define kernel_weighted_sum_np_ctx kernel_weighted_sum_np_ctx_conditional_literal
+#define kernel_weighted_sum_np_power12 kernel_weighted_sum_np_power12_conditional_literal
+#define kernel_weighted_sum_np_fold_route kernel_weighted_sum_np_fold_route_conditional_literal
+#define kernel_weighted_sum_np_route kernel_weighted_sum_np_route_conditional_literal
+#define kernel_weighted_sum_np kernel_weighted_sum_np_conditional_literal
+#define np_categorical_profile_coordinate_fill_prevalidated np_categorical_profile_coordinate_fill_prevalidated_conditional_literal
+#define np_categorical_profile_log_row_fill_prevalidated np_categorical_profile_log_row_fill_prevalidated_conditional_literal
+#define np_beta_categorical_log_factor np_beta_categorical_log_factor_conditional_literal
+#define np_beta_regression_categorical_gradients_validated np_beta_regression_categorical_gradients_validated_conditional_literal
+#define np_beta_absolute_route_body np_beta_absolute_route_body_conditional_literal
+#define np_beta_absolute_route_execute np_beta_absolute_route_execute_conditional_literal
+#define np_beta_absolute_route np_beta_absolute_route_conditional_literal
+#define np_beta_scalar_regression_fit_canonical np_beta_scalar_regression_fit_canonical_conditional_literal
+#define np_beta_regression_lp_moment_row_canonical np_beta_regression_lp_moment_row_canonical_conditional_literal
+#define np_beta_scaled_row_context_prepare np_beta_scaled_row_context_prepare_conditional_literal
+#define np_conditional_count_legacy_row_impl np_conditional_count_legacy_row_impl_conditional_literal
+#define np_conditional_count_legacy_row np_conditional_count_legacy_row_conditional_literal
+#define np_regression_categorical_profile_fit_body np_regression_categorical_profile_fit_body_conditional_literal
+#define np_regression_categorical_profile_fit_execute np_regression_categorical_profile_fit_execute_conditional_literal
+#define np_regression_categorical_profile_fit np_regression_categorical_profile_fit_conditional_literal
+#define np_regression_profile_residual_kernel_sum np_regression_profile_residual_kernel_sum_conditional_literal
+#define np_empty_x_row_mark np_empty_x_row_mark_conditional_literal
+#define np_regression_scalar_fit_execute np_regression_scalar_fit_execute_conditional_literal
+#define np_regression_scalar_fit np_regression_scalar_fit_conditional_literal
+#define np_conditional_lp_project_accepted np_conditional_lp_project_accepted_conditional_literal
+#define np_conditional_plot_capture_accepted np_conditional_plot_capture_accepted_conditional_literal
+#define np_regression_general_lp_empty_row np_regression_general_lp_empty_row_conditional_literal
+#define np_regression_general_lp_point_at_frame np_regression_general_lp_point_at_frame_conditional_literal
+#define np_regression_general_lp_categorical_points np_regression_general_lp_categorical_points_conditional_literal
+#define np_regression_general_lp_fit_body np_regression_general_lp_fit_body_conditional_literal
+#define np_regression_general_lp_fit_execute np_regression_general_lp_fit_execute_conditional_literal
+#define np_regression_general_lp_fit_ann_execute np_regression_general_lp_fit_ann_execute_conditional_literal
+#define np_regression_general_lp_fit np_regression_general_lp_fit_conditional_literal
+#define kernel_estimate_regression_categorical_tree_np kernel_estimate_regression_categorical_tree_np_conditional_literal
+#define np_conditional_kernel_row_core np_conditional_kernel_row_core_conditional_literal
+#define np_conditional_kernel_row np_conditional_kernel_row_conditional_literal
+#define np_regression_lp_hat_matrix np_regression_lp_hat_matrix_conditional_literal
+#define np_plot_gate_prepare np_plot_gate_prepare_conditional_literal
+#define np_plot_gate_body np_plot_gate_body_conditional_literal
+#define np_plot_gate_dispatch_native np_plot_gate_dispatch_native_conditional_literal
+#define np_beta_absolute_route_dispatch np_beta_absolute_route_dispatch_conditional_literal
+#define np_beta_absolute_route_mpi_owner np_beta_absolute_route_mpi_owner_conditional_literal
+#define np_beta_scalar_regression_fit_block_canonical np_beta_scalar_regression_fit_block_canonical_conditional_literal
+#include "conditional_literal/jksum_np_categorical_profile_coordinate_fill_prevalidated.inc"
+#include "conditional_literal/jksum_np_categorical_profile_log_row_fill_prevalidated.inc"
+#undef np_p_ukernelv
+#undef kernel_weighted_sum_np_ctx_ex
+#undef kernel_weighted_sum_np_ctx
+#undef kernel_weighted_sum_np_power12
+#undef kernel_weighted_sum_np_fold_route
+#undef kernel_weighted_sum_np_route
+#undef kernel_weighted_sum_np
+#undef np_categorical_profile_coordinate_fill_prevalidated
+#undef np_categorical_profile_log_row_fill_prevalidated
+#undef np_beta_categorical_log_factor
+#undef np_beta_regression_categorical_gradients_validated
+#undef np_beta_absolute_route_body
+#undef np_beta_absolute_route_execute
+#undef np_beta_absolute_route
+#undef np_beta_scalar_regression_fit_canonical
+#undef np_beta_regression_lp_moment_row_canonical
+#undef np_beta_scaled_row_context_prepare
+#undef np_conditional_count_legacy_row_impl
+#undef np_conditional_count_legacy_row
+#undef np_regression_categorical_profile_fit_body
+#undef np_regression_categorical_profile_fit_execute
+#undef np_regression_categorical_profile_fit
+#undef np_regression_profile_residual_kernel_sum
+#undef np_empty_x_row_mark
+#undef np_regression_scalar_fit_execute
+#undef np_regression_scalar_fit
+#undef np_conditional_lp_project_accepted
+#undef np_conditional_plot_capture_accepted
+#undef np_regression_general_lp_empty_row
+#undef np_regression_general_lp_point_at_frame
+#undef np_regression_general_lp_categorical_points
+#undef np_regression_general_lp_fit_body
+#undef np_regression_general_lp_fit_execute
+#undef np_regression_general_lp_fit_ann_execute
+#undef np_regression_general_lp_fit
+#undef kernel_estimate_regression_categorical_tree_np
+#undef np_conditional_kernel_row_core
+#undef np_conditional_kernel_row
+#undef np_regression_lp_hat_matrix
+#undef np_plot_gate_prepare
+#undef np_plot_gate_body
+#undef np_plot_gate_dispatch_native
+#undef np_beta_absolute_route_dispatch
+#undef np_beta_absolute_route_mpi_owner
+#undef np_beta_scalar_regression_fit_block_canonical
+#undef NP_CF316_LITERAL
+#undef NP_CF316_DISC_UPPER
+#undef NP_CF316_DISC_ORDERED_UPPER
+#undef NP_CF316_DISC_CONSTANT
+#undef NP_CF316_SKIP_UPPER

@@ -8841,13 +8841,13 @@
   operator <- if (isTRUE(cdf)) "integral" else "normal"
   xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = xdat)
   ykbw <- .npcdhat_make_ybw(bws = bws, tydat = ydat)
-  Kx <- .npcdhat_make_kernel_matrix(
+  Kx <- .np_conditional_literal_kernel_matrix(
     kbw = xkbw,
     txdat = xdat,
     exdat = exdat,
     operator = rep.int("normal", ncol(xdat))
   )
-  Ky <- .npcdhat_make_kernel_matrix(
+  Ky <- .np_conditional_literal_kernel_matrix(
     kbw = ykbw,
     txdat = ydat,
     exdat = eydat,
@@ -9287,7 +9287,7 @@
   exydat <- .np_bind_data_frames_fast(exdat, eydat)
 
   den <- as.numeric(.np_plot_with_local_compiled_eval(
-    npksum(
+    npksum.conditional_literal(
       txdat = xdat,
       tydat = ones,
       exdat = exdat,
@@ -9298,7 +9298,7 @@
     )$ksum
   )) / n.total
   num <- as.numeric(.np_plot_with_local_compiled_eval(
-    npksum(
+    npksum.conditional_literal(
       txdat = xydat,
       tydat = ones,
       exdat = exydat,
@@ -9532,7 +9532,7 @@
   ex.groups <- .np_plot_exact_row_groups(exdat)
   exdat.unique <- ex.groups$unique
   ngroups <- nrow(exdat.unique)
-  Gy <- .npcdhat_make_kernel_matrix(
+  Gy <- .np_conditional_literal_kernel_matrix(
     kbw = ybw,
     txdat = ydat,
     exdat = eydat,
@@ -9558,7 +9558,7 @@
   basis <- reg.spec$basis.engine
   bernstein.basis <- reg.spec$bernstein.basis.engine
 
-  kw <- .np_kernel_weights_direct(
+  kw <- .np_conditional_literal_kernel_weights(
     bws = xbw,
     txdat = xdat,
     exdat = exdat.unique,
@@ -10299,11 +10299,11 @@
                                            cdf) {
   xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = xdat)
   ykbw <- .npcdhat_make_ybw(bws = bws, tydat = ydat)
-  Kx <- .npcdhat_make_kernel_matrix(
+  Kx <- .np_conditional_literal_kernel_matrix(
     kbw = xkbw, txdat = xdat, exdat = exdat,
     operator = rep.int("normal", ncol(xdat))
   )
-  Ky <- .npcdhat_make_kernel_matrix(
+  Ky <- .np_conditional_literal_kernel_matrix(
     kbw = ykbw, txdat = ydat, exdat = eydat,
     operator = rep.int(if (cdf) "integral" else "normal", ncol(ydat))
   )

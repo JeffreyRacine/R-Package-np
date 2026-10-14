@@ -230,6 +230,14 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
 
 }
 \details{
+  Conditional fitting and replay use the literal categorical kernels for
+  both explanatory and response variables. Near-upper categorical bandwidths
+  are not replaced by approximate constant factors. The same target is used
+  for levels, gradients, standard errors, conditional hats, and reconstructed
+  plot uncertainty. This conditional-family policy does not change direct
+  regression or unconditional kernel-sum evaluation and does not modify the
+  caller's \code{np.largelambda} option.
+
   With generalized nearest-neighbor bandwidths, query identity matters when
   selecting a radius: a training observation excludes its own occurrence,
   whereas explicit evaluation data remain external queries even if their

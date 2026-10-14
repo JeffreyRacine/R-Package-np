@@ -99,12 +99,12 @@
       exdat = ex[, xbw$icon, drop = FALSE], degree = spec$degree.engine,
       basis = spec$basis.engine, bernstein.basis = spec$bernstein.engine))
     storage.mode(d) <- "double"
-    w <- .np_kernel_weights_direct(xbw, txdat, exdat = ex,
+    w <- .np_conditional_literal_kernel_weights(xbw, txdat, exdat = ex,
       bandwidth.divide = TRUE,
       int.do.tree = .npreg_fit_tree_code(xbw, xbw$ncon, xbw$nuno + xbw$nord))
-    r <- t(.npcdhat_make_kernel_matrix(ybw, tydat, ey,
+    r <- t(.np_conditional_literal_kernel_matrix(ybw, tydat, ey,
       operator = if (cdf) "integral" else "normal"))
-    slope <- if (quantile) t(.npcdhat_make_kernel_matrix(
+    slope <- if (quantile) t(.np_conditional_literal_kernel_matrix(
       ybw, tydat, ey, operator = "normal")) else NULL
     out[rows, ] <- .Call("C_np_conditional_lp_pair_se", z, d,
       as.matrix(w), r, slope, PACKAGE = "npRmpi")

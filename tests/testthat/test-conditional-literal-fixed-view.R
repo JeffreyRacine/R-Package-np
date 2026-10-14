@@ -1,0 +1,23 @@
+test_that("fixed-view conmode factors use literal X and Y under either categorical option", {
+  old <- options(np.largelambda=TRUE)
+  on.exit(options(old),add=TRUE)
+  x <- data.frame(x=factor(c("a","b","c","a","b","c","a","a","b"),levels=c("a","b","c")))
+  y <- data.frame(y=factor(c("u","v","w","u","u","v","w","u","v"),levels=c("u","v","w")))
+  ex <- data.frame(x=factor(c("a","b","c"),levels=levels(x$x)))
+  ey <- data.frame(y=factor(c("u","v","w"),levels=levels(y$y)))
+  lambda <- .664
+  bw <- npcdensbw(xdat=x,ydat=y,bws=c(lambda,lambda),bandwidth.compute=FALSE,
+    regtype="lc",uxkertype="aitchisonaitken",uykertype="aitchisonaitken")
+  literal <- function(tx,ex)ifelse(outer(as.character(ex),as.character(tx),"=="),1-lambda,lambda/2)
+  K <- literal(x$x,ex$x);Y <- literal(y$y,ey$y)
+  H <- K/rowSums(K);mu <- rowSums(H*Y)
+  expected <- H*(Y-mu)
+  factor.fun <- getFromNamespace(".np_plot_conmode_raw_factor","npRmpi")
+  one <- factor.fun(bw,x,y,ex,ey,view="fixed")
+  options(np.largelambda=FALSE)
+  two <- factor.fun(bw,x,y,ex,ey,view="fixed")
+  expect_equal(one$estimate,mu,tolerance=2e-12)
+  expect_equal(one$A,expected,tolerance=2e-12)
+  expect_identical(one,two)
+  expect_false(getOption("np.largelambda"))
+})

@@ -769,6 +769,11 @@ np_render_control <- function(style = c("band", "bar"),
                                   B = 399L,
                                   blocklen = NULL,
                                        gaussian.draws = 9999L) {
+  reconstruct.uncertainty <- (identical(errors, "bootstrap") && !isTRUE(gradients)) ||
+    (identical(errors, "asymptotic") &&
+       (isTRUE(gradients) || band %in% c("simultaneous", "all")))
+  if (reconstruct.uncertainty)
+    .np_conditional_require_replay_policy(object, "plot.conmode")
   lev <- if (!is.null(object$probability.levels)) {
     as.character(object$probability.levels)
   } else if (!is.null(object$probability.gradient.level)) {
