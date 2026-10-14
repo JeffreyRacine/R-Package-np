@@ -144,3 +144,47 @@ test_that("measured conmode probability plots have an independent MPI budget", {
     }
   }
 })
+
+
+test_that("general-LP derivative oracle groups have independent MPI budgets", {
+  helper <- testthat::test_path("..", "validation", "full_mpi_test_plan.R")
+  skip_if_not(file.exists(helper), "source plan helper unavailable")
+  scope <- new.env(parent = globalenv())
+  sys.source(helper, envir = scope)
+  # Keep this explicit list independent of the registry under test.
+  required <- c(
+    "test-regression-hc0-general-lp-derivative-01-bases-orders.R",
+    "test-regression-hc0-general-lp-derivative-02-beta-modes.R",
+    "test-regression-hc0-general-lp-derivative-contract.R"
+  )
+  files <- sort(list.files(testthat::test_path(), "^test-.*\\.[rR]$"))
+  expect_true(all(required %in% files))
+  expect_true(all(required %in% scope$npRmpi_full_test_singleton_files()))
+  synthetic <- sort(unique(c(
+    scope$npRmpi_full_test_singleton_files(), required,
+    "test-regression-hc0-general-lp-derivative-00-before.R",
+    "test-regression-hc0-general-lp-derivative-03-between.R",
+    "test-regression-hc0-general-lp-derivative-contract0-after.R"
+  )))
+  for (inventory in list(files, synthetic)) {
+    for (size in c(1L, 3L, 10L, length(inventory) + 1L)) {
+      plan <- scope$npRmpi_full_test_plan(inventory, size)
+      expect_identical(unlist(plan, use.names = FALSE), inventory)
+      expect_true(all(lengths(plan) >= 1L & lengths(plan) <= size))
+      for (file in required) {
+        position <- match(file, inventory)
+        singleton <- which(vapply(plan, identical, logical(1L), file))
+        expect_length(singleton, 1L)
+        if (length(singleton) == 1L && !is.na(position)) {
+          at <- singleton[[1L]]
+          if (position > 1L)
+            expect_identical(tail(plan[[at - 1L]], 1L),
+                             inventory[position - 1L], info = file)
+          if (position < length(inventory))
+            expect_identical(head(plan[[at + 1L]], 1L),
+                             inventory[position + 1L], info = file)
+        }
+      }
+    }
+  }
+})

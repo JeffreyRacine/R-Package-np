@@ -22,6 +22,9 @@ npRmpi_full_test_singleton_files <- function() {
     "test-npconmode-proper-probability-contract.R",
     # GNN fit/tree influence oracles need an independent bounded unit.
     "test-regression-gnn-fit-tree.R",
+    # Public response-map oracle groups each retain a bounded pooled budget.
+    "test-regression-hc0-general-lp-derivative-01-bases-orders.R",
+    "test-regression-hc0-general-lp-derivative-02-beta-modes.R",
     "test-regression-hc0-general-lp-derivative-contract.R",
     "test-regression-hc0-scalar-categorical-contract.R",
     "test-session-routing-subprocess-contract.R"
