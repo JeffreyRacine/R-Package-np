@@ -1113,6 +1113,7 @@ npqreg.condbandwidth <-
                 fit.controls = list(tol = tol, small = small, itmax = itmax),
                 train.rows.omit = rows.omit,
                 eval.rows.omit = if (no.ex) integer(0) else eval.omit)
+    fit <- .np_conditional_policy_stamp(fit)
     .npreg_finish_empty_rows(fit, empty.flags, omitted = eval.omit,
                              row.labels = empty.row.labels, owner = "npqreg")
   }

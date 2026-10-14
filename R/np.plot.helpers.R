@@ -5674,7 +5674,7 @@
   xydat <- .np_bind_data_frames_fast(xdat, ydat)
   exydat <- .np_bind_data_frames_fast(exdat, eydat)
 
-  den <- as.numeric(npksum(
+  den <- as.numeric(npksum.conditional_literal(
     txdat = xdat,
     tydat = ones,
     exdat = exdat,
@@ -5683,7 +5683,7 @@
     operator = xop,
     bandwidth.divide = !identical(kbx$ckertype, "beta")
   )$ksum) / n.total
-  num <- as.numeric(npksum(
+  num <- as.numeric(npksum.conditional_literal(
     txdat = xydat,
     tydat = ones,
     exdat = exydat,
@@ -5772,14 +5772,14 @@
     nvars = ncol(xdat) + ncol(ydat),
     where = "direct conditional numerator kernel weights"
   )
-  Kden <- .np_kernel_weights_direct(
+  Kden <- .np_conditional_literal_kernel_weights(
     bws = den.info$bws,
     txdat = xdat,
     exdat = exdat,
     bandwidth.divide = den.info$bandwidth.divide,
     operator = den.info$operator
   )
-  Knum <- .np_kernel_weights_direct(
+  Knum <- .np_conditional_literal_kernel_weights(
     bws = num.info$bws,
     txdat = data.frame(xdat, ydat),
     exdat = data.frame(exdat, eydat),
@@ -5942,7 +5942,7 @@
   ex.groups <- .np_plot_exact_row_groups(exdat)
   exdat.unique <- ex.groups$unique
   ngroups <- nrow(exdat.unique)
-  Gy <- .npcdhat_make_kernel_matrix(
+  Gy <- .np_conditional_literal_kernel_matrix(
     kbw = ybw,
     txdat = ydat,
     exdat = eydat,
@@ -5968,7 +5968,7 @@
   basis <- reg.spec$basis.engine
   bernstein.basis <- reg.spec$bernstein.basis.engine
 
-  kw <- .np_kernel_weights_direct(
+  kw <- .np_conditional_literal_kernel_weights(
     bws = xbw,
     txdat = xdat,
     exdat = exdat.unique,
@@ -6487,11 +6487,11 @@
                                            cdf) {
   xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = xdat)
   ykbw <- .npcdhat_make_ybw(bws = bws, tydat = ydat)
-  Kx <- .npcdhat_make_kernel_matrix(
+  Kx <- .np_conditional_literal_kernel_matrix(
     kbw = xkbw, txdat = xdat, exdat = exdat,
     operator = rep.int("normal", ncol(xdat))
   )
-  Ky <- .npcdhat_make_kernel_matrix(
+  Ky <- .np_conditional_literal_kernel_matrix(
     kbw = ykbw, txdat = ydat, exdat = eydat,
     operator = rep.int(if (cdf) "integral" else "normal", ncol(ydat))
   )
@@ -6918,13 +6918,13 @@
   operator <- if (isTRUE(cdf)) "integral" else "normal"
   xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = xdat)
   ykbw <- .npcdhat_make_ybw(bws = bws, tydat = ydat)
-  Kx <- .npcdhat_make_kernel_matrix(
+  Kx <- .np_conditional_literal_kernel_matrix(
     kbw = xkbw,
     txdat = xdat,
     exdat = exdat,
     operator = rep.int("normal", ncol(xdat))
   )
-  Ky <- .npcdhat_make_kernel_matrix(
+  Ky <- .np_conditional_literal_kernel_matrix(
     kbw = ykbw,
     txdat = ydat,
     exdat = eydat,

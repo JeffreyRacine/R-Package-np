@@ -17,6 +17,22 @@
   accuracy.
 }
 \details{
+  Conditional fitting and replay use the literal categorical kernels for
+  both explanatory and response variables. Near-upper categorical bandwidths
+  are not replaced by approximate constant factors. The same target is used
+  for levels, gradients, standard errors, conditional hats, and reconstructed
+  plot uncertainty. This conditional-family policy does not change direct
+  regression or unconditional kernel-sum evaluation and does not modify the
+  caller's \code{np.largelambda} option.
+
+  New fitted objects record \code{conditional.kernel.policy}. Stored values
+  in older objects remain available without refitting. A plot that combines
+  such historical stored class probabilities or effects with newly
+  reconstructed bootstrap or joint asymptotic uncertainty requires an explicit
+  refit under the current policy. Stored pointwise probability standard errors
+  remain readable. Explicit predictions at new evaluation data use the current
+  conditional target and retain the object's probability-normalization controls.
+
   With a formula-derived bandwidth object, supplying only \code{tydat}
   replaces the evaluated response in retained-training-sample order: one row
   per observation retained after the original subset and missing-value selection.

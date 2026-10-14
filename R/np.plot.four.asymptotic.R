@@ -283,10 +283,10 @@
   if (!is.null(gradient)) {
     s <- integer(length(continuous)); s[match(gradient, continuous)] <- 1L
   }
-  H <- .npcdhat_make_xhat_matrix(bws, x, ex, s = s)
+  H <- .np_conditional_literal_xhat_matrix(bws, x, ex, s = s)
   yb <- .npcdhat_make_ybw(bws, y)
-  Y <- .npcdhat_make_kernel_matrix(yb, y, ey, operator = "normal")
-  K <- .np_plot_density_matrix(.npcdhat_make_xkbw(bws, x), x, ex,
+  Y <- .np_conditional_literal_kernel_matrix(yb, y, ey, operator = "normal")
+  K <- .np_conditional_literal_density_matrix(.npcdhat_make_xkbw(bws, x), x, ex,
     rep("normal", ncol(x)))
   den <- rowSums(K)
   if (any(!is.finite(c(H, Y, K, den))) || any(den == 0))
@@ -1204,7 +1204,7 @@
   D<-.np_plot_density_conditional(bws,x,y,ex,ey,cdf=TRUE,gradient=gradient)
   f0<-.np_plot_density_conditional(bws,x,y,ex,ey,cdf=FALSE)
   xb<-.npcdhat_make_xkbw(bws,x);yb<-.npcdhat_make_ybw(bws,y)
-  K<-.np_plot_density_matrix(xb,x,ex,rep('normal',ncol(x)))
+  K<-.np_conditional_literal_density_matrix(xb,x,ex,rep('normal',ncol(x)))
   kind<-yb[['ckertype',exact=TRUE]];h<-yb[['bw',exact=TRUE]][1L]
   lb<-yb[['ckerlb',exact=TRUE]][1L];ub<-yb[['ckerub',exact=TRUE]][1L]
   if(any(quantile<=lb | quantile>=ub))
@@ -1222,16 +1222,15 @@
   # The CDF is donor-centered; the PDF is evaluation-centered. Swap the
   # canonical normal-kernel roles while retaining the fixed physical h/support.
   # This is essential for bounded and beta kernels; no symmetry is presumed.
-  FY<-t(.np_plot_density_matrix(yb,ey,y,'normal'))
+  FY<-t(.np_conditional_literal_density_matrix(yb,ey,y,'normal'))
   frames<-npCategoricalFirstDifferenceFrames(ex,index=gradient,where='LC full delta')
   endpoint<-function(xx) {
-    k<-.np_plot_density_matrix(xb,x,xx,rep('normal',ncol(x)))
-    k<-.np_plot_density_factor_weights(k,xb,x,xx,rep('normal',ncol(x)),ordered=FALSE)
+    k<-.np_conditional_literal_density_matrix(xb,x,xx,rep('normal',ncol(x)))
     rowSums(k*FY)/rowSums(k)
   }
   Dy<-endpoint(frames$upper)-endpoint(frames$lower)
   Fy<-rowSums(K*FY)/rowSums(K)
-  dY<-.np_plot_density_derivative_matrix(yb,y,ey,1L)
+  dY<-.np_conditional_literal_derivative_matrix(yb,y,ey,1L)
   fy<-rowSums(K*dY)/rowSums(K)
   f<-f0$estimate
   # Translation-kernel OP_DERIVATIVE differentiates the numerator. The
@@ -1241,7 +1240,7 @@
     edge<-function(value) {
       if(!is.finite(value))return(rep(0,m))
       yy<-setNames(data.frame(value),names(y))
-      drop(.np_plot_density_matrix(yb,yy,ey,'normal'))
+      drop(.np_conditional_literal_density_matrix(yb,yy,ey,'normal'))
     }
     fy<-fy-f*(edge(lb)-edge(ub))
   }
@@ -1395,7 +1394,7 @@
   f0<-.np_plot_density_conditional(bws,x,y,ex,ey,cdf=FALSE)
   jet<-.np_plot_qreg_nn_response_jet(bws,y,quantile,max.bytes,package)
   xb<-.npcdhat_make_xkbw(bws,x)
-  K<-.np_plot_density_matrix(xb,x,ex,rep('normal',ncol(x)));den<-rowSums(K)
+  K<-.np_conditional_literal_density_matrix(xb,x,ex,rep('normal',ncol(x)));den<-rowSums(K)
   Fy<-rowSums(K*jet$cdf.q)/den
   fy<-rowSums(K*jet$pdf.q)/den
   Fy.error<-ediv(esum(emul(abs(K),jet$cdf.q.error)),abs(den))
@@ -1403,8 +1402,7 @@
   fy.error<-ediv(esum(emul(abs(K),jet$pdf.q.absolute.discrepancy)),abs(den))
   frames<-npCategoricalFirstDifferenceFrames(ex,index=gradient,where='LC NN full delta')
   endpoint<-function(xx) {
-    k<-.np_plot_density_matrix(xb,x,xx,rep('normal',ncol(x)))
-    k<-.np_plot_density_factor_weights(k,xb,x,xx,rep('normal',ncol(x)),ordered=FALSE)
+    k<-.np_conditional_literal_density_matrix(xb,x,xx,rep('normal',ncol(x)))
     d<-rowSums(k)
     list(value=rowSums(k*jet$cdf.q)/d,error=ediv(esum(emul(abs(k),jet$cdf.q.error)),abs(d)))
   }

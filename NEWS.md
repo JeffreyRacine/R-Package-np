@@ -1,4 +1,11 @@
 # np 0.80-1
+- Conditional density, distribution, quantile and class-probability fitting
+  and replay now use the same literal categorical kernels on both X and Y.
+  Near-upper categorical bandwidths no longer select an approximate constant
+  target for some requests. Direct regression and unconditional kernel-sum
+  behavior and caller options are preserved. Older conmode objects retain
+  stored-value extraction; reconstructing uncertainty around historical stored
+  values requires an explicit refit.
 - Document numerical-conditioning limitations of raw-basis conditional
   local-polynomial fits. The Italy examples now centre calendar years and
   apply the same offset to prediction data; estimator arithmetic, defaults

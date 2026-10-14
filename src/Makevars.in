@@ -9,3 +9,7 @@ PKG_LIBS = $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) @NP_ACCELERATE_LIBS@
 all: $(SHLIB)
 np.o: np_plot_regression_gradient_projection.h np_plot_beta_moment_entry.h
 jksum.o: np_plot_alllarge_derivative.h np_plot_gate_dispatch.h np_plot_beta_concentration_score.h np_plot_nn_response_jet.h np_plot_beta_moment_weights.h np_plot_lp_precision_certificate.h np_plot_lsq_precision_propagation.h np_plot_ann_kernel_terms.h np_plot_beta_pdf_agreement.h np_plot_ann_cdf_terms.h np_plot_ann_rank_decode.h
+
+# Conditional categorical-policy instantiations share canonical source bodies.
+np.o: conditional_literal.h $(wildcard conditional_literal/entry_*.inc)
+jksum.o categorical_profile_tile.o: conditional_literal.h $(wildcard conditional_literal/jksum_*.inc)

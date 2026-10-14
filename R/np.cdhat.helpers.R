@@ -603,14 +603,14 @@
                                   allow.empty.rows = FALSE) {
   xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = txdat)
   ybw <- .npcdhat_make_ybw(bws = bws, tydat = tydat)
-  Kx <- .npcdhat_make_kernel_matrix(
+  Kx <- .np_conditional_literal_kernel_matrix(
     kbw = xkbw,
     txdat = txdat,
     exdat = exdat,
     operator = rep.int("normal", ncol(txdat)),
     train.is.eval = train.is.eval
   )
-  Ky <- .npcdhat_make_kernel_matrix(
+  Ky <- .np_conditional_literal_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
     exdat = eydat,
@@ -663,7 +663,7 @@
   }
 
   ybw <- .npcdhat_make_ybw(bws = bws, tydat = tydat)
-  Hx <- .npcdhat_make_xhat_matrix(
+  Hx <- .np_conditional_literal_xhat_matrix(
     bws = bws,
     txdat = txdat,
     exdat = exdat,
@@ -671,7 +671,7 @@
     train.is.eval = train.is.eval,
     allow.empty.rows = allow.empty.rows
   )
-  Gy <- .npcdhat_make_kernel_matrix(
+  Gy <- .np_conditional_literal_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
     exdat = eydat,
@@ -712,7 +712,7 @@
   }
 
   ybw <- .npcdhat_make_ybw(bws = bws, tydat = tydat)
-  Hx <- .npcdhat_make_xhat_matrix(
+  Hx <- .np_conditional_literal_xhat_matrix(
     bws = bws,
     txdat = txdat,
     exdat = exdat,
@@ -723,7 +723,7 @@
   )
   norms <- if (return.norm) Hx[["norm", exact = TRUE]] else NULL
   if (return.norm) Hx <- Hx[["hat", exact = TRUE]]
-  Gy <- .npcdhat_make_kernel_matrix(
+  Gy <- .np_conditional_literal_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
     exdat = eydat,

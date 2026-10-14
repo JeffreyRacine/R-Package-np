@@ -98,4 +98,15 @@ np_categorical_profile_tile_fill(
 const char *np_categorical_profile_tile_status_message(
   NPCategoricalProfileTileStatus status);
 
+/* Conditional-only literal categorical row. */
+NPCategoricalProfileTileStatus
+np_categorical_profile_log_row_fill_prevalidated_conditional_literal(
+  const NPCategoricalProfileKernelSpec *spec,
+  int eval_index,
+  int omitted_observation,
+  double *scratch,
+  size_t scratch_elements,
+  double *log_absolute,
+  signed char *sign);
+
 #endif

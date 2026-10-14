@@ -15,6 +15,7 @@
 }
 
 .onLoad <- function (lib, pkg) {
+  .np_conditional_literal_initialize(pkg)
   if (is.null(getOption("np.messages")))
     options(np.messages = TRUE)
   if (is.null(getOption("np.tree")))
