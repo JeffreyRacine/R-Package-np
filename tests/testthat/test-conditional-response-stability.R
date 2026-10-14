@@ -27,6 +27,26 @@ test_that("conditional uncertainty retains the effective response operator", {
   x <- data.frame(x = rnorm(120))
   y <- data.frame(y = factor(rep(letters[1:3], 40)))
   ex <- data.frame(x = c(-.5, 0, .5)); ey <- y[1:3, , drop = FALSE]
+  # A positive-variance oracle independent of the plotting/kernel helpers.
+  # lambda=.25 is outside both near-bound gates for every accepted tolerance
+  # in (0,.5), including an enclosing session's cached option values.
+  literal <- npcdensbw(xdat = x, ydat = y, bws = c(.25, .4),
+                       bandwidth.compute = FALSE)
+  literal.fit <- npcdens(bws = literal, exdat = ex, eydat = ey,
+                        gradients = TRUE, se = TRUE)
+  Y.literal <- ifelse(outer(as.character(ey$y), as.character(y$y), "=="),
+                      .75, .25/2)
+  u.literal <- outer(ex$x, x$x, "-")/.4
+  K.literal <- dnorm(u.literal)/.4
+  den.literal <- rowSums(K.literal)
+  mean.literal <- rowSums(K.literal*Y.literal)/den.literal
+  variance.literal <- rowSums(K.literal*(Y.literal-mean.literal)^2)/
+    (2*sqrt(pi)*.4*den.literal^2)
+  expected.literal <- sqrt(variance.literal)/(.4*sqrt(2))
+  expect_true(all(expected.literal > .05))
+  expect_equal(as.numeric(gradients(literal.fit, se = TRUE)), expected.literal,
+               tolerance = 2e-12)
+
   b <- npcdensbw(xdat = x, ydat = y, bws = c(2/3-1e-6, .4),
                  bandwidth.compute = FALSE)
   z <- npcdens(bws = b, exdat = ex, eydat = ey, gradients = TRUE, se = TRUE)
