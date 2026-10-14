@@ -54,7 +54,9 @@ test_that("data-only plots preserve graphics while renderer exits clean up", {
   y <- .4 * x$x + rnorm(nrow(x), sd = .3)
   b <- npcdistbw(xdat = x, ydat = y, bws = c(.3, .5), bandwidth.compute = FALSE)
   d <- npudens(npudensbw(dat = x, bws = .5, bandwidth.compute = FALSE), tdat = x)
-  fits <- list(d, npcdist(b, txdat = x, tydat = y), npqreg(b, txdat = x, tydat = y))
+  rb <- npregbw(xdat = x, ydat = y, bws = .5, bandwidth.compute = FALSE)
+  r <- npreg(rb, txdat = x, tydat = y)
+  fits <- list(d, r, npcdist(b, txdat = x, tydat = y), npqreg(b, txdat = x, tydat = y))
   plot_audit_device()
   reset <- function() {
     graphics::plot.new()
@@ -69,18 +71,31 @@ test_that("data-only plots preserve graphics while renderer exits clean up", {
     expect_type(out, "list")
     expect_identical(graphics::par(names(before)), before)
   }
-  reset()
-  before <- graphics::par(c("mfrow", "cex", "usr"))
-  plot_audit_method(d)(d, errors = "none", output = "plot-data", neval = 3L)
-  expect_identical(graphics::par("new"), FALSE)
-  expect_identical(graphics::par(c("mfrow", "cex")), before[c("mfrow", "cex")])
-  expect_false(identical(graphics::par("usr"), before$usr))
-  reset()
-  before <- graphics::par(c("mfrow", "cex"))
-  expect_error(plot_audit_method(d)(d, errors = "none", output = "plot-data",
-    neval = 3L, col = "not-a-valid-colour-contract-probe"), "invalid colou?r name")
-  expect_identical(graphics::par("new"), FALSE)
-  expect_identical(graphics::par(names(before)), before)
+  # Fixed regression must also preserve caller-owned state when data validation
+  # fails, both before and after the plot options have been normalized.
+  graphics::par(mfrow = c(2, 2))
+  for (expr in list(
+    quote(plot_audit_method(rb)(rb, xdat = x, errors = "none", output = "data")),
+    quote(plot_audit_method(r)(r, errors = "none", output = "data", xtrim = 2)))) {
+    reset()
+    before <- graphics::par(c("new", "mfrow", "mfg", "cex", "usr"))
+    expect_error(eval(expr))
+    expect_identical(graphics::par(names(before)), before)
+  }
+  for (fit in list(d, r)) {
+    reset()
+    before <- graphics::par(c("mfrow", "cex", "usr"))
+    plot_audit_method(fit)(fit, errors = "none", output = "plot-data", neval = 3L)
+    expect_identical(graphics::par("new"), FALSE)
+    expect_identical(graphics::par(c("mfrow", "cex")), before[c("mfrow", "cex")])
+    expect_false(identical(graphics::par("usr"), before$usr))
+    reset()
+    before <- graphics::par(c("mfrow", "cex"))
+    expect_error(plot_audit_method(fit)(fit, errors = "none", output = "plot-data",
+      neval = 3L, col = "not-a-valid-colour-contract-probe"), "invalid colou?r name")
+    expect_identical(graphics::par("new"), FALSE)
+    expect_identical(graphics::par(names(before)), before)
+  }
 })
 
 test_that("conmode pmzsd gradient intervals use the pointwise renderer", {
