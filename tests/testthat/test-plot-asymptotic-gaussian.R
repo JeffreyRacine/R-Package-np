@@ -244,6 +244,9 @@ test_that("partially linear reconstruction uses the plotted uncertainty scale", 
 })
 
 test_that("partially linear categorical influence uses the fitted mean owner", {
+  skip_on_cran()
+  skip_if_not(spawn_mpi_slaves())
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE, np.categorical.compress = TRUE)
   on.exit(options(old), add = TRUE)
   z <- data.frame(z = factor(rep(letters[1:4], 9L)))
