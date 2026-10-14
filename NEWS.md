@@ -1,4 +1,8 @@
 # np 0.80-1
+- Document numerical-conditioning limitations of raw-basis conditional
+  local-polynomial fits. The Italy examples now centre calendar years and
+  apply the same offset to prediction data; estimator arithmetic, defaults
+  and conditioning checks are unchanged.
 - Copula distribution plots with only ordered margins now construct adaptive
   nearest-neighbor simultaneous bands using their finite-support CDF factors.
 - Class-probability surfaces reject repeated conditioning-variable selectors
