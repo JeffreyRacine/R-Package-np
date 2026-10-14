@@ -45,6 +45,10 @@
     ".np_exact_operator_apply", ".npcdhat_make_kernel_matrix",
     ".npcdhat_make_xhat_matrix", "npksum.default",
     ".np_plot_density_derivative_matrix")
+  # MPI uses this closed-value forwarding helper where serial evaluates the
+  # named kernel call directly.  It must resolve the same private wrapper.
+  if (identical(pkg, "npRmpi"))
+    names <- c(names, ".npksum_closed_values")
   substitutions <- c(
     .np_regression_direct = "C_np_regression",
     .npreghat_exact_lp_apply_from_regression_core = "C_np_regression_lp_apply_conditional_ctx",
@@ -78,13 +82,52 @@
   lex$npksum.default <- get("npksum.conditional_literal", envir = ns,
                             inherits = FALSE)
   if (identical(pkg, "npRmpi")) {
-    dispatch <- get(".npRmpi_autodispatch_call", envir = ns, inherits = FALSE)
+    # Preserve the ordinary dotted-call classification (including publication
+    # bundling), but keep its selected private owner after materialization.
+    # Both unchanged dispatch closures must resolve the private materializer.
+    transport <- new.env(parent = ns)
+    for (name in c(".npRmpi_autodispatch_call", ".npRmpi_distributed_call_impl")) {
+      fun <- get(name, envir = ns, inherits = FALSE)
+      if (!is.function(fun) || !identical(environment(fun), ns))
+        stop("conditional literal transport source contract changed: ", name)
+      environment(fun) <- transport
+      assign(name, fun, envir = transport)
+    }
+    transport$.np_conditional_shared_materialize_call <- get(
+      ".npRmpi_autodispatch_materialize_call", envir = ns, inherits = FALSE)
+    materialize <- function(mc, caller_env, comm = 1L) {
+      owner <- as.name("npksum.conditional_literal")
+      if (!is.call(mc) || !identical(mc[[1L]], owner) ||
+          !isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE)))
+        stop("unexpected conditional kernel-sum materialization owner")
+      prepared <- .np_conditional_shared_materialize_call(
+        mc, caller_env = caller_env, comm = comm)
+      if (!is.call(prepared$call) ||
+          !identical(prepared$call[[1L]], as.name("npksum")) ||
+          !isTRUE(attr(prepared$call, ".npRmpi.bound.call.owner", exact = TRUE)))
+        stop("conditional kernel-sum materialization contract changed")
+      prepared$call[[1L]] <- owner
+      prepared
+    }
+    environment(materialize) <- transport
+    transport$.npRmpi_autodispatch_materialize_call <- materialize
+    lockEnvironment(transport, bindings = TRUE)
+    dispatch <- get(".npRmpi_autodispatch_call", envir = transport,
+                    inherits = FALSE)
     lex$.npRmpi_autodispatch_call <- local({
       original <- dispatch
+      engine <- lex$.np_conditional_npksum_engine
       function(mc, caller_env = parent.frame(), comm = 1L, owner.name = NULL) {
         if (!identical(owner.name, "npksum.default"))
           stop("unexpected conditional kernel-sum dispatch owner")
+        caller <- sys.parent()
+        if (!is.call(mc) || caller < 1L ||
+            !identical(sys.function(caller), engine))
+          stop("unexpected conditional kernel-sum dispatch engine")
+        # The wrapper evaluates in its caller's frame, so it need not occur
+        # on the engine's dynamic parent chain.  Bind only this trusted engine.
         mc[[1L]] <- as.name("npksum.conditional_literal")
+        attr(mc, ".npRmpi.bound.call.owner") <- TRUE
         original(mc, caller_env = caller_env, comm = comm,
                  owner.name = "npksum.conditional_literal")
       }

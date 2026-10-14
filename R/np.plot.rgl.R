@@ -388,11 +388,25 @@
         Sys.setenv(RGL_USE_NULL = old.env)
       }
     }, add = TRUE)
-    devices.before <- try(rgl::rgl.dev.list(), silent = TRUE)
-    if (inherits(devices.before, "try-error") || is.null(devices.before))
-      devices.before <- integer(0L)
-
-    rgl::open3d(useNULL = TRUE, silent = TRUE)
+    device.before <- rgl::cur3d()
+    owned.device <- NULL
+    close.owned.device <- function() {
+      if (!is.null(owned.device)) {
+        if (owned.device %in% rgl::rgl.dev.list())
+          rgl::close3d(dev = owned.device, silent = TRUE)
+        owned.device <<- NULL
+      }
+      invisible(NULL)
+    }
+    on.exit({
+      try(close.owned.device(), silent = TRUE)
+      try({
+        if (device.before != 0L && device.before %in% rgl::rgl.dev.list())
+          rgl::set3d(device.before, silent = TRUE)
+      }, silent = TRUE)
+    }, add = TRUE)
+    # Own only the device returned by this call, never a callback's device.
+    owned.device <- rgl::open3d(useNULL = TRUE, silent = TRUE)
     par3d.call <- .np_plot_merge_override_args(
       list(windowRect = defaults$windowRect),
       par3d.args
@@ -441,14 +455,7 @@
     do.call(rgl::grid3d, grid3d.call)
     if (isTRUE(rgl::rgl.useNULL()) || isTRUE(getOption("rgl.printRglwidget"))) {
       scene <- rgl::scene3d()
-      devices.after <- try(rgl::rgl.dev.list(), silent = TRUE)
-      if (inherits(devices.after, "try-error") || is.null(devices.after))
-        devices.after <- integer(0L)
-      new.devices <- setdiff(devices.after, devices.before)
-      if (length(new.devices))
-        try(rgl::close3d(dev = new.devices, silent = TRUE), silent = TRUE)
-      else
-        try(rgl::close3d(silent = TRUE), silent = TRUE)
+      try(close.owned.device(), silent = TRUE)
       widget <- do.call(rgl::rglwidget, c(list(x = scene), widget.args))
       widget <- .np_plot_rgl_hidpi_widget(
         widget,

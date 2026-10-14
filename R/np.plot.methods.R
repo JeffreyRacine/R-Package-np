@@ -1930,8 +1930,9 @@ np_render_control <- function(style = c("band", "bar"),
         graphics::segments(xord[good], lower[good], xord[good], upper[good],
                            col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
       } else {
-        graphics::lines(xord[good], lower[good], col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
-        graphics::lines(xord[good], upper[good], col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
+        geometry <- .np_plot_interval_geometry(xord, lower, upper)
+        graphics::lines(geometry$x, geometry$lower, col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
+        graphics::lines(geometry$x, geometry$upper, col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
       }
       if (!is.null(annotation)) {
         annotation$plot.args$main <- args$main

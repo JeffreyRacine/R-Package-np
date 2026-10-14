@@ -971,7 +971,7 @@
                 continuous = !xi.factor
               )
               if (plot.errors.type == "all") {
-                draw.all.error.types(
+                .np_plot_draw_all_errors_with_gaps(
                   ex = as.numeric(ei),
                   center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
                   all.err = temp.all.err,
@@ -999,7 +999,7 @@
                   estimate.col = plot.args$col,
                   estimate.lty = plot.args$lty,
                   estimate.lwd = plot.args$lwd)
-                draw.vec <- .np_plot_error_draw_vectors(ei, temp.dens, temp.err, plotOnEstimate)
+                draw.vec <- .np_plot_error_vectors_with_gaps(ei, temp.dens, temp.err, plotOnEstimate)
                 draw.args <- list(
                   ex = draw.vec$x,
                   ely = draw.vec$lower,
@@ -1010,7 +1010,7 @@
                   lty = if (xi.factor) 1 else 2,
                   annotation = panel.annotation
                 )
-                do.call(draw.errors, draw.args)
+                do.call(.np_plot_draw_errors_with_gaps, draw.args)
               }
             }
           }
@@ -1278,7 +1278,7 @@
                   continuous = !xi.factor
                 )
                 if (plot.errors.type == "all") {
-                  draw.all.error.types(
+                  .np_plot_draw_all_errors_with_gaps(
                     ex = as.numeric(ei),
                     center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
                     all.err = temp.all.err,
@@ -1306,7 +1306,7 @@
                     estimate.col = plot.args$col,
                     estimate.lty = plot.args$lty,
                     estimate.lwd = plot.args$lwd)
-                  draw.vec <- .np_plot_error_draw_vectors(ei, temp.dens, temp.err, plotOnEstimate)
+                  draw.vec <- .np_plot_error_vectors_with_gaps(ei, temp.dens, temp.err, plotOnEstimate)
                   draw.args <- list(
                     ex = draw.vec$x,
                     ely = draw.vec$lower,
@@ -1317,7 +1317,7 @@
                     lty = if (xi.factor) 1 else 2,
                     annotation = panel.annotation
                   )
-                  do.call(draw.errors, draw.args)
+                  do.call(.np_plot_draw_errors_with_gaps, draw.args)
                 }
               }
             }
@@ -1465,7 +1465,7 @@
                 continuous = !xi.factor
               )
               if (plot.errors.type == "all") {
-                draw.all.error.types(
+                .np_plot_draw_all_errors_with_gaps(
                   ex = as.numeric(allei[,plot.index]),
                   center = .np_plot_error_center(data.eval[,idx], err.block, plotOnEstimate),
                   all.err = data.err.all[[idx]],
@@ -1493,7 +1493,7 @@
                   estimate.col = plot.args$col,
                   estimate.lty = plot.args$lty,
                   estimate.lwd = plot.args$lwd)
-                draw.vec <- .np_plot_error_draw_vectors(allei[,plot.index], data.eval[,idx], err.block, plotOnEstimate)
+                draw.vec <- .np_plot_error_vectors_with_gaps(allei[,plot.index], data.eval[,idx], err.block, plotOnEstimate)
                 draw.args <- list(
                   ex = draw.vec$x,
                   ely = draw.vec$lower,
@@ -1504,7 +1504,7 @@
                   lty = if (xi.factor) 1 else 2,
                   annotation = panel.annotation
                 )
-                do.call(draw.errors, draw.args)
+                do.call(.np_plot_draw_errors_with_gaps, draw.args)
               }
             }
           }
