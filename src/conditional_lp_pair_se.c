@@ -44,16 +44,36 @@ static int np_lp_pair_endpoint(NPLPPairCall *call, int query,
   NPLPSolveWorkspace *s = &call->solve;
   NPLPSolvePolicyDiagnostics diagnostics = {0, 0.0};
   double anchor, b0, max_abs = 0.0, ridge_sign = 1.0;
-  int active = 0, scale_a = 0, scale_b = 0;
+  double response_anchor = 0.0;
+  int active = 0, first_active = -1, translate_response = 1;
+  int scale_a = 0, scale_b = 0;
   *point = *slope = NA_REAL;
-  for(int i = 0; i < n; ++i) active += w[i] != 0.0;
+  for(int i = 0; i < n; ++i)
+    if(w[i] != 0.0) {
+      if(first_active < 0) first_active = i;
+      ++active;
+      if(z[i] != 1.0) translate_response = 0;
+    }
   if(!active) return 1;
-  for(int j = 0; j < p; ++j)
+  if(translate_response) response_anchor = r[first_active];
+  /* A unit intercept makes a response translation exact for the accepted
+   * ridge-corrected map. Reuse score as response scratch until each donor's
+   * score replaces it; no previous scratch entry is needed by that loop.
+   * Nonunit bases and overflowing differences retain their raw representation. */
+  for(int i = 0; i < n; ++i) {
+    weighted[i] = z[i]*w[i];
+    if(translate_response) {
+      score[i] = w[i] != 0.0 ? r[i]-response_anchor : 0.0;
+      if(!isfinite(score[i])) translate_response = 0;
+    }
+  }
+  const double *response = translate_response ? score : r;
+  for(int j = 1; j < p; ++j)
     for(int i = 0; i < n; ++i)
       weighted[i + (size_t)n*j] = z[i + (size_t)n*j]*w[i];
   F77_CALL(dgemm)(&trans_t, &trans_n, &p, &p, &n, &alpha, z, &n,
     weighted, &n, &zero, s->gram_source, &p FCONE FCONE);
-  F77_CALL(dgemv)(&trans_t, &n, &p, &alpha, weighted, &n, r, &one,
+  F77_CALL(dgemv)(&trans_t, &n, &p, &alpha, weighted, &n, response, &one,
     &zero, s->rhs_source, &one FCONE);
   anchor = s->gram_source[0];
   b0 = s->rhs_source[0];
@@ -95,6 +115,8 @@ static int np_lp_pair_endpoint(NPLPPairCall *call, int query,
     *point += direction[j]*theta[j];
     s->rhs_source[j] = direction[j];
   }
+  if(translate_response)
+    *point += response_anchor*REAL(call->evaluation)[query];
   /* The derivative needs S^{-T} d. Use the retained factor, with no second
    * admission/ridge selection or assumption of bitwise Gram symmetry. */
   if(!np_lp_solve_workspace_solve_transpose_factored(s, p, 1))
@@ -114,12 +136,13 @@ static int np_lp_pair_endpoint(NPLPPairCall *call, int query,
       vz += direction[j]*z[i + (size_t)n*j];
       zt += theta[j]*z[i + (size_t)n*j];
     }
-    double value = w[i]*vz*(r[i]-zt);
+    const double ri = response[i];
+    double value = w[i]*vz*(ri-zt);
     if(ridge > 0.0) {
       const double da = w[i]*z[i]*z[i];
       const double dridge = ((double)diagnostics.ridge_steps/n)*ridge_sign*
         w[i]*z[i + (size_t)n*scale_a]*z[i + (size_t)n*scale_b];
-      value += w[i]*direction[0]*(ridge/anchor)*z[i]*r[i] +
+      value += w[i]*direction[0]*(ridge/anchor)*z[i]*ri +
         direction[0]*b0*(dridge/anchor - (ridge/anchor)*(da/anchor)) -
         dridge*vt;
     }
