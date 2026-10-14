@@ -450,7 +450,10 @@
       bws[["type", exact = TRUE]] %in% c("generalized_nn", "adaptive_nn"))
     return(.np_plot_copula_ratio_influence(object, data, ex, se,
       owner = environment(.np_plot_copula_influence)))
-  if (identical(bws[["type", exact = TRUE]], "adaptive_nn")) {
+  if (identical(bws[["type", exact = TRUE]], "adaptive_nn") &&
+      any(bws[["icon", exact = TRUE]])) {
+    # Ordered-only margins have no NN radii: their CDF factor uses the
+    # empirical common-donor path below, with the requested bws unchanged.
     # New simultaneous inference owns its scale; legacy marginal fields may
     # remain NA. Native point owners and old interval requests are untouched.
     value <- tryCatch({

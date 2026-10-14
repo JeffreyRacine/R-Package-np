@@ -411,8 +411,10 @@ prediction/evaluation route, or graphics renderer as appropriate.
   two-dimensional grid output. Central and uncertainty surfaces share one
   coordinate ordering: probability axes
   are sorted for display, while fitted values and returned plot data keep
-  their supplied-grid order. Duplicate axis values cannot form a rectangular
-  display grid. Surface plots use the package-wide
+  their supplied-grid order. Duplicate display coordinates are collapsed only
+  when their fitted values and interval endpoints agree; conflicting duplicates
+  are rejected. All supplied rows remain in the statistical band family and
+  returned plot data. Surface plots use the package-wide
   viridis default palette, detailed perspective ticks, and the same
   default viewing angles and base-graphics rotation cadence as the
   other surface plot methods. \code{renderer="rgl"} requests the shared
