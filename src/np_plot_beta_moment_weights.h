@@ -139,7 +139,7 @@ static SEXP np_plot_beta_moment_body(void *data)
   double **basis=np_plot_beta_moment_cols(B,n,w);
   int which=0,derivative_order=0,bernstein=0,basis_mode=0;
   double *eval_basis=NULL,*eval_derivative=NULL,*coefficient=NULL,*adjoint=NULL,*adjoint_error=NULL;
-  NPPlotLPCertificate certificate;
+  NPPlotLPCertificate certificate = {0};
   if(c->derivative){
     int np,wp;np_plot_beta_moment_dims(A(11),&np,&wp);
     if(np!=m||wp!=w||TYPEOF(A(12))!=INTSXP||XLENGTH(A(12))!=pc)

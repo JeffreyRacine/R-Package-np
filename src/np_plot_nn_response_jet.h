@@ -16,7 +16,8 @@ static double np_plot_nn_error_product(double a,double b)
 }
 static double np_plot_nn_error_sum(double a,double b)
 {
-  if(a==0.0)return b;if(b==0.0)return a;
+  if(a==0.0)return b;
+  if(b==0.0)return a;
   double z=nextafter(a+b,INFINITY);
   if(!R_FINITE(z)||z<0.0)error("np_plot_beta_numerical_unavailable: response discrepancy sum is not representable");
   return z;

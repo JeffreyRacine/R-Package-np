@@ -49,7 +49,9 @@ static double np_plot_lsq_precision_ratio(int m,int n,int row,
   double ms=0.0,es=0.0;
   for(int i=0;i<n;++i){const size_t at=(size_t)i*m+row;
     if(!R_FINITE(map[at])||!R_FINITE(err[at])||err[at]<0.0)return R_PosInf;
-    if(fabs(map[at])>ms)ms=fabs(map[at]);if(err[at]>es)es=err[at];}
+    if(fabs(map[at])>ms)ms=fabs(map[at]);
+    if(err[at]>es)es=err[at];
+  }
   if(es==0.0)return 0.0;
   if(ms==0.0||!R_FINITE(es))return R_PosInf;
   double sm=0.0,se=0.0;
