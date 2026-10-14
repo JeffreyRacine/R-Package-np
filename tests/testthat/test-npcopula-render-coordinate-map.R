@@ -16,7 +16,37 @@ test_that("copula render matrices follow requested coordinates without reorderin
   expect_identical(np:::.npcopula_grid_eval(old.fit)$z, grid$z)
   repeated <- npcopula(b, data = d, u = data.frame(u1 = c(.2, .2), u2 = c(.3, .7)),
     n.quasi.inv = 40L)
-  expect_error(np:::.npcopula_grid_eval(repeated), "not rectangular")
+  # Repeated coordinates form a display quotient only; statistical rows
+  # and the original fitted object remain intact.
+  repeated.before <- serialize(repeated, NULL)
+  repeated.data <- as.data.frame(repeated)
+  repeated.grid <- np:::.npcopula_grid_eval(repeated)
+  expect_identical(repeated.grid$u1, .2)
+  expect_identical(repeated.grid$u2, c(.3, .7))
+  expect_identical(dim(repeated.grid$z), c(1L, 2L))
+  expect_identical(nrow(repeated.data), 4L)
+  expected.z <- vapply(c(.3, .7), function(v) {
+    rows <- which(repeated$u.grid[[1L]] == .2 & repeated$u.grid[[2L]] == v)
+    expect_length(rows, 2L)
+    values <- fitted(repeated)[rows]
+    expect_identical(values[1L], values[2L])
+    unname(values[1L])
+  }, numeric(1L))
+  expect_identical(repeated.grid$z, matrix(expected.z, 1L, 2L))
+  expect_identical(repeated.grid$xgrid,
+                   repeated.data[repeated$xnames])
+  expect_identical(serialize(repeated, NULL), repeated.before)
+  expect_identical(plot(repeated, output = "data"), repeated.data)
+  expect_error(plot(repeated, output = "plot"),
+               "at least two distinct values on each probability axis", fixed = TRUE)
+  lower <- fitted(repeated) - .05
+  expect_identical(np:::.npcopula_grid_matrix(lower, repeated.grid),
+                   matrix(expected.z - .05, 1L, 2L))
+  conflict <- lower
+  same.cell <- which(repeated$u.grid[[1L]] == .2 & repeated$u.grid[[2L]] == .3)
+  conflict[same.cell[2L]] <- conflict[same.cell[2L]] + .125
+  expect_error(np:::.npcopula_grid_matrix(conflict, repeated.grid),
+               "conflicting surface values or interval endpoints", fixed = TRUE)
   malformed <- fit; malformed$u.grid[1L, ] <- malformed$u.grid[2L, ]
   expect_error(np:::.npcopula_grid_eval(malformed), "not rectangular")
   endpoints <- npcopula(b, data = d,

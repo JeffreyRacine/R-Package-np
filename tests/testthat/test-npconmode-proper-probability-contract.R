@@ -312,8 +312,34 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   expect_silent(plot(fit, gradients = TRUE, col = "blue", lwd = 2, lty = 3,
                      type = "l"))
   expect_silent(plot(fit, errors = "bootstrap", B = 39L))
-  expect_error(plot(fit, gradients = TRUE, errors = "asymptotic"),
-               "not probability gradients")
+  # Asymptotic gradient intervals are supported; their center retains the
+  # underlying conditional-density derivative, even with proper=TRUE.
+  grad.alpha <- 0.1
+  grad.intervals <- plot(fit, gradients = TRUE, errors = "asymptotic",
+                         band = "pointwise", alpha = grad.alpha, output = "data")
+  expect_named(grad.intervals, "x")
+  expect_true(all(c("effect", "center", "stderr", "lower", "upper") %in%
+                    names(grad.intervals$x)))
+  expect_identical(grad.intervals$x$x, grdata$x$x)
+  expect_equal(grad.intervals$x$effect, as.vector(direct$congrad),
+               tolerance = 1e-10)
+  expect_identical(grad.intervals$x$effect, grdata$x$effect)
+  expect_identical(grad.intervals$x$center, grad.intervals$x$effect)
+  expect_true(all(is.finite(grad.intervals$x$stderr)))
+  expect_true(all(grad.intervals$x$stderr >= 0))
+  expect_true(any(grad.intervals$x$stderr > 0))
+  normal.width <- qnorm(1 - grad.alpha / 2) * grad.intervals$x$stderr
+  expect_equal(grad.intervals$x$lower,
+               grad.intervals$x$effect - normal.width, tolerance = 1e-12)
+  expect_equal(grad.intervals$x$upper,
+               grad.intervals$x$effect + normal.width, tolerance = 1e-12)
+  expect_equal(plot(fit, gradients = TRUE, errors = "asymptotic",
+                    band = "pointwise", alpha = grad.alpha, output = "both"),
+               grad.intervals)
+  # The new asymptotic route does not admit bootstrap gradient intervals.
+  expect_error(plot(fit, gradients = TRUE, errors = "bootstrap", output = "data"),
+               'gradient/effect intervals currently require errors="asymptotic"',
+               fixed = TRUE)
   expect_error(plot(fit, renderer = "rgl"),
                "renderer='rgl' is supported only")
   grDevices::dev.off()
