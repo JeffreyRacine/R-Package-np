@@ -1,4 +1,18 @@
 # np 0.80-1
+- Explicit scalar-quantile perspective requests, including least-squares
+  quantile objects, now draw their requested surfaces. Default slice plots,
+  vector-quantile and gradient layouts retain their existing behavior.
+- Class-probability surfaces draw their available asymptotic intervals.
+  Copula surfaces preserve statistical rows while mapping identical display
+  coordinates; conflicting duplicates are rejected rather than averaged.
+- Nearest-neighbor copula density bands include shared-observation covariance
+  between the numerator and both estimated marginals, conditional on the
+  fitted smoothing state and fixed inverse coordinates. This does not include
+  uncertainty from estimating the inverse-coordinate grid.
+- Data-only regression plots preserve the caller's graphics state. Rendered
+  regression plots retain their existing cleanup behavior.
+- Least-squares quantile objects diagnose duplicate quantile levels before
+  plot preparation, retaining the existing rejection contract.
 - Correct single-index gradient plots with asymmetric bootstrap bands when
   an index coefficient is negative: lower and upper widths now exchange
   roles before scaling, including all-band data and rendering.
