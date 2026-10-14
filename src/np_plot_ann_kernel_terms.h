@@ -70,8 +70,11 @@ static double np_plot_ann_beta_radius_order(double q,double y,double h,
 SEXP C_np_plot_ann_kernel_terms(SEXP train,SEXP query,SEXP bandwidth,
   SEXP kernel,SEXP bounds,SEXP max_bytes)
 {
-  SEXP td=getAttrib(train,R_DimSymbol),qd=getAttrib(query,R_DimSymbol),
-    hd=getAttrib(bandwidth,R_DimSymbol),bd=getAttrib(bounds,R_DimSymbol);
+  /* Keep returned attributes rooted across subsequent allocating API calls. */
+  SEXP td=PROTECT(getAttrib(train,R_DimSymbol));
+  SEXP qd=PROTECT(getAttrib(query,R_DimSymbol));
+  SEXP hd=PROTECT(getAttrib(bandwidth,R_DimSymbol));
+  SEXP bd=PROTECT(getAttrib(bounds,R_DimSymbol));
   if(TYPEOF(train)!=REALSXP||TYPEOF(query)!=REALSXP||TYPEOF(bandwidth)!=REALSXP||
      TYPEOF(bounds)!=REALSXP||TYPEOF(kernel)!=INTSXP||XLENGTH(kernel)!=1||
      TYPEOF(max_bytes)!=REALSXP||XLENGTH(max_bytes)!=1||
@@ -155,5 +158,5 @@ SEXP C_np_plot_ann_kernel_terms(SEXP train,SEXP query,SEXP bandwidth,
       REAL(VECTOR_ELT(out,4))[at]=we;REAL(VECTOR_ELT(out,5))[at]=re;
     }
   }
-  UNPROTECT(3);return out;
+  UNPROTECT(7);return out;
 }
