@@ -597,6 +597,20 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,int RANDOM,int seed,int int
 
 int check_valid_scale_factor_cv(int KERNEL, int KERNEL_var_unordered_liracine, int KERNEL_reg_unordered_liracine, int BANDWIDTH, int BANDWIDTH_den_ml, int REGRESSION_ML, int num_obs, int num_var_continuous, int num_var_unordered, int num_var_ordered, int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, int *num_categories, double *vector_scale_factor);
 
+/* Conditional-only complete-support response translation scratch. */
+typedef struct NPConditionalCDFAnchor NPConditionalCDFAnchor;
+NPConditionalCDFAnchor *np_conditional_cdf_anchor_prepare(
+  int kernel_c, int kernel_u, int kernel_o, int bandwidth_mode,
+  int n, int nu, int no, int nc,
+  double **train_u, double **train_o, double **train_c,
+  double *scale_factors, int *num_categories, double **categorical_values,
+  const NPContinuousPreparedBandwidthView *prepared, double *prepared_lambda,
+  int use_prepared_ann);
+int np_conditional_cdf_anchor_fill(NPConditionalCDFAnchor *ctx,
+  double **eval_u, double **eval_o, double **eval_c,
+  const double *prepared_ann_continuous, const double *response,
+  double *anchor);
+
 typedef struct NPANNFitBatch NPANNFitBatch;
 NPANNFitBatch *np_ann_fit_batch_create(int kernel, int n, int m, int p,
   double **train, double **evaluation, double **radius);

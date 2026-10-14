@@ -29296,6 +29296,163 @@ typedef struct {
   int status;
 } NPRegressionGeneralLPFitExecution;
 
+/* Conditional CDF translation scratch only.  Ordinary regression never calls
+ * this adapter; the accepted regression owner and its preparation are intact. */
+struct NPConditionalCDFAnchor {
+  int n, nc, nu, no, bandwidth_mode, runtime_ready;
+  int *kernel_c, *kernel_u, *kernel_o, *operator;
+  double **train_u, **train_o, **train_c;
+  double *scale_factors, *lambda, *weights;
+  int *num_categories;
+  double **categorical_values, **bandwidth, **eval_bandwidth;
+  const NPContinuousPreparedBandwidthView *prepared;
+  NP_GateOverrideCtx gate;
+  XL active;
+};
+
+NPConditionalCDFAnchor *np_conditional_cdf_anchor_prepare(
+  const int kernel_c, const int kernel_u, const int kernel_o,
+  const int bandwidth_mode, const int n, const int nu, const int no,
+  const int nc, double **train_u, double **train_o, double **train_c,
+  double *scale_factors, int *num_categories, double **categorical_values,
+  const NPContinuousPreparedBandwidthView *prepared, double *prepared_lambda,
+  const int use_prepared_ann)
+{
+  if(n <= 0 || nc <= 0 || nu < 0 || no < 0 ||
+     (bandwidth_mode != BW_FIXED && bandwidth_mode != BW_GEN_NN &&
+      bandwidth_mode != BW_ADAP_NN))
+    return NULL;
+  if(bandwidth_mode != BW_FIXED &&
+     (prepared == NULL || prepared_lambda == NULL ||
+      prepared->bandwidth_mode != bandwidth_mode || prepared->num_train != n ||
+      prepared->num_continuous != nc ||
+      (bandwidth_mode == BW_GEN_NN && prepared->bandwidth_eval == NULL) ||
+      (bandwidth_mode == BW_ADAP_NN && prepared->bandwidth_train == NULL)))
+    return NULL;
+  NPConditionalCDFAnchor *ctx = (NPConditionalCDFAnchor *)R_alloc(1, sizeof(*ctx));
+  memset(ctx, 0, sizeof(*ctx));
+  ctx->n=n; ctx->nc=nc; ctx->nu=nu; ctx->no=no;
+  ctx->bandwidth_mode=bandwidth_mode;
+  ctx->train_u=train_u; ctx->train_o=train_o; ctx->train_c=train_c;
+  ctx->scale_factors=scale_factors; ctx->num_categories=num_categories;
+  ctx->categorical_values=categorical_values; ctx->prepared=prepared;
+  ctx->kernel_c=(int *)R_alloc((size_t)nc, sizeof(int));
+  ctx->kernel_u=(int *)R_alloc((size_t)MAX(1,nu), sizeof(int));
+  ctx->kernel_o=(int *)R_alloc((size_t)MAX(1,no), sizeof(int));
+  ctx->operator=(int *)R_alloc((size_t)(nc+nu+no), sizeof(int));
+  for(int d=0;d<nc;++d) ctx->kernel_c[d]=kernel_c;
+  for(int d=0;d<nu;++d) ctx->kernel_u[d]=kernel_u;
+  for(int d=0;d<no;++d) ctx->kernel_o[d]=kernel_o;
+  for(int d=0;d<nc+nu+no;++d) ctx->operator[d]=OP_NORMAL;
+  ctx->weights=(double *)R_alloc((size_t)n, sizeof(double));
+  if(bandwidth_mode == BW_GEN_NN)
+    ctx->eval_bandwidth=(double **)R_alloc((size_t)nc, sizeof(double *));
+  /* ANN categorical completion uses the incumbent continuous-row spans. */
+  if(use_prepared_ann) {
+    if(bandwidth_mode != BW_ADAP_NN) return NULL;
+    ctx->active.istart=(int *)R_alloc((size_t)n, sizeof(int));
+    ctx->active.nlev=(int *)R_alloc((size_t)n, sizeof(int));
+    ctx->active.nalloc=n;
+  }
+  if(bandwidth_mode == BW_FIXED) {
+    ctx->bandwidth=(double **)R_alloc((size_t)nc, sizeof(double *));
+    double *values=(double *)R_alloc((size_t)nc, sizeof(double));
+    ctx->lambda=(double *)R_alloc((size_t)MAX(1,nu+no), sizeof(double));
+    for(int d=0;d<nc;++d) ctx->bandwidth[d]=values+d;
+    if(kernel_bandwidth_mean_ctx(kernel_c, BW_FIXED, n, 0,
+         0, 0, 0, nc, nu, no, 1, scale_factors, NULL, NULL,
+         train_c, train_c, NULL, ctx->bandwidth, ctx->lambda,
+         NULL, NULL, NULL) != 0)
+      return NULL;
+  } else {
+    ctx->lambda=prepared_lambda;
+    ctx->bandwidth=prepared->bandwidth_train;
+  }
+  /* A full signature override has the same enabled gate policy as the fit.
+   * NULL parameter triplets/pairs request canonical full-geometry parameters. */
+  np_gate_ctx_set(&ctx->gate,nc,nu,no,ctx->kernel_c,ctx->kernel_u,
+    ctx->kernel_o,ctx->operator,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+  return ctx;
+}
+
+int np_conditional_cdf_anchor_fill(NPConditionalCDFAnchor *ctx,
+  double **eval_u, double **eval_o, double **eval_c,
+  const double *prepared_ann_continuous, const double *response,
+  double *anchor)
+{
+  if(ctx == NULL || response == NULL || anchor == NULL) return 1;
+  *anchor=0.0;
+  /* Match the incumbent fit's first option refresh after Y construction. */
+  if(!ctx->runtime_ready) {
+    np_refresh_runtime_tolerances();
+    ctx->runtime_ready=1;
+  }
+  if(ctx->bandwidth_mode == BW_GEN_NN) {
+    const int offset=ctx->prepared->evaluation_offset;
+    if(offset < 0 || offset >= ctx->prepared->num_eval_total) return 1;
+    for(int d=0;d<ctx->nc;++d)
+      ctx->eval_bandwidth[d]=ctx->prepared->bandwidth_eval[d]+offset;
+  }
+  if(prepared_ann_continuous != NULL) {
+    if(ctx->bandwidth_mode != BW_ADAP_NN ||
+       ctx->active.istart == NULL || ctx->active.nlev == NULL) return 1;
+    memcpy(ctx->weights,prepared_ann_continuous,(size_t)ctx->n*sizeof(double));
+    ctx->active.n=0;
+    for(int i=0;i<ctx->n;) {
+      if(ctx->weights[i]==0.0){++i;continue;}
+      const int start=i;
+      while(i<ctx->n && ctx->weights[i]!=0.0)++i;
+      ctx->active.istart[ctx->active.n]=start;
+      ctx->active.nlev[ctx->active.n++]=i-start;
+    }
+    for(int d=0;d<ctx->nu;++d)
+      np_ukernelv(ctx->kernel_u[d],ctx->train_u[d],ctx->n,1,
+        eval_u[d][0],ctx->lambda[d],ctx->num_categories[d],
+        ctx->weights,&ctx->active,1);
+    for(int d=0;d<ctx->no;++d) {
+      const int category=ctx->nu+d;
+      np_okernelv(ctx->kernel_o[d],ctx->train_o[d],ctx->n,1,
+        eval_o[d][0],ctx->lambda[category],
+        ctx->categorical_values[category],ctx->num_categories[category],
+        ctx->weights,&ctx->active,0);
+    }
+  } else {
+    double **row_bandwidth=ctx->bandwidth_mode==BW_GEN_NN ?
+      ctx->eval_bandwidth : ctx->bandwidth;
+    const int tree_enabled=ctx->bandwidth_mode==BW_GEN_NN &&
+      int_TREE_X==NP_TREE_TRUE && !int_cker_bound_extern &&
+      np_reg_gnn_tree_cannot_prune(1,ctx->nc,kdt_extern_X,ctx->kernel_c,
+        ctx->operator,eval_c,row_bandwidth) ? NP_TREE_FALSE : int_TREE_X;
+    const int status=kernel_weighted_sum_np_ctx_ex(
+      ctx->kernel_c,ctx->kernel_u,ctx->kernel_o,ctx->bandwidth_mode,
+      ctx->n,1,ctx->nu,ctx->no,ctx->nc,0,0,1,1,1,0,0,0,0,
+      ctx->operator,OP_NOOP,0,0,NULL,1,0,0,
+      ctx->bandwidth_mode==BW_ADAP_NN ? NP_TREE_FALSE : tree_enabled,
+      0,ctx->bandwidth_mode==BW_ADAP_NN ? NULL : kdt_extern_X,
+      NULL,NULL,NULL,ctx->train_u,ctx->train_o,ctx->train_c,
+      eval_u,eval_o,eval_c,NULL,NULL,NULL,ctx->scale_factors,1,
+      ctx->bandwidth,row_bandwidth,ctx->lambda,ctx->num_categories,
+      ctx->categorical_values,NULL,NULL,NULL,ctx->weights,&ctx->gate,NULL,
+      NULL,NULL,NULL,
+#ifdef MPI2
+      0,
+#endif
+      NULL,NULL);
+    if(status != 0) return status;
+  }
+  int selected=-1;
+  for(int i=0;i<ctx->n;++i) {
+    if(!R_FINITE(ctx->weights[i])) return 1;
+    if(ctx->weights[i]!=0.0 && selected<0) selected=i;
+  }
+  /* Empty support remains the incumbent fit's decision, with no translation. */
+  if(selected>=0) {
+    if(!R_FINITE(response[selected])) return 1;
+    *anchor=response[selected];
+  }
+  return 0;
+}
+
 /* Each caller of np_conditional_lp_project_accepted passes this exact embedded
  * workspace. The frozen reverse-call invariant excludes ordinary regression. */
 static void np_conditional_plot_capture_accepted(

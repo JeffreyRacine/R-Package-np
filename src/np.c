@@ -20009,7 +20009,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   } else {
     int status = 0;
     double *vsf_x = NULL, *vsf_y = NULL, *ykw = NULL, *y_eval_one = NULL;
-    double *lambda_y = NULL;
+    double *lambda_y = NULL, *lambda_x = NULL;
     double *mean_one = NULL, *stderr_one = NULL;
     double **xuno_eval_one = NULL, **xord_eval_one = NULL, **xcon_eval_one = NULL;
     double **yuno_eval_one = NULL, **yord_eval_one = NULL, **ycon_eval_one = NULL;
@@ -20268,7 +20268,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       double **columns = (double **)R_alloc(
         (size_t)num_reg_continuous_extern, sizeof(double *));
       double *storage = (double *)R_alloc(count, sizeof(double));
-      double *lambda_x = (double *)R_alloc(
+      lambda_x = (double *)R_alloc(
         (size_t)MAX(1, num_reg_unordered_extern + num_reg_ordered_extern),
         sizeof(double));
       for(i = 0; i < num_reg_continuous_extern; ++i)
@@ -20328,11 +20328,31 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         KERNEL_reg_extern, BANDWIDTH_den_extern, num_obs_train_extern,
         num_reg_continuous_extern, num_reg_unordered_extern,
         num_reg_ordered_extern, vsf_x, matrix_XY_continuous_train_extern);
+    NPConditionalCDFAnchor *cdf_anchor = NULL;
+    if(translate_cdf) {
+      cdf_anchor = np_conditional_cdf_anchor_prepare(
+        KERNEL_reg_extern, KERNEL_reg_unordered_extern,
+        KERNEL_reg_ordered_extern, BANDWIDTH_den_extern,
+        num_obs_train_extern, num_reg_unordered_extern,
+        num_reg_ordered_extern, num_reg_continuous_extern,
+        matrix_XY_unordered_train_extern, matrix_XY_ordered_train_extern,
+        matrix_XY_continuous_train_extern, vsf_x,
+        num_categories_extern + xcat_offset,
+        matrix_categorical_vals_extern + xcat_offset,
+        prepared_x_bandwidth_ptr, lambda_x, ann_fit_batch != NULL);
+    }
 
     saved_cker_bound = int_cker_bound_extern;
     saved_ckerlb = vector_ckerlb_extern;
     saved_ckerub = vector_ckerub_extern;
     log_likelihood = 0.0;
+    if(translate_cdf && cdf_anchor == NULL) {
+      np_regression_failure_message(&row_failure,
+        NP_REGRESSION_FAILURE_CONDITIONAL, 1,
+        "np_density_conditional: explanatory support preparation failed for CDF translation");
+      status = NP_REGRESSION_FIT_ERR_DEFERRED;
+      goto cleanup_conditional_lp;
+    }
 
     for(j = 0; j < num_obs_eval_extern; j++){
       double beta_y_log_scale = 0.0;
@@ -20480,17 +20500,28 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         plot_capture->response_logscale[row]=beta_y_active ? beta_y_log_scale : 0.0;
       }
 
-      /* Certified ordinary GENERAL maps reproduce constants.  Inconclusive
-       * and all-large maps retain the accepted uncentered response instead. */
-      const double response_anchor = translate_cdf ? ykw[0] : 0.0;
+      int_cker_bound_extern = int_cxker_bound_extern;
+      vector_ckerlb_extern = vector_cxkerlb_extern;
+      vector_ckerub_extern = vector_cxkerub_extern;
+      /* Extract once: the original continuous ANN row still feeds the fit. */
+      const double *ann_row = ann_fit_batch != NULL ?
+        np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1) : NULL;
+      double response_anchor = 0.0;
+      if(translate_cdf && np_conditional_cdf_anchor_fill(cdf_anchor,
+           xuno_eval_one,xord_eval_one,xcon_eval_one,ann_row,ykw,&response_anchor) != 0) {
+        if(row_failure.family == NP_REGRESSION_FAILURE_NONE)
+          np_regression_failure_message(&row_failure,
+            NP_REGRESSION_FAILURE_CONDITIONAL, 1,
+            "np_density_conditional: explanatory support row failed for CDF translation");
+        status = NP_REGRESSION_FIT_ERR_DEFERRED;
+        goto cleanup_conditional_lp;
+      }
+      /* An actual contributing donor anchors constant supported responses.
+       * Inconclusive/all-large maps retain their accepted uncentered response. */
       if(response_anchor != 0.0)
         for(int observation = 0; observation < num_obs_train_extern; ++observation)
           ykw[observation] -= response_anchor;
       y_eval_one[0] = ykw[0];
-
-      int_cker_bound_extern = int_cxker_bound_extern;
-      vector_ckerlb_extern = vector_cxkerlb_extern;
-      vector_ckerub_extern = vector_cxkerub_extern;
 
       NPRegressionLPEmptyRows row_empty = {NULL, 0, NULL, NULL, NULL};
       if(empty_rows != NULL) {
@@ -20554,8 +20585,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                NULL, empty_rows != NULL ? &row_empty : NULL, first_se_request,
                                                                variance_metadata != NULL ? &variance_one : NULL,
                                                                  &row_failure, &conditional_design,
-                                                                 ann_fit_batch == NULL ? NULL :
-                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1), row_projection_ptr);
+                                                                 ann_row, row_projection_ptr);
 
       if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
         do {
