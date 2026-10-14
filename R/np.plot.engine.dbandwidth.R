@@ -661,9 +661,9 @@
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
 
             if (plot.errors.type == "all") {
-              draw.all.error.types(
-                ex = as.numeric(na.omit(ei)),
-                center = as.numeric(na.omit(if (plotOnEstimate) temp.dens else temp.err[,3])),
+              .np_plot_draw_all_errors_with_gaps(
+                ex = as.numeric(ei),
+                center = as.numeric(if (plotOnEstimate) temp.dens else temp.err[,3]),
                 all.err = temp.all.err,
                 plot.errors.method = plot.errors.method,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
@@ -684,7 +684,7 @@
                 lty = if (xi.factor) 1 else 2,
                 annotation = panel.annotation
               )
-              do.call(draw.errors, draw.args)
+              do.call(.np_plot_draw_errors_with_gaps, draw.args)
             }
             if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
               .np_plot_draw_bias_center_legend(
@@ -828,9 +828,9 @@
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
 
             if (plot.errors.type == "all") {
-              draw.all.error.types(
-                ex = as.numeric(na.omit(allei[,i])),
-                center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,i] else data.err[,3*i])),
+              .np_plot_draw_all_errors_with_gaps(
+                ex = as.numeric(allei[,i]),
+                center = as.numeric(if (plotOnEstimate) data.eval[,i] else data.err[,3*i]),
                 all.err = data.err.all[[i]],
                 plot.errors.method = plot.errors.method,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
@@ -851,7 +851,7 @@
                 lty = if (xi.factor) 1 else 2,
                 annotation = panel.annotation
               )
-              do.call(draw.errors, draw.args)
+              do.call(.np_plot_draw_errors_with_gaps, draw.args)
             }
             if (bws$ndim == 1L && !xi.factor && !plotOnEstimate && plot.errors.type != "all")
               .np_plot_draw_bias_center_legend(

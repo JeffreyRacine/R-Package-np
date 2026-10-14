@@ -79,7 +79,7 @@ test_that("conditional literal closures preserve the original generic closures",
   wrapper <- get("npksum.conditional_literal",ns)
   expect_identical(formals(wrapper),formals(get("npksum.default",ns)))
   expect_identical(lex$npksum.default,wrapper)
-  if(identical(getNamespaceName(ns),"npRmpi")) {
+  if(identical(unname(getNamespaceName(ns)),"npRmpi")) {
     expect_error(lex$.npRmpi_autodispatch_call(quote(identity(1)),owner.name="npreg"),
                  "unexpected conditional kernel-sum dispatch owner")
   }

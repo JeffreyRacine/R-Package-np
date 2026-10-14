@@ -485,6 +485,7 @@
   if (length(se) != m || any(!is.finite(se)) || any(se < 0))
     .np_plot_joint_unavailable("copula uncertainty is unavailable on the declared grid")
   A <- matrix(NA_real_, m, n); fitted <- numeric(m)
+  constant.ratio <- if (density) logical(m) else NULL
   if (density) {
     marginal <- lapply(seq_len(p), function(j)
       .npcopula_marginal_bw(bws, data, j, target = "density", kbandwidth = TRUE))
@@ -497,18 +498,38 @@
     rows <- seq.int(first, min(m, first + budget$tile - 1L))
     if (density) {
       product <- matrix(1, length(rows), n); total <- matrix(0, length(rows), n)
+      nonconstant <- integer(length(rows))
+      unfloored <- rep(TRUE, length(rows))
       for (j in seq_len(p)) {
         W <- .np_plot_density_matrix(marginal[[j]], train[[j]],
           evaluate[[j]][rows, , drop = FALSE], "normal")
         mass <- rowMeans(W)
         if (any(!is.finite(mass)) || any(mass == 0))
           .np_plot_joint_unavailable("copula density has a zero or nonfinite marginal denominator")
+        # Count exact donor-constant raw margins before normalization. With at
+        # most one nonconstant margin, numerator and denominator are the same
+        # empirical mean times constants, even for signed nonzero constants.
+        constant <- vapply(seq_along(rows), function(i)
+          all(W[i, ] == W[i, 1L]), logical(1L))
+        nonconstant <- nonconstant + !constant
+        # Keep every marginal strictly outside the public point owner's NZD
+        # floor, including its potentially nondifferentiable boundary.
+        unfloored <- unfloored & abs(mass) > .Machine$double.eps
         W <- W / mass
         product <- product * W; total <- total + W
       }
       fitted[rows] <- rowMeans(product)
       phi <- product - fitted[rows] * (total - p + 1)
       A[rows, ] <- (phi - rowMeans(phi)) / n
+      exact <- nonconstant <= 1L & unfloored
+      if (any(exact)) {
+        # Do not turn an unrepresentable calculation into a zero certificate.
+        if (any(!is.finite(phi[exact, , drop = FALSE])))
+          stop("invalid four-family influence factor", call. = FALSE)
+        constant.ratio[rows[exact]] <- TRUE
+        fitted[rows[exact]] <- 1
+        A[rows[exact], ] <- 0
+      }
     } else {
       value <- .np_plot_density_unconditional(bws, data, ex[rows, , drop = FALSE], cdf = TRUE)
       A[rows, ] <- value$A; fitted[rows] <- value$estimate
@@ -521,8 +542,18 @@
   if (length(estimate) != m || any(!is.finite(fitted)) ||
       any(abs(fitted - estimate) > .01 * se + roundoff))
     stop("copula influence does not reproduce the plotted target", call. = FALSE)
-  list(A = A, estimate = fitted, forecast.bytes = budget$forecast.bytes,
+  if (any(constant.ratio) &&
+      any(abs(estimate[constant.ratio] - 1) > roundoff[constant.ratio]))
+    stop("constant copula ratio does not reproduce the plotted target", call. = FALSE)
+  result <- list(A = A, estimate = fitted, forecast.bytes = budget$forecast.bytes,
     exact.diagonal = density)
+  if (any(constant.ratio)) {
+    # Only the new simultaneous request receives the exact zero scale. Public
+    # SEs and the existing pointwise/Bonferroni interval payloads stay intact.
+    result$simultaneous.se <- se
+    result$simultaneous.se[constant.ratio] <- 0
+  }
+  result
 }
 
 .np_plot_copula_interval_local <- function(interval, object, data, ex, se,
