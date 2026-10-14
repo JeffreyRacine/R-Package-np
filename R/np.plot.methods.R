@@ -1528,11 +1528,14 @@ np_render_control <- function(style = c("band", "bar"),
     if (length(con.names) != 2L)
       stop("surface plot.conmode payloads require exactly two continuous conditioning variables, or a length-two 'plot.vars' selection",
            call. = FALSE)
-    return(con.names)
+    plot.vars <- con.names
   }
   if (!is.character(plot.vars) || length(plot.vars) != 2L ||
       any(is.na(plot.vars)) || any(!nzchar(plot.vars)))
     stop("'plot.vars' must be a character vector naming exactly two conditioning variables",
+         call. = FALSE)
+  if (anyDuplicated(plot.vars))
+    stop("'plot.vars' must name two distinct conditioning variables",
          call. = FALSE)
   if (any(!(plot.vars %in% xnames)))
     stop("'plot.vars' must name conditioning variables in the fitted conmode object",

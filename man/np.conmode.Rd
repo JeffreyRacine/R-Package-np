@@ -406,9 +406,10 @@ prediction/evaluation route, or plot route as appropriate.
     guarantee. \code{gaussian.draws} (default 9999) and \code{random.seed}
     control reproducible joint calibration; pointwise and Bonferroni-only
     gradient requests need no Gaussian simulation.
-    Surface asymptotic intervals are available
-    as \code{output="data"} payload columns; surface band rendering and
-    surface bootstrap intervals are intentionally deferred.
+    Surface asymptotic intervals are available as \code{output="data"}
+    payload columns and are drawn with graphical surface output. The two
+    conditioning variables selected by \code{plot.vars} must be distinct.
+    Surface bootstrap intervals remain unsupported.
     See \code{\link{npcdensbw}} and \code{\link{plot.np}} for the complete
     bandwidth-selection and plotting argument surfaces.
   }

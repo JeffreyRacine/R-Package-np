@@ -1,4 +1,8 @@
 # np 0.80-1
+- Copula distribution plots with only ordered margins now construct adaptive
+  nearest-neighbor simultaneous bands using their finite-support CDF factors.
+- Class-probability surfaces reject repeated conditioning-variable selectors
+  before evaluating or drawing a misaligned grid.
 - Explicit scalar-quantile perspective requests, including least-squares
   quantile objects, now draw their requested surfaces. Default slice plots,
   vector-quantile and gradient layouts retain their existing behavior.
