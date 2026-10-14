@@ -124,7 +124,11 @@ static SEXP np_plot_alllarge_derivative_execute(void *data)
 SEXP C_np_plot_alllarge_derivative(SEXP basis, SEXP x, SEXP ex, SEXP degree,
   SEXP bernstein, SEXP basis_mode, SEXP coordinate, SEXP order, SEXP permutation, SEXP accepted)
 {
-  SEXP bd=getAttrib(basis,R_DimSymbol),xd=getAttrib(x,R_DimSymbol),ed=getAttrib(ex,R_DimSymbol),ad=getAttrib(accepted,R_DimSymbol);
+  /* Keep returned attributes rooted across subsequent allocating API calls. */
+  SEXP bd=PROTECT(getAttrib(basis,R_DimSymbol));
+  SEXP xd=PROTECT(getAttrib(x,R_DimSymbol));
+  SEXP ed=PROTECT(getAttrib(ex,R_DimSymbol));
+  SEXP ad=PROTECT(getAttrib(accepted,R_DimSymbol));
   if(TYPEOF(basis)!=REALSXP||TYPEOF(x)!=REALSXP||TYPEOF(ex)!=REALSXP||TYPEOF(accepted)!=REALSXP||
      TYPEOF(bd)!=INTSXP||TYPEOF(xd)!=INTSXP||TYPEOF(ed)!=INTSXP||TYPEOF(ad)!=INTSXP||
      XLENGTH(bd)!=2||XLENGTH(xd)!=2||XLENGTH(ed)!=2||XLENGTH(ad)!=2||TYPEOF(degree)!=INTSXP||TYPEOF(permutation)!=INTSXP)
@@ -157,5 +161,5 @@ SEXP C_np_plot_alllarge_derivative(SEXP basis, SEXP x, SEXP ex, SEXP degree,
   SEXP names=PROTECT(allocVector(STRSXP,3));SET_STRING_ELT(names,0,mkChar("weights"));SET_STRING_ELT(names,1,mkChar("projection"));SET_STRING_ELT(names,2,mkChar("ridge"));setAttrib(c.output,R_NamesSymbol,names);
   np_lp_full_row_workspace_init(&c.inverse);
   R_UnwindProtect(np_plot_alllarge_derivative_execute,&c,np_plot_alllarge_derivative_cleanup,&c,NULL);
-  UNPROTECT(2);return c.output;
+  UNPROTECT(6);return c.output;
 }

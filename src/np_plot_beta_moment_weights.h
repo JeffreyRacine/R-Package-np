@@ -309,7 +309,10 @@ static SEXP np_plot_beta_moment_body(void *data)
       LOGICAL(certified)[j]=precision&&R_FINITE(ratio)&&ratio<=2e-11;
     }
   }
-  setAttrib(result,install("forecast.bytes"),ScalarReal(forecast));
+  /* Root the new value before symbol installation, regardless of the C
+   * compiler's argument evaluation order. */
+  SEXP forecast_value=PROTECT(ScalarReal(forecast));nprotect++;
+  setAttrib(result,install("forecast.bytes"),forecast_value);
   if(!c->derivative){UNPROTECT(nprotect);return result;}
   SEXP out=PROTECT(allocVector(VECSXP,11)),outnames=PROTECT(allocVector(STRSXP,11));nprotect+=2;
   SEXP requested_order=PROTECT(ScalarInteger(derivative_order));nprotect++;
