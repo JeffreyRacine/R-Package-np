@@ -1416,11 +1416,36 @@ test_that("every beta side enters the common conditional regression owner", {
   expect_gt(public_start, 0L)
   expect_gt(public_end, public_start)
   public_owner <- substr(ingress, public_start, public_end - 1L)
-  # Both registered entry points delegate to the same descriptor/route owner.
-  expect_match(public_owner, "SEXP C_np_density_conditional(", fixed = TRUE)
-  expect_match(public_owner, "SEXP C_np_density_conditional_variance(", fixed = TRUE)
+  # The two incumbent entries explicitly request no plot projection. The third
+  # delegation belongs only to the opt-in projection entry's unwind body.
+  owner_slice <- function(from, to) {
+    first <- regexpr(from, public_owner, fixed = TRUE)[[1L]]
+    last <- regexpr(to, public_owner, fixed = TRUE)[[1L]]
+    expect_gt(first, 0L)
+    expect_gt(last, first)
+    substr(public_owner, first, last - 1L)
+  }
+  ordinary_entry <- owner_slice("SEXP C_np_density_conditional(",
+                                "SEXP C_np_density_conditional_variance(")
+  variance_entry <- owner_slice("SEXP C_np_density_conditional_variance(",
+                                "static SEXP np_conditional_projection_body(")
+  projection_body <- owner_slice("static SEXP np_conditional_projection_body(",
+                                 "static void np_conditional_projection_cleanup(")
+  for (entry in list(ordinary_entry, variance_entry, projection_body))
+    expect_equal(sum(gregexpr("return np_density_conditional_call(",
+                             entry, fixed = TRUE)[[1L]] > 0L), 1L)
+  expect_match(ordinary_entry, "allow_external, 0, R_NilValue);", fixed = TRUE)
+  expect_match(variance_entry, "allow_external, 1, R_NilValue);", fixed = TRUE)
+  expect_match(projection_body,
+               "INTEGER(call->args[35])[1], call->args[35]);", fixed = TRUE)
+  projection_entry <- owner_slice("SEXP C_np_density_conditional_projection(",
+                                  "static SEXP np_regression_lp_apply_conditional_impl(")
+  expect_match(projection_entry,
+               "R_UnwindProtect(np_conditional_projection_body,&call,", fixed = TRUE)
+  expect_match(projection_entry,
+               "np_conditional_projection_cleanup,&call,NULL);", fixed = TRUE)
   expect_equal(sum(gregexpr("return np_density_conditional_call(",
-                           public_owner, fixed = TRUE)[[1L]] > 0L), 2L)
+                           public_owner, fixed = TRUE)[[1L]] > 0L), 3L)
   expect_match(
     public_owner,
     "x_descriptor.family == NP_CKERNEL_FAMILY_BETA) {",
@@ -1524,10 +1549,28 @@ test_that("every beta side enters the common conditional regression owner", {
       "                                                                 variance_metadata != NULL ? &variance_one : NULL,\n",
       "                                                                 &row_failure, &conditional_design,\n",
       "                                                                 ann_fit_batch == NULL ? NULL :\n",
-      "                                                                   np_ann_fit_batch_row(ann_fit_batch,j,lp_loop_stop,1), NULL);"
+      "                                                                   np_ann_fit_batch_row(ann_fit_batch,j,lp_loop_stop,1), row_projection_ptr);"
     ),
     fixed = TRUE
   )
+  # Incumbent entries keep the native row projection NULL; only an explicitly
+  # requested projection may populate it, using canonical donor/evaluation maps.
+  expect_match(conditional,
+               "NPRegressionFitProjection *row_projection_ptr = NULL;", fixed = TRUE)
+  expect_match(conditional, paste0(
+    "if(fit_projection != NULL) {\n",
+    "        row_projection = *fit_projection;\n",
+    "        row_projection.donor_map = ipt_XY;\n",
+    "        row_projection.eval_map = &ipe_XY[j];\n",
+    "        row_projection.emitted = 0;\n",
+    "        row_projection.constant = 0;\n",
+    "        row_projection_ptr = &row_projection;\n",
+    "        plot_capture->row=ipe_XY[j];\n",
+    "        plot_capture->donor_map=ipt_XY;\n",
+    "        for(int ii=0;ii<plot_capture->n;++ii) plot_capture->donor_order[ii]=ipt_XY[ii];\n",
+    "      }"), fixed = TRUE)
+  expect_equal(sum(gregexpr("row_projection_ptr = &row_projection;",
+                           conditional, fixed = TRUE)[[1L]] > 0L), 1L)
   expect_match(
     conditional, "np_beta_continuous_bandwidth_prepare_canonical(",
     fixed = TRUE

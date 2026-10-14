@@ -67,7 +67,24 @@ test_that("response and adjoint LP owners retain validated factorizations", {
       paste0("return np_regression_general_lp_fit_body(data, ",
              as.integer(ann), ");"), fixed = TRUE)
   }
-  expect_match(conditional, "if(diagnostics->ridge_total > 0.0)", fixed = TRUE)
+  # The accepted ridge branch still uses the adjoint factor; the nonridge
+  # branch still uses the plain factor. Capture is an opt-in observer after a
+  # successful solve and must not change either owner's returned status.
+  conditional.dispatch <- paste0(
+    "const int ok = diagnostics->ridge_total > 0.0 ? ",
+    "np_lp_solve_workspace_solve_adjoint_factored( ",
+    "workspace, nterms, nrhs, pristine_anchor, diagnostics) == ",
+    "NP_LP_SOLVE_POLICY_OK : ",
+    "np_lp_solve_workspace_solve_factored(workspace, nterms, nrhs);")
+  conditional.capture <- paste0(
+    "if(ok && np_conditional_plot_capture_current != NULL) ",
+    "np_conditional_plot_capture_accepted(workspace, nterms, nrhs);")
+  expect_match(gsub("[[:space:]]+", " ", conditional),
+    paste(conditional.dispatch, conditional.capture, "return ok;"),
+    fixed = TRUE)
+  expect_identical(count.calls(conditional,
+    "np_conditional_plot_capture_accepted("), 1L)
+  expect_identical(count.calls(conditional, "return "), 1L)
   expect_match(conditional, "np_lp_solve_workspace_solve_factored(", fixed = TRUE)
   expect_match(frame, "if(projection != NULL)", fixed = TRUE)
   expect_match(fit, "if(hc0_residual_preparing)", fixed = TRUE)
