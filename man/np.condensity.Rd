@@ -353,6 +353,18 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   expand missing settings to the same documented preset. Explicit
   incompatible settings fail fast rather than being silently rewritten.
 
+  With a raw polynomial basis, high powers of poorly scaled continuous
+  predictors (such as uncentred calendar years) can produce severely
+  ill-conditioned systems. Conditional local-polynomial fits do not apply
+  the design-conditioning rejection used by \code{npreg}; they may return
+  inaccurate finite values without a warning, with or without a ridge
+  adjustment. Centre or scale such predictors before fitting and apply the
+  same transformation to all evaluation or prediction data. The explicit
+  \code{bernstein.basis = TRUE} representation is another option for
+  improving conditioning. Check numerical stability for the chosen data,
+  degree and bandwidths. \code{proper = TRUE} enforces probability-shape
+  constraints; it does not repair an ill-conditioned polynomial solve.
+
   With \code{regtype = "lp"}, \code{gradients = TRUE} and
   \code{gradient.order} greater than one expose higher-order derivative
   estimates with respect to continuous explanatory variables. These
@@ -604,8 +616,11 @@ summary(fhat)
 ## Variations on local polynomial conditional density estimation with
 ## proper = TRUE.
 
+# Work in years relative to 1975 to condition the raw polynomial basis.
+# Calendar year = model year + year.offset, also for prediction data.
+year.offset <- 1975
 Italy2 <- within(Italy, {
-  year <- as.numeric(as.character(year))
+  year <- as.numeric(as.character(year)) - year.offset
 })
 
 ## Plot only: make the plotted surface proper on the plot evaluation grid.
@@ -649,7 +664,7 @@ g.grid <- seq(min(Italy2$gdp), max(Italy2$gdp), length.out = 200)
 
 nd_grid <- expand.grid(
   gdp = g.grid,
-  year = c(1955, 1975, 1995)
+  year = c(1955, 1975, 1995) - year.offset
 )
 
 pred_grid <- predict(fhat, newdata = nd_grid, proper = TRUE)
@@ -663,8 +678,8 @@ g2 <- seq(quantile(Italy2$gdp, 0.30),
           quantile(Italy2$gdp, 0.90), length.out = 35)
 
 nd_slice <- rbind(
-  data.frame(gdp = g1, year = rep(1960, length(g1))),
-  data.frame(gdp = g2, year = rep(1985, length(g2)))
+  data.frame(gdp = g1, year = rep(1960 - year.offset, length(g1))),
+  data.frame(gdp = g2, year = rep(1985 - year.offset, length(g2)))
 )
 
 pred_slice <- predict(
