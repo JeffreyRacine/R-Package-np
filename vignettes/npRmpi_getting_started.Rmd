@@ -101,8 +101,11 @@ derivative orders. Missing stored uncertainty, unsupported inference and an
 undefined evaluation row are different conditions; do not interpret `NA` as
 zero uncertainty. Asymptotic results condition on the selected smoothing
 settings, without bandwidth or polynomial-degree selection uncertainty.
-Plot bands apply within a panel, not jointly across all panels; asymptotic
-simultaneous bands are not available. See `?np.plot` for details.
+Supported plot targets provide asymptotic simultaneous variability bands over
+the finite evaluation grid within each panel, conditional on the selected
+smoothing settings. They do not provide joint coverage across separate panels.
+See `?np.plot` for supported targets, working-covariance assumptions and
+unavailability conditions.
 
 Use current dotted names such as `gradient.order`, `data.overlay` and
 `data.rug`, and `B` for bootstrap replication counts where documented.
@@ -121,14 +124,13 @@ operational rather than methodological.
 If you want the recommended route without spelling out all of the LP tuning
 arguments, use `nomad = TRUE`. This is a documented convenience preset, not a
 generic optimizer alias: it fills only missing LP degree-search controls and
-leaves compatible explicit overrides in place. This route uses the optional
-NOMAD backend provided by the suggested package `crs`, so install `crs` first
-if you want to use `nomad = TRUE` or
-`search.engine = "nomad"`/`"nomad+powell"`.
+leaves compatible explicit overrides in place. This route uses the
+NOMAD backend supplied by the required `crs` dependency (version 0.15-46
+or later), installed with `npRmpi`.
 
 ```{r, purl = FALSE}
 if (requireNamespace("crs", quietly = TRUE) &&
-    utils::packageVersion("crs") >= package_version("0.15-41")) {
+    utils::packageVersion("crs") >= package_version("0.15-46")) {
   npRmpi.init(nslaves = 1)
 
   set.seed(7)

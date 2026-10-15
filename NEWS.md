@@ -1,4 +1,6 @@
 # npRmpi 0.80-1
+- Update the getting-started guide to describe supported simultaneous
+  asymptotic bands and the required released `crs` dependency.
 - Conditional hat-operator row fanout now establishes the worker-local native
   computation mode as well as the R dispatch guard. This prevents cross-rank
   mixing for beta-kernel derivative apply requests while preserving the outer
