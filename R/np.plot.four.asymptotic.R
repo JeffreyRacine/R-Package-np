@@ -557,8 +557,20 @@
 }
 
 .np_plot_copula_interval_local <- function(interval, object, data, ex, se,
-                                      alpha, band.type, gaussian.draws) {
+                                      alpha, band.type, gaussian.draws,
+                                      grid = NULL) {
   cal <- .np_plot_joint_try({
+    repeated <- !is.null(grid$display.rows)
+    if (repeated) {
+      # Identical targets are one random variable, not separate events in the
+      # Gaussian maximum. Evaluate once, before tile-dependent roundoff can
+      # separate their influence rows. Keep the renderer's exact conflict gate.
+      for (j in seq_len(ncol(ex)))
+        .npcopula_display_values(ex[[j]], grid)
+      object$copula <- .npcopula_display_values(object$copula, grid)
+      se <- .npcopula_display_values(se, grid)
+      ex <- ex[grid$display.rows, , drop = FALSE]
+    }
     value <- .np_plot_copula_influence(object, data, ex, se)
     joint.se <- value$simultaneous.se
     if(is.null(joint.se)) joint.se <- se
@@ -569,6 +581,13 @@
       exact.diagonal = value$exact.diagonal)
     result$forecast.bytes <- value$forecast.bytes
     result$simultaneous.se <- joint.se
+    if (repeated) {
+      # Public rows and legacy marginal intervals retain their original order
+      # and multiplicity; only the new simultaneous process uses the quotient.
+      result$evaluation.rows <- length(grid$display.cell)
+      result$evaluation.index <- grid$display.cell
+      result$simultaneous.se <- joint.se[grid$display.cell]
+    }
     if(!is.null(value$simultaneous.se))
       result$marginal.scale <- "new simultaneous influence scale; incumbent marginal intervals retained"
     result
