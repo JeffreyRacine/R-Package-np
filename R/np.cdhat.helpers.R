@@ -965,14 +965,9 @@
   if (!length(tasks) || length(tasks) < 2L)
     return(NULL)
 
-  worker <- function(task) {
-    old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
-    old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
-    options(npRmpi.autodispatch.disable = TRUE)
-    options(npRmpi.autodispatch.context = TRUE)
-    on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
-    on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
-
+  ## Row tasks own distinct evaluation points; only the outer fanout may
+  ## communicate. Reuse the scoped R/native local-owner contract.
+  worker <- function(task) .npRmpi_with_local_regression({
     rows <- as.integer(task$rows)
     x.s.worker <- if (length(x.s)) x.s else NULL
     out <- .npcdhat_exact_apply(
@@ -999,7 +994,7 @@
     if (!identical(dim(out), c(length(rows), as.integer(ncol.out))))
       out <- matrix(as.numeric(out), nrow = length(rows), ncol = as.integer(ncol.out))
     out
-  }
+  })
 
   result <- .npRmpi_bootstrap_run_fanout(
     progress.unit = "row",

@@ -1,4 +1,8 @@
 # npRmpi 0.80-1
+- Conditional hat-operator row fanout now establishes the worker-local native
+  computation mode as well as the R dispatch guard. This prevents cross-rank
+  mixing for beta-kernel derivative apply requests while preserving the outer
+  row partition, caller state and error restoration.
 - Copula plots with repeated grid coordinates now draw asymptotic simultaneous
   bands consistently, retaining every requested output row. Identical targets
   share one calibrated band; conflicting duplicates are still rejected.
