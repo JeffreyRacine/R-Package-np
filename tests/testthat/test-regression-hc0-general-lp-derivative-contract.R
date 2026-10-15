@@ -140,7 +140,7 @@ test_that("balanced q-adjusted multiplier covariance equals general-LP HC0", {
 
 test_that("H6 batches adjoint directions without another covariance owner", {
   source <- paste(
-    readLines(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   owner <- h6_extract_lp_owner(source)

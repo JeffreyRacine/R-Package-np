@@ -21,7 +21,7 @@ fixed_occurrences <- function(text, pattern) {
 test_that("the generic scalar fit has one complete unwind owner", {
   path <- locate_scalar_fit_source()
   skip_if(is.null(path), "package sources unavailable")
-  engine <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  engine <- paste(np_test_read_incumbent_c_source(path, warn = FALSE), collapse = "\n")
   start <- regexpr(
     "enum {\n  NP_REGRESSION_SCALAR_FIT_OK = 0,",
     engine,
@@ -108,7 +108,7 @@ test_that("the generic scalar fit has one complete unwind owner", {
 test_that("the generic scalar branch delegates without duplicate ownership", {
   path <- locate_scalar_fit_source()
   skip_if(is.null(path), "package sources unavailable")
-  engine <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  engine <- paste(np_test_read_incumbent_c_source(path, warn = FALSE), collapse = "\n")
   start <- regexpr(
     "if(lp_engine_est == NP_LP_ENGINE_SCALAR) { // canonical scalar LP0",
     engine,
@@ -152,7 +152,7 @@ test_that("the generic scalar branch delegates without duplicate ownership", {
 test_that("conditional influence validates pointers before dereference", {
   path <- locate_scalar_fit_source()
   skip_if(is.null(path), "package sources unavailable")
-  engine <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  engine <- paste(np_test_read_incumbent_c_source(path, warn = FALSE), collapse = "\n")
   start <- regexpr(
     "static int NP_NOINLINE np_regression_conditional_influence_finish(",
     engine,

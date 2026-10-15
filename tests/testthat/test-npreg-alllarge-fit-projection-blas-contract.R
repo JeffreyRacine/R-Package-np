@@ -17,7 +17,7 @@ locate_alllarge_fit_projection_source <- function() {
 test_that("MPI all-large fit BLAS route is narrow and bounded", {
   src_file <- locate_alllarge_fit_projection_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   start <- grep(
     "^int kernel_estimate_regression_categorical_tree_np\\(",
     lines

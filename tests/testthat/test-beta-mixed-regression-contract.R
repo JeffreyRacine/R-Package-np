@@ -288,11 +288,11 @@ test_that("mixed beta regression is structurally canonical and linear-memory", {
   root <- locate_beta_mixed_regression_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 

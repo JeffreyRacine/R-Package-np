@@ -518,11 +518,11 @@ test_that("scalar HC0 is response-equivariant and constant responses are exact z
 
 test_that("HC0 activation remains private and linear-memory", {
   source <- paste(
-    readLines(test_path("..", "..", "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(test_path("..", "..", "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
   reducer <- paste(
-    readLines(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   hc0.start <- regexpr(

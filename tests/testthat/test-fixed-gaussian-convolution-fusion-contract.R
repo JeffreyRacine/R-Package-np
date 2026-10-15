@@ -2,7 +2,7 @@ test_that("ordinary-Gaussian convolution fusion is narrowly gated", {
   source_file <- test_path("..", "..", "src", "jksum.c")
   skip_if_not(file.exists(source_file), "package C sources unavailable")
 
-  text <- paste(readLines(source_file, warn = FALSE), collapse = "\n")
+  text <- paste(np_test_read_incumbent_c_source(source_file, warn = FALSE), collapse = "\n")
 
   expect_match(
     text,
@@ -38,7 +38,7 @@ test_that("ordinary-Gaussian convolution fusion is narrowly gated", {
 
   gate_end <- grep(
     "fused_gaussian_convolution_kind = 1;",
-    src <- readLines(source_file, warn = FALSE),
+    src <- np_test_read_incumbent_c_source(source_file, warn = FALSE),
     fixed = TRUE
   )
   expect_length(gate_end, 1L)

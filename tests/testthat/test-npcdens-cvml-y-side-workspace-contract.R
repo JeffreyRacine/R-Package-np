@@ -11,7 +11,7 @@ npcdens_y_side_source <- function(file) {
   hits <- candidates[file.exists(candidates)]
   if (!length(hits))
     return(NULL)
-  paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+  paste(np_test_read_incumbent_c_source(hits[[1L]], warn = FALSE), collapse = "\n")
 }
 
 npcdens_y_side_fixture <- function() {

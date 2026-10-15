@@ -17,7 +17,7 @@ locate_lp_row_source <- function() {
 test_that("fixed-objective width-one rows use an implicit scalar basis", {
   row_file <- locate_lp_row_source()
   skip_if(is.null(row_file), "source file src/jksum_lp_row.c unavailable")
-  source <- paste(readLines(row_file, warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(row_file, warn = FALSE), collapse = "\n")
 
   start <- regexpr(
     "static void np_lp_accumulate_dense_row_1(",
@@ -62,7 +62,7 @@ test_that("sparse-tree width-one pairs use the same implicit scalar algebra", {
   candidates <- unique(candidates[nzchar(candidates)])
   hits <- candidates[file.exists(candidates)]
   skip_if(!length(hits), "source file src/jksum.c unavailable")
-  source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(hits[[1L]], warn = FALSE), collapse = "\n")
 
   start <- regexpr("static inline void np_lp_accumulate_pair(", source,
                    fixed = TRUE)
@@ -131,7 +131,7 @@ test_that("MPI scalar fixed objectives use the batch sibling without LAPACK", {
   candidates <- unique(candidates[nzchar(candidates)])
   hits <- candidates[file.exists(candidates)]
   skip_if(!length(hits), "source file src/jksum.c unavailable")
-  source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(hits[[1L]], warn = FALSE), collapse = "\n")
 
   fixed_start <- regexpr(
     "static NPRegCvLpResult np_regression_cv_lp_basis_fixed(",
@@ -220,7 +220,7 @@ test_that("conditional width-one blocks share one raw row without LAPACK", {
   candidates <- unique(candidates[nzchar(candidates)])
   hits <- candidates[file.exists(candidates)]
   skip_if(!length(hits), "source file src/jksum.c unavailable")
-  source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(hits[[1L]], warn = FALSE), collapse = "\n")
 
   lines <- strsplit(source, "\n", fixed = TRUE)[[1L]]
   start <- grep(
@@ -263,7 +263,7 @@ test_that("conditional scalar CVLS and CVML use their MPI-optimal siblings", {
   candidates <- unique(candidates[nzchar(candidates)])
   hits <- candidates[file.exists(candidates)]
   skip_if(!length(hits), "source file src/jksum.c unavailable")
-  source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(hits[[1L]], warn = FALSE), collapse = "\n")
 
   support_start <- regexpr(
     "int np_conditional_lp_stream_engine_supported(void){",

@@ -56,7 +56,7 @@ test_that("alternate convolution bandwidth storage has one explicit owner", {
     }
   }
   skip_if(is.null(source.path), "package source unavailable")
-  engine <- paste(readLines(source.path, warn = FALSE), collapse = "\n")
+  engine <- paste(np_test_read_incumbent_c_source(source.path, warn = FALSE), collapse = "\n")
 
   expect_match(
     engine,

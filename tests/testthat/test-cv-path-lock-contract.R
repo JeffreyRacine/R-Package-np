@@ -38,7 +38,7 @@ test_that("canonical LP CV route predicates remain centralized", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
 
   expect_true(any(grepl("np_reg_cv_use_symmetric_dropone_path", lines, fixed = TRUE)))
   expect_true(any(grepl("np_reg_cv_use_canonical_lp_fixed_kernel", lines, fixed = TRUE)))
@@ -157,7 +157,7 @@ test_that("legacy LL compute engines and restoration switches are absent", {
   ))
   skip_if_not(all(file.exists(source_files)), "complete package C sources unavailable")
 
-  source <- paste(unlist(lapply(source_files, readLines, warn = FALSE)),
+  source <- paste(unlist(lapply(source_files, np_test_read_incumbent_c_source, warn = FALSE)),
                   collapse = "\n")
   forbidden <- c(
     "LL_LL",
@@ -182,7 +182,7 @@ test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   helper_start <- grep(
     "^static NPRegCvLpResult np_regression_cv_lp_basis_fixed\\(",
     lines
@@ -232,7 +232,7 @@ test_that("all-large, packed, and nearest-neighbor LP CV avoid legacy solve mars
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   helper_start <- grep(
     "^double np_kernel_estimate_regression_categorical_ls_aic\\(",
     lines
@@ -338,7 +338,7 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   shortcut_start <- grep(
     "^int kernel_estimate_regression_categorical_tree_np\\(",
     lines
@@ -428,7 +428,7 @@ test_that("canonical LP hat and apply routes share the typed solve policy", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   hat_start <- grep("^int np_regression_lp_hat_matrix\\(", lines)
   hat_stop <- grep("^typedef struct \\{$", lines)
   hat_stop <- hat_stop[hat_stop > hat_start][1L]
@@ -502,7 +502,7 @@ test_that("canonical LP hat and apply routes share the typed solve policy", {
 
   np_source_file <- file.path(dirname(src_file), "np.c")
   skip_if_not(file.exists(np_source_file), "source file src/np.c unavailable")
-  np_source <- paste(readLines(np_source_file, warn = FALSE), collapse = "\n")
+  np_source <- paste(np_test_read_incumbent_c_source(np_source_file, warn = FALSE), collapse = "\n")
   expect_true(grepl(
     "setAttrib(out, install(\"ridge.used\"), ridge_used);",
     np_source,
@@ -514,14 +514,14 @@ test_that("conditional LP LOO rows preserve signed deletion and beta deleted-sam
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   source <- paste(lines, collapse = "\n")
   solve_file <- file.path(dirname(src_file), "jksum_lp_solve.c")
   skip_if_not(file.exists(solve_file), "source file src/jksum_lp_solve.c unavailable")
-  solve_source <- paste(readLines(solve_file, warn = FALSE), collapse = "\n")
+  solve_source <- paste(np_test_read_incumbent_c_source(solve_file, warn = FALSE), collapse = "\n")
   header_file <- file.path(dirname(src_file), "jksum_lp_solve.h")
   skip_if_not(file.exists(header_file), "source file src/jksum_lp_solve.h unavailable")
-  header_source <- paste(readLines(header_file, warn = FALSE), collapse = "\n")
+  header_source <- paste(np_test_read_incumbent_c_source(header_file, warn = FALSE), collapse = "\n")
 
   for (obsolete in c(
     "NPGLPQRDropWorkspace",
@@ -605,7 +605,7 @@ test_that("conditional LP block rows reuse one canonical solve workspace", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   helper_start <- grep(
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
     lines
@@ -654,7 +654,7 @@ test_that("conditional and regression LP rows share one canonical solve policy",
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   struct_start <- grep("^typedef struct \\{$", lines)
   struct_stop <- grep("^} NPConditionalXRowCtx;$", lines)
   impl_start <- grep(
@@ -734,7 +734,7 @@ test_that("conditional LP block rows reuse canonical solve storage", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   helper_start <- grep(
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
     lines
@@ -779,7 +779,7 @@ test_that("conditional LP dense proof-row graph is absent from production", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  source <- paste(readLines(src_file, warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(src_file, warn = FALSE), collapse = "\n")
   retired <- c(
     "np_shadow_conditional_build_x_weights_core",
     "np_shadow_conditional_build_x_weights",
@@ -798,7 +798,7 @@ test_that("conditional LP row-stream rows use bounded canonical solve storage", 
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   helper_start <- grep(
     "^static int np_conditional_x_weight_row_stream_core_impl\\(",
     lines
@@ -843,7 +843,7 @@ test_that("conditional LP all-large retained inverses use bounded workspace stor
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   helper_start <- grep(
     "^static int np_conditional_lp_all_large_ctx_prepare_core\\(",
     lines
@@ -882,7 +882,7 @@ test_that("canonical LP direct-apply route uses the typed response solve", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   helper_start <- grep("^int np_regression_lp_apply_matrix\\(", lines)
   helper_stop <- grep("^static void np_conditional_yrow_ctx_clear\\(", lines)
   expect_length(helper_start, 1L)
@@ -910,7 +910,7 @@ test_that("obsolete density CV tree-bypass shim remains eradicated", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   expect_false(any(grepl(
     "np_den_cv_use_tree_bypass_path",
     lines,
@@ -922,7 +922,7 @@ test_that("live generic conditional CV keeps Y-side gating enabled", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
   start <- grep(
     "^int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv\\(",
     lines
@@ -949,7 +949,7 @@ test_that("conditional public LP CV routes have one kernelcv dispatch", {
   src_file <- locate_kernelcv_c()
   skip_if(is.null(src_file), "source file src/kernelcv.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(src_file, warn = FALSE)
 
   expect_equal(sum(grepl("^double cv_func_con_density_categorical_ml\\(", lines)), 0L)
   expect_equal(sum(grepl("^double cv_func_con_density_categorical_ls\\(", lines)), 0L)

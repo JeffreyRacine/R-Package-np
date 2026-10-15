@@ -184,7 +184,7 @@ test_that("all-large native categorical point retains the accepted point map", {
 
 test_that("H7A remains a point-only bounded-work adapter", {
   source <- paste(
-    readLines(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   start <- regexpr(

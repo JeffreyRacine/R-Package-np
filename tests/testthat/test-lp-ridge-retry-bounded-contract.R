@@ -42,11 +42,11 @@ test_that("all canonical LP solve retries are bounded", {
     logical(1L)
   )), "complete LP retry sources unavailable in this test context")
 
-  jksum <- paste(readLines(jksum.file, warn = FALSE), collapse = "\n")
-  solve.c <- paste(readLines(solve.c.file, warn = FALSE), collapse = "\n")
-  solve.h <- paste(readLines(solve.h.file, warn = FALSE), collapse = "\n")
-  reghat.c <- paste(readLines(reghat.c.file, warn = FALSE), collapse = "\n")
-  reghat.r <- paste(readLines(reghat.r.file, warn = FALSE), collapse = "\n")
+  jksum <- paste(np_test_read_incumbent_c_source(jksum.file, warn = FALSE), collapse = "\n")
+  solve.c <- paste(np_test_read_incumbent_c_source(solve.c.file, warn = FALSE), collapse = "\n")
+  solve.h <- paste(np_test_read_incumbent_c_source(solve.h.file, warn = FALSE), collapse = "\n")
+  reghat.c <- paste(np_test_read_incumbent_c_source(reghat.c.file, warn = FALSE), collapse = "\n")
+  reghat.r <- paste(np_test_read_incumbent_c_source(reghat.r.file, warn = FALSE), collapse = "\n")
 
   expect_true(grepl(
     "execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;",
@@ -153,7 +153,7 @@ test_that("compiled LP hat path rejects a non-finite system promptly", {
 test_that("MPI LP owner failures remain collective and fully owned", {
   jksum.file <- locate_lp_retry_source("jksum.c")
   skip_if(is.null(jksum.file), "source file src/jksum.c unavailable")
-  source <- paste(readLines(jksum.file, warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(jksum.file, warn = FALSE), collapse = "\n")
 
   expect_true(grepl(
     "owner->mpi_owner_chunk.sendbuf[owner_row_width_lp - 1] = -1.0;",

@@ -14,7 +14,7 @@ pkw_source_file <- function() {
 test_that("derivative kernel-weight ownership is invocation scoped", {
   source <- pkw_source_file()
   skip_if(is.null(source), "source file src/jksum.c unavailable")
-  text <- paste(readLines(source, warn = FALSE), collapse = "\n")
+  text <- paste(np_test_read_incumbent_c_source(source, warn = FALSE), collapse = "\n")
 
   expect_true(grepl("typedef struct {", text, fixed = TRUE))
   expect_true(grepl("} NPPermutationWeightOutput;", text, fixed = TRUE))
