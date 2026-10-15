@@ -1,4 +1,10 @@
 # npRmpi 0.80-1
+- Use portable explicit dependencies for conditional-kernel source fragments,
+  preserving incremental rebuilds without GNU Makefile extensions. Declare
+  the private conditional transport dependency for static R-code checks and
+  update the SSHRC funding URL. Estimator computations are unchanged.
+- Detect the modern MPI info-string API with explicit Open MPI prefixes as
+  well as pkg-config, without requiring unrelated MPI handle data symbols.
 - Use `MPI_Info_get_string` when the MPI library provides it, avoiding the
   deprecated-call installation warning with newer Open MPI. Older MPI and
   Windows builds retain the legacy API. The replacement preserves requested
