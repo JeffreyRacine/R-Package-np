@@ -91,9 +91,11 @@ configuration or an undefined evaluation row (for example, no compact-kernel
 support). Inspect warnings and `NA` results rather than treating them as zero
 uncertainty. Asymptotic results condition on the selected smoothing settings;
 they do not include bandwidth or polynomial-degree selection uncertainty.
-Plot bands apply within a panel, not jointly across all displayed panels;
-asymptotic simultaneous bands are not available. See `?np.plot` for band and
-bootstrap choices.
+Supported plot targets provide asymptotic simultaneous variability bands over
+the finite evaluation grid within each panel, conditional on the selected
+smoothing settings. They do not provide joint coverage across separate panels.
+See `?np.plot` for supported targets, working-covariance assumptions and
+unavailability conditions.
 
 ## Moving from 0.70-5 to 0.80-1
 
@@ -142,13 +144,12 @@ If you want the recommended route without spelling out all of the LP tuning
 arguments, use `nomad = TRUE`. This is a documented convenience preset, not a
 generic optimizer alias: it fills only missing values among the LP degree-search
 controls and leaves compatible explicit overrides in place. This route uses the
-optional NOMAD backend provided by the suggested package `crs`, so install
-`crs` first if you want to use `nomad = TRUE` or
-`search.engine = "nomad"`/`"nomad+powell"`.
+NOMAD backend supplied by the required `crs` dependency (version 0.15-46
+or later), installed with `np`.
 
 ```{r}
 if (requireNamespace("crs", quietly = TRUE) &&
-    utils::packageVersion("crs") >= package_version("0.15-41")) {
+    utils::packageVersion("crs") >= package_version("0.15-46")) {
   set.seed(7)
   n <- 120
   x <- runif(n, -1, 1)

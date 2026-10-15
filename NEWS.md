@@ -1,4 +1,6 @@
 # np 0.80-1
+- Update the getting-started guide to describe supported simultaneous
+  asymptotic bands and the required released `crs` dependency.
 - Asymptotic simultaneous plots now report unavailable joint bands when
   compact-support degeneracy leaves their correlation or marginal uncertainty
   unidentified, preserving available pointwise and Bonferroni bands. Projected
