@@ -1,4 +1,8 @@
 # np 0.80-1
+- Use portable explicit dependencies for conditional-kernel source fragments,
+  preserving incremental rebuilds without GNU Makefile extensions. Declare
+  the private conditional transport dependency for static R-code checks and
+  update the SSHRC funding URL. Estimator computations are unchanged.
 - Conditional density, distribution, quantile and class-probability fitting
   and replay now use the same literal categorical kernels on both X and Y.
   Near-upper categorical bandwidths no longer select an approximate constant
