@@ -52,11 +52,17 @@
     size <- sqrt(sum(row^2))
     norm[i] <- scale * size
     if (!is.finite(norm[i]) || norm[i] <= 0)
-      stop("influence variance is not representable", call. = FALSE)
+      .np_plot_joint_unavailable("influence variance is not representable")
     correlation.factor[i, ] <- row / size
   }
-  if (any(zero != (se == 0)))
-    stop("influence and marginal uncertainty disagree about zero variance", call. = FALSE)
+  if (any(zero != (se == 0))) {
+    # A working correlation factor and a separate marginal approximation can
+    # disagree at compact-support degeneracies. No joint process is identified
+    # there; an exact-diagonal owner, however, has violated its own contract.
+    if (exact.diagonal)
+      stop("influence and marginal uncertainty disagree about zero variance", call. = FALSE)
+    .np_plot_joint_unavailable("influence and marginal uncertainty disagree about zero variance")
+  }
   if (exact.diagonal && any(abs(norm[!zero] / se[!zero] - 1) >
       256 * .Machine$double.eps))
     stop("joint influence does not reproduce the marginal variance", call. = FALSE)
@@ -92,6 +98,10 @@
     bws[["tau.bws", exact = TRUE]][[index]]
   if (is.null(one)) stop("missing per-tau location-scale state", call. = FALSE)
   reg <- one[["reg.bws", exact = TRUE]]
+  # Compact support can leave no residual information for some displayed rows.
+  # This is already an unavailable marginal SE, not a reconstruction failure.
+  if (any(!is.finite(se)) || any(se < 0))
+    .np_plot_joint_unavailable("location-scale marginal uncertainty is unavailable on the declared grid")
   deriv <- categorical <- NULL
   if (!is.null(gradient)) {
     continuous <- which(reg[["icon", exact = TRUE]])
@@ -315,6 +325,11 @@
       .np_plot_joint_unavailable("class probability projection is on a face boundary")
     jac[] <- 0
     if (active[chosen]) {jac[active] <- -1/sum(active);jac[chosen] <- jac[chosen]+1}
+    # Projection can flatten an uncertain raw estimate to zero or one. The
+    # resulting zero Jacobian is not a constant-response certificate and must
+    # not manufacture a zero-width regular Gaussian interval.
+    if (all(jac == 0))
+      .np_plot_joint_unavailable("projected class probability has no regular nondegenerate influence")
     return(list(point=point[chosen],jacobian=jac,zeros=integer()))
   }
   active <- raw > 0; positive <- pmax(raw,0); total <- sum(positive)
@@ -323,6 +338,9 @@
   point <- positive[chosen]/total
   jac <- -point*as.numeric(active)/total
   if (active[chosen]) jac[chosen] <- jac[chosen]+1/total
+  if (raw[chosen] < 0 ||
+      (active[chosen] && sum(active) == 1L && any(raw < 0)))
+    .np_plot_joint_unavailable("clipped class probability has no regular nondegenerate influence")
   list(point=point,jacobian=jac,zeros=which(raw==0))
 }
 

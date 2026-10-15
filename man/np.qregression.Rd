@@ -355,6 +355,13 @@ prediction/evaluation route, or plot route as appropriate.
   coordinates are used only for drawing. The data overlay can be disabled
   with \code{data.overlay=FALSE}.
 
+  Local-polynomial conditional-response factors use local response moments
+  as a working covariance approximation conditional on the accepted design
+  and response map. At fixed nonshrinking bandwidths they need not equal the
+  full empirical-caseweight derivative, which also perturbs the design map.
+  Their leading interpretation requires smooth shrinking neighborhoods and
+  nondegenerate local response variation.
+
   Asymptotic \code{plot(..., band="simultaneous")} calibrates a joint
   Gaussian maximum over the retained grid within one panel and one
   \code{tau}; calibration is not joint across quantiles or panels. Levels

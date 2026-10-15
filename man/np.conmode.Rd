@@ -398,6 +398,10 @@ prediction/evaluation route, or plot route as appropriate.
     the proper-probability Jacobian, including smooth positive normalization,
     clipping with a stable sign pattern, and projection onto a stable simplex
     face. Branch seams or unidentified zero-variance rows remain unavailable.
+    A zero Jacobian caused by clipping or projection onto an inactive class or a
+    singleton face does not certify a constant sampling target. Such a panel
+    warns and returns unavailable simultaneous limits, retaining the plotted
+    probabilities and any available pointwise and Bonferroni intervals.
     Proper probability bands use standard errors from that transformed
     influence; existing pointwise and Bonferroni probability bands retain
     their own convention in \code{band="all"}.
@@ -416,7 +420,13 @@ prediction/evaluation route, or plot route as appropriate.
     level, not confidence bands for the winning class, all classes jointly,
     smoothing bias or values between grid points. Independent observations,
     regular local neighborhoods and valid covariance/marginal approximations
-    are required. A growing or data-dependent sample grid additionally needs
+    are required. Local-polynomial and fixed-view response factors use local
+    response moments as a working covariance approximation conditional on the
+    accepted design and response map. At fixed nonshrinking bandwidths they
+    need not equal a full empirical-caseweight derivative, which also perturbs
+    the design map. Their leading interpretation requires smooth shrinking
+    neighborhoods and nondegenerate local response variation.
+    A growing or data-dependent sample grid additionally needs
     uniform linearization, non-dominating influences and a Gaussian-maximum
     approximation; arbitrary sample grids do not carry a uniform-coverage
     guarantee. \code{gaussian.draws} (default 9999) and \code{random.seed}
