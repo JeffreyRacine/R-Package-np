@@ -11,5 +11,56 @@ np.o: np_plot_regression_gradient_projection.h np_plot_beta_moment_entry.h
 jksum.o: np_plot_alllarge_derivative.h np_plot_gate_dispatch.h np_plot_beta_concentration_score.h np_plot_nn_response_jet.h np_plot_beta_moment_weights.h np_plot_lp_precision_certificate.h np_plot_lsq_precision_propagation.h np_plot_ann_kernel_terms.h np_plot_beta_pdf_agreement.h np_plot_ann_cdf_terms.h np_plot_ann_rank_decode.h
 
 # Conditional categorical-policy instantiations share canonical source bodies.
-np.o: conditional_literal.h $(wildcard conditional_literal/entry_*.inc)
-jksum.o categorical_profile_tile.o: conditional_literal.h $(wildcard conditional_literal/jksum_*.inc)
+NP_CONDITIONAL_ENTRY_DEPS = \
+  conditional_literal/entry_C_np_kernelsum.inc \
+  conditional_literal/entry_C_np_regression.inc \
+  conditional_literal/entry_C_np_regression_lp_apply_conditional_ctx.inc \
+  conditional_literal/entry_np_kernelsum_common.inc \
+  conditional_literal/entry_np_regression.inc \
+  conditional_literal/entry_np_regression_fitted_execute.inc \
+  conditional_literal/entry_np_regression_lp_apply_conditional_impl.inc
+NP_CONDITIONAL_JKSUM_DEPS = \
+  conditional_literal/jksum_kernel_estimate_regression_categorical_tree_np.inc \
+  conditional_literal/jksum_kernel_weighted_sum_np.inc \
+  conditional_literal/jksum_kernel_weighted_sum_np_ctx.inc \
+  conditional_literal/jksum_kernel_weighted_sum_np_ctx_ex.inc \
+  conditional_literal/jksum_kernel_weighted_sum_np_fold_route.inc \
+  conditional_literal/jksum_kernel_weighted_sum_np_power12.inc \
+  conditional_literal/jksum_kernel_weighted_sum_np_route.inc \
+  conditional_literal/jksum_np_beta_absolute_route.inc \
+  conditional_literal/jksum_np_beta_absolute_route_body.inc \
+  conditional_literal/jksum_np_beta_absolute_route_execute.inc \
+  conditional_literal/jksum_np_beta_categorical_log_factor.inc \
+  conditional_literal/jksum_np_beta_regression_categorical_gradients_validated.inc \
+  conditional_literal/jksum_np_beta_regression_lp_moment_row_canonical.inc \
+  conditional_literal/jksum_np_beta_scalar_regression_fit_canonical.inc \
+  conditional_literal/jksum_np_beta_scaled_row_context_prepare.inc \
+  conditional_literal/jksum_np_categorical_profile_coordinate_fill_prevalidated.inc \
+  conditional_literal/jksum_np_categorical_profile_log_row_fill_prevalidated.inc \
+  conditional_literal/jksum_np_conditional_count_legacy_row.inc \
+  conditional_literal/jksum_np_conditional_count_legacy_row_impl.inc \
+  conditional_literal/jksum_np_conditional_kernel_row.inc \
+  conditional_literal/jksum_np_conditional_kernel_row_core.inc \
+  conditional_literal/jksum_np_conditional_lp_project_accepted.inc \
+  conditional_literal/jksum_np_conditional_plot_capture_accepted.inc \
+  conditional_literal/jksum_np_empty_x_row_mark.inc \
+  conditional_literal/jksum_np_p_ukernelv.inc \
+  conditional_literal/jksum_np_plot_gate_body.inc \
+  conditional_literal/jksum_np_plot_gate_dispatch_native.inc \
+  conditional_literal/jksum_np_plot_gate_prepare.inc \
+  conditional_literal/jksum_np_regression_categorical_profile_fit.inc \
+  conditional_literal/jksum_np_regression_categorical_profile_fit_body.inc \
+  conditional_literal/jksum_np_regression_categorical_profile_fit_execute.inc \
+  conditional_literal/jksum_np_regression_general_lp_categorical_points.inc \
+  conditional_literal/jksum_np_regression_general_lp_empty_row.inc \
+  conditional_literal/jksum_np_regression_general_lp_fit.inc \
+  conditional_literal/jksum_np_regression_general_lp_fit_ann_execute.inc \
+  conditional_literal/jksum_np_regression_general_lp_fit_body.inc \
+  conditional_literal/jksum_np_regression_general_lp_fit_execute.inc \
+  conditional_literal/jksum_np_regression_general_lp_point_at_frame.inc \
+  conditional_literal/jksum_np_regression_lp_hat_matrix.inc \
+  conditional_literal/jksum_np_regression_profile_residual_kernel_sum.inc \
+  conditional_literal/jksum_np_regression_scalar_fit.inc \
+  conditional_literal/jksum_np_regression_scalar_fit_execute.inc
+np.o: conditional_literal.h $(NP_CONDITIONAL_ENTRY_DEPS)
+jksum.o categorical_profile_tile.o: conditional_literal.h $(NP_CONDITIONAL_JKSUM_DEPS)
