@@ -93,8 +93,12 @@
       environment(fun) <- transport
       assign(name, fun, envir = transport)
     }
-    transport$.np_conditional_shared_materialize_call <- get(
+    # Declare the lexical dependency where the adapter is defined as well as
+    # in its final locked environment, so static analysis can resolve it.
+    .np_conditional_shared_materialize_call <- get(
       ".npRmpi_autodispatch_materialize_call", envir = ns, inherits = FALSE)
+    transport$.np_conditional_shared_materialize_call <-
+      .np_conditional_shared_materialize_call
     materialize <- function(mc, caller_env, comm = 1L) {
       owner <- as.name("npksum.conditional_literal")
       if (!is.call(mc) || !identical(mc[[1L]], owner) ||
