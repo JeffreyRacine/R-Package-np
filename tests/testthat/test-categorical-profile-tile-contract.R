@@ -524,6 +524,15 @@ test_that("categorical profile implementation and native sink are bounded", {
     readLines(file.path(source_root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
+  # The incumbent and literal owners expand the same explicit fragment.
+  # Inspect that definition rather than searching unrelated translation units.
+  fragment <- "conditional_literal/jksum_kernel_weighted_sum_np_ctx_ex.inc"
+  include <- paste0('#include "', fragment, '"')
+  jksum_lines <- readLines(file.path(source_root, "src", "jksum.c"),
+                          warn = FALSE)
+  expect_identical(sum(trimws(jksum_lines) == include), 2L)
+  weighted_sum <- paste(readLines(file.path(source_root, "src", fragment),
+                                  warn = FALSE), collapse = "\n")
   expect_match(
     jksum,
     "kn_same = np_score_uaa(1, lambda, ncat);",
@@ -540,17 +549,17 @@ test_that("categorical profile implementation and native sink are bounded", {
     fixed = TRUE
   ))
   expect_match(
-    jksum,
+    weighted_sum,
     "Validate categorical operator dispatch once at the map-construction",
     fixed = TRUE
   )
   expect_match(
-    jksum,
+    weighted_sum,
     "unsupported unordered kernel/operator combination",
     fixed = TRUE
   )
   expect_match(
-    jksum,
+    weighted_sum,
     "unsupported ordered kernel/operator combination",
     fixed = TRUE
   )
@@ -575,8 +584,8 @@ test_that("categorical profile implementation and native sink are bounded", {
     "tile_capacity_rows = tile_max_bytes/row_bytes;",
     fixed = TRUE
   )
-  expect_match(jksum, "kw != row_tile_sink->weights", fixed = TRUE)
-  expect_match(jksum, "np_ks_tree_use ||", fixed = TRUE)
+  expect_match(weighted_sum, "kw != row_tile_sink->weights", fixed = TRUE)
+  expect_match(weighted_sum, "np_ks_tree_use ||", fixed = TRUE)
   expect_match(
     jksum,
     "np_distribution_profile_cv_update",

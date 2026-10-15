@@ -1,5 +1,5 @@
 # Primitive quotient and finite case-mass oracles for the LC permutation owner.
-test_that("density continuous gradients retain effective explanatory factors", {
+test_that("density continuous gradients retain literal explanatory factors", {
 
   set.seed(731)
   x <- data.frame(x = rnorm(120), f = factor(rep(letters[1:3], 40)))
@@ -16,16 +16,13 @@ test_that("density continuous gradients retain effective explanatory factors", {
     joint <- .np_plot_density_conditional(b, x, y, ex, ey, cdf,
       gradient = 1L)
     expect_equal(joint$estimate, gradients(actual)[, 1L], tolerance = 1e-12)
-    # Observe the incumbent categorical owner; do not assume current R options
-    # describe its native cached state in an already-running test session.
-    kb <- .npcdhat_make_xkbw(b, x)
-    effective <- .np_plot_density_factor_weights(matrix(1, 3, 120), kb,
-      x, ex, rep("normal", 2), ordered = FALSE)
+    # Independent literal unordered-kernel weights: no effective-factor
+    # adjustment is part of the conditional estimator's requested target.
     raw <- outer(as.integer(ex$f), as.integer(x$f),
       function(a, b) ifelse(a == b, 1-.663, .663/2))
     u <- outer(ex$x, x$x, "-")/.6
-    K <- dnorm(u)/.6 * raw * effective
-    D <- -u*dnorm(u)/.6^2 * raw * effective
+    K <- dnorm(u)/.6 * raw
+    D <- -u*dnorm(u)/.6^2 * raw
     v <- outer(ey$y, y$y, "-")/.5
     Y <- if (cdf) pnorm(sqrt(2)*0.7071067810*v) else dnorm(v)/.5
     target <- function(mass) {
