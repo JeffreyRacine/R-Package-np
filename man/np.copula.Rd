@@ -161,8 +161,9 @@ estimated and where it is evaluated.
     spelling is often \code{data.frame(u1 = u1.seq, u2 = u2.seq)};
     names matching the original variables are also accepted here because
     \code{u} explicitly denotes probability coordinates. Repeated axis values
-    retain all original evaluation rows and the original interval-calibration
-    family. A surface draws one representative of each repeated coordinate
+    retain all original evaluation rows. Asymptotic simultaneous bands
+    evaluate and calibrate each identical target once, then repeat its limits
+    at the original rows; pointwise and Bonferroni intervals are unchanged. A surface draws one representative of each repeated coordinate
     only when the corresponding points and drawn interval endpoints agree
     exactly, including missingness; conflicting duplicates are rejected
     rather than averaged. Surface drawing requires at least two distinct
@@ -413,8 +414,13 @@ prediction/evaluation route, or graphics renderer as appropriate.
   are sorted for display, while fitted values and returned plot data keep
   their supplied-grid order. Duplicate display coordinates are collapsed only
   when their fitted values and interval endpoints agree; conflicting duplicates
-  are rejected. All supplied rows remain in the statistical band family and
-  returned plot data. Surface plots use the package-wide
+  are rejected. Asymptotic simultaneous calibration uses the unique targets
+  after exact agreement of their fitted values, physical coordinates and
+  marginal standard errors. Repeating a target does not change the maximum
+  of its Gaussian process. Calibration metadata records the unique grid size
+  and, when duplicates occur, the original row count and target mapping.
+  All supplied rows remain in returned plot data; existing pointwise and
+  Bonferroni intervals retain their original calibration. Surface plots use the package-wide
   viridis default palette, detailed perspective ticks, and the same
   default viewing angles and base-graphics rotation cadence as the
   other surface plot methods. \code{renderer="rgl"} requests the shared

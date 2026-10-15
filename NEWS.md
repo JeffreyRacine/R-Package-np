@@ -1,4 +1,7 @@
 # np 0.80-1
+- Copula plots with repeated grid coordinates now draw asymptotic simultaneous
+  bands consistently, retaining every requested output row. Identical targets
+  share one calibrated band; conflicting duplicates are still rejected.
 - Use portable explicit dependencies for conditional-kernel source fragments,
   preserving incremental rebuilds without GNU Makefile extensions. Declare
   the private conditional transport dependency for static R-code checks and

@@ -785,7 +785,7 @@ npcopula <- function(bws, ...) {
   if (identical(plot.errors.method, "asymptotic") &&
       plot.errors.type %in% c("simultaneous", "all"))
     interval <- .np_plot_copula_interval(interval, x, data, grid$xgrid, se,
-      plot.errors.alpha, plot.errors.type, gaussian.draws)
+      plot.errors.alpha, plot.errors.type, gaussian.draws, grid = grid)
   interval
 }
 
