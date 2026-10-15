@@ -30,7 +30,7 @@ Description: Nonparametric (and semiparametric) kernel methods that seamlessly
     gratefully acknowledge support from the Natural Sciences and Engineering
     Research Council of Canada (NSERC, <https://www.nserc-crsng.gc.ca/>), the
     Social Sciences and Humanities Research Council of Canada (SSHRC,
-    <https://www.sshrc-crsh.gc.ca/>), and the Shared Hierarchical Academic
+    <https://sshrc-crsh.canada.ca/en.aspx>), and the Shared Hierarchical Academic
     Research Computing Network (SHARCNET, <https://sharcnet.ca/>). We would
     also like to acknowledge the contributions of the 'GNU GSL' authors. In
     particular, we adapt the 'GNU GSL' B-spline routine 'gsl_bspline.c' adding
