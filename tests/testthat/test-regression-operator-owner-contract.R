@@ -27,7 +27,7 @@ regression_operator_owner_region <- function(source) {
 test_that("regression fit has one post-validation operator owner", {
   path <- locate_regression_operator_source()
   skip_if(is.null(path), "package sources unavailable")
-  source <- readLines(path, warn = FALSE)
+  source <- np_test_read_incumbent_c_source(path, warn = FALSE)
   region <- regression_operator_owner_region(source)
 
   allocations <- gregexpr(

@@ -15,7 +15,7 @@ locate_lp_source <- function(name) {
 test_that("general LP fit solves only requested variance directions", {
   source_file <- locate_lp_source("jksum.c")
   skip_if(is.null(source_file), "LP source unavailable in this test context")
-  source <- paste(readLines(source_file, warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(source_file, warn = FALSE), collapse = "\n")
 
   expect_true(grepl("int variance_nrhs = 1;", source, fixed = TRUE))
   expect_true(grepl("np_glp_gradient_direction_active", source, fixed = TRUE))

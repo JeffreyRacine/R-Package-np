@@ -35,7 +35,7 @@ general_lp_callsite_region <- function(source) {
 test_that("main general-LP fit branch has one complete unwind owner", {
   path <- locate_general_lp_fit_source()
   skip_if(is.null(path), "package sources unavailable")
-  source <- readLines(path, warn = FALSE)
+  source <- np_test_read_incumbent_c_source(path, warn = FALSE)
   region <- general_lp_owner_region(source)
   callsite <- general_lp_callsite_region(source)
 

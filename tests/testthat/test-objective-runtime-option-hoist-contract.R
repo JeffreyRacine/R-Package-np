@@ -11,7 +11,7 @@ objective_option_hoist_source <- function() {
   hits <- candidates[file.exists(candidates)]
   if (!length(hits))
     return(NULL)
-  paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+  paste(np_test_read_incumbent_c_source(hits[[1L]], warn = FALSE), collapse = "\n")
 }
 
 test_that("LP objectives freeze the Apple acceleration option only per call", {

@@ -19,15 +19,15 @@ test_that("activated beta absolute rows enter the canonical central engine", {
   skip_if(is.null(root), "package sources unavailable")
 
   ingress <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   row_engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.c"),
               warn = FALSE),
     collapse = "\n"
   )
@@ -170,12 +170,12 @@ test_that("adaptive beta PDF rows prepare invariant observation state", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   row_engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.c"),
               warn = FALSE),
     collapse = "\n"
   )
   row_header <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.h"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.h"),
               warn = FALSE),
     collapse = "\n"
   )
@@ -235,7 +235,7 @@ test_that("adaptive beta gradient rows reuse prepared observation state", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   row_engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row_gradient.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row_gradient.c"),
               warn = FALSE),
     collapse = "\n"
   )
@@ -329,17 +329,17 @@ test_that("beta CDF rows reuse observation and fixed concentration state", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   row_engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.c"),
               warn = FALSE),
     collapse = "\n"
   )
   row_header <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.h"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.h"),
               warn = FALSE),
     collapse = "\n"
   )
   beta_kernel <- paste(
-    readLines(file.path(root, "src", "beta_kernel.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "beta_kernel.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -494,7 +494,7 @@ test_that("higher-order beta overlap prepares each distinct side shape once", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   beta_kernel <- paste(
-    readLines(file.path(root, "src", "beta_kernel.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "beta_kernel.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -540,7 +540,7 @@ test_that("legacy callers cannot acquire beta route metadata implicitly", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -563,11 +563,11 @@ test_that("beta density and distribution fits have one canonical ingress", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -628,11 +628,11 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -781,12 +781,12 @@ test_that("canonical beta gradient rows separate operator and estimator algebra"
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   row_engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row_gradient.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row_gradient.c"),
               warn = FALSE),
     collapse = "\n"
   )
   estimator_engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -853,11 +853,11 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -913,11 +913,11 @@ test_that("regression objective owner activates the continuous scalar beta route
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
-    readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "kernelcv.c"), warn = FALSE),
     collapse = "\n"
   )
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -1005,23 +1005,23 @@ test_that("regression bandwidth ingress owns categorical compression state", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   regression_r <- paste(
-    readLines(file.path(root, "R", "np.regression.bw.R"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "R", "np.regression.bw.R"), warn = FALSE),
     collapse = "\n"
   )
   bandwidth_r <- paste(
-    readLines(file.path(root, "R", "rbandwidth.R"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "R", "rbandwidth.R"), warn = FALSE),
     collapse = "\n"
   )
   headers <- paste(
-    readLines(file.path(root, "src", "headers.h"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "headers.h"), warn = FALSE),
     collapse = "\n"
   )
   ingress <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
   callbacks <- paste(
-    readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "kernelcv.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -1066,11 +1066,11 @@ test_that("beta density CVML enters the canonical scaled-row owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
-    readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "kernelcv.c"), warn = FALSE),
     collapse = "\n"
   )
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -1138,11 +1138,11 @@ test_that("beta density CVLS enters canonical quadrature and LOO owners", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
-    readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "kernelcv.c"), warn = FALSE),
     collapse = "\n"
   )
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -1205,11 +1205,11 @@ test_that("beta distribution CVLS enters the canonical row owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
-    readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "kernelcv.c"), warn = FALSE),
     collapse = "\n"
   )
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -1276,15 +1276,15 @@ test_that("distribution bandwidth ingress owns categorical compression state", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   distribution_r <- paste(
-    readLines(file.path(root, "R", "np.distribution.bw.R"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "R", "np.distribution.bw.R"), warn = FALSE),
     collapse = "\n"
   )
   headers <- paste(
-    readLines(file.path(root, "src", "headers.h"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "headers.h"), warn = FALSE),
     collapse = "\n"
   )
   ingress <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -1331,19 +1331,19 @@ test_that("density bandwidth ingress owns categorical compression state", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   density_r <- paste(
-    readLines(file.path(root, "R", "np.density.bw.R"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "R", "np.density.bw.R"), warn = FALSE),
     collapse = "\n"
   )
   bandwidth_r <- paste(
-    readLines(file.path(root, "R", "bandwidth.R"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "R", "bandwidth.R"), warn = FALSE),
     collapse = "\n"
   )
   headers <- paste(
-    readLines(file.path(root, "src", "headers.h"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "headers.h"), warn = FALSE),
     collapse = "\n"
   )
   ingress <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -1393,7 +1393,7 @@ test_that("every beta side enters the common conditional regression owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
   public_start <- regexpr("static SEXP np_density_conditional_call(", ingress,
@@ -1535,11 +1535,17 @@ test_that("every beta side enters the common conditional regression owner", {
       "                                                               NULL, empty_rows != NULL ? &row_empty : NULL, first_se_request,\n",
       "                                                               variance_metadata != NULL ? &variance_one : NULL,\n",
       "                                                                 &row_failure, &conditional_design,\n",
-      "                                                                 ann_fit_batch == NULL ? NULL :\n",
-      "                                                                   np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1), row_projection_ptr);"
+      "                                                                 ann_row, row_projection_ptr);"
     ),
     fixed = TRUE
   )
+  # The same ANN row is prepared once and reused by translation and the fit.
+  expect_match(conditional, paste0(
+    "const double *ann_row = ann_fit_batch != NULL ?\n",
+    "        np_ann_fit_batch_row(ann_fit_batch,j,num_obs_eval_extern,1) : NULL;"),
+    fixed = TRUE)
+  expect_equal(sum(gregexpr("np_ann_fit_batch_row(", conditional,
+                            fixed = TRUE)[[1L]] > 0L), 1L)
   # Incumbent entries keep the native row projection NULL; only an explicitly
   # requested projection may populate it, using canonical donor/evaluation maps.
   expect_match(conditional,
@@ -1563,7 +1569,7 @@ test_that("every beta side enters the common conditional regression owner", {
     fixed = TRUE
   )
   expect_match(
-    conditional, "np_beta_scaled_row_context_prepare(", fixed = TRUE
+    conditional, "np_beta_scaled_row_context_prepare_conditional_literal(", fixed = TRUE
   )
   expect_match(
     conditional, "np_beta_scaled_row_context_fill(", fixed = TRUE
@@ -1577,7 +1583,7 @@ test_that("every beta side enters the common conditional regression owner", {
   ))
 
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   expect_match(
@@ -1626,7 +1632,7 @@ test_that("canonical beta regression moments preserve the sidecar transcript", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   row_engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.c"),
               warn = FALSE),
     collapse = "\n"
   )
@@ -1730,7 +1736,7 @@ test_that("signed-log beta rows compose every route segment", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.c"),
               warn = FALSE),
     collapse = "\n"
   )
@@ -1775,7 +1781,7 @@ test_that("canonical centered moments use an online training-order update", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.c"),
               warn = FALSE),
     collapse = "\n"
   )
@@ -1806,12 +1812,12 @@ test_that("conditional derivative restoration has one typed extended-real contra
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   row_engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.c"),
               warn = FALSE),
     collapse = "\n"
   )
   conditional <- paste(
-    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -1852,11 +1858,11 @@ test_that("centered moments have one activated fail-closed route boundary", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   header <- paste(
-    readLines(file.path(root, "src", "headers.h"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "headers.h"), warn = FALSE),
     collapse = "\n"
   )
 

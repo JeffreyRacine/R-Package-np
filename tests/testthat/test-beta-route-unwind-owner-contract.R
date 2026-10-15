@@ -23,7 +23,7 @@ test_that("the canonical beta row route has one unwind owner", {
   root <- route_unwind_source_root()
   skip_if(is.null(root), "package sources unavailable")
   engine <- paste(
-    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -113,7 +113,7 @@ test_that("nested beta derivative rows borrow route-owned scratch", {
   root <- route_unwind_source_root()
   skip_if(is.null(root), "package sources unavailable")
   row_engine <- paste(
-    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+    np_test_read_incumbent_c_source(file.path(root, "src", "continuous_kernel_row.c"),
               warn = FALSE),
     collapse = "\n"
   )

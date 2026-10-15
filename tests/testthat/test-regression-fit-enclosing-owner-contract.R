@@ -32,7 +32,7 @@ regression_fit_body <- function(source) {
 test_that("generic regression fit has one complete enclosing owner", {
   path <- locate_regression_fit_owner_source()
   skip_if(is.null(path), "package sources unavailable")
-  source <- readLines(path, warn = FALSE)
+  source <- np_test_read_incumbent_c_source(path, warn = FALSE)
   all_source <- paste(source, collapse = "\n")
   compact <- gsub("[[:space:]]+", " ", all_source)
   body <- regression_fit_body(source)
@@ -154,7 +154,7 @@ test_that("generic regression fit has one complete enclosing owner", {
 test_that("MPI owner-row solve exhaustion is not a beta-row failure", {
   path <- locate_regression_fit_owner_source()
   skip_if(is.null(path), "package sources unavailable")
-  source <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(path, warn = FALSE), collapse = "\n")
 
   expect_match(
     source,

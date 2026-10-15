@@ -32,7 +32,7 @@ fixed_count <- function(text, pattern) {
 test_that("five categorical-profile helpers share one complete owner", {
   path <- locate_categorical_profile_owner_source()
   skip_if(is.null(path), "package sources unavailable")
-  source <- readLines(path, warn = FALSE)
+  source <- np_test_read_incumbent_c_source(path, warn = FALSE)
   all_source <- paste(source, collapse = "\n")
   compact <- gsub("[[:space:]]+", " ", all_source)
 
@@ -103,8 +103,15 @@ test_that("five categorical-profile helpers share one complete owner", {
       unname(counts[["vector"]]),
       info = helper
     )
+    # Conditional probability targets use the approved literal-categorical owner;
+    # the other four helpers retain the incumbent owner and exact call counts.
+    kernel_owner <- if (helper == "conditional_categorical_profile_fit")
+      "kernel_weighted_sum_np_conditional_literal(" else "kernel_weighted_sum_np("
+    other_owner <- if (helper == "conditional_categorical_profile_fit")
+      "kernel_weighted_sum_np(" else "kernel_weighted_sum_np_conditional_literal("
+    expect_equal(fixed_count(body, other_owner), 0L, info = helper)
     expect_equal(
-      fixed_count(body, "kernel_weighted_sum_np("),
+      fixed_count(body, kernel_owner),
       unname(counts[["kernel"]]),
       info = helper
     )
@@ -131,7 +138,7 @@ test_that("categorical-profile owner capacity failures cannot fall back", {
   skip_if(is.null(path), "package sources unavailable")
   compact <- gsub(
     "[[:space:]]+", " ",
-    paste(readLines(path, warn = FALSE), collapse = "\n")
+    paste(np_test_read_incumbent_c_source(path, warn = FALSE), collapse = "\n")
   )
 
   for (resource in c("index", "matrix", "vector")) {

@@ -14,7 +14,7 @@ locate_objective_pack_source <- function() {
 test_that("generic LP objectives reuse only a matching immutable outer pack", {
   src_file <- locate_objective_pack_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
-  source <- paste(readLines(src_file, warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(src_file, warn = FALSE), collapse = "\n")
 
   expect_match(source, "const double \\*data;")
   expect_match(source, "} NP_OuterPackCtx;", fixed = TRUE)
@@ -30,7 +30,7 @@ test_that("generic LP objectives reuse only a matching immutable outer pack", {
 test_that("objective pack reuse requires non-adaptive full rows and certified dense geometry", {
   src_file <- locate_objective_pack_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
-  source <- paste(readLines(src_file, warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(src_file, warn = FALSE), collapse = "\n")
 
   expect_match(
     source,

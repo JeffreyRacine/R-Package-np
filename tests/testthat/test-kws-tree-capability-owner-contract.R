@@ -169,11 +169,11 @@ test_that("fixed KWS dense and tree siblings preserve all requested outputs", {
 
 test_that("fixed tree ownership cannot depend on sample size", {
   header <- paste(
-    readLines(np_test_source_path("src", "tree_capability.h"), warn = FALSE),
+    np_test_read_incumbent_c_source(np_test_source_path("src", "tree_capability.h"), warn = FALSE),
     collapse = "\n"
   )
   source <- paste(
-    readLines(np_test_source_path("src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(np_test_source_path("src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   selector <- sub(
@@ -193,7 +193,7 @@ test_that("fixed tree ownership cannot depend on sample size", {
 
 test_that("exact inactive tree dimensions do not trigger K(0) arithmetic", {
   source <- paste(
-    readLines(np_test_source_path("src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(np_test_source_path("src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   active_plan <- sub(

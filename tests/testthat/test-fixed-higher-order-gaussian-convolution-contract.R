@@ -11,9 +11,9 @@ test_that("fixed higher-order Gaussian convolution is an isolated fallback", {
     "package C sources unavailable"
   )
 
-  source <- paste(readLines(source_file, warn = FALSE), collapse = "\n")
-  helper <- paste(readLines(helper_file, warn = FALSE), collapse = "\n")
-  header <- paste(readLines(header_file, warn = FALSE), collapse = "\n")
+  source <- paste(np_test_read_incumbent_c_source(source_file, warn = FALSE), collapse = "\n")
+  helper <- paste(np_test_read_incumbent_c_source(helper_file, warn = FALSE), collapse = "\n")
+  header <- paste(np_test_read_incumbent_c_source(header_file, warn = FALSE), collapse = "\n")
 
   expect_match(
     source,

@@ -25,9 +25,9 @@ test_that("response and adjoint LP owners retain validated factorizations", {
     "LP source files unavailable in this test context"
   )
 
-  jksum_lines <- readLines(jksum_file, warn = FALSE)
-  solve_lines <- readLines(solve_file, warn = FALSE)
-  header_lines <- readLines(header_file, warn = FALSE)
+  jksum_lines <- np_test_read_incumbent_c_source(jksum_file, warn = FALSE)
+  solve_lines <- np_test_read_incumbent_c_source(solve_file, warn = FALSE)
+  header_lines <- np_test_read_incumbent_c_source(header_file, warn = FALSE)
 
   expect_equal(
     sum(grepl("np_lp_solve_workspace_solve_factored\\(", jksum_lines)),

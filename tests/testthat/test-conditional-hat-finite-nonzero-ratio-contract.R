@@ -16,7 +16,7 @@
     ),
     .npcdhat_make_xkbw = function(...) list(owner = "x"),
     .npcdhat_make_ybw = function(...) list(owner = "y"),
-    .npcdhat_make_kernel_matrix = function(kbw, ...) {
+    .np_conditional_literal_kernel_matrix = function(kbw, ...) {
       if (identical(kbw$owner, "x")) Kx else Ky
     },
     .package = package

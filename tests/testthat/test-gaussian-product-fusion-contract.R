@@ -1,7 +1,7 @@
 library(np)
 
 test_that("ordinary-Gaussian fusion admits all scalar-bandwidth row owners", {
-  src <- readLines(np_test_source_path("src", "jksum.c"), warn = FALSE)
+  src <- np_test_read_incumbent_c_source(np_test_source_path("src", "jksum.c"), warn = FALSE)
   text <- paste(src, collapse = "\n")
 
   expect_match(

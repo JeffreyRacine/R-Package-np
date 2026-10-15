@@ -15,9 +15,12 @@ n1_selected_fixture <- function(regtype = "lc", bwtype = "fixed") {
 test_that("selected-coordinate attribute is protected across allocating native calls", {
   source <- test_path("..", "..", "src", "np.c")
   if (!file.exists(source)) skip("native source is not available in installed context")
-  lines <- readLines(source, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(source, warn = FALSE)
   first <- grep("^SEXP C_np_regression\\(", lines)
   last <- grep("^SEXP C_np_density\\(", lines)
+  # The later macro-bound clone has a declaration with the same raw token.
+  # This contract owns the incumbent definition before C_np_density.
+  first <- first[first < last]
   expect_length(first, 1L)
   expect_length(last, 1L)
   wrapper <- lines[seq.int(first, last - 1L)]

@@ -232,11 +232,11 @@ test_that("scalar derivative HC0 is response-equivariant and exact for constants
 
 test_that("H3 keeps derivative HC0 streamed and scalar-only", {
   source <- paste(
-    readLines(test_path("..", "..", "src", "np.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(test_path("..", "..", "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
   reducer <- paste(
-    readLines(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
 
