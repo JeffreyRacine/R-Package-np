@@ -3,6 +3,13 @@
   computation mode as well as the R dispatch guard. This prevents cross-rank
   mixing for beta-kernel derivative apply requests while preserving the outer
   row partition, caller state and error restoration.
+- Asymptotic simultaneous plots now report unavailable joint bands when
+  compact-support degeneracy leaves their correlation or marginal uncertainty
+  unidentified, preserving available pointwise and Bonferroni bands. Projected
+  class probabilities no longer acquire zero-width simultaneous bands solely
+  because clipping or probability projection has flattened their local derivative.
+- Clarify the conditional-response working covariance used by quantile and
+  class-probability bands and its limitations at fixed nonshrinking bandwidths.
 - Copula plots with repeated grid coordinates now draw asymptotic simultaneous
   bands consistently, retaining every requested output row. Identical targets
   share one calibrated band; conflicting duplicates are still rejected.
