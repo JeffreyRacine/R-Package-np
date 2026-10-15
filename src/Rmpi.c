@@ -353,11 +353,24 @@ SEXP mpi_info_get(SEXP sexp_info, SEXP sexp_key, SEXP sexp_valuelen){
 
 	if (valuelen < 0)
 		error("mpi_info_get: valuelen must be non-negative");
+#ifdef HAVE_MPI_INFO_GET_STRING
+	/* The MPI-4 capacity includes the NUL; the R argument excludes it. */
+	if (valuelen == INT_MAX)
+		error("mpi_info_get: valuelen is too large for MPI_Info_get_string");
+	int buflen = valuelen + 1;
+#endif
     	PROTECT (sexp_value  = allocVector (STRSXP, 1));
  	value = (char *)Calloc((size_t)valuelen + 1, char);
+#ifdef HAVE_MPI_INFO_GET_STRING
+	/* Do not resize to the returned required length: retain truncation. */
+	mpi_errhandler(MPI_Info_get_string(info[infon],
+			CHAR2( STRING_ELT (sexp_key,0)),
+			&buflen, value, &flag));
+#else
 	mpi_errhandler(MPI_Info_get(info[infon],
 			CHAR2( STRING_ELT (sexp_key,0)), 
 			valuelen, value, &flag));
+#endif
         SET_STRING_ELT(sexp_value, 0, mkChar(value));
         UNPROTECT(1); 
 	Free(value);

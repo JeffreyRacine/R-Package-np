@@ -333,6 +333,27 @@ case "$MPITYPE" in
     ;;
 esac
 
+dnl MPI implementations may expose individual MPI-4 APIs before advertising
+dnl MPI_VERSION >= 4. Check both the declaration and the selected library.
+AC_MSG_CHECKING([for MPI_Info_get_string])
+np_saved_CPPFLAGS="$CPPFLAGS"
+np_saved_LIBS="$LIBS"
+CPPFLAGS="$CPPFLAGS $PKG_CPPFLAGS"
+LIBS="$PKG_LIBS $LIBS"
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <mpi.h>]], [[
+  int buflen = 1, flag;
+  char value[1];
+  int (*get_string)(MPI_Info, const char *, int *, char *, int *) =
+    MPI_Info_get_string;
+  return get_string(MPI_INFO_NULL, "key", &buflen, value, &flag);
+]])], [
+  AC_DEFINE([HAVE_MPI_INFO_GET_STRING], [1],
+            [Define if the MPI library provides MPI_Info_get_string.])
+  AC_MSG_RESULT([yes])
+], [AC_MSG_RESULT([no])])
+CPPFLAGS="$np_saved_CPPFLAGS"
+LIBS="$np_saved_LIBS"
+
 AC_SUBST(PKG_CPPFLAGS)
 AC_SUBST(PKG_LIBS)
 AC_SUBST(NP_ACCELERATE_CPPFLAGS)

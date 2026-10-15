@@ -1,4 +1,9 @@
 # npRmpi 0.80-1
+- Use `MPI_Info_get_string` when the MPI library provides it, avoiding the
+  deprecated-call installation warning with newer Open MPI. Older MPI and
+  Windows builds retain the legacy API. The replacement preserves requested
+  string truncation; unlike the legacy MPICH call, a short buffer need not
+  raise an error.
 - Conditional density, distribution, quantile and class-probability fitting
   and replay now use the same literal categorical kernels on both X and Y.
   Near-upper categorical bandwidths no longer select an approximate constant

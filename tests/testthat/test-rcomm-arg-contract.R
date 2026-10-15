@@ -1,3 +1,27 @@
+test_that("MPI info strings retain values, missing keys and handle reuse", {
+  skip_if_not(isTRUE(getOption("npRmpi.mpi.initialized", FALSE)),
+              "MPI initialization is required for info handles")
+  check_info <- function() {
+    .Call("mpi_info_create", 0L, PACKAGE = "npRmpi")
+    on.exit(.Call("mpi_info_free", 0L, PACKAGE = "npRmpi"))
+    .Call("mpi_info_set", 0L, "np_test_key", "abcdef", PACKAGE = "npRmpi")
+    for (capacity in c(6L, 7L, 32L)) {
+      expect_identical(.Call("mpi_info_get", 0L, "np_test_key", capacity,
+                            PACKAGE = "npRmpi"), "abcdef")
+      expect_identical(.Call("mpi_info_get", 0L, "np_test_missing", capacity,
+                            PACKAGE = "npRmpi"), "")
+    }
+    .Call("mpi_info_set", 0L, "np_test_key", "xy", PACKAGE = "npRmpi")
+    expect_identical(.Call("mpi_info_get", 0L, "np_test_key", 2L,
+                          PACKAGE = "npRmpi"), "xy")
+    for (capacity in c(-1L, NA_integer_))
+      expect_error(.Call("mpi_info_get", 0L, "np_test_key", capacity,
+                         PACKAGE = "npRmpi"), "valuelen must be non-negative")
+  }
+  check_info()
+  check_info()
+})
+
 test_that("mpi.comm.spawn validates scalar positive integer nslaves", {
   skip_if_not(is.loaded("mpi_comm_spawn"), "MPI_Comm_spawn is not supported in this build")
   spawn_fun <- get("mpi.comm.spawn", envir = asNamespace("npRmpi"), inherits = FALSE)
