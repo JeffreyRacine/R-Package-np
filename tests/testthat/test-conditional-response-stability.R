@@ -17,7 +17,7 @@ test_that("conditional LP CDF reproduces a saturated response", {
   expect_equal(as.numeric(se(z)), rep(0, 3L), tolerance = 0)
 })
 
-test_that("conditional uncertainty retains the effective response operator", {
+test_that("conditional uncertainty retains the literal response operator", {
   skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -50,24 +50,39 @@ test_that("conditional uncertainty retains the effective response operator", {
   b <- npcdensbw(xdat = x, ydat = y, bws = c(2/3-1e-6, .4),
                  bandwidth.compute = FALSE)
   z <- npcdens(bws = b, exdat = ex, eydat = ey, gradients = TRUE, se = TRUE)
-  # Ask the existing tile for its cached effective operator; an enclosing
-  # test session may have intentionally disabled the gate before loading.
-  kb <- .npcdhat_make_ybw(b, y)
-  Y <- .np_plot_density_factor_weights(
-    .np_plot_density_matrix(kb, y, ey, "normal"), kb, y, ey, "normal",
-    ordered = FALSE, constant.response = TRUE)
+  # Literal nominal-response weights retain small differences near the bound.
+  # Subtract a row constant before quotient differentiation: its derivative and
+  # case-mass influence are exactly zero, avoiding cancellation in the oracle.
+  lambda <- 2/3-1e-6
+  Y <- ifelse(outer(as.character(ey$y), as.character(y$y), "=="),
+              1-lambda, lambda/2)
+  Z <- Y-Y[, 1L]
   u <- outer(ex$x, x$x, "-")/.4
   K <- dnorm(u)/.4; D <- -u*dnorm(u)/.4^2
-  den <- rowSums(K); mean <- rowSums(K*Y)/den
-  constant <- apply(Y, 1L, function(row) all(row == row[1L]))
-  variance <- rowSums(K*(Y-mean)^2)/(2*sqrt(pi)*.4*den^2)
-  variance[constant] <- 0
+  den <- rowSums(K); mean <- rowSums(K*Z)/den
+  variance <- rowSums(K*(Z-mean)^2)/(2*sqrt(pi)*.4*den^2)
   expected <- sqrt(variance)/(.4*sqrt(2))
+  expect_true(all(expected > 0))
   expect_equal(as.numeric(gradients(z, se = TRUE)), expected, tolerance = 2e-12)
+  H <- D/den-(K/den)*(rowSums(D)/den)
+  expected.gradient <- rowSums(H*Z)
+  expected.A <- H*(Z-mean)-(K/den)*expected.gradient
+  expected.A <- expected.A-rowMeans(expected.A)
+  expect_true(all(rowSums(expected.A^2) > 0))
   joint <- .np_plot_density_conditional(b, x, y, ex, ey, gradient = 1L)
-  expect_equal(joint$estimate, gradients(z)[, 1L], tolerance = 2e-12)
-  expect_equal(joint$A[constant, , drop = FALSE],
-               matrix(0, sum(constant), nrow(x)), tolerance = 0)
+  expect_equal(joint$estimate, expected.gradient, tolerance = 2e-12)
+  expect_equal(joint$A, expected.A, tolerance = 2e-12)
+  # The public quotient subtracts uncentered O(1) terms. Its absolute error
+  # scales with their magnitudes, not with the near-zero derivative. gamma
+  # bounds summation roundoff; the factor eight covers the quotient chain.
+  eps <- .Machine$double.eps
+  gamma <- (nrow(x)+8)*eps/(1-(nrow(x)+8)*eps)
+  scale <- rowSums(abs(D*Y))/den +
+    abs(rowSums(K*Y)/den)*rowSums(abs(D))/den
+  bound <- 8*gamma*scale
+  expect_true(all(bound < abs(expected.gradient)*1e-4))
+  expect_true(all(abs(gradients(z)[, 1L]-expected.gradient) <= bound))
+
 })
 
 # Nominal Y coordinates use the normal kernel even in a CDF product.
@@ -85,7 +100,25 @@ test_that("conditional CDF response factors retain their native operator", {
   ex <- x[1:3, , drop = FALSE]; ey <- y[1:3, , drop = FALSE]
   z <- npcdist(bws = b, exdat = ex, eydat = ey, gradients = TRUE, se = TRUE)
   joint <- .np_plot_density_conditional(b, x, y, ex, ey, cdf = TRUE, gradient = 1L)
-  expect_equal(joint$estimate, gradients(z)[, 1L], tolerance = 2e-12)
+  # A nominal response still uses its literal unordered kernel in a CDF.
+  lambda <- .5-1e-6
+  Y <- ifelse(outer(as.character(ey$y), as.character(y$y), "=="),
+              1-lambda, lambda)
+  Z <- Y-Y[, 1L]
+  u <- outer(ex$x, x$x, "-")/.4
+  K <- dnorm(u)/.4; D <- -u*dnorm(u)/.4^2
+  den <- rowSums(K)
+  H <- D/den-(K/den)*(rowSums(D)/den)
+  expected.gradient <- rowSums(H*Z)
+  expect_equal(joint$estimate, expected.gradient, tolerance = 2e-12)
+  # Same uncentered quotient forward-error allowance as the density fixture.
+  eps <- .Machine$double.eps
+  gamma <- (nrow(x)+8)*eps/(1-(nrow(x)+8)*eps)
+  scale <- rowSums(abs(D*Y))/den +
+    abs(rowSums(K*Y)/den)*rowSums(abs(D))/den
+  bound <- 8*gamma*scale
+  expect_true(all(bound < abs(expected.gradient)*1e-4))
+  expect_true(all(abs(gradients(z)[, 1L]-expected.gradient) <= bound))
   p <- plot(z, errors = "asymptotic", band = "all", gradients = TRUE,
             neval = 5L, output = "data")
   expect_length(p[[1]]$band.errors[[1]]$simultaneous, 10L)
