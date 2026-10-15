@@ -345,7 +345,8 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <mpi.h>]], [[
   char value[1];
   int (*get_string)(MPI_Info, const char *, int *, char *, int *) =
     MPI_Info_get_string;
-  return get_string(MPI_INFO_NULL, "key", &buflen, value, &flag);
+  /* Link only: avoid unrelated predefined-handle data symbols. */
+  return get_string((MPI_Info)0, "key", &buflen, value, &flag);
 ]])], [
   AC_DEFINE([HAVE_MPI_INFO_GET_STRING], [1],
             [Define if the MPI library provides MPI_Info_get_string.])
