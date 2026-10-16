@@ -10,7 +10,7 @@ npreg_fit_owner_source <- function() {
   candidates <- unique(candidates[nzchar(candidates)])
   hits <- candidates[file.exists(candidates)]
   if (!length(hits)) return(NULL)
-  paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+  paste(np_test_read_incumbent_c_source(hits[[1L]], warn = FALSE), collapse = "\n")
 }
 
 npreg_fit_owner_body <- function(source) {
