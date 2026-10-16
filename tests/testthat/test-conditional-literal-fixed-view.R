@@ -1,4 +1,7 @@
 test_that("fixed-view conmode factors use literal X and Y under either categorical option", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.largelambda=TRUE)
   on.exit(options(old),add=TRUE)
   x <- data.frame(x=factor(c("a","b","c","a","b","c","a","a","b"),levels=c("a","b","c")))

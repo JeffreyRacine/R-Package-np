@@ -86,6 +86,9 @@ test_that("conditional literal closures preserve the original generic closures",
 })
 
 test_that("literal conditional categorical factors agree with a direct probability oracle", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.largelambda=TRUE)
   on.exit(options(old),add=TRUE)
   x <- data.frame(x=factor(c("a","b","c","a","b","c","a","a","b"),levels=c("a","b","c")))
