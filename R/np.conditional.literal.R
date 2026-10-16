@@ -79,12 +79,11 @@
   # The engine stays local.  Quoted calls in the beta derivative helper enter
   # the namespace wrapper, which also provides the MPI transport owner frame.
   lex$.np_conditional_npksum_engine <- lex$npksum.default
-  lex$npksum.default <- get("npksum.conditional_literal", envir = ns,
+  lex$npksum.default <- get("npksum_conditional_literal", envir = ns,
                             inherits = FALSE)
   if (identical(pkg, "npRmpi")) {
-    # Preserve the ordinary dotted-call classification (including publication
-    # bundling), but keep its selected private owner after materialization.
-    # Both unchanged dispatch closures must resolve the private materializer.
+    # Consult the existing npksum transport policy through a private adapter.
+    # Shared dispatch and protected regression keep their original closures.
     transport <- new.env(parent = ns)
     for (name in c(".npRmpi_autodispatch_call", ".npRmpi_distributed_call_impl")) {
       fun <- get(name, envir = ns, inherits = FALSE)
@@ -99,22 +98,57 @@
       ".npRmpi_autodispatch_materialize_call", envir = ns, inherits = FALSE)
     transport$.np_conditional_shared_materialize_call <-
       .np_conditional_shared_materialize_call
-    materialize <- function(mc, caller_env, comm = 1L) {
-      owner <- as.name("npksum.conditional_literal")
-      if (!is.call(mc) || !identical(mc[[1L]], owner) ||
+    .np_conditional_policy_call <- function(mc) {
+      if (!is.call(mc) ||
+          !identical(mc[[1L]], as.name("npksum_conditional_literal")) ||
           !isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE)))
         stop("unexpected conditional kernel-sum materialization owner")
+      mc[[1L]] <- as.name("npksum.default")
+      mc
+    }
+    transport$.np_conditional_policy_call <- .np_conditional_policy_call
+    materialize <- function(mc, caller_env, comm = 1L) {
       prepared <- .np_conditional_shared_materialize_call(
-        mc, caller_env = caller_env, comm = comm)
+        .np_conditional_policy_call(mc), caller_env = caller_env, comm = comm)
       if (!is.call(prepared$call) ||
           !identical(prepared$call[[1L]], as.name("npksum")) ||
           !isTRUE(attr(prepared$call, ".npRmpi.bound.call.owner", exact = TRUE)))
         stop("conditional kernel-sum materialization contract changed")
-      prepared$call[[1L]] <- owner
+      prepared$call[[1L]] <- as.name("npksum_conditional_literal")
       prepared
     }
     environment(materialize) <- transport
     transport$.npRmpi_autodispatch_materialize_call <- materialize
+    # Preserve bundling and profile identity in the unchanged dispatcher body.
+    call.name <- function(mc) {
+      .np_conditional_policy_call(mc)
+      "npksum"
+    }
+    opcode <- function(mc, caller_env) {
+      .np_conditional_policy_call(mc)
+      "conditional.literal.npksum"
+    }
+    .np_conditional_shared_publication_plan <- get(
+      ".npRmpi_lease_publication_plan", envir = ns, inherits = FALSE)
+    transport$.np_conditional_shared_publication_plan <-
+      .np_conditional_shared_publication_plan
+    publication <- function(mc)
+      .np_conditional_shared_publication_plan(.np_conditional_policy_call(mc))
+    environment(call.name) <- environment(opcode) <- environment(publication) <- transport
+    transport$.npRmpi_autodispatch_call_name <- call.name
+    transport$.npRmpi_spmd_opcode_from_call <- opcode
+    transport$.npRmpi_lease_publication_plan <- publication
+    # A non-autodispatch opcode fails closed if registration is absent.  The
+    # existing worker guard admits only this symbolic namespace-bound owner.
+    guard <- get(".npRmpi_spmd_eval_payload_call_guard", envir = ns,
+                 inherits = FALSE)
+    register <- get(".npRmpi_spmd_register_opcode", envir = ns, inherits = FALSE)
+    register("conditional.literal.npksum", local({
+      call.guard <- guard
+      function(payload, envelope) call.guard(payload, envelope,
+        allowed_calls = "npksum_conditional_literal",
+        where = "conditional literal kernel-sum")
+    }))
     lockEnvironment(transport, bindings = TRUE)
     dispatch <- get(".npRmpi_autodispatch_call", envir = transport,
                     inherits = FALSE)
@@ -130,10 +164,10 @@
           stop("unexpected conditional kernel-sum dispatch engine")
         # The wrapper evaluates in its caller's frame, so it need not occur
         # on the engine's dynamic parent chain.  Bind only this trusted engine.
-        mc[[1L]] <- as.name("npksum.conditional_literal")
+        mc[[1L]] <- as.name("npksum_conditional_literal")
         attr(mc, ".npRmpi.bound.call.owner") <- TRUE
         original(mc, caller_env = caller_env, comm = comm,
-                 owner.name = "npksum.conditional_literal")
+                 owner.name = "npksum_conditional_literal")
       }
     })
   }
@@ -146,7 +180,7 @@
 
 # Full formals preserve missingness and the existing MPI promise binder.  No
 # NativeSymbolInfo or private lexical environment is sent to another rank.
-npksum.conditional_literal <- function(bws,
+npksum_conditional_literal <- function(bws,
   txdat = stop("training data 'txdat' missing"), tydat = NULL, exdat = NULL,
   weights = NULL, bandwidth.divide = FALSE, compute.ocg = FALSE,
   compute.score = FALSE, kernel.pow = 1.0, leave.one.out = FALSE,

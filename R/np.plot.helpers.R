@@ -5674,7 +5674,7 @@
   xydat <- .np_bind_data_frames_fast(xdat, ydat)
   exydat <- .np_bind_data_frames_fast(exdat, eydat)
 
-  den <- as.numeric(npksum.conditional_literal(
+  den <- as.numeric(npksum_conditional_literal(
     txdat = xdat,
     tydat = ones,
     exdat = exdat,
@@ -5683,7 +5683,7 @@
     operator = xop,
     bandwidth.divide = !identical(kbx$ckertype, "beta")
   )$ksum) / n.total
-  num <- as.numeric(npksum.conditional_literal(
+  num <- as.numeric(npksum_conditional_literal(
     txdat = xydat,
     tydat = ones,
     exdat = exydat,
