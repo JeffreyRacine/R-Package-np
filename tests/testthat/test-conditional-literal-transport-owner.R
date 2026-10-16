@@ -2,12 +2,13 @@
 # preventing S3 genericization from replacing the selected literal owner.
 test_that("conditional kernel transport preserves owner and publication policy", {
   ns <- asNamespace("npRmpi")
-  wrapper <- get("npksum.conditional_literal", ns, inherits = FALSE)
+  wrapper <- get("npksum_conditional_literal", ns, inherits = FALSE)
   lex <- get(".np_conditional_literal_holder", ns, inherits = FALSE)$lex
   expect_identical(lex$npksum.default, wrapper)
   expect_identical(formals(wrapper), formals(get("npksum.default", ns)))
   expect_identical(environment(wrapper), ns)
-  expect_false("npksum.conditional_literal" %in% getNamespaceExports(ns))
+  expect_false("npksum_conditional_literal" %in% getNamespaceExports(ns))
+  expect_false(exists("npksum.conditional_literal", ns, inherits = FALSE))
 
   if (identical(unname(getNamespaceName(ns)), "npRmpi")) {
     closed <- get(".npksum_closed_values", lex, inherits = FALSE)
@@ -35,12 +36,12 @@ test_that("conditional kernel transport preserves owner and publication policy",
     capture$engine <- trusted.engine
     environment(captured.adapter) <- capture
     captured <- trusted.engine()
-    expect_identical(captured$call[[1L]], as.name("npksum.conditional_literal"))
+    expect_identical(captured$call[[1L]], as.name("npksum_conditional_literal"))
     expect_true(attr(captured$call, ".npRmpi.bound.call.owner", exact = TRUE))
     expect_identical(as.list(captured$call)[-1L],
                      as.list(quote(npksum.default(txdat = owned.data,
                                                   operator = "normal")))[-1L])
-    expect_identical(captured$owner, "npksum.conditional_literal")
+    expect_identical(captured$owner, "npksum_conditional_literal")
     expect_identical(captured$comm, 1L)
     expect_true(environmentIsLocked(transport))
     expect_identical(parent.env(transport), ns)
@@ -67,26 +68,28 @@ test_that("conditional kernel transport preserves owner and publication policy",
     bw.value <- list(type = "fixed")
     training <- data.frame(x = c(.2, .4, .6))
     evaluation <- data.frame(x = c(.3, .5))
-    mc <- quote(npksum.conditional_literal(bws = bw.value,
+    mc <- quote(npksum_conditional_literal(bws = bw.value,
       txdat = training, exdat = evaluation, operator = "normal"))
     bind <- get(".npRmpi_autodispatch_bind_call_owner", ns)
-    bound <- bind(mc, "npksum.conditional_literal", mc, wrapper)
+    bound <- bind(mc, "npksum_conditional_literal", mc, wrapper)
     expect_true(attr(bound, ".npRmpi.bound.call.owner", exact = TRUE))
-    ordinary <- shared(bound, caller_env = environment())
+    canonical <- bound
+    canonical[[1L]] <- as.name("npksum.default")
+    ordinary <- shared(canonical, caller_env = environment())
     conditional <- private(bound, caller_env = environment())
     expected <- ordinary
-    expected$call[[1L]] <- as.name("npksum.conditional_literal")
+    expected$call[[1L]] <- as.name("npksum_conditional_literal")
     expect_identical(conditional, expected)
     expect_identical(conditional[setdiff(names(conditional), "call")],
                      ordinary[setdiff(names(ordinary), "call")])
     expect_gt(length(conditional$prepublish), 1L)
-    call.name <- get(".npRmpi_autodispatch_call_name", ns)(bound)
+    call.name <- get(".npRmpi_autodispatch_call_name", transport)(bound)
     # This is the unchanged distributed body's exact bundle decision.
     expect_identical(sub("\\..*$", "", call.name), "npksum")
     expect_true(identical(sub("\\..*$", "", call.name), "npksum") &&
                   length(conditional$prepublish) > 1L)
-    expect_identical(get(".npRmpi_spmd_opcode_from_call", ns)(bound, environment()),
-                     "autodispatch.npksum.core")
+    expect_identical(get(".npRmpi_spmd_opcode_from_call", transport)(bound, environment()),
+                     "conditional.literal.npksum")
     # Exercise the unchanged worker guard with an evaluator stub only; a
     # literal npksum allow-list is narrower than its registered core policy.
     guard <- get(".npRmpi_spmd_eval_payload_call_guard", ns)
@@ -94,17 +97,31 @@ test_that("conditional kernel transport preserves owner and publication policy",
     guard.capture$.npRmpi_spmd_eval_payload <- function(payload, envelope)
       list(payload = payload, envelope = envelope)
     environment(guard) <- guard.capture
-    envelope <- list(opcode = "autodispatch.npksum.core")
+    envelope <- list(opcode = "conditional.literal.npksum")
     admitted <- guard(list(call = conditional$call), envelope,
-                      allowed_calls = "npksum")
+                      allowed_calls = "npksum_conditional_literal")
     expect_identical(admitted$payload$call, conditional$call)
     expect_identical(admitted$envelope, envelope)
     expect_error(guard(list(call = quote(npreg())), envelope,
-                       allowed_calls = "npksum"), "restricted to")
-    expect_identical(get(".npRmpi_lease_publication_plan", ns)(bound),
+                       allowed_calls = "npksum_conditional_literal"), "restricted to")
+    expect_identical(get(".npRmpi_lease_publication_plan", transport)(bound),
                      list(kind = "none", producer = "npksum"))
     expect_identical(conditional$lease.bindings, ordinary$lease.bindings)
-    expect_identical(get(".npRmpi_autodispatch_large_arg_threshold_for_call", ns)(bound), 1L)
+    timeout <- get(".npRmpi_spmd_timeout_class_from_opcode", ns)
+    expect_identical(timeout("conditional.literal.npksum"),
+                     timeout("autodispatch.npksum.core"))
+    registry <- get(".npRmpi_spmd_registry", ns)
+    handler <- get("conditional.literal.npksum", registry, inherits = FALSE)
+    expect_error(handler(list(call = quote(npreg())), envelope), "restricted to")
+    expect_error(handler(list(call = quote(npksum())), envelope), "restricted to")
+    # Test missing registration without mutating the live registry.
+    lookup <- get(".npRmpi_spmd_get_opcode", ns)
+    lookup.env <- new.env(parent = ns)
+    lookup.env$.npRmpi_spmd_registry <- new.env(parent = emptyenv())
+    environment(lookup) <- lookup.env
+    expect_error(lookup("conditional.literal.npksum"), "not registered")
+    expect_length(ls(lookup.env$.npRmpi_spmd_registry), 0L)
+    expect_identical(get(".npRmpi_autodispatch_large_arg_threshold_for_call", ns)(canonical), 1L)
     expect_identical(shared(quote(npksum.default()), environment())$call[[1L]],
                      as.name("npksum"))
     expect_error(private(quote(npksum.default()), environment()),

@@ -9287,7 +9287,7 @@
   exydat <- .np_bind_data_frames_fast(exdat, eydat)
 
   den <- as.numeric(.np_plot_with_local_compiled_eval(
-    npksum.conditional_literal(
+    npksum_conditional_literal(
       txdat = xdat,
       tydat = ones,
       exdat = exdat,
@@ -9298,7 +9298,7 @@
     )$ksum
   )) / n.total
   num <- as.numeric(.np_plot_with_local_compiled_eval(
-    npksum.conditional_literal(
+    npksum_conditional_literal(
       txdat = xydat,
       tydat = ones,
       exdat = exydat,

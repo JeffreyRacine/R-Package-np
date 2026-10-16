@@ -76,7 +76,7 @@ test_that("conditional literal closures preserve the original generic closures",
       expect_s3_class(get(paste0(".np_literal_",old),lex),"NativeSymbolInfo")
     }
   }
-  wrapper <- get("npksum.conditional_literal",ns)
+  wrapper <- get("npksum_conditional_literal",ns)
   expect_identical(formals(wrapper),formals(get("npksum.default",ns)))
   expect_identical(lex$npksum.default,wrapper)
   if(identical(unname(getNamespaceName(ns)),"npRmpi")) {
