@@ -28,7 +28,7 @@ mpi_public_kw_source_region <- function(lines, start_pattern, stop_pattern) {
 test_that("MPI public kernel weights use one plane and typed collectives", {
   path <- locate_mpi_public_kw_source()
   skip_if(is.null(path), "package sources unavailable")
-  lines <- readLines(path, warn = FALSE)
+  lines <- np_test_read_incumbent_c_source(path, warn = FALSE)
   owner <- mpi_public_kw_source_region(
     lines,
     "^static int NP_OUTER_PACK_ADJACENT_HOT_ALIGN kernel_weighted_sum_np_ctx_ex\\(",
