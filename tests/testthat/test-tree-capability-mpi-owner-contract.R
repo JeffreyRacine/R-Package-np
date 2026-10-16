@@ -5,7 +5,7 @@ test_that("fixed tree ownership cannot depend on sample size", {
     collapse = "\n"
   )
   source <- paste(
-    readLines(npRmpi_test_source_path("src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(npRmpi_test_source_path("src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   selector <- sub(
@@ -25,7 +25,7 @@ test_that("fixed tree ownership cannot depend on sample size", {
 
 test_that("exact inactive MPI tree dimensions do not trigger K(0) arithmetic", {
   source <- paste(
-    readLines(npRmpi_test_source_path("src", "jksum.c"), warn = FALSE),
+    np_test_read_incumbent_c_source(npRmpi_test_source_path("src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   active_plan <- sub(
