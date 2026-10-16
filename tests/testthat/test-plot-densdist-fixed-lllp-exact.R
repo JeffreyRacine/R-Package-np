@@ -7,11 +7,15 @@ test_that("fixed conditional localpoly helper routes all counts sources through 
   expect_false(grepl("\\.np_inid_boot_from_conditional_localpoly_fixed_rowwise\\(", body.txt))
 })
 
-test_that("fixed conditional localpoly precompute uses direct fixed x-kernel weights in npRmpi", {
+test_that("fixed conditional localpoly precompute uses literal direct fixed x-kernel weights in npRmpi", {
   precompute <- getFromNamespace(".np_inid_boot_from_conditional_localpoly_fixed_precompute", "npRmpi")
   body.txt <- paste(deparse(body(precompute), width.cutoff = 500L), collapse = " ")
 
-  expect_match(body.txt, "\\.np_kernel_weights_direct\\(")
+  expect_match(body.txt, "\\.np_conditional_literal_kernel_weights\\(")
+  literal <- getFromNamespace(".np_conditional_literal_kernel_weights", "npRmpi")
+  expect_identical(body(literal),
+                   quote(.np_conditional_literal_holder$lex$.np_kernel_weights_direct(...)))
+  expect_false(grepl("\\.np_kernel_weights_direct\\(", body.txt))
 })
 
 test_that("npRmpi fixed conditional grouped precompute/core smoke completes in subprocess", {
