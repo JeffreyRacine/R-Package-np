@@ -39,3 +39,13 @@ test_that("worker break detector handles raw and wrapped shutdown sentinels", {
   expect_false(is_break("not_break"))
   expect_false(is_break(quote(.npRmpi_with_manual_bcast_context(1 + 1))))
 })
+
+
+test_that("unregistered profile abort has no authority in ordinary sessions", {
+  skip_if(isTRUE(getOption("npRmpi.profile.active", FALSE)),
+          "profile termination is exercised by external subprocess contracts")
+  expect_false(.Call("np_profile_job_abort", PACKAGE = "npRmpi"))
+  handler <- getOption("error")
+  expect_false(getFromNamespace(".npRmpi_profile_abort_error", "npRmpi")())
+  expect_identical(getOption("error"), handler)
+})

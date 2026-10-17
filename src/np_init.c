@@ -135,6 +135,8 @@ extern SEXP mpi_comm_split(SEXP, SEXP, SEXP, SEXP);
 extern SEXP mpi_comm_c2f(SEXP);
 extern SEXP mpi_comm_free(SEXP);
 extern SEXP mpi_abort(SEXP);
+extern SEXP np_profile_job_register(void);
+extern SEXP np_profile_job_abort(void);
 extern SEXP mpi_comm_set_errhandler(SEXP);
 extern SEXP mpi_comm_test_inter(SEXP);
 #ifdef MPI2
@@ -331,6 +333,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"mpi_comm_split",                (DL_FUNC) &mpi_comm_split,                  4},
     {"mpi_comm_c2f",                  (DL_FUNC) &mpi_comm_c2f,                    1},
     {"mpi_comm_free",                 (DL_FUNC) &mpi_comm_free,                   1},
+    {"np_profile_job_register",       (DL_FUNC) &np_profile_job_register,          0},
+    {"np_profile_job_abort",          (DL_FUNC) &np_profile_job_abort,             0},
     {"mpi_abort",                     (DL_FUNC) &mpi_abort,                       1},
     {"mpi_comm_set_errhandler",       (DL_FUNC) &mpi_comm_set_errhandler,         1},
     {"mpi_comm_test_inter",           (DL_FUNC) &mpi_comm_test_inter,             1},

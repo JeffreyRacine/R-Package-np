@@ -85,6 +85,8 @@ SEXP mpi_comm_split(SEXP sexp_comm, SEXP sexp_color, SEXP sexp_key, SEXP sexp_ne
 SEXP mpi_comm_c2f(SEXP sexp_comm);
 SEXP mpi_comm_free(SEXP sexp_comm);
 SEXP mpi_abort(SEXP sexp_comm);
+SEXP np_profile_job_register(void);
+SEXP np_profile_job_abort(void);
 SEXP mpi_comm_set_errhandler(SEXP sexp_comm);
 SEXP mpi_comm_test_inter(SEXP sexp_comm);
 SEXP mpi_comm_spawn (SEXP sexp_slave, SEXP sexp_argv, SEXP sexp_nslave, SEXP sexp_info,

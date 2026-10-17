@@ -1167,6 +1167,44 @@ SEXP mpi_comm_free(SEXP sexp_comm){
 	return AsInt(erreturn(mpi_errhandler(MPI_Comm_free(&comm[commn]))));
 }
 
+/* Terminal failure authority belongs only to the standalone profile launcher.
+ * Registration and abort do not communicate with peers: failed ranks may no
+ * longer participate in the cooperative command/teardown protocol. */
+static int np_profile_job_owned = 0;
+
+SEXP np_profile_job_register(void)
+{
+    int initialized = 0, finalized = 0, size = 0, relation = MPI_UNEQUAL;
+    MPI_Comm parent = MPI_COMM_NULL;
+    if (MPI_Initialized(&initialized) != MPI_SUCCESS || !initialized ||
+        MPI_Finalized(&finalized) != MPI_SUCCESS || finalized ||
+        comm == NULL || comm[1] == MPI_COMM_NULL)
+        return ScalarLogical(0);
+    if (MPI_Comm_get_parent(&parent) != MPI_SUCCESS || parent != MPI_COMM_NULL ||
+        MPI_Comm_size(MPI_COMM_WORLD, &size) != MPI_SUCCESS || size < 2 ||
+        MPI_Comm_compare(MPI_COMM_WORLD, comm[1], &relation) != MPI_SUCCESS ||
+        (relation != MPI_IDENT && relation != MPI_CONGRUENT))
+        return ScalarLogical(0);
+    np_profile_job_owned = 1;
+    return ScalarLogical(1);
+}
+
+SEXP np_profile_job_abort(void)
+{
+    int initialized = 0, finalized = 0, rank = -1;
+    if (!np_profile_job_owned ||
+        MPI_Initialized(&initialized) != MPI_SUCCESS || !initialized ||
+        MPI_Finalized(&finalized) != MPI_SUCCESS || finalized)
+        return ScalarLogical(0);
+    np_profile_job_owned = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    REprintf("npRmpi profile rank %d: terminating MPI job after an unhandled error.\n", rank);
+    MPI_Abort(MPI_COMM_WORLD, 1);
+    /* MPI_Abort is best effort. Tell the R handler if it unexpectedly returns
+     * so it can fail without re-entering cooperative MPI finalizers. */
+    return ScalarLogical(1);
+}
+
 SEXP mpi_abort(SEXP sexp_comm){
 	int errcode=0, commn=rmpi_require_comm_index(sexp_comm, "communicator");
 	if (commn==0)

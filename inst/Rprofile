@@ -99,22 +99,30 @@ if (mpi.comm.size(0) > 1)
 if (mpi.comm.size(0) > 1)
   np.mpi.initialize()
 
+# Own terminal errors only after the profile's communicator setup succeeds.
+.npRmpi_ns <- asNamespace("npRmpi")
+get(".npRmpi_profile_install_error_handler", envir = .npRmpi_ns,
+    inherits = FALSE)()
+
 if (mpi.comm.rank(0) > 0) {
   options(echo = FALSE)
   .comm <- 1
   .npRmpi_ns <- asNamespace("npRmpi")
   .npRmpi_worker_loop <- get(".npRmpi_worker_loop", envir = .npRmpi_ns, inherits = FALSE)
   mpi.barrier(0)
-  .npRmpi_worker_loop(
-    comm = .comm,
-    nonblock = .nonblock,
-    sleep = .sleep,
-    recv.timeout = .recv.timeout,
-    loop.label = "profile slave",
-    timeout.remediation = paste(
-      "check profile env wiring (avoid dual R_PROFILE_USER/R_PROFILE),",
-      "verify FI_* interface settings, and retry with a fresh MPI launch."
-    )
+  tryCatch(
+    .npRmpi_worker_loop(
+      comm = .comm,
+      nonblock = .nonblock,
+      sleep = .sleep,
+      recv.timeout = .recv.timeout,
+      loop.label = "profile slave",
+      timeout.remediation = paste(
+        "check profile env wiring (avoid dual R_PROFILE_USER/R_PROFILE),",
+        "verify FI_* interface settings, and retry with a fresh MPI launch."
+      )
+    ),
+    error = get(".npRmpi_profile_abort_error", envir = .npRmpi_ns, inherits = FALSE)
   )
   mpi.comm.free(.comm)
   mpi.quit()

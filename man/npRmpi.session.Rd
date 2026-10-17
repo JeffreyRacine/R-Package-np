@@ -146,6 +146,17 @@ be initialized from \code{.Rprofile}. Also avoid setting both \code{R_PROFILE}
 and \code{R_PROFILE_USER} to the same file; this is treated as a startup
 misconfiguration and fails fast.
 
+A standalone multi-rank profile job owns its terminal error policy. An error
+escaping the worker command loop or reaching the master's top-level error
+handler terminates the MPI job with a nonzero status, after reporting the
+error. This avoids cooperative shutdown waiting for ranks that have already
+left the command protocol. The profile installs its own \code{options(error=)}
+handler; replacing that handler removes the master's fail-fast protection.
+To recover from an anticipated command error, catch it inside the broadcast
+expression on every affected rank. Catching only the master-side error does
+not recover a failed worker. Session and attach mode keep their existing
+error handling, and one-rank profile use does not install this policy.
+
 Minimal comparison script (three patterns) follows:
 \preformatted{
 ## CASE 1: user-friendly (single R process; spawn mode)

@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+- Standalone profile/manual-broadcast jobs terminate with a nonzero status
+  after an unhandled master or worker error, preserving the diagnostic instead
+  of waiting indefinitely in cooperative shutdown. Caught errors inside the
+  broadcast expression remain recoverable; session/attach behavior is unchanged.
+
 - Preserve explicit `data=NULL` when reusing formula-bearing least-squares
   quantile bandwidth objects, and retain the stored-sample diagnostic for
   prohibited replacement data. Unsupported native data remains an error.
