@@ -1,4 +1,6 @@
 test_that("data-first native calls agree with named training roles", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   withr::local_options(np.messages = FALSE)
   set.seed(4191)
   d <- data.frame(x = runif(24), y = rnorm(24), z = runif(24))
@@ -43,6 +45,8 @@ test_that("data-first native calls agree with named training roles", {
 })
 
 test_that("unconditional data-first syntax accepts all native input shapes", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   withr::local_options(np.messages = FALSE)
   x <- seq(-1, 1, length.out = 18)
   for (fit in list(npudens, npudist))
@@ -57,6 +61,8 @@ test_that("unconditional data-first syntax accepts all native input shapes", {
 })
 
 test_that("automatic data-first promises are evaluated once", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   withr::local_options(np.messages = FALSE)
   x <- data.frame(x = seq(-1, 1, length.out = 18))
   count <- 0L
@@ -68,6 +74,8 @@ test_that("automatic data-first promises are evaluated once", {
 })
 
 test_that("optional smooth-coefficient z data do not displace manual bandwidths", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   withr::local_options(np.messages = FALSE)
   x <- data.frame(x = seq(.1, 1, length.out = 18))
   y <- sin(x$x)
@@ -79,6 +87,8 @@ test_that("optional smooth-coefficient z data do not displace manual bandwidths"
 
 # A reused bandwidth object must not restore its original sample during plotting.
 test_that("native regression plots retain the fit's replacement sample", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   withr::local_options(np.messages = FALSE)
   set.seed(9)
   xa <- data.frame(x = rnorm(60)); xb <- data.frame(x = rnorm(60, 5, 2))

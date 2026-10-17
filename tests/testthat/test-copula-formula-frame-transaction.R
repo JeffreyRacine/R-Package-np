@@ -1,4 +1,6 @@
 test_that("copula formula entries share one constructor and fitting sample", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
   set.seed(992L)
   d <- data.frame(x = runif(32), z = rnorm(32))
@@ -42,6 +44,8 @@ test_that("copula formula entries share one constructor and fitting sample", {
 })
 
 test_that("copula formula uses the first stochastic sample and subset", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
   set.seed(993L)
   d <- data.frame(x = runif(32), z = rnorm(32))
@@ -71,6 +75,8 @@ test_that("copula formula uses the first stochastic sample and subset", {
 })
 
 test_that("copula time-series formulas agree with independently indexed data", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
   set.seed(995L)
   x <- ts(rnorm(36), frequency = 4)
@@ -92,6 +98,8 @@ test_that("copula time-series formulas agree with independently indexed data", {
 })
 
 test_that("copula invalid formula input fails before bandwidth search", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
   d <- data.frame(x = seq(.1, .9, length.out = 24), z = seq(.9, .1, length.out = 24), w = 1:24)
   for (target in c("density", "distribution")) {

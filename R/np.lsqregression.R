@@ -1345,8 +1345,31 @@ nplsqregbw.formula <-
     out
   }
 
+.nplsqreg_stored_training_error <- function(controls) {
+  stop(paste0("nplsqreg(): a stored LSQ bandwidth object retains its training sample; ",
+              "do not supply ", paste(shQuote(controls), collapse = ", "),
+              ". Rebuild it with nplsqregbw() for another training sample, ",
+              "or use newdata/exdat for prediction."), call. = FALSE)
+}
+
+# Stored formula-bearing LSQ objects own a frozen training sample, not the
+# ordinary native data policy. Their established NULL data is a no-op; real
+# replacement data must rebuild the pseudo responses. Read only that promise.
+.nplsqreg_check_reuse_data <- function(bws, dots) {
+  at <- which(names(dots) == "data")
+  if (!length(at)) return(invisible(NULL))
+  if (missing(bws) || !inherits(bws, "lsqregressionbandwidth") ||
+      !inherits(bws[["formula", exact = TRUE]], "formula"))
+    .np_native_data_error()
+  if (length(at) != 1L)
+    stop("formal argument 'data' matched by multiple actual arguments", call. = FALSE)
+  if (!is.null(eval(as.name(paste0("..", at)), envir = parent.frame())))
+    .nplsqreg_stored_training_error("data")
+  invisible(NULL)
+}
+
 nplsqregbw.lsqregressionbandwidth <- function(bws, tau = bws$tau, ...) {
-  .np_reject_native_data(substitute(list(...))[-1L])
+  .nplsqreg_check_reuse_data(bws, substitute(list(...))[-1L])
 
   tau <- .nplsqreg_validate_tau_values(tau)
   if (length(tau) != length(bws$tau) || !isTRUE(all.equal(tau, bws$tau)))
@@ -1980,7 +2003,7 @@ nplsqreg.formula <-
 nplsqreg.lsqregressionbandwidth <-
   function(bws, txdat = NULL, tydat = NULL, tau = bws$tau,
            se = FALSE, ...) {
-  .np_reject_native_data(substitute(list(...))[-1L])
+  .nplsqreg_check_reuse_data(bws, substitute(list(...))[-1L])
 
     retained.training <- is.null(txdat) && is.null(tydat)
     restore <- function(out) {
@@ -2053,7 +2076,7 @@ nplsqreg.default <-
            gradient.order = 1L,
            se = FALSE,
            ...) {
-  .np_reject_native_data(substitute(list(...))[-1L])
+  .nplsqreg_check_reuse_data(bws, substitute(list(...))[-1L])
 
 
     dots.dispatch <- list(...)
@@ -2078,6 +2101,9 @@ nplsqreg.default <-
     residuals <- npValidateScalarLogical(residuals, "residuals")
     se <- npValidateScalarLogical(se, "se")
     dots <- dots.dispatch
+    # The LSQ owner has consumed the permitted NULL. It is not an argument to
+    # the native regression leaf that fits the retained pseudo responses.
+    dots$data <- NULL
     defer.empty <- isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])
     dots$.np.defer.empty.rows <- NULL
     if (!missing(bws) && inherits(bws, "lsqregressionbandwidth")) {
@@ -2087,10 +2113,7 @@ nplsqreg.default <-
           !is.null(dots[[name]]) && !(name == "subset" && isTRUE(dots[[name]])),
         logical(1L))]
       if (length(controls))
-        stop(paste0("nplsqreg(): a stored LSQ bandwidth object retains its training sample; ",
-                    "do not supply ", paste(shQuote(controls), collapse = ", "),
-                    ". Rebuild it with nplsqregbw() for another training sample, ",
-                    "or use newdata/exdat for prediction."), call. = FALSE)
+        .nplsqreg_stored_training_error(controls)
     }
     native.newdata <- dots$newdata
     dots$newdata <- NULL

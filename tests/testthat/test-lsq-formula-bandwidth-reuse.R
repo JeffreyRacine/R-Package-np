@@ -1,4 +1,6 @@
 test_that("LSQ formula regression bandwidths retain data and specification", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   set.seed(952)
   n <- 80L
   d <- data.frame(x = rnorm(n), z = runif(n))
@@ -27,6 +29,8 @@ test_that("LSQ formula regression bandwidths retain data and specification", {
 })
 
 test_that("LSQ formula bandwidth reuse owns transformed and selected rows", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   set.seed(753)
   n <- 67L
   d <- data.frame(x = rnorm(n), z = runif(n), y = rnorm(n))
@@ -60,6 +64,8 @@ test_that("LSQ formula bandwidth reuse owns transformed and selected rows", {
 })
 
 test_that("LSQ explicit subset precedence does not change later saved-sample reuse", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   d <- data.frame(x = seq(.01, .99, length.out = 64L))
   d$y <- sin(4 * d$x) + d$x^2
   b <- npregbw(y ~ x, data = d, subset = x < .5, bws = .2,

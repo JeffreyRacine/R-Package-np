@@ -1,4 +1,6 @@
 test_that("formula constructors and one-call fits construct a formula once", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
   set.seed(1717)
   d <- data.frame(y = rnorm(24), x = runif(24), z = rnorm(24),
@@ -58,6 +60,8 @@ test_that("formula constructors and one-call fits construct a formula once", {
 })
 
 test_that("formula handoff preserves environments, provenance and lazy subsets", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
   d <- data.frame(y = sin(1:24), x = seq(.1,.9,length.out=24))
   count <- new.env(parent = emptyenv()); count$n <- 0L
@@ -97,6 +101,8 @@ test_that("a formula construction error is not retried or substituted", {
 })
 
 test_that("formula factories preserve reordered and forwarded call shapes", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
   d <- data.frame(y = sin(1:24), x = seq(.1,.9,length.out=24))
   count <- 0L

@@ -59,9 +59,11 @@ Named options passed via \code{\dots} include:
     \strong{Data and evaluation controls}
     \describe{
       \item{\code{data}}{
-        an optional \code{\link{data.frame}} used to resolve stored
-        formula calls when explicit training data arguments are not
-        supplied.
+        replacement training data for the partially linear formula-bandwidth
+        plot route, when explicit training inputs are omitted. Other plot
+        routes do not consume this argument and reject it, including explicit
+        \code{NULL}. Refit with the intended data before plotting; see
+        \code{\link{np-data-interfaces}}.
       }
       \item{\code{grid.control}}{
         optional detailed grid controls created by

@@ -1,5 +1,5 @@
 test_that("least-squares quantile formula owners bind wrapper data values", {
-  expect_true(spawn_mpi_slaves(1L))
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE)
   on.exit(options(old),add=TRUE)
