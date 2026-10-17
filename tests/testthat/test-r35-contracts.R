@@ -98,3 +98,48 @@ test_that("index explicit diagnostics preserve the training response scale", {
     }
   }
 })
+
+# CF-332: this is stored formula-object reuse, not an ordinary native call.
+# Covers the bandwidth reuse entry and wrappers absent from the original block.
+test_that("stored formula LSQ data policy survives bandwidth and wrapper reuse", {
+  d <- data.frame(x = seq(.05, .95, length.out = 32L))
+  d$y <- sin(4 * d$x) + d$x^2
+  b <- npregbw(y ~ x, data = d, bws = .3, bandwidth.compute = FALSE)
+  wrap <- function(fun, object, data = NULL) fun(object, data = data)
+  bw.method <- get("nplsqregbw.lsqregressionbandwidth", environment(nplsqregbw))
+  for (tau in list(.5, c(.25, .75))) {
+    lb <- nplsqreg(b, tau = tau, scale = rep(.3, 32L), delta = .5,
+                   bandwidth.compute = FALSE)$bws
+    original <- lb
+    ref <- fitted(nplsqreg(lb))
+    expect_identical(nplsqregbw(lb, data = NULL), lb)
+    expect_identical(wrap(nplsqregbw, lb), lb)
+    expect_identical(fitted(wrap(nplsqreg, lb)), ref)
+    expect_identical(fitted(do.call(nplsqreg, list(lb, data = NULL))), ref)
+    expect_error(nplsqregbw(lb, data = d), "stored LSQ bandwidth object")
+    expect_error(wrap(nplsqreg, lb, d), "stored LSQ bandwidth object")
+    # A direct method must not force unrelated dots just to inspect data.
+    expect_identical(bw.method(lb, unused = stop("unrelated promise forced"),
+                              data = NULL), lb)
+    expect_error(bw.method(lb, data = NULL, data = d), "multiple actual arguments")
+    count <- 0L
+    expect_identical(bw.method(lb, data = { count <- count + 1L; NULL }), lb)
+    expect_identical(count, 1L)
+    expect_identical(lb, original)
+  }
+})
+
+test_that("stored native LSQ objects keep strict non-forcing data rejection", {
+  x <- data.frame(x = seq(.05, .95, length.out = 24L)); y <- sin(4 * x$x)
+  lb <- nplsqreg(txdat = x, tydat = y, bws = .3, scale = rep(.3, 24L),
+                 delta = .5, bandwidth.compute = FALSE)$bws
+  expect_null(lb$formula)
+  for (fun in list(nplsqreg, nplsqregbw))
+    expect_error(fun(lb, data = NULL), "`data=` is supported only", fixed = TRUE)
+  for (name in c("nplsqregbw.lsqregressionbandwidth",
+                 "nplsqreg.lsqregressionbandwidth", "nplsqreg.default")) {
+    fun <- get(name, environment(nplsqreg))
+    expect_error(fun(lb, data = stop("data was forced")),
+                 "`data=` is supported only", fixed = TRUE)
+  }
+})

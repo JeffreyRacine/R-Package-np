@@ -1,5 +1,9 @@
 # np 0.80-1
 
+- Preserve explicit `data=NULL` when reusing formula-bearing least-squares
+  quantile bandwidth objects, and retain the stored-sample diagnostic for
+  prohibited replacement data. Unsupported native data remains an error.
+- Clarify the partially linear formula-bandwidth plot route's `data` support.
 - Native `data=` rejection also handles arguments forwarded through wrapper
   ellipses without forcing their values.
 - Native methods now reject unsupported `data`, including explicit `data=NULL`,
