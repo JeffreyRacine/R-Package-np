@@ -90,3 +90,20 @@ test_that("CMS native data suppliedness includes NULL and partial formal names",
                  "`data=` is supported only with the formula interface",fixed=TRUE)
   }
 })
+
+# This closes forwarded formal matching, distinct from the dots-name guards.
+# These public calls must stop before model validation, fitting or MPI dispatch.
+test_that("CMS data rejection survives wrapper forwarding", {
+  forward <- function(fun, ...) fun(...)
+  nested <- function(fun, ...) forward(fun, ...)
+  diagnostic <- "`data=` is supported only with the formula interface"
+  for (fun in list(npcmstest, npqcmstest)) {
+    expect_error(nested(fun, xdat = 1:8, ydat = 1:8, data = NULL),
+                 diagnostic, fixed = TRUE)
+    expect_error(nested(fun, xdat = 1:8, ydat = 1:8, data = ),
+                 diagnostic, fixed = TRUE)
+    expect_error(nested(fun, xdat = 1:8, ydat = 1:8,
+                       dat = stop("data promise was forced")),
+                 diagnostic, fixed = TRUE)
+  }
+})

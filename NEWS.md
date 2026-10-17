@@ -1,4 +1,7 @@
 # np 0.80-1
+
+- Native `data=` rejection also handles arguments forwarded through wrapper
+  ellipses without forcing their values.
 - Native methods now reject unsupported `data`, including explicit `data=NULL`,
   with guidance to use formula calls, explicit inputs or `with(data, ...)`.
   Formula refits and genuine native `data` consumers retain their interfaces.

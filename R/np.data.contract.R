@@ -28,10 +28,12 @@
 
 # match.call drops explicitly empty actuals when their formals have defaults.
 # Replace only those syntax slots before matching; never evaluate an argument.
+# Ellipsis in the inspected call belongs to its caller, not this helper caller.
 .np_data_formal_supplied <- function(call, definition) {
   actuals <- as.list(call)
   empty <- vapply(actuals, identical, logical(1L), quote(expr = ))
   actuals[empty] <- list(quote(.np_missing_actual))
   "data" %in% names(match.call(definition = definition,
-                             call = as.call(actuals), expand.dots = FALSE))
+                             call = as.call(actuals), expand.dots = FALSE,
+                             envir = parent.frame(2L)))
 }
