@@ -2,6 +2,8 @@
 - Native methods now reject unsupported `data`, including explicit `data=NULL`,
   with guidance to use formula calls, explicit inputs or `with(data, ...)`.
   Formula refits and genuine native `data` consumers retain their interfaces.
+  Plot routes that do not consume replacement `data` now reject it, while
+  the supported partially linear formula-bandwidth route retains that input.
   The IV native calls also diagnose bare unbound response names accompanied
   by `z`, `w` and `data` without evaluating that data argument.
 - Update the getting-started guide to describe supported simultaneous
