@@ -111,6 +111,8 @@ npscoefbw.NULL <-
            ydat = stop("invoked without data 'ydat'"),
            zdat = NULL,
            bws, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     miss.z <- missing(zdat)
 
@@ -567,6 +569,8 @@ npscoefbw.scbandwidth <-
            scale.factor.search.lower = NULL,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")
     dots <- list(...)
@@ -2972,6 +2976,8 @@ npscoefbw.default <-
            scale.factor.search.lower = NULL,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")
     dots <- list(...)

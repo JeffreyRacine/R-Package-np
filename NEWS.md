@@ -1,4 +1,9 @@
 # np 0.80-1
+- Native methods now reject unsupported `data`, including explicit `data=NULL`,
+  with guidance to use formula calls, explicit inputs or `with(data, ...)`.
+  Formula refits and genuine native `data` consumers retain their interfaces.
+  The IV native calls also diagnose bare unbound response names accompanied
+  by `z`, `w` and `data` without evaluating that data argument.
 - Update the getting-started guide to describe supported simultaneous
   asymptotic bands and the required released `crs` dependency.
 - Asymptotic simultaneous plots now report unavailable joint bands when

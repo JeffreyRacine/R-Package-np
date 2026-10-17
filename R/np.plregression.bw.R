@@ -57,6 +57,8 @@ npplregbw.NULL =
            ydat = stop("invoked without data `ydat'"),
            zdat = stop("invoked without data `zdat'"),
            bws, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
@@ -88,6 +90,8 @@ npplregbw.plbandwidth =
            ydat = stop("invoked without data `ydat'"),
            zdat = stop("invoked without data `zdat'"),
            bws, nmulti, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     ## n observations
     ## rows are observations, columns are variables
@@ -724,6 +728,8 @@ npplregbw.default =
            scale.factor.search.lower = NULL,
            ftol, itmax, nmulti, nomad.remin, powell.remin, small, tol,
            ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
 
     ## maintain x names and 'toFrame'

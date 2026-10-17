@@ -101,6 +101,8 @@ npcdens.formula <-
 
 npcdens.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     do.call(npcdens, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat"), list(...), npcdens.conbandwidth))
   }
@@ -115,6 +117,8 @@ npcdens.conbandwidth <- function(bws,
                                  proper.method = c("project"),
                                  proper.control = list(),
                                  ..., se = FALSE){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
   se <- npValidateScalarLogical(se, "se")
   dots <- list(...)

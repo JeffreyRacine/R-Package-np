@@ -88,6 +88,8 @@ npudens.formula <-
 
 npudens.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     do.call(npudens, .np_retained_training_args(
       bws, c(tdat = "dat"), list(...), npudens.bandwidth))
   }
@@ -96,6 +98,8 @@ npudens.bandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
            edat, ..., se = FALSE){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
   se <- npValidateScalarLogical(se, "se")
   ann.se <- se && identical(bws[["type", exact = TRUE]], "adaptive_nn") &&

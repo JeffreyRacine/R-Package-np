@@ -71,6 +71,8 @@ npindexbw.NULL <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
            bws, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     xdat <- toFrame(xdat)
 
@@ -1854,6 +1856,8 @@ npindexbw.default <-
            scale.factor.search.lower = NULL,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     only.beta <- !missing(only.optimize.beta) &&
       npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
@@ -2204,6 +2208,8 @@ npindexbw.sibandwidth <-
            .restore.first.start = TRUE,
            ...,
            .fixed.h.lower = NULL){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     dots <- list(...)
     npRejectUnsupportedBwsolver(dots, "npindexbw")

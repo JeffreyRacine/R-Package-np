@@ -54,6 +54,9 @@
            ...,
            random.seed, .np.empty.report = NULL, gaussian.draws = 9999L){
 
+    if (.np_data_formal_supplied(sys.call(), sys.function()))
+      .np_plot_data_error()
+
     sub.supplied <- !missing(sub)
 
     reg.spec <- npValidatedConditionalRegSpec(

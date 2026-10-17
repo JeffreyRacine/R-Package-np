@@ -868,6 +868,8 @@ npqreg.formula <-
 
 npqreg.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     do.call(npqreg, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat"), list(...), npqreg.condbandwidth))
   }
@@ -887,6 +889,8 @@ npqreg.condbandwidth <-
            tol = 1.490116e-04,
            small = 1.490116e-05, itmax = 10000,
            ..., se = FALSE){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     fit.start <- proc.time()[3]
     se <- npValidateScalarLogical(se, "se")

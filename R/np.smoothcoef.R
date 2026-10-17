@@ -127,6 +127,8 @@ npscoef.formula <-
 
 npscoef.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     roles <- c(txdat = "xdat", tydat = "ydat")
     if (!is.null(bws$zdati))
       roles <- c(roles, tzdat = "zdat")
@@ -1383,6 +1385,8 @@ npscoef.scbandwidth <-
            residuals = FALSE,
            tol = .Machine$double.eps,
            ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     npRejectLegacyBooleanErrors(list(...), "npscoef")
     .np_scoef_fit_internal(
       bws = bws,

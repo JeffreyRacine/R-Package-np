@@ -126,7 +126,7 @@ test_that("formula factories preserve reordered and forwarded call shapes", {
   # coverage claims; separate named formula= is the supported reordered form.
   count <- 0L
   expect_error(npcdens(bws = c(.4,.4), make.formula(), data = d,
-                       bandwidth.compute = FALSE), "xdat must be a data frame")
+                       bandwidth.compute = FALSE), "`data=` is supported only with the formula interface", fixed = TRUE)
   expect_identical(count, 1L)
   count <- 0L
   expect_error(npqreg(bws = make.formula(), txdat = d["x"], tydat = d$y,

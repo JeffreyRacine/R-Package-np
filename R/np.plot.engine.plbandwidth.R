@@ -56,6 +56,11 @@
            ...,
            random.seed, .np.empty.report = NULL, gaussian.draws = 9999L){
 
+    if (.np_data_formal_supplied(sys.call(), sys.function()) &&
+        !(missing(xdat) && missing(ydat) && missing(zdat) &&
+          !is.null(bws[["formula", exact = TRUE]])))
+      .np_plot_data_error()
+
     sub.supplied <- !missing(sub)
 
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)

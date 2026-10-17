@@ -74,6 +74,8 @@ npsigtest.formula <-
 
 npsigtest.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     ev <- npsigtest(xdat = .np_eval_bws_call_arg(bws, "xdat"),
                     ydat = .np_eval_bws_call_arg(bws, "ydat"),
                     bws = bws, ...)
@@ -532,6 +534,8 @@ npsigtest.rbandwidth <- function(bws,
                                  index = seq_len(ncol(xdat)),
                                  random.seed = 42,
                                  ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
   xdat <- toFrame(xdat)
 

@@ -179,6 +179,8 @@ npcdistbw.condbandwidth <-
            transform.bounds = FALSE,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     .np_density_bw_progress(bandwidth.compute, bwsolver, FALSE, {
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npcdistbw")
@@ -2581,6 +2583,8 @@ npcdistbw.NULL <-
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
            bws, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     dots <- list(...)
     .np_nomad_native_reject_unsupported_options_from_dots(
       dots,
@@ -2676,6 +2680,8 @@ npcdistbw.default <-
            ## dummy arguments for condbandwidth() function call
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npcdistbw")
     ## maintain x names and 'toFrame'

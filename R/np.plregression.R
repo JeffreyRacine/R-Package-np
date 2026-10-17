@@ -87,6 +87,8 @@ npplreg.formula <-
 
 npplreg.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     do.call(npplreg, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat", tzdat = "zdat"), list(...), npplreg.plbandwidth))
   }
@@ -492,6 +494,8 @@ npplreg.plbandwidth <-
            tydat = stop("training data tydat missing"),
            tzdat = stop("training data tzdat missing"),
            exdat, eydat, ezdat, residuals = FALSE, ..., se = FALSE){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     fit.start <- proc.time()[3]
     residuals <- npValidateScalarLogical(residuals, "residuals")

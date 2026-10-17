@@ -121,6 +121,10 @@ npcmstest <- function(formula,
                       density.weighted = TRUE,
                       random.seed = 42,
                       ...) {
+  if (missing(formula) && !missing(xdat) && !missing(ydat) &&
+      .np_data_formal_supplied(sys.call(), sys.function()))
+    .np_native_data_error()
+
 
   if (...length())
     npRejectLegacyBootstrapCount(names(list(...)), "npcmstest")

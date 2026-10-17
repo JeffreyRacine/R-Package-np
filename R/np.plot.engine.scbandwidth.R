@@ -57,6 +57,9 @@
            ...,
            random.seed, gaussian.draws = 9999L){
 
+    if (.np_data_formal_supplied(sys.call(), sys.function()))
+      .np_plot_data_error()
+
     sub.supplied <- !missing(sub)
     coef.index <- .np_plot_match_coef_index(coef.index)
     common.scale <- .np_plot_match_flag(common.scale, "common.scale")

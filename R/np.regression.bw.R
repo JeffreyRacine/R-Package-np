@@ -55,6 +55,8 @@ npregbw.NULL <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            bws, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     dots <- list(...)
     .np_nomad_native_reject_unsupported_options_from_dots(
       dots,
@@ -423,6 +425,8 @@ npregbw.rbandwidth <-
            transform.bounds = FALSE,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     dots <- list(...)
     if (length(nomad.opts))
@@ -2621,6 +2625,8 @@ npregbw.default <-
            ukertype,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     lp.dot.args <- list(...)
     if (length(nomad.opts))

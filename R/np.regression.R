@@ -377,6 +377,8 @@ npreg.formula <-
 
 npreg.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     ev <- do.call(npreg, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat"), list(...), npreg.rbandwidth))
     ev$call <- match.call(expand.dots = FALSE)
@@ -403,6 +405,8 @@ npreg.rbandwidth <-
            exdat, eydat, gradient.order = 1L, gradients = FALSE,
            residuals = FALSE, se = FALSE,
            ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     fit.start <- proc.time()[3]
 
     dots <- list(...)
@@ -916,6 +920,7 @@ npreg.rbandwidth <-
 
 npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
                           se = FALSE, ...){
+
   sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
   dots <- .np_formula_dispatch_args(

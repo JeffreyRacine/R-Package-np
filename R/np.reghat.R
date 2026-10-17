@@ -1791,6 +1791,8 @@ npreghat.formula <-
 
 npreghat.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     dots <- list(...)
     args <- .np_retained_training_args(
       bws, c(txdat = "xdat", y = "ydat"), dots, npreghat.rbandwidth,
@@ -1802,6 +1804,8 @@ npreghat.call <-
 
 npreghat.npregression <-
   function(bws, txdat, y, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     model <- bws
     rbw <- model$bws
 
@@ -1829,6 +1833,8 @@ npreghat.rbandwidth <-
            ridge = 0.0,
            s = NULL,
            ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     output <- match.arg(output)
     if (!is.numeric(ridge) || length(ridge) != 1L ||
