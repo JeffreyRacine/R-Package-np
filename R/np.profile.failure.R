@@ -10,8 +10,9 @@
     # Abort was requested but returned. The job is terminal: do not attempt
     # collective finalization again or recurse through the top-level handler.
     options(npRmpi.mpi.initialized = FALSE, error = NULL)
-    stop("MPI_Abort returned after a terminal profile error; MPI cleanup was not retried.",
-         call. = FALSE)
+    cat("MPI_Abort returned after a terminal profile error; exiting without MPI cleanup.\n",
+        file = stderr())
+    quit(save = "no", status = 1L, runLast = FALSE)
   }
   invisible(FALSE)
 }
