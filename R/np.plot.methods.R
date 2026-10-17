@@ -187,6 +187,18 @@ np_render_control <- function(style = c("band", "bar"),
                                           bws = NULL,
                                           context = "plot") {
   dot.names <- .np_plot_dot_names(dots_call)
+  if ("data" %in% dot.names) {
+    data.owner <- if (identical(method, .np_plot_compat_dispatch))
+      .np_plot_engine_for_bws(bws) else method
+    if (identical(data.owner, .np_plot_bandwidth_engine) ||
+        identical(data.owner, .np_plot_dbandwidth_engine) ||
+        identical(data.owner, .np_plot_rbandwidth_engine) ||
+        identical(data.owner, .np_plot_conbandwidth_engine) ||
+        identical(data.owner, .np_plot_condbandwidth_engine) ||
+        identical(data.owner, .np_plot_scbandwidth_engine) ||
+        identical(data.owner, .np_plot_sibandwidth_engine))
+      .np_plot_data_error()
+  }
   if (any(!nzchar(dot.names)))
     stop(sprintf("unnamed plot arguments are not supported for %s", context),
          call. = FALSE)

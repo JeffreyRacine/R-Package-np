@@ -111,6 +111,8 @@ npscoefbw.NULL <-
            ydat = stop("invoked without data 'ydat'"),
            zdat = NULL,
            bws, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")
     if (.npRmpi_master_local_entry_needed()) {
       .np.local.entry <- new.env(parent=emptyenv())
@@ -2347,6 +2349,8 @@ npscoefbw.scbandwidth <-
            dfac.init = 1.0,
            scale.factor.search.lower = NULL,
            ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     dots <- list(...)
     npRejectUnsupportedBwsolver(dots, "npscoefbw")
@@ -3773,6 +3777,8 @@ npscoefbw.default <-
            scale.factor.search.lower = NULL,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")
     if (.npRmpi_master_local_entry_needed()) {

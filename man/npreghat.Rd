@@ -52,7 +52,14 @@ These arguments identify the fitted bandwidth object, formula/data interface, tr
   \item{bws}{An object of class \code{rbandwidth} or \code{npregression}.}
 
 
-  \item{data}{A data frame used with the formula interface.}
+  \item{data}{
+    This argument belongs to the formula interface (including supported
+    formula-bearing bandwidth-object refits). Native calls must supply their
+    vectors, matrices or data frames directly, or use \code{with(data, ...)}.
+    Supplying \code{data}, including explicit \code{data = NULL}, to a native
+    route that does not consume it is an error; see
+    \code{\link{np-data-interfaces}}.
+A data frame used with the formula interface.}
 
 
   \item{exdat}{Optional evaluation predictors.}

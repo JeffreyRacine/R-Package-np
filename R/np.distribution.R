@@ -78,6 +78,8 @@ npudist.formula <-
 
 npudist.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     do.call(npudist, .np_retained_training_args(
       bws, c(tdat = "dat"), list(...), npudist.dbandwidth))
   }
@@ -86,6 +88,8 @@ npudist.dbandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
            edat, ..., se = FALSE){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     se <- npValidateScalarLogical(se, "se")
     ann.se <- se && identical(bws[["type", exact = TRUE]], "adaptive_nn") &&

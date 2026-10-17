@@ -77,6 +77,9 @@
       stop("conditional-quantile plots support only first derivatives ('gradient.order = 1')",
            call. = FALSE)
 
+    if (.np_data_formal_supplied(sys.call(), sys.function()))
+      .np_plot_data_error()
+
     sub.supplied <- !missing(sub)
 
     plot.gradient.available <- rep.int(TRUE, bws$xndim)

@@ -1346,6 +1346,8 @@ nplsqregbw.formula <-
   }
 
 nplsqregbw.lsqregressionbandwidth <- function(bws, tau = bws$tau, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
   tau <- .nplsqreg_validate_tau_values(tau)
   if (length(tau) != length(bws$tau) || !isTRUE(all.equal(tau, bws$tau)))
     stop("cross-tau nplsqreg bandwidth-object reuse is not supported",
@@ -1354,6 +1356,8 @@ nplsqregbw.lsqregressionbandwidth <- function(bws, tau = bws$tau, ...) {
 }
 
 nplsqregbw.NULL <- function(...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
   nplsqregbw.default(...)
 }
 
@@ -1398,6 +1402,8 @@ nplsqregbw.default <-
            optim.control = list(maxit = 50L),
            ...,
            nomad.opts = list()) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "nplsqregbw")
     .npRmpi_require_active_slave_pool(where = "nplsqregbw()")
@@ -1974,6 +1980,8 @@ nplsqreg.formula <-
 nplsqreg.lsqregressionbandwidth <-
   function(bws, txdat = NULL, tydat = NULL, tau = bws$tau,
            se = FALSE, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     retained.training <- is.null(txdat) && is.null(tydat)
     restore <- function(out) {
       # The retained arrays are complete cases; only the owning bandwidth
@@ -2029,6 +2037,8 @@ nplsqreg.lsqregressionbandwidth <-
   }
 
 nplsqreg.NULL <- function(...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
   nplsqreg.default(...)
 }
 
@@ -2043,6 +2053,8 @@ nplsqreg.default <-
            gradient.order = 1L,
            se = FALSE,
            ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     dots.dispatch <- list(...)
     npRejectLegacyBooleanErrors(dots.dispatch, "nplsqreg")

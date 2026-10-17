@@ -71,6 +71,8 @@ npindexbw.NULL <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
            bws, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
     if (.npRmpi_master_local_entry_needed()) {
       .np.local.entry <- new.env(parent=emptyenv())
@@ -2794,6 +2796,8 @@ npindexbw.default <-
            scale.factor.search.lower = NULL,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     only.beta <- !missing(only.optimize.beta) &&
       npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npindexbw")
@@ -3197,6 +3201,8 @@ npindexbw.sibandwidth <-
            .restore.first.start = TRUE,
            ...,
            .fixed.h.lower = NULL){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     dots <- list(...)
     npRejectUnsupportedBwsolver(dots, "npindexbw")

@@ -100,6 +100,8 @@ npcdist.formula <-
 
 npcdist.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     do.call(npcdist, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat"), list(...), npcdist.condbandwidth))
   }
@@ -115,6 +117,8 @@ npcdist.condbandwidth <-
            proper.method = c("isotonic"),
            proper.control = list(),
            ..., se = FALSE){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     se <- npValidateScalarLogical(se, "se")
     dots <- list(...)

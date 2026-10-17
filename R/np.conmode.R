@@ -108,6 +108,8 @@ npconmode.formula <-
 
 npconmode.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     do.call(npconmode, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat"), list(...), npconmode.conbandwidth))
   }
@@ -509,6 +511,8 @@ npconmode.conbandwidth <-
             gradients = FALSE,
             level = NULL,
             ..., se = FALSE){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     se <- npValidateScalarLogical(se, "se")
     .npRmpi_require_active_slave_pool(where = "npconmode()")

@@ -73,7 +73,9 @@ npksum.formula <-
   }
 
 npksum.integer <-
-  function(...) { npksum.numeric(...) }
+  function(...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+ npksum.numeric(...) }
 
 # Transport already-owned dots instead of replaying expressions on workers.
 # This is local to npksum; shared dispatcher targets and protocol are unchanged.
@@ -95,6 +97,8 @@ npksum.numeric <-
            bandwidth.divide, compute.ocg, compute.score, kernel.pow,
            leave.one.out, operator, permutation.operator, return.kernel.weights,
            ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     dots <- list(...)
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
     dots$return.derivative.kernel.weights <- NULL
@@ -192,6 +196,8 @@ npksum.default <-
            permutation.operator = names(PERMUTATION_OPERATORS),
            return.kernel.weights = FALSE,
            ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     dots <- list(...)
     internal.power12 <- isTRUE(dots$.np.internal.power12)
     dots$.np.internal.power12 <- NULL

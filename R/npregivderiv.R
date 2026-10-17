@@ -66,7 +66,10 @@
     force=force)
 }
 
-npregivderiv <- function(y, ...) UseMethod("npregivderiv")
+npregivderiv <- function(y, ...) {
+  .np_iv_native_data_preflight(substitute(y), substitute(list(...))[-1L], parent.frame())
+  UseMethod("npregivderiv")
+}
 
 .np_iv_deriv_adjoint_dots <- function(dots) {
   dot.names <- names(dots)
@@ -95,6 +98,8 @@ npregivderiv.default <- function(y,
                          degree=NULL,
                          nomad=FALSE,
                          ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
   .npRmpi_require_active_slave_pool(where = "npregivderiv()")
   .np_iv_require_fixed_bandwidth(...)
   if (.npRmpi_autodispatch_active()) {

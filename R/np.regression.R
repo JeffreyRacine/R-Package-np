@@ -406,6 +406,8 @@ npreg.formula <-
 
 npreg.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     ev <- do.call(npreg, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat"), list(...), npreg.rbandwidth))
     ev$call <- match.call(expand.dots = FALSE)
@@ -432,6 +434,8 @@ npreg.rbandwidth <-
            exdat, eydat, gradient.order = 1L, gradients = FALSE,
            residuals = FALSE, se = FALSE,
            ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     fit.start <- proc.time()[3]
     gradients <- npValidateScalarLogical(gradients, "gradients")
     se <- npValidateScalarLogical(se, "se")
@@ -1194,6 +1198,7 @@ npreg.rbandwidth <-
 
 npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
                           se = FALSE, ...){
+
   .npRmpi_require_active_slave_pool(where = "npreg()")
   if (.npRmpi_master_local_entry_needed()) {
     .np.local.entry <- new.env(parent=emptyenv())

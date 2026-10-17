@@ -43,7 +43,10 @@
 ## phi: the IV estimator of phi(z)
 ## convergence: a character string indicating whether/why iteration terminated
 
-npregiv <- function(y, ...) UseMethod("npregiv")
+npregiv <- function(y, ...) {
+  .np_iv_native_data_preflight(substitute(y), substitute(list(...))[-1L], parent.frame())
+  UseMethod("npregiv")
+}
 
 .npregiv_select_stop_index <- function(norm.stop) {
   if(!length(norm.stop))
@@ -117,6 +120,8 @@ npregiv.default <- function(y,
                     degree=NULL,
                     nomad=FALSE,
                     ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
   .npRmpi_require_active_slave_pool(where = "npregiv()")
   .np_iv_require_fixed_bandwidth(...)
   if (.npRmpi_autodispatch_active()) {

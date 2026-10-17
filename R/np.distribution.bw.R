@@ -125,6 +125,8 @@ npudistbw.formula <-
 npudistbw.NULL <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, ...){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
     if (.npRmpi_master_local_entry_needed()) {
       .np.local.entry <- new.env(parent=emptyenv())
@@ -857,6 +859,8 @@ npudistbw.dbandwidth <-
            eval.only = FALSE,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudistbw")
     dot.args <- list(...)
     internal.certify <- dot.args[[".beta.range.certify", exact = TRUE]]
@@ -1274,6 +1278,8 @@ npudistbw.default <-
            transform.bounds,
            ...,
            nomad.opts = list()){
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudistbw")
     .npRmpi_require_active_slave_pool(where = "npudistbw()")
     if (.npRmpi_master_local_entry_needed()) {

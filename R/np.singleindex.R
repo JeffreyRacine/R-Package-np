@@ -229,6 +229,8 @@ npindex.formula <-
 
 npindex.call <-
   function(bws, ...) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
     do.call(npindex, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat"), list(...), npindex.sibandwidth))
   }
@@ -672,6 +674,8 @@ npindex.sibandwidth <-
            gradients = FALSE,
            residuals = FALSE, ..., se.type = c("asymptotic", "bootstrap"),
            y.eval = NULL) {
+  .np_reject_native_data(substitute(list(...))[-1L])
+
 
     if (!is.null(y.eval)) y.eval <- npValidateScalarLogical(y.eval, "y.eval")
     fit.start <- proc.time()[3]
