@@ -151,6 +151,20 @@ test_that("early data diagnostics preserve factories and active bindings", {
                "^object '.np_unbound_formula' not found$")
 })
 
+test_that("direct default native names receive data-interface guidance", {
+  for (family in c("npreg", "npudens", "npudist", "npcdens", "npcdist",
+                   "npindex", "npscoef", "npplreg", "npqreg", "npconmode", "npsigtest")) {
+    roles <- if (family %in% c("npudens", "npudist")) "tdat" else
+      if (family == "npsigtest") c("xdat", "ydat") else c("txdat", "tydat")
+    inputs <- setNames(lapply(roles, function(x) as.name(paste0(".np_unbound_", x))), roles)
+    inputs["data"] <- list(quote(NULL))
+    fun <- get(paste0(family, ".default"), envir = environment(npreg), inherits = FALSE)
+    expect_error(eval(as.call(c(list(fun), inputs))),
+                 "`data=` is supported only with the formula interface", fixed = TRUE,
+                 info = family)
+  }
+})
+
 # R retains a forced promise even if a previous argument removes its source name.
 test_that("early diagnostic preserves an already cached observation promise", {
   scope <- new.env(parent = environment())
