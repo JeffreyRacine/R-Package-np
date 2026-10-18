@@ -61,6 +61,11 @@ test_that("profile startup template resolves the worker loop through a namespace
   tracker <- new.env(parent = emptyenv())
   fake.ns <- new.env(parent = baseenv())
 
+  assign(".npRmpi_profile_install_error_handler", function() {
+    tracker$error_handler_installed <- TRUE
+    invisible(TRUE)
+  }, envir = fake.ns)
+  assign(".npRmpi_profile_abort_error", function(e) stop(e), envir = fake.ns)
   assign(".npRmpi_worker_loop", function(...) {
     tracker$worker_called <- TRUE
     tracker$args <- list(...)
@@ -100,6 +105,7 @@ test_that("profile startup template resolves the worker loop through a namespace
 
   expect_identical(tracker$namespace_name, "npRmpi")
   expect_true(isTRUE(tracker$init_called))
+  expect_true(isTRUE(tracker$error_handler_installed))
   expect_true(isTRUE(tracker$worker_called))
   expect_true(isTRUE(tracker$free_called))
   expect_true(isTRUE(tracker$quit_called))
