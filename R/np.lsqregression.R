@@ -11,7 +11,10 @@ nplsqreg <-
          inherits(bws, "rbandwidth") && !is.null(bws$formula)))
       .nplsqreg_formula_dispatch_args(
         nplsqreg.formula, substitute(list(...))[-1L], environment())
-    else list(...)
+    else .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment(),
+      data.roles = c("txdat", "tydat"), call = sys.call(), caller = parent.frame(),
+      omit.subset = FALSE)
 
     if (!missing(bws)) {
       if (isa(bws, "lsqregressionbandwidth"))
@@ -38,7 +41,10 @@ nplsqregbw <-
     args <- if (!missing(bws) && inherits(bws, "formula"))
       .nplsqreg_formula_dispatch_args(
         nplsqregbw.formula, substitute(list(...))[-1L], environment())
-    else list(...)
+    else .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment(),
+      data.roles = c("xdat", "ydat"), call = sys.call(), caller = parent.frame(),
+      omit.subset = FALSE)
 
     if (!missing(bws)) {
       if (isa(bws, "lsqregressionbandwidth"))

@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Improve `data=` diagnostics for directly supplied, unbound native observation
+  names across estimator and bandwidth interfaces, including direct default
+  methods. Preserve formula factories, legitimate data consumers and evaluation
+  order; native inputs still use ordinary R evaluation rather than a data mask.
+
 - Preserve explicit `data=NULL` when reusing formula-bearing least-squares
   quantile bandwidth objects, and retain the stored-sample diagnostic for
   prohibited replacement data. Unsupported native data remains an error.

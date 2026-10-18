@@ -1,6 +1,9 @@
 npreghat <-
   function(bws, ...){
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment(),
+      data.roles = c("txdat", "y"), call = sys.call(), caller = parent.frame(),
+      omit.subset = FALSE)
 
     if (!missing(bws)){
       # A fitted model owns a registered method; its call is not a bandwidth

@@ -75,13 +75,21 @@
   indices
 }
 
-.np_formula_dispatch_args <- function(method, expressions, promise.frame) {
-  omitted <- .np_formula_subset_indices(method, expressions)
-  if (!length(omitted))
+.np_formula_dispatch_args <- function(method, expressions, promise.frame,
+                                      data.roles = character(), call = NULL,
+                                      caller = NULL, omit.subset = TRUE) {
+  omitted <- if (omit.subset) .np_formula_subset_indices(method, expressions) else integer()
+  diagnose <- length(data.roles) && "data" %in% names(expressions)
+  if (!length(omitted) && !diagnose)
     return(eval(quote(list(...)), envir = promise.frame))
   indices <- setdiff(seq_along(expressions), omitted)
-  args <- lapply(indices, function(i)
-    eval(substitute(...elt(index), list(index = i)), envir = promise.frame))
+  args <- lapply(indices, function(i) {
+    argument <- names(expressions)[i]
+    if (diagnose && length(argument) && argument %in% data.roles)
+      .np_data_argument_preflight(expressions[[i]], argument, call, caller,
+        value = eval(substitute(...elt(index), list(index = i)), envir = promise.frame))
+    eval(substitute(...elt(index), list(index = i)), envir = promise.frame)
+  })
   if (!is.null(names(expressions)))
     names(args) <- names(expressions)[indices]
   args

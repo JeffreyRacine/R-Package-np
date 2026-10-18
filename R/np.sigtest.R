@@ -8,7 +8,9 @@
 npsigtest <-
   function(bws, ..., B = 399){
     args <- .np_formula_dispatch_args(
-      NULL, substitute(list(...))[-1L], environment())
+      NULL, substitute(list(...))[-1L], environment(),
+      data.roles = c("xdat", "ydat"),
+      call = sys.call(), caller = parent.frame())
     npRejectLegacyBootstrapCount(names(args), "npsigtest")
 
     if (!missing(bws)){
@@ -1301,8 +1303,11 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
 
   ## if bws was passed in explicitly, do not compute bandwidths
 
-  if(xdat.named)
+  if(xdat.named) {
+    if ("data" %in% sc.names)
+      .np_data_argument_preflight(substitute(xdat), "xdat", sys.call(), parent.frame(), value = xdat)
     xdat <- toFrame(xdat)
+  }
 
   sc.bw <- sc
   

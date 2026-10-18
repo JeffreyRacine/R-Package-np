@@ -205,6 +205,10 @@
       call_obj[[index]] <- substitute(quote(VALUE), list(VALUE = formula.value$value))
     }
   }
+  # Formula ownership has now been resolved in the incumbent order. Reject
+  # unsupported data before realizing native inputs for the selector handoff.
+  if (is.null(formula.value) && !is.null(native.map) && "data" %in% names(call_obj))
+    .np_native_data_error()
   native <- if (is.null(formula.value))
     .np_bw_native_values(call_obj, native.map, native.frame, caller_env) else
     list(call = call_obj, expressions = list())
@@ -325,12 +329,18 @@
   dot.names <- names(dots)
   has.named.bws <- !is.null(dot.names) && any(dot.names == "bws")
 
+  dispatch.call <- sys.call(sys.parent())
   value <- function(i) {
     if (is.null(promise.frame))
       return(.np_try_eval_in_frames(dots[[i]], eval_env = eval_env))
     # Force the original dot promise, not its captured syntax. UseMethod
     # forwards this same promise to the selected method. In particular an
     # error must propagate here, not cause the formula factory to be retried.
+    if ("data" %in% dot.names && length(dot.names[i]) &&
+        dot.names[i] %in% data_arg_names)
+      .np_data_argument_preflight(dots[[i]], dot.names[i],
+                                 dispatch.call, eval_env,
+        value = eval(substitute(...elt(INDEX), list(INDEX = i)), envir = promise.frame))
     list(ok = TRUE, value = eval(substitute(...elt(INDEX), list(INDEX = i)),
                                 envir = promise.frame))
   }

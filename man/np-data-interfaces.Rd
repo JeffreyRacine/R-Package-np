@@ -16,7 +16,9 @@ Where \code{data} is not a native input, even explicitly supplying
 \code{data = NULL} is an error. Omit it, supply inputs such as
 \code{xdat = d["x"]} and \code{ydat = d$y}, or evaluate the native call inside
 \code{with(d, ...)}. Native inputs use ordinary R evaluation, not a data mask.
-Existing argument evaluation and method dispatch are preserved. An error in
+Directly supplied, unbound native observation names receive this interface
+guidance at their existing argument-resolution boundary. No data-mask lookup
+is attempted. Existing argument evaluation and method dispatch are preserved. An error in
 a supplied expression may therefore occur before the native-data diagnostic;
 MPI methods retain their normal error context.
 This includes the native IV interfaces: use \code{with(d, npregiv(y, z, w))}
