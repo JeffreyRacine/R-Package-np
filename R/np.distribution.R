@@ -3,7 +3,9 @@ npudist <-
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npudist")
     args <- .np_formula_dispatch_args(
-      NULL, substitute(list(...))[-1L], environment())
+      NULL, substitute(list(...))[-1L], environment(),
+      data.roles = c("tdat"),
+      call = sys.call(), caller = parent.frame())
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -311,6 +313,8 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
     .npRmpi_local_entry_begin(.np.local.entry)
   }
   bws.formula.early <- (!missing(bws)) && inherits(bws, "formula")
+  if (!missing(tdat) && "data" %in% names(substitute(list(...))))
+    .np_data_argument_preflight(substitute(tdat), "tdat", sys.call(), parent.frame(), value = tdat)
   tdat.formula.early <- (!missing(tdat)) && inherits(tdat, "formula")
   formula.input <- .np_formula_dispatch_args(
     NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
@@ -356,6 +360,8 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
   ## if bws was passed in explicitly, do not compute bandwidths
     
   if(tdat.named) {
+    if ("data" %in% sc.names)
+      .np_data_argument_preflight(substitute(tdat), "tdat", sys.call(), parent.frame(), value = tdat)
     # Preserve vector syntax before coercion gives it the formal's name.
     original.name <- if (is.null(dim(tdat)))
       paste(deparse(.np_formula_dot_expression(substitute(tdat), parent.frame())), collapse = "") else NULL

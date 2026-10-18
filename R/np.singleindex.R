@@ -18,7 +18,9 @@ npindex <-
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npindex")
     args <- .np_formula_dispatch_args(
-      NULL, substitute(list(...))[-1L], environment())
+      NULL, substitute(list(...))[-1L], environment(),
+      data.roles = c("txdat", "tydat"),
+      call = sys.call(), caller = parent.frame())
     npRejectLegacyBooleanErrors(args, "npindex")
     npRejectLegacyBootstrapCount(names(args), "npindex")
     .np_singleindex_reject_higher_gradient_order(args, where = "npindex")
@@ -368,9 +370,18 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
     dispatch.call <- match.call()
     if (explicit.sibandwidth && isTRUE(.np_progress_enabled(domain = "bandwidth")))
       dispatch.call$.np_lc_fixed_progress_route <- TRUE
-    if (!explicit.sibandwidth && !no.txdat && !no.tydat)
+    if (!explicit.sibandwidth && !no.txdat && !no.tydat) {
+      if ("data" %in% sc.names) {
+        input.call <- sys.call()
+        input.caller <- parent.frame()
+        return(.np_index_dispatch(dispatch.call,
+          { .np_data_argument_preflight(substitute(txdat), "txdat", input.call, input.caller, value = txdat); txdat },
+          { .np_data_argument_preflight(substitute(tydat), "tydat", input.call, input.caller, value = tydat); tydat },
+          parent.frame(), owner.name = "npindex.default", data.names = c("txdat", "tydat")))
+      }
       return(.np_index_dispatch(dispatch.call, txdat, tydat, parent.frame(),
         owner.name = "npindex.default", data.names = c("txdat", "tydat")))
+    }
     return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npindex.default"))
   }
 
@@ -426,6 +437,8 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
   ## if bws was passed in explicitly, do not compute bandwidths
 
   if(txdat.named) {
+    if ("data" %in% sc.names)
+      .np_data_argument_preflight(substitute(txdat), "txdat", sys.call(), parent.frame(), value = txdat)
     # Preserve vector syntax before coercion gives it the formal's name.
     original.name <- if (is.null(dim(txdat)))
       paste(deparse(.np_formula_dot_expression(substitute(txdat), parent.frame())), collapse = "") else NULL

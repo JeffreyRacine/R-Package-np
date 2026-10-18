@@ -107,3 +107,68 @@ test_that("CMS data rejection survives wrapper forwarding", {
                  diagnostic, fixed = TRUE)
   }
 })
+
+# Public first-force coverage complements the selected-owner tests above: those
+# owners are never reached if an unbound observation name fails during dispatch.
+test_that("public bare native names receive data-interface guidance", {
+  roles <- list(
+    npregbw = c("xdat", "ydat"), npudensbw = "dat", npudistbw = "dat",
+    npcdensbw = c("xdat", "ydat"), npcdistbw = c("xdat", "ydat"),
+    npindexbw = c("xdat", "ydat"), npscoefbw = c("xdat", "ydat", "zdat"),
+    npplregbw = c("xdat", "ydat", "zdat"), nplsqregbw = c("xdat", "ydat"),
+    npreg = c("tydat", "txdat"), npudens = "tdat", npudist = "tdat",
+    npcdens = c("txdat", "tydat"), npcdist = c("txdat", "tydat"),
+    npindex = c("txdat", "tydat"), npscoef = c("txdat", "tydat", "tzdat"),
+    npplreg = c("txdat", "tydat", "tzdat"), nplsqreg = c("txdat", "tydat"),
+    npqreg = c("txdat", "tydat"), npconmode = c("txdat", "tydat"),
+    npksum = "txdat", npreghat = c("txdat", "y"),
+    npsigtest = c("xdat", "ydat"), npcmstest = c("xdat", "ydat"),
+    npqcmstest = c("xdat", "ydat"), npregiv = c("y", "z", "w"),
+    npregivderiv = c("y", "z", "w"))
+  for (family in names(roles)) {
+    for (reversed in c(FALSE, TRUE)) {
+      names <- if (reversed) rev(roles[[family]]) else roles[[family]]
+      inputs <- setNames(lapply(names, function(x) as.name(paste0(".np_unbound_", x))), names)
+      inputs["data"] <- list(quote(NULL))
+      fun <- get(family, envir = environment(npreg), inherits = FALSE)
+      expr <- as.call(c(list(fun), inputs))
+      expect_error(eval(expr), "`data=` is supported only with the formula interface",
+                   fixed = TRUE, info = paste(family, reversed))
+    }
+  }
+})
+
+test_that("early data diagnostics preserve factories and active bindings", {
+  factory <- function() stop("original user factory error", call. = FALSE)
+  expect_error(npreg(txdat = factory(), tydat = 1:4, data = NULL),
+               "^original user factory error$")
+  scope <- new.env(parent = environment())
+  makeActiveBinding("active", factory, scope)
+  expect_error(eval(quote(npreg(txdat = active, tydat = 1:4, data = NULL)), scope),
+               "^original user factory error$")
+  # A formula itself must still resolve through ordinary R evaluation.
+  expect_error(npreg(formula = .np_unbound_formula, data = NULL),
+               "^object '.np_unbound_formula' not found$")
+})
+
+# R retains a forced promise even if a previous argument removes its source name.
+test_that("early diagnostic preserves an already cached observation promise", {
+  scope <- new.env(parent = environment())
+  scope$x <- 1:4
+  materialize <- function(...) {
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(),
+      data.roles = "txdat", call = sys.call(), caller = parent.frame())
+  }
+  scope$materialize <- materialize
+  scope$cache <- function() {
+    for (i in seq_len(sys.nframe())) if (identical(sys.function(i), materialize)) {
+      eval(quote(..2), envir = sys.frame(i))
+      break
+    }
+    rm("x", envir = scope)
+    NULL
+  }
+  result <- eval(quote(materialize(data = cache(), txdat = x)), scope)
+  expect_identical(result, list(data = NULL, txdat = 1:4))
+  expect_false(exists("x", envir = scope, inherits = FALSE))
+})

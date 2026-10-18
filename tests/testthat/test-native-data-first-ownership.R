@@ -112,3 +112,19 @@ test_that("native regression plots retain the fit's replacement sample", {
       tolerance = 1e-12)
   }
 })
+
+test_that("direct default native names receive data-interface guidance", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  for (family in c("npreg", "npudens", "npudist", "npcdens", "npcdist",
+                   "npindex", "npscoef", "npplreg", "npqreg", "npconmode", "npsigtest")) {
+    roles <- if (family %in% c("npudens", "npudist")) "tdat" else
+      if (family == "npsigtest") c("xdat", "ydat") else c("txdat", "tydat")
+    inputs <- setNames(lapply(roles, function(x) as.name(paste0(".np_unbound_", x))), roles)
+    inputs["data"] <- list(quote(NULL))
+    fun <- get(paste0(family, ".default"), envir = environment(npreg), inherits = FALSE)
+    expect_error(eval(as.call(c(list(fun), inputs))),
+                 "`data=` is supported only with the formula interface", fixed = TRUE,
+                 info = family)
+  }
+})

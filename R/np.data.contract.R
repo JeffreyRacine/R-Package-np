@@ -37,3 +37,23 @@
                              call = as.call(actuals), expand.dots = FALSE,
                              envir = parent.frame(2L)))
 }
+
+# Call immediately before the incumbent owner first forces this dot. Only a
+# directly supplied named symbol has an unambiguous lexical lookup here.
+# Forwarded promises, factories and existing bindings keep ordinary evaluation.
+.np_data_argument_preflight <- function(expr, argument, call, caller, value) {
+  if (missing(expr) || !is.symbol(expr) || !nzchar(as.character(expr)) ||
+      !nzchar(argument) || sum(names(call) == argument) != 1L ||
+      !identical(call[[argument]], expr) ||
+      exists(as.character(expr), envir = caller, inherits = TRUE))
+    return(invisible(NULL))
+  # Absence of the original name does not prove failure: an earlier argument
+  # may already have forced this promise. Force the original promise here, at
+  # the incumbent boundary, so a cached value remains valid. This handler is
+  # restricted to the proved direct, unbound symbol; user factories and bound
+  # active/delayed promises never enter it.
+  tryCatch({ value; invisible(NULL) }, error = function(e)
+    stop(conditionMessage(e), ". ",
+         "`data=` is supported only with the formula interface. For native calls, supply vectors, matrices or data frames directly, or use `with(data, ...)`.",
+         call. = FALSE))
+}

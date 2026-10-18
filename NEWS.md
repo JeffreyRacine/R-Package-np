@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Improve `data=` diagnostics for directly supplied, unbound native observation
+  names across estimator and bandwidth interfaces, including direct default
+  methods. Preserve formula factories, legitimate data consumers and evaluation
+  order; native inputs still use ordinary R evaluation rather than a data mask.
+
 - Standalone profile/manual-broadcast jobs terminate with a nonzero status
   after an unhandled master or worker error, preserving the diagnostic instead
   of waiting indefinitely in cooperative shutdown. Caught errors inside the

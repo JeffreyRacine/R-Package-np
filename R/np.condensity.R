@@ -3,7 +3,9 @@ npcdens <-
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npcdens")
     args <- .np_formula_dispatch_args(
-      NULL, substitute(list(...))[-1L], environment())
+      NULL, substitute(list(...))[-1L], environment(),
+      data.roles = c("txdat", "tydat"),
+      call = sys.call(), caller = parent.frame())
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -736,6 +738,8 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   no.tydat <- missing(tydat)
   has.explicit.bws <- (!no.bws) && isa(bws, "conbandwidth")
   bws.formula <- (!no.bws) && inherits(bws, "formula")
+  if (!missing(txdat) && "data" %in% sc.names)
+    .np_data_argument_preflight(substitute(txdat), "txdat", sys.call(), parent.frame(), value = txdat)
   txdat.formula <- (!no.txdat) && inherits(txdat, "formula")
   dots <- .np_formula_dispatch_args(
     NULL, substitute(list(...))[-1L], environment())
@@ -818,6 +822,8 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   ## if bws was passed in explicitly, do not compute bandwidths
     
   if(txdat.named) {
+    if ("data" %in% sc.names)
+      .np_data_argument_preflight(substitute(txdat), "txdat", sys.call(), parent.frame(), value = txdat)
     # Preserve vector syntax before coercion gives it the formal's name.
     original.name <- if (is.null(dim(txdat)))
       paste(deparse(.np_formula_dot_expression(substitute(txdat), parent.frame())), collapse = "") else NULL
@@ -826,6 +832,8 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   }
 
   if(tydat.named) {
+    if ("data" %in% sc.names)
+      .np_data_argument_preflight(substitute(tydat), "tydat", sys.call(), parent.frame(), value = tydat)
     # Preserve vector syntax before coercion gives it the formal's name.
     original.name <- if (is.null(dim(tydat)))
       paste(deparse(.np_formula_dot_expression(substitute(tydat), parent.frame())), collapse = "") else NULL

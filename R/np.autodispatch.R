@@ -3003,11 +3003,30 @@
       all(c("formula", "xdat", "ydat") %in% formal.names))
     syntax <- setdiff(syntax, "call")
   owned <- setdiff(intersect(names(mc), names(original)), c("", syntax))
+  # Diagnose only the proved native observation slots immediately before the
+  # incumbent promise force; other owners and all no-data calls are unchanged.
+  data.roles <- if ("data" %in% names(original) &&
+                    is.symbol(mc[[1L]]) &&
+                    isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE))) switch(
+    as.character(mc[[1L]]),
+    npreg.default = c("txdat", "tydat"),
+    npudens.default = c("tdat"),
+    npudist.default = c("tdat"),
+    npcdens.default = c("txdat", "tydat"),
+    npcdist.default = c("txdat", "tydat"),
+    npindex.default = c("txdat", "tydat"),
+    npscoef.default = c("txdat", "tydat", "tzdat"),
+    npplreg.default = c("txdat", "tydat", "tzdat"),
+    npqreg.default = c("txdat", "tydat"),
+    character()) else character()
   for (name in owned) {
     # Rewrites for a dispatched leaf keep their own values. Only unchanged
     # arguments denote this activation's formal/dots promises. Formula-owned
     # syntax retains its data-mask owner; native dots are ordinary values.
     if (!identical(mc[[name]], original[[name]])) next
+    if (name %in% data.roles)
+      .np_data_argument_preflight(original[[name]], name, owner.call, caller,
+        value = get(name, envir = owner, inherits = FALSE))
     if (name %in% formal.names) {
       value <- get(name, envir = owner, inherits = FALSE)
     } else {

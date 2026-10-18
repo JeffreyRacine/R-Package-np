@@ -3,7 +3,9 @@ npconmode <-
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npconmode")
     args <- .np_formula_dispatch_args(
-      NULL, substitute(list(...))[-1L], environment())
+      NULL, substitute(list(...))[-1L], environment(),
+      data.roles = c("txdat", "tydat"),
+      call = sys.call(), caller = parent.frame())
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -804,6 +806,8 @@ npconmode.default <- function(bws, txdat, tydat,
   ## if bws was passed in explicitly, do not compute bandwidths
     
   if(txdat.named || (bws.named && !no.txdat && !inherits(txdat, "formula"))) {
+    if ("data" %in% sc.names)
+      .np_data_argument_preflight(substitute(txdat), "txdat", sys.call(), parent.frame(), value = txdat)
     # Keep the caller's vector name; explicit frame/matrix names are authoritative.
     original.name <- if (is.null(dim(txdat)))
       paste(deparse(.np_formula_dot_expression(substitute(txdat), parent.frame())), collapse = "") else NULL
@@ -812,6 +816,8 @@ npconmode.default <- function(bws, txdat, tydat,
   }
 
   if(tydat.named) {
+    if ("data" %in% sc.names)
+      .np_data_argument_preflight(substitute(tydat), "tydat", sys.call(), parent.frame(), value = tydat)
     # Keep the caller's vector name; explicit frame/matrix names are authoritative.
     original.name <- if (is.null(dim(tydat)))
       paste(deparse(.np_formula_dot_expression(substitute(tydat), parent.frame())), collapse = "") else NULL
