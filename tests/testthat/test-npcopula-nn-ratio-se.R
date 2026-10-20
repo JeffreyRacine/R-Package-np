@@ -48,6 +48,12 @@ test_that("NN copula errors combine aligned numerator and marginal scores", {
     single.bw <- npudensbw(dat = single, bws = 0, bwtype = type,
                            bandwidth.compute = FALSE)
     expect_identical(owner(single.bw, single, single), 0)
+    categorical <- data.frame(x = ordered(rep(letters[1:3], 4L)))
+    categorical.bw <- npudensbw(dat = categorical, bws = .2, bwtype = type,
+      ckertype = "uniform", bandwidth.compute = FALSE)
+    expect_silent(categorical.se <- owner(categorical.bw, categorical, categorical))
+    expect_identical(categorical.se, rep(0, nrow(categorical)))
+
     b1 <- npudensbw(dat = x[1L], bws = k, bandwidth.compute = FALSE, bwtype = type)
     expect_identical(owner(b1, x[1L], ex[1L]), c(0, 0))
     off <- npcopula(bws = bw, data = x)
@@ -67,4 +73,17 @@ test_that("NN ratio norm is stable without erasing small positive uncertainty", 
   expect_gt(norm(c(-1e-200, 1e-200)), 0)
   expect_identical(norm(c(4, 4)), 0)
   expect_identical(norm(c(NA_real_, 1)), NA_real_)
+})
+
+test_that("retained NN metadata preserves genuine kernel conditions", {
+  ns <- asNamespace(getNamespaceName(environment(npcopula)))
+  retained <- get(".npcopula_density_se_nn_retained", ns)
+  expect_warning(retained(list(ckertype = "uniform"), warning("distinct condition")),
+    "distinct condition")
+  expect_error(retained(list(ckertype = "uniform"), stop("distinct failure")),
+    "distinct failure")
+  advisory <- unname(get(".np_io_prefix_text", ns)(
+    "ignoring kernel order specified with uniform kernel type"))
+  expect_warning(retained(list(ckertype = "gaussian"), warning(advisory)),
+    "ignoring kernel order")
 })
