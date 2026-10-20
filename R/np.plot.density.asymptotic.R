@@ -300,16 +300,25 @@
 }
 # Same-sample random-radius term. Geometry, kernels and boundary-face pilots come from
 # their current owners; vectorized interval accumulation avoids n^2.
-.np_plot_density_ann <- function(bws, x, ex, pdf) {
-  n <- nrow(x)
-  m <- nrow(ex)
-  reason <- .np_ann_se_domain(bws, n, pdf)
+.np_plot_density_ann_prepare <- function(bws, x, pdf, uniform.faces = FALSE) {
+  reason <- .np_ann_se_domain(bws, nrow(x), pdf)
   if (!is.null(reason))
     .np_plot_joint_unavailable(reason)
   st <- .np_ann_se_geometry(bws, x)
   if (!st$valid)
     .np_plot_joint_unavailable("nonregular ANN spacing geometry")
   kb <- .np_make_kbandwidth_unconditional(bws, x)
+  if (uniform.faces)
+    st$uniform <- .np_ann_uniform_prepare(kb, x)
+  list(state = st, bandwidth = kb)
+}
+.np_plot_density_ann <- function(bws, x, ex, pdf, prepared = NULL) {
+  n <- nrow(x)
+  m <- nrow(ex)
+  if (is.null(prepared))
+    prepared <- .np_plot_density_ann_prepare(bws, x, pdf)
+  st <- prepared[["state", exact = TRUE]]
+  kb <- prepared[["bandwidth", exact = TRUE]]
   p <- ncol(st$x)
   e <- as.matrix(ex[, bws[["icon", exact = TRUE]], drop = FALSE])
   # The ANN native kernel owner returns physically normalized weights. Use its
@@ -335,7 +344,8 @@
   A <- matrix(NA_real_, m, n)
   faces <- NULL
   if (pdf && identical(bws[["ckertype", exact = TRUE]], "uniform")) {
-    st$uniform <- .np_ann_uniform_prepare(kb, x)
+    if (is.null(st[["uniform", exact = TRUE]]))
+      st$uniform <- .np_ann_uniform_prepare(kb, x)
     # Reuse the unchanged support-face formula with a local kernel dependency.  Only
     # this copied closure is adapted; the package namespace stays intact.
     face.owner <- .np_ann_uniform_faces

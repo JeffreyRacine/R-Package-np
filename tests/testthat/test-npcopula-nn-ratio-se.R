@@ -61,3 +61,29 @@ test_that("retained NN metadata preserves genuine kernel conditions", {
   expect_warning(retained(list(ckertype = "gaussian"), warning(advisory)),
     "ignoring kernel order")
 })
+
+
+test_that("uniform ANN query factors reuse invocation-local training preparation", {
+  if (exists("spawn_mpi_slaves", mode = "function")) {
+    if (!spawn_mpi_slaves()) skip("Could not initialize MPI context")
+    on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  }
+  ns <- asNamespace(getNamespaceName(environment(npcopula)))
+  x <- data.frame(x = sin(1:32) + (1:32)/32,
+                  y = cos(1:32) + (1:32)/64)
+  bw <- npudensbw(dat = x, bws = c(6, 6), bwtype = "adaptive_nn",
+                  ckertype = "uniform", bandwidth.compute = FALSE)
+  retained <- get(".npcopula_density_se_nn_retained", ns)
+  prepare <- get(".np_plot_density_ann_prepare", ns)
+  factor <- get(".npcopula_density_se_nn_factor", ns)
+  context <- retained(bw, prepare(bw, x, TRUE, uniform.faces = TRUE))
+  before <- serialize(context, NULL)
+  evaluation <- rbind(x[c(1, 5, 11), ], data.frame(x = 1e6, y = 1e6))
+  for (i in seq_len(nrow(evaluation)))
+    expect_identical(factor(bw, x, evaluation[i, , drop = FALSE], context),
+                     factor(bw, x, evaluation[i, , drop = FALSE]))
+  expect_identical(serialize(context, NULL), before)
+  # Fresh preparation must continue to reject invalid training geometry.
+  tied <- x; tied$x <- 1
+  expect_error(prepare(bw, tied, TRUE), "nonregular ANN spacing geometry")
+})

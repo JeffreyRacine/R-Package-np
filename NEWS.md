@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Reuse invocation-local training preparation for uniform adaptive-neighbor
+  density-copula standard errors, preserving query-specific support faces and
+  unavailable rows. Point estimates and `se=FALSE` are unchanged.
+
 * Correct explicitly requested nearest-neighbor density-copula pointwise
   standard errors to include the same-sample joint/marginal ratio covariance.
   Preserve point estimates, selected bandwidths, `se=FALSE`, fixed-bandwidth
