@@ -18,9 +18,12 @@
     bws[["ckertype", exact = TRUE]])
 }
 
-.npcopula_density_se_nn_factor <- function(bws, data, evaluation) {
+.npcopula_density_se_nn_factor <- function(bws, data, evaluation, prepared = NULL) {
+  if (isTRUE(prepared[["unavailable", exact = TRUE]])) return(NULL)
   .npcopula_density_se_nn_retained(bws,
-    tryCatch(.np_plot_density_unconditional(bws, data, evaluation),
+    tryCatch(if (is.null(prepared))
+      .np_plot_density_unconditional(bws, data, evaluation) else
+      .np_plot_density_ann(bws, data, evaluation, TRUE, prepared),
     np_plot_joint_unavailable = function(e) {
       if (conditionMessage(e) %in% c("nonregular ANN spacing geometry",
                                      "nonregular ANN support face")) return(NULL)
@@ -63,6 +66,26 @@
         !identical(joint.spec, marginal.spec))
       stop("NN copula marginal primitive identity failed", call. = FALSE)
   }
+  # Contexts belong only to this local invocation. Reuse training geometry,
+  # never query-specific kernels, support faces or influence factors.
+  joint.prepared <- NULL
+  marginal.prepared <- vector("list", p)
+  if (ann && identical(bws[["ckertype", exact = TRUE]], "uniform")) {
+    prepare <- function(b, x) {
+      if (!any(b[["icon", exact = TRUE]])) return(NULL)
+      .npcopula_density_se_nn_retained(b,
+        tryCatch(.np_plot_density_ann_prepare(b, x, TRUE, uniform.faces = TRUE),
+          np_plot_joint_unavailable = function(e) {
+            if (identical(conditionMessage(e), "nonregular ANN spacing geometry"))
+              return(list(unavailable = TRUE))
+            stop(e)
+          }))
+    }
+    joint.prepared <- prepare(bws, data)
+    if (p > 1L && !isTRUE(joint.prepared[["unavailable", exact = TRUE]]))
+      marginal.prepared <- lapply(seq_len(p), function(j)
+        prepare(marginal.bws[[j]], training[[j]]))
+  }
   tile <- max(1L, min(64L, floor(4194304 / (8 * as.double(n) * (80 + 12 * p)))))
   # The existing face primitive reports a whole-call regularity condition.
   # Query-local calls preserve row-local availability without a retry/fallback.
@@ -70,7 +93,8 @@
   out <- rep.int(NA_real_, m)
   for (start in seq.int(1L, m, by = tile)) {
     rows <- seq.int(start, min(m, start + tile - 1L))
-    joint <- .npcopula_density_se_nn_factor(bws, data, xgrid[rows, , drop = FALSE])
+    joint <- .npcopula_density_se_nn_factor(bws, data, xgrid[rows, , drop = FALSE],
+      joint.prepared)
     if (is.null(joint)) next
     if (p == 1L) {
       # Reuse the same primitive; no subtraction of approximately equal factors.
@@ -83,7 +107,7 @@
       valid <- rep.int(TRUE, length(rows))
       for (j in seq_len(p)) {
         child <- .npcopula_density_se_nn_factor(marginal.bws[[j]], training[[j]],
-          evaluation[[j]][rows, , drop = FALSE])
+          evaluation[[j]][rows, , drop = FALSE], marginal.prepared[[j]])
         if (is.null(child)) { valid[] <- FALSE; break }
         if (ann && !any(marginal.bws[[j]][["icon", exact = TRUE]]))
           child$A <- child$A * sqrt(n / (n - 1))
