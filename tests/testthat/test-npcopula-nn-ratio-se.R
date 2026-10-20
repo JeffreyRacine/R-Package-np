@@ -113,3 +113,87 @@ test_that("uniform ANN query factors reuse invocation-local training preparation
   tied <- x; tied$x <- 1
   expect_error(prepare(bw, tied, TRUE), "nonregular ANN spacing geometry")
 })
+
+
+test_that("NN uncertainty work is absent on default and explicit OFF routes", {
+  # Extended lane: actual namespace hooks (and MPI ranks) test work, not output.
+  skip_on_cran()
+
+  ns <- asNamespace("np")
+  manage <- function(action) {
+    ns <- asNamespace("np")
+    keys <- c(".npcopula_density_se_nn", ".npcopula_density_se_nn_local",
+              ".npcopula_density_se_nn_factor", ".np_plot_density_ann_prepare")
+    tag <- "np.nn.off.contract"
+    if (action == "install") {
+      originals <- stats::setNames(lapply(keys, function(k) get(k, ns)), keys)
+      stopifnot(!any(vapply(originals, function(f) !is.null(attr(f, tag)), TRUE)))
+      state <- new.env(parent = emptyenv())
+      state$counts <- stats::setNames(integer(length(keys)), keys)
+      state$originals <- originals
+      for (key in keys) local({
+        name <- key; original <- originals[[name]]
+        hook <- function(...) {
+          state$counts[name] <- state$counts[name] + 1L
+          original(...)
+        }
+        attr(hook, tag) <- state
+        unlockBinding(name, ns); assign(name, hook, ns); lockBinding(name, ns)
+      })
+    }
+    state <- attr(get(keys[1L], ns), tag)
+    stopifnot(is.environment(state))
+    answer <- state$counts
+    if (action == "restore") {
+      for (key in keys) {
+        unlockBinding(key, ns); assign(key, state$originals[[key]], ns)
+        lockBinding(key, ns)
+      }
+      stopifnot(all(vapply(keys, function(k)
+        identical(get(k, ns), state$originals[[k]]), TRUE)))
+    }
+    list(counts = answer)
+  }
+  # Do not transport the surrounding test environment to MPI workers.
+  environment(manage) <- baseenv()
+  everywhere <- function(action) list(manage(action)$counts)
+  # Uniform metadata re-enters the existing constructor advisory on public calls.
+  # Match only that known condition; every other warning remains a test warning.
+  advisory <- unname(get(".np_io_prefix_text", ns)(
+    "ignoring kernel order specified with uniform kernel type"))
+  quiet.uniform <- function(expr) withCallingHandlers(expr, warning = function(w) {
+    if (identical(conditionMessage(w), advisory)) invokeRestart("muffleWarning")
+  })
+  installed <- FALSE
+  on.exit(if (installed) everywhere("restore"), add = TRUE, after = FALSE)
+  everywhere("install"); installed <- TRUE
+  d <- data.frame(x = sin(1:32) + (1:32)/32,
+                  y = cos(1:32) + (1:32)/64)
+  grid <- data.frame(x = rep(c(.3, .5, .7), length.out = 3L),
+                     y = rep(c(.35, .55, .65), length.out = 3L))
+  for (type in c("generalized_nn", "adaptive_nn")) {
+    bw <- npudensbw(dat = d, bws = c(6, 6), bwtype = type,
+                    ckertype = "uniform", bandwidth.compute = FALSE)
+    args <- list(bws = bw, data = d, u = grid, n.quasi.inv = 24)
+    before <- everywhere("read")
+    off <- quiet.uniform(do.call(npcopula, args))
+    explicit <- quiet.uniform(do.call(npcopula, c(args, list(se = FALSE))))
+    invisible(quiet.uniform(predict(off, u = grid, se.fit = FALSE, n.quasi.inv = 24)))
+    expect_identical(everywhere("read"), before)
+    expect_null(off$copulaerr)
+    expect_null(explicit$copulaerr)
+    # Positive controls prove the hooks are on the actual numerical path.
+    invisible(quiet.uniform(do.call(npcopula, c(args, list(se = TRUE)))))
+    after <- everywhere("read")
+    delta <- Reduce(`+`, Map(`-`, after, before))
+    expect_gt(unname(delta[".npcopula_density_se_nn"]), 0L)
+    expect_gt(unname(delta[".npcopula_density_se_nn_local"]), 0L)
+    expect_gt(unname(delta[".npcopula_density_se_nn_factor"]), 0L)
+    if (type == "adaptive_nn") {
+      expect_gt(unname(delta[".np_plot_density_ann_prepare"]), 0L)
+
+    }
+  }
+  everywhere("restore"); installed <- FALSE
+  expect_null(quiet.uniform(do.call(npcopula, args))$copulaerr)
+})
