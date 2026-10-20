@@ -10,13 +10,21 @@
   if (is.finite(value)) value else NA_real_
 }
 
+# All inputs here are retained bandwidth metadata, not a fresh kernel-order
+# request. Reuse the common exact advisory policy; other conditions propagate.
+.npcopula_density_se_nn_retained <- function(bws, expr) {
+  .np_retained_uniform_constructor(function(ckertype) force(expr),
+    bws[["ckertype", exact = TRUE]])
+}
+
 .npcopula_density_se_nn_factor <- function(bws, data, evaluation) {
-  tryCatch(.np_plot_density_unconditional(bws, data, evaluation),
+  .npcopula_density_se_nn_retained(bws,
+    tryCatch(.np_plot_density_unconditional(bws, data, evaluation),
     np_plot_joint_unavailable = function(e) {
       if (conditionMessage(e) %in% c("nonregular ANN spacing geometry",
                                      "nonregular ANN support face")) return(NULL)
       stop(e)
-    })
+    }))
 }
 
 .npcopula_density_se_nn_local <- function(bws, data, xgrid,
@@ -31,17 +39,29 @@
   ann <- identical(bws[["type", exact = TRUE]], "adaptive_nn") &&
     any(bws[["icon", exact = TRUE]])
   marginal.bws <- lapply(seq_len(p), function(j)
-    .npcopula_marginal_bw(bws, data, j, target = "density"))
+    .npcopula_density_se_nn_retained(bws,
+      .npcopula_marginal_bw(bws, data, j, target = "density")))
   training <- lapply(seq_len(p), function(j)
     .npcopula_marginal_data(bws, data, j))
   evaluation <- lapply(seq_len(p), function(j)
     .npcopula_marginal_eval_data(bws, xgrid, j))
-  if (p == 1L &&
-      (!identical(data[[1L]], training[[1L]][[1L]]) ||
-       !identical(xgrid[[1L]], evaluation[[1L]][[1L]]) ||
-       !identical(.np_make_kbandwidth_unconditional(bws, data),
-                  .np_make_kbandwidth_unconditional(marginal.bws[[1L]], training[[1L]]))))
-    stop("NN copula marginal primitive identity failed", call. = FALSE)
+  if (p == 1L) {
+    joint.spec <- .npcopula_density_se_nn_retained(bws,
+      .np_make_kbandwidth_unconditional(bws, data))
+    marginal.spec <- .npcopula_density_se_nn_retained(marginal.bws[[1L]],
+      .np_make_kbandwidth_unconditional(marginal.bws[[1L]], training[[1L]]))
+    if (joint.spec[["ncon", exact = TRUE]] == 0L &&
+        marginal.spec[["ncon", exact = TRUE]] == 0L) {
+      # Continuous metadata cannot distinguish two purely categorical kernels.
+      inactive <- c("ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub", "pckertype")
+      joint.spec[inactive] <- NULL
+      marginal.spec[inactive] <- NULL
+    }
+    if (!identical(data[[1L]], training[[1L]][[1L]]) ||
+        !identical(xgrid[[1L]], evaluation[[1L]][[1L]]) ||
+        !identical(joint.spec, marginal.spec))
+      stop("NN copula marginal primitive identity failed", call. = FALSE)
+  }
   tile <- max(1L, min(64L, floor(4194304 / (8 * as.double(n) * (80 + 12 * p)))))
   # Face availability is query-local; the existing primitive signals a whole
   # input condition. Single-query calls preserve every other regular row.
