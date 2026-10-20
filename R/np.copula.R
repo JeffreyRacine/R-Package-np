@@ -564,8 +564,7 @@ npcopula <- function(bws, ...) {
   if (density) {
     if (identical(bws[["type", exact = TRUE]], "fixed"))
       return(.npcopula_density_se_fixed(bws, data, xgrid, progress.context))
-    joint <- npudens(tdat = data, edat = xgrid, bws = bws, se = TRUE)
-    return(se(joint) / .npcopula_marginal_density_product(bws, data, xgrid))
+    return(.npcopula_density_se_nn(bws, data, xgrid, progress.context))
   }
   joint <- npudist(tdat = data, edat = xgrid, bws = bws, se = TRUE)
   se(joint)
