@@ -450,10 +450,18 @@ prediction/evaluation route, or graphics renderer as appropriate.
   covariance of the joint density and all marginal densities. Query
   coordinates and selected bandwidths are held fixed. A zero marginal
   density or nonfinite influence produces an unavailable row standard
-  error (\code{NA}) and a notice. Nearest-neighbor density-copula errors
-  retain the existing joint-density error divided by the marginal-density
-  product; their complete ratio and random-radius covariance is not covered
-  by the fixed-bandwidth correction. Bootstrap intervals resample
+  error (\code{NA}) and a notice. Nearest-neighbor density-copula pointwise
+  errors also combine the joint and all marginal influences before squaring,
+  including their same-sample covariances. Generalized-neighbor errors hold
+  query radii fixed; adaptive-neighbor errors retain the existing donor-radius
+  and uniform support-face terms. Purely categorical margins use the same
+  normalization as their joint influence. The one-dimensional defined ratio
+  has exactly zero standard error. These calculations use external-query
+  uncertainty geometry even for sample evaluations, whose point estimates
+  retain their existing training-identity convention. No extra generalized-
+  neighbor radius, estimated-coordinate, selection or bias term is added.
+  Unsupported adaptive-neighbor pointwise domains remain unavailable.
+  Bootstrap intervals resample
   rows and recompute the plotted copula surface on the same probability
   grid. These interval conventions do not fully propagate uncertainty
   from the marginal quasi-inverse transform. \code{band="simultaneous"}
@@ -468,8 +476,9 @@ prediction/evaluation route, or graphics renderer as appropriate.
   densities. The fitted inverse coordinates remain fixed for these working
   targets. A one-dimensional density ratio has exactly zero simultaneous
   variability when its positive numerator and sole marginal are the same
-  canonical primitive. These new simultaneous scales do not replace the
-  existing nearest-neighbor pointwise or Bonferroni scales.
+  canonical primitive. The simultaneous influence and calibration owners
+  are unchanged by the pointwise full-ratio correction; their broader support
+  domain remains separate from pointwise availability.
 
   These are finite-grid selected-smoothing variability bands, not
   bias-corrected population or continuum confidence bands. Unavailable
@@ -477,8 +486,9 @@ prediction/evaluation route, or graphics renderer as appropriate.
   grids retain NA simultaneous limits with a specific notice. Adaptive-neighbor
   density and distribution bands include regular finite-bound and beta-kernel
   routes through a separate simultaneous influence scale. The existing
-  \code{se()}, pointwise and Bonferroni values are unchanged, including their
-  \code{NA} values where marginal errors are not implemented. Thus
+  pointwise domain is not extended by those simultaneous routes: \code{se()},
+  pointwise and Bonferroni values remain \code{NA} where the required pointwise
+  influences are not implemented. Thus
   \code{band="all"} may contain finite simultaneous limits together with
   unavailable marginal limits. Ordinary fractional neighbor counts use the
   point estimator's canonical rounding. Extended maximum-radius counts require

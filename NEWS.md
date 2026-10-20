@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Correct explicitly requested nearest-neighbor density-copula pointwise
+  standard errors to include the same-sample joint/marginal ratio covariance.
+  Preserve point estimates, selected bandwidths, `se=FALSE`, fixed-bandwidth
+  and distribution-copula owners, and simultaneous-band calibration. Retain
+  existing adaptive-neighbor radius/support-face terms; additional generalized-
+  neighbor radius and estimated-coordinate uncertainty remain deferred.
+
 * Improve `data=` diagnostics for directly supplied, unbound native observation
   names across estimator and bandwidth interfaces, including direct default
   methods. Preserve formula factories, legitimate data consumers and evaluation
