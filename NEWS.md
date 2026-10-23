@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+* Stream exact marginal calibration summaries and common-draw family maxima
+  instead of retaining the complete plot-grid-by-draw matrix.
+
 * Admit regularized generalized-neighbor Bernstein main rows for iterated
   correction using their full canonical operator and correction covariance;
   retain auxiliary-rank checks and return main regularization diagnostics.

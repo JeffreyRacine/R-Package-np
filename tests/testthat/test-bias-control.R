@@ -127,3 +127,24 @@ test_that("regularized Bernstein GNN rows retain the fitted model and correction
   for(j in seq_len(nrow(x)))covariance <- covariance+outer(value$W[,j],value$W[,j])*state$variance[j]
   expect_equal(tcrossprod(value$factor),covariance,tolerance=1e-10)
 })
+
+test_that("streamed calibration uses whole-family sizes and common-draw maxima", {
+  set.seed(61024);groups <- rep(c("mean","d1","d2"),each=26L)
+  absolute <- abs(matrix(rnorm(78*63),78,63));alpha <- c(.01,.05,.1)
+  state <- npRmpi:::.np_bias_limits_prepare(groups,alpha,FALSE,63L)
+  for(b in npRmpi:::.np_bias_target_blocks(26L,3L))
+    state <- npRmpi:::.np_bias_limits_update(state,absolute[b$rows,,drop=FALSE],b$rows)
+  result <- npRmpi:::.np_bias_limits_finish(state)
+  for(g in unique(groups)) {
+    ii <- which(groups==g)
+    maximum <- apply(absolute[ii,,drop=FALSE],2L,max)
+    critical <- unname(quantile(maximum,1-alpha,type=1L))
+    expect_identical(unname(result$raw_max_critical[,g]),critical)
+    for(j in ii) {
+      point <- unname(quantile(absolute[j,],1-alpha,type=1L))
+      bonf <- pmax(critical,unname(quantile(absolute[j,],1-alpha/length(ii),type=1L)))
+      expect_identical(unname(result$limits$pointwise[j,2,]),point)
+      expect_identical(unname(result$limits$bonferroni[j,2,]),bonf)
+    }
+  }
+})
