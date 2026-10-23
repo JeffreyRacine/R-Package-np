@@ -2,6 +2,7 @@
  * No fit, rank decision or factorization occurs in this helper. */
 #include <R.h>
 #include <Rinternals.h>
+#include "headers.h"
 SEXP C_np_plot_projection_apply(SEXP basis, SEXP projection, SEXP kernel)
 {
   if(TYPEOF(basis) != REALSXP || !isMatrix(basis) ||
@@ -13,6 +14,16 @@ SEXP C_np_plot_projection_apply(SEXP basis, SEXP projection, SEXP kernel)
                               nrows(kernel) != n || ncols(kernel) != g)))
     error("plot projection dimensions do not agree");
   SEXP out = PROTECT(allocMatrix(REALSXP, g, n));
+  SEXP accepted=getAttrib(projection,install(".np.fit.accepted"));
+  if(accepted != R_NilValue) {
+    if(TYPEOF(accepted)!=LGLSXP || XLENGTH(accepted)!=1 ||
+       LOGICAL(accepted)[0]!=TRUE || kernel==R_NilValue)
+      error("invalid accepted regression projection request");
+    np_regression_inference_projection_apply(n,p,g,REAL(basis),
+      REAL(projection),REAL(kernel),REAL(out));
+    UNPROTECT(1);
+    return out;
+  }
   for(int j = 0; j < g; ++j) {
     R_CheckUserInterrupt();
     for(int i = 0; i < n; ++i) {

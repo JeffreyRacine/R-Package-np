@@ -62,4 +62,29 @@ test_that("captured partial-global rows preserve request scope and permutations"
   }
 })
 
+test_that("accepted covariance replay retains cancellation terms", {
+  skip_on_cran()
+  skip_if_not(spawn_mpi_slaves())
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
+  old <- options(np.messages=FALSE,np.tree=FALSE)
+  on.exit(options(old),add=TRUE)
+  x <- data.frame(x=seq(-1,1,length.out=64L),z=sin(seq_len(64L)))
+  y <- sin(x$x)+cos(seq_len(64L))*.2
+  e <- x[c(5L,20L,40L,60L),,drop=FALSE]
+  bw <- npregbw(xdat=x,ydat=y,bws=c(.03,.03),regtype="lp",
+    degree=c(1L,1L),bernstein.basis=TRUE,bandwidth.compute=FALSE)
+  fit <- .np_regression_direct(bw,x,y,e,se=TRUE,gradients=TRUE,fit.inference=TRUE)
+  ordinary <- .np_regression_direct(bw,x,y,e,se=TRUE,gradients=TRUE)
+  expect_identical(fit[names(ordinary)],ordinary)
+  expect_true(any(fit$fit.inference[[3L]]>0))
+  for(j in 0:2) {
+    derivative <- if(j==0L)NULL else as.integer(seq_len(2L)==j)
+    got <- .np_plot_regression_joint_covariance(bw,x,y,e,fit=fit,deriv=derivative)
+    target <- if(j==0L)fit$merr else fit$gerr[,j]
+    expect_lt(max(abs(sqrt(diag(got$covariance))-target)),1e-12)
+  }
+  # This tests covariance ownership. Ill-conditioned forward/adjoint point
+  # disagreement is separate; the public plot's existing guard is retained.
+})
+
 })

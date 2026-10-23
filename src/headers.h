@@ -15,6 +15,10 @@
 #include "regression_contract.h"
 #include "jksum_lp_solve.h"
 
+/* Bounded plot replay of the accepted ordinary-regression HC0 projection. */
+void np_regression_inference_projection_apply(int n, int p, int m,
+  const double *basis, const double *projection, const double *kernel, double *out);
+
 /* Numeric ordered labels lie on a validated integer lattice. Round the
  * difference so decimal offsets cannot reduce an integer distance by one.
  * Cache indices and scalar/retained-support kernels share this conversion. */
