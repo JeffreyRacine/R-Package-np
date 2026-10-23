@@ -40,3 +40,5 @@ mknpkg.sh
 ^benchmarks/perf
 ^benchmarks/validation
 ^benchmarks/common
+
+^research$

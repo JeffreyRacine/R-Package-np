@@ -194,6 +194,12 @@ Named options passed via \code{\dots} include:
         behavior, wild-bootstrap multipliers, and dependent-bootstrap
         block length.
       }
+      \item{\code{bias.control}}{
+        regression auxiliary settings created by \code{\link{np_bias_control}}.
+        Used with \code{center="bias-corrected"}. Omitting the control uses
+        the iterated defaults; explicit \code{construction="legacy"} retains
+        the previous bootstrap correction.
+      }
       \item{\code{bootstrap}}{
         the bootstrap resampling scheme. Regression-family plots support
         \code{"wild"}, \code{"inid"}, \code{"fixed"}, and
@@ -205,18 +211,12 @@ Named options passed via \code{\dots} include:
         displays when available.
       }
       \item{\code{center}}{
-        one of \code{"estimate"} or \code{"bias-corrected"}. When
-        bootstrap errors are requested, \code{center="bias-corrected"}
-        centers plotted uncertainty bands or bars on a bootstrap
-        bias-corrected estimate. The package chooses the validated
-        correction engine for the requested bootstrap route. Wild
-        bootstrap regression routes use the standard wild-bootstrap
-        correction. Pairwise and dependent-bootstrap routes
-        \code{"inid"}, \code{"fixed"}, and \code{"geom"} use an
-        oversmoothed pilot correction for fixed-bandwidth estimators where
-        that route has been implemented and validated. Unsupported
-        combinations fail clearly rather than silently using a weak
-        correction.
+        one of \code{"estimate"} (the default) or \code{"bias-corrected"}.
+        For ordinary regression, the latter selects iterated correction with
+        Gaussian or bootstrap calibration; see \code{\link{np_bias_control}}
+        for its supported scope, auxiliary settings and coverage qualifications.
+        Other estimator families retain their method-specific bootstrap
+        corrections. Unsupported combinations fail explicitly.
         For one-dimensional regression curves, the
         ordinary estimate remains visible and the selected bias-corrected
         estimate is drawn as an additional center line when available.
@@ -774,6 +774,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   negligible relative to sampling variability, or to be corrected with
   sufficient accuracy.
 
+  Ordinary regression now uses the iterated construction described in
+  \code{\link{np_bias_control}}. Its returned \code{inference} component
+  records the complete corrected process and every effective setting.
+  Pointwise, simultaneous and Bonferroni bands share this construction.
+  The following legacy centering discussion applies to the other supported
+  families and to explicit regression \code{construction="legacy"}.
+
   When bootstrap errors are requested, \code{center="bias-corrected"}
   recenters the plotted bootstrap bounds on a method-specific
   Efron-Tibshirani bootstrap bias-corrected estimate, where available.
@@ -868,20 +875,21 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   smoothed-bootstrap and regression two-bandwidth literatures, not claims
   of universal optimality.
 
-  In practice, users who want confidence-style bounds should prefer
-  bootstrap errors with \code{center="bias-corrected"}. The
+  For ordinary regression confidence-style bounds, Gaussian or bootstrap
+  calibration can be used with \code{center="bias-corrected"}. Other families
+  retain their supported bootstrap corrections. The
   ordinary fitted curve or surface remains the default estimate because
   bias correction can increase variance and may have larger mean squared
   error than the uncorrected estimator.
 
-  Asymptotic standard errors are taken from fitted-object components such as
+  For ordinary estimate-centered plots, asymptotic standard errors are taken from fitted-object components such as
   \code{merr}, \code{gerr}, \code{derr}, \code{conderr}, and
   \code{congerr} where implemented. Ordinary regression, single-index
   mean/gradient and transformed-response least-squares quantile errors
   inherit the residual normalization described in \code{\link{npreg}}.
   This does not replace other families' covariance formulas.
 
-  Bootstrap resampling is conducted pairwise on \eqn{(y,X,Z)} (i.e., by
+  Outside iterated regression correction, bootstrap resampling is conducted pairwise on \eqn{(y,X,Z)} (i.e., by
   resampling rows of \eqn{(y,X)} or \eqn{(y,X,Z)} as appropriate).
   Bootstrap method support differs by estimator family:
   \preformatted{
@@ -889,7 +897,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Density/distribution-family (npudens/npudist/npcdens/npcdist/npconmode): inid, fixed, geom
   }
   hence \code{"wild"} is only available for regression-family plotting.
-  Bias-corrected bootstrap centering is currently restricted to supported
+  Legacy bias-corrected bootstrap centering is restricted to supported
   fixed-bandwidth plot routes. Non-fixed, adaptive-nearest-neighbor, and
   generalized-nearest-neighbor bandwidth routes fail closed for
   \code{center="bias-corrected"}. Conditional quantile

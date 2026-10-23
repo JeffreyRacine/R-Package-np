@@ -11,7 +11,7 @@
 }
 \usage{
 np_boot_control(nonfixed = c("exact", "frozen"),
-                wild = c("rademacher", "mammen"),
+                wild = c("mammen", "rademacher"),
                 blocklen = NULL)
 
 np_grid_control(xtrim = NULL, xq = NULL, slices = NULL)
@@ -25,7 +25,8 @@ np_render_control(style = c("band", "bar"),
     \code{"exact"} reconstructs each duplicate-row resample and recomputes
     nearest-neighbour bandwidths; \code{"frozen"} reuses the bandwidths from
     the fitted object.}
-  \item{wild}{Wild-bootstrap multiplier distribution.}
+  \item{wild}{Wild-bootstrap multiplier distribution. Mammen is the default;
+    Rademacher remains available explicitly.}
   \item{blocklen}{Optional block length for block bootstrap methods.}
   \item{xtrim}{Optional two-element trim range for evaluation grids.}
   \item{xq}{Optional evaluation quantiles.}
@@ -42,6 +43,9 @@ and Ma (2024) and Cattaneo, Chandak, Jansson and Ma (2024). See
 \code{\link{plot.np}} for the full published references, implementation scope
 and estimator-specific qualifications.
 
+
+  Regression auxiliary bias controls are supplied separately through
+  \code{\link{np_bias_control}}.
 
   These helpers validate names and values early. Raw lists are deliberately not
   accepted as substitutes, so misspelled detailed controls fail before plot

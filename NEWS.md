@@ -1,5 +1,16 @@
 # np 0.80-1
 
+* Add `np_bias_control()` and iterated `npreg` plot inference through
+  `center="bias-corrected"`, with Gaussian and bootstrap calibration of the
+  complete corrected observation operator. Preserve selected bandwidths,
+  degree and basis; use stable auxiliary Bernstein bases above degree one,
+  scale-equivariant pilot rules and bounded training-row storage. Return
+  effective settings and inference diagnostics. The initial supported scope
+  and coverage qualifications are documented in `?np_bias_control`.
+* Make Mammen the default wild multiplier throughout plotting. Explicit
+  Rademacher remains available. `np_bias_control(construction="legacy")`
+  retains the prior regression bootstrap correction when requested.
+
 * Reuse invocation-local training preparation for uniform adaptive-neighbor
   density-copula standard errors, preserving query-specific support faces and
   unavailable rows. Point estimates and `se=FALSE` are unchanged.

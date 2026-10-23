@@ -7,7 +7,8 @@
                                         lerr.all = NULL,
                                         herr.all = NULL,
                                         surface3d.args = list(),
-                                        legend3d.args = list()) {
+                                        legend3d.args = list(),
+                                        construction = NULL) {
   draw_one <- function(z, color) {
     if (is.null(z))
       return(invisible(FALSE))
@@ -55,7 +56,7 @@
       list(
         "topright",
         legend = unname(
-          .np_plot_all_band_legend_labels(plot.errors.method)[drawn.bands]
+          .np_plot_all_band_legend_labels(plot.errors.method, construction)[drawn.bands]
         ),
         col = unname(band.cols[drawn.bands]),
         lty = .np_plot_lty("solid"),

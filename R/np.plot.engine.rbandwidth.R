@@ -38,7 +38,7 @@
            plot.errors.boot.num = 9999,
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
            plot.errors.boot.nonfixed = c("exact", "frozen"),
-           plot.errors.boot.wild = c("rademacher", "mammen"),
+           plot.errors.boot.wild = c("mammen", "rademacher"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate", "bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
@@ -52,7 +52,8 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, .np.empty.report = NULL, gaussian.draws = 9999L){
+           random.seed, .np.empty.report = NULL, gaussian.draws = 9999L,
+           bias.control = NULL){
 
     if (.np_data_formal_supplied(sys.call(), sys.function()))
       .np_plot_data_error()
@@ -194,9 +195,26 @@
     
     error.request <- .np_plot_normalize_error_request(plot.errors.method,
                                                       plot.errors.type)
+    bias.request <- identical(as.character(plot.errors.center)[1L],"bias-corrected") &&
+      error.request$method %in% c("asymptotic","bootstrap")
+    if (!is.null(bias.control) && !inherits(bias.control,"np_bias_control"))
+      stop("bias.control must be created by np_bias_control()",call.=FALSE)
+    if (!is.null(bias.control) && !bias.request)
+      stop("bias.control requires center='bias-corrected' and inference errors",call.=FALSE)
+    if (bias.request && is.null(bias.control)) bias.control <- np_bias_control()
+    if (bias.request) bias.control <- .np_bias_validate_control(bias.control)
+    new.bias <- bias.request && identical(bias.control[["construction"]],"iterated")
+    if (bias.request && !new.bias && error.request$method=="asymptotic")
+      stop("legacy bias correction requires errors='bootstrap'",call.=FALSE)
+    if (new.bias && gradients && any(gradient.order!=1L))
+      stop("iterated bias correction currently supports first derivatives",call.=FALSE)
+    if (new.bias && plot.bxp)
+      stop("factor.boxplot is unavailable for iterated bias-corrected intervals",call.=FALSE)
+    if (new.bias && as.character(plot.errors.boot.nonfixed)[1L]!="exact")
+      stop("nonfixed='frozen' controls legacy resampling; omit it for iterated correction",call.=FALSE)
     joint.request <- identical(error.request$method, "asymptotic") &&
-      error.request$type %in% c("simultaneous", "all")
-    if (!missing(gaussian.draws) && !joint.request)
+      error.request$type %in% c("simultaneous", "all") && !new.bias
+    if (!missing(gaussian.draws) && !joint.request && !(new.bias && error.request$method=="asymptotic"))
       stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- FALSE
     joint.residual <- NULL
@@ -219,8 +237,10 @@
       xdat = xdat,
       common.scale = common.scale,
       ylim = ylim,
-      allow_asymptotic_simultaneous = joint.eligible,
-      error.request = error.request
+      allow_asymptotic_simultaneous = joint.eligible || new.bias,
+      error.request = error.request,
+      allow_asymptotic_bias = new.bias,
+      defer_block_selection = new.bias
     )
 
     plot.behavior <- normalized.opts$plot.behavior
@@ -239,6 +259,8 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
+    bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
+      .np_bias_regression_prepare(bws,xdat,ydat,bias.control)) else NULL
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     overlay.ok <- .np_plot_overlay_enabled(
@@ -318,21 +340,24 @@
         ydat = ydat,
         exdat = x.eval,
         gradient.order = gradient.order,
-        need.asymptotic = identical(plot.errors.method, "asymptotic"),
+        need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
         .np.empty.report = .np.empty.report
       )
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
       joint.calibration <- NULL
+      bias.inference <- NULL
       lerr.all <- NULL
       herr.all <- NULL
       
       treg = matrix(data = tobj$mean,
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-      if (plot.errors.method == "bootstrap"){
-        terr.obj <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+      if (new.bias || plot.errors.method == "bootstrap"){
+        terr.obj <- if(new.bias).np_bias_plot_errors(bias.state,setNames(x.eval,names(xdat)),"mean",plot.errors.method,
+          plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
+          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = x.eval,
           fit.mean.train = fit.mean.train,
           gradients = FALSE,
@@ -350,6 +375,7 @@
           bws = bws)
         terr <- terr.obj[["boot.err"]]
         terr.all <- terr.obj[["boot.all.err"]]
+        if(new.bias)bias.inference <- terr.obj[["inference"]]
 
         pc = (.np_plot_center_is_bias_corrected(plot.errors.center))
         center.val <- if(pc) terr[,3] else tobj$mean
@@ -437,6 +463,10 @@
           ntrain = dim(xdat)[1])
           r1$bias = NA
           r1$bias.corrected = NA
+        if (!is.null(bias.inference)) {
+          r1$inference <- bias.inference
+          r1$band.errors <- terr.all
+        }
         if (!is.null(joint.calibration)) {
           r1$band.calibration <- joint.calibration
           if (identical(plot.errors.type, "all")) r1$band.errors <- terr.all
@@ -492,6 +522,7 @@
             }
             if (plot.errors) {
               .np_plot_error_surfaces_rgl(
+                construction = if(new.bias) "iterated" else NULL,
                 x = x1.eval,
                 y = x2.eval,
                 plot.errors.type = plot.errors.type,
@@ -593,6 +624,7 @@
               border = scalar_default(border, .np_plot_color("context_border")),
               lwd = scalar_default(lwd, par()$lwd),
               annotation = .np_plot_variability_annotation_spec(
+                construction = if(new.bias) "iterated" else NULL,
                 plot.errors.method = plot.errors.method,
                 plot.errors.type = plot.errors.type,
                 plot.errors.alpha = plot.errors.alpha,
@@ -607,6 +639,7 @@
 
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
+                construction = if(new.bias) "iterated" else NULL,
                 legend = plot.legend,
                 x = "topright",
                 lty = .np_plot_lty("solid"),
@@ -679,6 +712,7 @@
         temp.boot = list()
         temp.all.err <- NULL
         joint.calibration <- NULL
+        bias.inference <- NULL
 
         xi.factor = is.factor(xdat[,i])
         component.available <- !isTRUE(gradients) || plot.gradient.available[i]
@@ -704,14 +738,23 @@
           exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
           gradients = gradients,
           gradient.order = gradient.order,
-          need.asymptotic = identical(plot.errors.method, "asymptotic"),
+          need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
           .np.empty.report = .np.empty.report
         )
 
         temp.mean[seq_len(xi.neval)] = if (gradients) tr$grad[, i] else tr$mean
 
         if (plot.errors && component.available){
-          if (plot.errors.method == "asymptotic") {
+          if (new.bias) {
+            target <- if(!gradients)"mean" else if(xi.factor)paste0("c",i) else paste0("d",match(i,which(bws$icon)))
+            corrected <- .np_bias_plot_errors(bias.state,
+              subcol(exdat,ei,i)[seq_len(xi.neval),,drop=FALSE],target,plot.errors.method,
+              plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
+              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type)
+            temp.err[seq_len(xi.neval),] <- corrected[["boot.err"]]
+            temp.all.err <- corrected[["boot.all.err"]]
+            bias.inference <- corrected[["inference"]]
+          } else if (plot.errors.method == "asymptotic") {
             asym.obj <- .np_plot_asymptotic_error_from_se(
               se = if (gradients) tr$gerr[,i] else tr$merr,
               alpha = plot.errors.alpha,
@@ -954,6 +997,7 @@
           if (plot.errors && component.available &&
               !(xi.factor && plot.bootstrap && plot.bxp)){
             panel.annotation <- .np_plot_variability_annotation_spec(
+                construction = if(new.bias) "iterated" else NULL,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -977,6 +1021,7 @@
 
             if (plot.errors.type == "all") {
               draw.all.error.types(
+                construction = if(new.bias) "iterated" else NULL,
                 ex = as.numeric(na.omit(ei)),
                 center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
                 all.err = temp.all.err,
@@ -1061,6 +1106,10 @@
               )
           }
           plot.out[[i]]$bxp = temp.boot
+          if (!is.null(bias.inference)) {
+            plot.out[[i]]$inference <- bias.inference
+            plot.out[[i]]$band.errors <- temp.all.err
+          }
           if (!is.null(joint.calibration)) {
             plot.out[[i]]$band.calibration <- joint.calibration
             if (identical(plot.errors.type, "all"))
@@ -1246,6 +1295,7 @@
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             panel.annotation <- .np_plot_variability_annotation_spec(
+                construction = if(new.bias) "iterated" else NULL,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -1269,6 +1319,7 @@
             
             if (plot.errors.type == "all") {
               draw.all.error.types(
+                construction = if(new.bias) "iterated" else NULL,
                 ex = as.numeric(na.omit(allei[,i])),
                 center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,i] else data.err[,3*i])),
                 all.err = data.err.all[[i]],
