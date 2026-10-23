@@ -61,7 +61,7 @@ np_bias_control <- function(construction = c("iterated", "legacy"),
 # Check the construction before dispatch, including caller-edited list fields.
 .np_bias_validate_control <- function(control) {
   if (!inherits(control, "np_bias_control") ||
-      length(control[["version"]]) != 1L || !control[["version"]] %in% c(1L, 2L) ||
+      !(identical(control[["version"]], 1L) || identical(control[["version"]], 2L)) ||
       !identical(length(control[["construction"]]), 1L) ||
       !control[["construction"]] %in% c("iterated", "legacy"))
     stop("invalid np_bias_control object", call. = FALSE)
