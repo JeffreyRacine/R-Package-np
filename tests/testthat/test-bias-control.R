@@ -60,3 +60,29 @@ test_that("iterated intervals describe maximum calibration without relabeling le
                      construction="iterated")$candidates
   expect_true(all(grepl("bias-corrected", text, fixed=TRUE)))
 })
+
+
+test_that("auxiliary degrees resolve by coordinate without altering the main model", {
+  resolve <- npRmpi:::.np_bias_degree_spec
+  spec <- resolve(np_bias_control(), c("a", "b", "c"), c(1, 2, 6), 200)
+  expect_identical(spec$effective, c(a=5L, b=5L, c=6L))
+  expect_identical(spec$main, c(a=1L, b=2L, c=6L))
+  spec <- resolve(np_bias_control(degree=c(b=4, a=2)), c("a", "b"), c(1, 3), 100)
+  expect_identical(spec$effective, c(a=2L, b=4L))
+  expect_error(resolve(np_bias_control(degree=2), c("a", "b"), c(1, 3), 100), "cover")
+  expect_error(resolve(np_bias_control(), paste0("x",1:10), rep(1,10), 100), "residual degrees")
+  expect_error(np_bias_control(degree=c(a=2,a=3)), "unique names")
+  expect_error(np_bias_control(degree=0), "positive integers")
+  old <- np_bias_control(degree=5L)
+  old$version <- 1L
+  expect_identical(npRmpi:::.np_bias_validate_control(old), old)
+})
+
+test_that("target blocks cover both axes without changing target-major indices", {
+  for (ng in c(1L,26L)) for (nt in c(20L,21L,501L)) {
+    blocks <- npRmpi:::.np_bias_target_blocks(ng,nt)
+    rows <- unlist(lapply(blocks, `[[`, "rows"))
+    expect_identical(sort(as.integer(rows)), seq_len(ng*nt))
+    expect_true(all(vapply(blocks,function(b) length(b$grid)<=25L && length(b$rows)<=500L,logical(1))))
+  }
+})

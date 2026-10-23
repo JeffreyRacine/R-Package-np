@@ -25,7 +25,7 @@ function (spec, e)
 .np_bias_projection <-
 function (spec, e, degree, nu)
 {
-    drop(W.lp(spec$xcon, exdat = e[spec$numeric.cols], degree = rep.int(degree, spec$d), gradient.vec = if (sum(nu))
+    drop(W.lp(spec$xcon, exdat = e[spec$numeric.cols], degree = degree, gradient.vec = if (sum(nu))
         nu
     else NULL, basis = "glp", bernstein.basis = spec$bernstein))
 }
@@ -112,7 +112,7 @@ function (x, z, h)
 .np_bias_stable_prepare <-
 function (spec, grid, map, block = 16L)
 {
-    stopifnot(block >= 1L, block <= 16L, spec$q >= 1L, length(spec$b) == spec$d, length(spec$h) == spec$d,
+    stopifnot(block >= 1L, block <= 16L, length(spec$q) == spec$d, all(spec$q >= 1L), length(spec$b) == spec$d, length(spec$h) == spec$d,
         all(is.finite(spec$b)), all(spec$b > 0), all(is.finite(spec$h)), all(spec$h > 0), nrow(map) <=
             500L, ncol(spec$Q) < min(lengths(spec$groups)))
     projectors <- .np_bias_projectors(spec, grid, map)
@@ -206,8 +206,8 @@ function (spec, at, derivatives = TRUE)
     zero <- u[1, , drop = FALSE]
     zero[, ] <- 0
     basis <- W.lp
-    Q <- basis(u, degree = rep.int(spec$q, spec$d), basis = "glp", bernstein.basis = spec$bernstein)
-    v <- drop(basis(u, exdat = zero, degree = rep.int(spec$q, spec$d), basis = "glp", bernstein.basis = spec$bernstein))
+    Q <- basis(u, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein)
+    v <- drop(basis(u, exdat = zero, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein))
     k <- drop(.np_kernel_weights_direct(spec$pilot.bws, txdat = x, exdat = at[spec$numeric.cols], bandwidth.divide = TRUE))
     h <- .np_bias_solve(Q, k, v)
     dh <- list()
@@ -215,7 +215,7 @@ function (spec, at, derivatives = TRUE)
         for (d in seq_len(spec$d)) {
             nu <- integer(spec$d)
             nu[d] <- 1L
-            dv <- drop(basis(u, exdat = zero, degree = rep.int(spec$q, spec$d), gradient.vec = nu, basis = "glp",
+            dv <- drop(basis(u, exdat = zero, degree = spec$q, gradient.vec = nu, basis = "glp",
                 bernstein.basis = spec$bernstein))/spec$b[d]
             coefficient <- .np_bias_solve(Q, k, dv)
             w <- h * u[[d]]/spec$b[d]

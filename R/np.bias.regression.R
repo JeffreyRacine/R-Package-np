@@ -5,7 +5,7 @@
   if (!is.null(degree)) {
     source[["regtype"]] <- "lp"
     source[["basis"]] <- "glp"
-    source[["degree"]] <- rep.int(as.integer(degree), ncol(x))
+    source[["degree"]] <- npValidateGlpDegree("lp", degree, ncol(x), argname="auxiliary degree")
     source[["bernstein.basis"]] <- bernstein
     source[["type"]] <- "fixed"
     source[["ckertype"]] <- "gaussian"
@@ -24,10 +24,9 @@
     stop("bias correction requires finite retained training data", call. = FALSE)
   reg <- npValidatedConditionalRegSpec(bws, where = "bias correction", ncon.field = "ncon")
   nc <- which(bws[["icon"]]); fc <- which(!bws[["icon"]]); d <- length(nc)
-  if (!d %in% 1:2 || bws[["ckertype"]] != "gaussian" || bws[["ckerorder"]] != 2L ||
-      bws[["ckerbound"]] != "none" || reg[["basis.engine"]] != "glp" ||
-      any(reg[["degree.engine"]] > 2L))
-    stop("iterated regression bias correction currently supports unbounded second-order Gaussian kernels, one/two continuous predictors and complete main degree <= 2", call. = FALSE)
+  if (!d || bws[["ckertype"]] != "gaussian" || bws[["ckerorder"]] != 2L ||
+      bws[["ckerbound"]] != "none" || reg[["basis.engine"]] != "glp")
+    stop("iterated regression bias correction currently supports unbounded second-order Gaussian kernels, at least one continuous predictor and GLP main models", call. = FALSE)
   if (length(fc) && (!all(vapply(x[fc],is.factor,logical(1))) ||
       any(vapply(x[fc],nlevels,integer(1)) != 2L) ||
       sum(bws[["iuno"]]) > 1L || sum(bws[["iord"]]) > 1L))
@@ -35,10 +34,8 @@
   keys <- if (length(fc)) do.call(paste,c(lapply(x[fc],as.integer),sep=":")) else rep("all",nrow(x))
   groups <- split(seq_len(nrow(x)),keys)
   if (length(groups) != 2^length(fc)) stop("bias correction requires every training profile",call.=FALSE)
-  settings <- .np_bias_resolve(control,x[nc],lengths(groups))
-  q <- settings[["auxiliary_degree"]]
-  if (q < max(reg[["degree.engine"]]) || any(lengths(groups) <= choose(d+q,d)))
-    stop("auxiliary degree must cover the fitted degree and leave positive profile residual degrees of freedom",call.=FALSE)
+  settings <- .np_bias_resolve(control,x[nc],lengths(groups),reg[["degree.engine"]])
+  q <- unname(settings[["degree_spec"]][["effective"]])
   offset <- vapply(x[nc],mean,numeric(1)); scale <- settings[["spread"]]
   standardized <- x
   for (j in seq_len(d)) standardized[[nc[j]]] <- (x[[nc[j]]]-offset[j])/scale[j]
@@ -52,7 +49,7 @@
     variance_h=unname(settings[["bandwidth"]][["variance"]]/scale),
     offset=offset,scale=scale,y=as.double(y),settings=settings)
   spec$pilot.bws <- .np_bias_regbw(bws,spec$xcon,spec$b,q,spec$bernstein)
-  spec$Q <- W.lp(spec$xcon,degree=rep.int(q,d),basis="glp",bernstein.basis=spec$bernstein)
+  spec$Q <- W.lp(spec$xcon,degree=q,basis="glp",bernstein.basis=spec$bernstein)
   training <- .np_bias_p0_residuals(spec,matrix(y,ncol=1L))
   spec$residual <- drop(training$residual)
   spec$residual_raw <- drop(training$raw)
@@ -71,7 +68,7 @@
 }
 
 .np_bias_variance <- function(spec, residual, block = 16L) {
-  bws <- .np_bias_regbw(spec$pilot.bws,spec$xcon,spec$variance_h,1L,FALSE)
+  bws <- .np_bias_regbw(spec$pilot.bws,spec$xcon,spec$variance_h,rep.int(1L,spec$d),FALSE)
   variance <- numeric(nrow(spec$x))
   for (ii in spec$groups) for (first in seq.int(1L,length(ii),by=block)) {
     jj <- seq.int(first,min(length(ii),first+block-1L))

@@ -95,6 +95,27 @@
   list(value=value,end=get(".Random.seed",.GlobalEnv,inherits=FALSE))
 }
 
+# Partition both axes without changing the target-major family order or draws.
+.np_bias_target_blocks <- function(n.grid, n.targets, anchors = 25L, rows = 500L) {
+  if (any(!is.finite(c(n.grid,n.targets,anchors,rows))) ||
+      any(c(n.grid,n.targets,anchors,rows) < 1) ||
+      any(c(n.grid,n.targets,anchors,rows) != floor(c(n.grid,n.targets,anchors,rows))) ||
+      n.grid > .Machine$integer.max / n.targets)
+    stop("invalid or unrepresentable bias target grid", call.=FALSE)
+  count <- min(n.targets, rows)
+  grid.block <- min(anchors, rows %/% count)
+  out <- list()
+  for (first in seq.int(1L,n.grid,by=grid.block)) {
+    jj <- seq.int(first,min(n.grid,first+grid.block-1L))
+    for (target in seq.int(1L,n.targets,by=count)) {
+      tt <- seq.int(target,min(n.targets,target+count-1L))
+      out[[length(out)+1L]] <- list(grid=jj,
+        rows=as.vector(outer(jj,(as.double(tt)-1)*n.grid,"+")))
+    }
+  }
+  out
+}
+
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL) {
   if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<2||B!=floor(B)||B>.Machine$integer.max)
@@ -103,8 +124,10 @@
     stop("alpha must contain distinct values in (0, 0.5)",call.=FALSE)
   if(!law%in%c("gaussian","mammen","rademacher","inid","fixed","geom"))stop("unsupported corrected inference law",call.=FALSE)
   if(!identical(names(grid),names(state$x))||!nrow(grid)||anyNA(grid))stop("invalid bias evaluation grid",call.=FALSE)
+  if(!is.character(targets)||!length(targets)||anyNA(targets)||anyDuplicated(targets))
+    stop("invalid or duplicate bias target family",call.=FALSE)
+  blocks <- .np_bias_target_blocks(nrow(grid),length(targets))
   map <- expand.grid(row=seq_len(nrow(grid)),target=targets,stringsAsFactors=FALSE)
-  if(anyDuplicated(targets))stop("duplicate bias target family",call.=FALSE)
   M <- nrow(map);B <- as.integer(B)
   center <- original <- se <- score.se <- numeric(M)
   draws <- matrix(0,M,B)
@@ -112,8 +135,8 @@
   selection <- if(law%in%c("fixed","geom")) .np_bias_block_selection(state$residual_raw,law,blocklen) else NULL
   if(!exists(".Random.seed",.GlobalEnv,inherits=FALSE))runif(1L)
   rng <- get(".Random.seed",.GlobalEnv,inherits=FALSE);rng.kind <- RNGkind();end <- rng
-  for(first in seq.int(1L,nrow(grid),by=25L)) {
-    jj <- seq.int(first,min(nrow(grid),first+24L));rr <- which(map$row%in%jj)
+  for(batch in blocks) {
+    jj <- batch$grid;rr <- batch$rows
     local.map <- map[rr,,drop=FALSE];local.map$row <- match(local.map$row,jj)
     value <- .np_bias_regression_rows(state,grid[jj,,drop=FALSE],local.map)
     center[rr] <- value$center;original[rr] <- value$original_center;se[rr] <- value$se
