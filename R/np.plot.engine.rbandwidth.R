@@ -856,6 +856,7 @@
             if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
           } else {
             plot.args$x <- ei
+            if (!is.null(xlim)) plot.args$xlim <- xlim
           }
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- .np_plot_geometry_values(temp.mean)
@@ -1173,6 +1174,7 @@
             if (plot.bootstrap && plot.bxp) plot.args$z <- all.bxp[[i]] else plot.args$f <- allei[,i]
           } else {
             plot.args$x <- allei[,i]
+            if (!is.null(xlim)) plot.args$xlim <- xlim
           }
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- .np_plot_geometry_values(data.eval[,i])
