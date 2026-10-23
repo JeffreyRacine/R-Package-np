@@ -104,3 +104,24 @@ test_that("projector geometry does not depend on an unused HC3 denominator", {
     expect_equal(b$coefficient%*%b$Q,diag(ncol(b$Q)),tolerance=1e-7)
   }
 })
+
+test_that("regularized Bernstein GNN rows retain the fitted model and correction covariance", {
+  old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  set.seed(1501080011);x <- data.frame(x1=runif(800),x2=runif(800))
+  y <- sin(3*x$x1)+x$x2^2
+  bw <- npregbw(xdat=x,ydat=y,bws=c(7,4),regtype="lp",degree=c(1,6),
+    bernstein.basis=TRUE,bwtype="generalized_nn",bandwidth.compute=FALSE)
+  saved <- bw;grid <- data.frame(x1=c(.34,.58),x2=c(.5,.9))
+  state <- np:::.np_bias_regression_prepare(bw,x,y)
+  map <- expand.grid(row=1:2,target=c("mean","d1","d2"),stringsAsFactors=FALSE)
+  value <- np:::.np_bias_regression_rows(state,grid,map)
+  fit <- npreg(bw,txdat=x,tydat=y,exdat=grid,gradients=TRUE)
+  expect_identical(bw,saved)
+  expect_true(any(value$main.regularization$ridge>0))
+  expect_equal(value$original_center,c(fitted(fit),as.vector(gradients(fit))),tolerance=1e-8)
+  expect_equal(drop(value$W%*%(1+rowSums(as.matrix(x)^2))),
+    c(1+rowSums(as.matrix(grid)^2),as.vector(2*as.matrix(grid))),tolerance=1e-7)
+  covariance <- matrix(0,nrow(map),nrow(map))
+  for(j in seq_len(nrow(x)))covariance <- covariance+outer(value$W[,j],value$W[,j])*state$variance[j]
+  expect_equal(tcrossprod(value$factor),covariance,tolerance=1e-10)
+})

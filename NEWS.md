@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Admit regularized generalized-neighbor Bernstein main rows for iterated
+  correction using their full canonical operator and correction covariance;
+  retain auxiliary-rank checks and return main regularization diagnostics.
+
 * Bias-corrected regression inference removes an unused HC3 leverage refusal,
   clarifies auxiliary-support diagnostics, and documents fixed-factor wild
   calibration, profile borrowing and computational limitations.

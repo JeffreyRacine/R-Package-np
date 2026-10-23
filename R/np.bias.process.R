@@ -125,6 +125,7 @@
   M <- nrow(map);B <- as.integer(B)
   center <- original <- se <- score.se <- numeric(M)
   draws <- matrix(0,M,B)
+  regularization <- list()
   score <- law%in%c("inid","fixed","geom")
   selection <- if(law%in%c("fixed","geom")) .np_bias_block_selection(state$residual_raw,law,blocklen) else NULL
   if(!exists(".Random.seed",.GlobalEnv,inherits=FALSE))runif(1L)
@@ -133,6 +134,9 @@
     jj <- batch$grid;rr <- batch$rows
     local.map <- map[rr,,drop=FALSE];local.map$row <- match(local.map$row,jj)
     value <- .np_bias_regression_rows(state,grid[jj,,drop=FALSE],local.map)
+    diagnostic <- value$main.regularization
+    diagnostic$row <- jj[diagnostic$row]
+    regularization[[length(regularization)+1L]] <- diagnostic
     center[rr] <- value$center;original[rr] <- value$original_center;se[rr] <- value$se
     F <- if(score)sweep(value$W,2L,state$residual,"*") else value$factor
     if(score)F <- F-rowMeans(F)
@@ -160,6 +164,9 @@
   list(construction="iterated",version=1L,estimate=original,center=center,
     correction=original-center,se=se,bands=bands,map=map,grid=grid,
     settings=state$settings,law=law,block.selection=selection,draws=B,alpha=alpha,
+    main.regularization=do.call(rbind,regularization),
+    covariance=list(operator="complete corrected observation rows",variance="smoothed P0 residual variance",
+      calibration=if(score)"residual score process" else "fixed-factor multiplier process"),
     calibration=calibrated,score.se=if(score)score.se else NULL,
     rng=list(kind=rng.kind,start=rng,end=end,convention="common observation draws across all target blocks"),
     scope="finite grid within each scalar-target family",owner="bounded corrected observation factors")
