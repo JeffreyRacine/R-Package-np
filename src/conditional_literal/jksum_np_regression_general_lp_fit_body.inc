@@ -281,6 +281,11 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	      ((BANDWIDTH_reg == BW_FIXED) ||
 	       (BANDWIDTH_reg == BW_GEN_NN) ||
 	       (BANDWIDTH_reg == BW_ADAP_NN));
+    if(call->fit_projection != NULL &&
+       call->fit_projection->inference_residual != NULL &&
+       (double)owner->nterms * (1.0 + num_reg_continuous) +
+         8.0 + 3.0 * (num_reg_continuous + num_reg_unordered + num_reg_ordered) > INT_MAX)
+      error("compact regression inference MPI row width exceeds native limits");
 	    const int owner_chunk_rows_lp =
 	      np_reg_mpi_owner_chunk_rows(num_obs_eval,
 	                                  1 + call->do_merr + 2*hc0_residual_preparing +
@@ -316,7 +321,10 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	        const int structural_width = ordinary_hc0 && call->do_gerr &&
 	          call->hc0_context->gradient_structural_zero != NULL ?
 	          num_reg_continuous + num_reg_unordered + num_reg_ordered : 0;
-	        const int owner_row_width_lp = 2 + call->do_merr +
+	        const int capture_width = call->fit_projection != NULL &&
+	          call->fit_projection->inference_residual != NULL ?
+	          1 + owner->nterms * (1 + num_reg_continuous) : 0;
+	        const int owner_row_width_lp = 2 + call->do_merr + capture_width +
 	          2*hc0_residual_preparing + structural_width +
 	          (call->do_grad ?
 	           num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) +
@@ -347,6 +355,11 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	          NPLPSolvePolicyDiagnostics solve_diagnostics_owner = {0, 0.0};
 	          int have_vcov_owner = 0;
 	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
+          /* Append only this rank's accepted adjoints to its existing row.
+           * The last status cell and incumbent chunk/row ownership stay intact. */
+          double * const capture = out_owner + owner_row_width_lp - 1 - capture_width;
+          for(int k = 0; k < capture_width; ++k)
+            capture[k] = NA_REAL;
 	          double * const owner_kernel_row = categorical_pair ?
 	            owner->categorical_base_kernel_row : owner->mpi_kernel_row;
 
@@ -664,6 +677,20 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	                  owner_solve_failed = 1;
 	                  break;
 	                }
+                if(capture_width > 0) {
+                  memcpy(capture, owner->solve_workspace.rhs_work,
+                         (size_t)owner->nterms * sizeof(double));
+                  int rhs = 1;
+                  if(call->do_grad && call->do_gerr)
+                    for(int d = 0; d < num_reg_continuous; ++d)
+                      if(np_glp_gradient_direction_active(d)) {
+                        memcpy(capture + (size_t)(d + 1) * owner->nterms,
+                               owner->solve_workspace.rhs_work + (size_t)rhs * owner->nterms,
+                               (size_t)owner->nterms * sizeof(double));
+                        ++rhs;
+                      }
+                  capture[capture_width - 1] = solve_diagnostics_owner.ridge_total;
+                }
 	                have_vcov_owner = 1;
 	              } else if(np_conditional_lp_project_accepted(
 	                          &owner->solve_workspace,
@@ -808,7 +835,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	            }
 	          }
 	          for(l = 0; l < structural_width; ++l)
-	            out_owner[owner_row_width_lp - 1 - structural_width + l] =
+	            out_owner[owner_row_width_lp - 1 - capture_width - structural_width + l] =
 	              call->hc0_context->gradient_structural_zero[l][jj];
 	          const int caller_row = call->empty_rows != NULL && call->empty_rows->row_map != NULL ?
 	            call->empty_rows->row_map[jj] : jj;
@@ -901,6 +928,16 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	                  ISNA(in[ipos]) ? 0 : (int)in[ipos];
 	                ++ipos;
 	              }
+              if(capture_width > 0) {
+                NPRegressionFitProjection *out = call->fit_projection;
+                np_fit_projection_row(out, in + ipos, jj);
+                ipos += owner->nterms;
+                for(int d = 0; d < num_reg_continuous; ++d)
+                  for(int k = 0; k < owner->nterms; ++k)
+                    out->inference_gradient[out->eval_map[jj] +
+                      (size_t)out->neval * (k + (size_t)d * out->width)] = in[ipos++];
+                out->inference_ridge[out->eval_map[jj]] = in[ipos++];
+              }
 	              pos_i++;
 	            }
 	          }

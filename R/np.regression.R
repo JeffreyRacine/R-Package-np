@@ -627,6 +627,7 @@ npreg.rbandwidth <-
     npRejectLegacyLpArgs(names(dots), where = "npreg")
     warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
+    inference.bws <- if (isTRUE(dots[[".np.fit.inference", exact = TRUE]])) bws else NULL
     txdat = toFrame(txdat)
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
@@ -876,6 +877,9 @@ npreg.rbandwidth <-
     enrow = (if (no.ex) tnrow else dim(exdat)[1])
     ncol = dim(txdat)[2]
 
+    inference.response <- if (!is.null(inference.bws))
+      .np_hat_response(tydat, bws[["ydati", exact = TRUE]]) else NULL
+
     ## convert tydat, eydat to numeric, from a factor with levels from the y-data
     ## used during bandwidth selection.
     
@@ -1020,6 +1024,14 @@ npreg.rbandwidth <-
       integer(1)
     }
 
+    native.output.request <- c(output.request,
+      as.integer(!no.ex && !isTRUE(dots[[".np.require.complete", exact = TRUE]]) &&
+        reg.spec$regtype.engine %in% c("ll", "lp")))
+    capture.inference <- isTRUE(dots[[".np.fit.inference", exact = TRUE]])
+    if (capture.inference)
+      native.output.request <- .np_regression_inference_request(
+        native.output.request, bws, reg.spec, degree.c, se, no.ex)
+
     call_regression <- function() {
       .Call("C_np_regression",
             asDouble(tuno), asDouble(tord), asDouble(tcon), asDouble(tydat),
@@ -1034,9 +1046,7 @@ npreg.rbandwidth <-
             as.integer(npLpBasisCode(reg.spec$basis.engine)),
             as.integer(enrow),
             as.integer(ncol),
-            c(output.request,
-              as.integer(!no.ex && !isTRUE(dots[[".np.require.complete", exact = TRUE]]) &&
-                reg.spec$regtype.engine %in% c("ll", "lp"))),
+            native.output.request,
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
             PACKAGE = "npRmpi")
@@ -1179,6 +1189,12 @@ npreg.rbandwidth <-
     if (identical(bws$regtype, "lp"))
       ev.args$gradient.order <- glp.gradient.order
     ev <- do.call(npregression, ev.args)
+    if (capture.inference) {
+      ev$fit.projection <- attr(myout, ".np.fit.projection", exact = TRUE)
+      ev$fit.inference <- attr(myout, ".np.fit.inference", exact = TRUE)
+      ev$fit.request <- list(bws = inference.bws, xdat = txdat.frame, ydat = inference.response,
+        exdat = exdat.frame, gradients = gradients, gradient.order = gradient.order)
+    }
     certificate <- attr(myout, ".np.gradient.structural.zero", exact = TRUE)
     if (gradient.errors && !is.null(certificate))
       attr(ev, ".np.gradient.structural.zero") <-

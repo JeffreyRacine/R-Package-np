@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Regression Gaussian simultaneous variability bands now reuse the distributed
+  fit's accepted influence rows and residuals, including coordinatewise
+  large-bandwidth decisions. MPI fitting remains rank-owned; ordinary fits,
+  bootstrap bands and bias-correction settings are unchanged.
+
+
 * Stream exact marginal calibration summaries and common-draw family maxima
   instead of retaining the complete plot-grid-by-draw matrix.
 

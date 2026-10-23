@@ -1611,6 +1611,26 @@ npreghat <-
   grad
 }
 
+# Replay environments and MPI leases are transport metadata, not fitted geometry.
+.np_regression_inference_bws_identity <- function(bws) {
+  bws <- .npRmpi_autodispatch_untag(bws)
+  bws[["call"]] <- NULL
+  bws
+}
+
+.np_regression_inference_request <- function(request, bws, spec, degree,
+                                              se, no.ex, projection = FALSE,
+                                              coordinate = NULL) {
+  if (!se || no.ex || isTRUE(projection) || !is.null(coordinate) ||
+      !.np_plot_regression_capture_supported(bws))
+    stop("compact regression inference requires an external fixed unbounded second-order Gaussian SE fit",
+         call. = FALSE)
+  attr(request, ".np.inference.width") <- as.integer(
+    if (npIsCanonicalLp0Spec(spec, bws$ncon)) 1L else
+      npLpBasisNcol(spec$basis.engine, degree))
+  request
+}
+
 .np_regression_direct <- function(bws,
                                   txdat,
                                   tydat,
@@ -1891,17 +1911,10 @@ npreghat <-
     output.request <- c(output.request,
       as.integer(npLpBasisNcol(reg.spec$basis.engine, degree.c)))
   }
-  if (isTRUE(fit.inference)) {
-    if (!se || no.ex || isTRUE(fit.projection) || !is.null(gradient.coordinate) ||
-        !identical(bws[["type", exact=TRUE]], "fixed") ||
-        !identical(bws[["ckertype", exact=TRUE]], "gaussian") ||
-        bws[["ckerorder", exact=TRUE]] != 2L ||
-        !identical(bws[["ckerbound", exact=TRUE]], "none") || bws$ncon < 1L)
-      stop("compact regression inference requires an external fixed unbounded second-order Gaussian SE fit",call.=FALSE)
-    attr(output.request,".np.inference.width") <- as.integer(
-      if (npIsCanonicalLp0Spec(reg.spec,bws$ncon)) 1L else
-        npLpBasisNcol(reg.spec$basis.engine,degree.c))
-  }
+  if (isTRUE(fit.inference))
+    output.request <- .np_regression_inference_request(
+      output.request, bws, reg.spec, degree.c, se, no.ex,
+      fit.projection, gradient.coordinate)
   if (!is.null(gradient.coordinate))
     attr(output.request, ".np.gradient.coordinate") <- as.integer(match(
       gradient.coordinate, c(which(bws[["icon", exact = TRUE]]),

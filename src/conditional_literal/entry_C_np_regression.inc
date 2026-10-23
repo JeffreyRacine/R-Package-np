@@ -231,10 +231,6 @@ SEXP C_np_regression(SEXP tuno,
     if((double)width * ncon > INT_MAX ||
        (double)width * (num_train + (double)en * (1 + ncon)) > R_XLEN_T_MAX)
       error("compact regression inference dimensions overflow");
-#ifdef MPI2
-    if(!np_mpi_local_regression_active() && iNum_Processors > 1)
-      error("compact regression inference requires an explicit local regression scope");
-#endif
     PROTECT(projection_basis = allocMatrix(REALSXP, num_train, width));
     PROTECT(projection_rows = allocMatrix(REALSXP, en, width));
     PROTECT(inference_gradient = allocMatrix(REALSXP, en, width * ncon));

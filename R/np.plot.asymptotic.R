@@ -198,7 +198,8 @@
   request <- fit[["fit.request", exact=TRUE]]
   if (!.np_plot_regression_capture_supported(bws) ||
       !is.null(categorical.index) || !is.list(request) ||
-      !identical(request$bws,bws) || !identical(request$xdat,x) ||
+      !identical(.np_regression_inference_bws_identity(request$bws),
+                 .np_regression_inference_bws_identity(bws)) || !identical(request$xdat,x) ||
       !identical(request$ydat,y) || !identical(request$exdat,ex))
     stop("regression inference capture does not match its fit request",call.=FALSE)
   state <- fit[["fit.inference", exact=TRUE]]

@@ -374,7 +374,8 @@
               exdat = x.eval, bws = bws,
               se = TRUE,
               gradient.order = gradient.order,
-              warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE)
+              warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE,
+              .np.fit.inference = joint.eligible && .np_plot_regression_capture_supported(bws))
             engine.trace(
               event = "npreg.done",
               fields = list(slice = 0L, gradients = gradients, n_eval = length(tobj$mean))
@@ -487,7 +488,7 @@
                  call. = FALSE)
           joint <- .np_plot_activity_run("Computing joint regression surface influence",
             .np_plot_regression_joint_covariance(bws, xdat, ydat, x.eval,
-                                                 factor = TRUE))
+                                                 factor = TRUE, fit = tobj))
           joint.se <- vapply(seq_len(nrow(x.eval)), function(i)
             sqrt(sum(joint$influence[i, ]^2)), numeric(1L))
           if (any(abs(joint.se - tobj$merr) > 1e-9 * pmax(1, abs(tobj$merr))))
@@ -846,14 +847,18 @@
                   se = TRUE,
                   gradients = gradients,
                   gradient.order = gradient.order,
-                  warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE))
+                  warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE,
+                  .np.fit.inference = joint.eligible && !(gradients && xi.factor) &&
+                    .np_plot_regression_capture_supported(bws)))
               } else {
                 npreg(txdat = xdat, tydat = ydat,
                   exdat = eval.slice, bws = bws,
                   se = TRUE,
                   gradients = gradients,
                   gradient.order = gradient.order,
-                  warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE)
+                  warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE,
+                  .np.fit.inference = joint.eligible && !(gradients && xi.factor) &&
+                    .np_plot_regression_capture_supported(bws))
               }
               engine.trace(
                 event = "npreg.done",
@@ -918,8 +923,10 @@
                 .np_plot_regression_joint_covariance(bws, xdat, ydat,
                   subcol(exdat, ei, i)[seq_len(xi.neval), , drop = FALSE],
                   residual = joint.residual, deriv = deriv,
-                  categorical.index = if (gradients && xi.factor) i else NULL))
-              joint.residual <- joint$residual
+                  categorical.index = if (gradients && xi.factor) i else NULL,
+                  fit = tr))
+              if (is.null(tr[["fit.inference", exact = TRUE]]))
+                joint.residual <- joint$residual
               joint.se <- sqrt(diag(joint$covariance))
               if (gradients && any(abs(joint$estimate - target.value) >
                                    1e-9 * pmax(1, abs(target.value))))

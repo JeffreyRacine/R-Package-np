@@ -88,3 +88,71 @@ test_that("accepted covariance replay retains cancellation terms", {
 })
 
 })
+
+test_that("distributed inference capture retains the public fitted owner", {
+  skip_on_cran()
+  skip_if_not(spawn_mpi_slaves(n=3L))
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
+  old <- options(np.messages=FALSE,np.tree=FALSE,np.largeh=TRUE)
+  on.exit(options(old),add=TRUE)
+  x <- data.frame(x=seq(-1,1,length.out=64L))
+  y <- x$x+x$x^2+cos(seq_len(64L))*.2
+  e <- data.frame(x=c(-.6,.4)) # Fewer evaluation rows than ranks.
+  bw <- npregbw(xdat=x,ydat=y,bws=1000,bandwidth.compute=FALSE,
+    regtype="lp",degree=2,bernstein.basis=TRUE)
+  fit <- npreg(bw,txdat=x,tydat=y,exdat=e,se=TRUE,gradients=TRUE,
+    .np.fit.inference=TRUE,warn.glp.gradient=FALSE)
+  ordinary <- npreg(bw,txdat=x,tydat=y,exdat=e,se=TRUE,gradients=TRUE,
+    warn.glp.gradient=FALSE)
+  for(nm in c("mean","merr","grad","gerr"))
+    expect_identical(fit[[nm]],ordinary[[nm]])
+  Q <- cbind(1,x$x,x$x^2); q <- qr(Q); U <- qr.Q(q)
+  A <- backsolve(qr.R(q),t(U))
+  z <- (y-drop(Q%*%qr.coef(q,y)))/sqrt(1-rowSums(U^2))
+  for(derivative in c(FALSE,TRUE)) {
+    V <- if(derivative)cbind(0,1,2*e$x)else cbind(1,e$x,e$x^2)
+    C <- tcrossprod(sweep(V%*%A,2L,z,"*"))
+    got <- .np_plot_regression_joint_covariance(bw,x,y,e,fit=fit,
+      deriv=if(derivative)1L else NULL)
+    expect_equal(got$covariance,C,tolerance=1e-12)
+  }
+  expect_error(npreg(bw,txdat=x,tydat=y,se=TRUE,.np.fit.inference=TRUE),
+    "external fixed")
+  recovered <- npreg(bw,txdat=x,tydat=y,exdat=e,se=TRUE)
+  expect_identical(recovered$mean,ordinary$mean)
+  expect_null(recovered$fit.inference)
+})
+
+test_that("distributed large-bandwidth public bands preserve marginal widths", {
+  skip_on_cran()
+  skip_if_not(spawn_mpi_slaves())
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
+  old <- options(np.messages=FALSE,np.tree=FALSE)
+  on.exit(options(old),add=TRUE)
+  x <- data.frame(x=seq(-2,2,length.out=60L)); y <- x$x+cos(seq_len(60L))
+  bw <- npregbw(xdat=x,ydat=y,bws=700,regtype="ll",bandwidth.compute=FALSE)
+  for(grad in c(FALSE,TRUE)) {
+    a <- plot(bw,errors="asymptotic",band="all",gradients=grad,
+      output="data",neval=5L)[[1L]]
+    p <- plot(bw,errors="asymptotic",band="pointwise",gradients=grad,
+      output="data",neval=5L)[[1L]]
+    expect_identical(a$mean,p$mean); expect_identical(a$merr,p$merr)
+    bands <- a$band.errors
+    expect_true(all(is.finite(bands$simultaneous)))
+    expect_true(all(bands$pointwise<=bands$simultaneous))
+    expect_true(all(bands$simultaneous<=bands$bonferroni))
+  }
+})
+
+test_that("formula capture provenance survives MPI call materialization", {
+  skip_on_cran()
+  skip_if_not(spawn_mpi_slaves())
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
+  old <- options(np.messages=FALSE)
+  on.exit(options(old),add=TRUE)
+  set.seed(42)
+  x <- runif(60,-2,2); y <- x+rnorm(60)
+  model <- npreg(y~x,regtype="ll")
+  bands <- plot(model,errors="asymptotic",band="all",output="data",neval=5L)
+  expect_true(all(is.finite(bands[[1L]]$band.errors$simultaneous)))
+})
