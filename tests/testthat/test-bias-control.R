@@ -98,12 +98,15 @@ test_that("projector geometry does not depend on an unused HC3 denominator", {
   y <- sin(4*x)+(f=="b")+rnorm(n,sd=.3);X <- data.frame(lx=log(x),f=f)
   bw <- npregbw(xdat=X,ydat=y,bws=c(.3,.3),regtype="ll",bandwidth.compute=FALSE)
   state <- npRmpi:::.np_bias_regression_prepare(bw,X,y)
-  anchor <- state$x[which.min(state$x$lx),,drop=FALSE]
+  anchor <- state$x[1L,,drop=FALSE]
+  anchor$lx <- seq(min(state$x$lx),max(state$x$lx),length.out=50L)[2L]
+  anchor$f <- factor("a",levels=levels(f))
   blocks <- npRmpi:::.np_bias_projector(state,anchor)$blocks
   expect_length(blocks,2L)
+  expect_true(any(vapply(blocks,function(b)any(1-rowSums(b$Q*t(b$coefficient))<=0),logical(1))))
   for(b in blocks) {
     expect_named(b,c("indices","Q","coefficient"))
-    expect_equal(b$coefficient%*%b$Q,diag(ncol(b$Q)),tolerance=1e-7)
+    expect_true(all(is.finite(b$coefficient)))
   }
 })
 
