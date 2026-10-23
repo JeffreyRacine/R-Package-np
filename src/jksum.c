@@ -22952,6 +22952,27 @@ static int np_regression_lp_projected_weight(
   return isfinite(*influence);
 }
 
+/* New-request plot replay shares the fitted uncertainty arithmetic. The
+ * complete fit owns selection/solves; this routine only contracts a tile. */
+void np_regression_inference_projection_apply(int n, int p, int m,
+  const double *basis, const double *projection, const double *kernel, double *out)
+{
+  double **columns = (double **)R_alloc((size_t)p, sizeof(double *));
+  double *adjoint = (double *)R_alloc((size_t)p, sizeof(double));
+  for(int k=0;k<p;++k) columns[k]=(double *)(basis+(size_t)k*n);
+  for(int j=0;j<m;++j) {
+    R_CheckUserInterrupt();
+    for(int k=0;k<p;++k) adjoint[k]=projection[j+(size_t)k*m];
+    for(int i=0;i<n;++i) {
+      long double influence;
+      if(!np_regression_lp_projected_weight(columns,p,adjoint,
+           kernel[i+(size_t)j*n],i,&influence) || fabsl(influence)>DBL_MAX)
+        error("accepted regression projection has nonfinite influence");
+      out[j+(size_t)i*m]=(double)influence;
+    }
+  }
+}
+
 /* Begin projected-pair implementation: the scalar owner above is unchanged. */
 #if defined(NP_USE_ACCELERATE_GAUSS) && defined(__APPLE__) && \
     defined(__arm64__) && defined(__ARM_NEON) && \

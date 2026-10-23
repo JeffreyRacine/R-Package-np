@@ -238,6 +238,7 @@
         max.bytes=max.bytes,.np.gate=state[[4L]],.np.index=index))
     adjoint <- if (is.null(direction)) projection[[2L]][index,,drop=FALSE] else
       state[[1L]][index,(direction-1L)*width+seq_len(width),drop=FALSE]
+    attr(adjoint,".np.fit.accepted") <- TRUE
     weights <- .np_plot_lsq_gate_weights(bws,geometry,index,max.bytes=max.bytes)
     .Call("C_np_plot_projection_apply",projection[[1L]],adjoint,weights,PACKAGE="np")
   }
