@@ -91,3 +91,18 @@ test_that("target blocks cover both axes without changing target-major indices",
     expect_true(all(vapply(blocks,function(b) length(b$grid)<=25L && length(b$rows)<=500L,logical(1))))
   }
 })
+
+test_that("projector geometry does not depend on an unused HC3 denominator", {
+  old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  set.seed(42);n <- 120L;x <- runif(n);f <- factor(sample(c("a","b"),n,TRUE))
+  y <- sin(4*x)+(f=="b")+rnorm(n,sd=.3);X <- data.frame(lx=log(x),f=f)
+  bw <- npregbw(xdat=X,ydat=y,bws=c(.3,.3),regtype="ll",bandwidth.compute=FALSE)
+  state <- npRmpi:::.np_bias_regression_prepare(bw,X,y)
+  anchor <- state$x[which.min(state$x$lx),,drop=FALSE]
+  blocks <- npRmpi:::.np_bias_projector(state,anchor)$blocks
+  expect_length(blocks,2L)
+  for(b in blocks) {
+    expect_named(b,c("indices","Q","coefficient"))
+    expect_equal(b$coefficient%*%b$Q,diag(ncol(b$Q)),tolerance=1e-7)
+  }
+})

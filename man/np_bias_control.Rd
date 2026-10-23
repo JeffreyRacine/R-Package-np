@@ -88,7 +88,12 @@ np_bias_control(construction = c("iterated", "legacy"),
   Use \code{errors="asymptotic"} for Gaussian calibration or
   \code{errors="bootstrap"} with the existing \code{bootstrap} and
   \code{\link{np_boot_control}} choices. Mammen is the default wild law;
-  explicit Rademacher remains available. The iterated inid, fixed and geom
+  explicit Rademacher remains available. In the iterated construction, Gaussian,
+  Mammen and Rademacher multiply the same complete observation rows scaled by
+  the smoothed variance estimate. Mammen and Rademacher are fixed-factor
+  multiplier calibrations, not residual wild refits. They need not have the
+  same finite-sample tails as Gaussian, especially when a few observations
+  dominate a target. The iterated inid, fixed and geom
   constructions resample corrected residual scores rather than refitting each
   row resample. Inid uses the smoothed variance refinement; fixed and geom use
   their score-bootstrap scale. Automatic block selection uses raw P0 residuals
@@ -108,7 +113,21 @@ np_bias_control(construction = c("iterated", "legacy"),
 
   The original one/two-continuous, LC/LL/quadratic defaults have encouraging
   finite-sample evidence, especially for
-  Gaussian and Mammen calibration. They are not a uniform honesty guarantee
+  Gaussian and Mammen calibration. Auxiliary fits require adequate local
+  support throughout the retained training sample, including observations
+  outside the displayed grid. Skewed or heavy-tailed predictors can cause
+  explicit auxiliary-rank failures; trimming the plot grid does not fix these.
+  Inspect the reported pilot role and its bandwidth or degree controls. A
+  transformed-predictor model is a new fitted specification, not a plotting
+  adjustment. Stable bases also do not guarantee well-conditioned normal
+  equations for very wide predictor ranges.
+
+  The profile-specific correction can remove much of the main estimator's
+  categorical borrowing and substantially increase interval widths, especially
+  in small profiles. Computation includes streamed quadratic-time training
+  operators; absence of a training-square matrix does not imply linear time.
+  MPI currently distributes calibration draws, not the training operators.
+  These results are not a uniform honesty guarantee
   over arbitrary regression functions or smoothing choices. Difficult
   localized bumps, residual bias and dependent-data mean coverage remain
   qualifications. Bandwidth selection and degree search uncertainty are not

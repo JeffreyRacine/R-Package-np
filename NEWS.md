@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Bias-corrected regression inference removes an unused HC3 leverage refusal,
+  clarifies auxiliary-support diagnostics, and documents fixed-factor wild
+  calibration, profile borrowing and computational limitations.
+
 * Generalize iterated regression bias correction to arbitrary positive continuous
   dimension and package-admissible mixed GLP main degrees. Add automatic and
   scalar/vector auxiliary degree controls, preserving literal overrides and
