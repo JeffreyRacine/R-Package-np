@@ -8,7 +8,7 @@
 }
 \usage{
 np_bias_control(construction = c("iterated", "legacy"),
-                iterations = 16L, degree = 5L, bernstein.basis = TRUE,
+                iterations = 16L, degree = NULL, bernstein.basis = TRUE,
                 p0.scale = 4, p1.scale = 1.5,
                 operator.scale = 4/3, variance.scale = 4/3,
                 p0.bandwidth = NULL, p1.bandwidth = NULL,
@@ -22,13 +22,18 @@ np_bias_control(construction = c("iterated", "legacy"),
   \item{iterations}{Positive integer number of residual correction iterations.
     The default is 16. Larger values increase computation and need not improve
     coverage monotonically.}
-  \item{degree}{Positive integer auxiliary polynomial degree, common to the
-    continuous coordinates. This is distinct from the fitted model degree.
-    It must cover that degree and leave positive residual degrees of freedom
-    in every observed categorical profile.}
+  \item{degree}{Auxiliary polynomial degree, distinct from the fitted model's
+    degree. The default \code{NULL} resolves coordinate by coordinate to
+    \code{pmax(5L, main.degree)}. A positive integer scalar applies to every
+    continuous predictor; an unnamed vector follows continuous-predictor order,
+    and a named vector must name every continuous predictor exactly. Explicit
+    values are literal overrides. The auxiliary GLP space must contain the
+    main polynomial space and leave positive residual degrees of freedom in
+    every observed categorical profile. Actual local rank checks also apply.}
   \item{bernstein.basis}{Logical. Must be \code{TRUE} for auxiliary degree
-    greater than one. The canonical stable Bernstein representation is used
-    for the complete auxiliary polynomial space, including derivative rows.}
+    greater than one. The canonical stable GLP representation (degree-graded shifted Legendre)
+    is used for the auxiliary polynomial space, including derivative rows.
+    This control never changes the fitted main model basis.}
   \item{p0.scale, p1.scale, operator.scale, variance.scale}{Positive auxiliary
     bandwidth scale factors. Each may be a scalar, an unnamed vector in
     continuous-predictor order, or a vector named for every continuous
@@ -63,15 +68,22 @@ np_bias_control(construction = c("iterated", "legacy"),
   complete row, including correction covariance. No training-square smoothing
   matrix is retained. Training preparation is reused and query rows are blocked.
 
-  The initial supported scope is an unbounded second-order Gaussian kernel,
-  LC, LL or complete quadratic main models, fixed, adaptive-neighbour or
-  generalized-neighbour bandwidths, and one or two continuous predictors.
+  The implementation admits an unbounded second-order Gaussian kernel,
+  LC, LL and package-admissible GLP main degree vectors, including mixed
+  degrees, with any positive number of continuous predictors. Fixed,
+  adaptive-neighbour and generalized-neighbour bandwidths are supported.
+  Fit higher-degree models with \code{bernstein.basis=TRUE} for numerical
+  stability; plotting preserves the stored basis and selected degrees.
+  Larger auxiliary spaces require more observations in every profile and
+  more computation; infeasible or unidentified systems fail explicitly, with
+  no automatic degree reduction. Explicit auxiliary vectors can describe
+  smaller anisotropic spaces that still contain the main model.
   At most one binary unordered and one binary ordered predictor are admitted,
   with every joint profile observed. Means, first partial derivatives and
   categorical first differences are supported. Categorical differences have
-  numerical operator validation; the coverage experiments concern means and
-  continuous derivatives. Higher main degrees, higher derivatives and other
-  kernels require further qualification and currently fail explicitly.
+  numerical operator validation; coverage evidence must be interpreted for
+  the configurations actually studied. Higher derivatives, other kernels,
+  additive and tensor main bases remain outside this construction.
 
   Use \code{errors="asymptotic"} for Gaussian calibration or
   \code{errors="bootstrap"} with the existing \code{bootstrap} and
@@ -94,7 +106,8 @@ np_bias_control(construction = c("iterated", "legacy"),
   or \code{B} to control calibration precision. Increasing the number of
   draws can be necessary for remote empirical Bonferroni tails on large grids.
 
-  Frozen defaults have encouraging finite-sample evidence, especially for
+  The original one/two-continuous, LC/LL/quadratic defaults have encouraging
+  finite-sample evidence, especially for
   Gaussian and Mammen calibration. They are not a uniform honesty guarantee
   over arbitrary regression functions or smoothing choices. Difficult
   localized bumps, residual bias and dependent-data mean coverage remain
@@ -112,7 +125,8 @@ np_bias_control(construction = c("iterated", "legacy"),
   \code{"plot-data"}, each returned regression component includes
   \code{inference}: original and corrected estimates, correction, standard
   errors, all three bands, evaluation grid and target mapping, requested and
-  effective controls, main-model settings, training-row metadata, calibration
+  effective controls (including the named auxiliary degree vector, its rule
+  and term count in \code{settings$degree_spec}), main-model settings, training-row metadata, calibration
   law and draw count, block selection and RNG state. The historical \code{bias}
   and \code{gbias} sign conventions are preserved. With \code{band="all"},
   \code{band.errors} also retains the displayed error widths. The original

@@ -373,7 +373,9 @@ Named options passed via \code{\dots} include:
       \code{lwd}, \code{main}, \code{sub}, \code{type}, \code{xlab},
       \code{xlim}, \code{ylab}, \code{ylim}, \code{zlab}, \code{zlim}}{
         standard graphical controls forwarded to the underlying plotting
-        primitives when relevant.
+        primitives when relevant. In continuous two-dimensional regression
+        panels, \code{xlim} sets the display limits without changing the
+        evaluation grid or the family used to calibrate simultaneous bands.
       }
     }
 

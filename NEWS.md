@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Generalize iterated regression bias correction to arbitrary positive continuous
+  dimension and package-admissible mixed GLP main degrees. Add automatic and
+  scalar/vector auxiliary degree controls, preserving literal overrides and
+  recording the resolved polynomial space. Preserve fixed model specifications
+  and bounded observation-row storage.
+* Honor explicit `xlim` in continuous regression plot panels, including
+  derivative and common-scale panels, without changing the inference grid.
+
 * Add `np_bias_control()` and iterated `npreg` plot inference through
   `center="bias-corrected"`, with Gaussian and bootstrap calibration of the
   complete corrected observation operator. Preserve selected bandwidths,
