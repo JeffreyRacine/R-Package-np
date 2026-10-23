@@ -170,6 +170,8 @@
     local.map <- map[rr,,drop=FALSE];local.map$row <- match(local.map$row,jj)
     value <- .np_bias_regression_rows(state,grid[jj,,drop=FALSE],local.map)
     diagnostic <- value$main.regularization
+    if(law!="gaussian" && any(diagnostic$ridge>0))
+      stop("bootstrap calibration for regularized generalized-NN main rows remains unqualified; Gaussian inference is available with the qualifications documented in np_bias_control",call.=FALSE)
     diagnostic$row <- jj[diagnostic$row]
     regularization[[length(regularization)+1L]] <- diagnostic
     center[rr] <- value$center;original[rr] <- value$original_center;se[rr] <- value$se
@@ -200,7 +202,9 @@
     correction=original-center,se=se,bands=bands,map=map,grid=grid,
     settings=state$settings,law=law,block.selection=selection,draws=B,alpha=alpha,
     main.regularization=do.call(rbind,regularization),
-    covariance=list(operator="complete corrected observation rows",variance="smoothed P0 residual variance",
+    covariance=list(operator="complete corrected observation rows",
+      variance=if(law%in%c("fixed","geom"))"empirical residual-score process variance" else "smoothed P0 residual variance",
+      studentization=if(score)"empirical residual-score process SD" else "smoothed complete-row SD",
       calibration=if(score)"residual score process" else "fixed-factor multiplier process"),
     calibration=calibrated,score.se=if(score)score.se else NULL,
     rng=list(kind=rng.kind,start=rng,end=end,convention="common observation draws across all target blocks"),
