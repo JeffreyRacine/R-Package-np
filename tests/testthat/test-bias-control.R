@@ -74,6 +74,11 @@ test_that("auxiliary degrees resolve by coordinate without altering the main mod
   old <- np_bias_control(degree=5L)
   old$version <- 1L
   expect_identical(np:::.np_bias_validate_control(old), old)
+  for (version in list(1, 2, "1", "2", NA_integer_, TRUE, c(1L,2L))) {
+    edited <- np_bias_control()
+    edited$version <- version
+    expect_error(np:::.np_bias_validate_control(edited), "invalid np_bias_control")
+  }
 })
 
 test_that("target blocks cover both axes without changing target-major indices", {
