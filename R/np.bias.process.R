@@ -46,25 +46,49 @@
     method=method,selector="b.star",both=selected)
 }
 
-.np_bias_limits <- function(absolute,groups,alpha,gaussian=FALSE) {
-  if(any(!is.finite(absolute))||any(absolute<0))stop("invalid corrected process draws",call.=FALSE)
-  index <- split(seq_len(nrow(absolute)),groups)
+# Retain exact marginal order statistics and one draw maximum per family.
+# The full grid-by-draw matrix is never retained by inference.
+.np_bias_limits_prepare <- function(groups, alpha, gaussian, B) {
+  index <- split(seq_along(groups),groups)
+  list(index=index,alpha=alpha,gaussian=gaussian,
+    maximum=matrix(0,length(index),B),
+    point=matrix(0,length(groups),length(alpha)),
+    bonf=matrix(0,length(groups),length(alpha)))
+}
+
+.np_bias_limits_update <- function(state, absolute, rows) {
+  if(nrow(absolute)!=length(rows) || ncol(absolute)!=ncol(state$maximum) ||
+     any(!is.finite(absolute)) || any(absolute<0))
+    stop("invalid corrected process draws",call.=FALSE)
+  for(g in seq_along(state$index)) {
+    local <- which(rows %in% state$index[[g]])
+    if(!length(local))next
+    state$maximum[g,] <- pmax(state$maximum[g,],apply(absolute[local,,drop=FALSE],2L,max))
+    if(!state$gaussian)for(j in local) {
+      q <- unname(quantile(absolute[j,],c(1-state$alpha,1-state$alpha/length(state$index[[g]])),type=1L))
+      state$point[rows[j],] <- q[seq_along(state$alpha)]
+      state$bonf[rows[j],] <- q[length(state$alpha)+seq_along(state$alpha)]
+    }
+  }
+  state
+}
+
+.np_bias_limits_finish <- function(state) {
+  alpha <- state$alpha;index <- state$index
   limits <- setNames(lapply(c("pointwise","simultaneous","bonferroni"),function(b)
-    array(0,c(nrow(absolute),2L,length(alpha)),dimnames=list(NULL,c("lower","upper"),as.character(alpha)))),
+    array(0,c(nrow(state$point),2L,length(alpha)),dimnames=list(NULL,c("lower","upper"),as.character(alpha)))),
     c("pointwise","simultaneous","bonferroni"))
   raw.max <- matrix(0,length(alpha),length(index),dimnames=list(as.character(alpha),names(index)))
   for(g in seq_along(index)) {
     ii <- index[[g]];m <- length(ii)
-    maximum <- apply(absolute[ii,,drop=FALSE],2L,max)
-    raw.max[,g] <- unname(quantile(maximum,1-alpha,type=1L))
+    raw.max[,g] <- unname(quantile(state$maximum[g,],1-alpha,type=1L))
     for(j in ii) {
-      if(gaussian) {
+      if(state$gaussian) {
         point <- qnorm(alpha/2,lower.tail=FALSE)
         bonf <- qnorm(alpha/(2*m),lower.tail=FALSE)
         simultaneous <- pmin(bonf,pmax(point,raw.max[,g]))
       } else {
-        q <- unname(quantile(absolute[j,],c(1-alpha,1-alpha/m),type=1L))
-        point <- q[seq_along(alpha)];bonf <- q[length(alpha)+seq_along(alpha)]
+        point <- state$point[j,];bonf <- state$bonf[j,]
         simultaneous <- raw.max[,g]
         if(any(point>simultaneous))stop("maximum marginal-order invariant failed",call.=FALSE)
         bonf <- pmax(bonf,simultaneous)
@@ -77,6 +101,11 @@
     }
   }
   list(limits=limits,raw_max_critical=raw.max)
+}
+
+.np_bias_limits <- function(absolute,groups,alpha,gaussian=FALSE) {
+  state <- .np_bias_limits_prepare(groups,alpha,gaussian,ncol(absolute))
+  .np_bias_limits_finish(.np_bias_limits_update(state,absolute,seq_len(nrow(absolute))))
 }
 
 # Replaying a draw stream for bounded target batches does not consume a new
@@ -124,7 +153,7 @@
   map <- expand.grid(row=seq_len(nrow(grid)),target=targets,stringsAsFactors=FALSE)
   M <- nrow(map);B <- as.integer(B)
   center <- original <- se <- score.se <- numeric(M)
-  draws <- matrix(0,M,B)
+  calibration.state <- .np_bias_limits_prepare(map$target,alpha,law=="gaussian",B)
   regularization <- list()
   score <- law%in%c("inid","fixed","geom")
   selection <- if(law%in%c("fixed","geom")) .np_bias_block_selection(state$residual_raw,law,blocklen) else NULL
@@ -153,10 +182,10 @@
       divisor <- ifelse(s==0,1,s)
       if(law!="inid")se[rr] <- s
     }
-    draws[rr,] <- abs(part$value/divisor)
+    calibration.state <- .np_bias_limits_update(calibration.state,abs(part$value/divisor),rr)
   }
   assign(".Random.seed",end,.GlobalEnv)
-  calibrated <- .np_bias_limits(draws,map$target,alpha,law=="gaussian")
+  calibrated <- .np_bias_limits_finish(calibration.state)
   bands <- lapply(calibrated$limits,function(x) {
     for(k in seq_along(alpha))for(side in 1:2)x[,side,k] <- center+se*x[,side,k]
     x
