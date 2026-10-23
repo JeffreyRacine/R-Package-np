@@ -118,7 +118,17 @@ np_bias_control(construction = c("iterated", "legacy"),
   rows, including the numerical ridge and intercept restoration. Polynomial
   correction includes their regularization bias; covariance uses the complete
   corrected rows. This does not establish coverage for unidentified pilot fits
-  or a uniform honesty guarantee. Other regularized main rows remain unqualified.
+  or a uniform honesty guarantee. These newly admitted regularized rows
+  currently support Gaussian calibration only. Bounded fixed-specification
+  simulations with Gaussian errors gave adequate coverage, but a two-predictor
+  small-neighbor mean case had substantially inadequate Mammen coverage despite
+  negligible residual bias and accurate variance. Some corrected rows were
+  dominated by one observation. Such concentration also limits justification
+  of the Gaussian approximation for non-Gaussian errors; this validation does
+  not establish arbitrary-error or uniform coverage. Bootstrap calibration of
+  these regularized rows is explicitly refused, without changing the selected
+  law. Bootstrap support for previously admitted zero-ridge rows is unchanged.
+  Other regularized main rows remain unqualified.
   Per-target/frame numerical ridge values are returned in
   \code{inference$main.regularization}, and \code{inference$covariance}
   describes the variance and calibration construction.

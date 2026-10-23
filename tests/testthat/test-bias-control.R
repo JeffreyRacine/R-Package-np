@@ -127,6 +127,13 @@ test_that("regularized Bernstein GNN rows retain the fitted model and correction
   covariance <- matrix(0,nrow(map),nrow(map))
   for(j in seq_len(nrow(x)))covariance <- covariance+outer(value$W[,j],value$W[,j])*state$variance[j]
   expect_equal(tcrossprod(value$factor),covariance,tolerance=1e-10)
+  for(law in c("mammen","rademacher","inid","fixed","geom")) {
+    set.seed(61028);rng <- .Random.seed
+    expect_error(np:::.np_bias_inference(state,grid,c("mean","d1","d2"),
+      .05,63L,law,if(law%in%c("fixed","geom"))3L else NULL),
+      "bootstrap calibration.*remains unqualified")
+    expect_identical(.Random.seed,rng)
+  }
 })
 
 test_that("streamed calibration uses whole-family sizes and common-draw maxima", {

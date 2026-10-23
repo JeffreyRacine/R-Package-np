@@ -6,6 +6,9 @@
 * Admit regularized generalized-neighbor Bernstein main rows for iterated
   correction using their full canonical operator and correction covariance;
   retain auxiliary-rank checks and return main regularization diagnostics.
+  This extension currently admits Gaussian calibration only, with documented
+  Gaussian-error validation limits; bootstrap calibration remains unqualified
+  for regularized main rows and is explicitly refused without changing laws.
 
 * Bias-corrected regression inference removes an unused HC3 leverage refusal,
   clarifies auxiliary-support diagnostics, and documents fixed-factor wild
