@@ -24,18 +24,25 @@
     stop("bias correction requires finite retained training data", call. = FALSE)
   reg <- npValidatedConditionalRegSpec(bws, where = "bias correction", ncon.field = "ncon")
   nc <- which(bws[["icon"]]); fc <- which(!bws[["icon"]]); d <- length(nc)
+  legacy.hint <- if (bws[["type"]]=="fixed" && d>0L)
+    "; explicit bootstrap bias.control=np_bias_control(construction='legacy') retains the previous construction for supported bootstrap methods" else ""
   if (!d || bws[["ckertype"]] != "gaussian" || bws[["ckerorder"]] != 2L ||
       bws[["ckerbound"]] != "none" || reg[["basis.engine"]] != "glp")
-    stop("iterated regression bias correction currently supports unbounded second-order Gaussian kernels, at least one continuous predictor and GLP main models", call. = FALSE)
+    stop(paste0("iterated regression bias correction currently supports unbounded second-order Gaussian kernels, at least one continuous predictor and GLP main models",legacy.hint), call. = FALSE)
   if (length(fc) && (!all(vapply(x[fc],is.factor,logical(1))) ||
       any(vapply(x[fc],nlevels,integer(1)) != 2L) ||
       sum(bws[["iuno"]]) > 1L || sum(bws[["iord"]]) > 1L))
-    stop("iterated regression bias correction currently admits at most one binary unordered and one binary ordered predictor", call. = FALSE)
+    stop(paste0("iterated regression bias correction currently admits at most one binary unordered and one binary ordered predictor",legacy.hint), call. = FALSE)
   keys <- if (length(fc)) do.call(paste,c(lapply(x[fc],as.integer),sep=":")) else rep("all",nrow(x))
   groups <- split(seq_len(nrow(x)),keys)
   if (length(groups) != 2^length(fc)) stop("bias correction requires every training profile",call.=FALSE)
   settings <- .np_bias_resolve(control,x[nc],lengths(groups),reg[["degree.engine"]])
   q <- unname(settings[["degree_spec"]][["effective"]])
+  for (ii in groups) {
+    distinct <- vapply(x[ii,nc,drop=FALSE],function(z)length(unique(z)),integer(1))
+    if (any(distinct <= q))
+      stop("auxiliary polynomial degree requires more distinct values in each training profile; use bias.control=np_bias_control(degree=...) with an identified space containing the fixed main model",call.=FALSE)
+  }
   offset <- vapply(x[nc],mean,numeric(1)); scale <- settings[["spread"]]
   standardized <- x
   for (j in seq_len(d)) standardized[[nc[j]]] <- (x[[nc[j]]]-offset[j])/scale[j]
@@ -98,7 +105,7 @@
 
 .np_bias_projector_blocks <- function(spec,anchor,reference=FALSE) {
   if (reference) stop("runtime bias operator has no diagnostic fallback",call.=FALSE)
-  .np_bias_projector(spec,anchor,numeric(nrow(spec$x)),components=TRUE)$blocks
+  .np_bias_projector(spec,anchor)$blocks
 }
 
 .np_bias_main_rows <- function(spec,evals,nu) {

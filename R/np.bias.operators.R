@@ -3,14 +3,14 @@
 # Extracted from the admitted Gate26 arithmetic; no observation-square storage.
 
 .np_bias_solve <-
-function (W, k, v)
+function (W, k, v, role = "auxiliary pilot")
 {
     out <- .npreghat_solve_eval(W, v, k, ridge.base = 0, canonical.lp = TRUE, allow.empty.rows = FALSE)
     if (is.null(out) || !is.finite(out$ridge) || out$ridge != 0)
-        stop("UNQUALIFIED: required original/pilot solve uses ridge")
+        stop(paste0(role, " requires regularization; bias correction needs an identified auxiliary fit. Inspect sparse training tails and the corresponding pilot bandwidth/degree controls."), call. = FALSE)
     row <- k * drop(W %*% out$v)
     if (any(!is.finite(row)))
-        stop("UNQUALIFIED: nonfinite required row")
+        stop(paste0(role, " produced nonfinite observation weights"), call. = FALSE)
     row
 }
 
@@ -31,18 +31,15 @@ function (spec, e, degree, nu)
 }
 
 .np_bias_projector <-
-function (spec, anchor, y, components = FALSE)
+function (spec, anchor)
 {
     n <- nrow(spec$x)
-    stopifnot(length(y) == n, nrow(anchor) == 1L, all(is.finite(y)))
+    stopifnot(nrow(anchor) == 1L)
     k <- drop(.np_kernel_weights_direct(spec$pilot.bws, txdat = spec$xcon, exdat = anchor[spec$numeric.cols],
         bandwidth.divide = TRUE))
     if (any(!is.finite(k)) || any(k < 0))
-        stop("UNQUALIFIED: HC3 requires finite nonnegative pilot weights")
-    residual <- leverage <- numeric(n)
-    blocks <- if (components)
-        vector("list", length(spec$groups))
-    else NULL
+        stop("P0 projection requires finite nonnegative pilot weights", call. = FALSE)
+    blocks <- vector("list", length(spec$groups))
     block.index <- 0L
     for (ii in spec$groups) {
         Q <- spec$Q[ii, , drop = FALSE]
@@ -54,29 +51,20 @@ function (spec, anchor, y, components = FALSE)
             z <- .Call("C_np_lp_adjoint_prepared_ridge", G, as.double(rhs), as.integer(length(ii)), as.integer(rank.bound),
                 PACKAGE = "np")
             if (!is.finite(z$ridge) || z$ridge != 0 || any(!is.finite(z$v)))
-                stop("UNQUALIFIED: HC3 required canonical solve uses ridge")
+                stop("P0 projection requires regularization; inspect sparse training profiles and p0.bandwidth/p0.scale or the auxiliary degree", call. = FALSE)
             z$v
         }
-        beta <- solve.canonical(crossprod(Q, weight * y[ii]))
         inverse <- matrix(0, width, width)
         for (j in seq_len(width)) {
             rhs <- numeric(width)
             rhs[j] <- 1
             inverse[, j] <- solve.canonical(rhs)
         }
-        diagonal <- weight * rowSums((Q %*% inverse) * Q)
-        denominator <- 1 - diagonal
-        if (any(!is.finite(denominator)) || any(denominator <= 0))
-            stop("UNQUALIFIED: nonpositive HC3 leverage denominator")
-        residual[ii] <- (y[ii] - drop(Q %*% beta))/denominator
-        leverage[ii] <- diagonal
-        if (components) {
-            block.index <- block.index + 1L
-            blocks[[block.index]] <- list(indices = ii, Q = Q, coefficient = inverse %*% t(Q * weight),
-                denominator = denominator)
-        }
+        block.index <- block.index + 1L
+        blocks[[block.index]] <- list(indices = ii, Q = Q,
+            coefficient = inverse %*% t(Q * weight))
     }
-    list(residual = residual, leverage = leverage, blocks = blocks)
+    list(blocks = blocks)
 }
 
 .np_bias_projectors <-
@@ -122,13 +110,13 @@ function (spec, grid, map, block = 16L)
         g <- drop(.np_kernel_weights_direct(spec$pilot.bws, txdat = spec$xcon, exdat = projectors[[a]]$e[spec$numeric.cols],
             bandwidth.divide = TRUE))
         if (any(!is.finite(g)) || any(g <= 0))
-            stop("UNQUALIFIED: nonpositive stability metric")
+            stop("P0 stability weights underflowed; inspect sparse training tails and p0.bandwidth/p0.scale", call. = FALSE)
         for (b in seq_along(projectors[[a]]$blocks)) {
             p <- projectors[[a]]$blocks[[b]]
             ii <- p$indices
             qrfit <- qr(p$Q * sqrt(g[ii]))
             if (qrfit$rank != ncol(p$Q))
-                stop("UNQUALIFIED: metric QR rank")
+                stop("P0 weighted polynomial design is rank deficient; inspect the auxiliary degree and training support", call. = FALSE)
             p$g <- g[ii]
             p$thin <- qr.Q(qrfit) * sqrt(g[ii])
             p$projected.trace <- 0
@@ -150,7 +138,7 @@ function (spec, grid, map, block = 16L)
             p$projected.trace <- sum(tr[(a - 1L) * width + seq_len(width)])
             p$normalizer <- sum(p$g) - p$projected.trace
             if (!is.finite(p$normalizer) || p$normalizer <= 1e-08 * sum(p$g))
-                stop("UNQUALIFIED: unresolved positive residual trace")
+                stop("P0 residual operator has insufficient positive trace for bias correction", call. = FALSE)
             p$thin <- NULL
             projectors[[a]]$blocks[[b]] <- p
         }
@@ -209,7 +197,7 @@ function (spec, at, derivatives = TRUE)
     Q <- basis(u, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein)
     v <- drop(basis(u, exdat = zero, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein))
     k <- drop(.np_kernel_weights_direct(spec$pilot.bws, txdat = x, exdat = at[spec$numeric.cols], bandwidth.divide = TRUE))
-    h <- .np_bias_solve(Q, k, v)
+    h <- .np_bias_solve(Q, k, v, "P1 auxiliary pilot")
     dh <- list()
     if (derivatives)
         for (d in seq_len(spec$d)) {
@@ -217,9 +205,9 @@ function (spec, at, derivatives = TRUE)
             nu[d] <- 1L
             dv <- drop(basis(u, exdat = zero, degree = spec$q, gradient.vec = nu, basis = "glp",
                 bernstein.basis = spec$bernstein))/spec$b[d]
-            coefficient <- .np_bias_solve(Q, k, dv)
+            coefficient <- .np_bias_solve(Q, k, dv, "P1 auxiliary derivative pilot")
             w <- h * u[[d]]/spec$b[d]
-            dh[[d]] <- coefficient + w - .np_bias_solve(Q, k, drop(crossprod(Q, w)))
+            dh[[d]] <- coefficient + w - .np_bias_solve(Q, k, drop(crossprod(Q, w)), "P1 auxiliary derivative pilot")
         }
     list(indices = ii, mean = h, derivatives = dh)
 }
@@ -301,7 +289,7 @@ function (spec, responses, block = 16L)
                 .np.require.finite = TRUE)
             ridge <- attr(H, "ridge.used", exact = TRUE)
             if (is.null(ridge) || any(!is.finite(ridge)) || any(ridge != 0))
-                stop("unqualified P0 residual ridge")
+                stop("P0 residual fit requires regularization at a training observation; trimming the evaluation grid cannot repair it. Inspect training tails and p0.bandwidth/p0.scale or the auxiliary degree", call. = FALSE)
             H
         }
         v <- .np_bias_residual_apply(owner, responses[ii, , drop = FALSE], block)
