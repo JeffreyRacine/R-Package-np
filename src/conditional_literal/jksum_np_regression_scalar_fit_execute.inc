@@ -341,6 +341,13 @@ static SEXP np_regression_scalar_fit_execute(void *data)
         call->mean_stderr[i] = NA_REAL;
       continue;
     }
+    if(call->fit_projection != NULL && call->fit_projection->inference_residual != NULL) {
+      NPRegressionFitProjection *out=call->fit_projection;
+      if(out->width != 1) error("scalar inference basis width mismatch");
+      out->projection[out->eval_map[i]]=1.0/denominator;
+      out->inference_ridge[out->eval_map[i]]=0.0;
+      ++out->emitted;
+    }
     if(!point_already_computed) {
       call->mean[i] = owner->mean_columns[response_offset] / denominator;
       if(!R_FINITE(call->mean[i])) {

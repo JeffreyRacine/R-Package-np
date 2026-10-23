@@ -1,5 +1,9 @@
 # np 0.80-1
 
+- Fixed Gaussian regression simultaneous variability bands now reuse the fitted
+  owner's covariance inputs, including coordinate-specific large-bandwidth
+  weights, so joint bands reproduce the reported marginal standard errors.
+
 * Stream exact marginal calibration summaries and common-draw family maxima
   instead of retaining the complete plot-grid-by-draw matrix.
 

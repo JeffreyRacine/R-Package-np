@@ -48,6 +48,10 @@ SEXP C_np_regression(SEXP tuno,
   NPRegressionFitProjection *fit_projection_ptr = NULL;
   SEXP projection_basis = R_NilValue, projection_rows = R_NilValue;
   int extra_protect = 0;
+  SEXP inference_request = PROTECT(getAttrib(output_request, install(".np.inference.width")));
+  ++extra_protect;
+  SEXP inference_gradient = R_NilValue, inference_residual = R_NilValue;
+  SEXP inference_ridge = R_NilValue, inference_gate = R_NilValue;
   int do_merr;
   int do_grad;
   int do_gerr;
@@ -216,6 +220,49 @@ SEXP C_np_regression(SEXP tuno,
     active_diagnostics = &beta_diagnostics;
   }
 
+  if(inference_request != R_NilValue) {
+    if(TYPEOF(inference_request) != INTSXP || XLENGTH(inference_request) != 1 ||
+       INTEGER(inference_request)[0] == NA_INTEGER || INTEGER(inference_request)[0] < 1 ||
+       !do_merr || ncon < 1 || num_train < 2 || en < 1 || train_is_eval ||
+       INTEGER(myopti_i)[REG_BWI] != BW_FIXED ||
+       INTEGER(myopti_i)[REG_CKRNEVI] != 0 ||
+       XLENGTH(output_request) != 2 || nunordered < 0 || nordered < 0 ||
+       (double)ncon + nunordered + nordered > INT_MAX ||
+       en != num_eval || descriptor.family != NP_CKERNEL_FAMILY_LEGACY ||
+       descriptor.order != 2)
+      error("invalid compact regression inference request");
+    for(int d=0;d<ncon;++d)
+      if(ckerlb_p[d] > -DBL_MAX || ckerub_p[d] < DBL_MAX)
+        error("compact regression inference requires unbounded kernels");
+    const int width = INTEGER(inference_request)[0];
+    if((double)width * ncon > INT_MAX ||
+       (double)width * (num_train + (double)en * (1 + ncon)) > R_XLEN_T_MAX)
+      error("compact regression inference dimensions overflow");
+#ifdef MPI2
+    if(!np_mpi_local_regression_active() && iNum_Processors > 1)
+      error("compact regression inference requires an explicit local regression scope");
+#endif
+    PROTECT(projection_basis = allocMatrix(REALSXP, num_train, width));
+    PROTECT(projection_rows = allocMatrix(REALSXP, en, width));
+    PROTECT(inference_gradient = allocMatrix(REALSXP, en, width * ncon));
+    PROTECT(inference_residual = allocVector(REALSXP, num_train));
+    PROTECT(inference_ridge = allocVector(REALSXP, en));
+    PROTECT(inference_gate = allocMatrix(REALSXP, 3, ncon + nunordered + nordered));
+    extra_protect += 6;
+    for(R_xlen_t i=0;i<XLENGTH(projection_basis);++i) REAL(projection_basis)[i]=width==1 ? 1.0 : NA_REAL;
+    for(R_xlen_t i=0;i<XLENGTH(projection_rows);++i) REAL(projection_rows)[i]=NA_REAL;
+    for(R_xlen_t i=0;i<XLENGTH(inference_gradient);++i) REAL(inference_gradient)[i]=NA_REAL;
+    for(int i=0;i<num_train;++i) REAL(inference_residual)[i]=NA_REAL;
+    for(int i=0;i<en;++i) REAL(inference_ridge)[i]=NA_REAL;
+    memset(REAL(inference_gate),0,(size_t)XLENGTH(inference_gate)*sizeof(double));
+    fit_projection = (NPRegressionFitProjection){
+      .ntrain=num_train,.neval=en,.width=width,
+      .basis=REAL(projection_basis),.projection=REAL(projection_rows),
+      .inference_gradient=REAL(inference_gradient),.inference_residual=REAL(inference_residual),
+      .inference_ridge=REAL(inference_ridge),.inference_gate=REAL(inference_gate),.inference_ncon=ncon};
+    fit_projection_ptr=&fit_projection;
+  }
+
   if(TYPEOF(output_request) == INTSXP && XLENGTH(output_request) == 3) {
     const int width = INTEGER(output_request)[2];
     if(width < 1 || do_merr || do_grad || ncon < 1 || num_train < 1 ||
@@ -292,7 +339,7 @@ SEXP C_np_regression(SEXP tuno,
     setAttrib(out, install(".np.gradient.structural.zero"), certificate);
   }
   if(fit_projection_ptr != NULL) {
-    if(fit_projection.emitted != en)
+    if(fit_projection.emitted != en && inference_request == R_NilValue)
       error("plot fit projection did not visit every fitted row");
     SEXP projection_result = PROTECT(allocVector(VECSXP, 3));
     ++extra_protect;
@@ -300,6 +347,12 @@ SEXP C_np_regression(SEXP tuno,
     SET_VECTOR_ELT(projection_result, 1, projection_rows);
     SET_VECTOR_ELT(projection_result, 2, ScalarLogical(fit_projection.constant));
     setAttrib(out, install(".np.fit.projection"), projection_result);
+    if(inference_request != R_NilValue) {
+      SEXP state=PROTECT(allocVector(VECSXP,4)); ++extra_protect;
+      SET_VECTOR_ELT(state,0,inference_gradient); SET_VECTOR_ELT(state,1,inference_residual);
+      SET_VECTOR_ELT(state,2,inference_ridge); SET_VECTOR_ELT(state,3,inference_gate);
+      setAttrib(out,install(".np.fit.inference"),state);
+    }
   }
   UNPROTECT(27 + extra_protect);
   return out;

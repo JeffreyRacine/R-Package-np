@@ -611,6 +611,14 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    call->empty_rows, NULL, NULL, NULL, NULL, NULL, call->fit_projection);
 
 
+  if(call->fit_projection != NULL && call->fit_projection->inference_residual != NULL) {
+    if(!ordinary_hc0_active) error("compact inference requires the accepted residual owner");
+    for(int donor=0; donor<num_obs_train_extern; ++donor)
+      call->fit_projection->inference_residual[ipt[donor]] =
+        ordinary_hc0_information[donor] == NP_RESIDUAL_IDENTIFIED ?
+        ordinary_hc0_residual[donor] * ordinary_hc0_context.residual_scale : NA_REAL;
+  }
+
   if(ordinary_hc0_active && ordinary_hc0_context.unknown_count > 0) {
 #ifdef MPI2
     const int distributed = !np_mpi_local_regression_active() &&

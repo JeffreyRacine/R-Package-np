@@ -604,6 +604,25 @@ NPRegressionFitProjection *fit_projection){
     }
   }
 
+  if(fit_projection != NULL && fit_projection->inference_gate != NULL) {
+    double *g=fit_projection->inference_gate;
+    for(int d=0;d<num_reg_continuous;++d) {
+      g[3*d]=gate_override_active && ov_cont_ok != NULL && ov_cont_ok[d];
+      g[3*d+1]=g[3*d] ? ov_cont_hmin[d] : 0.0;
+      g[3*d+2]=g[3*d] ? ov_cont_k0[d] : 0.0;
+    }
+    for(int d=0;d<num_reg_unordered;++d) {
+      const int k=num_reg_continuous+d;
+      g[3*k]=gate_override_active && ov_disc_uno_ok != NULL && ov_disc_uno_ok[d];
+      g[3*k+2]=g[3*k] ? ov_disc_uno_const[d] : 0.0;
+    }
+    for(int d=0;d<num_reg_ordered;++d) {
+      const int k=num_reg_continuous+num_reg_unordered+d;
+      g[3*k]=gate_override_active && ov_disc_ord_ok != NULL && ov_disc_ord_ok[d];
+      g[3*k+2]=g[3*k] ? ov_disc_ord_const[d] : 0.0;
+    }
+  }
+
   {
     int all_large_gate = (BANDWIDTH_reg == BW_FIXED) && gate_override_active;
     if(all_large_gate){
@@ -1016,7 +1035,7 @@ NPRegressionFitProjection *fit_projection){
               }
             }
 
-            if(fit_projection != NULL) {
+            if(fit_projection != NULL && fit_projection->inference_residual == NULL) {
               np_fit_projection_basis(fit_projection, basis, glp_nterms);
               fit_projection->constant = 1;
             }
@@ -1092,7 +1111,7 @@ NPRegressionFitProjection *fit_projection){
                       q += eval_basis_block[j*eval_block_rows + row] *
                         projection_block[j*nblock + row];
                   mean[i + row] = yhat_block[row];
-                  if(fit_projection != NULL)
+                  if(fit_projection != NULL && fit_projection->inference_residual == NULL)
                     np_fit_projection_inverse(fit_projection, inverse_workspace.gram,
                       eval_basis_block + row, eval_block_rows, i + row);
                   if(shortcut_do_merr) {
@@ -1147,7 +1166,7 @@ NPRegressionFitProjection *fit_projection){
                   }
 
                 mean[i] = yhat;
-                if(fit_projection != NULL)
+                if(fit_projection != NULL && fit_projection->inference_residual == NULL)
                   np_fit_projection_inverse(fit_projection, inverse_workspace.gram,
                                             eval_basis, 1, i);
                 if(shortcut_do_merr) {
@@ -1328,6 +1347,7 @@ NPRegressionFitProjection *fit_projection){
       .kernel_squared_integral = K_INT_KERNEL_P,
       .bandwidth_product = hprod,
       .gradient_stderr_factor = gfac,
+      .fit_projection = fit_projection,
       .empty_rows = failure != NULL ? empty_rows : NULL
     };
     scalar_fit_status = np_regression_scalar_fit(&scalar_call);

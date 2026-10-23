@@ -195,6 +195,23 @@ static void np_plot_gate_prepare(NPPlotGateCall *c)
       }
     }
   }
+  /* A new ordinary-regression request can replay the accepted full-fit gate.
+   * Existing LSQ/conditional requests retain their geometry preparation above. */
+  SEXP captured=getAttrib(c->geometry,install(".np.fit.gate"));
+  if(captured != R_NilValue) {
+    if(c->bandwidth_type != BW_FIXED || TYPEOF(captured) != REALSXP ||
+       !isMatrix(captured) || nrows(captured) != 3 || ncols(captured) != nc+nu+no)
+      error("invalid captured regression kernel gate");
+    const double *g=REAL(captured);
+    for(int j=0;j<nc+nu+no;++j) {
+      if((g[3*j]!=0.0 && g[3*j]!=1.0) || !R_FINITE(g[3*j+1]) ||
+         !R_FINITE(g[3*j+2]) || g[3*j+1]<0.0 || g[3*j+2]<0.0)
+        error("invalid captured regression kernel gate value");
+      if(j<nc) { c->cont_ok[j]=(int)g[3*j]; c->cont_hmin[j]=g[3*j+1]; c->cont_k0[j]=g[3*j+2]; }
+      else if(j<nc+nu) {c->uno_ok[j-nc]=(int)g[3*j];c->uno_const[j-nc]=g[3*j+2];}
+      else {c->ord_ok[j-nc-nu]=(int)g[3*j];c->ord_const[j-nc-nu]=g[3*j+2];}
+    }
+  }
   np_gate_ctx_set(&c->gate, nc, nu, no, c->codes, c->codes+nc,
     c->codes+nc+nu, c->op, c->cont_ok, c->cont_hmin, c->cont_k0,
     c->uno_ok, c->uno_const, c->ord_ok, c->ord_const);

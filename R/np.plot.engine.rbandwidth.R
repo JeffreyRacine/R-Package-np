@@ -341,7 +341,7 @@
         exdat = x.eval,
         gradient.order = gradient.order,
         need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
-        .np.empty.report = .np.empty.report
+        .np.empty.report = .np.empty.report, need.joint = joint.eligible
       )
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
@@ -407,7 +407,7 @@
                  call. = FALSE)
           joint <- .np_plot_activity_run("Computing joint regression surface influence",
             .np_plot_regression_joint_covariance(bws, xdat, ydat, x.eval,
-                                                 factor = TRUE))
+                                                 factor = TRUE, fit = tobj))
           joint.se <- vapply(seq_len(nrow(x.eval)), function(i)
             sqrt(sum(joint$influence[i, ]^2)), numeric(1L))
           if (any(abs(joint.se - tobj$merr) > 1e-9 * pmax(1, abs(tobj$merr))))
@@ -739,7 +739,8 @@
           gradients = gradients,
           gradient.order = gradient.order,
           need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
-          .np.empty.report = .np.empty.report
+          .np.empty.report = .np.empty.report,
+          need.joint = joint.eligible && (!gradients || !xi.factor)
         )
 
         temp.mean[seq_len(xi.neval)] = if (gradients) tr$grad[, i] else tr$mean
@@ -777,8 +778,10 @@
                 .np_plot_regression_joint_covariance(bws, xdat, ydat,
                   subcol(exdat, ei, i)[seq_len(xi.neval), , drop = FALSE],
                   residual = joint.residual, deriv = deriv,
-                  categorical.index = if (gradients && xi.factor) i else NULL))
-              joint.residual <- joint$residual
+                  categorical.index = if (gradients && xi.factor) i else NULL, fit = tr))
+              # Uncaptured categorical contrasts retain their own residual owner.
+              if (is.null(tr[["fit.inference", exact = TRUE]]))
+                joint.residual <- joint$residual
               joint.se <- sqrt(diag(joint$covariance))
               if (gradients && any(abs(joint$estimate - target.value) >
                                    1e-9 * pmax(1, abs(target.value))))

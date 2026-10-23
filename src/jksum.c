@@ -22726,6 +22726,7 @@ typedef struct {
   double kernel_squared_integral;
   double bandwidth_product;
   double gradient_stderr_factor;
+  NPRegressionFitProjection *fit_projection;
   NPRegressionLPEmptyRows *empty_rows;
 } NPRegressionScalarFitCall;
 

@@ -1082,13 +1082,20 @@
 
 # Whole-evaluation derivative maps preserve the native derivative owner and
 # ordering. In particular, this does not use public hat higher-order dispatch.
-.np_plot_lsq_gate_derivative <- function(bws,x,ex=NULL,s,package='np',max.bytes=128*1024^2) {
+.np_plot_lsq_gate_derivative <- function(bws,x,ex=NULL,s,package='np',max.bytes=128*1024^2,
+                                         .np.gate=NULL, .np.index=NULL) {
   geometry <- .np_plot_lsq_gate_geometry(bws,x,ex,max.bytes=max.bytes)
+  if (!is.null(.np.gate)) attr(geometry,".np.fit.gate") <- .np.gate
   t <- geometry$train; e <- geometry$eval
+  parent.rows <- nrow(e$con)
+  if (!is.null(.np.index)) {
+    geometry$eval.index <- .np_plot_lsq_gate_indices(.np.index, parent.rows)
+    e <- lapply(e, function(a) a[.np.index,,drop=FALSE])
+  }
   spec <- npValidatedConditionalRegSpec(bws,where='LSQ scoped derivative',ncon.field='ncon')
   width <- if(npIsCanonicalLp0Spec(spec,bws$ncon)) 1 else
     npLpBasisNcol(spec$basis.engine,spec$degree.engine)
-  .np_plot_lsq_gate_budget(nrow(t$con),nrow(e$con),length(bws$bw),nrow(e$con),max.bytes,width)
+  .np_plot_lsq_gate_budget(nrow(t$con),nrow(e$con),length(bws$bw),parent.rows,max.bytes,width)
   if (!is.integer(s) || length(s)!=bws$ncon || anyNA(s) || any(s<0L))
     stop('invalid LSQ derivative vector',call.=FALSE)
   npCheckRegressionDesignCondition(

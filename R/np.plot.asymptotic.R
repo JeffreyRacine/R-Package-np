@@ -183,12 +183,73 @@
   metadata
 }
 
+# Captured adjoints belong to one complete request, including its native
+# constant-weight decisions. Only the observation rows are tiled below.
+.np_plot_regression_capture_supported <- function(bws) {
+  identical(bws[["type", exact=TRUE]], "fixed") &&
+    identical(bws[["ckertype", exact=TRUE]], "gaussian") &&
+    isTRUE(bws[["ckerorder", exact=TRUE]] == 2L) &&
+    identical(bws[["ckerbound", exact=TRUE]], "none") &&
+    isTRUE(bws[["ncon", exact=TRUE]] > 0L)
+}
+
+.np_plot_regression_capture_operator <- function(fit,bws,x,y,ex,deriv,
+                                                 categorical.index,max.bytes) {
+  request <- fit[["fit.request", exact=TRUE]]
+  if (!.np_plot_regression_capture_supported(bws) ||
+      !is.null(categorical.index) || !is.list(request) ||
+      !identical(request$bws,bws) || !identical(request$xdat,x) ||
+      !identical(request$ydat,y) || !identical(request$exdat,ex))
+    stop("regression inference capture does not match its fit request",call.=FALSE)
+  state <- fit[["fit.inference", exact=TRUE]]
+  projection <- fit[["fit.projection", exact=TRUE]]
+  spec <- npValidatedConditionalRegSpec(bws,where="regression inference capture",
+                                        ncon.field="ncon")
+  scalar <- npIsCanonicalLp0Spec(spec,bws$ncon)
+  width <- if (scalar) 1L else npLpBasisNcol(spec$basis.engine,spec$degree.engine)
+  n <- nrow(x); m <- nrow(ex); d <- bws$ncon
+  if (!is.list(state) || length(state)!=4L || !is.list(projection) ||
+      length(projection)!=3L ||
+      !identical(dim(projection[[1L]]),c(n,as.integer(width))) ||
+      !identical(dim(projection[[2L]]),c(m,as.integer(width))) ||
+      !identical(dim(state[[1L]]),c(m,as.integer(width*d))) ||
+      length(state[[2L]])!=n || length(state[[3L]])!=m ||
+      !identical(dim(state[[4L]]),c(3L,ncol(x))))
+    stop("invalid compact regression inference state",call.=FALSE)
+  direction <- NULL
+  if (!is.null(deriv)) {
+    order <- rep_len(request$gradient.order,d)
+    if (!isTRUE(request$gradients) || length(deriv)!=d || anyNA(deriv) ||
+        any(deriv<0L) || sum(deriv>0L)!=1L)
+      stop("derivative is absent from the regression inference capture",call.=FALSE)
+    direction <- which(deriv>0L)
+    if (deriv[direction]!=order[direction])
+      stop("derivative order differs from the regression inference capture",call.=FALSE)
+  }
+  geometry <- .np_plot_lsq_gate_geometry(bws,x,ex,max.bytes=max.bytes)
+  attr(geometry,".np.fit.gate") <- state[[4L]]
+  operator <- function(evaluation, derivative=NULL, index=NULL) {
+    index <- .np_plot_lsq_gate_indices(index,m)
+    if (!identical(derivative,deriv) ||
+        !identical(evaluation,ex[index,,drop=FALSE]))
+      stop("regression inference tile differs from its complete request",call.=FALSE)
+    if (!is.null(direction) && scalar)
+      return(.np_plot_lsq_gate_derivative(bws,x,ex,s=as.integer(deriv),
+        max.bytes=max.bytes,.np.gate=state[[4L]],.np.index=index))
+    adjoint <- if (is.null(direction)) projection[[2L]][index,,drop=FALSE] else
+      state[[1L]][index,(direction-1L)*width+seq_len(width),drop=FALSE]
+    weights <- .np_plot_lsq_gate_weights(bws,geometry,index,max.bytes=max.bytes)
+    .Call("C_np_plot_projection_apply",projection[[1L]],adjoint,weights,PACKAGE="np")
+  }
+  list(operator=operator,residual=state[[2L]])
+}
+
 .np_plot_regression_joint_covariance <- function(bws, xdat, ydat, exdat,
                                                 residual = NULL, deriv = NULL,
                                                 categorical.index = NULL,
                                                 factor = FALSE,
                                                 block.bytes = 4 * 1024^2,
-                                                max.bytes = 64 * 1024^2) {
+                                                max.bytes = 64 * 1024^2, fit = NULL) {
   n <- nrow(xdat)
   g <- nrow(exdat)
   ydat <- .np_hat_response(ydat, bws[["ydati", exact = TRUE]])
@@ -216,11 +277,15 @@
   if ((!factor && g > 512L) || rows < 1)
     .np_plot_joint_unavailable("joint covariance exceeds the plot memory/grid budget")
   rows <- min(rows, n, g)
-  operator <- function(evaluation, derivative = NULL) {
+  operator <- function(evaluation, derivative = NULL, index = NULL) {
     npreghat(bws = bws, txdat = xdat, exdat = evaluation, deriv = derivative,
              output = "matrix", .np.require.finite = TRUE)
   }
-  z <- residual
+  captured <- if (!is.null(fit[["fit.inference", exact=TRUE]]))
+    .np_plot_regression_capture_operator(fit,bws,xdat,ydat,exdat,deriv,
+      categorical.index,max.bytes) else NULL
+  z <- if (is.null(captured)) residual else captured$residual
+  if (!is.null(captured)) operator <- captured$operator
   if (is.null(z) && bws[["type", exact = TRUE]] %in% c("generalized_nn", "adaptive_nn"))
     z <- .np_plot_response_residuals(bws, xdat, ydat, rows)$residual
   if (is.null(z)) {
@@ -263,7 +328,7 @@
     if (!is.null(deriv))
       stop("joint covariance cannot combine continuous and categorical derivatives",
            call. = FALSE)
-    evaluation.operator <- function(evaluation, derivative = NULL) {
+    evaluation.operator <- function(evaluation, derivative = NULL, index = NULL) {
       frames <- npCategoricalFirstDifferenceFrames(evaluation, categorical.index,
                                                    "plot joint covariance")
       operator(frames$upper) - operator(frames$lower)
@@ -275,7 +340,7 @@
   starts <- seq.int(1L, g, by = rows)
   for (a in seq_along(starts)) {
     ia <- seq.int(starts[a], min(g, starts[a] + rows - 1L))
-    hat <- evaluation.operator(exdat[ia, , drop = FALSE], deriv)
+    hat <- evaluation.operator(exdat[ia, , drop = FALSE], deriv, ia)
     if (!is.null(estimate)) estimate[ia] <- drop(hat %*% ydat)
     left <- sweep(hat, 2L, z, "*")
     if (factor) {
@@ -285,7 +350,7 @@
     for (b in seq_len(a)) {
       ib <- seq.int(starts[b], min(g, starts[b] + rows - 1L))
       right <- if (a == b) left else
-        sweep(evaluation.operator(exdat[ib, , drop = FALSE], deriv), 2L, z, "*")
+        sweep(evaluation.operator(exdat[ib, , drop = FALSE], deriv, ib), 2L, z, "*")
       cell <- tcrossprod(left, right)
       covariance[ia, ib] <- cell
       covariance[ib, ia] <- t(cell)
