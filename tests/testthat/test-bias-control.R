@@ -93,6 +93,8 @@ test_that("target blocks cover both axes without changing target-major indices",
 })
 
 test_that("projector geometry does not depend on an unused HC3 denominator", {
+  if (!spawn_mpi_slaves(n=1L)) skip("MPI pool unavailable in this test context")
+  on.exit(close_mpi_slaves(force=TRUE), add=TRUE)
   old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
   set.seed(42);n <- 120L;x <- runif(n);f <- factor(sample(c("a","b"),n,TRUE))
   y <- sin(4*x)+(f=="b")+rnorm(n,sd=.3);X <- data.frame(lx=log(x),f=f)
@@ -111,6 +113,8 @@ test_that("projector geometry does not depend on an unused HC3 denominator", {
 })
 
 test_that("regularized Bernstein GNN rows retain the fitted model and correction covariance", {
+  if (!spawn_mpi_slaves(n=1L)) skip("MPI pool unavailable in this test context")
+  on.exit(close_mpi_slaves(force=TRUE), add=TRUE)
   old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
   set.seed(1501080011);x <- data.frame(x1=runif(800),x2=runif(800))
   y <- sin(3*x$x1)+x$x2^2
