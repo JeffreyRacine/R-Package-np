@@ -63,7 +63,9 @@
   for(g in seq_along(state$index)) {
     local <- which(rows %in% state$index[[g]])
     if(!length(local))next
-    state$maximum[g,] <- pmax(state$maximum[g,],apply(absolute[local,,drop=FALSE],2L,max))
+    maximum <- state$maximum[g,]
+    for(j in local)maximum <- pmax(maximum,absolute[j,])
+    state$maximum[g,] <- maximum
     if(!state$gaussian)for(j in local) {
       q <- unname(quantile(absolute[j,],c(1-state$alpha,1-state$alpha/length(state$index[[g]])),type=1L))
       state$point[rows[j],] <- q[seq_along(state$alpha)]
@@ -82,22 +84,20 @@
   for(g in seq_along(index)) {
     ii <- index[[g]];m <- length(ii)
     raw.max[,g] <- unname(quantile(state$maximum[g,],1-alpha,type=1L))
-    for(j in ii) {
-      if(state$gaussian) {
-        point <- qnorm(alpha/2,lower.tail=FALSE)
-        bonf <- qnorm(alpha/(2*m),lower.tail=FALSE)
-        simultaneous <- pmin(bonf,pmax(point,raw.max[,g]))
-      } else {
-        point <- state$point[j,];bonf <- state$bonf[j,]
-        simultaneous <- raw.max[,g]
-        if(any(point>simultaneous))stop("maximum marginal-order invariant failed",call.=FALSE)
-        bonf <- pmax(bonf,simultaneous)
-      }
-      for(band in names(limits)) {
-        critical <- switch(band,pointwise=point,simultaneous=simultaneous,bonferroni=bonf)
-        limits[[band]][j,1L,] <- -critical
-        limits[[band]][j,2L,] <- critical
-      }
+    if(state$gaussian) {
+      point <- matrix(rep(qnorm(alpha/2,lower.tail=FALSE),each=m),m,length(alpha))
+      bonf <- matrix(rep(qnorm(alpha/(2*m),lower.tail=FALSE),each=m),m,length(alpha))
+      simultaneous <- pmin(bonf,pmax(point,matrix(rep(raw.max[,g],each=m),m,length(alpha))))
+    } else {
+      point <- state$point[ii,,drop=FALSE];bonf <- state$bonf[ii,,drop=FALSE]
+      simultaneous <- matrix(rep(raw.max[,g],each=m),m,length(alpha))
+      if(any(point>simultaneous))stop("maximum marginal-order invariant failed",call.=FALSE)
+      bonf <- pmax(bonf,simultaneous)
+    }
+    for(band in names(limits)) {
+      critical <- switch(band,pointwise=point,simultaneous=simultaneous,bonferroni=bonf)
+      limits[[band]][ii,1L,] <- -critical
+      limits[[band]][ii,2L,] <- critical
     }
   }
   list(limits=limits,raw_max_critical=raw.max)
