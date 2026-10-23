@@ -113,7 +113,16 @@ np_bias_control(construction = c("iterated", "legacy"),
 
   The original one/two-continuous, LC/LL/quadratic defaults have encouraging
   finite-sample evidence, especially for
-  Gaussian and Mammen calibration. Auxiliary fits require adequate local
+  Gaussian and Mammen calibration. Regularized generalized-neighbor main
+  fits with a stored Bernstein basis use their complete canonical observation
+  rows, including the numerical ridge and intercept restoration. Polynomial
+  correction includes their regularization bias; covariance uses the complete
+  corrected rows. This does not establish coverage for unidentified pilot fits
+  or a uniform honesty guarantee. Other regularized main rows remain unqualified.
+  Per-target/frame numerical ridge values are returned in
+  \code{inference$main.regularization}, and \code{inference$covariance}
+  describes the variance and calibration construction.
+  Auxiliary fits require adequate local
   support throughout the retained training sample, including observations
   outside the displayed grid. Skewed or heavy-tailed predictors can cause
   explicit auxiliary-rank failures; trimming the plot grid does not fix these.

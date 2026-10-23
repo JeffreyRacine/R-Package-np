@@ -129,13 +129,19 @@
     H <- npreghat(spec$bws,txdat=spec$x,exdat=evals,s=s,output="matrix",.np.require.finite=TRUE)
     ridge <- attr(H,"ridge.used",exact=TRUE)
   }
-  if (is.null(ridge) || any(!is.finite(ridge)) || any(ridge!=0) || any(!is.finite(H)))
-    stop("bias correction requires identified zero-ridge main rows",call.=FALSE)
+  if (is.null(ridge) || any(!is.finite(ridge)) || any(ridge<0) || any(!is.finite(H)))
+    stop("bias correction requires finite canonical main observation rows",call.=FALSE)
+  admitted <- spec$bws[["type"]]=="generalized_nn" &&
+    any(reg[["degree.engine"]]>1L) && isTRUE(reg[["bernstein.basis.engine"]])
+  if (any(ridge!=0) && !admitted)
+    stop("regularized main rows are qualified only for generalized-NN GLP models with a stored Bernstein basis; the fitted model has not been changed",call.=FALSE)
+  attr(H,"ridge.used") <- ridge
   H
 }
 
 .np_bias_original <- function(spec,grid,map,block=16L) {
   out <- matrix(0,nrow(map),nrow(spec$x))
+  regularization <- list()
   for(target in unique(map$target)) {
     rr <- which(map$target==target)
     for(first in seq.int(1L,length(rr),by=block)) {
@@ -143,10 +149,15 @@
       frames <- lapply(jj,function(j).np_bias_frames(spec,grid[map$row[j],,drop=FALSE],target))
       for(k in seq_along(frames[[1L]]$sign)) {
         evals <- do.call(rbind,lapply(frames,function(f)f$e[[k]]))
-        out[jj,] <- out[jj,,drop=FALSE]+frames[[1L]]$sign[k]*.np_bias_main_rows(spec,evals,frames[[1L]]$nu)
+        H <- .np_bias_main_rows(spec,evals,frames[[1L]]$nu)
+        regularization[[length(regularization)+1L]] <- data.frame(
+          row=map$row[jj],target=target,frame=k,ridge=attr(H,"ridge.used",exact=TRUE),
+          stringsAsFactors=FALSE)
+        out[jj,] <- out[jj,,drop=FALSE]+frames[[1L]]$sign[k]*H
       }
     }
   }
+  attr(out,"main.regularization") <- do.call(rbind,regularization)
   out
 }
 
@@ -172,6 +183,8 @@
     stop("internal bias target block exceeded",call.=FALSE)
   for(j in seq_len(spec$d))grid[[spec$numeric.cols[j]]] <- (grid[[spec$numeric.cols[j]]]-spec$offset[j])/spec$scale[j]
   L <- .np_bias_original(spec,grid,map)
+  regularization <- attr(L,"main.regularization",exact=TRUE)
+  attr(L,"main.regularization") <- NULL
   op <- .np_bias_stable_prepare(spec,grid,map)
   W <- .np_bias_polynomial(spec,grid,map,L,op$projectors)
   target <- .np_bias_stable_target(spec,grid,map,op)
@@ -198,5 +211,5 @@
   factor <- sweep(C,2L,sqrt(spec$variance),"*")
   if(any(!is.finite(factor)))stop("nonfinite corrected influence rows",call.=FALSE)
   list(W=C,original=L,center=drop(C%*%spec$y),original_center=drop(L%*%spec$y),
-    se=sqrt(rowSums(factor^2)),factor=factor)
+    se=sqrt(rowSums(factor^2)),factor=factor,main.regularization=regularization)
 }
