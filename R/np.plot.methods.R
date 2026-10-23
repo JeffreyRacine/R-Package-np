@@ -36,7 +36,7 @@
 }
 
 np_boot_control <- function(nonfixed = c("exact", "frozen"),
-                            wild = c("rademacher", "mammen"),
+                            wild = c("mammen", "rademacher"),
                             blocklen = NULL) {
   nonfixed <- match.arg(nonfixed)
   wild <- match.arg(wild)
@@ -251,7 +251,7 @@ np_render_control <- function(style = c("band", "bar"),
   identical(layout, "auto")
 }
 
-.np_plot_normalize_public_dots <- function(dots, context = "plot") {
+.np_plot_normalize_public_dots <- function(dots, context = "plot", allow_asymptotic_bias = FALSE) {
   supplied <- names(dots)
   has <- function(x) x %in% supplied
 
@@ -427,8 +427,8 @@ np_render_control <- function(style = c("band", "bar"),
   boot.only <- c("plot.errors.boot.method", "plot.errors.boot.num",
                  "plot.errors.boot.nonfixed", "plot.errors.boot.wild",
                  "plot.errors.boot.blocklen")
-  boot.supplied <- any(c("bootstrap", "B", "boot.control", "center",
-                         "plot.errors.center", boot.only) %in% supplied)
+  center.only <- if (allow_asymptotic_bias && identical(method,"asymptotic")) character() else c("center","plot.errors.center")
+  boot.supplied <- any(c("bootstrap", "B", "boot.control", center.only, boot.only) %in% supplied)
   if (!identical(method, "bootstrap") && boot.supplied)
     stop("bootstrap controls require errors = \"bootstrap\"",
          call. = FALSE)
@@ -454,7 +454,9 @@ np_render_control <- function(style = c("band", "bar"),
     context = .plot_context
   )
   dots <- list(...)
-  dots <- .np_plot_normalize_public_dots(dots, context = .plot_context)
+  dots <- .np_plot_normalize_public_dots(dots, context = .plot_context,
+    allow_asymptotic_bias = identical(method,.np_plot_rbandwidth_engine) ||
+      (identical(method,.np_plot_compat_dispatch) && inherits(bws,"rbandwidth")))
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 
@@ -672,7 +674,7 @@ np_render_control <- function(style = c("band", "bar"),
     context = "plot.npregression"
   )
   dots <- list(...)
-  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npregression")
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npregression", allow_asymptotic_bias = TRUE)
   if (is.null(dots$xdat) && is.null(dots$ydat))
     object$bws <- .np_plot_restore_bandwidth_from_call(
       object, object$bws, caller_env = parent.frame(2L)

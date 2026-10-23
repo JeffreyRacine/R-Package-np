@@ -544,7 +544,8 @@
                                             plot.errors.center = "estimate",
                                             continuous = TRUE,
                                             shared = FALSE,
-                                            per.quantile = FALSE) {
+                                            per.quantile = FALSE,
+                                            construction = NULL) {
   method <- match.arg(as.character(plot.errors.method)[1L],
                       c("bootstrap", "asymptotic"))
   band <- match.arg(as.character(plot.errors.type)[1L],
@@ -615,6 +616,14 @@
     candidates <- gsub("\\bband(s?)\\b", "interval\\1", candidates)
   }
 
+  if (identical(construction, "iterated")) {
+    candidates <- gsub("rank-based", "maximum-based", candidates, fixed=TRUE)
+    candidates <- gsub("bootstrap rank band", "bootstrap maximum band", candidates, fixed=TRUE)
+    candidates <- gsub("bootstrap SD", "corrected SE", candidates, fixed=TRUE)
+    candidates <- gsub("asymptotic SE", "corrected SE", candidates, fixed=TRUE)
+    candidates <- gsub("bootstrap z \u00d7 SD", "bootstrap z \u00d7 SE", candidates, fixed=TRUE)
+  }
+
   if (isTRUE(per.quantile) && band %in% c("simultaneous", "bonferroni", "all")) {
     candidates <- sub("; within each panel$", "", candidates)
     candidates <- sub("simultaneous within each panel", "simultaneous", candidates,
@@ -622,7 +631,8 @@
     candidates <- paste0(candidates, "; within each quantile curve")
   }
 
-  if (identical(method, "bootstrap") && identical(center, "bias-corrected")) {
+  if ((identical(method, "bootstrap") || identical(construction, "iterated")) &&
+      identical(center, "bias-corrected")) {
     suffix <- if (length(candidates) >= 3L) {
       c(rep.int("; bias-corrected center", length(candidates) - 1L),
         "; bias-corrected")
@@ -652,12 +662,13 @@
                                                  context = NULL,
                                                  continuous = TRUE,
                                                  fixed = TRUE,
-                                                 per.quantile = FALSE) {
+                                                 per.quantile = FALSE,
+                                                 construction = NULL) {
   if (!isTRUE(eligible) || isTRUE(sub.supplied) ||
       !isTRUE(fixed) ||
       identical(as.character(plot.errors.method)[1L], "none"))
     return(NULL)
-  list(
+  result <- list(
     plot.errors.method = as.character(plot.errors.method)[1L],
     plot.errors.type = as.character(plot.errors.type)[1L],
     plot.errors.alpha = as.double(plot.errors.alpha)[1L],
@@ -667,6 +678,8 @@
     continuous = continuous,
     per.quantile = per.quantile
   )
+  if (!is.null(construction)) result$construction <- construction
+  result
 }
 
 .np_plot_variability_label_select <- function(candidates,
@@ -749,7 +762,8 @@
     plot.errors.center = spec$plot.errors.center,
     continuous = spec$continuous,
     shared = shared,
-    per.quantile = spec$per.quantile
+    per.quantile = spec$per.quantile,
+    construction = spec[["construction"]]
   )
   if (!length(descriptor$candidates))
     return(invisible(FALSE))
@@ -1251,7 +1265,7 @@
   invisible(NULL)
 }
 
-.np_plot_normalize_wild <- function(wild = c("rademacher", "mammen")) {
+.np_plot_normalize_wild <- function(wild = c("mammen", "rademacher")) {
   if (length(wild) > 1L)
     wild <- wild[1L]
   match.arg(wild, c("mammen", "rademacher"))
@@ -4186,7 +4200,7 @@
                                                 bws,
                                                 ydat,
                                                 B,
-                                                wild = c("rademacher", "mammen"),
+                                                wild = c("mammen", "rademacher"),
                                                 fit.mean.train = NULL,
                                                 gradients = FALSE,
                                                 gradient.order = 1L,
@@ -4339,7 +4353,7 @@
                                             bws,
                                             ydat,
                                             B,
-                                            wild = c("rademacher", "mammen"),
+                                            wild = c("mammen", "rademacher"),
                                             fit.mean.train = NULL,
                                             gradients = FALSE,
                                             gradient.order = 1L,
@@ -5828,7 +5842,7 @@
                                            ezdat,
                                            bws,
                                            B,
-                                           wild = c("rademacher", "mammen"),
+                                           wild = c("mammen", "rademacher"),
                                            leave.one.out = FALSE,
                                            progress.label = NULL,
                                            target = c("mean", "grad"),
@@ -11273,7 +11287,7 @@ draw.all.error.types <- function(ex, center, all.err,
                                  legend = TRUE,
                                  xi.factor = FALSE,
                                  plot.errors.method,
-                                 annotation = NULL){
+                                 annotation = NULL, construction = NULL){
   if (is.null(all.err)) return(invisible(NULL))
 
   if (xi.factor) {
@@ -11314,7 +11328,8 @@ draw.all.error.types <- function(ex, center, all.err,
       lty = .np_plot_lty("interval"),
       lwd = .np_plot_lwd("band_all_1d"),
       plot.errors.method = plot.errors.method,
-      drawn = drawn
+      drawn = drawn,
+      construction = construction
     )
   if (any(drawn))
     .np_plot_draw_variability_annotation(annotation)
@@ -12760,9 +12775,14 @@ plotFactor <- function(f, y, ...){
        call. = FALSE)
 }
 
-.np_plot_all_band_legend_labels <- function(plot.errors.method) {
+.np_plot_all_band_legend_labels <- function(plot.errors.method, construction = NULL) {
   method <- match.arg(as.character(plot.errors.method)[1L],
                       c("bootstrap", "asymptotic"))
+  if (identical(method, "bootstrap") && identical(construction, "iterated")) {
+    return(c(pointwise="Pointwise (quantiles)",
+      simultaneous="Simultaneous (maximum, finite grid)",
+      bonferroni="Bonferroni (quantile envelope)"))
+  }
   if (identical(method, "bootstrap")) {
     c(pointwise = "Pointwise (quantiles)",
       simultaneous = "Simultaneous (rank-based)",
@@ -12808,7 +12828,8 @@ plotFactor <- function(f, y, ...){
                                           plot.errors.method,
                                           drawn = NULL,
                                           lerr.all = NULL,
-                                          herr.all = NULL) {
+                                          herr.all = NULL,
+                                          construction = NULL) {
   band.cols <- .np_plot_all_band_colors()
   band.names <- c("pointwise", "simultaneous", "bonferroni")
   explicit.labels <- is.list(legend.value) && !is.null(legend.value$legend)
@@ -12822,7 +12843,7 @@ plotFactor <- function(f, y, ...){
   }
   if (!length(band.names))
     return(NULL)
-  labels <- .np_plot_all_band_legend_labels(plot.errors.method)
+  labels <- .np_plot_all_band_legend_labels(plot.errors.method, construction)
   .np_plot_legend_args(
     list(x = x,
          legend = unname(labels[band.names]),
@@ -12844,7 +12865,8 @@ plotFactor <- function(f, y, ...){
                                           plot.errors.method = NULL,
                                           drawn = NULL,
                                           lerr.all = NULL,
-                                          herr.all = NULL) {
+                                          herr.all = NULL,
+                                          construction = NULL) {
   if (is.null(plot.errors.method))
     plot.errors.method <- if (!is.null(lerr.all$simultaneous) ||
                               !is.null(herr.all$simultaneous)) {
@@ -12866,7 +12888,8 @@ plotFactor <- function(f, y, ...){
     plot.errors.method = plot.errors.method,
     drawn = drawn,
     lerr.all = lerr.all,
-    herr.all = herr.all
+    herr.all = herr.all,
+    construction = construction
   )
   if (!is.null(legend.args))
     do.call(graphics::legend, legend.args)
@@ -15796,7 +15819,7 @@ compute.default.error.range <- function(center, err) {
                                              plot.errors.method,
                                              plot.errors.boot.method,
                                              plot.errors.boot.nonfixed = c("exact", "frozen"),
-                                             plot.errors.boot.wild = c("rademacher", "mammen"),
+                                             plot.errors.boot.wild = c("mammen", "rademacher"),
                                              plot.errors.boot.blocklen,
                                              plot.errors.center,
                                              plot.errors.type,
@@ -15808,7 +15831,9 @@ compute.default.error.range <- function(center, err) {
                                              ylim,
                                              allow_asymptotic_quantile = TRUE,
                                              allow_asymptotic_simultaneous = FALSE,
-                                             error.request = NULL) {
+                                             error.request = NULL,
+                                             allow_asymptotic_bias = FALSE,
+                                             defer_block_selection = FALSE) {
   scalar_choice <- function(value, default) {
     if (is.null(value) || length(value) < 1L || is.na(value[1L])) default else value[1L]
   }
@@ -15830,8 +15855,8 @@ compute.default.error.range <- function(center, err) {
     c("exact", "frozen")
   )
   plot.errors.boot.wild <- match.arg(
-    scalar_choice(plot.errors.boot.wild, "rademacher"),
-    c("rademacher", "mammen")
+    scalar_choice(plot.errors.boot.wild, "mammen"),
+    c("mammen", "rademacher")
   )
   plot.errors.center <- match.arg(
     scalar_choice(plot.errors.center, "estimate"),
@@ -15872,13 +15897,13 @@ compute.default.error.range <- function(center, err) {
     if (!allow_asymptotic_simultaneous && plot.errors.type == "all")
       .np_warning("asymptotic simultaneous confidence bands are unavailable here; 'all' returns pointwise/bonferroni and NA simultaneous")
 
-    if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
+    if (!allow_asymptotic_bias && .np_plot_center_is_bias_corrected(plot.errors.center)) {
       .np_warning("no bias corrections can be calculated with asymptotics, centering on estimate")
       plot.errors.center <- "estimate"
     }
   }
 
-  if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
+  if (!defer_block_selection && is.element(plot.errors.boot.method, c("fixed", "geom")) &&
       is.null(plot.errors.boot.blocklen))
     plot.errors.boot.blocklen <- b.star(xdat, round = TRUE)[1,1]
 
@@ -16969,7 +16994,7 @@ compute.bootstrap.errors.rbandwidth =
            slice.index,
            plot.errors.boot.method,
            plot.errors.boot.nonfixed = c("exact", "frozen"),
-           plot.errors.boot.wild = c("rademacher", "mammen"),
+           plot.errors.boot.wild = c("mammen", "rademacher"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -17432,7 +17457,7 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.boot.method,
            t0.override = NULL,
            plot.errors.boot.nonfixed = c("exact", "frozen"),
-           plot.errors.boot.wild = c("rademacher", "mammen"),
+           plot.errors.boot.wild = c("mammen", "rademacher"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -17723,7 +17748,7 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.boot.method,
            t0.override = NULL,
            plot.errors.boot.nonfixed = c("exact", "frozen"),
-           plot.errors.boot.wild = c("rademacher", "mammen"),
+           plot.errors.boot.wild = c("mammen", "rademacher"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -18832,7 +18857,7 @@ compute.bootstrap.errors.sibandwidth =
            gradients,
            plot.errors.boot.method,
            plot.errors.boot.nonfixed = c("exact", "frozen"),
-           plot.errors.boot.wild = c("rademacher", "mammen"),
+           plot.errors.boot.wild = c("mammen", "rademacher"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,

@@ -39,7 +39,7 @@
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
            plot.errors.boot.nonfixed = c("exact", "frozen"),
-           plot.errors.boot.wild = c("rademacher", "mammen"),
+           plot.errors.boot.wild = c("mammen", "rademacher"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 9999,
            plot.errors.center = c("estimate", "bias-corrected"),
