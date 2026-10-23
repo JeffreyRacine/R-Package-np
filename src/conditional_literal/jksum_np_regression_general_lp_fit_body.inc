@@ -1106,7 +1106,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       for(i = 0; i < owner->nterms; ++i)
         call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];
     }
-    if(call->fit_projection != NULL) {
+    if(call->fit_projection != NULL && call->fit_projection->inference_residual == NULL) {
       for(i = 0; i < owner->nterms; ++i)
         owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
       if(np_lp_solve_workspace_solve_adjoint_factored(
@@ -1292,6 +1292,21 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       }
 
       if(have_vcov) {
+        if(ordinary_hc0 && call->fit_projection != NULL &&
+           call->fit_projection->inference_residual != NULL) {
+          NPRegressionFitProjection *out=call->fit_projection;
+          np_fit_projection_row(out,owner->solve_workspace.rhs_work,j);
+          out->inference_ridge[out->eval_map[j]]=solve_diagnostics.ridge_total;
+          int rhs=1;
+          if(call->do_grad && call->do_gerr)
+            for(int d=0;d<num_reg_continuous;++d)
+              if(np_glp_gradient_direction_active(d)) {
+                for(int k=0;k<owner->nterms;++k)
+                  out->inference_gradient[out->eval_map[j]+(size_t)out->neval*(k+(size_t)d*out->width)]=
+                    owner->solve_workspace.rhs_work[k+(size_t)rhs*owner->nterms];
+                ++rhs;
+              }
+        }
         if(ordinary_hc0) {
           if(owner->inference_reuse.entry != NULL)
             np_inference_reuse_begin_row(

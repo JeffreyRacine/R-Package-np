@@ -132,6 +132,9 @@ typedef struct {
 typedef struct {
   int ntrain, neval, width, emitted, constant;
   double *basis, *projection;
+  /* Opt-in ordinary-regression inference capture; NULL preserves old owners. */
+  double *inference_gradient, *inference_residual, *inference_ridge, *inference_gate;
+  int inference_ncon;
   const int *donor_map, *eval_map;
 } NPRegressionFitProjection;
 

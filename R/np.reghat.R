@@ -1620,8 +1620,12 @@ npreghat <-
                                   gradient.order = 1L,
                                   local.mode = FALSE, allow.empty.rows = FALSE,
                                   gradient.coordinate = NULL,
-                                  fit.projection = FALSE) {
+                                  fit.projection = FALSE, fit.inference = FALSE) {
   no.ex <- is.null(exdat)
+  inference.identity <- if (isTRUE(fit.inference))
+    list(bws=bws, xdat=toFrame(txdat),
+      ydat=.np_hat_response(tydat,bws[["ydati",exact=TRUE]]), exdat=toFrame(exdat),
+      gradients=gradients, gradient.order=gradient.order) else NULL
   se <- npValidateScalarLogical(se, "se")
   gradients <- npValidateScalarLogical(gradients, "gradients")
   local.mode <- .npRmpi_regression_native_local_mode(local.mode)
@@ -1887,6 +1891,17 @@ npreghat <-
     output.request <- c(output.request,
       as.integer(npLpBasisNcol(reg.spec$basis.engine, degree.c)))
   }
+  if (isTRUE(fit.inference)) {
+    if (!se || no.ex || isTRUE(fit.projection) || !is.null(gradient.coordinate) ||
+        !identical(bws[["type", exact=TRUE]], "fixed") ||
+        !identical(bws[["ckertype", exact=TRUE]], "gaussian") ||
+        bws[["ckerorder", exact=TRUE]] != 2L ||
+        !identical(bws[["ckerbound", exact=TRUE]], "none") || bws$ncon < 1L)
+      stop("compact regression inference requires an external fixed unbounded second-order Gaussian SE fit",call.=FALSE)
+    attr(output.request,".np.inference.width") <- as.integer(
+      if (npIsCanonicalLp0Spec(reg.spec,bws$ncon)) 1L else
+        npLpBasisNcol(reg.spec$basis.engine,degree.c))
+  }
   if (!is.null(gradient.coordinate))
     attr(output.request, ".np.gradient.coordinate") <- as.integer(match(
       gradient.coordinate, c(which(bws[["icon", exact = TRUE]]),
@@ -1925,8 +1940,12 @@ npreghat <-
 
   .npreg_report_variance_unavailable(myout)
   out <- list(mean = mean.out)
-  if (isTRUE(fit.projection))
+  if (isTRUE(fit.projection) || isTRUE(fit.inference))
     out$fit.projection <- attr(myout, ".np.fit.projection", exact = TRUE)
+  if (isTRUE(fit.inference)) {
+    out$fit.inference <- attr(myout, ".np.fit.inference", exact=TRUE)
+    out$fit.request <- inference.identity
+  }
 
   if (se)
     out$merr <- as.double(myout$merr)
