@@ -591,6 +591,15 @@
     )
   )
 
+  if (identical(construction, "iterated") && identical(method, "asymptotic") &&
+      !identical(band, "pmzsd")) {
+    candidates <- switch(band,
+      pointwise=sprintf("%s pointwise Gaussian studentized band (quantiles)", level),
+      bonferroni=sprintf("%s Bonferroni Gaussian studentized band (quantile envelope)", level),
+      simultaneous=sprintf("%s Gaussian studentized maximum band; finite grid within panel", level),
+      all=sprintf("%s Gaussian studentized bands", level))
+  }
+
   if (isTRUE(shared)) {
     candidates <- gsub("\\bbands?\\b", "intervals", candidates)
     if (identical(key, "bootstrap:simultaneous")) {
@@ -8256,7 +8265,7 @@ plotFactor <- function(f, y, ...){
 .np_plot_all_band_legend_labels <- function(plot.errors.method, construction = NULL) {
   method <- match.arg(as.character(plot.errors.method)[1L],
                       c("bootstrap", "asymptotic"))
-  if (identical(method, "bootstrap") && identical(construction, "iterated")) {
+  if (identical(construction, "iterated")) {
     return(c(pointwise="Pointwise (quantiles)",
       simultaneous="Simultaneous (maximum, finite grid)",
       bonferroni="Bonferroni (quantile envelope)"))

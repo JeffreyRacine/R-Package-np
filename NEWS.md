@@ -1,5 +1,11 @@
 # np 0.80-1
 
+- Calibrate iterated bias-corrected Gaussian and Mammen regression bands using
+  replicate-specific residual-pilot studentization. Preserve the corrected
+  center, observed SE, 16 iterations and selected model. Record the construction
+  in returned inference metadata and describe empirical Gaussian marginal
+  quantiles accurately in plot labels. Other bootstrap laws remain unchanged.
+
 - Activate coordinatewise local-to-global bias correction for eligible fixed
   Gaussian regression plots, reusing the actual fitted observation rows and
   adapted P0 residuals. Preserve frozen settings, bounded storage, and ordinary

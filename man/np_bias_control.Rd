@@ -124,12 +124,15 @@ np_bias_control(construction = c("iterated", "legacy"),
   Use \code{errors="asymptotic"} for Gaussian calibration or
   \code{errors="bootstrap"} with the existing \code{bootstrap} and
   \code{\link{np_boot_control}} choices. Mammen is the default wild law;
-  explicit Rademacher remains available. In the iterated construction, Gaussian,
-  Mammen and Rademacher multiply the same complete observation rows scaled by
-  the smoothed variance estimate. Mammen and Rademacher are fixed-factor
-  multiplier calibrations, not residual wild refits. They need not have the
-  same finite-sample tails as Gaussian, especially when a few observations
-  dominate a target. The iterated inid, fixed and geom
+  explicit Rademacher remains available. In the iterated construction, Gaussian
+  and Mammen use a residual-pilot studentized multiplier process. Each draw
+  perturbs the fitted P0 pilot by Gaussian or Mammen innovations scaled by the
+  observed smoothed variance. The same normalized P0 residual operator and
+  variance smoother then provide that draw's denominator. Numerators use the
+  complete corrected observation rows. The corrected center and observed
+  standard errors are unchanged; replicate-specific denominators calibrate all
+  three interval types. No bandwidth or degree is reselected. Rademacher retains
+  its fixed-factor multiplier calibration. The iterated inid, fixed and geom
   constructions resample corrected residual scores rather than refitting each
   row resample. Inid uses the smoothed variance refinement; fixed and geom use
   their score-bootstrap scale. Automatic block selection uses raw P0 residuals
@@ -141,15 +144,19 @@ np_bias_control(construction = c("iterated", "legacy"),
   and \code{"all"} share the corrected center and scale. Simultaneous
   coverage refers to the finite displayed grid within each scalar target
   family. Bands are nested and coincide for a singleton family. Gaussian
-  marginal limits are analytic; bootstrap limits use absolute studentized
-  draws and an outward Bonferroni envelope. \code{band="pmzsd"} retains
+  and bootstrap marginal limits use absolute studentized draws and an outward
+  Bonferroni envelope. \code{band="pmzsd"} retains
   its normal-quantile times standard-error meaning. Use \code{gaussian.draws}
   or \code{B} to control calibration precision. Increasing the number of
   draws can be necessary for remote empirical Bonferroni tails on large grids.
 
   The original one/two-continuous, LC/LL/quadratic defaults have encouraging
-  finite-sample evidence, especially for
-  Gaussian and Mammen calibration. Regularized generalized-neighbor main
+  finite-sample evidence, especially for Gaussian and Mammen calibration.
+  Independent confirmation of the studentized construction used fixed
+  one-predictor models at sample sizes 100 and 250, degrees 0, 2 and 4, with
+  quadratic and sinusoidal signals. Broader mixed-data and nearest-neighbor
+  support has numerical validation; this is not evidence of comparable coverage
+  throughout those classes. Regularized generalized-neighbor main
   fits with a stored Bernstein basis use their complete canonical observation
   rows, including the numerical ridge and intercept restoration. Polynomial
   correction includes their regularization bias; covariance uses the complete
@@ -181,7 +188,9 @@ np_bias_control(construction = c("iterated", "legacy"),
   categorical borrowing and substantially increase interval widths, especially
   in small profiles. Computation includes streamed quadratic-time training
   operators; absence of a training-square matrix does not imply linear time.
-  MPI currently distributes calibration draws, not the training operators.
+  MPI distributes calibration draws, including their residual-pilot projections
+  and variance calculations. Observed-data preparation retains its existing
+  computational ownership.
   These results are not a uniform honesty guarantee
   over arbitrary regression functions or smoothing choices. Difficult
   localized bumps, residual bias and dependent-data mean coverage remain
@@ -201,7 +210,10 @@ np_bias_control(construction = c("iterated", "legacy"),
   errors, all three bands, evaluation grid and target mapping, requested and
   effective controls (including the named auxiliary degree vector, its rule
   and term count in \code{settings$degree_spec}), main-model settings, training-row metadata, calibration
-  law and draw count, block selection and RNG state. The historical \code{bias}
+  law and draw count, block selection and RNG state. For Gaussian/Mammen
+  studentized calibration, \code{inference$studentization} records the
+  construction and bounded training/draw block sizes; \code{inference$covariance}
+  records the denominator and calibration methods. The historical \code{bias}
   and \code{gbias} sign conventions are preserved. With \code{band="all"},
   \code{band.errors} also retains the displayed error widths. The original
   fitted object is unchanged.

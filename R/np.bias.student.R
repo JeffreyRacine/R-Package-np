@@ -1,0 +1,139 @@
+# Re-studentization leaves the corrected rows and observed standard errors fixed.
+# Pilot/variance providers return at most 16 training rows; no square operator
+# or persistent cache is constructed.
+.np_bias_student_p0_hat <- function(bws, x, at) {
+  .npreghat_exact_lp_matrix_from_regression_core(bws, txdat=x, exdat=at,
+    degree=bws[["degree"]], basis=bws[["basis"]],
+    bernstein.basis=bws[["bernstein.basis"]])
+}
+
+.np_bias_student_pilot_owner <- function(pilot) {
+  force(pilot)
+  function(ii) {
+    n <- nrow(pilot$x)
+    if (!length(ii) || length(ii)>16L || anyNA(ii) ||
+        any(ii<1L | ii>n | ii!=floor(ii)))
+      stop("invalid studentization pilot row request", call.=FALSE)
+    if (!is.null(pilot$adaptation)) {
+      a <- pilot$adaptation
+      return(do.call(rbind, lapply(ii, function(i)
+        .np_bias_adaptation_pilot(a, a$x[i,,drop=FALSE], a$geometry$b0,
+          a$Q[i,,drop=FALSE])$H)))
+    }
+    out <- matrix(0,length(ii),n)
+    for (group in pilot$groups) {
+      rows <- which(ii %in% group)
+      if (!length(rows)) next
+      H <- .np_bias_student_p0_hat(pilot$bws, pilot$x[group,,drop=FALSE],
+        pilot$x[ii[rows],,drop=FALSE])
+      ridge <- attr(H,"ridge.used",exact=TRUE)
+      if (length(ridge)!=length(rows) || any(!is.finite(ridge)) || any(ridge!=0))
+        stop("P0 studentization requires an identified residual pilot", call.=FALSE)
+      out[rows,group] <- H
+    }
+    out
+  }
+}
+
+.np_bias_student_variance_owner <- function(smoother) {
+  force(smoother)
+  function(ii) {
+    n <- nrow(smoother$x)
+    if (!length(ii) || length(ii)>16L || anyNA(ii) ||
+        any(ii<1L | ii>n | ii!=floor(ii)))
+      stop("invalid studentization variance row request", call.=FALSE)
+    out <- matrix(0,length(ii),n)
+    for (group in smoother$groups) {
+      rows <- which(ii %in% group)
+      if (!length(rows)) next
+      # Constants cancel in this positive product-kernel normalization.
+      # Keep the frozen one-coordinate operation order.
+      K <- matrix(1,length(rows),length(group))
+      for (j in seq_along(smoother$h))
+        K <- K * exp(-.5*(outer(smoother$x[[j]][ii[rows]],
+          smoother$x[[j]][group],"-")/smoother$h[j])^2)
+      mass <- rowSums(K)
+      if (any(!is.finite(K)) || any(!is.finite(mass)) || any(mass<=0))
+        stop("invalid studentization variance smoother", call.=FALSE)
+      out[rows,group] <- K/mass
+    }
+    out
+  }
+}
+
+.np_bias_student_prepare <- function(state) {
+  pilot <- list(x=state$xcon, groups=state$groups, bws=state$pilot.bws,
+    adaptation=if (is.null(state$adaptation)) NULL else
+      state$adaptation[c("x","Q","geometry")])
+  owner <- .np_bias_student_pilot_owner(pilot)
+  # Zero padding preserves the frozen three-response product shape without
+  # using a true signal or any other simulation-only input.
+  check <- .np_bias_residual_apply(owner,
+    cbind(state$y,state$y-state$residual_raw,0))
+  if (max(abs(check$row_variance-state$residual_row_variance))>1e-8 ||
+      max(abs(check$residual[,1L]-state$residual))>1e-8)
+    stop("studentization residual pilot disagrees with the observed pilot", call.=FALSE)
+  list(pilot=pilot, q=state$residual_row_variance, rmu=check$residual[,2L],
+    root.variance=sqrt(state$variance),
+    smoother=list(x=state$xcon,groups=state$groups,h=state$variance_h))
+}
+
+.np_bias_student_target <- function(prepared, W, se) {
+  A <- .np_bias_right_compose(W^2,
+    .np_bias_student_variance_owner(prepared$smoother))
+  if (any(!is.finite(A)) || any(A<0))
+    stop("invalid studentization variance composition",call.=FALSE)
+  active <- rowSums(abs(W))>0
+  if (any(!is.finite(se)) || any(se<0) || any(active & se==0) || any(!active & se!=0))
+    stop("inconsistent corrected target scale",call.=FALSE)
+  list(A=A,active=active)
+}
+
+.np_bias_student_slices <- function(size) {
+  lapply(seq.int(1L,size,by=256L),function(first)
+    seq.int(first,min(size,first+255L)))
+}
+
+.np_bias_student_errors <- function(root.variance, size, law) {
+  lapply(.np_bias_student_slices(size),function(ii)
+    root.variance * .np_bias_draws(length(root.variance),length(ii),law))
+}
+
+.np_bias_student_chunk <- function(prepared, W, target, size, law) {
+  n <- ncol(W)
+  slices <- .np_bias_student_slices(size)
+  errors <- .np_bias_student_errors(prepared$root.variance,size,law)
+  numerator <- lapply(errors,function(ep) W %*% ep)
+  residual <- matrix(0,n,size)
+  owner <- .np_bias_student_pilot_owner(prepared$pilot)
+  for (first in seq.int(1L,n,by=16L)) {
+    ii <- seq.int(first,min(n,first+15L))
+    H <- owner(ii)
+    for (b in seq_along(slices))
+      residual[ii,slices[[b]]] <-
+        (errors[[b]][ii,,drop=FALSE]-H %*% errors[[b]])/sqrt(prepared$q[ii])
+  }
+  out <- matrix(0,nrow(W),size)
+  for (b in seq_along(slices)) {
+    ii <- slices[[b]]
+    scale <- sqrt(target$A %*% (residual[,ii,drop=FALSE]+prepared$rmu)^2)
+    if (any(!is.finite(scale)) || any(scale[target$active,,drop=FALSE]<=0))
+      stop("nonpositive replicate studentization scale",call.=FALSE)
+    # A zero corrected row is a deterministic target, not a variance floor.
+    out[target$active,ii] <- abs(numerator[[b]][target$active,,drop=FALSE]/
+      scale[target$active,,drop=FALSE])
+  }
+  out
+}
+
+.np_bias_student_draws <- function(prepared, W, se, B, law) {
+  target <- .np_bias_student_target(prepared,W,se)
+  out <- matrix(0,nrow(W),B)
+  for (first in seq.int(1L,B,by=1024L)) {
+    ii <- seq.int(first,min(B,first+1023L))
+    out[,ii] <- .np_bias_student_chunk(prepared,W,target,length(ii),law)
+    .np_plot_progress_notify(stage="Calibrating studentized process",
+      done=max(ii),total=B,unit="draws")
+  }
+  out
+}

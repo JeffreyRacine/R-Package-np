@@ -28,6 +28,8 @@ test_that("corrected plot families nest and singleton limits coincide", {
               gaussian.draws=63L, neval=3L, output="data")[[1L]]
   expect_identical(fit, original)
   expect_identical(.Random.seed, rng)
+  expect_identical(out$inference$studentization$construction, "residual-pilot-v1")
+  expect_identical(out$inference$settings$iterations, 16L)
   expect_true(out$inference$settings$bernstein.basis)
   expect_identical(out$inference$settings$main$degree, bw$degree)
   b <- out$inference$bands
@@ -57,6 +59,12 @@ test_that("iterated intervals describe maximum calibration without relabeling le
   text <- descriptor("asymptotic", "pointwise", .05, "bias-corrected",
                      construction="iterated")$candidates
   expect_true(all(grepl("bias-corrected", text, fixed=TRUE)))
+  expect_true(all(grepl("studentized", text, fixed=TRUE)))
+  expect_false(any(grepl("normal quantile", text, fixed=TRUE)))
+  expect_match(label("asymptotic", "iterated")[["pointwise"]], "quantiles", fixed=TRUE)
+  expect_match(label("asymptotic")[["pointwise"]], "SE", fixed=TRUE)
+  expect_match(descriptor("asymptotic", "pmzsd", .05, "bias-corrected",
+    construction="iterated")$candidates[1], "normal quantile", fixed=TRUE)
 })
 
 
@@ -183,4 +191,32 @@ test_that("public adaptation controls preserve frozen and explicit constructions
   expect_identical(.np_bias_resolve(old.control,x,60L,1L)$adaptation_request,"none")
   bad <- np_bias_control();bad$adaptation <- c("auto","none")
   expect_error(.np_bias_validate_control(bad),"invalid bias adaptation")
+})
+
+
+test_that("studentization streams frozen draw blocks and preserves zero targets", {
+  old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  set.seed(27052)
+  x <- data.frame(x=runif(64));y <- sin(3*x$x)+rnorm(64,sd=.2)
+  bw <- npregbw(xdat=x,ydat=y,bws=.3,bandwidth.compute=FALSE,regtype="ll")
+  state <- np:::.np_bias_regression_prepare(bw,x,y)
+  prepared <- np:::.np_bias_student_prepare(state)
+  map <- expand.grid(row=1:2,target=c("mean","d1"),stringsAsFactors=FALSE)
+  value <- np:::.np_bias_regression_rows(state,x[1:2,,drop=FALSE],map)
+  W <- rbind(value$W,0);se <- c(value$se,0)
+  target <- np:::.np_bias_student_target(prepared,W,se)
+  for(law in c("gaussian","mammen")) {
+    set.seed(27053)
+    expected <- cbind(np:::.np_bias_student_chunk(prepared,W,target,256L,law),
+      np:::.np_bias_student_chunk(prepared,W,target,1L,law))
+    rng <- .Random.seed
+    set.seed(27053)
+    actual <- np:::.np_bias_student_draws(prepared,W,se,257L,law)
+    expect_identical(actual,expected)
+    expect_identical(.Random.seed,rng)
+    expect_true(all(actual[nrow(W),]==0))
+  }
+  bad <- target;bad$A[,] <- 0
+  expect_error(np:::.np_bias_student_chunk(prepared,W,bad,2L,"gaussian"),
+    "nonpositive replicate studentization scale")
 })
