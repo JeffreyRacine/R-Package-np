@@ -118,10 +118,10 @@ np_bias_control(construction = c("iterated", "legacy"),
   smaller anisotropic spaces that still contain the main model.
   The original profile-specific construction admits at most one binary
   unordered and one binary ordered predictor, with every joint profile observed.
-  It supports means, first partial derivatives and categorical first
-  differences. Categorical differences have
-  numerical operator validation; coverage evidence must be interpreted for
-  the configurations actually studied. Higher derivatives, other kernels,
+  It supports means, pure partial derivatives and categorical first
+  differences, with the higher-order qualifications described below.
+  Categorical differences have numerical operator validation; coverage evidence
+  must be interpreted for the configurations actually studied. Other kernels,
   additive and tensor main bases remain outside this construction.
 
   Other categorical layouts use a partially pooled auxiliary for fixed-bandwidth
