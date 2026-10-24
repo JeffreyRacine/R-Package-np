@@ -11,6 +11,7 @@
 
 #include "jksum_lp_solve.h"
 #include "reghat_fast.h"
+#include "regression_precision.h"
 
 /*
  * Exact compiled counterpart of the R loop in
@@ -100,10 +101,19 @@ static SEXP np_lp_adjoint_prepared(SEXP gram, SEXP rhs, SEXP ntrain_arg,
   }
   memcpy(workspace.gram_source, REAL(gram), (size_t)p*(size_t)p*sizeof(double));
   memcpy(workspace.rhs_source, REAL(rhs), (size_t)p*sizeof(double));
+  const double anchor=workspace.gram_source[0];
   const NPLPSolvePolicyStatus status = np_lp_solve_workspace_solve_adjoint_ranked(
     &workspace, p, 1, 1.0/ntrain, rank, &diagnostics);
   if(status == NP_LP_SOLVE_POLICY_OK)
     memcpy(REAL(out), workspace.rhs_work, (size_t)p*sizeof(double));
+  SEXP admission=getAttrib(gram,install(".np.precision.eligible"));
+  if(status==NP_LP_SOLVE_POLICY_OK && admission!=R_NilValue && TYPEOF(admission)==LGLSXP &&
+     XLENGTH(admission)==1 && LOGICAL(admission)[0]==TRUE && np_regression_precision_needed(&workspace,p)) {
+    memcpy(REAL(out),REAL(rhs),(size_t)p*sizeof(double));
+    SEXP policy=PROTECT(allocMatrix(REALSXP,1,2));
+    REAL(policy)[0]=diagnostics.ridge_total;REAL(policy)[1]=anchor;
+    setAttrib(out,install(".np.fit.precision"),policy);UNPROTECT(1);
+  }
   np_lp_solve_workspace_clear(&workspace);
   if(status == NP_LP_SOLVE_POLICY_NONFINITE)
     error("LP solve failed in R hat-matrix path: non-finite system");
@@ -184,7 +194,7 @@ static NPReghatLPRowStatus np_reghat_lp_prediction_raw(
   NPLPSolveWorkspace * const solve_workspace,
   double * const prediction,
   const int check_interrupt,
-  const int support_rank)
+  const int support_rank, double *accepted_anchor, double *accepted_ridge)
 {
   const double alpha = 1.0;
   const double beta = 0.0;
@@ -219,6 +229,7 @@ static NPReghatLPRowStatus np_reghat_lp_prediction_raw(
   memcpy(solve_workspace->rhs_source, basis_eval,
          (size_t)nterms*sizeof(double));
 
+  if(accepted_anchor!=NULL)*accepted_anchor=solve_workspace->gram_source[0];
   if(check_interrupt)
     R_CheckUserInterrupt();
   switch(np_lp_solve_workspace_solve_adjoint_ranked(
@@ -236,6 +247,7 @@ static NPReghatLPRowStatus np_reghat_lp_prediction_raw(
     return NP_REGHAT_LP_ROW_INVALID;
   }
 
+  if(accepted_ridge!=NULL)*accepted_ridge=diagnostics.ridge_total;
   F77_CALL(dgemv)(&trans_n, &ntrain, &nterms, &alpha,
                   design, &ntrain, solve_workspace->rhs_work, &one,
                   &beta, prediction, &one FCONE);
@@ -353,7 +365,7 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked(
   status = np_reghat_lp_prediction_raw(
     workspace->ntrain, workspace->nterms, workspace->design,
     weights, basis_eval, workspace->weighted_design,
-    &workspace->solve_workspace, workspace->prediction, 0, support_rank);
+    &workspace->solve_workspace, workspace->prediction, 0, support_rank, NULL, NULL);
   if(status != NP_REGHAT_LP_ROW_OK)
     return status;
   for(observation = 0; observation < workspace->ntrain; ++observation) {
@@ -387,6 +399,7 @@ typedef struct {
   int neval;
   int nterms;
   NPReghatLPWorkspace workspace;
+  NPRegressionPrecision precision;
 } NPReghatMatrixExecution;
 
 /* Requested-only scaled Euclidean norm. Keep response values out of this
@@ -433,6 +446,7 @@ static void np_reghat_matrix_execution_cleanup(void *data, Rboolean jump)
     (NPReghatMatrixExecution *)data;
   (void)jump;
   np_reghat_lp_workspace_clear(&execution->workspace);
+  np_regression_precision_clear(&execution->precision);
 }
 
 static SEXP np_reghat_matrix_execution_run(void *data)
@@ -458,6 +472,9 @@ static SEXP np_reghat_matrix_execution_run(void *data)
     columns[term] = workspace->design + (size_t)ntrain * term;
   np_lp_design_support_prepare(&design_support, columns, ntrain, nterms);
 
+  SEXP admission=getAttrib(execution->kw,install(".np.precision.eligible"));
+  const int precision_eligible=admission!=R_NilValue && TYPEOF(admission)==LGLSXP &&
+    XLENGTH(admission)==1 && LOGICAL(admission)[0]==TRUE;
   for(int j = 0; j < neval; j++){
     const double * const weights =
       REAL(execution->kw) + (size_t)j*(size_t)ntrain;
@@ -468,11 +485,12 @@ static SEXP np_reghat_matrix_execution_run(void *data)
     for(int term = 0; term < nterms; term++)
       workspace->solve_workspace.rhs_work[term] =
         REAL(execution->weval)[j + (size_t)neval*(size_t)term];
+    double anchor=0,ridge=0;
     row_status = np_reghat_lp_prediction_raw(
       ntrain, nterms, workspace->design, weights,
       workspace->solve_workspace.rhs_work, workspace->weighted_design,
       &workspace->solve_workspace, workspace->prediction, 0,
-      np_lp_rank_upper_bound_from_design(weights, ntrain, nterms, &design_support));
+      np_lp_rank_upper_bound_from_design(weights, ntrain, nterms, &design_support),&anchor,&ridge);
     if(execution->allow_empty && row_status != NP_REGHAT_LP_ROW_OK &&
        row_status != NP_REGHAT_LP_ROW_NONFINITE &&
        np_lp_complete_weights_are_zero(weights, ntrain)) {
@@ -502,10 +520,18 @@ static SEXP np_reghat_matrix_execution_run(void *data)
       error("LP solve failed in compiled hat-matrix path after bounded ridging");
     if(row_status != NP_REGHAT_LP_ROW_OK)
       error("invalid wider-LP compiled hat-matrix input");
+    int precise=precision_eligible && np_regression_precision_needed(&workspace->solve_workspace,nterms);
+    if(precise) {
+      int constant=1;for(int i=1;i<ntrain && constant;++i)constant=weights[i]==weights[0];
+      precise=!constant;
+    }
+    if(precise && (!np_regression_precision_factor(&execution->precision,columns,weights,ntrain,nterms,ridge,anchor) ||
+        !np_regression_precision_row(&execution->precision,workspace->solve_workspace.rhs_source)))
+      error("accepted LP precision row failed");
     if(execution->return_norm) {
       NPReghatRowNorm norm = {0.0, 1.0, 0};
       for(int i = 0; i < ntrain; ++i) {
-        const double value = weights[i]*workspace->prediction[i];
+        const double value = precise ? execution->precision.row[i] : weights[i]*workspace->prediction[i];
         REAL(out)[j + (size_t)neval*(size_t)i] = value;
         np_reghat_row_norm_add(&norm, value);
       }
@@ -515,7 +541,7 @@ static SEXP np_reghat_matrix_execution_run(void *data)
     } else {
       for(int i = 0; i < ntrain; i++)
         REAL(out)[j + (size_t)neval*(size_t)i] =
-          weights[i]*workspace->prediction[i];
+          precise ? execution->precision.row[i] : weights[i]*workspace->prediction[i];
     }
   }
 

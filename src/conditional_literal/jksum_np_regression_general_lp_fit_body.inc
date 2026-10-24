@@ -12,6 +12,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   const int num_reg_ordered = call->num_reg_ordered;
   const int num_reg_continuous = call->num_reg_continuous;
   const int use_bernstein = (int_glp_bernstein_extern != 0);
+  const int precision_eligible = np_regression_precision_eligible(call);
   const double epsilon = 1.0/(double)MAX(1, num_obs_train);
   const int hc0_residual_preparing = call->hc0_context != NULL &&
     call->hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
@@ -298,6 +299,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     double pristine_anchor = 0.0;
     NPLPSolvePolicyDiagnostics solve_diagnostics = {0, 0.0};
     int have_vcov = 0;
+    int precise = 0;
 
 #ifdef MPI2
 	      if(use_mpi_owner_reduce_lp && ((j % owner_chunk_rows_lp) == 0)){
@@ -937,6 +939,11 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
+    precise = precision_eligible && np_regression_precision_needed(&owner->solve_workspace,owner->nterms);
+    if(precise && !np_regression_precision_prepare(call,owner,hc0_kernel_row,
+         hc0_kernel_divisor,solve_diagnostics.ridge_total,pristine_anchor)) {
+      execution->status=NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;return R_NilValue;
+    }
     for(i = 0; i < owner->nterms; ++i)
       owner->coefficient[i] = owner->solve_workspace.rhs_work[i];
 
@@ -955,10 +962,19 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
                                  call->matrix_X_continuous_eval,
                                  j,
                                  owner->eval_basis);
+    if(precise && !np_regression_precision_row(&owner->precision,owner->eval_basis)) {
+      execution->status=NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;return R_NilValue;
+    }
     if(!preserve_point) {
       call->mean[j] = 0.0;
       for(i = 0; i < owner->nterms; ++i)
         call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];
+      if(precise)call->mean[j]=np_regression_precision_apply(&owner->precision,call->vector_Y);
+    }
+    if(precise && call->fit_projection!=NULL) {
+      NPRegressionFitProjection *out=call->fit_projection;
+      out->precision_policy[out->eval_map[j]]=solve_diagnostics.ridge_total;
+      out->precision_policy[out->eval_map[j]+out->neval]=pristine_anchor;
     }
     if(call->fit_projection != NULL && call->fit_projection->inference_residual == NULL) {
       for(i = 0; i < owner->nterms; ++i)
@@ -968,7 +984,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
            pristine_anchor, &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK)
         error("accepted fit projection solve failed");
       np_fit_projection_row(call->fit_projection,
-                            owner->solve_workspace.rhs_work, j);
+                            precise ? owner->eval_basis : owner->solve_workspace.rhs_work, j);
     }
     if(hc0_residual_preparing) {
       for(i = 0; i < owner->nterms; ++i)
@@ -976,10 +992,11 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       if(np_lp_solve_workspace_solve_adjoint_factored(
            &owner->solve_workspace, owner->nterms, 1,
            pristine_anchor, &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK ||
-         !np_regression_hc0_lp_prepare_row(
+         !(precise ? np_regression_precision_residual(&owner->precision,preparation,j,
+             solve_diagnostics.ridge_total==0.0) : np_regression_hc0_lp_prepare_row(
            owner->basis, owner->nterms, owner->solve_workspace.rhs_work,
            hc0_kernel_row, preparation, j,
-           solve_diagnostics.ridge_total == 0.0)) {
+           solve_diagnostics.ridge_total == 0.0))) {
         execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
         return R_NilValue;
       }
@@ -1103,6 +1120,12 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
             call->gradient[l][j] = 0.0;
             for(i = 0; i < owner->nterms; ++i)
               call->gradient[l][j] += direction[i]*owner->coefficient[i];
+            if(precise) {
+              if(!np_regression_precision_row(&owner->precision,direction)) {
+                execution->status=NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;return R_NilValue;
+              }
+              call->gradient[l][j]=np_regression_precision_apply(&owner->precision,call->vector_Y);
+            }
           } else if(!active)
             call->gradient[l][j] = NA_REAL;
           if(call->do_gerr) {
@@ -1149,7 +1172,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
         if(ordinary_hc0 && call->fit_projection != NULL &&
            call->fit_projection->inference_residual != NULL) {
           NPRegressionFitProjection *out=call->fit_projection;
-          np_fit_projection_row(out,owner->solve_workspace.rhs_work,j);
+          np_fit_projection_row(out,precise ? owner->solve_workspace.rhs_source : owner->solve_workspace.rhs_work,j);
           out->inference_ridge[out->eval_map[j]]=solve_diagnostics.ridge_total;
           int rhs=1;
           if(call->do_grad && call->do_gerr)
@@ -1157,7 +1180,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
               if(np_glp_gradient_direction_active(d)) {
                 for(int k=0;k<owner->nterms;++k)
                   out->inference_gradient[out->eval_map[j]+(size_t)out->neval*(k+(size_t)d*out->width)]=
-                    owner->solve_workspace.rhs_work[k+(size_t)rhs*owner->nterms];
+                    (precise ? owner->solve_workspace.rhs_source : owner->solve_workspace.rhs_work)[k+(size_t)rhs*owner->nterms];
                 ++rhs;
               }
         }
@@ -1167,13 +1190,15 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
               &owner->inference_reuse, owner->basis, call->hc0_context,
               hc0_kernel_row, num_obs_train, hc0_kernel_divisor,
               np_progress_fit_heartbeat);
-          if(!np_regression_hc0_lp_standard_error_reuse(
+          if(!(precise ? np_regression_precision_se(&owner->precision,owner->eval_basis,
+               call->hc0_context,&call->mean_stderr[j],call->hc0_context->mean_unavailable!=NULL?
+               &call->hc0_context->mean_unavailable[j]:NULL) : np_regression_hc0_lp_standard_error_reuse(
                &owner->inference_reuse, 0,
                owner->solve_workspace.rhs_work,
                owner->basis, owner->nterms, hc0_kernel_row, hc0_kernel_divisor,
                call->hc0_context, &call->mean_stderr[j],
                call->hc0_context->mean_unavailable != NULL ?
-                 &call->hc0_context->mean_unavailable[j] : NULL)) {
+                 &call->hc0_context->mean_unavailable[j] : NULL))) {
             execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
             return R_NilValue;
           }
@@ -1196,13 +1221,16 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
                 owner->solve_workspace.rhs_work +
                   (size_t)rhs*(size_t)owner->nterms;
               if(ordinary_hc0) {
-                if(!np_regression_hc0_lp_standard_error_reuse(
+                if(!(precise ? np_regression_precision_se(&owner->precision,
+                     owner->solve_workspace.rhs_source+(size_t)rhs*owner->nterms,
+                     call->hc0_context,&call->gradient_stderr[l][j],call->hc0_context->gradient_unavailable!=NULL?
+                     &call->hc0_context->gradient_unavailable[l][j]:NULL) : np_regression_hc0_lp_standard_error_reuse(
                      &owner->inference_reuse, rhs,
                      projection,
                      owner->basis, owner->nterms, hc0_kernel_row, hc0_kernel_divisor,
                      call->hc0_context, &call->gradient_stderr[l][j],
                      call->hc0_context->gradient_unavailable != NULL ?
-                       &call->hc0_context->gradient_unavailable[l][j] : NULL)) {
+                       &call->hc0_context->gradient_unavailable[l][j] : NULL))) {
                   execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
                   return R_NilValue;
                 }

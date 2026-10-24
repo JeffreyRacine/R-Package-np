@@ -33,6 +33,7 @@
 #include "headers.h"
 #include "conditional_failure.h"
 #include "regression_contrast.h"
+#include "regression_precision.h"
 #include "regression_alllarge_residual.h"
 #include "regression_inference_reuse.h"
 #include "conditional_kernel_moments.h"
@@ -23763,6 +23764,8 @@ typedef struct {
   double *moments;
   double *power2_moments;
   double *retained_kernel_row;
+  NPRegressionPrecision precision;
+  double *precision_kernel;
   NPGLPBasisCtx *basis_context;
   double *coefficient;
   double *eval_basis;
@@ -23974,6 +23977,8 @@ static void np_regression_general_lp_fit_owner_init(
   owner->moments = NULL;
   owner->power2_moments = NULL;
   owner->retained_kernel_row = NULL;
+  np_regression_precision_init(&owner->precision);
+  owner->precision_kernel = NULL;
   owner->basis_context = NULL;
   owner->coefficient = NULL;
   owner->eval_basis = NULL;
@@ -24026,6 +24031,8 @@ static void np_regression_general_lp_fit_owner_cleanup(
   free(owner->moments);
   free(owner->power2_moments);
   free(owner->retained_kernel_row);
+  np_regression_precision_clear(&owner->precision);
+  free(owner->precision_kernel);
   free(owner->coefficient);
   free(owner->power2_projection);
   free(owner->categorical_point);
@@ -24050,6 +24057,90 @@ static void np_regression_general_lp_fit_owner_cleanup(
 #endif
   if(jump && call->enclosing_owner != NULL)
     np_regression_fit_owner_clear(call->enclosing_owner);
+}
+
+
+/* Scoped precision sibling. Accepted rank/ridge and all incumbent kernel/tree
+ * selection remain upstream. NN, conditional, categorical and signed routes
+ * are unchanged until their own representation and timing gates close. */
+static int np_regression_precision_eligible(const NPRegressionGeneralLPFitCall *call)
+{
+  if(!call->ordinary_response || call->bandwidth_mode != BW_FIXED ||
+     call->kernel_route != NULL || int_cker_bound_extern ||
+     call->num_reg_unordered || call->num_reg_ordered || call->all_large_kernel_rows)
+    return 0;
+  for(int d=0;d<call->num_reg_continuous;++d)
+    if(call->kernel_c[d]!=0)return 0;
+  return 1;
+}
+static int np_regression_precision_prepare(
+  const NPRegressionGeneralLPFitCall *call, NPRegressionGeneralLPFitOwner *owner,
+  const double *retained, double divisor, double ridge, double anchor)
+{
+  const int n=call->num_obs_train;
+  if(owner->precision_kernel==NULL)
+    owner->precision_kernel=(double *)malloc((size_t)n*sizeof(double));
+  if(owner->precision_kernel==NULL)return 0;
+  if(retained!=NULL) {
+    for(int i=0;i<n;++i)owner->precision_kernel[i]=retained[i]/divisor;
+  } else {
+    if(kernel_weighted_sum_np_ctx_ex(call->kernel_c,call->kernel_u,call->kernel_o,
+      call->bandwidth_mode,n,1,0,0,call->num_reg_continuous,
+      0,0,1,1,1,0,0,0,0,call->operator,OP_NOOP,0,0,NULL,1,0,0,
+      call->tree_enabled,0,kdt_extern_X,NULL,NULL,NULL,
+      call->matrix_X_unordered_train,call->matrix_X_ordered_train,call->matrix_X_continuous_train,
+      owner->eval_unordered,owner->eval_ordered,owner->eval_continuous,
+      NULL,NULL,NULL,call->vector_scale_factor,1,call->matrix_bandwidth,
+      call->matrix_bandwidth,call->lambda,call->num_categories,
+      call->matrix_categorical_vals,NULL,NULL,NULL,owner->precision_kernel,
+      call->gate_context,NULL,NULL,NULL,NULL,
+#ifdef MPI2
+      0,
+#endif
+      NULL,NULL)!=0)return 0;
+  }
+  return np_regression_precision_factor(&owner->precision,owner->basis,
+    owner->precision_kernel,n,owner->nterms,ridge,anchor);
+}
+static int np_regression_precision_residual(NPRegressionPrecision *q,
+  NPRegressionResidualPreparation *preparation, int evaluation, int unregularized)
+{
+  const int self=preparation->evaluation_to_donor[evaluation];
+  int support=0;NPResidualOffDiagonal state={0};long double normalized=0;
+  for(int i=0;i<q->n;++i){
+    support+=q->weights[i]!=0;
+    if(i!=self)np_residual_offdiag_add(&state,q->row[i],
+      (long double)preparation->response[self]-preparation->response[i]);
+  }
+  if(unregularized && q->weights[self]!=0 && support==q->p) {
+    preparation->normalized_residual[self]=0;
+    preparation->information[self]=NP_RESIDUAL_UNIDENTIFIED;return 1;
+  }
+  NPResidualInformation information=np_residual_offdiag_finish(&state,1.0L,&normalized);
+  if(information==NP_RESIDUAL_INVALID || fabsl(normalized)>DBL_MAX)return 0;
+  preparation->normalized_residual[self]=(double)normalized;
+  preparation->information[self]=information;return 1;
+}
+static int np_regression_precision_se(NPRegressionPrecision *q,
+  const double *direction, const NPRegressionHC0Context *context,
+  double *out, int *unavailable)
+{
+  if(!np_regression_precision_row(q,direction))return 0;
+  int zero=1;for(int k=0;k<q->p;++k)if(direction[k]!=0)zero=0;
+  NPResidualVariance variance={0};long double result=0;
+  for(int i=0;i<q->n;++i){
+    const NPResidualInformation information=context->residual_information!=NULL?
+      context->residual_information[i]:NP_RESIDUAL_IDENTIFIED;
+    const int structural_zero=zero || q->weights[i]==0;
+    if(information==NP_RESIDUAL_UNIDENTIFIED && !structural_zero) {
+      *out=NA_REAL;if(unavailable!=NULL)*unavailable=1;return 1;
+    }
+    np_residual_variance_add(&variance,structural_zero?0:q->row[i],structural_zero,
+      information,context->scaled_residual[i]);
+  }
+  if(np_residual_variance_finish(&variance,&result)!=NP_RESIDUAL_IDENTIFIED)return 0;
+  result*=context->residual_scale;if(!isfinite(result)||result>DBL_MAX)return 0;
+  *out=(double)result;return 1;
 }
 
 /* Fit-only transport: categorical frames share the same continuous ANN row.

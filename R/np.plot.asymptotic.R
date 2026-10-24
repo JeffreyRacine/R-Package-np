@@ -1,3 +1,17 @@
+# Subsetting a matrix drops private replay metadata. Preserve the row-owned
+# policy explicitly; ordinary matrices remain unchanged.
+.np_plot_projection_slice <- function(x, index, columns = seq_len(ncol(x))) {
+  out <- x[index,columns,drop=FALSE]
+  policy <- attr(x,".np.fit.precision",exact=TRUE)
+  if (!is.null(policy)) {
+    if (!is.matrix(policy) || !identical(dim(policy),c(nrow(x),2L)) ||
+        any(!is.finite(policy)) || any(policy<0))
+      stop("invalid accepted precision replay policy",call.=FALSE)
+    attr(out,".np.fit.precision") <- policy[index,,drop=FALSE]
+  }
+  out
+}
+
 # A missing joint interval must retain one row per retained plotted center.
 # Other interval routes preserve their established omission behavior.
 .np_plot_joint_interval_rows <- function(errors, center, joint, type) {
@@ -236,8 +250,8 @@
     if (!is.null(direction) && scalar)
       return(.np_plot_lsq_gate_derivative(bws,x,ex,s=as.integer(deriv),
         max.bytes=max.bytes,.np.gate=state[[4L]],.np.index=index))
-    adjoint <- if (is.null(direction)) projection[[2L]][index,,drop=FALSE] else
-      state[[1L]][index,(direction-1L)*width+seq_len(width),drop=FALSE]
+    adjoint <- if (is.null(direction))  .np_plot_projection_slice(projection[[2L]],index) else
+      .np_plot_projection_slice(state[[1L]],index,(direction-1L)*width+seq_len(width))
     attr(adjoint,".np.fit.accepted") <- TRUE
     weights <- .np_plot_lsq_gate_weights(bws,geometry,index,max.bytes=max.bytes)
     .Call("C_np_plot_projection_apply",projection[[1L]],adjoint,weights,PACKAGE="np")
@@ -600,7 +614,7 @@
       kw <- do.call(npksum, args)$kw
     }
     .Call("C_np_plot_projection_apply", ingredients[[1L]],
-      ingredients[[2L]][index, , drop = FALSE], kw, PACKAGE = "np")
+      .np_plot_projection_slice(ingredients[[2L]],index), kw, PACKAGE = "np")
   }
 }
 
