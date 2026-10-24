@@ -142,6 +142,9 @@
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE) {
+  if (isTRUE(state$pooled) &&
+      (!identical(targets,"mean") || !law %in% c("gaussian","mammen")))
+    stop("pooled mixed-data bias correction currently supports means with Gaussian or Mammen calibration only",call.=FALSE)
   if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<2||B!=floor(B)||B>.Machine$integer.max)
     stop("bias calibration draws must be an integer >= 2",call.=FALSE)
   if(!length(alpha)||any(!is.finite(alpha))||any(alpha<=0|alpha>=.5)||anyDuplicated(alpha))

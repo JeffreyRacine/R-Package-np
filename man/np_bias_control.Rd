@@ -41,8 +41,10 @@ np_bias_control(construction = c("iterated", "legacy"),
     continuous predictor; an unnamed vector follows continuous-predictor order,
     and a named vector must name every continuous predictor exactly. Explicit
     values are literal overrides. The auxiliary GLP space must contain the
-    main polynomial space and leave positive residual degrees of freedom in
-    every observed categorical profile. Actual local rank checks also apply.}
+    main polynomial space. Profile-specific auxiliaries require positive
+    residual degrees of freedom in every profile; pooled auxiliaries require
+    this for each profile main space and for their joint auxiliary space.
+    Actual local rank checks also apply.}
   \item{bernstein.basis}{Logical. Must be \code{TRUE} for auxiliary degree
     greater than one. The canonical stable GLP representation (degree-graded shifted Legendre)
     is used for the auxiliary polynomial space, including derivative rows.
@@ -114,12 +116,38 @@ np_bias_control(construction = c("iterated", "legacy"),
   more computation; infeasible or unidentified systems fail explicitly, with
   no automatic degree reduction. Explicit auxiliary vectors can describe
   smaller anisotropic spaces that still contain the main model.
-  At most one binary unordered and one binary ordered predictor are admitted,
-  with every joint profile observed. Means, first partial derivatives and
-  categorical first differences are supported. Categorical differences have
+  The original profile-specific construction admits at most one binary
+  unordered and one binary ordered predictor, with every joint profile observed.
+  It supports means, first partial derivatives and categorical first
+  differences. Categorical differences have
   numerical operator validation; coverage evidence must be interpreted for
   the configurations actually studied. Higher derivatives, other kernels,
   additive and tensor main bases remain outside this construction.
+
+  Other categorical layouts use a partially pooled auxiliary for fixed-bandwidth
+  means with Gaussian or Mammen calibration. This includes multiple unordered
+  and ordered predictors and factors with more than two levels. Higher-order
+  continuous curvature is shared across observed joint profiles; each profile
+  retains its own polynomial terms through the fitted main degree. P0 and P1
+  use this same joint space. Existing profile-specific routes are unchanged;
+  no failure silently selects a different construction. Evaluation profiles
+  must occur in the training sample. Unused factor levels do not create fitted
+  profiles. Local-to-global adaptation is not activated for this pooled path.
+  Its qualified workspace contains at most 128 joint auxiliary columns, and
+  every profile main space must leave positive residual support. Ill-conditioned
+  pilots fail explicitly, even with stable bases; no profile is dropped or
+  degree reduced. The joint space, profile sizes and rank criterion are recorded
+  in \code{inference$settings$auxiliary_space}. The existing auxiliary controls
+  remain effective, including literal raw-bandwidth overrides.
+
+  Bounded pooled-mean simulations with two continuous, two binary unordered and
+  two binary ordered predictors, degree-one main fits, and sample sizes 400/800
+  gave encouraging overall Gaussian/Mammen coverage under balanced and sparse
+  profile counts. This is narrower evidence than numerical support for other
+  counts, levels and degrees. Sparse weighted pilot geometry, including the
+  retained wage1 stress case, can still fail numerical identification.
+  Nearest-neighbor bandwidths, derivatives, categorical contrasts and other
+  bootstrap laws remain unqualified for the pooled path.
 
   Use \code{errors="asymptotic"} for Gaussian calibration or
   \code{errors="bootstrap"} with the existing \code{bootstrap} and

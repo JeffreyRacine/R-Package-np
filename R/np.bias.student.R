@@ -14,6 +14,10 @@
     if (!length(ii) || length(ii)>16L || anyNA(ii) ||
         any(ii<1L | ii>n | ii!=floor(ii)))
       stop("invalid studentization pilot row request", call.=FALSE)
+    if (!is.null(pilot$profile)) {
+      a <- pilot$profile
+      return(.np_bias_profile_pilot_rows(a,a$x[ii,,drop=FALSE],a$h$p0,"pooled P0"))
+    }
     if (!is.null(pilot$adaptation)) {
       a <- pilot$adaptation
       return(do.call(rbind, lapply(ii, function(i)
@@ -62,6 +66,7 @@
 }
 
 .np_bias_student_prepare <- function(state) {
+  if (isTRUE(state$pooled)) return(.np_bias_profile_student_prepare(state))
   pilot <- list(x=state$xcon, groups=state$groups, bws=state$pilot.bws,
     adaptation=if (is.null(state$adaptation)) NULL else
       state$adaptation[c("x","Q","geometry")])

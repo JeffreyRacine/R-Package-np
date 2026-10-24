@@ -231,3 +231,19 @@ test_that("studentization streams frozen draw blocks and preserves zero targets"
   expect_error(np:::.np_bias_student_chunk(prepared,W,bad,2L,"gaussian"),
     "nonpositive replicate studentization scale")
 })
+
+
+test_that("pooled profile admission is explicit and weighted projection is reproducible", {
+  x <- data.frame(u=factor(rep(1:2,each=8)), v=factor(rep(1:2,8)), z=seq_len(16)/16)
+  b <- list(icon=c(FALSE,FALSE,TRUE),iuno=c(TRUE,TRUE,FALSE),iord=rep(FALSE,3))
+  expect_true(np:::.np_bias_profile_layout(b,x))
+  b$iuno[2] <- FALSE; b$iord[2] <- TRUE
+  expect_false(np:::.np_bias_profile_layout(b,x))
+  x$v <- factor(rep(1:4,4))
+  expect_true(np:::.np_bias_profile_layout(b,x))
+  Q <- cbind(1,x$z,x$z^2);g <- exp(-x$z^2);y <- sin(x$z)
+  p <- np:::.np_bias_profile_solve(Q,g)
+  expect_equal(drop(p$coefficient %*% y),unname(lm.wfit(Q,y,g)$coefficients),tolerance=1e-10)
+  expect_equal(p$coefficient %*% Q,diag(ncol(Q)),tolerance=1e-10)
+  expect_error(np:::.np_bias_profile_solve(cbind(Q,Q[,2]),g),"numerically unidentified")
+})
