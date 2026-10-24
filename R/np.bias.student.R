@@ -118,11 +118,12 @@
   for (b in seq_along(slices)) {
     ii <- slices[[b]]
     scale <- sqrt(target$A %*% (residual[,ii,drop=FALSE]+prepared$rmu)^2)
-    if (any(!is.finite(scale)) || any(scale[target$active,,drop=FALSE]<=0))
+    if (any(!is.finite(scale)) || any(scale<=0 & target$active))
       stop("nonpositive replicate studentization scale",call.=FALSE)
-    # A zero corrected row is a deterministic target, not a variance floor.
-    out[target$active,ii] <- abs(numerator[[b]][target$active,,drop=FALSE]/
-      scale[target$active,,drop=FALSE])
+    # Only deterministic zero rows get a harmless divisor: their numerator and
+    # returned pivot are exactly zero. Active scales are never floored.
+    if (any(!target$active)) scale[!target$active,] <- 1
+    out[,ii] <- abs(numerator[[b]]/scale)
   }
   out
 }
