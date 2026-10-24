@@ -71,8 +71,9 @@
   # using a true signal or any other simulation-only input.
   check <- .np_bias_residual_apply(owner,
     cbind(state$y,state$y-state$residual_raw,0))
+  response.scale <- max(abs(state$y), .Machine$double.xmin)
   if (max(abs(check$row_variance-state$residual_row_variance))>1e-8 ||
-      max(abs(check$residual[,1L]-state$residual))>1e-8)
+      max(abs(check$residual[,1L]-state$residual)/response.scale)>1e-8)
     stop("studentization residual pilot disagrees with the observed pilot", call.=FALSE)
   list(pilot=pilot, q=state$residual_row_variance, rmu=check$residual[,2L],
     root.variance=sqrt(state$variance),

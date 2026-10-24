@@ -211,6 +211,17 @@ test_that("studentization streams frozen draw blocks and preserves zero targets"
   bw <- npregbw(xdat=x,ydat=y,bws=.3,bandwidth.compute=FALSE,regtype="ll")
   state <- npRmpi:::.np_bias_regression_prepare(bw,x,y)
   prepared <- npRmpi:::.np_bias_student_prepare(state)
+  for (response.scale in c(1e-8,1e8)) {
+    scaled <- state
+    for (name in c("y","residual_raw","residual"))
+      scaled[[name]] <- state[[name]]*response.scale
+    scaled$variance <- state$variance*response.scale^2
+    check <- npRmpi:::.np_bias_student_prepare(scaled)
+    expect_equal(check$rmu/response.scale,prepared$rmu,tolerance=1e-10)
+  }
+  inconsistent <- state
+  inconsistent$residual[1L] <- inconsistent$residual[1L]+.01*max(abs(state$y))
+  expect_error(npRmpi:::.np_bias_student_prepare(inconsistent),"disagrees")
   map <- expand.grid(row=1:2,target=c("mean","d1"),stringsAsFactors=FALSE)
   value <- npRmpi:::.np_bias_regression_rows(state,x[1:2,,drop=FALSE],map)
   W <- rbind(value$W,0);se <- c(value$se,0)
