@@ -146,7 +146,8 @@
 }
 
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
-                               B=9999L, law="gaussian", blocklen=NULL, fit=NULL) {
+                               B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
+                               studentize=TRUE) {
   if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<2||B!=floor(B)||B>.Machine$integer.max)
     stop("bias calibration draws must be an integer >= 2",call.=FALSE)
   if(!length(alpha)||any(!is.finite(alpha))||any(alpha<=0|alpha>=.5)||anyDuplicated(alpha))
@@ -159,7 +160,9 @@
   map <- expand.grid(row=seq_len(nrow(grid)),target=targets,stringsAsFactors=FALSE)
   M <- nrow(map);B <- as.integer(B)
   center <- original <- se <- score.se <- numeric(M)
-  calibration.state <- .np_bias_limits_prepare(map$target,alpha,law=="gaussian",B)
+  student <- isTRUE(studentize) && law %in% c("gaussian","mammen")
+  calibration.state <- .np_bias_limits_prepare(map$target,alpha,law=="gaussian" && !student,B)
+  prepared <- NULL
   regularization <- adaptation <- list()
   adapted.rows <- if (!is.null(state$adaptation))
     .np_bias_adaptation_capture(state,fit,grid,targets) else NULL
@@ -180,11 +183,17 @@
     diagnostic$row <- jj[diagnostic$row]
     regularization[[length(regularization)+1L]] <- diagnostic
     center[rr] <- value$center;original[rr] <- value$original_center;se[rr] <- value$se
-    F <- if(score)sweep(value$W,2L,state$residual,"*") else value$factor
-    if(score)F <- F-rowMeans(F)
     divisor <- ifelse(value$se==0,1,value$se)
-    part <- .np_bias_stream(rng,
-      .np_bias_process_draws(F,B,law,if(is.null(selection))NULL else selection$length))
+    if (student) {
+      if (is.null(prepared)) prepared <- .np_bias_student_prepare(state)
+      part <- .np_bias_stream(rng,
+        .np_bias_student_draws(prepared,value$W,value$se,B,law))
+    } else {
+      F <- if(score)sweep(value$W,2L,state$residual,"*") else value$factor
+      if(score)F <- F-rowMeans(F)
+      part <- .np_bias_stream(rng,
+        .np_bias_process_draws(F,B,law,if(is.null(selection))NULL else selection$length))
+    }
     .np_plot_progress_notify(stage="Constructing bias-corrected intervals",
       done=max(jj),total=nrow(grid),unit="grid")
     end <- part$end
@@ -195,7 +204,8 @@
       divisor <- ifelse(s==0,1,s)
       if(law!="inid")se[rr] <- s
     }
-    calibration.state <- .np_bias_limits_update(calibration.state,abs(part$value/divisor),rr)
+    calibration.state <- .np_bias_limits_update(calibration.state,
+      if(student)part$value else abs(part$value/divisor),rr)
   }
   assign(".Random.seed",end,.GlobalEnv)
   calibrated <- .np_bias_limits_finish(calibration.state)
@@ -203,15 +213,19 @@
     for(k in seq_along(alpha))for(side in 1:2)x[,side,k] <- center+se*x[,side,k]
     x
   })
-  list(construction="iterated",version=1L,estimate=original,center=center,
+  list(construction="iterated",version=if(student)2L else 1L,estimate=original,center=center,
     correction=original-center,se=se,bands=bands,map=map,grid=grid,
     settings=state$settings,law=law,block.selection=selection,draws=B,alpha=alpha,
     main.regularization=do.call(rbind,regularization),
     adaptation=if(length(adaptation))adaptation else NULL,
     covariance=list(operator="complete corrected observation rows",
       variance=if(law%in%c("fixed","geom"))"empirical residual-score process variance" else "smoothed P0 residual variance",
-      studentization=if(score)"empirical residual-score process SD" else "smoothed complete-row SD",
-      calibration=if(score)"residual score process" else "fixed-factor multiplier process"),
+      studentization=if(student)"replicate-specific smoothed P0 residual SD" else
+        if(score)"empirical residual-score process SD" else "smoothed complete-row SD",
+      calibration=if(student)"residual-pilot studentized multiplier process" else
+        if(score)"residual score process" else "fixed-factor multiplier process"),
+    studentization=if(student)list(construction="residual-pilot-v1",
+      draw.block=256L,reuse.block=1024L,training.block=16L) else NULL,
     calibration=calibrated,score.se=if(score)score.se else NULL,
     rng=list(kind=rng.kind,start=rng,end=end,convention="common observation draws across all target blocks"),
     scope="finite grid within each scalar-target family",owner="bounded corrected observation factors")
@@ -222,7 +236,8 @@
   law <- if(method=="asymptotic")"gaussian" else if(bootstrap=="wild")wild else bootstrap
   inference <- .np_plot_activity_run("Constructing bias-corrected intervals",
     .np_bias_inference(state,grid,target,alpha,
-      if(method=="asymptotic")gaussian.draws else B,law,blocklen,fit))
+      if(method=="asymptotic")gaussian.draws else B,law,blocklen,fit,
+      studentize=band!="pmzsd"))
   all <- lapply(inference$bands,function(x)cbind(inference$center-x[,1,1],x[,2,1]-inference$center))
   width <- if(band=="pmzsd")cbind(inference$se,inference$se)*qnorm(alpha/2,lower.tail=FALSE) else
     all[[if(band=="all")"pointwise" else band]]
