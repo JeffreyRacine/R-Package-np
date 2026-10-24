@@ -67,3 +67,7 @@ NP_CONDITIONAL_JKSUM_DEPS = \
   conditional_literal/jksum_np_regression_scalar_fit_execute.inc
 np.o: conditional_literal.h $(NP_CONDITIONAL_ENTRY_DEPS)
 jksum.o categorical_profile_tile.o: conditional_literal.h $(NP_CONDITIONAL_JKSUM_DEPS)
+
+# Shared accepted-policy precision workspace and replay consumers.
+regression_precision.o: regression_precision.h regression_contrast.h jksum_lp_solve.h
+jksum.o reghat_fast.o np_plot_projection.o: regression_precision.h

@@ -110,9 +110,11 @@ SEXP C_np_plot_regression_gradient_projection(SEXP args)
   SEXP grad=PROTECT(allocVector(REALSXP,(R_xlen_t)m*nc));++protected_count;
   SEXP B=PROTECT(allocMatrix(REALSXP,n,width));++protected_count;
   SEXP P=PROTECT(allocMatrix(REALSXP,m,width));++protected_count;
+  SEXP policy=PROTECT(allocMatrix(REALSXP,m,2));++protected_count;
+  memset(REAL(policy),0,(size_t)m*2*sizeof(double));
   double extra[6]={0};int variance_unavailable=0;int *gradient_zero=NULL;
   NPRegressionFitProjection projection={.ntrain=n,.neval=m,.width=width,
-    .basis=REAL(B),.projection=REAL(P)};
+    .basis=REAL(B),.projection=REAL(P),.precision_policy=REAL(policy)};
   NPContinuousKernelRoute beta_route;
   NPContinuousKernelDerivativeDiagnostics diagnostics;
   const NPContinuousKernelRoute *route=NULL;
@@ -135,6 +137,9 @@ SEXP C_np_plot_regression_gradient_projection(SEXP args)
     &variance_unavailable,&gradient_zero,&projection);
   if(projection.emitted!=m)
     error("plot gradient projection did not visit every evaluation row");
+  for(int i=0;i<m;++i)if(REAL(policy)[m+i]>0) {
+    setAttrib(P,install(".np.fit.precision"),policy);break;
+  }
   SEXP projection_result=PROTECT(allocVector(VECSXP,3));++protected_count;
   SET_VECTOR_ELT(projection_result,0,B);SET_VECTOR_ELT(projection_result,1,P);
   SET_VECTOR_ELT(projection_result,2,ScalarLogical(projection.constant));

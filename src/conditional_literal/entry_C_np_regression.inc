@@ -52,6 +52,7 @@ SEXP C_np_regression(SEXP tuno,
   ++extra_protect;
   SEXP inference_gradient = R_NilValue, inference_residual = R_NilValue;
   SEXP inference_ridge = R_NilValue, inference_gate = R_NilValue;
+  SEXP precision_policy = R_NilValue;
   int do_merr;
   int do_grad;
   int do_gerr;
@@ -271,6 +272,12 @@ SEXP C_np_regression(SEXP tuno,
     fit_projection_ptr = &fit_projection;
   }
 
+  if(fit_projection_ptr != NULL) {
+    PROTECT(precision_policy=allocMatrix(REALSXP,en,2));++extra_protect;
+    memset(REAL(precision_policy),0,(size_t)en*2*sizeof(double));
+    fit_projection.precision_policy=REAL(precision_policy);
+  }
+
   if(TYPEOF(output_request) == INTSXP && XLENGTH(output_request) >= 2 &&
      INTEGER(output_request)[1] == 1 && !train_is_eval) {
     PROTECT(empty_flags = allocVector(INTSXP, en));
@@ -335,6 +342,12 @@ SEXP C_np_regression(SEXP tuno,
     SET_VECTOR_ELT(projection_result, 0, projection_basis);
     SET_VECTOR_ELT(projection_result, 1, projection_rows);
     SET_VECTOR_ELT(projection_result, 2, ScalarLogical(fit_projection.constant));
+    for(int i=0;i<en;++i)if(REAL(precision_policy)[en+i]>0) {
+      setAttrib(projection_rows,install(".np.fit.precision"),precision_policy);
+      if(inference_gradient!=R_NilValue)
+        setAttrib(inference_gradient,install(".np.fit.precision"),precision_policy);
+      break;
+    }
     setAttrib(out, install(".np.fit.projection"), projection_result);
     if(inference_request != R_NilValue) {
       SEXP state=PROTECT(allocVector(VECSXP,4)); ++extra_protect;

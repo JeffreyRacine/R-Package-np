@@ -1163,7 +1163,7 @@
     kw <- if(isTRUE(ingredients[[3L]])) NULL else
       .np_plot_lsq_gate_weights(bws,geometry,index,training=is.null(ex),package=package,max.bytes=max.bytes)
     .Call('C_np_plot_projection_apply',ingredients[[1L]],
-      ingredients[[2L]][index,,drop=FALSE],kw,PACKAGE=package)
+      .np_plot_projection_slice(ingredients[[2L]],index),kw,PACKAGE=package)
   }
 }
 

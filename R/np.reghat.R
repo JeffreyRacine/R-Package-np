@@ -1,3 +1,12 @@
+.np_regression_precision_scope <- function(bws) {
+  identical(bws[["type",exact=TRUE]],"fixed") &&
+    identical(bws[["ckertype",exact=TRUE]],"gaussian") &&
+    identical(as.integer(bws[["ckerorder",exact=TRUE]]),2L) &&
+    bws[["ncon",exact=TRUE]]>0L && bws[["nuno",exact=TRUE]]==0L && bws[["nord",exact=TRUE]]==0L &&
+    all(is.infinite(bws[["ckerlb",exact=TRUE]]) & bws[["ckerlb",exact=TRUE]]<0) &&
+    all(is.infinite(bws[["ckerub",exact=TRUE]]) & bws[["ckerub",exact=TRUE]]>0)
+}
+
 npreghat <-
   function(bws, ...){
     args <- .np_formula_dispatch_args(
@@ -1041,6 +1050,8 @@ npreghat <-
     bernstein.basis = bernstein.basis
   )
 
+  precision.eligible <- .np_regression_precision_scope(bws)
+  if(precision.eligible) attr(kw,".np.precision.eligible") <- TRUE
   matprod.mode <- getOption("matprod")
   H.fast <- if (ncol(W.train) == 1L ||
                 identical(matprod.mode, "default") ||
@@ -1074,11 +1085,22 @@ npreghat <-
       empty.rows[j] <- 1L
       next
     }
+    if(precision.eligible && !all(w==w[1L])) attr(A.base,".np.precision.eligible") <- TRUE
     solved <- .Call("C_np_lp_adjoint_prepared", A.base, as.double(rhs),
                     as.integer(ntrain),
                     as.integer(min(ncol(W.train), sum(w != 0.0))),
                     PACKAGE = "npRmpi")
 
+    policy <- attr(solved,".np.fit.precision",exact=TRUE)
+    if(!is.null(policy)) {
+      direction <- matrix(solved,nrow=1L)
+      attr(direction,".np.fit.precision") <- policy
+      row <- drop(.Call("C_np_plot_projection_apply",as.matrix(W.train),direction,
+        matrix(w,ncol=1L),PACKAGE="npRmpi"))
+      H[j,] <- row
+      if(return.norm) norms[j,] <- .Call("C_np_reghat_row_norm",row,PACKAGE="npRmpi")
+      next
+    }
     if (return.norm) {
       row <- w * drop(W.train %*% solved)
       H[j, ] <- row
