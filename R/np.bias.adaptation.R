@@ -1,4 +1,4 @@
-# Private B3 integration seam. No public caller until statistical qualification.
+# Frozen coordinatewise local-to-global correction and public integration seam.
 # Model fitting, calibration and variance smoothing retain their existing owners.
 # Only bounded target rows and thin training/basis factors are retained.
 .np_bias_adaptation_basis <- function(x, at, degree, derivative = 0L) {
@@ -21,6 +21,7 @@
   for (first in seq.int(1L,nrow(x),by=16L)) {
     ii <- seq.int(first,min(nrow(x),first+15L))
     out[,ii] <- rows %*% .np_bias_adaptation_kernel(x,x[ii,,drop=FALSE],bandwidth)
+    if ((first-1L) %% 256L == 0L) .np_plot_progress_notify()
   }
   out
 }
@@ -89,6 +90,8 @@
       state$Q[i,,drop=FALSE])$H
     R <- -drop(H); R[i] <- R[i]+1
     raw[i] <- sum(R*spec$y); rowvar[i] <- sum(R^2)
+    if (i %% 16L == 0L || i == n)
+      .np_plot_progress_notify(done=i,total=n,unit="training rows")
   }
   if (any(!is.finite(rowvar)) || any(rowvar<=0))
     stop("invalid adapted P0 residual row",call.=FALSE)
@@ -107,6 +110,7 @@
       .np_bias_adaptation_pilot(state,x[i,,drop=FALSE],state$geometry$b1,
         state$Q[i,,drop=FALSE])$H))
     out <- out+rows[,ii,drop=FALSE]%*%H
+    .np_plot_progress_notify(done=max(ii),total=nrow(x),unit="pilot rows")
   }
   out
 }
@@ -165,4 +169,71 @@
     adaptation=list(version=state$version,geometry=geo,iterations=state$iterations,
       tau=tau,eta=eta,training_p1_rows=nrow(x),variance_bandwidth=spec$variance_h,
       residual_policy="adapted P0 row-variance normalized"))
+}
+
+# One activation policy for public callers. Old controls and literal overrides
+# keep their original construction unless adaptation is explicitly requested.
+.np_bias_adaptation_policy <- function(spec) {
+  mode <- spec$settings$adaptation_request
+  requested <- spec$settings$requested
+  roles <- c("p0", "p1", "operator")
+  defaults <- c(p0=4,p1=1.5,operator=4/3)
+  override <- any(vapply(roles,function(role) {
+    key <- paste0(role,".scale")
+    value <- requested$bandwidth.controls[[key]]
+    key %in% requested$supplied || is.null(value) || !identical(as.double(value),as.double(defaults[[role]])) ||
+      !is.null(names(value)) || length(value)!=1L
+  },logical(1)))
+  eligible <- !length(spec$factor.cols) && spec$bws[["type"]]=="fixed" &&
+    spec$bws[["ckertype"]]=="gaussian" && spec$bws[["ckerorder"]]==2L &&
+    spec$bws[["ckerbound"]]=="none" && isTRUE(spec$bernstein)
+  reason <- if(mode=="none") "disabled" else if(!eligible) "incumbent model class" else
+    if(mode=="auto" && override) "explicit auxiliary geometry override" else "eligible"
+  if(mode=="local-to-global" && !eligible)
+    stop("local-to-global adaptation requires continuous-only fixed Gaussian GLP with stable auxiliary basis",call.=FALSE)
+  active <- FALSE
+  if(reason=="eligible") {
+    active <- any(unname(spec$bws[["bandwidth"]][["x"]])>spec$b)
+    if(!active) reason <- "local geometry unchanged"
+  }
+  list(requested=mode,eligible=eligible,active=active,reason=reason,
+    version="B3-coordinate-isolated-1")
+}
+
+# Capture is tied to the complete panel request, not a newly fitted row batch.
+.np_bias_adaptation_capture <- function(state, fit, grid, targets) {
+  request <- fit[["fit.request",exact=TRUE]]
+  expected <- state$main.request
+  if (!is.list(request) || !identical(request$bws,expected$bws) ||
+      !identical(request$xdat,expected$xdat) || !identical(as.double(request$ydat),as.double(expected$ydat)) ||
+      !identical(unname(as.matrix(request$exdat)),unname(as.matrix(grid))))
+    stop("adapted bias correction requires its complete fitted plot request",call.=FALSE)
+  ridge <- fit[["fit.inference",exact=TRUE]][[3L]]
+  if (length(ridge)!=nrow(grid) || any(!is.finite(ridge)) || any(ridge!=0))
+    stop("regularized fixed-bandwidth main rows remain unqualified for bias correction",call.=FALSE)
+  width <- ncol(state$Q); n <- nrow(state$x); m <- nrow(grid)
+  max.bytes <- 256*(as.double(n)*min(500L,m)+(as.double(n)+m)*(state$d+width+1)+as.double(width)^2)
+  operators <- setNames(lapply(targets,function(target) {
+    nu <- integer(state$d)
+    if(target!="mean") {
+      j <- suppressWarnings(as.integer(substring(target,2L)))
+      if(!startsWith(target,"d") || is.na(j) || !j %in% seq_len(state$d))
+        stop("invalid adaptation derivative target",call.=FALSE)
+      nu[j] <- 1L
+    }
+    derivative <- if(any(nu)) nu else NULL
+    owner <- .np_plot_regression_capture_operator(fit,request$bws,request$xdat,
+      request$ydat,request$exdat,derivative,NULL,max.bytes)
+    list(owner=owner$operator,derivative=derivative)
+  }),targets)
+  function(index,map) {
+    rows <- matrix(0,nrow(map),nrow(state$x))
+    for(target in unique(map$target)) {
+      rr <- which(map$target==target); ii <- index[map$row[rr]]; op <- operators[[target]]
+      rows[rr,] <- op$owner(request$exdat[ii,,drop=FALSE],op$derivative,ii)
+    }
+    value <- .np_bias_adaptation_rows(state$adaptation,grid[index,,drop=FALSE],map,rows)
+    value$main.regularization <- data.frame(row=map$row,target=map$target,frame=1L,ridge=ridge[index[map$row]])
+    value
+  }
 }

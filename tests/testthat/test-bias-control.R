@@ -156,3 +156,31 @@ test_that("streamed calibration uses whole-family sizes and common-draw maxima",
     }
   }
 })
+
+
+test_that("public adaptation controls preserve frozen and explicit constructions", {
+  old <- options(np.messages=FALSE)
+  on.exit(options(old),add=TRUE)
+  set.seed(42)
+  x <- data.frame(x=runif(60,-2,2)); y <- x$x+rnorm(60)
+  bw <- npregbw(xdat=x,ydat=y,bws=10000,bwscaling=TRUE,
+    regtype="ll",bandwidth.compute=FALSE)
+  saved <- bw
+  out <- plot(bw,errors="asymptotic",center="bias-corrected",band="all",
+    neval=3L,gaussian.draws=63L,output="data")[[1L]]$inference
+  expect_true(out$settings$adaptation$active)
+  expect_identical(bw,saved)
+  expect_true(all(is.finite(out$center)))
+  expect_equal(out$center,out$estimate,tolerance=1e-6)
+  expect_true(out$settings$bandwidth$p0 > out$settings$reference_bandwidth$p0)
+  for(control in list(np_bias_control(adaptation="none"),
+                      np_bias_control(p0.bandwidth=.9),np_bias_control(p0.scale=4))) {
+    state <- .np_bias_regression_prepare(bw,x,y,control,adapt=TRUE)
+    expect_null(state$adaptation)
+    expect_false(state$settings$adaptation$active)
+  }
+  old.control <- np_bias_control();old.control$version <- 2L;old.control$adaptation <- NULL
+  expect_identical(.np_bias_resolve(old.control,x,60L,1L)$adaptation_request,"none")
+  bad <- np_bias_control();bad$adaptation <- c("auto","none")
+  expect_error(.np_bias_validate_control(bad),"invalid bias adaptation")
+})

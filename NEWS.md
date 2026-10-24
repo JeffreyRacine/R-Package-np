@@ -1,5 +1,14 @@
 # np 0.80-1
 
+- Activate coordinatewise local-to-global bias correction for eligible fixed
+  Gaussian regression plots, reusing the actual fitted observation rows and
+  adapted P0 residuals. Preserve frozen settings, bounded storage, and ordinary
+  categorical/NN construction. Add `np_bias_control(adaptation=)` with explicit
+  reference/override semantics and return effective adaptation settings.
+- Improve narrow-bandwidth local-polynomial fitting, gradient and covariance
+  precision using the accepted ridge with stable QR evaluation and row replay.
+  Bandwidth/degree search objectives and ridge policy are unchanged.
+
 - Fixed Gaussian regression simultaneous variability bands now reuse the fitted
   owner's covariance inputs, including coordinate-specific large-bandwidth
   weights, so joint bands reproduce the reported marginal standard errors.

@@ -18,7 +18,7 @@
   out
 }
 
-.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control()) {
+.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE) {
   x <- toFrame(x)
   if (!is.numeric(y) || length(y) != nrow(x) || any(!is.finite(y)) || anyNA(x))
     stop("bias correction requires finite retained training data", call. = FALSE)
@@ -57,11 +57,6 @@
     offset=offset,scale=scale,y=as.double(y),settings=settings)
   spec$pilot.bws <- .np_bias_regbw(bws,spec$xcon,spec$b,q,spec$bernstein)
   spec$Q <- W.lp(spec$xcon,degree=q,basis="glp",bernstein.basis=spec$bernstein)
-  training <- .np_bias_p0_residuals(spec,matrix(y,ncol=1L))
-  spec$residual <- drop(training$residual)
-  spec$residual_raw <- drop(training$raw)
-  spec$residual_row_variance <- training$row_variance
-  spec$variance <- .np_bias_variance(spec,spec$residual)
   spec$p1 <- list(b=unname(settings[["bandwidth"]][["p1"]]/scale))
   spec$p1$pilot.bws <- .np_bias_regbw(bws,spec$xcon,spec$p1$b,q,spec$bernstein)
   spec$settings$coordinate_offset <- offset
@@ -70,7 +65,35 @@
     rows.omit=bws[["rows.omit"]],source="retained plot training frame")
   spec$settings$main <- list(bandwidth=bws[["bandwidth"]][["x"]],type=bws[["type"]],
     regtype=bws[["regtype"]],degree=bws[["degree"]],basis=bws[["basis"]],
-    bernstein.basis=bws[["bernstein.basis"]],kernel=bws[["ckertype"]],order=bws[["ckerorder"]])
+    bernstein.basis=bws[["bernstein.basis"]],kernel=bws[["ckertype"]],order=bws[["ckerorder"]],
+    scale.factor=bws[["sfactor"]][["x"]])
+  policy <- if (isTRUE(adapt)) .np_bias_adaptation_policy(spec) else NULL
+  if (!is.null(policy) && policy$active) {
+    adapted <- .np_bias_adaptation_prepare(spec)
+    for (name in c("residual", "residual_raw", "residual_row_variance", "variance"))
+      spec[[name]] <- adapted[[name]]
+    spec$adaptation <- adapted
+    spec$main.request <- list(bws=bws,xdat=x,ydat=as.double(y))
+    spec$settings$policy <- "rot-profile-v1+coordinate-isolated-v1"
+    spec$settings$reference_bandwidth <- spec$settings$bandwidth
+    spec$settings$reference_package_scale <- spec$settings$effective_package_scale
+    effective <- list(p0=adapted$geometry$b0,p1=adapted$geometry$b1,
+      operator=adapted$geometry$bK,variance=spec$variance_h)
+    for (role in names(effective)) {
+      spec$settings$bandwidth[[role]] <- setNames(effective[[role]]*scale,names(spec$xcon))
+      spec$settings$effective_package_scale[[role]] <-
+        spec$settings$bandwidth[[role]]/(scale*nrow(x)^(-spec$settings$exponent))
+    }
+    policy$geometry <- adapted$geometry
+    policy$residual_policy <- "adapted P0 row-variance normalized"
+  } else {
+    training <- .np_bias_p0_residuals(spec,matrix(y,ncol=1L))
+    spec$residual <- drop(training$residual)
+    spec$residual_raw <- drop(training$raw)
+    spec$residual_row_variance <- training$row_variance
+    spec$variance <- .np_bias_variance(spec,spec$residual)
+  }
+  if (!is.null(policy)) spec$settings$adaptation <- policy
   spec
 }
 

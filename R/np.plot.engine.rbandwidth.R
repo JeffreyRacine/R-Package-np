@@ -260,7 +260,7 @@
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
-      .np_bias_regression_prepare(bws,xdat,ydat,bias.control)) else NULL
+      .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE)) else NULL
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     overlay.ok <- .np_plot_overlay_enabled(
@@ -341,7 +341,8 @@
         exdat = x.eval,
         gradient.order = gradient.order,
         need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
-        .np.empty.report = .np.empty.report, need.joint = joint.eligible
+        .np.empty.report = .np.empty.report, need.joint = joint.eligible,
+        need.bias.capture = !is.null(bias.state$adaptation)
       )
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
@@ -357,7 +358,7 @@
       if (new.bias || plot.errors.method == "bootstrap"){
         terr.obj <- if(new.bias).np_bias_plot_errors(bias.state,setNames(x.eval,names(xdat)),"mean",plot.errors.method,
           plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tobj) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = x.eval,
           fit.mean.train = fit.mean.train,
           gradients = FALSE,
@@ -740,7 +741,8 @@
           gradient.order = gradient.order,
           need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
           .np.empty.report = .np.empty.report,
-          need.joint = joint.eligible && (!gradients || !xi.factor)
+          need.joint = joint.eligible && (!gradients || !xi.factor),
+          need.bias.capture = !is.null(bias.state$adaptation)
         )
 
         temp.mean[seq_len(xi.neval)] = if (gradients) tr$grad[, i] else tr$mean
@@ -751,7 +753,7 @@
             corrected <- .np_bias_plot_errors(bias.state,
               subcol(exdat,ei,i)[seq_len(xi.neval),,drop=FALSE],target,plot.errors.method,
               plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type)
+              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tr)
             temp.err[seq_len(xi.neval),] <- corrected[["boot.err"]]
             temp.all.err <- corrected[["boot.all.err"]]
             bias.inference <- corrected[["inference"]]

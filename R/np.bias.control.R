@@ -5,8 +5,10 @@ np_bias_control <- function(construction = c("iterated", "legacy"),
                             p0.scale = 4, p1.scale = 1.5,
                             operator.scale = 4/3, variance.scale = 4/3,
                             p0.bandwidth = NULL, p1.bandwidth = NULL,
-                            operator.bandwidth = NULL, variance.bandwidth = NULL) {
+                            operator.bandwidth = NULL, variance.bandwidth = NULL,
+                            adaptation = c("auto", "none", "local-to-global")) {
   construction <- match.arg(construction)
+  adaptation <- match.arg(adaptation)
   supplied <- names(match.call(expand.dots = FALSE))[-1L]
   if (construction == "legacy" && length(setdiff(supplied, "construction")))
     stop("auxiliary bias controls do not apply to construction='legacy'", call. = FALSE)
@@ -39,11 +41,12 @@ np_bias_control <- function(construction = c("iterated", "legacy"),
       stop(name, " must contain finite positive values with unique names, if named", call. = FALSE)
     requested[[name]] <- value
   }
-  structure(list(construction = construction, iterations = as.integer(iterations),
+  out <- list(construction = construction, iterations = as.integer(iterations),
     degree = if (construction == "legacy") 5L else degree, bernstein.basis = bernstein.basis,
     bandwidth.controls = requested, supplied = supplied,
-    version = if (construction == "legacy") 1L else 2L),
-    class = "np_bias_control")
+    version = if (construction == "legacy") 1L else 3L)
+  if (construction != "legacy") out$adaptation <- adaptation
+  structure(out, class = "np_bias_control")
 }
 
 .np_bias_vector <- function(value, columns, name) {
@@ -61,7 +64,8 @@ np_bias_control <- function(construction = c("iterated", "legacy"),
 # Check the construction before dispatch, including caller-edited list fields.
 .np_bias_validate_control <- function(control) {
   if (!inherits(control, "np_bias_control") ||
-      !(identical(control[["version"]], 1L) || identical(control[["version"]], 2L)) ||
+      !(identical(control[["version"]], 1L) || identical(control[["version"]], 2L) ||
+        identical(control[["version"]], 3L)) ||
       !identical(length(control[["construction"]]), 1L) ||
       !control[["construction"]] %in% c("iterated", "legacy"))
     stop("invalid np_bias_control object", call. = FALSE)
@@ -77,7 +81,13 @@ np_bias_control <- function(construction = c("iterated", "legacy"),
     if (identical(control[["version"]], 1L) &&
         (length(control[["degree"]]) != 1L || !is.null(names(control[["degree"]]))))
       stop("version 1 bias controls require a scalar auxiliary degree", call. = FALSE)
+    if (identical(control[["version"]], 3L) &&
+        (!is.character(control[["adaptation"]]) || length(control[["adaptation"]]) != 1L ||
+         is.na(control[["adaptation"]]) ||
+         !control[["adaptation"]] %in% c("auto", "none", "local-to-global")))
+      stop("invalid bias adaptation control", call.=FALSE)
     checked <- do.call(np_bias_control, c(list(construction="iterated",
+      adaptation=if (identical(control[["version"]], 3L)) control[["adaptation"]] else "none",
       iterations=control[["iterations"]], degree=control[["degree"]],
       bernstein.basis=control[["bernstein.basis"]]), control[["bandwidth.controls"]]))
     if (!setequal(names(checked[["bandwidth.controls"]]),
@@ -114,6 +124,7 @@ np_bias_control <- function(construction = c("iterated", "legacy"),
   requested <- control
   # Revalidate ordinary list fields if a caller has edited a control object.
   control <- do.call(np_bias_control, c(list(construction="iterated",
+    adaptation=if (identical(control[["version"]], 3L)) control[["adaptation"]] else "none",
     iterations=control[["iterations"]], degree=control[["degree"]],
     bernstein.basis=control[["bernstein.basis"]]), control[["bandwidth.controls"]]))
   d <- ncol(xcon); n <- nrow(xcon); n.min <- min(profile.sizes)
@@ -134,7 +145,8 @@ np_bias_control <- function(construction = c("iterated", "legacy"),
     bandwidth[[role]] <- if (is.raw) value else value * spread * n.min^(-a)
     effective[[role]] <- bandwidth[[role]]/(spread*n^(-a))
   }
-  list(construction = "iterated", version = 2L, policy = "rot-profile-v1",
+  list(construction = "iterated", version = 3L, policy = "rot-profile-v1",
+    adaptation_request = control[["adaptation"]],
     requested = requested, resolved_request = resolved, source = source,
     columns = names(xcon), n = n, profile_sizes = profile.sizes, n_min = n.min,
     exponent = a, spread = spread, spread_convention = "EssDee on full retained training sample",
