@@ -262,7 +262,8 @@
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
-      .np_bias_regression_prepare(bws,xdat,ydat,bias.control)) else NULL
+      .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE)) else NULL
+    bias.capture <- !is.null(bias.state$adaptation)
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     overlay.ok <- .np_plot_overlay_enabled(
@@ -362,9 +363,9 @@
       if (is.ordered(xdat[,2]))
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
-      if (plot.errors.method == "asymptotic" && !new.bias) {
+      if ((plot.errors.method == "asymptotic" && !new.bias) || bias.capture) {
         tobj <- .np_plot_activity_run(
-          "Computing regression plot asymptotic fit",
+          if (bias.capture) "Computing regression plot fit" else "Computing regression plot asymptotic fit",
           {
             engine.trace(
               event = "npreg.start",
@@ -375,7 +376,7 @@
               se = TRUE,
               gradient.order = gradient.order,
               warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE,
-              .np.fit.inference = joint.eligible && .np_plot_regression_capture_supported(bws))
+              .np.fit.inference = bias.capture || (joint.eligible && .np_plot_regression_capture_supported(bws)))
             engine.trace(
               event = "npreg.done",
               fields = list(slice = 0L, gradients = gradients, n_eval = length(tobj$mean))
@@ -438,7 +439,7 @@
       if (new.bias || plot.errors.method == "bootstrap"){
         terr.obj <- if(new.bias).np_bias_plot_errors(bias.state,setNames(x.eval,names(xdat)),"mean",plot.errors.method,
           plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tobj) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = x.eval,
           fit.mean.train = fit.mean.train,
           gradients = FALSE,
@@ -809,7 +810,7 @@
         }
         
         eval.slice <- subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
-        if (!gradients &&
+        if (!gradients && !bias.capture &&
             (plot.errors.method != "asymptotic" || new.bias) &&
             identical(bws$type, "fixed")) {
           tr <- .np_plot_activity_run(
@@ -833,9 +834,9 @@
               tr
             }
           )
-        } else if (plot.errors.method == "asymptotic" && !new.bias) {
+        } else if ((plot.errors.method == "asymptotic" && !new.bias) || bias.capture) {
           tr <- .np_plot_activity_run(
-            "Computing regression plot asymptotic fit",
+            if (bias.capture) "Computing regression plot fit" else "Computing regression plot asymptotic fit",
             {
               engine.trace(
                 event = "npreg.start",
@@ -848,8 +849,8 @@
                   gradients = gradients,
                   gradient.order = gradient.order,
                   warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE,
-                  .np.fit.inference = joint.eligible && !(gradients && xi.factor) &&
-                    .np_plot_regression_capture_supported(bws)))
+                  .np.fit.inference = bias.capture || (joint.eligible && !(gradients && xi.factor) &&
+                    .np_plot_regression_capture_supported(bws))))
               } else {
                 npreg(txdat = xdat, tydat = ydat,
                   exdat = eval.slice, bws = bws,
@@ -857,8 +858,8 @@
                   gradients = gradients,
                   gradient.order = gradient.order,
                   warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE,
-                  .np.fit.inference = joint.eligible && !(gradients && xi.factor) &&
-                    .np_plot_regression_capture_supported(bws))
+                  .np.fit.inference = bias.capture || (joint.eligible && !(gradients && xi.factor) &&
+                    .np_plot_regression_capture_supported(bws)))
               }
               engine.trace(
                 event = "npreg.done",
@@ -896,7 +897,7 @@
             corrected <- .np_bias_plot_errors(bias.state,
               subcol(exdat,ei,i)[seq_len(xi.neval),,drop=FALSE],target,plot.errors.method,
               plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type)
+              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tr)
             temp.err[seq_len(xi.neval),] <- corrected[["boot.err"]]
             temp.all.err <- corrected[["boot.all.err"]]
             bias.inference <- corrected[["inference"]]

@@ -12,9 +12,22 @@ np_bias_control(construction = c("iterated", "legacy"),
                 p0.scale = 4, p1.scale = 1.5,
                 operator.scale = 4/3, variance.scale = 4/3,
                 p0.bandwidth = NULL, p1.bandwidth = NULL,
-                operator.bandwidth = NULL, variance.bandwidth = NULL)
+                operator.bandwidth = NULL, variance.bandwidth = NULL,
+                adaptation = c("auto", "none", "local-to-global"))
 }
 \arguments{
+  \item{adaptation}{Coordinatewise local-to-global auxiliary correction.
+    \code{"auto"} uses the validated transition for continuous-only fixed
+    Gaussian GLP models when P0, P1 and operator bandwidth controls are omitted.
+    Local coordinates remain unchanged. Explicit geometry bandwidth or scale
+    overrides retain the original construction under \code{"auto"}; iterations,
+    auxiliary degree and variance controls remain effective.
+    \code{"none"} retains the frozen pre-adaptation construction.
+    \code{"local-to-global"} explicitly applies the transition, treating
+    supplied P0, P1 and operator bandwidths as reference values that may grow.
+    It errors for unsupported model classes. Older serialized version-1/2
+    controls retain \code{"none"}. Main model bandwidths and degrees never change.}
+
   \item{construction}{\code{"iterated"} selects the corrected observation
     operator and its full covariance. \code{"legacy"} explicitly requests
     the previous bootstrap centering construction; it requires bootstrap
@@ -67,6 +80,29 @@ np_bias_control(construction = c("iterated", "legacy"),
   corrected observation row. Variance estimation and calibration use that
   complete row, including correction covariance. No training-square smoothing
   matrix is retained. Training preparation is reused and query rows are blocked.
+
+  For an active local-to-global transition, each continuous coordinate uses
+  the dimensionless ratio \eqn{r_j=\max(1,h_j/b_{0j})}, where \eqn{h_j} is
+  the fitted bandwidth and \eqn{b_{0j}} the reference P0 bandwidth in the same
+  units. P0, P1 and residual-operator bandwidths are multiplied by \eqn{r_j};
+  the variance-smoothing bandwidth is unchanged. A fixed coordinatewise
+  polynomial penalty reduces auxiliary components beyond the main model's
+  polynomial space as that coordinate becomes global. The frozen residual
+  iteration normalization makes the same transition. This is an auxiliary
+  inference construction, not degree selection or a change to the main fit.
+  Adapted P0 row-variance-normalized residuals supply variance estimation and
+  residual-score calibration. Actual fitted observation rows are reused,
+  including each complete plot panel's large-bandwidth weight decisions.
+  Returned settings distinguish requested reference and effective bandwidths,
+  effective scale factors, activation reason and transition geometry.
+  Categorical and NN models retain their existing correction under
+  \code{"auto"}. Continuous dimension and main degree are not capped by this
+  activation rule; coverage evidence for the transition concentrates on
+  one/two continuous predictors and LC/LL/quadratic models, with numerical
+  validation of higher and mixed degrees. This does not establish general
+  high-dimensional or high-degree coverage. Transition coverage was assessed
+  with Gaussian and Mammen calibration; other laws retain their stated
+  finite-sample qualifications.
 
   The implementation admits an unbounded second-order Gaussian kernel,
   LC, LL and package-admissible GLP main degree vectors, including mixed

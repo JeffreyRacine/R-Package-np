@@ -146,7 +146,7 @@
 }
 
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
-                               B=9999L, law="gaussian", blocklen=NULL) {
+                               B=9999L, law="gaussian", blocklen=NULL, fit=NULL) {
   if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<2||B!=floor(B)||B>.Machine$integer.max)
     stop("bias calibration draws must be an integer >= 2",call.=FALSE)
   if(!length(alpha)||any(!is.finite(alpha))||any(alpha<=0|alpha>=.5)||anyDuplicated(alpha))
@@ -160,7 +160,9 @@
   M <- nrow(map);B <- as.integer(B)
   center <- original <- se <- score.se <- numeric(M)
   calibration.state <- .np_bias_limits_prepare(map$target,alpha,law=="gaussian",B)
-  regularization <- list()
+  regularization <- adaptation <- list()
+  adapted.rows <- if (!is.null(state$adaptation))
+    .np_bias_adaptation_capture(state,fit,grid,targets) else NULL
   score <- law%in%c("inid","fixed","geom")
   selection <- if(law%in%c("fixed","geom")) .np_bias_block_selection(state$residual_raw,law,blocklen) else NULL
   if(!exists(".Random.seed",.GlobalEnv,inherits=FALSE))runif(1L)
@@ -168,7 +170,10 @@
   for(batch in blocks) {
     jj <- batch$grid;rr <- batch$rows
     local.map <- map[rr,,drop=FALSE];local.map$row <- match(local.map$row,jj)
-    value <- .np_bias_regression_rows(state,grid[jj,,drop=FALSE],local.map)
+    value <- if (is.null(adapted.rows)) .np_bias_regression_rows(state,grid[jj,,drop=FALSE],local.map) else
+      adapted.rows(jj,local.map)
+    if (!is.null(value$adaptation)) adaptation[[length(adaptation)+1L]] <-
+      list(rows=rr,grid=jj,details=value$adaptation)
     diagnostic <- value$main.regularization
     if(law!="gaussian" && any(diagnostic$ridge>0))
       stop("bootstrap calibration for regularized generalized-NN main rows remains unqualified; Gaussian inference is available with the qualifications documented in np_bias_control",call.=FALSE)
@@ -202,6 +207,7 @@
     correction=original-center,se=se,bands=bands,map=map,grid=grid,
     settings=state$settings,law=law,block.selection=selection,draws=B,alpha=alpha,
     main.regularization=do.call(rbind,regularization),
+    adaptation=if(length(adaptation))adaptation else NULL,
     covariance=list(operator="complete corrected observation rows",
       variance=if(law%in%c("fixed","geom"))"empirical residual-score process variance" else "smoothed P0 residual variance",
       studentization=if(score)"empirical residual-score process SD" else "smoothed complete-row SD",
@@ -212,11 +218,11 @@
 }
 
 .np_bias_plot_errors <- function(state, grid, target, method, bootstrap, wild,
-                                 alpha, B, gaussian.draws, blocklen, band) {
+                                 alpha, B, gaussian.draws, blocklen, band, fit=NULL) {
   law <- if(method=="asymptotic")"gaussian" else if(bootstrap=="wild")wild else bootstrap
   inference <- .np_plot_activity_run("Constructing bias-corrected intervals",
     .np_bias_inference(state,grid,target,alpha,
-      if(method=="asymptotic")gaussian.draws else B,law,blocklen))
+      if(method=="asymptotic")gaussian.draws else B,law,blocklen,fit))
   all <- lapply(inference$bands,function(x)cbind(inference$center-x[,1,1],x[,2,1]-inference$center))
   width <- if(band=="pmzsd")cbind(inference$se,inference$se)*qnorm(alpha/2,lower.tail=FALSE) else
     all[[if(band=="all")"pointwise" else band]]
