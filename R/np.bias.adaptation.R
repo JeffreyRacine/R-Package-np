@@ -1,0 +1,168 @@
+# Private B3 integration seam. No public caller until statistical qualification.
+# Model fitting, calibration and variance smoothing retain their existing owners.
+# Only bounded target rows and thin training/basis factors are retained.
+.np_bias_adaptation_basis <- function(x, at, degree, derivative = 0L) {
+  nu <- integer(ncol(x)); if (derivative) nu[derivative] <- 1L
+  W.lp(as.data.frame(x), exdat=as.data.frame(at), degree=degree,
+    gradient.vec=if (derivative) nu else NULL, basis="glp", bernstein.basis=TRUE)
+}
+
+.np_bias_adaptation_kernel <- function(x, at, bandwidth) {
+  if (nrow(at)>16L) stop("internal adaptation kernel tile exceeded",call.=FALSE)
+  out <- matrix(0,nrow(x),nrow(at))
+  for (j in seq_along(bandwidth))
+    out <- out+outer(x[,j],at[,j],"-")^2/bandwidth[j]^2
+  exp(-out/2)
+}
+
+.np_bias_adaptation_product <- function(rows, x, bandwidth) {
+  if (nrow(rows)>500L) stop("internal adaptation row block exceeded",call.=FALSE)
+  out <- matrix(0,nrow(rows),nrow(x))
+  for (first in seq.int(1L,nrow(x),by=16L)) {
+    ii <- seq.int(first,min(nrow(x),first+15L))
+    out[,ii] <- rows %*% .np_bias_adaptation_kernel(x,x[ii,,drop=FALSE],bandwidth)
+  }
+  out
+}
+
+.np_bias_adaptation_geometry <- function(p, h, b0, b1, bK, q) {
+  if (length(p)!=length(q) || any(q<p) || any(!is.finite(h)) || any(h<=0))
+    stop("invalid fixed-model adaptation geometry",call.=FALSE)
+  r <- pmax(1,h/b0); u <- r^2-1; terms <- npBuildLpTerms(q)
+  penalty <- numeric(nrow(terms))
+  for (j in seq_along(q)) {
+    excess <- pmax(terms[,j]-p[j],0); ii <- which(excess>0)
+    penalty[ii] <- penalty[ii]+u[j]*excess[ii]^2
+  }
+  total <- rowSums(terms)
+  for (k in unique(total[total>0])) {
+    ii <- which(total==k)
+    excess <- pmax(k-pmax(max(p),apply(terms[ii,,drop=FALSE],1,max)),0)
+    jj <- which(excess>0)
+    if (length(jj)) penalty[ii[jj]] <- penalty[ii[jj]]+min(u[q>=k])*excess[jj]^2
+  }
+  if (any(!is.finite(penalty))) stop("nonfinite adaptation penalty",call.=FALSE)
+  list(q=q,r=r,lambda=penalty,rho=prod(1-r^-2),b0=b0*r,b1=b1*r,bK=bK*r,
+    original.q=q,global=is.infinite(h),inactive=all(r==1))
+}
+
+# Q and its reference geometry are prepared once, not once per pilot row.
+.np_bias_adaptation_pilot <- function(state, at, bandwidth, value = NULL,
+                                    derivatives = integer()) {
+  x <- state$x; Q <- state$Q; n <- nrow(x); P <- ncol(Q)
+  g <- drop(.np_bias_adaptation_kernel(x,at,bandwidth))
+  aug <- rbind(Q*sqrt(g),diag(sqrt(n*state$geometry$lambda),P))
+  fit <- qr(aug,LAPACK=FALSE,tol=1e-12)
+  if (fit$rank!=P) stop("declared penalized pilot not identified",call.=FALSE)
+  A <- backsolve(qr.R(fit),t(qr.Q(fit)[seq_len(n),,drop=FALSE])*rep(sqrt(g),each=P))
+  if (!identical(fit$pivot,seq_len(P))) { original <- A; A[fit$pivot,] <- original }
+  if (is.null(value)) value <- .np_bias_adaptation_basis(x,at,state$geometry$q)
+  H <- value %*% A
+  D <- matrix(0,length(derivatives),n)
+  for (k in seq_along(derivatives)) {
+    j <- derivatives[k]
+    w <- H*rep((x[,j]-at[1,j])/bandwidth[j]^2,each=nrow(H))
+    D[k,] <- .np_bias_adaptation_basis(x,at,state$geometry$q,j)%*%A+w-(w%*%Q)%*%A
+  }
+  list(A=A,g=g,H=H,D=D)
+}
+
+.np_bias_adaptation_prepare <- function(spec) {
+  if (length(spec$factor.cols) || spec$bws[["type"]]!="fixed" ||
+      spec$bws[["ckertype"]]!="gaussian" || spec$bws[["ckerorder"]]!=2L ||
+      spec$bws[["ckerbound"]]!="none" || !isTRUE(spec$bernstein))
+    stop("private adaptation seam requires continuous fixed Gaussian GLP pilots with a stable basis",call.=FALSE)
+  reg <- npValidatedConditionalRegSpec(spec$bws,where="private adaptation",ncon.field="ncon")
+  if (reg[["basis.engine"]]!="glp") stop("private adaptation requires GLP",call.=FALSE)
+  geo <- .np_bias_adaptation_geometry(reg[["degree.engine"]],
+    unname(spec$bws[["bandwidth"]][["x"]]),spec$b,spec$p1$b,spec$h,spec$q)
+  state <- list(spec=spec,x=as.matrix(spec$xcon),Q=spec$Q,geometry=geo,
+    version="B3-coordinate-isolated-1",iterations=spec$settings[["iterations"]])
+  if (geo$inactive) {
+    state$residual <- spec$residual; state$residual_raw <- spec$residual_raw
+    state$residual_row_variance <- spec$residual_row_variance; state$variance <- spec$variance
+    return(state)
+  }
+  n <- nrow(state$x); raw <- rowvar <- numeric(n)
+  for (i in seq_len(n)) {
+    H <- .np_bias_adaptation_pilot(state,state$x[i,,drop=FALSE],geo$b0,
+      state$Q[i,,drop=FALSE])$H
+    R <- -drop(H); R[i] <- R[i]+1
+    raw[i] <- sum(R*spec$y); rowvar[i] <- sum(R^2)
+  }
+  if (any(!is.finite(rowvar)) || any(rowvar<=0))
+    stop("invalid adapted P0 residual row",call.=FALSE)
+  state$residual_raw <- raw; state$residual_row_variance <- rowvar
+  state$residual <- raw/sqrt(rowvar)
+  state$variance <- .np_bias_variance(spec,state$residual)
+  state
+}
+
+# Apply P1 once to every row in this bounded batch. No training-square pilot.
+.np_bias_adaptation_compose <- function(rows, state) {
+  x <- state$x; out <- matrix(0,nrow(rows),nrow(x))
+  for (first in seq.int(1L,nrow(x),by=16L)) {
+    ii <- seq.int(first,min(nrow(x),first+15L))
+    H <- do.call(rbind,lapply(ii,function(i)
+      .np_bias_adaptation_pilot(state,x[i,,drop=FALSE],state$geometry$b1,
+        state$Q[i,,drop=FALSE])$H))
+    out <- out+rows[,ii,drop=FALSE]%*%H
+  }
+  out
+}
+
+.np_bias_adaptation_rows <- function(state, grid, map, main.rows) {
+  spec <- state$spec; x <- state$x; geo <- state$geometry; Q <- state$Q
+  if (nrow(map)>500L || nrow(grid)>25L || nrow(main.rows)!=nrow(map) ||
+      ncol(main.rows)!=nrow(x) || any(!is.finite(main.rows)))
+    stop("invalid bounded adaptation target rows",call.=FALSE)
+  if (geo$inactive) return(.np_bias_regression_rows(spec,grid,map))
+  at <- sweep(sweep(as.matrix(grid),2L,spec$offset,"-"),2L,spec$scale,"/")
+  nu <- vapply(map$target,function(t) if(t=="mean") 0L else {
+    j <- suppressWarnings(as.integer(substring(t,2L)))
+    if (!startsWith(t,"d") || is.na(j) || j<1L || j>spec$d)
+      stop("invalid adaptation derivative target",call.=FALSE)
+    j
+  },integer(1))
+  units <- vapply(nu,function(j)if(j)spec$scale[j] else 1,numeric(1))
+  L <- main.rows*units; W <- T1 <- matrix(0,nrow(map),nrow(x))
+  eta <- tau <- numeric(nrow(grid))
+  for (anchor in unique(map$row)) {
+    rr <- which(map$row==anchor); t <- at[anchor,,drop=FALSE]
+    po <- .np_bias_adaptation_pilot(state,t,geo$b0); A <- po$A; g <- po$g
+    v <- do.call(rbind,lapply(nu[rr],function(j).np_bias_adaptation_basis(x,t,geo$q,j)))
+    resid <- function(rows) rows-(rows%*%Q)%*%A
+    kg <- function(rows) sweep(.np_bias_adaptation_product(rows,x,geo$bK),2L,g,"*")
+    projected <- sum(diag(kg(A)%*%Q))
+    tau[anchor] <- sum(g)-projected
+    eta[anchor] <- sum(g)-(1-geo$rho)*projected
+    normalizer <- eta[anchor]
+    if (!is.finite(normalizer) || normalizer<=0 || tau[anchor] < -1e-10*sum(g))
+      stop("invalid declared step normalization",call.=FALSE)
+    T <- do.call(rbind,lapply(nu[rr],function(j) {
+      v <- drop(.np_bias_adaptation_kernel(x,t,geo$bK))
+      if(j)v <- v*(x[,j]-t[1,j])/geo$bK[j]^2
+      v*g/normalizer
+    }))
+    w <- L[rr,,drop=FALSE]+(v-L[rr,,drop=FALSE]%*%Q)%*%A
+    delta <- resid(T-kg(w)/normalizer)
+    for (step in seq_len(state$iterations)) {
+      if(step>1L)delta <- delta-resid(kg(delta)/normalizer)
+      w <- w+delta
+    }
+    W[rr,] <- w
+    for (k in seq_along(rr)) {
+      j <- nu[rr[k]]
+      pilot <- .np_bias_adaptation_pilot(state,t,geo$b1,derivatives=if(j)j else integer())
+      T1[rr[k],] <- if(j)pilot$D else pilot$H
+    }
+  }
+  C <- (W-.np_bias_adaptation_compose(W,state)+T1)/units
+  factor <- sweep(C,2L,sqrt(state$variance),"*")
+  if (any(!is.finite(factor))) stop("nonfinite adapted influence rows",call.=FALSE)
+  list(W=C,original=main.rows,center=drop(C%*%spec$y),
+    original_center=drop(main.rows%*%spec$y),se=sqrt(rowSums(factor^2)),factor=factor,
+    adaptation=list(version=state$version,geometry=geo,iterations=state$iterations,
+      tau=tau,eta=eta,training_p1_rows=nrow(x),variance_bandwidth=spec$variance_h,
+      residual_policy="adapted P0 row-variance normalized"))
+}
