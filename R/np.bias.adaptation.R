@@ -1,8 +1,8 @@
 # Frozen coordinatewise local-to-global correction and public integration seam.
 # Model fitting, calibration and variance smoothing retain their existing owners.
 # Only bounded target rows and thin training/basis factors are retained.
-.np_bias_adaptation_basis <- function(x, at, degree, derivative = 0L) {
-  nu <- integer(ncol(x)); if (derivative) nu[derivative] <- 1L
+.np_bias_adaptation_basis <- function(x, at, degree, derivative = 0L, order = 1L) {
+  nu <- integer(ncol(x)); if (derivative) nu[derivative] <- order
   W.lp(as.data.frame(x), exdat=as.data.frame(at), degree=degree,
     gradient.vec=if (derivative) nu else NULL, basis="glp", bernstein.basis=TRUE)
 }
@@ -49,7 +49,7 @@
 
 # Q and its reference geometry are prepared once, not once per pilot row.
 .np_bias_adaptation_pilot <- function(state, at, bandwidth, value = NULL,
-                                    derivatives = integer()) {
+                                    derivatives = integer(), orders = NULL) {
   x <- state$x; Q <- state$Q; n <- nrow(x); P <- ncol(Q)
   g <- drop(.np_bias_adaptation_kernel(x,at,bandwidth))
   aug <- rbind(Q*sqrt(g),diag(sqrt(n*state$geometry$lambda),P))
@@ -62,6 +62,15 @@
   D <- matrix(0,length(derivatives),n)
   for (k in seq_along(derivatives)) {
     j <- derivatives[k]
+    order <- if(is.null(orders)) 1L else orders[j]
+    if (order>1L) {
+      values <- do.call(rbind,lapply(0:order,function(r)
+        .np_bias_adaptation_basis(x,at,state$geometry$q,if(r)j else 0L,r)))
+      ratios <- .np_bias_gaussian_derivatives((x[,j]-at[1,j])/bandwidth[j],bandwidth[j],order)
+      D[k,] <- .np_bias_weighted_derivative(Q,g,values,ratios,
+        penalty=n*state$geometry$lambda,role="adapted P1 higher derivative pilot")
+      next
+    }
     w <- H*rep((x[,j]-at[1,j])/bandwidth[j]^2,each=nrow(H))
     D[k,] <- .np_bias_adaptation_basis(x,at,state$geometry$q,j)%*%A+w-(w%*%Q)%*%A
   }
@@ -128,13 +137,13 @@
       stop("invalid adaptation derivative target",call.=FALSE)
     j
   },integer(1))
-  units <- vapply(nu,function(j)if(j)spec$scale[j] else 1,numeric(1))
+  units <- vapply(nu,function(j)if(j)spec$scale[j]^.np_bias_derivative_order(spec,j) else 1,numeric(1))
   L <- main.rows*units; W <- T1 <- matrix(0,nrow(map),nrow(x))
   eta <- tau <- numeric(nrow(grid))
   for (anchor in unique(map$row)) {
     rr <- which(map$row==anchor); t <- at[anchor,,drop=FALSE]
     po <- .np_bias_adaptation_pilot(state,t,geo$b0); A <- po$A; g <- po$g
-    v <- do.call(rbind,lapply(nu[rr],function(j).np_bias_adaptation_basis(x,t,geo$q,j)))
+    v <- do.call(rbind,lapply(nu[rr],function(j).np_bias_adaptation_basis(x,t,geo$q,j,.np_bias_derivative_order(spec,j))))
     resid <- function(rows) rows-(rows%*%Q)%*%A
     kg <- function(rows) sweep(.np_bias_adaptation_product(rows,x,geo$bK),2L,g,"*")
     projected <- sum(diag(kg(A)%*%Q))
@@ -145,7 +154,11 @@
       stop("invalid declared step normalization",call.=FALSE)
     T <- do.call(rbind,lapply(nu[rr],function(j) {
       v <- drop(.np_bias_adaptation_kernel(x,t,geo$bK))
-      if(j)v <- v*(x[,j]-t[1,j])/geo$bK[j]^2
+      if(j) {
+        order <- .np_bias_derivative_order(spec,j)
+        if(order==1L)v <- v*(x[,j]-t[1,j])/geo$bK[j]^2
+        else v <- v*.np_bias_gaussian_derivatives((x[,j]-t[1,j])/geo$bK[j],geo$bK[j],order)[,order+1L]
+      }
       v*g/normalizer
     }))
     w <- L[rr,,drop=FALSE]+(v-L[rr,,drop=FALSE]%*%Q)%*%A
@@ -157,7 +170,7 @@
     W[rr,] <- w
     for (k in seq_along(rr)) {
       j <- nu[rr[k]]
-      pilot <- .np_bias_adaptation_pilot(state,t,geo$b1,derivatives=if(j)j else integer())
+      pilot <- .np_bias_adaptation_pilot(state,t,geo$b1,derivatives=if(j)j else integer(),orders=spec$gradient.order)
       T1[rr[k],] <- if(j)pilot$D else pilot$H
     }
   }
@@ -219,7 +232,7 @@
       j <- suppressWarnings(as.integer(substring(target,2L)))
       if(!startsWith(target,"d") || is.na(j) || !j %in% seq_len(state$d))
         stop("invalid adaptation derivative target",call.=FALSE)
-      nu[j] <- 1L
+      nu[j] <- .np_bias_derivative_order(state,j)
     }
     derivative <- if(any(nu)) nu else NULL
     owner <- .np_plot_regression_capture_operator(fit,request$bws,request$xdat,

@@ -18,7 +18,7 @@
   out
 }
 
-.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE) {
+.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE, gradient.order = NULL) {
   x <- toFrame(x)
   if (!is.numeric(y) || length(y) != nrow(x) || any(!is.finite(y)) || anyNA(x))
     stop("bias correction requires finite retained training data", call. = FALSE)
@@ -31,8 +31,11 @@
     stop(paste0("iterated regression bias correction currently supports unbounded second-order Gaussian kernels, at least one continuous predictor and GLP main models",legacy.hint), call. = FALSE)
   if (length(fc) && !all(vapply(x[fc],is.factor,logical(1))))
     stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
-  if (.np_bias_profile_layout(bws,x))
+  orders <- .np_bias_derivative_request(reg,d,gradient.order)
+  if (.np_bias_profile_layout(bws,x)) {
+    if (!is.null(orders)) stop("higher derivatives remain unqualified for pooled categorical auxiliaries",call.=FALSE)
     return(.np_bias_profile_prepare(bws,x,y,control,reg))
+  }
   keys <- if (length(fc)) do.call(paste,c(lapply(x[fc],as.integer),sep=":")) else rep("all",nrow(x))
   groups <- split(seq_len(nrow(x)),keys)
   if (length(groups) != 2^length(fc)) stop("bias correction requires every training profile",call.=FALSE)
@@ -67,6 +70,10 @@
     regtype=bws[["regtype"]],degree=bws[["degree"]],basis=bws[["basis"]],
     bernstein.basis=bws[["bernstein.basis"]],kernel=bws[["ckertype"]],order=bws[["ckerorder"]],
     scale.factor=bws[["sfactor"]][["x"]])
+  if (!is.null(orders)) {
+    spec$gradient.order <- orders
+    spec$settings$gradient.order <- setNames(orders,names(spec$xcon))
+  }
   policy <- if (isTRUE(adapt)) .np_bias_adaptation_policy(spec) else NULL
   if (!is.null(policy) && policy$active) {
     adapted <- .np_bias_adaptation_prepare(spec)
@@ -122,7 +129,7 @@
   } else {
     nu <- if (target=="mean") 0L else as.integer(substring(target,2L))
     if (is.na(nu) || !nu %in% 0:spec$d) stop("invalid derivative bias target",call.=FALSE)
-    list(e=list(e),sign=1,nu=nu)
+    list(e=list(e),sign=1,nu=nu,order=.np_bias_derivative_order(spec,nu))
   }
 }
 
@@ -132,7 +139,7 @@
 }
 
 .np_bias_main_rows <- function(spec,evals,nu) {
-  s <- integer(spec$d); if(nu)s[nu] <- 1L
+  s <- integer(spec$d); if(nu)s[nu] <- .np_bias_derivative_order(spec,nu)
   reg <- npValidatedConditionalRegSpec(spec$bws,where="bias main operator",ncon.field="ncon")
   if (spec$bws[["type"]]=="generalized_nn" && any(reg[["degree.engine"]]>1L)) {
     # Retain the qualified prepared-adjoint GNN owner used by the checkpoint.
@@ -191,7 +198,7 @@
     DQ <- t(vapply(rr,function(r) {
       f <- .np_bias_frames(spec,grid[map$row[r],,drop=FALSE],map$target[r]);v <- numeric(ncol(spec$Q))
       for(k in seq_along(f$e))if(.np_bias_key(spec,f$e[[k]])==key) {
-        s <- integer(spec$d);if(f$nu)s[f$nu] <- 1L
+        s <- integer(spec$d);if(f$nu)s[f$nu] <- f$order
         v <- v+f$sign[k]*.np_bias_projection(spec,f$e[[k]],spec$q,s)
       }
       v
@@ -224,13 +231,13 @@
   for(r in seq_len(nrow(map))) {
     f <- .np_bias_frames(spec,grid[map$row[r],,drop=FALSE],map$target[r])
     for(k in seq_along(f$e)) {
-      p <- .np_bias_pilot_rows(pilot,f$e[[k]],derivatives=f$nu>0L)
+      p <- .np_bias_pilot_rows(pilot,f$e[[k]],derivatives=f$nu>0L,orders=spec$gradient.order)
       h <- if(f$nu)p$derivatives[[f$nu]] else p$mean
       T[r,p$indices] <- T[r,p$indices]+f$sign[k]*h
     }
   }
   C <- W-(WP-T)
-  units <- vapply(map$target,function(t)if(startsWith(t,"d"))spec$scale[as.integer(substring(t,2L))] else 1,numeric(1))
+  units <- vapply(map$target,function(t)if(startsWith(t,"d"))spec$scale[as.integer(substring(t,2L))]^.np_bias_derivative_order(spec,as.integer(substring(t,2L))) else 1,numeric(1))
   C <- sweep(C,1L,units,"/"); L <- sweep(L,1L,units,"/")
   factor <- sweep(C,2L,sqrt(spec$variance),"*")
   if(any(!is.finite(factor)))stop("nonfinite corrected influence rows",call.=FALSE)

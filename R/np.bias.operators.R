@@ -174,8 +174,11 @@ function (spec, grid, map, op)
             e <- as.matrix(f$e[[k]][spec$numeric.cols])
             ii <- b$indices
             v <- drop(.np_bias_kernel(op$x[ii, , drop = FALSE], e, op$h))
-            if (f$nu)
-                v <- v * (op$x[ii, f$nu] - e[1L, f$nu])/op$h[f$nu]^2
+            if (f$nu) {
+                if (f$order==1L) v <- v * (op$x[ii, f$nu] - e[1L, f$nu])/op$h[f$nu]^2
+                else v <- v * .np_bias_gaussian_derivatives(
+                    (op$x[ii,f$nu]-e[1L,f$nu])/op$h[f$nu],op$h[f$nu],f$order)[,f$order+1L]
+            }
             out[r, ii] <- out[r, ii] + f$sign[k] * v * b$g/b$normalizer
         }
     }
@@ -183,7 +186,7 @@ function (spec, grid, map, op)
 }
 
 .np_bias_pilot_rows <-
-function (spec, at, derivatives = TRUE)
+function (spec, at, derivatives = TRUE, orders = NULL)
 {
     ii <- spec$groups[[.np_bias_key(spec, at)]]
     if (is.null(ii))
@@ -201,6 +204,17 @@ function (spec, at, derivatives = TRUE)
     dh <- list()
     if (derivatives)
         for (d in seq_len(spec$d)) {
+            order <- if (is.null(orders)) 1L else orders[d]
+            if (order>1L) {
+                values <- do.call(rbind,lapply(0:order,function(j) {
+                    s <- integer(spec$d);s[d] <- j
+                    drop(basis(u,exdat=zero,degree=spec$q,gradient.vec=if(j)s else NULL,
+                        basis="glp",bernstein.basis=spec$bernstein))/spec$b[d]^j
+                }))
+                ratios <- .np_bias_gaussian_derivatives(u[[d]],spec$b[d],order)
+                dh[[d]] <- .np_bias_weighted_derivative(Q,k,values,ratios,role="P1 auxiliary higher derivative pilot")
+                next
+            }
             nu <- integer(spec$d)
             nu[d] <- 1L
             dv <- drop(basis(u, exdat = zero, degree = spec$q, gradient.vec = nu, basis = "glp",

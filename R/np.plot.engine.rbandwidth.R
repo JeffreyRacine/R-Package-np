@@ -205,8 +205,6 @@
       stop("legacy bias correction requires errors='bootstrap'",call.=FALSE)
     if (new.bias && isTRUE(.npRmpi_autodispatch_called_from_bcast()))
       stop("iterated bias inference requires coordinator context; call plot from the master",call.=FALSE)
-    if (new.bias && gradients && any(gradient.order!=1L))
-      stop("iterated bias correction currently supports first derivatives",call.=FALSE)
     if (new.bias && plot.bxp)
       stop("factor.boxplot is unavailable for iterated bias-corrected intervals",call.=FALSE)
     if (new.bias && as.character(plot.errors.boot.nonfixed)[1L]!="exact")
@@ -262,7 +260,8 @@
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
-      .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE)) else NULL
+      .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE,
+        gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL)) else NULL
     bias.capture <- !is.null(bias.state$adaptation)
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)

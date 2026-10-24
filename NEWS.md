@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+- Bias-corrected regression plots support higher pure coordinate derivatives
+  with Gaussian or Mammen bands when the fitted polynomial has at least one
+  degree beyond the requested derivative order. Existing mixed-degree and
+  gradient.order vectors retain their coordinate-specific meaning.
+
 - Extend iterated bias-corrected fixed-bandwidth regression means to additional
   categorical layouts using a shared-curvature/profile-main auxiliary and full
   covariance. Gaussian and Mammen calibration retain 16 default iterations and
