@@ -5,7 +5,7 @@ test_that("higher derivative rows differentiate weights and preserve polynomial 
   expect_equal(ratios[,3L],((u/h)^2-1)/h^2)
   V <- rbind(c(1,0,0),c(0,1,0),c(0,0,2))
   H <- npRmpi:::.np_bias_weighted_derivative(Q,k,V,ratios)
-  expect_equal(drop(H %*% Q),c(0,0,2),tolerance=1e-11)
+  expect_equal(unname(drop(H %*% Q)),c(0,0,2),tolerance=1e-11)
   expect_null(npRmpi:::.np_bias_derivative_request(list(degree.engine=1L),1L,1L))
   expect_identical(npRmpi:::.np_bias_derivative_request(list(degree.engine=c(3L,4L)),2L,c(2L,3L)),c(2L,3L))
   expect_error(npRmpi:::.np_bias_derivative_request(list(degree.engine=2L),1L,2L),"degree - 1",fixed=TRUE)
