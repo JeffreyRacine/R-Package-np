@@ -29,10 +29,10 @@
   if (!d || bws[["ckertype"]] != "gaussian" || bws[["ckerorder"]] != 2L ||
       bws[["ckerbound"]] != "none" || reg[["basis.engine"]] != "glp")
     stop(paste0("iterated regression bias correction currently supports unbounded second-order Gaussian kernels, at least one continuous predictor and GLP main models",legacy.hint), call. = FALSE)
-  if (length(fc) && (!all(vapply(x[fc],is.factor,logical(1))) ||
-      any(vapply(x[fc],nlevels,integer(1)) != 2L) ||
-      sum(bws[["iuno"]]) > 1L || sum(bws[["iord"]]) > 1L))
-    stop(paste0("iterated regression bias correction currently admits at most one binary unordered and one binary ordered predictor",legacy.hint), call. = FALSE)
+  if (length(fc) && !all(vapply(x[fc],is.factor,logical(1))))
+    stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
+  if (.np_bias_profile_layout(bws,x))
+    return(.np_bias_profile_prepare(bws,x,y,control,reg))
   keys <- if (length(fc)) do.call(paste,c(lapply(x[fc],as.integer),sep=":")) else rep("all",nrow(x))
   groups <- split(seq_len(nrow(x)),keys)
   if (length(groups) != 2^length(fc)) stop("bias correction requires every training profile",call.=FALSE)
@@ -202,6 +202,7 @@
 }
 
 .np_bias_regression_rows <- function(spec,grid,map) {
+  if (isTRUE(spec$pooled)) return(.np_bias_profile_rows(spec,grid,map))
   if (nrow(map)>500L || nrow(unique(grid[spec$numeric.cols]))>25L)
     stop("internal bias target block exceeded",call.=FALSE)
   for(j in seq_len(spec$d))grid[[spec$numeric.cols[j]]] <- (grid[[spec$numeric.cols[j]]]-spec$offset[j])/spec$scale[j]

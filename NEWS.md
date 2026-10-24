@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+- Extend iterated bias-corrected fixed-bandwidth regression means to additional
+  categorical layouts using a shared-curvature/profile-main auxiliary and full
+  covariance. Gaussian and Mammen calibration retain 16 default iterations and
+  existing controls. Previously admitted routes are unchanged; sparse pilot
+  rank failures remain explicit. Document the bounded coverage evidence and
+  unsupported pooled derivative/NN/bootstrap extensions.
+
 - Calibrate iterated bias-corrected Gaussian and Mammen regression bands using
   replicate-specific residual-pilot studentization. Preserve the corrected
   center, observed SE, 16 iterations and selected model. Record the construction
