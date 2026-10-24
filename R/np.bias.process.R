@@ -142,6 +142,10 @@
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE) {
+  higher <- !is.null(state$gradient.order) && any(vapply(targets,function(t)
+    startsWith(t,"d") && .np_bias_derivative_order(state,as.integer(substring(t,2L)))>1L,logical(1)))
+  if (higher && !law %in% c("gaussian","mammen"))
+    stop("higher-order bias correction currently supports Gaussian or Mammen calibration",call.=FALSE)
   if (isTRUE(state$pooled) &&
       (!identical(targets,"mean") || !law %in% c("gaussian","mammen")))
     stop("pooled mixed-data bias correction currently supports means with Gaussian or Mammen calibration only",call.=FALSE)

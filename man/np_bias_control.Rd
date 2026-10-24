@@ -149,6 +149,19 @@ np_bias_control(construction = c("iterated", "legacy"),
   Nearest-neighbor bandwidths, derivatives, categorical contrasts and other
   bootstrap laws remain unqualified for the pooled path.
 
+  Outside the pooled categorical path, higher pure coordinate derivatives use
+  the existing \code{gradient.order} argument. Each requested order greater than
+  one must satisfy \code{gradient.order[j] <= degree[j] - 1}; the fitted main
+  degree is never increased. Scalar orders are recycled across continuous
+  coordinates and vectors retain their coordinate-specific meaning. These are
+  pure partial derivatives, not cross partials. Newly admitted higher orders
+  use Gaussian or Mammen calibration. The complete weighted P1 pilot is
+  differentiated analytically, including its weight and coefficient dependence,
+  and all correction covariance terms and derivative units are retained.
+  The effective vector is recorded in \code{inference$settings$gradient.order}.
+  Numerical support does not imply well-determined high derivatives at small
+  sample sizes; intervals can be wide and sparse pilot geometry can fail.
+
   Use \code{errors="asymptotic"} for Gaussian calibration or
   \code{errors="bootstrap"} with the existing \code{bootstrap} and
   \code{\link{np_boot_control}} choices. Mammen is the default wild law;

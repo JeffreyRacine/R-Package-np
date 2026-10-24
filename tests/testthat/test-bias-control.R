@@ -1,3 +1,16 @@
+test_that("higher derivative rows differentiate weights and preserve polynomial moments", {
+  u <- seq(-1,1,length.out=24L); h <- .7
+  Q <- cbind(1,u,u^2); k <- exp(-u^2/(2*h^2))
+  ratios <- np:::.np_bias_gaussian_derivatives(u/h,h,2L)
+  expect_equal(ratios[,3L],((u/h)^2-1)/h^2)
+  V <- rbind(c(1,0,0),c(0,1,0),c(0,0,2))
+  H <- np:::.np_bias_weighted_derivative(Q,k,V,ratios)
+  expect_equal(drop(H %*% Q),c(0,0,2),tolerance=1e-11)
+  expect_null(np:::.np_bias_derivative_request(list(degree.engine=1L),1L,1L))
+  expect_identical(np:::.np_bias_derivative_request(list(degree.engine=c(3L,4L)),2L,c(2L,3L)),c(2L,3L))
+  expect_error(np:::.np_bias_derivative_request(list(degree.engine=2L),1L,2L),"degree - 1",fixed=TRUE)
+})
+
 test_that("bias controls preserve explicit construction and auxiliary basis", {
   control <- np_bias_control()
   expect_s3_class(control, "np_bias_control")
