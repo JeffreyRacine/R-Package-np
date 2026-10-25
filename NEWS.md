@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Extend pooled mixed-data Gaussian/Mammen correction to regular adaptive-neighbor
+  main fits, including admitted pure derivatives and categorical contrasts.
+  Preserve selected neighbor counts, degree, auxiliary settings and the existing
+  fixed-bandwidth construction. Unidentified or regularized pooled rows still fail.
+
 * Add iterated bias-corrected means and categorical contrasts for fixed-bandwidth
   categorical-only regression. Use the exact observed-profile reduction, full
   contrast covariance and Gaussian/Mammen studentization; retain the main fit

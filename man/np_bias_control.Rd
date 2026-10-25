@@ -128,8 +128,9 @@ np_bias_control(construction = c("iterated", "legacy"),
   must be interpreted for the configurations actually studied. Other kernels,
   additive and tensor main bases remain outside this construction.
 
-  Other categorical layouts use a partially pooled auxiliary for fixed-bandwidth
-  means, pure continuous derivatives and categorical first differences with
+  Other categorical layouts use a partially pooled auxiliary for fixed or
+  adaptive-neighbour bandwidths, supporting means, pure continuous derivatives
+  and categorical first differences with
   Gaussian or Mammen calibration. This includes multiple unordered
   and ordered predictors and factors with more than two levels. Higher-order
   continuous curvature is shared across observed joint profiles; each profile
@@ -158,8 +159,10 @@ np_bias_control(construction = c("iterated", "legacy"),
   both endpoints before computing covariance and studentization; uncertainty
   includes their cross-covariance. Both endpoints must be observed training
   profiles. Identical endpoints give exactly zero differences and intervals.
-  Nearest-neighbor bandwidths and other bootstrap laws remain unqualified for
-  the pooled path.
+  Generalized-neighbour bandwidths and other bootstrap laws remain unqualified
+  for the pooled path. Adaptive-neighbour main rows use the selected fixed
+  neighbor counts and the fitted estimator's derivative convention; auxiliary
+  pilots retain their separate fixed bandwidths.
 
   Fixed-bandwidth models with categorical predictors only use an exact
   finite-profile reduction: the corrected means are observed joint-profile
