@@ -1,10 +1,10 @@
-test_that("pooled adaptive NN rows retain the fitted owner and polynomial functionals", {
+test_that("pooled NN rows retain the fitted owner and polynomial functionals", {
 
   old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
   set.seed(61003);n <- 120L
   x <- data.frame(x=runif(n,-1,1),u=factor(rep(1:3,each=40)),o=ordered(rep(1:2,60)))
   signal <- x$x^3+.2*as.integer(x$u);y <- signal+rnorm(n,sd=.3)
-  for(type in "adaptive_nn") {
+  for(type in c("adaptive_nn","generalized_nn")) {
     b <- npregbw(xdat=x,ydat=y,bws=c(60,.2,.2),bwtype=type,regtype="lp",degree=3,
       bernstein.basis=TRUE,bandwidth.compute=FALSE)
     a <- np:::.np_bias_regression_prepare(b,x,y,gradient.order=2L)

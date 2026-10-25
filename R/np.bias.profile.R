@@ -73,7 +73,7 @@
 }
 
 .np_bias_profile_prepare <- function(bws, x, y, control, reg, orders=NULL) {
-  if (!bws[["type"]] %in% c("fixed", "adaptive_nn"))
+  if (!bws[["type"]] %in% c("fixed", "adaptive_nn", "generalized_nn"))
     stop("unsupported pooled main bandwidth type", call.=FALSE)
   nc <- which(bws[["icon"]]); fc <- which(!bws[["icon"]])
   keys <- .np_bias_profile_keys(x,fc)
