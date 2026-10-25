@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Map ordered-factor floor rugs to the same numeric coordinates as their
+  surfaces in base and rgl plots, preserving numeric and nonnumeric level
+  spacing. This prevents calendar-year rugs from distorting rgl scenes.
+
 * Keep automatic Gaussian band subtitles visible on ordinary plot devices
   using compact measured labels, including bias-corrected simultaneous bands.
   Preserve explicit subtitles, font size and plotting margins.
