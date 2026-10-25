@@ -456,7 +456,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   extended-real estimates to retain their mathematical meaning without
   passing invalid coordinates or limits to a graphics backend.
 
-  Plot variability-band constructions are:
+  The default variability and legacy bootstrap constructions are listed below.
+  Iterated bias-corrected regression uses the separate construction described
+  immediately after this table.
   \preformatted{
   errors       band             construction
   bootstrap    pmzsd            center +/- z_(1-alpha/2) * bootstrap SD
@@ -474,7 +476,22 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   typically \eqn{m=\texttt{neval}^2}{m=neval^2} for full 2D perspective
   surfaces).
 
-  Thus \code{errors="bootstrap", band="pmzsd"} summarizes each
+  For regression with \code{center="bias-corrected"} and the default
+  \code{np_bias_control(construction="iterated")}, \code{"pmzsd"}
+  retains the symmetric normal-quantile rule around the corrected center.
+  The other three band types use empirical quantiles of the corrected process.
+  Gaussian and Mammen calibration use replicate-specific studentization:
+  pointwise limits use marginal absolute studentized statistics, simultaneous
+  limits use their within-target maxima, and Bonferroni limits use marginal
+  tail probabilities adjusted by the number of grid points. An outward
+  envelope preserves nesting and singleton equality. These bands are symmetric
+  around the corrected center; asymptotic pointwise limits need not equal
+  \eqn{z_{1-\alpha/2}} times the corrected standard error. Other supported
+  bootstrap laws retain their documented corrected-process calibration;
+  see \code{\link{np_bias_control}} for law-specific definitions and support.
+
+  In the default and legacy constructions in the table,
+  \code{errors="bootstrap", band="pmzsd"} summarizes each
   bootstrap distribution by its standard deviation and imposes a symmetric
   normal-quantile shape on the displayed band. In contrast, bootstrap
   \code{"pointwise"} and \code{"bonferroni"} bands use the corresponding
@@ -484,8 +501,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   deviations or pointwise tail quantiles. With \code{band="all"}, these
   distinct bootstrap families are displayed together where supported.
 
-  For asymptotic errors, \code{"pmzsd"} and \code{"pointwise"} are two
-  names for the same symmetric normal construction. Let \eqn{T(x)} denote
+  Outside iterated bias-corrected regression, asymptotic \code{"pmzsd"}
+  and \code{"pointwise"} are two names for the same symmetric normal
+  construction. Let \eqn{T(x)} denote
   the plotted functional (mean, gradient, density, distribution, etc.) and
   \eqn{\widehat{se}(x)} its asymptotic standard error. Both use
   \eqn{T(x)\pm z_{1-\alpha/2}\widehat{se}(x)}{T(x) +/- z_(1-alpha/2) se(x)}.
@@ -747,7 +765,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   construction, for example \code{"Pointwise (quantiles)"} and
   \code{"Simultaneous (rank-based)"} for bootstrap bands, or
   \code{"Pointwise (z × SE)"} and
-  \code{"Bonferroni (adjusted z × SE)"} for asymptotic bands. A default
+  \code{"Bonferroni (adjusted z × SE)"} for asymptotic variability bands.
+  Iterated bias-corrected regression instead identifies Gaussian studentized
+  quantiles and maximum-based calibration where applicable. A default
   legend omits any family for which no finite band was drawn. Explicit
   user-supplied legend labels are preserved without relabelling or
   filtering.
