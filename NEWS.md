@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Extend the existing rademacher calibration to higher continuous derivatives
+  on the original continuous and simple mixed-data routes. Preserve its literal
+  resampling law, corrected rows and defaults; pooled admission is unchanged.
+  Admit the same literal law for finite-profile categorical-only inference,
+  with its documented small-profile coverage limitations.
+
 * Admit the existing inid corrected-score calibration for pooled means,
   derivatives and categorical contrasts, and for original higher derivatives.
   Retain the complete correction, smoothed variance and all frozen defaults.

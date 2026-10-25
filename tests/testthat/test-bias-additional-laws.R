@@ -9,7 +9,7 @@ test_that("original higher derivatives preserve the admitted literal laws", {
     bernstein.basis=TRUE,bandwidth.compute=FALSE)
   fit <- npreg(b,txdat=x,tydat=y);saved <- fit
   state <- npRmpi:::.np_bias_regression_prepare(b,x,y,gradient.order=2L)
-  for(law in c("inid")) {
+  for(law in c("inid","rademacher")) {
     one <- npRmpi:::.np_bias_inference(state,x[1,,drop=FALSE],"d1",.05,63L,law)
     expect_identical(one$law,law)
     expect_identical(one$bands$pointwise,one$bands$simultaneous)
@@ -64,7 +64,7 @@ test_that("categorical-only additional laws record their actual calibration", {
   set.seed(61029);x <- data.frame(u=factor(rep(1:3,each=30L)));y <- as.integer(x$u)+rnorm(90L)
   b <- npregbw(xdat=x,ydat=y,bws=.2,regtype="lc",bandwidth.compute=FALSE)
   state <- npRmpi:::.np_bias_regression_prepare(b,x,y)
-  for(law in c("inid"))for(target in c("mean","c1")) {
+  for(law in c("inid","rademacher"))for(target in c("mean","c1")) {
     z <- npRmpi:::.np_bias_inference(state,x[31,,drop=FALSE],target,.05,63L,law)
     expect_identical(z$law,law)
     expect_identical(z$bands$pointwise,z$bands$simultaneous)
