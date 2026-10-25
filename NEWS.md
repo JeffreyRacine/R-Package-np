@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Integrate the frozen M1 local-to-global correction for eligible mixed-data
+  fixed Gaussian regression bands with Gaussian or Mammen calibration.
+  Adapt P0 residuals and complete observation rows without changing the main
+  model, variance-smoothing bandwidth or default 16 iterations. Preserve
+  adaptation="none", inactive geometry, other calibration laws and continuous
+  adaptation. Categorical contrasts use both endpoints from one captured fit.
+  M1's narrower bands carry the documented target-specific coverage trade-offs.
+
 * Extend the existing geom calibration to higher continuous derivatives
   on the original continuous and simple mixed-data routes. Preserve its literal
   resampling law, corrected rows and defaults; pooled admission is unchanged.

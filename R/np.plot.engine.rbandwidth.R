@@ -259,7 +259,9 @@
     plot.errors <- normalized.opts$plot.errors
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
       .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE,
-        gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL)) else NULL
+        gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
+         law=if(plot.errors.method=="asymptotic")"gaussian" else
+           if(plot.errors.boot.method=="wild")plot.errors.boot.wild else plot.errors.boot.method)) else NULL
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     overlay.ok <- .np_plot_overlay_enabled(
@@ -341,7 +343,7 @@
         gradient.order = gradient.order,
         need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
         .np.empty.report = .np.empty.report, need.joint = joint.eligible,
-        need.bias.capture = !is.null(bias.state$adaptation)
+        need.bias.capture = !is.null(bias.state$adaptation), bias.state = bias.state
       )
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
@@ -741,8 +743,9 @@
           need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
           .np.empty.report = .np.empty.report,
           need.joint = joint.eligible && (!gradients || !xi.factor),
-          need.bias.capture = !is.null(bias.state$adaptation)
-        )
+          need.bias.capture = !is.null(bias.state$adaptation), bias.state = bias.state,
+           bias.target = if(!gradients)"mean" else if(xi.factor)paste0("c",i) else paste0("d",match(i,which(bws$icon)))
+         )
 
         temp.mean[seq_len(xi.neval)] = if (gradients) tr$grad[, i] else tr$mean
 

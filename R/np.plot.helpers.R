@@ -8764,7 +8764,7 @@ plotFactor <- function(f, y, ...){
                                      gradient.order = 1L,
                                      need.asymptotic = FALSE,
                                      .np.empty.report = NULL, need.joint = FALSE,
-                                     need.bias.capture = FALSE) {
+                                     need.bias.capture = FALSE, bias.state = NULL, bias.target = "mean") {
   .np_plot_activity_run(
     label = if (isTRUE(need.asymptotic)) {
       "Computing regression plot asymptotic fit"
@@ -8772,7 +8772,11 @@ plotFactor <- function(f, y, ...){
       "Computing regression plot fit"
     },
     expr = {
-      if (isTRUE(need.bias.capture)) {
+      if (!is.null(bias.state$mixed)) {
+         fit <- .np_bias_mixed_eval(bias.state,bws,xdat,ydat,exdat,gradients,gradient.order,bias.target)
+         return(.npreg_publish_plot_rows(fit,report=.np.empty.report,row.labels=row.names(exdat)))
+       }
+       if (isTRUE(need.bias.capture)) {
         fit <- .np_regression_direct(bws,xdat,ydat,exdat,se=TRUE,
           gradients=gradients,gradient.order=gradient.order,
           allow.empty.rows=TRUE,fit.inference=TRUE)

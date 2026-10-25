@@ -72,15 +72,13 @@
     "bernstein","Q","h")]
 }
 
-.np_bias_profile_prepare <- function(bws, x, y, control, reg, orders=NULL) {
+.np_bias_profile_prepare <- function(bws, x, y, control, reg, orders=NULL, adapt=FALSE, law=NULL) {
   if (!bws[["type"]] %in% c("fixed", "adaptive_nn", "generalized_nn"))
     stop("unsupported pooled main bandwidth type", call.=FALSE)
   nc <- which(bws[["icon"]]); fc <- which(!bws[["icon"]])
   keys <- .np_bias_profile_keys(x,fc)
   groups <- split(seq_len(nrow(x)),keys)
   settings <- .np_bias_resolve(control,x[nc],nrow(x),reg[["degree.engine"]])
-  if (settings$adaptation_request=="local-to-global")
-    stop("local-to-global adaptation remains unqualified for pooled mixed-data auxiliaries", call.=FALSE)
   # Retain the frozen global-then-profile scale operation order. Raw overrides
   # are literal predictor-unit bandwidths and must not receive this adjustment.
   adjustment <- (nrow(x)/min(lengths(groups)))^settings$exponent
@@ -115,6 +113,11 @@
     if (nrow(M)<=ncol(M) || qr(M)$rank!=ncol(M))
       stop("profile main space lacks identified residual support", call.=FALSE)
   }
+  a$variance_h <- a$h$variance
+  policy <- if(isTRUE(adapt)) .np_bias_mixed_policy(a,bws,law) else NULL
+  if(!is.null(policy) && policy$active) {
+    a <- .np_bias_mixed_prepare(a,bws,x,policy)
+  } else {
   pilot <- .np_bias_profile_pilot(a)
   raw <- q <- mu <- numeric(nrow(x))
   for (ii in .np_bias_profile_tiles(nrow(x))) {
@@ -134,6 +137,7 @@
     a$variance[ii] <- drop(S(ii) %*% a$residual^2)
   if (any(!is.finite(a$variance)) || any(a$variance<=0))
     stop("nonpositive pooled smoothed variance",call.=FALSE)
+  }
   a$settings$auxiliary_space <- list(construction="shared curvature with profile-main deviations",
     columns=ncol(a$Q),shared.columns=settings$degree_spec$nterms,
     profile.main.columns=main.terms$nterms,profiles=names(groups),rank.tolerance=1e-11,
@@ -146,8 +150,9 @@
     regtype=bws[["regtype"]],degree=bws[["degree"]],basis=bws[["basis"]],
     bernstein.basis=bws[["bernstein.basis"]],kernel=bws[["ckertype"]],order=bws[["ckerorder"]],
     scale.factor=bws[["sfactor"]][["x"]])
-  a$settings$adaptation <- list(requested=settings$adaptation_request,active=FALSE,
-    eligible=FALSE,reason="pooled mixed-data auxiliary")
+  if(is.null(a$mixed)) a$settings$adaptation <- if(!is.null(policy)) policy else
+    list(requested=settings$adaptation_request,active=FALSE,
+      eligible=FALSE,reason="pooled mixed-data auxiliary")
   a
 }
 
