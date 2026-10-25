@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Regression inference compares retained model state independently of historical
+  call metadata. This restores formula-based MPI local-to-global correction
+  while preserving exact data, bandwidth, degree and evaluation identity.
+
 * Corrected-process MPI calibration now transports its factor matrix safely
   for a single resampling chunk. Literal laws, draw streams and distributed
   ownership are unchanged; small explicit draw counts no longer collide with

@@ -217,7 +217,7 @@
 .np_bias_adaptation_capture <- function(state, fit, grid, targets) {
   request <- fit[["fit.request",exact=TRUE]]
   expected <- state$main.request
-  if (!is.list(request) || !identical(request$bws,expected$bws) ||
+  if (!is.list(request) || !.np_plot_regression_capture_same_bws(request$bws,expected$bws) ||
       !identical(request$xdat,expected$xdat) || !identical(as.double(request$ydat),as.double(expected$ydat)) ||
       !identical(unname(as.matrix(request$exdat)),unname(as.matrix(grid))))
     stop("adapted bias correction requires its complete fitted plot request",call.=FALSE)
