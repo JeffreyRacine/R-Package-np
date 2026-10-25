@@ -142,11 +142,11 @@
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE) {
-  if (isTRUE(state$categorical.only) && !law %in% c("gaussian","mammen","inid"))
+  if (isTRUE(state$categorical.only) && !law %in% c("gaussian","mammen","inid","rademacher"))
     stop("categorical-only bias correction does not support this calibration law",call.=FALSE)
   higher <- !is.null(state$gradient.order) && any(vapply(targets,function(t)
     startsWith(t,"d") && .np_bias_derivative_order(state,as.integer(substring(t,2L)))>1L,logical(1)))
-  if (higher && !law %in% c("gaussian","mammen","inid"))
+  if (higher && !law %in% c("gaussian","mammen","inid","rademacher"))
     stop("higher-order bias correction does not support this calibration law",call.=FALSE)
   if (isTRUE(state$pooled) &&
       !law %in% c("gaussian","mammen","inid"))
