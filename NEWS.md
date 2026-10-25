@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Regression inference compares retained model state independently of historical
+  call metadata. This restores formula-based MPI local-to-global correction
+  while preserving exact data, bandwidth, degree and evaluation identity.
+
 * Fixed-bandwidth pooled categorical bias correction now supports continuous
   pure derivatives and categorical first differences with Gaussian/Mammen
   calibration. Complete pilot derivatives and endpoint cross-covariance use

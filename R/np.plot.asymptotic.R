@@ -207,12 +207,23 @@
     isTRUE(bws[["ncon", exact=TRUE]] > 0L)
 }
 
+# Calls retain historical formula/evaluation environments. MPI transport may
+# remove that provenance, while the complete computational bandwidth state and
+# retained training/evaluation data remain identical. Never evaluate a call to
+# validate a compact fitted operator, or omit any other bandwidth field.
+.np_plot_regression_capture_same_bws <- function(left, right) {
+  if (!is.list(left) || !is.list(right)) return(FALSE)
+  left[["call"]] <- NULL
+  right[["call"]] <- NULL
+  identical(left, right)
+}
+
 .np_plot_regression_capture_operator <- function(fit,bws,x,y,ex,deriv,
                                                  categorical.index,max.bytes) {
   request <- fit[["fit.request", exact=TRUE]]
   if (!.np_plot_regression_capture_supported(bws) ||
       !is.null(categorical.index) || !is.list(request) ||
-      !identical(request$bws,bws) || !identical(request$xdat,x) ||
+      !.np_plot_regression_capture_same_bws(request$bws,bws) || !identical(request$xdat,x) ||
       !identical(request$ydat,y) || !identical(request$exdat,ex))
     stop("regression inference capture does not match its fit request",call.=FALSE)
   state <- fit[["fit.inference", exact=TRUE]]
