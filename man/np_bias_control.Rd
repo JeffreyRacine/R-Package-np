@@ -132,7 +132,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   adaptive-neighbour or generalized-neighbour bandwidths, supporting means,
   pure continuous derivatives
   and categorical first differences with
-  Gaussian or Mammen calibration. This includes multiple unordered
+  Gaussian, Mammen or inid calibration. This includes multiple unordered
   and ordered predictors and factors with more than two levels. Higher-order
   continuous curvature is shared across observed joint profiles; each profile
   retains its own polynomial terms through the fitted main degree. P0 and P1
@@ -163,14 +163,19 @@ np_bias_control(construction = c("iterated", "legacy"),
   both endpoints before computing covariance and studentization; uncertainty
   includes their cross-covariance. Both endpoints must be observed training
   profiles. Identical endpoints give exactly zero differences and intervals.
-  Other bootstrap laws remain unqualified for the pooled path. Nearest-neighbour
+  Rademacher, fixed and geom remain unqualified for the pooled path.
+  Pooled inid uses the same complete corrected rows and its existing smoothed
+  variance and residual-score calibration. Bounded regular-neighborhood
+  confirmation was encouraging overall, with weaker mean coverage than
+  Gaussian/Mammen in a fixed cubic case, particularly at 90 percent nominal.
+  These results do not establish nominal coverage for every configuration. Nearest-neighbour
   main rows use the selected fixed neighbor counts and the fitted estimator's
   derivative convention; auxiliary pilots retain their separate fixed bandwidths.
   Bounded coverage assessment uses regular CV-guided neighbor counts; very small
   neighborhoods remain edge stresses rather than primary qualification cases.
   Pooled main rows requiring a positive numerical ridge remain unsupported.
 
-  Fixed-bandwidth models with categorical predictors only use an exact
+  Fixed-bandwidth local-constant models with categorical predictors only use an exact
   finite-profile reduction: the corrected means are observed joint-profile
   sample means, and contrasts subtract those complete profile-average rows.
   The main fit and categorical lambdas remain fixed. Every observed profile
@@ -180,15 +185,19 @@ np_bias_control(construction = c("iterated", "legacy"),
   Continuous auxiliary geometry controls and explicit local-to-global
   adaptation have no meaning for this route and are rejected.
 
-  This categorical-only route supports Gaussian and Mammen calibration.
+  This categorical-only route supports gaussian, mammen, inid calibration.
   Gaussian pseudo-errors use the observed unbiased within-profile variance;
   Mammen pseudo-errors use signed, leverage-normalized within-profile residuals.
-  Each draw re-estimates the corresponding profile variance. For a single
+  For these two laws, each draw re-estimates the corresponding profile variance. For a single
   profile with normal iid errors the Gaussian pivot has the Student-t law;
   that exact statement does not extend to arbitrary contrasts or error laws.
   Complete contrast covariance and common draws determine joint bands.
+  Other admitted laws retain their existing fixed-factor or residual-score
+  calibration, without replicate-specific profile studentization; fixed and
+  geom retain automatic residual-based block selection. The reported variance
+  and calibration fields distinguish these constructions.
   Coverage evidence is bounded: many small, unequal profiles can still lead
-  to Mammen mean under-coverage. No categorical profile is dropped or pooled
+  to mean and contrast under-coverage across laws, particularly with skewed errors. No categorical profile is dropped or pooled
   further to conceal that limitation. The finite-profile construction and
   actual variance policy are recorded in the returned inference object.
 
@@ -197,8 +206,9 @@ np_bias_control(construction = c("iterated", "legacy"),
   one must satisfy \code{gradient.order[j] <= degree[j] - 1}; the fitted main
   degree is never increased. Scalar orders are recycled across continuous
   coordinates and vectors retain their coordinate-specific meaning. These are
-  pure partial derivatives, not cross partials. Newly admitted higher orders
-  use Gaussian or Mammen calibration. The complete weighted P1 pilot is
+  pure partial derivatives, not cross partials. Original profile-specific
+  higher orders use gaussian, mammen, inid. Pooled higher orders retain
+  their separately stated law support. The complete weighted P1 pilot is
   differentiated analytically, including its weight and coefficient dependence,
   and all correction covariance terms and derivative units are retained.
   The effective vector is recorded in \code{inference$settings$gradient.order}.

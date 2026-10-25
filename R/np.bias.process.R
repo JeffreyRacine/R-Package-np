@@ -142,15 +142,15 @@
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE) {
-  if (isTRUE(state$categorical.only) && !law %in% c("gaussian","mammen"))
-    stop("categorical-only bias correction currently supports Gaussian or Mammen calibration only",call.=FALSE)
+  if (isTRUE(state$categorical.only) && !law %in% c("gaussian","mammen","inid"))
+    stop("categorical-only bias correction does not support this calibration law",call.=FALSE)
   higher <- !is.null(state$gradient.order) && any(vapply(targets,function(t)
     startsWith(t,"d") && .np_bias_derivative_order(state,as.integer(substring(t,2L)))>1L,logical(1)))
-  if (higher && !law %in% c("gaussian","mammen"))
-    stop("higher-order bias correction currently supports Gaussian or Mammen calibration",call.=FALSE)
+  if (higher && !law %in% c("gaussian","mammen","inid"))
+    stop("higher-order bias correction does not support this calibration law",call.=FALSE)
   if (isTRUE(state$pooled) &&
-      !law %in% c("gaussian","mammen"))
-    stop("pooled mixed-data bias correction currently supports Gaussian or Mammen calibration only",call.=FALSE)
+      !law %in% c("gaussian","mammen","inid"))
+    stop("pooled mixed-data bias correction currently supports Gaussian, Mammen or inid calibration only",call.=FALSE)
   if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<2||B!=floor(B)||B>.Machine$integer.max)
     stop("bias calibration draws must be an integer >= 2",call.=FALSE)
   if(!length(alpha)||any(!is.finite(alpha))||any(alpha<=0|alpha>=.5)||anyDuplicated(alpha))
@@ -222,12 +222,12 @@
     main.regularization=do.call(rbind,regularization),
     adaptation=if(length(adaptation))adaptation else NULL,
     covariance=list(operator="complete corrected observation rows",
-      variance=if(isTRUE(state$categorical.only))"within-profile residual variance" else
-        if(law%in%c("fixed","geom"))"empirical residual-score process variance" else "smoothed P0 residual variance",
+      variance=if(law%in%c("fixed","geom"))"empirical residual-score process variance" else
+        if(isTRUE(state$categorical.only))"within-profile residual variance" else "smoothed P0 residual variance",
       studentization=if(isTRUE(state$categorical.only) && student)"replicate-specific within-profile residual SD" else
+        if(score)"empirical residual-score process SD" else
         if(isTRUE(state$categorical.only))"within-profile residual SD" else
-        if(student)"replicate-specific smoothed P0 residual SD" else
-        if(score)"empirical residual-score process SD" else "smoothed complete-row SD",
+        if(student)"replicate-specific smoothed P0 residual SD" else "smoothed complete-row SD",
       calibration=if(student)"residual-pilot studentized multiplier process" else
         if(score)"residual score process" else "fixed-factor multiplier process"),
     studentization=if(student)list(construction=if(isTRUE(state$categorical.only))
