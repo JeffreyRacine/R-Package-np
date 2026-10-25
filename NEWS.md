@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Corrected-process MPI calibration now transports its factor matrix safely
+  for a single resampling chunk. Literal laws, draw streams and distributed
+  ownership are unchanged; small explicit draw counts no longer collide with
+  R argument matching.
+
 * Fixed-bandwidth pooled categorical bias correction now supports continuous
   pure derivatives and categorical first differences with Gaussian/Mammen
   calibration. Complete pilot derivatives and endpoint cross-covariance use

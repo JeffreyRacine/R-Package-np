@@ -27,13 +27,13 @@
   tasks <- .npRmpi_bootstrap_chunk_tasks(B,32L,with.seeds=FALSE)
   tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks,function(task)
     invisible(.np_bias_process_innovations(n,task$start,task$start+task$bsz-1L,B,law,blocklen)))
-  worker <- function(task,F,B,law,blocklen) {
+  worker <- function(task,factors,B,law,blocklen) {
     .npRmpi_bootstrap_use_task_rng(task)
-    t(.np_bias_process_chunk(F,task$start,task$start+task$bsz-1L,B,law,blocklen))
+    t(.np_bias_process_chunk(factors,task$start,task$start+task$bsz-1L,B,law,blocklen))
   }
   t(.npRmpi_bootstrap_run_fanout(tasks,worker,ncol.out=nrow(F),
     what="corrected process",profile.where="mpi.applyLB:bias-process",
-    progress.label="Calibrating corrected process",F=F,B=B,law=law,blocklen=blocklen))
+    progress.label="Calibrating corrected process",factors=F,B=B,law=law,blocklen=blocklen))
 }
 
 .np_bias_block_selection <- function(residual, method, blocklen=NULL) {
