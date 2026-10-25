@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Extend pooled mixed-data Gaussian/Mammen correction to regular generalized-
+  neighbor main fits, using the existing fitted-row and derivative conventions.
+  Preserve fixed neighbor counts and auxiliary geometry; positive-ridge pooled
+  rows remain unsupported and tiny-neighborhood stress limitations are documented.
+
 * Extend pooled mixed-data Gaussian/Mammen correction to regular adaptive-neighbor
   main fits, including admitted pure derivatives and categorical contrasts.
   Preserve selected neighbor counts, degree, auxiliary settings and the existing
