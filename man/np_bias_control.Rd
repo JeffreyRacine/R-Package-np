@@ -198,6 +198,12 @@ np_bias_control(construction = c("iterated", "legacy"),
   its normal-quantile times standard-error meaning. Use \code{gaussian.draws}
   or \code{B} to control calibration precision. Increasing the number of
   draws can be necessary for remote empirical Bonferroni tails on large grids.
+  If \eqn{\alpha/m < 1/B}, the empirical marginal Bonferroni quantile reaches
+  the largest simulated absolute statistic before the outward envelope is
+  applied. Here \eqn{B} denotes \code{gaussian.draws} for Gaussian
+  calibration or \code{B} for bootstrap calibration. Increasing the draw
+  count improves tail resolution; the default count does not ensure precise
+  Bonferroni tails for every grid size.
 
   The original one/two-continuous, LC/LL/quadratic defaults have encouraging
   finite-sample evidence, especially for Gaussian and Mammen calibration.

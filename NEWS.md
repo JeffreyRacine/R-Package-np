@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Clarify that iterated Gaussian/Mammen pointwise, simultaneous and Bonferroni
+  bands use studentized empirical quantiles; pmzsd keeps its normal-quantile
+  interpretation. Document finite-draw resolution of Bonferroni tails.
+
 * Automatic bias-corrected categorical panels use observed values while keeping
   declared levels and the fitted categorical kernel intact. Missing contrast
   reference/adjacent endpoints remain explicit identification errors.
