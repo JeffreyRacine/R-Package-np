@@ -12117,6 +12117,11 @@ plotFactor <- function(f, y, ...){
   invisible(TRUE)
 }
 
+.np_plot_surface_coordinate <- function(x) {
+  # Surface grids use metric numeric labels, or ranks for nonnumeric levels.
+  if (is.factor(x)) dlev(x)[as.integer(x)] else x
+}
+
 .np_plot_draw_floor_rug_persp <- function(x1,
                                           x2,
                                           zlim,
@@ -12125,6 +12130,8 @@ plotFactor <- function(f, y, ...){
   if (is.null(x1) || is.null(x2) || is.null(zlim) || is.null(persp.mat))
     return(invisible(FALSE))
 
+  x1 <- .np_plot_surface_coordinate(x1)
+  x2 <- .np_plot_surface_coordinate(x2)
   ok <- is.finite(x1) & is.finite(x2)
   if (!any(ok))
     return(invisible(FALSE))
@@ -12165,6 +12172,8 @@ plotFactor <- function(f, y, ...){
   if (is.null(x1) || is.null(x2) || is.null(zlim))
     return(invisible(FALSE))
 
+  x1 <- .np_plot_surface_coordinate(x1)
+  x2 <- .np_plot_surface_coordinate(x2)
   ok <- is.finite(x1) & is.finite(x2)
   if (!any(ok))
     return(invisible(FALSE))
