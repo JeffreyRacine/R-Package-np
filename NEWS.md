@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Expand the bounded pooled auxiliary workspace from 256 to 384 columns.
+  Retain the same rank and residual-support checks, with preallocation guards
+  and bounded row storage. Existing smaller spaces keep identical arithmetic.
+  This capacity extension does not resolve sparse weighted-pilot identification.
+
 * Extend pooled mixed-data Gaussian/Mammen correction to regular generalized-
   neighbor main fits, using the existing fitted-row and derivative conventions.
   Preserve fixed neighbor counts and auxiliary geometry; positive-ridge pooled
