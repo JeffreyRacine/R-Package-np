@@ -176,7 +176,14 @@ np_bias_control(construction = c("iterated", "legacy"),
   both endpoints before computing covariance and studentization; uncertainty
   includes their cross-covariance. Both endpoints must be observed training
   profiles. Identical endpoints give exactly zero differences and intervals.
-  Rademacher, fixed and geom remain unqualified for the pooled path.
+  Pooled Rademacher uses the residual-pilot studentizer with literal independent
+  plus/minus-one innovations. In a bounded independent confirmation over regular
+  fixed, adaptive-NN and generalized-NN cases, its 95 percent simultaneous
+  coverage ranged from 93.75 to 98.83 percent across means, derivatives and
+  categorical differences. The adaptive-NN mean remained weaker at 90 percent
+  nominal (87.11 percent, versus 89.84 percent for Mammen). These finite-grid
+  results do not qualify every profile geometry or establish uniform coverage.
+  Fixed and geom remain unqualified for the pooled path.
   Pooled inid uses the same complete corrected rows and its existing smoothed
   variance and residual-score calibration. Bounded regular-neighborhood
   confirmation was encouraging overall, with weaker mean coverage than
@@ -244,8 +251,9 @@ np_bias_control(construction = c("iterated", "legacy"),
   variance smoother then provide that draw's denominator. Numerators use the
   complete corrected observation rows. The corrected center and observed
   standard errors are unchanged; replicate-specific denominators calibrate all
-  three interval types. No bandwidth or degree is reselected. Rademacher retains
-  its fixed-factor multiplier calibration. The iterated inid, fixed and geom
+  three interval types. No bandwidth or degree is reselected. Pooled Rademacher
+  uses the same studentizer with its own literal innovations; other Rademacher
+  routes retain their fixed-factor multiplier calibration. The iterated inid, fixed and geom
   constructions resample corrected residual scores rather than refitting each
   row resample. Inid uses the smoothed variance refinement; fixed and geom use
   their score-bootstrap scale. Automatic block selection uses raw P0 residuals
