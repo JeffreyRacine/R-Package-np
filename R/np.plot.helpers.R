@@ -594,7 +594,8 @@
     ),
     "asymptotic:simultaneous" = c(
       sprintf("%s asymptotic Gaussian simultaneous variability band; finite grid within panel", level),
-      sprintf("%s Gaussian simultaneous band; finite grid within panel", level)
+      sprintf("%s Gaussian simultaneous band; finite grid within panel", level),
+      sprintf("%s Gaussian simultaneous band; panel grid", level)
     ),
     "asymptotic:all" = c(
       sprintf("%s asymptotic variability bands", level),
@@ -605,9 +606,18 @@
   if (identical(construction, "iterated") && identical(method, "asymptotic") &&
       !identical(band, "pmzsd")) {
     candidates <- switch(band,
-      pointwise=sprintf("%s pointwise Gaussian studentized band (quantiles)", level),
-      bonferroni=sprintf("%s Bonferroni Gaussian studentized band (quantile envelope)", level),
-      simultaneous=sprintf("%s Gaussian studentized maximum band; finite grid within panel", level),
+      pointwise=c(
+        sprintf("%s pointwise Gaussian studentized band (quantiles)", level),
+        sprintf("%s pointwise Gaussian t band (quantiles)", level),
+        sprintf("%s pointwise Gaussian t band", level)),
+      bonferroni=c(
+        sprintf("%s Bonferroni Gaussian studentized band (quantile envelope)", level),
+        sprintf("%s Bonferroni Gaussian t band (quantile envelope)", level),
+        sprintf("%s Bonferroni Gaussian t band", level)),
+      simultaneous=c(
+        sprintf("%s Gaussian studentized maximum band; finite grid within panel", level),
+        sprintf("%s Gaussian max-t band; finite grid within panel", level),
+        sprintf("%s Gaussian max-t band; panel grid", level)),
       all=sprintf("%s Gaussian studentized bands", level))
   }
 
