@@ -273,6 +273,8 @@ test_that("pooled profile admission is explicit and weighted projection is repro
 
 
 test_that("pooled derivative and contrast rows reproduce profile polynomials", {
+  if (!spawn_mpi_slaves(n=1L)) skip("MPI pool unavailable in this test context")
+  on.exit(close_mpi_slaves(force=TRUE), add=TRUE)
   set.seed(31023)
   n <- 90L
   x <- data.frame(x=runif(n,-1,1),u=factor(rep(1:3,each=30)),
