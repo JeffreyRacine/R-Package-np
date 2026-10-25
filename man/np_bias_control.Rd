@@ -133,7 +133,10 @@ np_bias_control(construction = c("iterated", "legacy"),
   use this same joint space. Existing profile-specific routes are unchanged;
   no failure silently selects a different construction. Evaluation profiles
   must occur in the training sample. Unused factor levels do not create fitted
-  profiles. Local-to-global adaptation is not activated for this pooled path.
+  profiles. Automatic bias-corrected categorical panels use observed values
+  while retaining the full declared factor levels and original contrast
+  references. A contrast still requires both endpoint profiles to be observed.
+  Local-to-global adaptation is not activated for this pooled path.
   Its qualified workspace contains at most 256 joint auxiliary columns, and
   every profile main space must leave positive residual support. Ill-conditioned
   pilots fail explicitly, even with stable bases; no profile is dropped or
