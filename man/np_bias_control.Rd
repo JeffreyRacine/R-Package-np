@@ -185,10 +185,12 @@ np_bias_control(construction = c("iterated", "legacy"),
   Continuous auxiliary geometry controls and explicit local-to-global
   adaptation have no meaning for this route and are rejected.
 
-  This categorical-only route supports gaussian, mammen, inid, rademacher, fixed, geom calibration.
+  This categorical-only route supports Gaussian, Mammen, Rademacher,
+  inid, fixed and geom calibration.
   Gaussian pseudo-errors use the observed unbiased within-profile variance;
   Mammen pseudo-errors use signed, leverage-normalized within-profile residuals.
-  For these two laws, each draw re-estimates the corresponding profile variance. For a single
+  For these two laws, each draw re-estimates the corresponding profile variance.
+  For a single
   profile with normal iid errors the Gaussian pivot has the Student-t law;
   that exact statement does not extend to arbitrary contrasts or error laws.
   Complete contrast covariance and common draws determine joint bands.
@@ -197,7 +199,10 @@ np_bias_control(construction = c("iterated", "legacy"),
   geom retain automatic residual-based block selection. The reported variance
   and calibration fields distinguish these constructions.
   Coverage evidence is bounded: many small, unequal profiles can still lead
-  to mean and contrast under-coverage across laws, particularly with skewed errors. No categorical profile is dropped or pooled
+  to mean and contrast under-coverage across laws, particularly with skewed
+  errors. Additional-law coverage screens used 128 datasets per case; the
+  separate 1024-dataset categorical-only confirmation assessed Gaussian/Mammen.
+  No categorical profile is dropped or pooled
   further to conceal that limitation. The finite-profile construction and
   actual variance policy are recorded in the returned inference object.
 
@@ -207,7 +212,8 @@ np_bias_control(construction = c("iterated", "legacy"),
   degree is never increased. Scalar orders are recycled across continuous
   coordinates and vectors retain their coordinate-specific meaning. These are
   pure partial derivatives, not cross partials. Original profile-specific
-  higher orders use gaussian, mammen, inid, rademacher, fixed, geom. Pooled higher orders retain
+  higher orders use Gaussian, Mammen, Rademacher, inid, fixed and geom.
+  Pooled higher orders retain
   their separately stated law support. The complete weighted P1 pilot is
   differentiated analytically, including its weight and coefficient dependence,
   and all correction covariance terms and derivative units are retained.
