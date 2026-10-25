@@ -104,7 +104,11 @@ np_bias_control(construction = c("iterated", "legacy"),
   validation of higher and mixed degrees. This does not establish general
   high-dimensional or high-degree coverage. Transition coverage was assessed
   with Gaussian and Mammen calibration; other laws retain their stated
-  finite-sample qualifications.
+  finite-sample qualifications. Near activation, weak auxiliary polynomial
+  directions can make the current penalty practically sensitive to small
+  bandwidth changes: corrected centers and widths may change appreciably
+  while the fitted model changes little. This transition-stability limitation
+  remains unresolved.
 
   The implementation admits an unbounded second-order Gaussian kernel,
   LC, LL and package-admissible GLP main degree vectors, including mixed
