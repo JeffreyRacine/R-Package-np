@@ -31,7 +31,7 @@ test_that("original higher derivatives preserve the admitted literal laws", {
   }
 })
 
-test_that("pooled inid preserves scores and retains unqualified-law refusals", {
+test_that("pooled laws preserve scores and their admitted calibration", {
   old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
   set.seed(61028);n <- 120L
   x <- data.frame(x=runif(n,-1,1),u=factor(rep(1:3,each=n/3)))
@@ -48,7 +48,16 @@ test_that("pooled inid preserves scores and retains unqualified-law refusals", {
     expect_identical(z$bands$pointwise,z$bands$bonferroni)
     expect_true(all(is.finite(z$bands$simultaneous)))
   }
-  for(law in c("rademacher","fixed","geom"))
+  for(law in c("rademacher")) {
+    z <- np:::.np_bias_inference(state,x[41,,drop=FALSE],"mean",.05,63L,law)
+    expect_identical(z$law,law)
+    expect_identical(z$version,if(law=="rademacher")2L else 3L)
+    expect_identical(z$settings$iterations,16L)
+    expect_identical(z$bands$pointwise,z$bands$simultaneous)
+    expect_identical(z$bands$pointwise,z$bands$bonferroni)
+    expect_true(all(is.finite(z$bands$simultaneous)))
+  }
+  for(law in c("fixed","geom"))
     expect_error(np:::.np_bias_inference(state,x[1,,drop=FALSE],"mean",.05,31L,law),
       "pooled mixed-data bias correction")
 })
