@@ -148,6 +148,8 @@
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE) {
+  if (isTRUE(state$categorical.only) && !law %in% c("gaussian","mammen"))
+    stop("categorical-only bias correction currently supports Gaussian or Mammen calibration only",call.=FALSE)
   higher <- !is.null(state$gradient.order) && any(vapply(targets,function(t)
     startsWith(t,"d") && .np_bias_derivative_order(state,as.integer(substring(t,2L)))>1L,logical(1)))
   if (higher && !law %in% c("gaussian","mammen"))
@@ -226,12 +228,16 @@
     main.regularization=do.call(rbind,regularization),
     adaptation=if(length(adaptation))adaptation else NULL,
     covariance=list(operator="complete corrected observation rows",
-      variance=if(law%in%c("fixed","geom"))"empirical residual-score process variance" else "smoothed P0 residual variance",
-      studentization=if(student)"replicate-specific smoothed P0 residual SD" else
+      variance=if(isTRUE(state$categorical.only))"within-profile residual variance" else
+        if(law%in%c("fixed","geom"))"empirical residual-score process variance" else "smoothed P0 residual variance",
+      studentization=if(isTRUE(state$categorical.only) && student)"replicate-specific within-profile residual SD" else
+        if(isTRUE(state$categorical.only))"within-profile residual SD" else
+        if(student)"replicate-specific smoothed P0 residual SD" else
         if(score)"empirical residual-score process SD" else "smoothed complete-row SD",
       calibration=if(student)"residual-pilot studentized multiplier process" else
         if(score)"residual score process" else "fixed-factor multiplier process"),
-    studentization=if(student)list(construction="residual-pilot-v1",
+    studentization=if(student)list(construction=if(isTRUE(state$categorical.only))
+      "finite-profile-studentized-v1" else "residual-pilot-v1",
       draw.block=256L,reuse.block=1024L,training.block=16L) else NULL,
     calibration=calibrated,score.se=if(score)score.se else NULL,
     rng=list(kind=rng.kind,start=rng,end=end,convention="common observation draws across all target blocks"),

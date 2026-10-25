@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Add iterated bias-corrected means and categorical contrasts for fixed-bandwidth
+  categorical-only regression. Use the exact observed-profile reduction, full
+  contrast covariance and Gaussian/Mammen studentization; retain the main fit
+  and 16 requested iterations. Unidentified profiles and inapplicable continuous
+  auxiliary controls fail explicitly. Existing continuous routes are unchanged.
+
 * Clarify that iterated Gaussian/Mammen pointwise, simultaneous and Bonferroni
   bands use studentized empirical quantiles; pmzsd keeps its normal-quantile
   interpretation. Document finite-draw resolution of Bonferroni tails.

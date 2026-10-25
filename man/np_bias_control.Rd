@@ -161,6 +161,28 @@ np_bias_control(construction = c("iterated", "legacy"),
   Nearest-neighbor bandwidths and other bootstrap laws remain unqualified for
   the pooled path.
 
+  Fixed-bandwidth models with categorical predictors only use an exact
+  finite-profile reduction: the corrected means are observed joint-profile
+  sample means, and contrasts subtract those complete profile-average rows.
+  The main fit and categorical lambdas remain fixed. Every observed profile
+  must have at least two observations and positive residual variance; missing
+  contrast endpoints are refused. The requested iteration count is recorded,
+  together with the algebraic fact that all residual increments are zero.
+  Continuous auxiliary geometry controls and explicit local-to-global
+  adaptation have no meaning for this route and are rejected.
+
+  This categorical-only route supports Gaussian and Mammen calibration.
+  Gaussian pseudo-errors use the observed unbiased within-profile variance;
+  Mammen pseudo-errors use signed, leverage-normalized within-profile residuals.
+  Each draw re-estimates the corresponding profile variance. For a single
+  profile with normal iid errors the Gaussian pivot has the Student-t law;
+  that exact statement does not extend to arbitrary contrasts or error laws.
+  Complete contrast covariance and common draws determine joint bands.
+  Coverage evidence is bounded: many small, unequal profiles can still lead
+  to Mammen mean under-coverage. No categorical profile is dropped or pooled
+  further to conceal that limitation. The finite-profile construction and
+  actual variance policy are recorded in the returned inference object.
+
   Higher pure coordinate derivatives, including the pooled categorical path, use
   the existing \code{gradient.order} argument. Each requested order greater than
   one must satisfy \code{gradient.order[j] <= degree[j] - 1}; the fitted main
