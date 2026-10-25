@@ -14,6 +14,8 @@
     if (!length(ii) || length(ii)>16L || anyNA(ii) ||
         any(ii<1L | ii>n | ii!=floor(ii)))
       stop("invalid studentization pilot row request", call.=FALSE)
+    if (isTRUE(pilot$categorical.only))
+      return(.np_bias_categorical_average_rows(pilot$groups,pilot$profile.index[ii],n))
     if (!is.null(pilot$profile)) {
       a <- pilot$profile
       return(.np_bias_profile_pilot_rows(a,a$x[ii,,drop=FALSE],a$h$p0,"pooled P0"))
@@ -66,6 +68,7 @@
 }
 
 .np_bias_student_prepare <- function(state) {
+  if (isTRUE(state$categorical.only)) return(.np_bias_categorical_student_prepare(state))
   if (isTRUE(state$pooled)) return(.np_bias_profile_student_prepare(state))
   pilot <- list(x=state$xcon, groups=state$groups, bws=state$pilot.bws,
     adaptation=if (is.null(state$adaptation)) NULL else
@@ -100,6 +103,15 @@
     seq.int(first,min(size,first+255L)))
 }
 
+# The q=0 saturated profile owner uses observed residual wild errors. For
+# profile averages their conditional covariance equals the cell-variance map,
+# while heterogeneous residual magnitudes retain an estimable replicate scale.
+# Existing continuous owners keep their frozen smoothed-variance construction.
+.np_bias_student_error_scale <- function(prepared, law) {
+  if (identical(law,"mammen") && !is.null(prepared$wild.residual))
+    prepared$wild.residual else prepared$root.variance
+}
+
 .np_bias_student_errors <- function(root.variance, size, law) {
   lapply(.np_bias_student_slices(size),function(ii)
     root.variance * .np_bias_draws(length(root.variance),length(ii),law))
@@ -108,7 +120,7 @@
 .np_bias_student_chunk <- function(prepared, W, target, size, law) {
   n <- ncol(W)
   slices <- .np_bias_student_slices(size)
-  errors <- .np_bias_student_errors(prepared$root.variance,size,law)
+  errors <- .np_bias_student_errors(.np_bias_student_error_scale(prepared,law),size,law)
   numerator <- lapply(errors,function(ep) W %*% ep)
   residual <- matrix(0,n,size)
   owner <- .np_bias_student_pilot_owner(prepared$pilot)

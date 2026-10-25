@@ -24,6 +24,7 @@
     stop("bias correction requires finite retained training data", call. = FALSE)
   reg <- npValidatedConditionalRegSpec(bws, where = "bias correction", ncon.field = "ncon")
   nc <- which(bws[["icon"]]); fc <- which(!bws[["icon"]]); d <- length(nc)
+  if (!d) return(.np_bias_categorical_prepare(bws,x,y,control,reg))
   legacy.hint <- if (bws[["type"]]=="fixed" && d>0L)
     "; explicit bootstrap bias.control=np_bias_control(construction='legacy') retains the previous construction for supported bootstrap methods" else ""
   if (!d || bws[["ckertype"]] != "gaussian" || bws[["ckerorder"]] != 2L ||
@@ -208,6 +209,7 @@
 }
 
 .np_bias_regression_rows <- function(spec,grid,map) {
+  if (isTRUE(spec$categorical.only)) return(.np_bias_categorical_rows(spec,grid,map))
   if (isTRUE(spec$pooled)) return(.np_bias_profile_rows(spec,grid,map))
   if (nrow(map)>500L || nrow(unique(grid[spec$numeric.cols]))>25L)
     stop("internal bias target block exceeded",call.=FALSE)
