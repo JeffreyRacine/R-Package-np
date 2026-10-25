@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Admit the existing inid corrected-score calibration for pooled means,
+  derivatives and categorical contrasts, and for original higher derivatives.
+  Retain the complete correction, smoothed variance and all frozen defaults.
+  Other pooled bootstrap laws remain unqualified.
+  Admit the same literal law for finite-profile categorical-only inference,
+  with its documented small-profile coverage limitations.
+
 * Expand the bounded pooled auxiliary workspace from 256 to 384 columns.
   Retain the same rank and residual-support checks, with preallocation guards
   and bounded row storage. Existing smaller spaces keep identical arithmetic.
