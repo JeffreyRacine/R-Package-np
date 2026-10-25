@@ -3,8 +3,16 @@
 .np_bias_score_variance <- function(F, blocklen, law) {
   F <- F-rowMeans(F)
   n <- ncol(F)
-  if (law!="fixed") stop("unknown score-studentized block law",call.=FALSE)
+  if (!law %in% c("fixed","geom")) stop("unknown score-studentized block law",call.=FALSE)
   if (blocklen==1L) return(rowSums(F^2))
+  if (law=="geom") {
+    # Finite-n circular autocovariances; the end-of-sequence weights matter.
+    z <- stats::mvfft(t(F))
+    ac <- Re(stats::mvfft(Conj(z)*z,inverse=TRUE))/n
+    k <- seq_len(n-1L)
+    w <- c(n,2*(n-k)*(1-1/blocklen)^k)/n
+    return(drop(crossprod(w,ac)))
+  }
   if (blocklen==n) return(numeric(nrow(F)))
   variance <- function(width) {
     if (!width) return(numeric(nrow(F)))

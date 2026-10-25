@@ -157,8 +157,8 @@
   if (higher && !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
     stop("higher-order bias correction does not support this calibration law",call.=FALSE)
   if (isTRUE(state$pooled) &&
-      !law %in% c("gaussian","mammen","inid","rademacher","fixed"))
-    stop("pooled mixed-data bias correction currently supports Gaussian, Mammen, Rademacher, fixed or inid calibration only",call.=FALSE)
+      !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
+    stop("pooled mixed-data bias correction currently supports Gaussian, Mammen, Rademacher, fixed, geom or inid calibration only",call.=FALSE)
   if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<2||B!=floor(B)||B>.Machine$integer.max)
     stop("bias calibration draws must be an integer >= 2",call.=FALSE)
   if(!length(alpha)||any(!is.finite(alpha))||any(alpha<=0|alpha>=.5)||anyDuplicated(alpha))
@@ -173,7 +173,7 @@
   center <- original <- se <- score.se <- numeric(M)
   student <- isTRUE(studentize) && (law %in% c("gaussian","mammen") ||
     (isTRUE(state$pooled) && law=="rademacher"))
-  score.calibration <- isTRUE(state$pooled) && law=="fixed"
+  score.calibration <- isTRUE(state$pooled) && law %in% c("fixed","geom")
   calibration.state <- .np_bias_limits_prepare(map$target,alpha,law=="gaussian" && !student,B)
   prepared <- NULL
   regularization <- adaptation <- list()

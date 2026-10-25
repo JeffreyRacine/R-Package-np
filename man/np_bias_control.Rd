@@ -194,7 +194,14 @@ np_bias_control(construction = c("iterated", "legacy"),
   (87.5 percent derivative coverage) does not qualify general dependence.
   Full-length fixed blocks have zero conditional covariance and are refused
   for nonzero targets; deterministic zero targets retain zero intervals.
-  Geom remains unqualified for the pooled path.
+  Pooled geom uses its own exact finite-sample circular autocovariance weights
+  and literal stationary-block draws with the same score bootstrap-t construction.
+  Its separate regular 95 percent simultaneous confirmation ranged from 92.58
+  to 98.05 percent; generalized-NN mean coverage was 92.58 percent versus 96.48
+  for Mammen, and 87.89 percent at 90 percent nominal. Fixed-bandwidth mean
+  intervals were about 1.5 times as wide as Mammen's. The dependent-error
+  probe remains diagnostic only. A full-length geom block parameter has a
+  different, nondegenerate law and is not subject to fixed-block degeneracy.
   Pooled inid uses the same complete corrected rows and its existing smoothed
   variance and residual-score calibration. Bounded regular-neighborhood
   confirmation was encouraging overall, with weaker mean coverage than
@@ -267,7 +274,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   routes retain their fixed-factor multiplier calibration. The iterated inid, fixed and geom
   constructions resample corrected residual scores rather than refitting each
   row resample. Inid uses the smoothed variance refinement; fixed and geom use
-  their score-bootstrap scale. On the pooled fixed-block path the scale is
+  their score-bootstrap scale. On pooled fixed and geom paths the scale is
   the exact conditional covariance and bootstrap-t uses a replicate-specific
   selected-block scale. The \code{pmzsd} display uses a normal multiple of the
   observed scale, with no bootstrap-t coverage claim. Degenerate resampling
