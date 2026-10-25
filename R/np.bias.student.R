@@ -17,6 +17,7 @@
       stop("invalid studentization pilot row request", call.=FALSE)
     if (isTRUE(pilot$categorical.only))
       return(.np_bias_categorical_average_rows(pilot$groups,pilot$profile.index[ii],n))
+    if (!is.null(pilot$mixed)) return(.np_bias_mixed_p0_owner(pilot$mixed)(ii))
     if (!is.null(pilot$profile)) {
       a <- pilot$profile
       return(.np_bias_profile_pilot_rows(a,a$x[ii,,drop=FALSE],a$h$p0,"pooled P0"))
@@ -70,6 +71,7 @@
 
 .np_bias_student_prepare <- function(state) {
   if (isTRUE(state$categorical.only)) return(.np_bias_categorical_student_prepare(state))
+  if (!is.null(state$mixed)) return(.np_bias_mixed_student_prepare(state))
   if (isTRUE(state$pooled)) return(.np_bias_profile_student_prepare(state))
   pilot <- list(x=state$xcon, groups=state$groups, bws=state$pilot.bws,
     adaptation=if (is.null(state$adaptation)) NULL else

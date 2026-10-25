@@ -261,7 +261,9 @@
     plot.errors <- normalized.opts$plot.errors
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
       .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE,
-        gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL)) else NULL
+        gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
+        law=if(plot.errors.method=="asymptotic")"gaussian" else
+          if(plot.errors.boot.method=="wild")plot.errors.boot.wild else plot.errors.boot.method)) else NULL
     bias.capture <- !is.null(bias.state$adaptation)
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
@@ -362,7 +364,11 @@
       if (is.ordered(xdat[,2]))
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
-      if ((plot.errors.method == "asymptotic" && !new.bias) || bias.capture) {
+      if (!is.null(bias.state$mixed)) {
+        tobj <- .np_plot_activity_run("Computing regression plot fit",
+          .npreg_publish_plot_rows(.np_bias_mixed_eval(bias.state,bws,xdat,ydat,
+            setNames(x.eval,names(xdat)),FALSE,gradient.order,"mean"),report=.np.empty.report))
+      } else if ((plot.errors.method == "asymptotic" && !new.bias) || bias.capture) {
         tobj <- .np_plot_activity_run(
           if (bias.capture) "Computing regression plot fit" else "Computing regression plot asymptotic fit",
           {
@@ -809,7 +815,12 @@
         }
         
         eval.slice <- subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
-        if (!gradients && !bias.capture &&
+        if (!is.null(bias.state$mixed)) {
+          target <- if(!gradients)"mean" else if(xi.factor)paste0("c",i) else paste0("d",match(i,which(bws$icon)))
+          tr <- .np_plot_activity_run("Computing regression plot fit",
+            .npreg_publish_plot_rows(.np_bias_mixed_eval(bias.state,bws,xdat,ydat,
+              eval.slice,gradients,gradient.order,target),report=.np.empty.report))
+        } else if (!gradients && !bias.capture &&
             (plot.errors.method != "asymptotic" || new.bias) &&
             identical(bws$type, "fixed")) {
           tr <- .np_plot_activity_run(

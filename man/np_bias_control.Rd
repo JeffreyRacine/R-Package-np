@@ -17,8 +17,11 @@ np_bias_control(construction = c("iterated", "legacy"),
 }
 \arguments{
   \item{adaptation}{Coordinatewise local-to-global auxiliary correction.
-    \code{"auto"} uses the validated transition for continuous-only fixed
-    Gaussian GLP models when P0, P1 and operator bandwidth controls are omitted.
+    \code{"auto"} uses the validated transition for fixed Gaussian GLP
+    models when P0, P1 and operator bandwidth controls are omitted. Mixed-data
+    models use the M1 nested-projection construction with Gaussian or Mammen
+    calibration and at most 384 auxiliary columns; other mixed-data
+    configurations retain their incumbent construction.
     Local coordinates remain unchanged. Explicit geometry bandwidth or scale
     overrides retain the original construction under \code{"auto"}; iterations,
     auxiliary degree and variance controls remain effective.
@@ -142,7 +145,17 @@ np_bias_control(construction = c("iterated", "legacy"),
   profiles. Automatic bias-corrected categorical panels use observed values
   while retaining the full declared factor levels and original contrast
   references. A contrast still requires both endpoint profiles to be observed.
-  Local-to-global adaptation is not activated for this pooled path.
+  For eligible fixed-bandwidth Gaussian or Mammen inference, local-to-global
+  adaptation applies the same M1 nested-projection construction as on the
+  original simple mixed-data path. It adapts P0, P1 and the residual operator
+  coordinate by coordinate while retaining the original variance-smoothing
+  bandwidth. The complete categorical endpoint difference is formed before
+  covariance and calibration. The default 16 correction iterations and the
+  fitted bandwidths and degrees are unchanged. Use \code{adaptation="none"}
+  to retain the incumbent construction. M1 generally produces narrower bands
+  in the studied global and partially global cases, with documented coverage
+  trade-offs: improvements for some targets and modest losses for others.
+  These finite-grid results do not establish uniform coverage guarantees.
   Its qualified workspace contains at most 384 joint auxiliary columns, and
   every profile main space must leave positive residual support. Ill-conditioned
   pilots fail explicitly, even with stable bases; no profile is dropped or

@@ -150,6 +150,8 @@
                                studentize=TRUE) {
   if (isTRUE(state$categorical.only) && !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
     stop("categorical-only bias correction does not support this calibration law",call.=FALSE)
+  if (!is.null(state$mixed) && !law %in% c("gaussian","mammen"))
+    stop("mixed local-to-global adaptation supports Gaussian or Mammen calibration; use adaptation='none' for incumbent laws",call.=FALSE)
   higher <- !is.null(state$gradient.order) && any(vapply(targets,function(t)
     startsWith(t,"d") && .np_bias_derivative_order(state,as.integer(substring(t,2L)))>1L,logical(1)))
   if (higher && !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
@@ -173,7 +175,7 @@
   calibration.state <- .np_bias_limits_prepare(map$target,alpha,law=="gaussian" && !student,B)
   prepared <- NULL
   regularization <- adaptation <- list()
-  adapted.rows <- if (!is.null(state$adaptation))
+  adapted.rows <- if (!is.null(state$mixed)) .np_bias_mixed_capture(state,fit,grid,targets) else if (!is.null(state$adaptation))
     .np_bias_adaptation_capture(state,fit,grid,targets) else NULL
   score <- law%in%c("inid","fixed","geom")
   selection <- if(law%in%c("fixed","geom")) .np_bias_block_selection(state$residual_raw,law,blocklen) else NULL

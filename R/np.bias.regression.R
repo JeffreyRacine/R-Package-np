@@ -18,7 +18,7 @@
   out
 }
 
-.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE, gradient.order = NULL) {
+.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE, gradient.order = NULL, law = NULL) {
   x <- toFrame(x)
   if (!is.numeric(y) || length(y) != nrow(x) || any(!is.finite(y)) || anyNA(x))
     stop("bias correction requires finite retained training data", call. = FALSE)
@@ -34,7 +34,7 @@
     stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
   orders <- .np_bias_derivative_request(reg,d,gradient.order)
   if (.np_bias_profile_layout(bws,x)) {
-    return(.np_bias_profile_prepare(bws,x,y,control,reg,orders))
+    return(.np_bias_profile_prepare(bws,x,y,control,reg,orders,adapt,law))
   }
   keys <- if (length(fc)) do.call(paste,c(lapply(x[fc],as.integer),sep=":")) else rep("all",nrow(x))
   groups <- split(seq_len(nrow(x)),keys)
@@ -74,7 +74,11 @@
     spec$gradient.order <- orders
     spec$settings$gradient.order <- setNames(orders,names(spec$xcon))
   }
-  policy <- if (isTRUE(adapt)) .np_bias_adaptation_policy(spec) else NULL
+  policy <- if (isTRUE(adapt)) {
+    if(length(fc)) .np_bias_mixed_policy(spec,bws,law) else .np_bias_adaptation_policy(spec)
+  } else NULL
+  if(length(fc) && !is.null(policy) && policy$active)
+    return(.np_bias_mixed_prepare(spec,bws,x,policy))
   if (!is.null(policy) && policy$active) {
     adapted <- .np_bias_adaptation_prepare(spec)
     for (name in c("residual", "residual_raw", "residual_row_variance", "variance"))
