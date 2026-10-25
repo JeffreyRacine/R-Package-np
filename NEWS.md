@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Pooled geometric-block bias-corrected bounds now use their own exact
+  finite-sample circular covariance and replicate score studentization.
+  Literal stationary-block draws and raw-residual block selection remain
+  unchanged. Separate bounded confirmation supports regular cases with the
+  documented GNN, nominal-level and dependent-data limitations.
+
+
 * Pooled fixed-block bias-corrected bounds use the exact finite-sample
   circular-block score covariance and replicate-specific score studentization.
   Raw-residual block selection, literal draws and fixed model are preserved.
