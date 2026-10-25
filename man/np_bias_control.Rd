@@ -216,8 +216,11 @@ np_bias_control(construction = c("iterated", "legacy"),
   quadratic and sinusoidal signals. Broader mixed-data and nearest-neighbor
   support has numerical validation; this is not evidence of comparable coverage
   throughout those classes. Regularized generalized-neighbor main
-  fits with a stored Bernstein basis use their complete canonical observation
-  rows, including the numerical ridge and intercept restoration. Polynomial
+  fits with a stored Bernstein basis use reconstructed observation
+  rows, including the numerical ridge and intercept restoration. In
+  near-singular stress designs, these rows can disagree with the fitted
+  estimator, even when the reported ridge is zero. Such cases remain
+  unqualified; a zero ridge is not a numerical identity certificate. Polynomial
   correction includes their regularization bias; covariance uses the complete
   corrected rows. This does not establish coverage for unidentified pilot fits
   or a uniform honesty guarantee. These newly admitted regularized rows
