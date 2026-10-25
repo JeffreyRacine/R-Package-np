@@ -718,8 +718,8 @@
         component.available <- !isTRUE(gradients) || plot.gradient.available[i]
 
         if (xi.factor){
-          ei = levels(xdat[,i])
-          ei = .np_factor_with_levels(ei, levels = ei)
+          ei = if (new.bias) .np_bias_observed_factor_values(xdat[,i]) else levels(xdat[,i])
+          ei = .np_factor_with_levels(ei, levels = levels(xdat[,i]))
           xi.neval = length(ei)
         } else {
           xi.neval = neval

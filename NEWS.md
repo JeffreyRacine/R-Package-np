@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Automatic bias-corrected categorical panels use observed values while keeping
+  declared levels and the fitted categorical kernel intact. Missing contrast
+  reference/adjacent endpoints remain explicit identification errors.
+
 * Regression inference compares retained model state independently of historical
   call metadata. This restores formula-based MPI local-to-global correction
   while preserving exact data, bandwidth, degree and evaluation identity.

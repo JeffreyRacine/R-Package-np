@@ -289,3 +289,12 @@
   list(W=C,original=L,center=drop(C%*%a$y),original_center=drop(L%*%a$y),
     se=se,factor=F,main.regularization=do.call(rbind,regularization))
 }
+
+# An automatic observed-profile inference grid may omit unused values, but its
+# factor levels must remain intact: they define the fitted categorical kernel
+# and the original reference/adjacent contrast endpoints.
+.np_bias_observed_factor_values <- function(x) {
+  if (!is.factor(x)) stop("observed categorical grid requires a factor",call.=FALSE)
+  values <- levels(x)
+  values[values %in% as.character(x[!is.na(x)])]
+}
