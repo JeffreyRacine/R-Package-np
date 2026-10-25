@@ -143,12 +143,15 @@ np_bias_control(construction = c("iterated", "legacy"),
   while retaining the full declared factor levels and original contrast
   references. A contrast still requires both endpoint profiles to be observed.
   Local-to-global adaptation is not activated for this pooled path.
-  Its qualified workspace contains at most 256 joint auxiliary columns, and
+  Its qualified workspace contains at most 384 joint auxiliary columns, and
   every profile main space must leave positive residual support. Ill-conditioned
   pilots fail explicitly, even with stable bases; no profile is dropped or
   degree reduced. The joint space, profile sizes and rank criterion are recorded
   in \code{inference$settings$auxiliary_space}. The existing auxiliary controls
-  remain effective, including literal raw-bandwidth overrides.
+  remain effective, including literal raw-bandwidth overrides. The finite
+  column bound is independent of sample size. Wider admitted spaces can be
+  computationally expensive; larger capacity does not repair unidentified
+  weighted geometry or inadequate profile residual support.
 
   Bounded pooled-mean simulations with two continuous, two binary unordered and
   two binary ordered predictors, degree-one main fits, and sample sizes 400/800
