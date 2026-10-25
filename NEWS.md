@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Pooled bias-corrected Rademacher bounds now use the residual-pilot
+  studentizer with literal plus/minus-one innovations. The fixed model and
+  observed standard errors remain unchanged. Bounded confirmation supports
+  regular fixed/NN cases, with an explicitly documented weaker 90% mean cell;
+  existing nonpooled Rademacher and mixed M1 calibration are unchanged.
+
 * Map ordered-factor floor rugs to the same numeric coordinates as their
   surfaces in base and rgl plots, preserving numeric and nonnumeric level
   spacing. This prevents calendar-year rugs from distorting rgl scenes.
