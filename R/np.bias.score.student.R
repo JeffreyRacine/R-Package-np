@@ -66,6 +66,8 @@
     last <- min(B,first+31L)
     out[,first:last] <- .np_bias_score_student_chunk(F,active,observed,first,last,
       B,law,blocklen,studentize)
+    .np_plot_progress_notify(stage="Calibrating studentized score process",
+      done=last,total=B,unit="draws")
   }
   out
 }
