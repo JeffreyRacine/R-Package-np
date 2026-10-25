@@ -125,7 +125,8 @@ np_bias_control(construction = c("iterated", "legacy"),
   additive and tensor main bases remain outside this construction.
 
   Other categorical layouts use a partially pooled auxiliary for fixed-bandwidth
-  means with Gaussian or Mammen calibration. This includes multiple unordered
+  means, pure continuous derivatives and categorical first differences with
+  Gaussian or Mammen calibration. This includes multiple unordered
   and ordered predictors and factors with more than two levels. Higher-order
   continuous curvature is shared across observed joint profiles; each profile
   retains its own polynomial terms through the fitted main degree. P0 and P1
@@ -133,7 +134,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   no failure silently selects a different construction. Evaluation profiles
   must occur in the training sample. Unused factor levels do not create fitted
   profiles. Local-to-global adaptation is not activated for this pooled path.
-  Its qualified workspace contains at most 128 joint auxiliary columns, and
+  Its qualified workspace contains at most 256 joint auxiliary columns, and
   every profile main space must leave positive residual support. Ill-conditioned
   pilots fail explicitly, even with stable bases; no profile is dropped or
   degree reduced. The joint space, profile sizes and rank criterion are recorded
@@ -146,10 +147,14 @@ np_bias_control(construction = c("iterated", "legacy"),
   profile counts. This is narrower evidence than numerical support for other
   counts, levels and degrees. Sparse weighted pilot geometry, including the
   retained wage1 stress case, can still fail numerical identification.
-  Nearest-neighbor bandwidths, derivatives, categorical contrasts and other
-  bootstrap laws remain unqualified for the pooled path.
+  Categorical differences subtract the complete corrected observation rows at
+  both endpoints before computing covariance and studentization; uncertainty
+  includes their cross-covariance. Both endpoints must be observed training
+  profiles. Identical endpoints give exactly zero differences and intervals.
+  Nearest-neighbor bandwidths and other bootstrap laws remain unqualified for
+  the pooled path.
 
-  Outside the pooled categorical path, higher pure coordinate derivatives use
+  Higher pure coordinate derivatives, including the pooled categorical path, use
   the existing \code{gradient.order} argument. Each requested order greater than
   one must satisfy \code{gradient.order[j] <= degree[j] - 1}; the fitted main
   degree is never increased. Scalar orders are recycled across continuous

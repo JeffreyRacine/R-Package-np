@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Fixed-bandwidth pooled categorical bias correction now supports continuous
+  pure derivatives and categorical first differences with Gaussian/Mammen
+  calibration. Complete pilot derivatives and endpoint cross-covariance use
+  the existing 16-iteration construction. The qualified bounded auxiliary
+  workspace expands from 128 to 256 columns without changing rank or residual
+  support requirements. Existing mean and simple-profile owners are retained.
+
+
 - Bias-corrected regression plots support higher pure coordinate derivatives
   with Gaussian or Mammen bands when the fitted polynomial has at least one
   degree beyond the requested derivative order. Existing mixed-degree and
@@ -10,7 +18,7 @@
   covariance. Gaussian and Mammen calibration retain 16 default iterations and
   existing controls. Previously admitted routes are unchanged; sparse pilot
   rank failures remain explicit. Document the bounded coverage evidence and
-  unsupported pooled derivative/NN/bootstrap extensions.
+  unsupported pooled NN/additional-bootstrap extensions.
 
 - Calibrate iterated bias-corrected Gaussian and Mammen regression bands using
   replicate-specific residual-pilot studentization. Preserve the corrected

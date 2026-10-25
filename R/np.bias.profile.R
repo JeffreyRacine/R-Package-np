@@ -16,10 +16,10 @@
   split(seq_len(n), (seq_len(n)-1L) %/% size)
 }
 
-.np_bias_profile_basis <- function(a, at) {
-  Q <- W.lp(a$xcon, exdat=at[a$nc], degree=a$degree, basis="glp",
+.np_bias_profile_basis <- function(a, at, derivative=NULL) {
+  Q <- W.lp(a$xcon, exdat=at[a$nc], degree=a$degree, gradient.vec=derivative, basis="glp",
     bernstein.basis=a$bernstein)
-  M <- W.lp(a$xcon, exdat=at[a$nc], degree=a$main.degree, basis="glp",
+  M <- W.lp(a$xcon, exdat=at[a$nc], degree=a$main.degree, gradient.vec=derivative, basis="glp",
     bernstein.basis=a$bernstein)
   key <- .np_bias_profile_keys(at, a$fc)
   if (any(!key %in% a$levels))
@@ -72,9 +72,9 @@
     "bernstein","Q","h")]
 }
 
-.np_bias_profile_prepare <- function(bws, x, y, control, reg) {
+.np_bias_profile_prepare <- function(bws, x, y, control, reg, orders=NULL) {
   if (bws[["type"]] != "fixed")
-    stop("pooled mixed-data bias correction currently supports fixed bandwidth means only", call.=FALSE)
+    stop("pooled mixed-data bias correction currently supports fixed bandwidths only", call.=FALSE)
   nc <- which(bws[["icon"]]); fc <- which(!bws[["icon"]])
   keys <- .np_bias_profile_keys(x,fc)
   groups <- split(seq_len(nrow(x)),keys)
@@ -104,7 +104,7 @@
   xs <- x
   for (j in seq_along(nc)) xs[[nc[j]]] <- (x[[nc[j]]]-offset[j])/scale[j]
   a <- list(pooled=TRUE,bw=bws,x=xs,original.x=x,xcon=xs[nc],nc=nc,fc=fc,
-    numeric.cols=nc,factor.cols=fc,keys=keys,levels=names(groups),groups=groups,
+    numeric.cols=nc,factor.cols=fc,d=length(nc),gradient.order=orders,keys=keys,levels=names(groups),groups=groups,
     main.degree=main.degree,degree=degree,bernstein=settings$bernstein.basis,
     offset=offset,scale=scale,y=as.double(y),settings=settings)
   a$h <- lapply(settings$bandwidth,function(h)unname(h/scale))
@@ -138,6 +138,7 @@
     columns=ncol(a$Q),shared.columns=settings$degree_spec$nterms,
     profile.main.columns=main.terms$nterms,profiles=names(groups),rank.tolerance=1e-11,
     workspace.columns=256L)
+  if (!is.null(orders)) a$settings$gradient.order <- setNames(orders,names(a$xcon))
   a$settings$coordinate_offset <- offset; a$settings$coordinate_scale <- scale
   a$settings$training <- list(n=nrow(x),columns=names(x),row.names=rownames(x),
     rows.omit=bws[["rows.omit"]],source="retained plot training frame")
@@ -167,18 +168,36 @@
   sweep(out,2L,weight,"*")
 }
 
-.np_bias_profile_rows <- function(a, grid, map) {
-  if (nrow(map)>25L || any(map$target!="mean"))
-    stop("pooled mixed-data correction requires a bounded mean target block",call.=FALSE)
+.np_bias_profile_component_rows <- function(a, grid, map, axes=integer(nrow(map))) {
+  if (nrow(map)>25L || length(axes)!=nrow(map))
+    stop("pooled mixed-data correction requires a bounded functional block",call.=FALSE)
   grid <- grid[map$row,,drop=FALSE]
-  L <- npreghat(a$bw,txdat=a$original.x,exdat=grid,output="matrix",.np.require.finite=TRUE)
-  ridge <- attr(L,"ridge.used",exact=TRUE)
+  if (all(axes==0L)) {
+    L <- npreghat(a$bw,txdat=a$original.x,exdat=grid,output="matrix",.np.require.finite=TRUE)
+    ridge <- attr(L,"ridge.used",exact=TRUE)
+  } else {
+    L <- matrix(0,nrow(grid),nrow(a$x)); ridge <- numeric(nrow(grid))
+    for (axis in unique(axes)) {
+      ii <- which(axes==axis); nu <- integer(a$d)
+      if (axis) nu[axis] <- .np_bias_derivative_order(a,axis)
+      H <- npreghat(a$bw,txdat=a$original.x,exdat=grid[ii,,drop=FALSE],
+        s=nu,output="matrix",.np.require.finite=TRUE)
+      L[ii,] <- H; ridge[ii] <- attr(H,"ridge.used",exact=TRUE)
+    }
+  }
   if (length(ridge)!=nrow(grid) || any(!is.finite(ridge)) || any(ridge!=0))
     stop("pooled mixed-data correction requires unregularized main rows",call.=FALSE)
   attr(L,"ridge.used") <- NULL
   e <- grid
   for (j in seq_along(a$nc)) e[[a$nc[j]]] <- (e[[a$nc[j]]]-a$offset[j])/a$scale[j]
   E <- .np_bias_profile_basis(a,e)
+  units <- rep(1,nrow(e))
+  for (axis in unique(axes[axes>0L])) {
+    ii <- which(axes==axis); nu <- integer(a$d)
+    nu[axis] <- .np_bias_derivative_order(a,axis)
+    units[ii] <- a$scale[axis]^nu[axis]
+    E[ii,] <- .np_bias_profile_basis(a,e[ii,,drop=FALSE],nu)/units[ii]
+  }
   W <- matrix(0,nrow(e),nrow(a$x))
   for (r in seq_len(nrow(e))) {
     g <- drop(.np_bias_profile_kernel(a,e[r,,drop=FALSE],a$h$p0,FALSE))
@@ -193,6 +212,12 @@
     right <- function(Z) Z-(Z %*% a$Q) %*% p$coefficient
     w <- L[r,,drop=FALSE]+(E[r,,drop=FALSE]-L[r,,drop=FALSE] %*% a$Q) %*% p$coefficient
     target <- t(.np_bias_profile_kernel(a,e[r,,drop=FALSE],a$h$operator))*rep(g/D,each=1L)
+    if (axes[r]) {
+      axis <- axes[r]; order <- .np_bias_derivative_order(a,axis)
+      target <- target * rep(.np_bias_gaussian_derivatives(
+        (a$xcon[[axis]]-e[[a$nc[axis]]][r])/a$h$operator[axis],
+        a$h$operator[axis],order)[,order+1L]/units[r],each=1L)
+    }
     delta <- right(target-.np_bias_profile_product(w,a,g/D))
     for (step in seq_len(a$settings$iterations)) {
       if (step>1L) delta <- delta-right(.np_bias_profile_product(delta,a,g/D))
@@ -205,10 +230,62 @@
     .np_bias_profile_pilot_rows(pilot,pilot$x[ii,,drop=FALSE],pilot$h$p1,"pooled P1"))
   T <- do.call(rbind,lapply(.np_bias_profile_tiles(nrow(e)),function(ii)
     .np_bias_profile_pilot_rows(pilot,e[ii,,drop=FALSE],pilot$h$p1,"pooled P1")))
+  for (r in which(axes>0L)) {
+    axis <- axes[r]; order <- .np_bias_derivative_order(a,axis)
+    T[r,] <- .np_bias_profile_pilot_derivative(a,e[r,,drop=FALSE],axis,order)/units[r]
+  }
   C <- W-WP+T
   F <- sweep(C,2L,sqrt(a$variance),"*"); se <- sqrt(rowSums(F^2))
   if (any(!is.finite(F)) || any(!is.finite(se)) || any(se<=0))
     stop("invalid pooled corrected influence rows",call.=FALSE)
   list(W=C,original=L,center=drop(C %*% a$y),original_center=drop(L %*% a$y),
     se=se,factor=F,main.regularization=data.frame(row=map$row,target="mean",frame=1L,ridge=ridge))
+}
+
+
+# Total derivative of the weighted joint-space pilot in standardized units.
+.np_bias_profile_pilot_derivative <- function(a, at, axis, order) {
+  value <- do.call(rbind,lapply(0:order,function(k) {
+    nu <- integer(length(a$nc)); nu[axis] <- k
+    .np_bias_profile_basis(a,at,if(k)nu else NULL)
+  }))
+  h <- a$h$p1
+  weight <- drop(.np_bias_profile_kernel(a,at,h,FALSE))
+  ratios <- .np_bias_gaussian_derivatives(
+    (a$xcon[[axis]]-at[[a$nc[axis]]])/h[axis],h[axis],order)
+  .np_bias_weighted_derivative(a$Q,weight,value,ratios,
+    role="pooled P1 derivative",rank.tolerance=1e-11)
+}
+
+# Combine complete observation rows before covariance/studentization. In
+# particular, categorical endpoints share their observation innovations.
+.np_bias_profile_rows <- function(a, grid, map) {
+  if (all(map$target=="mean"))
+    return(.np_bias_profile_component_rows(a,grid,map))
+  if (nrow(map)>500L) stop("pooled functional block exceeded",call.=FALSE)
+  frames <- lapply(seq_len(nrow(map)),function(r)
+    .np_bias_frames(a,grid[map$row[r],,drop=FALSE],map$target[r]))
+  at <- do.call(rbind,lapply(frames,function(f)do.call(rbind,f$e)))
+  owner <- rep(seq_along(frames),lengths(lapply(frames,`[[`,"e")))
+  signs <- unlist(lapply(frames,`[[`,"sign"))
+  axes <- rep(vapply(frames,`[[`,integer(1),"nu"),lengths(lapply(frames,`[[`,"e")))
+  C <- L <- matrix(0,nrow(map),nrow(a$x)); regularization <- list()
+  for (ii in .np_bias_profile_tiles(nrow(at),25L)) {
+    value <- .np_bias_profile_component_rows(a,at[ii,,drop=FALSE],
+      data.frame(row=seq_along(ii),target=map$target[owner[ii]]),axes[ii])
+    for (j in seq_along(ii)) {
+      r <- owner[ii[j]]
+      C[r,] <- C[r,,drop=FALSE]+signs[ii[j]]*value$W[j,,drop=FALSE]
+      L[r,] <- L[r,,drop=FALSE]+signs[ii[j]]*value$original[j,,drop=FALSE]
+    }
+    meta <- value$main.regularization
+    meta$row <- map$row[owner[ii]]; meta$target <- map$target[owner[ii]]
+    meta$frame <- sequence(lengths(lapply(frames,`[[`,"e")))[ii]
+    regularization[[length(regularization)+1L]] <- meta
+  }
+  F <- sweep(C,2L,sqrt(a$variance),"*"); se <- sqrt(rowSums(F^2))
+  if (any(!is.finite(F)) || any(!is.finite(se)))
+    stop("invalid pooled corrected functional rows",call.=FALSE)
+  list(W=C,original=L,center=drop(C%*%a$y),original_center=drop(L%*%a$y),
+    se=se,factor=F,main.regularization=do.call(rbind,regularization))
 }

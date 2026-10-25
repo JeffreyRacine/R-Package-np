@@ -25,7 +25,7 @@
 }
 
 .np_bias_weighted_derivative <- function(Q, weight, value, ratios,
-                                         penalty=NULL, role="higher-order pilot") {
+                                         penalty=NULL, role="higher-order pilot", rank.tolerance=1e-12) {
   P <- ncol(Q); n <- nrow(Q); order <- nrow(value)-1L
   if (!is.matrix(value) || ncol(value)!=P || order<1L ||
       !is.matrix(ratios) || !identical(dim(ratios),c(n,order+1L)) ||
@@ -38,7 +38,7 @@
   augmented <- if (any(penalty>0)) rbind(weighted,diag(sqrt(penalty),P)) else weighted
   norm <- sqrt(colSums(augmented^2))
   if (any(!is.finite(norm)) || any(norm<=0)) stop(role," has an unsupported column",call.=FALSE)
-  fit <- qr(sweep(augmented,2L,norm,"/"),tol=1e-12,LAPACK=FALSE)
+  fit <- qr(sweep(augmented,2L,norm,"/"),tol=rank.tolerance,LAPACK=FALSE)
   if (fit$rank!=P) stop(role," is numerically unidentified",call.=FALSE)
   R <- qr.R(fit); pivot <- fit$pivot
   solve.gram <- function(rhs) {
