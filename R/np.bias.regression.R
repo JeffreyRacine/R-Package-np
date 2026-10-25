@@ -33,8 +33,7 @@
     stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
   orders <- .np_bias_derivative_request(reg,d,gradient.order)
   if (.np_bias_profile_layout(bws,x)) {
-    if (!is.null(orders)) stop("higher derivatives remain unqualified for pooled categorical auxiliaries",call.=FALSE)
-    return(.np_bias_profile_prepare(bws,x,y,control,reg))
+    return(.np_bias_profile_prepare(bws,x,y,control,reg,orders))
   }
   keys <- if (length(fc)) do.call(paste,c(lapply(x[fc],as.integer),sep=":")) else rep("all",nrow(x))
   groups <- split(seq_len(nrow(x)),keys)

@@ -270,3 +270,27 @@ test_that("pooled profile admission is explicit and weighted projection is repro
   expect_equal(p$coefficient %*% Q,diag(ncol(Q)),tolerance=1e-10)
   expect_error(npRmpi:::.np_bias_profile_solve(cbind(Q,Q[,2]),g),"numerically unidentified")
 })
+
+
+test_that("pooled derivative and contrast rows reproduce profile polynomials", {
+  set.seed(31023)
+  n <- 90L
+  x <- data.frame(x=runif(n,-1,1),u=factor(rep(1:3,each=30)),
+    o=ordered(rep(1:2,45)))
+  y <- x$x^3+.2*as.integer(x$u)+rnorm(n,sd=.3)
+  b <- npregbw(xdat=x,ydat=y,bws=c(.6,.2,.2),regtype="lp",degree=3,
+    bernstein.basis=TRUE,bandwidth.compute=FALSE)
+  a <- npRmpi:::.np_bias_regression_prepare(b,x,y,gradient.order=2L)
+  expect_true(a$pooled)
+  g <- x[1:2,,drop=FALSE];g$x <- c(-.3,.3)
+  g$u <- factor(2,levels=levels(x$u))
+  map <- expand.grid(row=1:2,target=c("d1","c2"),stringsAsFactors=FALSE)
+  v <- npRmpi:::.np_bias_regression_rows(a,g,map)
+  truth <- c(6*g$x,rep(.2,2))
+  expect_equal(drop(v$W %*% (x$x^3+.2*as.integer(x$u))),truth,tolerance=1e-8)
+  frames <- npRmpi:::npCategoricalFirstDifferenceFrames(g,2L,"test")
+  means <- lapply(list(frames$upper,frames$lower),function(e)
+    npRmpi:::.np_bias_regression_rows(a,e,data.frame(row=1:2,target="mean")))
+  expect_equal(v$W[3:4,,drop=FALSE],means[[1L]]$W-means[[2L]]$W,tolerance=1e-12)
+  expect_equal(v$se^2,rowSums(v$factor^2),tolerance=1e-12)
+})
