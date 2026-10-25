@@ -1,8 +1,6 @@
 test_that("categorical correction reduces to cell means and residual wild covariance", {
   if (!spawn_mpi_slaves(n=1L)) skip("MPI pool unavailable in this test context")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
-  if (!spawn_mpi_slaves(n=1L)) skip("MPI pool unavailable in this test context")
-  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old <- options(np.messages=FALSE);on.exit(options(old),add=TRUE)
   set.seed(61006);x <- data.frame(u=factor(rep(1:3,each=20)));y <- as.integer(x$u)+rnorm(60)
   b <- npregbw(xdat=x,ydat=y,bws=.2,regtype="lc",bandwidth.compute=FALSE)
