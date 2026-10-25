@@ -185,7 +185,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   Continuous auxiliary geometry controls and explicit local-to-global
   adaptation have no meaning for this route and are rejected.
 
-  This categorical-only route supports gaussian, mammen, inid, rademacher, fixed calibration.
+  This categorical-only route supports gaussian, mammen, inid, rademacher, fixed, geom calibration.
   Gaussian pseudo-errors use the observed unbiased within-profile variance;
   Mammen pseudo-errors use signed, leverage-normalized within-profile residuals.
   For these two laws, each draw re-estimates the corresponding profile variance. For a single
@@ -207,7 +207,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   degree is never increased. Scalar orders are recycled across continuous
   coordinates and vectors retain their coordinate-specific meaning. These are
   pure partial derivatives, not cross partials. Original profile-specific
-  higher orders use gaussian, mammen, inid, rademacher, fixed. Pooled higher orders retain
+  higher orders use gaussian, mammen, inid, rademacher, fixed, geom. Pooled higher orders retain
   their separately stated law support. The complete weighted P1 pilot is
   differentiated analytically, including its weight and coefficient dependence,
   and all correction covariance terms and derivative units are retained.

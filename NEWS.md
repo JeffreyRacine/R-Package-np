@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Extend the existing geom calibration to higher continuous derivatives
+  on the original continuous and simple mixed-data routes. Preserve its literal
+  resampling law, corrected rows and defaults; pooled admission is unchanged.
+  Admit the same literal law for finite-profile categorical-only inference,
+  with its documented small-profile coverage limitations.
+
 * Extend the existing fixed calibration to higher continuous derivatives
   on the original continuous and simple mixed-data routes. Preserve its literal
   resampling law, corrected rows and defaults; pooled admission is unchanged.
