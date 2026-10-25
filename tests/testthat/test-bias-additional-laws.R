@@ -52,7 +52,7 @@ test_that("pooled laws preserve scores and their admitted calibration", {
     expect_identical(z$bands$pointwise,z$bands$bonferroni)
     expect_true(all(is.finite(z$bands$simultaneous)))
   }
-  for(law in c("rademacher","fixed")) {
+  for(law in c("rademacher","fixed","geom")) {
     z <- npRmpi:::.np_bias_inference(state,x[41,,drop=FALSE],"mean",.05,63L,law)
     expect_identical(z$law,law)
     expect_identical(z$version,if(law=="rademacher")2L else 3L)
@@ -61,9 +61,6 @@ test_that("pooled laws preserve scores and their admitted calibration", {
     expect_identical(z$bands$pointwise,z$bands$bonferroni)
     expect_true(all(is.finite(z$bands$simultaneous)))
   }
-  for(law in c("geom"))
-    expect_error(npRmpi:::.np_bias_inference(state,x[1,,drop=FALSE],"mean",.05,31L,law),
-      "pooled mixed-data bias correction")
 })
 
 test_that("categorical-only additional laws record their actual calibration", {
