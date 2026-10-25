@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Keep automatic Gaussian band subtitles visible on ordinary plot devices
+  using compact measured labels, including bias-corrected simultaneous bands.
+  Preserve explicit subtitles, font size and plotting margins.
+
 * Integrate the frozen M1 local-to-global correction for eligible mixed-data
   fixed Gaussian regression bands with Gaussian or Mammen calibration.
   Adapt P0 residuals and complete observation rows without changing the main
