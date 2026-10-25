@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Pooled fixed-block bias-corrected bounds use the exact finite-sample
+  circular-block score covariance and replicate-specific score studentization.
+  Raw-residual block selection, literal draws and fixed model are preserved.
+  Regular 95% coverage improved in bounded confirmation; weak GNN means,
+  interval-width costs and limited dependent-data evidence remain documented.
+
+
 * Pooled bias-corrected Rademacher bounds now use the residual-pilot
   studentizer with literal plus/minus-one innovations. The fixed model and
   observed standard errors remain unchanged. Bounded confirmation supports

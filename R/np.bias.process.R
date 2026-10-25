@@ -157,8 +157,8 @@
   if (higher && !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
     stop("higher-order bias correction does not support this calibration law",call.=FALSE)
   if (isTRUE(state$pooled) &&
-      !law %in% c("gaussian","mammen","inid","rademacher"))
-    stop("pooled mixed-data bias correction currently supports Gaussian, Mammen, Rademacher or inid calibration only",call.=FALSE)
+      !law %in% c("gaussian","mammen","inid","rademacher","fixed"))
+    stop("pooled mixed-data bias correction currently supports Gaussian, Mammen, Rademacher, fixed or inid calibration only",call.=FALSE)
   if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<2||B!=floor(B)||B>.Machine$integer.max)
     stop("bias calibration draws must be an integer >= 2",call.=FALSE)
   if(!length(alpha)||any(!is.finite(alpha))||any(alpha<=0|alpha>=.5)||anyDuplicated(alpha))
@@ -173,6 +173,7 @@
   center <- original <- se <- score.se <- numeric(M)
   student <- isTRUE(studentize) && (law %in% c("gaussian","mammen") ||
     (isTRUE(state$pooled) && law=="rademacher"))
+  score.calibration <- isTRUE(state$pooled) && law=="fixed"
   calibration.state <- .np_bias_limits_prepare(map$target,alpha,law=="gaussian" && !student,B)
   prepared <- NULL
   regularization <- adaptation <- list()
@@ -200,6 +201,13 @@
       if (is.null(prepared)) prepared <- .np_bias_student_prepare(state)
       part <- .np_bias_stream(rng,
         .np_bias_student_draws(prepared,value$W,value$se,B,law))
+    } else if (score.calibration) {
+      F <- sweep(value$W,2L,state$residual,"*")
+      F <- F-rowMeans(F)
+      part <- .np_bias_stream(rng,
+        .np_bias_score_student_draws(F,B,law,selection$length,value$se>0,studentize))
+      se[rr] <- score.se[rr] <- part$value$se
+      part$value <- part$value$absolute
     } else {
       F <- if(score)sweep(value$W,2L,state$residual,"*") else value$factor
       if(score)F <- F-rowMeans(F)
@@ -209,7 +217,7 @@
     .np_plot_progress_notify(stage="Constructing bias-corrected intervals",
       done=max(jj),total=nrow(grid),unit="grid")
     end <- part$end
-    if(score) {
+    if(score && !score.calibration) {
       s <- apply(part$value,1L,sd)
       if(any(!is.finite(s))||any(s<=0 & value$se>0))stop("nonpositive score-bootstrap scale",call.=FALSE)
       score.se[rr] <- s
@@ -217,7 +225,7 @@
       if(law!="inid")se[rr] <- s
     }
     calibration.state <- .np_bias_limits_update(calibration.state,
-      if(student)part$value else abs(part$value/divisor),rr)
+      if(student || score.calibration)part$value else abs(part$value/divisor),rr)
   }
   assign(".Random.seed",end,.GlobalEnv)
   calibrated <- .np_bias_limits_finish(calibration.state)
@@ -225,21 +233,27 @@
     for(k in seq_along(alpha))for(side in 1:2)x[,side,k] <- center+se*x[,side,k]
     x
   })
-  list(construction="iterated",version=if(student)2L else 1L,estimate=original,center=center,
+  list(construction="iterated",version=if(score.calibration)3L else if(student)2L else 1L,estimate=original,center=center,
     correction=original-center,se=se,bands=bands,map=map,grid=grid,
     settings=state$settings,law=law,block.selection=selection,draws=B,alpha=alpha,
     main.regularization=do.call(rbind,regularization),
     adaptation=if(length(adaptation))adaptation else NULL,
     covariance=list(operator="complete corrected observation rows",
-      variance=if(law%in%c("fixed","geom"))"empirical residual-score process variance" else
+      variance=if(score.calibration)"exact conditional selected-block score variance" else
+        if(law%in%c("fixed","geom"))"empirical residual-score process variance" else
         if(isTRUE(state$categorical.only))"within-profile residual variance" else "smoothed P0 residual variance",
-      studentization=if(isTRUE(state$categorical.only) && student)"replicate-specific within-profile residual SD" else
+      studentization=if(score.calibration) {
+        if(studentize)"replicate-specific selected-block score SD" else "observed selected-block score SD"
+      } else if(isTRUE(state$categorical.only) && student)"replicate-specific within-profile residual SD" else
         if(score)"empirical residual-score process SD" else
         if(isTRUE(state$categorical.only))"within-profile residual SD" else
         if(student)"replicate-specific smoothed P0 residual SD" else "smoothed complete-row SD",
-      calibration=if(student)"residual-pilot studentized multiplier process" else
+      calibration=if(score.calibration) {
+        if(studentize)"conditional score bootstrap-t process" else "conditional score process"
+      } else if(student)"residual-pilot studentized multiplier process" else
         if(score)"residual score process" else "fixed-factor multiplier process"),
-    studentization=if(student)list(construction=if(isTRUE(state$categorical.only))
+    studentization=if(score.calibration && studentize)list(construction="conditional-block-score-v1",
+      draw.block=32L) else if(student)list(construction=if(isTRUE(state$categorical.only))
       "finite-profile-studentized-v1" else "residual-pilot-v1",
       draw.block=256L,reuse.block=1024L,training.block=16L) else NULL,
     calibration=calibrated,score.se=if(score)score.se else NULL,
