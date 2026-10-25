@@ -183,7 +183,18 @@ np_bias_control(construction = c("iterated", "legacy"),
   categorical differences. The adaptive-NN mean remained weaker at 90 percent
   nominal (87.11 percent, versus 89.84 percent for Mammen). These finite-grid
   results do not qualify every profile geometry or establish uniform coverage.
-  Fixed and geom remain unqualified for the pooled path.
+  Pooled fixed-block calibration uses exact finite-sample circular-block
+  covariance of the complete corrected residual scores, and recomputes that
+  covariance on each literal resampled score sequence for bootstrap-t pivots.
+  The selected block length remains fixed during calibration. Its regular
+  95 percent simultaneous confirmation ranged from 91.80 to 98.44 percent;
+  generalized-NN mean coverage was 91.80 percent versus 96.48 for Mammen.
+  Fixed-bandwidth mean intervals were about 1.5 times as wide as Mammen's.
+  Weaker 90 and 99 percent cells remain; a 32-dataset dependent-error probe
+  (87.5 percent derivative coverage) does not qualify general dependence.
+  Full-length fixed blocks have zero conditional covariance and are refused
+  for nonzero targets; deterministic zero targets retain zero intervals.
+  Geom remains unqualified for the pooled path.
   Pooled inid uses the same complete corrected rows and its existing smoothed
   variance and residual-score calibration. Bounded regular-neighborhood
   confirmation was encouraging overall, with weaker mean coverage than
@@ -256,7 +267,12 @@ np_bias_control(construction = c("iterated", "legacy"),
   routes retain their fixed-factor multiplier calibration. The iterated inid, fixed and geom
   constructions resample corrected residual scores rather than refitting each
   row resample. Inid uses the smoothed variance refinement; fixed and geom use
-  their score-bootstrap scale. Automatic block selection uses raw P0 residuals
+  their score-bootstrap scale. On the pooled fixed-block path the scale is
+  the exact conditional covariance and bootstrap-t uses a replicate-specific
+  selected-block scale. The \code{pmzsd} display uses a normal multiple of the
+  observed scale, with no bootstrap-t coverage claim. Degenerate resampling
+  variance for an active target is an error, not a zero-width interval.
+  Automatic block selection uses raw P0 residuals
   with \code{b.star(..., round=TRUE)}: BstarCB for fixed and BstarSB for geom.
   The legacy \code{nonfixed="frozen"} resampling switch is not applicable.
   Explicit block lengths are retained as overrides.
