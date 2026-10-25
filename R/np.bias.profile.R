@@ -98,8 +98,8 @@
   width <- settings$degree_spec$nterms + (length(groups)-1)*main.terms$nterms
   if (!main.terms$capacity.ok || !main.terms$rank.ok || width>=nrow(x))
     stop("pooled auxiliary requires residual support in every profile main space and in the joint space", call.=FALSE)
-  if (width>128L)
-    stop("pooled auxiliary exceeds the qualified 128-column workspace; existing profile-specific routes are unchanged", call.=FALSE)
+  if (width>256L)
+    stop("pooled auxiliary exceeds the qualified 256-column workspace; existing profile-specific routes are unchanged", call.=FALSE)
   offset <- vapply(x[nc],mean,numeric(1)); scale <- settings$spread
   xs <- x
   for (j in seq_along(nc)) xs[[nc[j]]] <- (x[[nc[j]]]-offset[j])/scale[j]
@@ -137,7 +137,7 @@
   a$settings$auxiliary_space <- list(construction="shared curvature with profile-main deviations",
     columns=ncol(a$Q),shared.columns=settings$degree_spec$nterms,
     profile.main.columns=main.terms$nterms,profiles=names(groups),rank.tolerance=1e-11,
-    workspace.columns=128L)
+    workspace.columns=256L)
   a$settings$coordinate_offset <- offset; a$settings$coordinate_scale <- scale
   a$settings$training <- list(n=nrow(x),columns=names(x),row.names=rownames(x),
     rows.omit=bws[["rows.omit"]],source="retained plot training frame")
