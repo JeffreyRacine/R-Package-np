@@ -60,7 +60,9 @@
   k <- if (covariance) m else 0
   processes <- .np_plot_gaussian_integer(processes, "density resident processes", .Machine$integer.max)
   levels <- sum(vapply(state$x, function(z) length(levels(z)), integer(1L)))
-  per.process <- 8 * (4*n*p + 12*n*t + 4*n*32 + 4*t*B + 8*B + 12*k^2 + 4*m*p + 4*levels)
+  support.bytes <- sum(vapply(state$x, function(z)
+    if (is.factor(z)) as.numeric(object.size(levels(z))) else 0, numeric(1L)))
+  per.process <- 8 * (4*n*p + 12*n*t + 4*n*32 + 4*t*B + 8*B + 12*k^2 + 4*m*p + 4*levels) + 4*support.bytes
   # Conservatively charge the full coordinator forecast to every resident
   # process, including replicated inputs, serialized tasks and R copies.
   bytes <- processes * per.process
