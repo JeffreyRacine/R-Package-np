@@ -57,8 +57,10 @@
     K<-K*dnorm(u)/h;radius<-radius+u^2
   }
   Q<-K
-  if(state$r+state$s>0L)for(z in state$category){
-    v<-.np_udens_bc_categorical_rows(z,grid[[z$index]])
+  if(state$r+state$s>0L)for(a in seq_along(state$category)){
+    z<-state$category[[a]]
+    v<-if(is.null(state$category.cache)).np_udens_bc_categorical_rows(z,grid[[z$index]]) else
+      lapply(state$category.cache[[a]],function(rows)rows[,state$replicate.index,drop=FALSE])
     K<-K*v$original;Q<-Q*if(corrected)v$corrected else v$original
   }
   P<-if(corrected)1+q/2-radius/2 else matrix(1,m,n)
@@ -70,7 +72,7 @@
 .np_udens_b2_nn_contribution <- function(state, grid, corrected=TRUE) {
   .np_udens_b2_nn_grid(state,grid)
   if(!is.logical(corrected)||length(corrected)!=1L||is.na(corrected))stop("corrected must be TRUE or FALSE",call.=FALSE)
-  .np_udens_bc_budget(state,nrow(grid),1L,nrow(grid),FALSE)
+  .np_udens_b2_budget(state,nrow(grid),1L,nrow(grid),FALSE)
   if(state$q==0L)return(.np_udens_bc_contribution(state,grid,corrected))
   geometry<-if(state$type=="adaptive_nn")state$ann else .np_udens_b2_gnn_geometry(state,grid)
   z<-.np_udens_b2_nn_rows(state,grid,geometry,corrected)
@@ -92,6 +94,7 @@
 }
 
 .np_udens_b2_nn_gaussian <- function(state,grid,alpha=c(.05,.1),B=9999L,tile=25L,corrected=TRUE) {
+  budget<-.np_udens_b2_budget(state,nrow(grid),B,tile,TRUE)
   owner<-new.env(parent=environment(.np_udens_bc_gaussian))
   owner$.np_udens_bc_grid<-.np_udens_b2_nn_grid
   owner$.np_udens_bc_contribution<-.np_udens_b2_nn_contribution
@@ -100,6 +103,7 @@
   }
   entry<-.np_udens_bc_inference;environment(entry)<-owner
   out<-entry(state,grid,law="gaussian",alpha=alpha,B=B,tile=tile,corrected=corrected)
+  out$settings$budget<-budget
   out$settings$h<-out$settings$auxiliary.h<-NULL
   out$settings$counts<-state$requested;out$settings$covariance<-"complete direct and random-radius observation influence"
   out
