@@ -1,7 +1,8 @@
 # Signed density bootstrap-t. This entry is private and leaves v1 untouched.
 .np_udens_b2_boot_request <- function(law, blocklen, n) {
   law <- match.arg(law,c("inid"))
-  if (!is.null(blocklen) && !identical(as.integer(blocklen),1L))
+  if (!is.null(blocklen) && (!is.numeric(blocklen) || length(blocklen)!=1L ||
+      !is.finite(blocklen) || blocklen!=1))
     stop("inid density bootstrap requires block length one",call.=FALSE)
   list(law=law,blocklen=1L)
 }
