@@ -9,12 +9,13 @@
   if (!is.data.frame(x) || nrow(x) < 2L || ncol(x) < 1L ||
       anyNA(x) || anyDuplicated(names(x)) || any(!nzchar(names(x))))
     stop("invalid density correction training frame", call. = FALSE)
-  if (!all(vapply(x, is.numeric, logical(1L))) ||
-      any(!is.finite(as.matrix(x))))
-    stop("this continuous density checkpoint requires numeric coordinates", call. = FALSE)
   if (!is.numeric(max.bytes) || length(max.bytes) != 1L ||
       !is.finite(max.bytes) || max.bytes <= 0)
     stop("density correction memory budget must be positive and finite", call. = FALSE)
+  if (!all(vapply(x, is.numeric, logical(1L))))
+    return(.np_udens_bc_mixed_prepare(bws, x, max.bytes))
+  if (any(!is.finite(as.matrix(x))))
+    stop("density correction requires finite numeric coordinates", call. = FALSE)
   h <- .np_physical_bandwidth(bws)
   if (!is.numeric(h) || length(h) != ncol(x) || any(!is.finite(h)) || any(h <= 0))
     stop("density correction requires positive finite physical bandwidths", call. = FALSE)
@@ -28,6 +29,7 @@
 }
 
 .np_udens_bc_grid <- function(state, grid) {
+  if (state$r + state$s > 0L) return(.np_udens_bc_mixed_grid(state, grid))
   if (!is.data.frame(grid) || nrow(grid) < 1L ||
       !identical(names(grid), names(state$x)) || anyNA(grid) ||
       !all(vapply(grid, is.numeric, logical(1L))) || any(!is.finite(as.matrix(grid))))

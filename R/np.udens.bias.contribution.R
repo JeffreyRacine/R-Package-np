@@ -5,6 +5,8 @@
     stop("corrected must be TRUE or FALSE", call. = FALSE)
   if (nrow(grid) > 25L)
     stop("density contribution requests must use at most 25 target rows", call. = FALSE)
+  if (state$r + state$s > 0L)
+    return(.np_udens_bc_mixed_contribution(state, grid, corrected))
   .np_udens_bc_budget(state, nrow(grid), 1L, nrow(grid), FALSE)
   K <- .np_plot_density_matrix(state$kbw, state$x, grid, rep("normal", state$q))
   radius <- matrix(0, nrow(grid), state$n)
