@@ -12,11 +12,9 @@
   out<-matrix(0,nrow(D),n)
   # Interval starts/stops are native zero-based half-open sorted indices.
   # Group duplicate endpoints before prefix summation, never an n-by-n map.
-  for(a in seq_len(nrow(D))){
-    w<--D[a,order]/g$density.sum/n
-    sums<-rowsum(c(w,-w),c(g$left+1L,g$right+1L),reorder=FALSE)
-    delta<-numeric(n+1L);delta[as.integer(rownames(sums))]<-sums[,1L]
-    out[a,order]<-cumsum(delta)[seq_len(n)]
-  }
+  weights<- -t(D[,order,drop=FALSE])/g$density.sum/n
+  sums<-rowsum(rbind(weights,-weights),c(g$left+1L,g$right+1L),reorder=FALSE)
+  delta<-matrix(0,n+1L,nrow(D));delta[as.integer(rownames(sums)),]<-sums
+  for(a in seq_len(nrow(D)))out[a,order]<-cumsum(delta[,a])[seq_len(n)]
   out
 }
