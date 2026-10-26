@@ -73,7 +73,7 @@
   B <- .np_plot_gaussian_integer(B,"density draws",.Machine$integer.max)
   if(B<2L)stop("density calibration requires at least two draws",call.=FALSE)
   .np_udens_bc_grid(state,grid);m <- nrow(grid)
-  budget <- .np_udens_bc_budget(state,m,B,tile,FALSE)
+  budget <- .np_udens_b2_budget(state,m,B,tile,FALSE)
   if(!existed)runif(1L)
   start <- get(".Random.seed",.GlobalEnv,inherits=FALSE);end <- NULL
   fresh <- function()list(maximum=rep(-Inf,B),point=matrix(0,m,length(alpha)),bonf=matrix(0,m,length(alpha)))
