@@ -1,5 +1,5 @@
 # Literal multinomial bootstrap-t. Extended pivots are private to density.
-.np_udens_bc_inid_pivot <- function(F, raw, counts) {
+.np_udens_bc_inid_pivot <- function(F, raw, counts, accurate = FALSE) {
   if (!is.matrix(F) || !is.numeric(F) || !is.matrix(raw) ||
       !identical(dim(F), dim(raw)) || !is.matrix(counts) ||
       ncol(F) < 2L || nrow(counts) != ncol(F) ||
@@ -17,7 +17,10 @@
   cancellation <- integer(nrow(F))
   # This is a cancellation diagnostic, not a variance threshold/floor. Every
   # suspect cell is recomputed from centered raw observations and its counts.
-  suspect <- which(variance <= 128*.Machine$double.eps*(moment + numerator^2/n), arr.ind = TRUE)
+  # Mixed rows can concentrate on few profiles. Recompute ill-conditioned
+  # subtractions to an accuracy target; never change or floor their variance.
+  guard <- 128*.Machine$double.eps / if (accurate) 1e-12 else 1
+  suspect <- which(variance <= guard*(moment + numerator^2/n), arr.ind = TRUE)
   if (nrow(suspect)) for (i in seq_len(nrow(suspect))) {
     r <- suspect[i, 1L]; b <- suspect[i, 2L]
     active <- which(counts[, b] > 0)
@@ -47,17 +50,17 @@
        cancellation = cancellation)
 }
 
-.np_udens_bc_inid_chunk <- function(F, raw, first, last, B) {
+.np_udens_bc_inid_chunk <- function(F, raw, first, last, B, accurate = FALSE) {
   counts <- .np_bias_process_innovations(ncol(F), first, last, B, "inid", 1L) + 1
-  .np_udens_bc_inid_pivot(F, raw, counts)
+  .np_udens_bc_inid_pivot(F, raw, counts, accurate)
 }
 
-.np_udens_bc_inid_dispatch <- function(F, raw, B) {
+.np_udens_bc_inid_dispatch <- function(F, raw, B, accurate = FALSE) {
   absolute <- matrix(0, nrow(F), B)
   degenerate <- cancellation <- integer(nrow(F))
   for (first in seq.int(1L, B, by = 32L)) {
     last <- min(B, first + 31L)
-    z <- .np_udens_bc_inid_chunk(F, raw, first, last, B)
+    z <- .np_udens_bc_inid_chunk(F, raw, first, last, B, accurate)
     absolute[, first:last] <- z$absolute
     degenerate <- degenerate + z$degeneracy
     cancellation <- cancellation + z$cancellation
@@ -99,7 +102,8 @@
     value <- .np_udens_bc_contribution(state, grid[ii, , drop = FALSE], corrected)
     if (any(!is.finite(value$se)) || any(value$se <= 0))
       stop("density inference requires positive finite observed scales", call. = FALSE)
-    stream <- .np_bias_stream(start, .np_udens_bc_inid_dispatch(value$factor, value$corrected, B))
+    stream <- .np_bias_stream(start, .np_udens_bc_inid_dispatch(value$factor, value$corrected, B,
+      accurate = state$r + state$s > 0L))
     if (!is.null(end) && !identical(end, stream$end))
       stop("density inid tiles consumed inconsistent streams", call. = FALSE)
     end <- stream$end; z <- stream$value
