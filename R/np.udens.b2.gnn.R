@@ -1,7 +1,7 @@
 # Private random-radius density prototype. Existing fixed and native owners are untouched.
 .np_udens_b2_nn_prepare <- function(bws, x, max.bytes=256*1024^2) {
   type<-bws[["type",exact=TRUE]]
-  if(!type%in%c("generalized_nn"))stop("unadmitted density NN type",call.=FALSE)
+  if(!type%in%c("generalized_nn","adaptive_nn"))stop("unadmitted density NN type",call.=FALSE)
   numeric<-vapply(x,is.numeric,logical(1L));raw<-.np_physical_bandwidth(bws)
   package<-getNamespaceName(environment(.np_physical_bandwidth))
   rank<-if(any(numeric)).Call("C_np_plot_ann_rank_decode",as.double(raw[numeric]),as.integer(nrow(x)),PACKAGE=package)else NULL
@@ -17,6 +17,7 @@
   state$construction<-"density-bc-v2-random-radius"
   state$metadata$type<-type;state$metadata$radius<-"recomputed from the sample at fixed counts"
   state$metadata$rank.remainder.order<-if(length(state$lookup))1/state$lookup else numeric()
+  if(type=="adaptive_nn"&&state$q>0L)state$ann<-.np_udens_b2_ann_geometry(state)
   state
 }
 
@@ -69,14 +70,17 @@
   if(!is.logical(corrected)||length(corrected)!=1L||is.na(corrected))stop("corrected must be TRUE or FALSE",call.=FALSE)
   .np_udens_bc_budget(state,nrow(grid),1L,nrow(grid),FALSE)
   if(state$q==0L)return(.np_udens_bc_contribution(state,grid,corrected))
-  geometry<-.np_udens_b2_gnn_geometry(state,grid)
+  geometry<-if(state$type=="adaptive_nn")state$ann else .np_udens_b2_gnn_geometry(state,grid)
   z<-.np_udens_b2_nn_rows(state,grid,geometry,corrected)
   phi<-z$corrected;x<-state$x[state$numeric];g<-grid[state$numeric]
   for(j in seq_len(state$q)){
-    h<-geometry$radius[,j];u<-outer(g[[j]],x[[j]],"-")/h
+    h<-geometry$radius[,j];if(state$type=="adaptive_nn")h<-matrix(rep(h,each=nrow(grid)),nrow(grid),state$n)
+    u<-outer(g[[j]],x[[j]],"-")/h
     D<-z$Q/h*((u^2-1)*z$P+if(corrected)u^2 else 0)
-    inside<-abs(outer(g[[j]],x[[j]],"-"))<=h
-    phi<-phi-rowMeans(D)/geometry$density.sum[,j]*inside
+    if(state$type=="adaptive_nn")phi<-phi+.np_udens_b2_ann_influence(D,geometry,j,state$n) else {
+      inside<-abs(outer(g[[j]],x[[j]],"-"))<=h
+      phi<-phi-rowMeans(D)/geometry$density.sum[,j]*inside
+    }
   }
   center<-z$corrected[,1]+rowMeans(z$corrected-z$corrected[,1])
   F<-(phi-phi[,1]-rowMeans(phi-phi[,1]))/state$n
