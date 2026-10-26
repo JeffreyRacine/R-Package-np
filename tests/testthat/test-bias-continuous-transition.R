@@ -21,3 +21,26 @@ test_that("continuous transition uses a geometry-relative nested projection", {
   original <- np:::.np_bias_adaptation_pilot(local,at,geometry$b1)
   expect_lt(max(abs(z$H-original$H)),1e-4)
 })
+
+
+test_that("continuous pilot preparation preserves named kernel and derivative rows", {
+  x <- cbind(x1=sin(seq_len(72)),x2=cos(seq_len(72)*sqrt(2)))
+  rownames(x) <- paste0("row",seq_len(nrow(x)))
+  Q <- np:::.np_bias_adaptation_basis(x,x,c(2L,2L))
+  geometry <- np:::.np_bias_adaptation_geometry(c(1L,1L),c(1.4,.6),
+    c(1,1),c(.4,.4),c(.35,.35),c(2L,2L))
+  state <- list(x=x,Q=Q,geometry=geometry)
+  at <- x[17,,drop=FALSE]
+  prepared <- state
+  prepared$geometry$transition <- np:::.np_bias_transition_geometry(Q,geometry$lambda,x)
+  for(h in list(geometry$b1,c(Inf,geometry$b1[2]))) {
+    expected <- drop(np:::.np_bias_adaptation_kernel(x,at,h))
+    actual <- np:::.np_bias_transition_weights(prepared,at,h,prepared$geometry$transition)
+    expect_identical(actual,expected)
+  }
+  original <- np:::.np_bias_adaptation_pilot(state,at,geometry$b1,
+    derivatives=1:2,orders=c(1L,1L))
+  reused <- np:::.np_bias_adaptation_pilot(prepared,at,geometry$b1,
+    derivatives=1:2,orders=c(1L,1L))
+  expect_identical(reused,original)
+})
