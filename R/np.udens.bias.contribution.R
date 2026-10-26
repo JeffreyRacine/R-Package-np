@@ -13,7 +13,9 @@
   L <- if (corrected) K * (1 + state$q/2 - radius/2) else K
   if (any(!is.finite(K)) || any(!is.finite(L)))
     stop("nonfinite density correction contributions", call. = FALSE)
-  center <- rowMeans(L)
+  # Anchor before averaging: identical observations certify exact zero
+  # uncertainty, rather than a small positive scale from summation roundoff.
+  center <- L[, 1L] + rowMeans(L - L[, 1L])
   F <- (L - center) / state$n
   list(original = K, corrected = L, original.center = rowMeans(K),
        center = center, factor = F, se = sqrt(rowSums(F^2)))
