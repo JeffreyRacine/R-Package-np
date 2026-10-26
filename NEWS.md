@@ -6,6 +6,12 @@
   Bounded paired coverage confirmation includes means, first derivatives and
   a cubic second-derivative slice; near-singular geometry remains unqualified.
 
+* Reuse immutable auxiliary geometry and exact single-anchor calculations
+  without changing corrected rows, covariance or calibration. Finite-grid
+  coverage remains broadly comparable to the preceding construction.
+  Bounded qualification accepts small active-transition median costs and
+  specified timing-tail exceptions.
+
 * Pooled geometric-block bias-corrected bounds now use their own exact
   finite-sample circular covariance and replicate score studentization.
   Literal stationary-block draws and raw-residual block selection remain

@@ -69,6 +69,7 @@
     state$residual_row_variance <- spec$residual_row_variance; state$variance <- spec$variance
     return(state)
   }
+  state$geometry$transition <- .np_bias_transition_geometry(state$Q,geo$lambda,state$x)
   n <- nrow(state$x); raw <- rowvar <- numeric(n)
   for (i in seq_len(n)) {
     H <- .np_bias_adaptation_pilot(state,state$x[i,,drop=FALSE],geo$b0,
@@ -144,15 +145,22 @@
       w <- w+delta
     }
     W[rr,] <- w
+    derivative.targets <- nu[rr][nu[rr]>0L]
+    pilot <- .np_bias_adaptation_pilot(state,t,geo$b1,
+      derivatives=derivative.targets,orders=spec$gradient.order)
+    derivative.row <- 0L
     for (k in seq_along(rr)) {
       j <- nu[rr[k]]
-      pilot <- .np_bias_adaptation_pilot(state,t,geo$b1,derivatives=if(j)j else integer(),orders=spec$gradient.order)
-      T1[rr[k],] <- if(j)pilot$D else pilot$H
+      if(j) {
+        derivative.row <- derivative.row+1L
+        T1[rr[k],] <- pilot$D[derivative.row,]
+      } else T1[rr[k],] <- pilot$H
     }
   }
   C <- (W-.np_bias_adaptation_compose(W,state)+T1)/units
   factor <- sweep(C,2L,sqrt(state$variance),"*")
   if (any(!is.finite(factor))) stop("nonfinite adapted influence rows",call.=FALSE)
+  geo$transition <- NULL
   list(W=C,original=main.rows,center=drop(C%*%spec$y),
     original_center=drop(main.rows%*%spec$y),se=sqrt(rowSums(factor^2)),factor=factor,
     adaptation=list(version=state$version,geometry=geo,iterations=state$iterations,

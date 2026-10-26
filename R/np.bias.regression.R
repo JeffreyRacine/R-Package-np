@@ -96,6 +96,7 @@
         spec$settings$bandwidth[[role]]/(scale*nrow(x)^(-spec$settings$exponent))
     }
     policy$geometry <- adapted$geometry
+    policy$geometry$transition <- NULL
     policy$residual_policy <- "adapted P0 row-variance normalized"
   } else {
     training <- .np_bias_p0_residuals(spec,matrix(y,ncol=1L))
