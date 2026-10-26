@@ -13,6 +13,8 @@
         rm(list = ".Random.seed", envir = .GlobalEnv)
     }
   }, add = TRUE)
+  if (!identical(state[["metadata", exact = TRUE]][["type", exact = TRUE]], "fixed"))
+    stop("hybrid density inference requires a fixed-bandwidth state", call. = FALSE)
   .np_udens_bc_grid(state, grid)
   budget <- .np_udens_b2_budget(state, nrow(grid), B, tile, TRUE)
   model <- .np_udens_b2_smoothed_covariance(state, grid, tile, corrected)
