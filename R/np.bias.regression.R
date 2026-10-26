@@ -85,7 +85,7 @@
       spec[[name]] <- adapted[[name]]
     spec$adaptation <- adapted
     spec$main.request <- list(bws=bws,xdat=x,ydat=as.double(y))
-    spec$settings$policy <- "rot-profile-v1+coordinate-isolated-v1"
+    spec$settings$policy <- "rot-profile-v1+continuous-nested-projection-v1"
     spec$settings$reference_bandwidth <- spec$settings$bandwidth
     spec$settings$reference_package_scale <- spec$settings$effective_package_scale
     effective <- list(p0=adapted$geometry$b0,p1=adapted$geometry$b1,

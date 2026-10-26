@@ -1,4 +1,4 @@
-# Frozen coordinatewise local-to-global correction and public integration seam.
+# Coordinatewise local-to-global correction and public integration seam.
 # Model fitting, calibration and variance smoothing retain their existing owners.
 # Only bounded target rows and thin training/basis factors are retained.
 .np_bias_adaptation_basis <- function(x, at, degree, derivative = 0L, order = 1L) {
@@ -50,31 +50,7 @@
 # Q and its reference geometry are prepared once, not once per pilot row.
 .np_bias_adaptation_pilot <- function(state, at, bandwidth, value = NULL,
                                     derivatives = integer(), orders = NULL) {
-  x <- state$x; Q <- state$Q; n <- nrow(x); P <- ncol(Q)
-  g <- drop(.np_bias_adaptation_kernel(x,at,bandwidth))
-  aug <- rbind(Q*sqrt(g),diag(sqrt(n*state$geometry$lambda),P))
-  fit <- qr(aug,LAPACK=FALSE,tol=1e-12)
-  if (fit$rank!=P) stop("declared penalized pilot not identified",call.=FALSE)
-  A <- backsolve(qr.R(fit),t(qr.Q(fit)[seq_len(n),,drop=FALSE])*rep(sqrt(g),each=P))
-  if (!identical(fit$pivot,seq_len(P))) { original <- A; A[fit$pivot,] <- original }
-  if (is.null(value)) value <- .np_bias_adaptation_basis(x,at,state$geometry$q)
-  H <- value %*% A
-  D <- matrix(0,length(derivatives),n)
-  for (k in seq_along(derivatives)) {
-    j <- derivatives[k]
-    order <- if(is.null(orders)) 1L else orders[j]
-    if (order>1L) {
-      values <- do.call(rbind,lapply(0:order,function(r)
-        .np_bias_adaptation_basis(x,at,state$geometry$q,if(r)j else 0L,r)))
-      ratios <- .np_bias_gaussian_derivatives((x[,j]-at[1,j])/bandwidth[j],bandwidth[j],order)
-      D[k,] <- .np_bias_weighted_derivative(Q,g,values,ratios,
-        penalty=n*state$geometry$lambda,role="adapted P1 higher derivative pilot")
-      next
-    }
-    w <- H*rep((x[,j]-at[1,j])/bandwidth[j]^2,each=nrow(H))
-    D[k,] <- .np_bias_adaptation_basis(x,at,state$geometry$q,j)%*%A+w-(w%*%Q)%*%A
-  }
-  list(A=A,g=g,H=H,D=D)
+  .np_bias_transition_pilot(state, at, bandwidth, value, derivatives, orders)
 }
 
 .np_bias_adaptation_prepare <- function(spec) {
@@ -87,7 +63,7 @@
   geo <- .np_bias_adaptation_geometry(reg[["degree.engine"]],
     unname(spec$bws[["bandwidth"]][["x"]]),spec$b,spec$p1$b,spec$h,spec$q)
   state <- list(spec=spec,x=as.matrix(spec$xcon),Q=spec$Q,geometry=geo,
-    version="B3-coordinate-isolated-1",iterations=spec$settings[["iterations"]])
+    version="B4-nested-projection-1",iterations=spec$settings[["iterations"]])
   if (geo$inactive) {
     state$residual <- spec$residual; state$residual_raw <- spec$residual_raw
     state$residual_row_variance <- spec$residual_row_variance; state$variance <- spec$variance
@@ -210,7 +186,7 @@
     if(!active) reason <- "local geometry unchanged"
   }
   list(requested=mode,eligible=eligible,active=active,reason=reason,
-    version="B3-coordinate-isolated-1")
+    version="B4-nested-projection-1")
 }
 
 # Capture is tied to the complete panel request, not a newly fitted row batch.
