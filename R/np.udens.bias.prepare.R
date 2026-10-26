@@ -49,15 +49,21 @@
   invisible(TRUE)
 }
 
-.np_udens_bc_budget <- function(state, m, B, tile, covariance) {
+.np_udens_bc_budget <- function(state, m, B, tile, covariance, processes = 1L) {
   tile <- .np_plot_gaussian_integer(tile, "density target tile", 25L)
   B <- .np_plot_gaussian_integer(B, "density draws", .Machine$integer.max)
   if (covariance && m > 512L)
     stop("density covariance representation exceeds the 512-point cap", call. = FALSE)
   n <- as.double(state$n); p <- ncol(state$x); t <- min(tile, m)
   k <- if (covariance) m else 0
-  bytes <- 8 * (4*n*p + 12*n*t + 4*n*32 + 4*t*B + 8*B + 12*k^2 + 4*m*p)
+  processes <- .np_plot_gaussian_integer(processes, "density resident processes", .Machine$integer.max)
+  levels <- sum(vapply(state$x, function(z) length(levels(z)), integer(1L)))
+  per.process <- 8 * (4*n*p + 12*n*t + 4*n*32 + 4*t*B + 8*B + 12*k^2 + 4*m*p + 4*levels)
+  # Conservatively charge the full coordinator forecast to every resident
+  # process, including replicated inputs, serialized tasks and R copies.
+  bytes <- processes * per.process
   if (!is.finite(bytes) || bytes > state$max.bytes)
     stop("density correction live-byte forecast exceeds the requested budget", call. = FALSE)
-  list(bytes = bytes, tile = tile, draw.chunk = 32L, covariance.dimension = k)
+  list(bytes = bytes, per.process = per.process, processes = processes,
+       retained.levels = levels, tile = tile, draw.chunk = 32L, covariance.dimension = k)
 }
