@@ -1,6 +1,7 @@
 # Signed density bootstrap-t. This entry is private and leaves v1 untouched.
 .np_udens_b2_boot_request <- function(law, blocklen, n) {
-  law <- match.arg(law,c("inid"))
+  law <- match.arg(law,c("inid","fixed"))
+  if(law=="fixed")return(list(law=law,blocklen=.np_udens_b2_block_length(blocklen,n)))
   if (!is.null(blocklen) && (!is.numeric(blocklen) || length(blocklen)!=1L ||
       !is.finite(blocklen) || blocklen!=1))
     stop("inid density bootstrap requires block length one",call.=FALSE)
@@ -8,13 +9,22 @@
 }
 
 .np_udens_b2_indices <- function(n, first, last, B, law, blocklen) {
+  if(law!="inid"&&blocklen>1L){
+    draw<-.np_block_replicate_drawer(n,n,blocklen,law,TRUE)
+    return(lapply(seq_len(last-first+1L),function(j)draw()))
+  }
   counts <- .np_bias_process_innovations(n,first,last,B,law,blocklen)+1
   lapply(seq_len(ncol(counts)),function(j)rep.int(seq_len(n),counts[,j]))
 }
 
-.np_udens_b2_variance <- function(F, law, blocklen) rowSums(F^2)
+.np_udens_b2_variance <- function(F, law, blocklen) {
+  if(law=="inid"||blocklen==1L)return(rowSums(F^2))
+  .np_bias_score_variance(F,blocklen,law)
+}
 
 .np_udens_b2_boot_chunk <- function(state, grid, base, first, last, B, law, blocklen) {
+  if(law!="inid"&&blocklen>1L)
+    return(.np_udens_b2_block_chunk(state,grid,base,first,last,B,law,blocklen))
   n <- state$n
   counts <- .np_bias_process_innovations(n,first,last,B,law,blocklen)+1
   z <- .np_udens_bc_inid_pivot(base$factor,base$corrected,counts,
