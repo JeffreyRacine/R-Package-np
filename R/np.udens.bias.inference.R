@@ -14,7 +14,7 @@
         rm(list = ".Random.seed", envir = .GlobalEnv)
     }
   }, add = TRUE)
-  law <- match.arg(law, "gaussian")
+  law <- match.arg(law, c("gaussian", "inid"))
   representation <- match.arg(representation)
   bands <- match.arg(bands, c("pointwise", "simultaneous", "bonferroni"), several.ok = TRUE)
   if (!is.numeric(alpha) || !length(alpha) || any(!is.finite(alpha)) ||
@@ -23,10 +23,12 @@
   B <- .np_plot_gaussian_integer(B, "density draws", .Machine$integer.max)
   if (B < 2L) stop("density calibration requires at least two draws", call. = FALSE)
   .np_udens_bc_grid(state, grid)
-  budget <- .np_udens_bc_budget(state, nrow(grid), B, tile, representation == "covariance")
+  budget <- .np_udens_bc_budget(state, nrow(grid), B, tile,
+                                law == "gaussian" && representation == "covariance")
   if (!existed) runif(1L)
   start <- get(".Random.seed", .GlobalEnv, inherits = FALSE)
-  value <- if (representation == "covariance")
+  value <- if (law == "inid")
+    .np_udens_bc_inid(state, grid, alpha, B, tile, corrected, start) else if (representation == "covariance")
     .np_udens_bc_gaussian(state, grid, alpha, B, tile, corrected, start) else
     .np_udens_bc_factor(state, grid, alpha, B, tile, corrected, start)
   m <- nrow(grid)
@@ -49,7 +51,8 @@
       construction = state$construction, corrected = corrected, law = law,
       h = state$h, auxiliary.h = state$h, ratio = 1, n = state$n,
       q = state$q, r = state$r, s = state$s, alpha = alpha, B = B,
-      representation = representation, covariance = "empirical, n-squared",
+      representation = if (law == "inid") "observation counts" else representation,
+      covariance = "empirical, n-squared",
       metadata = state$metadata, budget = budget),
     rng = list(kind = kind, entry = previous, start = start, end = value$end))
   assign(".Random.seed", value$end, .GlobalEnv)
