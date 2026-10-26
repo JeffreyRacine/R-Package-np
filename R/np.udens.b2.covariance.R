@@ -91,6 +91,12 @@
 }
 
 .np_udens_b2_smoothed_covariance <- function(state, grid, tile = 25L, corrected = TRUE) {
+  if(.np_udens_b2_empirical_pilot_identity(state)){
+    out<-.np_udens_bc_covariance(state,grid,tile,corrected)
+    out$pilot.mean<-out$center
+    out$variance.measure<-"same-bandwidth normalized positive KDE"
+    return(out)
+  }
   .np_udens_bc_grid(state,grid)
   m <- nrow(grid);.np_udens_bc_budget(state,m,1L,tile,TRUE)
   mu <- center <- original <- numeric(m);C <- matrix(0,m,m)
