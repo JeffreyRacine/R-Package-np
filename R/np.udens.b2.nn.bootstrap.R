@@ -1,10 +1,11 @@
-# Exact GNN bootstrap: counts are held fixed; radii and scales are refitted.
+# Exact NN bootstrap: counts are held fixed; radii and scales are refitted.
 .np_udens_b2_nn_refit <- function(state, index) {
   if(length(index)!=state$n||anyNA(index)||any(index<1L|index>state$n)||any(index!=floor(index)))
     stop("invalid density NN resample indices",call.=FALSE)
   out<-state;out$x<-state$x[index,,drop=FALSE];rownames(out$x)<-NULL
   if(state$r+state$s>0L)for(j in seq_along(out$category))
     out$category[[j]]$training<-state$category[[j]]$training[index]
+  if(state$type=="adaptive_nn"&&state$q>0L)out$ann<-.np_udens_b2_ann_geometry(out)
   out
 }
 
@@ -30,7 +31,7 @@
 
 .np_udens_b2_nn_bootstrap <- function(state, grid, law="inid",blocklen=NULL,
                                       alpha=c(.05,.1),B=9999L,tile=25L,corrected=TRUE) {
-  if(!state$type%in%c("generalized_nn"))stop("unadmitted exact density NN bootstrap type",call.=FALSE)
+  if(!state$type%in%c("generalized_nn","adaptive_nn"))stop("unadmitted exact density NN bootstrap type",call.=FALSE)
   if(state$q==0L)return(.np_udens_b2_bootstrap(state,grid,law,blocklen,alpha,B,tile,corrected))
   owner<-new.env(parent=environment(.np_udens_b2_bootstrap))
   owner$.np_udens_bc_grid<-.np_udens_b2_nn_grid
