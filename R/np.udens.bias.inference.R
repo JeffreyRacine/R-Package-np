@@ -24,7 +24,8 @@
   if (B < 2L) stop("density calibration requires at least two draws", call. = FALSE)
   .np_udens_bc_grid(state, grid)
   budget <- .np_udens_bc_budget(state, nrow(grid), B, tile,
-                                law == "gaussian" && representation == "covariance")
+                                law == "gaussian" && representation == "covariance",
+                                processes = max(1L, mpi.comm.size(1L)))
   if (!existed) runif(1L)
   start <- get(".Random.seed", .GlobalEnv, inherits = FALSE)
   value <- if (law == "inid")
