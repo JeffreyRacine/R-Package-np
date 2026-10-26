@@ -35,10 +35,12 @@
     k<-state$lookup[j];w<-min(floor(n^(2/3)),floor(min(k,n-k)/2))
     if(w<1L||k-w<1L||k+w>n)stop("density GNN spacing pilot is non-interior",call.=FALSE)
     x<-state$x[state$numeric][[j]];t<-grid[state$numeric][[j]]
-    for(a in seq_len(m)){
-      d<-abs(x-t[a]);order<-sort.int(d,partial=c(k-w,k,k+w))
-      h[a,j]<-order[k];density[a,j]<-(2*w/n)/(order[k+w]-order[k-w])
+    distinct<-unique(t);r<-den<-numeric(length(distinct))
+    for(a in seq_along(distinct)){
+      d<-abs(x-distinct[a]);order<-sort.int(d,partial=c(k-w,k,k+w))
+      r[a]<-order[k];den[a]<-(2*w/n)/(order[k+w]-order[k-w])
     }
+    index<-match(t,distinct);h[,j]<-r[index];density[,j]<-den[index]
   }
   if(any(!is.finite(h))||any(h<=0)||any(!is.finite(density))||any(density<=0))
     stop("density GNN radius or spacing pilot is unavailable",call.=FALSE)
