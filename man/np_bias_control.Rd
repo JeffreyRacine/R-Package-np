@@ -91,8 +91,9 @@ np_bias_control(construction = c("iterated", "legacy"),
   the fitted bandwidth and \eqn{b_{0j}} the reference P0 bandwidth in the same
   units. P0, P1 and residual-operator bandwidths are multiplied by \eqn{r_j};
   the variance-smoothing bandwidth is unchanged. A fixed coordinatewise
-  polynomial penalty reduces auxiliary components beyond the main model's
-  polynomial space as that coordinate becomes global. The frozen residual
+  polynomial geometry defines a convex mixture of nested weighted polynomial
+  projections. Auxiliary components beyond the main model's polynomial space
+  shrink relative to their weighted geometry as that coordinate becomes global. The frozen residual
   iteration normalization makes the same transition. This is an auxiliary
   inference construction, not degree selection or a change to the main fit.
   Adapted P0 row-variance-normalized residuals supply variance estimation and
@@ -103,15 +104,14 @@ np_bias_control(construction = c("iterated", "legacy"),
   Categorical and NN models retain their existing correction under
   \code{"auto"}. Continuous dimension and main degree are not capped by this
   activation rule; coverage evidence for the transition concentrates on
-  one/two continuous predictors and LC/LL/quadratic models, with numerical
-  validation of higher and mixed degrees. This does not establish general
+  one/two continuous predictors and LC/LL/quadratic models, plus a cubic
+  second-derivative slice, with numerical validation of higher and mixed degrees. This does not establish general
   high-dimensional or high-degree coverage. Transition coverage was assessed
   with Gaussian and Mammen calibration; other laws retain their stated
-  finite-sample qualifications. Near activation, weak auxiliary polynomial
-  directions can make the current penalty practically sensitive to small
-  bandwidth changes: corrected centers and widths may change appreciably
-  while the fitted model changes little. This transition-stability limitation
-  remains unresolved.
+  finite-sample qualifications. The nested projection transition removes the
+  absolute-penalty sensitivity found near activation in the bounded validation
+  fixtures. This does not establish uniform finite-sample coverage or qualify
+  near-singular auxiliary or main-fit geometry.
 
   The implementation admits an unbounded second-order Gaussian kernel,
   LC, LL and package-admissible GLP main degree vectors, including mixed

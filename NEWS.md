@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Stabilize continuous-only local-to-global bias correction near activation
+  using nested weighted polynomial projections. Preserve the main fit, 16-step
+  correction, existing calibration laws and mixed-data M1 construction.
+  Bounded paired coverage confirmation includes means, first derivatives and
+  a cubic second-derivative slice; near-singular geometry remains unqualified.
+
 * Pooled geometric-block bias-corrected bounds now use their own exact
   finite-sample circular covariance and replicate score studentization.
   Literal stationary-block draws and raw-residual block selection remain
