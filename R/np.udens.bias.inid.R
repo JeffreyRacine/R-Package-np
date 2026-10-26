@@ -85,6 +85,7 @@
                             .np_udens_bc_inid_pivot = .np_udens_bc_inid_pivot),
     metadata.reducer = reducer, factors = F, raw = raw, B = B)
   diagnostics <- attr(out, "density.pivot", exact = TRUE)
+  attr(out, "density.pivot") <- NULL
   list(absolute = t(out), degeneracy = diagnostics$degeneracy,
        cancellation = diagnostics$cancellation)
 }
