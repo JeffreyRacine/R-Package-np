@@ -1,5 +1,5 @@
 # Literal multinomial bootstrap-t. Extended pivots are private to density.
-.np_udens_bc_inid_pivot <- function(F, raw, counts) {
+.np_udens_bc_inid_pivot <- function(F, raw, counts, accurate = FALSE) {
   if (!is.matrix(F) || !is.numeric(F) || !is.matrix(raw) ||
       !identical(dim(F), dim(raw)) || !is.matrix(counts) ||
       ncol(F) < 2L || nrow(counts) != ncol(F) ||
@@ -17,7 +17,10 @@
   cancellation <- integer(nrow(F))
   # This is a cancellation diagnostic, not a variance threshold/floor. Every
   # suspect cell is recomputed from centered raw observations and its counts.
-  suspect <- which(variance <= 128*.Machine$double.eps*(moment + numerator^2/n), arr.ind = TRUE)
+  # Mixed rows can concentrate on few profiles. Recompute ill-conditioned
+  # subtractions to an accuracy target; never change or floor their variance.
+  guard <- 128*.Machine$double.eps / if (accurate) 1e-12 else 1
+  suspect <- which(variance <= guard*(moment + numerator^2/n), arr.ind = TRUE)
   if (nrow(suspect)) for (i in seq_len(nrow(suspect))) {
     r <- suspect[i, 1L]; b <- suspect[i, 2L]
     active <- which(counts[, b] > 0)
@@ -47,12 +50,12 @@
        cancellation = cancellation)
 }
 
-.np_udens_bc_inid_chunk <- function(F, raw, first, last, B) {
+.np_udens_bc_inid_chunk <- function(F, raw, first, last, B, accurate = FALSE) {
   counts <- .np_bias_process_innovations(ncol(F), first, last, B, "inid", 1L) + 1
-  .np_udens_bc_inid_pivot(F, raw, counts)
+  .np_udens_bc_inid_pivot(F, raw, counts, accurate)
 }
 
-.np_udens_bc_inid_dispatch <- function(F, raw, B) {
+.np_udens_bc_inid_dispatch <- function(F, raw, B, accurate = FALSE) {
   n <- ncol(F)
   .npRmpi_bootstrap_fanout_enabled(n = n, B = B, chunk.size = 32L,
                                   what = "density inid process")
@@ -60,10 +63,10 @@
   tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks, function(task)
     invisible(.np_bias_process_innovations(n, task$start,
       task$start + task$bsz - 1L, B, "inid", 1L)))
-  worker <- function(task, factors, raw, B) {
+  worker <- function(task, factors, raw, B, accurate) {
     .npRmpi_bootstrap_use_task_rng(task)
     z <- .np_udens_bc_inid_chunk(factors, raw, task$start,
-                                task$start + task$bsz - 1L, B)
+                                task$start + task$bsz - 1L, B, accurate)
     out <- t(z$absolute)
     attr(out, "density.pivot") <- list(degeneracy = z$degeneracy,
                                        cancellation = z$cancellation)
@@ -83,7 +86,7 @@
     progress.label = "Calibrating density inid process", progress.unit = "draws",
     required.bindings = list(.np_udens_bc_inid_chunk = .np_udens_bc_inid_chunk,
                             .np_udens_bc_inid_pivot = .np_udens_bc_inid_pivot),
-    metadata.reducer = reducer, factors = F, raw = raw, B = B)
+    metadata.reducer = reducer, factors = F, raw = raw, B = B, accurate = accurate)
   diagnostics <- attr(out, "density.pivot", exact = TRUE)
   attr(out, "density.pivot") <- NULL
   list(absolute = t(out), degeneracy = diagnostics$degeneracy,
@@ -122,7 +125,8 @@
     value <- .np_udens_bc_contribution(state, grid[ii, , drop = FALSE], corrected)
     if (any(!is.finite(value$se)) || any(value$se <= 0))
       stop("density inference requires positive finite observed scales", call. = FALSE)
-    stream <- .np_bias_stream(start, .np_udens_bc_inid_dispatch(value$factor, value$corrected, B))
+    stream <- .np_bias_stream(start, .np_udens_bc_inid_dispatch(value$factor, value$corrected, B,
+      accurate = state$r + state$s > 0L))
     if (!is.null(end) && !identical(end, stream$end))
       stop("density inid tiles consumed inconsistent streams", call. = FALSE)
     end <- stream$end; z <- stream$value
