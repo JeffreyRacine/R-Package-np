@@ -196,12 +196,14 @@ Named options passed via \code{\dots} include:
       }
       \item{\code{bias.control}}{
         regression auxiliary settings created by \code{\link{np_bias_control}},
-        or optional fixed-inid density settings created by
-        \code{\link{np_udens_bias_control}}. Density defaults retain legacy centering.
-        Used with \code{center="bias-corrected"}. For regression, omitting the
-        control uses the iterated defaults; density retains its legacy
-        construction. Explicit \code{construction="legacy"} retains the
-        previous bootstrap correction.
+        or optional fixed-bandwidth density settings created by
+        \code{\link{np_udens_bias_control}}. Used with
+        \code{center="bias-corrected"}. Omitting the control selects the
+        corresponding corrected construction. The default estimate center is
+        unchanged. Explicit \code{construction="legacy"} retains the previous
+        bootstrap correction. Density Gaussian/inid support, finite-draw
+        restrictions and private recovery status are detailed in
+        \code{\link{np_udens_bias_control}}.
       }
       \item{\code{bootstrap}}{
         the bootstrap resampling scheme. Regression-family plots support
