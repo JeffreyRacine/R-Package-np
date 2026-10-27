@@ -624,7 +624,7 @@
     candidates <- gsub("\\bband(s?)\\b", "interval\\1", candidates)
   }
 
-  if (identical(construction, "iterated")) {
+  if (identical(construction, "iterated") || identical(construction, "positive-covariance")) {
     candidates <- gsub("rank-based", "maximum-based", candidates, fixed=TRUE)
     candidates <- gsub("bootstrap rank band", "bootstrap maximum band", candidates, fixed=TRUE)
     candidates <- gsub("bootstrap SD", "corrected SE", candidates, fixed=TRUE)
@@ -8284,7 +8284,7 @@ plotFactor <- function(f, y, ...){
 .np_plot_all_band_legend_labels <- function(plot.errors.method, construction = NULL) {
   method <- match.arg(as.character(plot.errors.method)[1L],
                       c("bootstrap", "asymptotic"))
-  if (identical(construction, "iterated")) {
+  if (identical(construction, "iterated") || identical(construction, "positive-covariance")) {
     return(c(pointwise="Pointwise (quantiles)",
       simultaneous="Simultaneous (maximum, finite grid)",
       bonferroni="Bonferroni (quantile envelope)"))

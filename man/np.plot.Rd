@@ -195,10 +195,13 @@ Named options passed via \code{\dots} include:
         block length.
       }
       \item{\code{bias.control}}{
-        regression auxiliary settings created by \code{\link{np_bias_control}}.
-        Used with \code{center="bias-corrected"}. Omitting the control uses
-        the iterated defaults; explicit \code{construction="legacy"} retains
-        the previous bootstrap correction.
+        regression auxiliary settings created by \code{\link{np_bias_control}},
+        or optional fixed-inid density settings created by
+        \code{\link{np_udens_bias_control}}. Density defaults retain legacy centering.
+        Used with \code{center="bias-corrected"}. For regression, omitting the
+        control uses the iterated defaults; density retains its legacy
+        construction. Explicit \code{construction="legacy"} retains the
+        previous bootstrap correction.
       }
       \item{\code{bootstrap}}{
         the bootstrap resampling scheme. Regression-family plots support

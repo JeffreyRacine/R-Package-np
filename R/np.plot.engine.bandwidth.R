@@ -45,7 +45,7 @@
            plot.par.mfrow = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, gaussian.draws = 9999L){
+           random.seed, gaussian.draws = 9999L, bias.control = NULL){
 
     if (.np_data_formal_supplied(sys.call(), sys.function()))
       .np_plot_data_error()
@@ -142,6 +142,11 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
+    bias.state <- .np_udens_plot_prepare(bias.control, bws, xdat,
+      plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type)
+    new.bias <- !is.null(bias.state)
+    if (new.bias && isTRUE(plot.bxp))
+      stop("positive-covariance density bounds require factor.boxplot=FALSE", call. = FALSE)
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
@@ -220,6 +225,8 @@
       tdens = matrix(data = tobj$dens,
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
+      bias.raw <- if (new.bias) .np_udens_plot_errors(bias.state, x.eval,
+        plot.errors.alpha, plot.errors.boot.num, plot.errors.type) else NULL
       terr.payload <- .np_plot_interval_payload(
         estimate = tobj$dens,
         se = tobj$derr,
@@ -227,7 +234,7 @@
         plot.errors.alpha = plot.errors.alpha,
         plot.errors.type = plot.errors.type,
         plot.errors.center = plot.errors.center,
-        bootstrap_raw = if (identical(plot.errors.method, "bootstrap")) {
+        bootstrap_raw = if (new.bias) bias.raw else if (identical(plot.errors.method, "bootstrap")) {
           compute.bootstrap.errors(
             xdat = xdat,
             exdat = x.eval,
@@ -294,6 +301,7 @@
                         derr = terr[,1:2], ntrain = nrow(xdat), se = plot.errors)
         if (joint.eligible)
           d1 <- .np_plot_density_band_fields(d1, terr.payload)
+        if (new.bias) d1$inference <- bias.raw$inference
         d1$bias = NA
         d1$bias.corrected = NA
 
@@ -427,6 +435,7 @@
               border = scalar_default(border, .np_plot_color("context_border")),
               lwd = scalar_default(lwd, par()$lwd),
               annotation = .np_plot_variability_annotation_spec(
+                construction = if (new.bias) "positive-covariance" else NULL,
                 plot.errors.method = plot.errors.method,
                 plot.errors.type = plot.errors.type,
                 plot.errors.alpha = plot.errors.alpha,
@@ -440,6 +449,7 @@
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
+                construction = if (new.bias) "positive-covariance" else NULL,
                 legend = plot.legend,
                 x = "topright",
                 lty = .np_plot_lty("solid"),
@@ -530,6 +540,8 @@
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){
+          bias.raw <- if (new.bias) .np_udens_plot_errors(bias.state, eval.slice,
+            plot.errors.alpha, plot.errors.boot.num, plot.errors.type) else NULL
           temp.payload <- .np_plot_interval_payload(
             estimate = temp.dens[seq_len(xi.neval)],
             se = tobj$derr,
@@ -537,7 +549,7 @@
             plot.errors.alpha = plot.errors.alpha,
             plot.errors.type = plot.errors.type,
             plot.errors.center = plot.errors.center,
-            bootstrap_raw = if (identical(plot.errors.method, "bootstrap")) {
+            bootstrap_raw = if (new.bias) bias.raw else if (identical(plot.errors.method, "bootstrap")) {
               compute.bootstrap.errors(
                 xdat = xdat,
                 exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
@@ -635,6 +647,7 @@
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             panel.annotation <- .np_plot_variability_annotation_spec(
+                construction = if (new.bias) "positive-covariance" else NULL,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -646,6 +659,7 @@
             )
             if (plot.errors.type == "all") {
               .np_plot_draw_all_errors_with_gaps(
+                construction = if (new.bias) "positive-covariance" else NULL,
                 ex = as.numeric(ei),
                 center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
                 all.err = temp.all.err,
@@ -705,6 +719,7 @@
               joint.eligible, plot.errors.type),
             ntrain = bws$nobs, se = plot.errors
           )
+          if (new.bias) plot.out[[i]]$inference <- bias.raw$inference
           plot.out[[i]]$bias = NA
           plot.out[[i]]$bias.corrected = NA
           if (.np_plot_center_is_bias_corrected(plot.errors.center))
@@ -795,6 +810,7 @@
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             err.block <- data.err[, seq(3*i - 2L, length.out = 3L), drop = FALSE]
             panel.annotation <- .np_plot_variability_annotation_spec(
+                construction = if (new.bias) "positive-covariance" else NULL,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -806,6 +822,7 @@
             )
             if (plot.errors.type == "all") {
               .np_plot_draw_all_errors_with_gaps(
+                construction = if (new.bias) "positive-covariance" else NULL,
                 ex = as.numeric(allei[,i]),
                 center = .np_plot_error_center(data.eval[,i], err.block, plotOnEstimate),
                 all.err = data.err.all[[i]],
