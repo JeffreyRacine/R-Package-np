@@ -24,7 +24,8 @@ congruence correction. Absolute studentized pivots calibrate all three bands;
 there is no normal-critical floor, draw deletion or redraw.
 
 The initial construction is limited to 512 evaluation points per panel and a
-256 MiB resident-process memory forecast. For a two-dimensional surface,
+256 MiB forecast for inference storage summed over participating processes,
+in addition to the baseline memory used by R and loaded packages. For a two-dimensional surface,
 \code{neval=20} uses 400 points; the default 50 by 50 surface exceeds the cap.
 Use an explicit smaller grid or slices. No grid is silently reduced. The
 \code{pmzsd} band and bootstrap factor boxplots are not available for this
