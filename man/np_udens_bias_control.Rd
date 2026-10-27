@@ -55,7 +55,7 @@ can be signed and is not clipped or renormalized.
 include an \code{inference} component with the corrected center, covariance,
 absolute bands, bandwidths, effective calibration settings, degeneracy counts
 and random-stream provenance.}
-\seealso{\code{\link{npudens}}, \code{\link{npplot}}, \code{\link{np_bias_control}}}
+\seealso{\code{\link{npudens}}, \code{\link[=plot.np]{npplot}}, \code{\link{np_bias_control}}}
 \examples{
 npRmpi.init(nslaves = 1)
 set.seed(123)
