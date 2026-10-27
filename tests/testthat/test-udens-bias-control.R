@@ -18,9 +18,11 @@ test_that("density correction retains literal law and singleton contracts", {
   x <- data.frame(x = rnorm(40))
   bw <- npudensbw(dat = x, bws = .5, bandwidth.compute = FALSE)
   rng <- .Random.seed
+  grDevices::pdf(file = NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
   out <- plot(bw, xdat = x, errors = "bootstrap", bootstrap = "inid",
     center = "bias-corrected", band = "all", B = 49L, neval = 1L,
-    output = "data", bias.control = np_udens_bias_control())[[1L]]
+    output = "plot-data", bias.control = np_udens_bias_control())[[1L]]
   expect_identical(.Random.seed, rng)
   expect_identical(out$inference$settings$primary, "absolute")
   expect_identical(out$inference$bands$pointwise, out$inference$bands$simultaneous)

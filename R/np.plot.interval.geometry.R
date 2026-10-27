@@ -47,7 +47,8 @@
                                                legend = TRUE,
                                                xi.factor = FALSE,
                                                plot.errors.method,
-                                               annotation = NULL) {
+                                               annotation = NULL,
+                                               construction = NULL) {
   if (is.null(all.err)) return(invisible(NULL))
   if (xi.factor) {
     plot.errors.style <- "bar"
@@ -77,7 +78,8 @@
     .np_plot_draw_all_band_legend(
       legend = legend, x = legend.loc, lty = .np_plot_lty("interval"),
       lwd = .np_plot_lwd("band_all_1d"),
-      plot.errors.method = plot.errors.method, drawn = drawn)
+      plot.errors.method = plot.errors.method, drawn = drawn,
+      construction = construction)
   if (any(drawn))
     .np_plot_draw_variability_annotation(annotation)
   invisible(NULL)
