@@ -462,8 +462,10 @@ np_render_control <- function(style = c("band", "bar"),
   )
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = .plot_context,
-    allow_asymptotic_bias = identical(method,.np_plot_rbandwidth_engine) ||
-      (identical(method,.np_plot_compat_dispatch) && inherits(bws,"rbandwidth")))
+    allow_asymptotic_bias = identical(method, .np_plot_rbandwidth_engine) ||
+      identical(method, .np_plot_bandwidth_engine) ||
+      (identical(method, .np_plot_compat_dispatch) &&
+       (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth"))))
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 
@@ -690,7 +692,8 @@ np_render_control <- function(style = c("band", "bar"),
     stop("unused plot argument: plot.rug; did you mean data.rug?",
          call. = FALSE)
   dots <- list(...)
-  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity")
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity",
+    allow_asymptotic_bias = TRUE)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_condensity <- function(object, ..., .plot_dots_call = NULL) {

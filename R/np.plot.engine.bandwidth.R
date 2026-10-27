@@ -124,6 +124,8 @@
       common.scale = common.scale,
       ylim = ylim,
       allow_asymptotic_simultaneous = joint.eligible,
+      # Preserve the request for the density-specific admission check below.
+      allow_asymptotic_bias = TRUE,
       error.request = error.request
     )
 
@@ -145,6 +147,7 @@
     bias.state <- .np_udens_plot_prepare(bias.control, bws, xdat,
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type)
     new.bias <- !is.null(bias.state)
+    joint.eligible <- joint.eligible && !new.bias
     if (new.bias && isTRUE(plot.bxp))
       stop("positive-covariance density bounds require factor.boxplot=FALSE", call. = FALSE)
     first.render <- .np_plot_first_render_state()
@@ -226,8 +229,9 @@
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       bias.raw <- if (new.bias) .np_udens_plot_errors(bias.state, x.eval,
-        plot.errors.alpha, plot.errors.boot.num, plot.errors.type) else NULL
-      terr.payload <- .np_plot_interval_payload(
+        plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
+          gaussian.draws else plot.errors.boot.num, plot.errors.type) else NULL
+      terr.payload <- if (new.bias) .np_udens_plot_payload(bias.raw) else .np_plot_interval_payload(
         estimate = tobj$dens,
         se = tobj$derr,
         plot.errors.method = plot.errors.method,
@@ -298,7 +302,9 @@
 
       if (plot.behavior != "plot"){
         d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens,
-                        derr = terr[,1:2], ntrain = nrow(xdat), se = plot.errors)
+                        derr = if (new.bias && identical(bias.state$plot.control.version, 2L))
+                          cbind(-terr[,1L], terr[,2L]) else terr[,1:2],
+                        ntrain = nrow(xdat), se = plot.errors)
         if (joint.eligible)
           d1 <- .np_plot_density_band_fields(d1, terr.payload)
         if (new.bias) d1$inference <- bias.raw$inference
@@ -542,8 +548,9 @@
 
         if (plot.errors){
           bias.raw <- if (new.bias) .np_udens_plot_errors(bias.state, eval.slice,
-            plot.errors.alpha, plot.errors.boot.num, plot.errors.type) else NULL
-          temp.payload <- .np_plot_interval_payload(
+            plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
+          gaussian.draws else plot.errors.boot.num, plot.errors.type) else NULL
+          temp.payload <- if (new.bias) .np_udens_plot_payload(bias.raw) else .np_plot_interval_payload(
             estimate = temp.dens[seq_len(xi.neval)],
             se = tobj$derr,
             plot.errors.method = plot.errors.method,
