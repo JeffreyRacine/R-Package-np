@@ -11,13 +11,18 @@ Use \code{errors="asymptotic"} for Gaussian calibration or
 \code{errors="bootstrap"}, \code{bootstrap="inid"} for literal independent
 resampling. Explicit \code{construction="legacy"} retains the previous
 bootstrap correction. Previously saved version-1 controls retain their F4
-bootstrap construction and its limitations. Newly created controls have version 2.
+bootstrap construction and its limitations. Saved version-2 controls retain the fixed reference construction.
+Newly created private controls have version 3 and add a joint log-scale
+uncertainty envelope with fixed scale-tail probability 0.05. The F3 center
+and F4 marginal scales remain unchanged; the complete influence of both
+pilot variances supplies the additional scale uncertainty. This is a
+practical envelope under evaluation, not a finite-sample coverage guarantee.
 Regression iterations and residual/pilot assumptions do not apply.
 
 The candidate supports fixed, unbounded, second-order Gaussian continuous
-kernels with the supported Aitchison--Aitken unordered and Li--Racine ordered
-kernels, including nonbinary categories. Selected bandwidths and categorical
-smoothing parameters remain fixed. The corrected center and complete
+kernels for one or two numeric variables. Mixed-data qualification of the
+new envelope remains deferred; saved controls retain their previous scope.
+Selected bandwidths remain fixed. The corrected center and complete
 observation contributions are unchanged from the previous density correction.
 The covariance combines the previous positive-pilot marginal scales with the
 complete empirical corrected correlation. It intentionally differs from the
@@ -54,7 +59,7 @@ and explicit legacy routes retain their previous contracts and limitations.
 The full-sample-range empirical coverage of this recovery candidate remains
 under investigation. Earlier interior-grid evidence does not qualify it.
 The fitted density is unchanged; the corrected center and confidence endpoints
-may be negative and are not clipped or renormalized. For version-2 outputs,
+may be negative and are not clipped or renormalized. For version-2 and version-3 outputs,
 \code{bias.corrected + derr[,1]} and \code{bias.corrected + derr[,2]} recover
 lower and upper endpoints for curves and surfaces. Legacy/version-1 surfaces
 retain their historical positive lower-width convention.

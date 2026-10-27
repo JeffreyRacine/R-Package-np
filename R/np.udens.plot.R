@@ -1,7 +1,7 @@
 # Family-specific controls; regression iterations and pilot controls do not apply.
 np_udens_bias_control <- function(construction = c("positive-covariance", "legacy")) {
   construction <- match.arg(construction)
-  structure(list(construction = construction, calibration = "absolute", version = 2L),
+  structure(list(construction = construction, calibration = "absolute", version = 3L),
             class = "np_udens_bias_control")
 }
 
@@ -16,7 +16,7 @@ np_udens_bias_control <- function(construction = c("positive-covariance", "legac
       length(control[["construction", exact = TRUE]]) != 1L ||
       !control[["construction", exact = TRUE]] %in% c("positive-covariance", "legacy") ||
       length(version) != 1L || !is.integer(version) ||
-      is.na(version) || !version %in% c(1L, 2L))
+      is.na(version) || !version %in% c(1L, 2L, 3L))
     stop("bias.control must be created by np_udens_bias_control()", call. = FALSE)
   expected <- np_udens_bias_control(control[["construction", exact = TRUE]])
   expected$version <- version
@@ -44,7 +44,11 @@ np_udens_bias_control <- function(construction = c("positive-covariance", "legac
 .np_udens_plot_errors <- function(state, grid, alpha, B, band) {
   names(grid) <- names(state$x)
   inference <- .np_plot_activity_run("Constructing bias-corrected density intervals",
-    if (identical(state$plot.control.version, 2L))
+    if (identical(state$plot.control.version, 3L))
+      .np_udens_scale_inference(state, grid, law = state$plot.law,
+        alpha = alpha, B = B,
+        bands = if (band == "all") c("pointwise", "simultaneous", "bonferroni") else band)
+    else if (identical(state$plot.control.version, 2L))
       .np_udens_reference_inference(state, grid, law = state$plot.law,
         alpha = alpha, B = B,
         bands = if (band == "all") c("pointwise", "simultaneous", "bonferroni") else band)
