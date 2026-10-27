@@ -343,7 +343,7 @@
         gradient.order = gradient.order,
         need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
         .np.empty.report = .np.empty.report, need.joint = joint.eligible,
-        need.bias.capture = !is.null(bias.state$adaptation), bias.state = bias.state
+        need.bias.capture = !is.null(bias.state$adaptation) || !is.null(bias.state$local.inference), bias.state = bias.state
       )
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
@@ -743,7 +743,7 @@
           need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
           .np.empty.report = .np.empty.report,
           need.joint = joint.eligible && (!gradients || !xi.factor),
-          need.bias.capture = !is.null(bias.state$adaptation), bias.state = bias.state,
+          need.bias.capture = !is.null(bias.state$adaptation) || !is.null(bias.state$local.inference), bias.state = bias.state,
            bias.target = if(!gradients)"mean" else if(xi.factor)paste0("c",i) else paste0("d",match(i,which(bws$icon)))
          )
 

@@ -268,7 +268,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   observed smoothed variance. The same normalized P0 residual operator and
   variance smoother then provide that draw's denominator. Numerators use the
   complete corrected observation rows. The corrected center and observed
-  standard errors are unchanged; replicate-specific denominators calibrate all
+  standard errors are fixed across draws; replicate-specific denominators calibrate all
   three interval types. No bandwidth or degree is reselected. Pooled Rademacher
   uses the same studentizer with its own literal innovations; other Rademacher
   routes retain their fixed-factor multiplier calibration. The iterated inid, fixed and geom
@@ -314,7 +314,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   unqualified; a zero ridge is not a numerical identity certificate. Polynomial
   correction includes their regularization bias; covariance uses the complete
   corrected rows. This does not establish coverage for unidentified pilot fits
-  or a uniform honesty guarantee. These newly admitted regularized rows
+  or a uniform honesty guarantee. These generalized-neighbor regularized rows
   currently support Gaussian calibration only. Bounded fixed-specification
   simulations with Gaussian errors gave adequate coverage, but a two-predictor
   small-neighbor mean case had substantially inadequate Mammen coverage despite
@@ -324,7 +324,27 @@ np_bias_control(construction = c("iterated", "legacy"),
   not establish arbitrary-error or uniform coverage. Bootstrap calibration of
   these regularized rows is explicitly refused, without changing the selected
   law. Bootstrap support for previously admitted zero-ridge rows is unchanged.
-  Other regularized main rows remain unqualified.
+  A separate fixed-bandwidth extension uses the complete original fitted
+  observation rows for univariate continuous Gaussian or Mammen inference,
+  with inactive local-to-global adaptation, means and first derivatives.
+  Main polynomials above degree one require the stored Bernstein basis.
+  The accepted numerical ridge and intercept restoration are retained.
+  This route pools raw P0 residual squares before dividing by pooled residual
+  row-variance factors, using the same normalization in replicate studentization.
+  Calibration errors use a separate positive nearest-neighbor variance pilot
+  with \eqn{k=\lceil n^{4/5}\rceil}, including ties; the main estimator's
+  bandwidth and degree are unchanged. Effective pilot geometry is recorded in
+  \code{inference$settings$local.inference}. Other existing routes retain their
+  previous constructions.
+
+  Independent confirmation on two fixed designs at \eqn{n=100} found improved
+  endpoint coverage and encouraging full-grid Gaussian/Mammen coverage.
+  Mammen retains pointwise undercoverage at some contrasts dominated by few
+  observations, including an ordinary unregularized control. This limitation
+  is not removed by more calibration draws or established to be removed by
+  more correction iterations. These results do not establish uniform coverage,
+  random-design or bandwidth-selection validity. Other regularized main rows
+  remain unqualified.
   Per-target/frame numerical ridge values are returned in
   \code{inference$main.regularization}, and \code{inference$covariance}
   describes the variance and calibration construction.

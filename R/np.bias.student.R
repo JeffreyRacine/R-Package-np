@@ -64,6 +64,8 @@
         stop("invalid studentization variance smoother", call.=FALSE)
       out[rows,group] <- K/mass
     }
+    if (!is.null(smoother$q))
+      out <- sweep(out,2L,smoother$q,"*")/smoother$denominator[ii]
     out
   }
 }
@@ -84,9 +86,15 @@
   if (max(abs(check$row_variance-state$residual_row_variance))>1e-8 ||
       max(abs(check$residual[,1L]-state$residual)/response.scale)>1e-8)
     stop("studentization residual pilot disagrees with the observed pilot", call.=FALSE)
+  smoother <- list(x=state$xcon,groups=state$groups,h=state$variance_h)
+  generation <- state$variance
+  if (!is.null(state$local.inference)) {
+    smoother$q <- state$residual_row_variance
+    smoother$denominator <- state$local.inference$denominator
+    generation <- state$local.inference$generation
+  }
   list(pilot=pilot, q=state$residual_row_variance, rmu=check$residual[,2L],
-    root.variance=sqrt(state$variance),
-    smoother=list(x=state$xcon,groups=state$groups,h=state$variance_h))
+    root.variance=sqrt(generation),smoother=smoother)
 }
 
 .np_bias_student_target <- function(prepared, W, se) {

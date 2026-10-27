@@ -103,7 +103,8 @@
     spec$residual <- drop(training$residual)
     spec$residual_raw <- drop(training$raw)
     spec$residual_row_variance <- training$row_variance
-    spec$variance <- .np_bias_variance(spec,spec$residual)
+    if (.np_bias_local_supported(spec,law)) spec <- .np_bias_local_prepare(spec) else
+      spec$variance <- .np_bias_variance(spec,spec$residual)
   }
   if (!is.null(policy)) spec$settings$adaptation <- policy
   spec
@@ -167,11 +168,12 @@
   .np_bias_main_admit(spec,H,ridge,reg)
 }
 
-.np_bias_main_admit <- function(spec,H,ridge,reg) {
+.np_bias_main_admit <- function(spec,H,ridge,reg,captured=FALSE) {
   if (is.null(ridge) || any(!is.finite(ridge)) || any(ridge<0) || any(!is.finite(H)))
     stop("bias correction requires finite canonical main observation rows",call.=FALSE)
   admitted <- spec$bws[["type"]]=="generalized_nn" &&
     any(reg[["degree.engine"]]>1L) && isTRUE(reg[["bernstein.basis.engine"]])
+  admitted <- admitted || (isTRUE(captured) && !is.null(spec$local.inference))
   if (any(ridge!=0) && !admitted)
     stop("regularized main rows are qualified only for generalized-NN GLP models with a stored Bernstein basis; the fitted model has not been changed",call.=FALSE)
   attr(H,"ridge.used") <- ridge
@@ -217,7 +219,7 @@
   W
 }
 
-.np_bias_regression_rows <- function(spec,grid,map,original=NULL) {
+.np_bias_regression_rows <- function(spec,grid,map,original=NULL,captured=FALSE) {
   if (!is.null(original) && (isTRUE(spec$categorical.only) || isTRUE(spec$pooled)))
     stop("captured original rows are unavailable for this bias owner",call.=FALSE)
   if (isTRUE(spec$categorical.only)) return(.np_bias_categorical_rows(spec,grid,map))
@@ -232,7 +234,7 @@
         !is.data.frame(diagnostic) || nrow(diagnostic)!=nrow(map))
       stop("invalid bounded captured original rows",call.=FALSE)
     reg <- npValidatedConditionalRegSpec(spec$bws,where="bias main operator",ncon.field="ncon")
-    .np_bias_main_admit(spec,original,diagnostic$ridge,reg)
+    .np_bias_main_admit(spec,original,diagnostic$ridge,reg,captured=captured)
     original
   }
   regularization <- attr(L,"main.regularization",exact=TRUE)
