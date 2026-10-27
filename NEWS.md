@@ -1,5 +1,9 @@
 # npRmpi 0.80-2 (development)
 
+* Extend the fixed-bandwidth univariate Gaussian/Mammen bias-corrected plot
+  construction to raw main polynomial bases, for means and first derivatives,
+  using the original fitted rows and the existing variance calibration.
+
 * Allow bias-corrected Gaussian and Mammen plots to use the original fitted
   rows for univariate continuous fixed-bandwidth means and first derivatives
   with inactive local-to-global adaptation, including qualified regularized
