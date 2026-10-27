@@ -164,6 +164,10 @@
     H <- npreghat(spec$bws,txdat=spec$x,exdat=evals,s=s,output="matrix",.np.require.finite=TRUE)
     ridge <- attr(H,"ridge.used",exact=TRUE)
   }
+  .np_bias_main_admit(spec,H,ridge,reg)
+}
+
+.np_bias_main_admit <- function(spec,H,ridge,reg) {
   if (is.null(ridge) || any(!is.finite(ridge)) || any(ridge<0) || any(!is.finite(H)))
     stop("bias correction requires finite canonical main observation rows",call.=FALSE)
   admitted <- spec$bws[["type"]]=="generalized_nn" &&
@@ -213,13 +217,24 @@
   W
 }
 
-.np_bias_regression_rows <- function(spec,grid,map) {
+.np_bias_regression_rows <- function(spec,grid,map,original=NULL) {
+  if (!is.null(original) && (isTRUE(spec$categorical.only) || isTRUE(spec$pooled)))
+    stop("captured original rows are unavailable for this bias owner",call.=FALSE)
   if (isTRUE(spec$categorical.only)) return(.np_bias_categorical_rows(spec,grid,map))
   if (isTRUE(spec$pooled)) return(.np_bias_profile_rows(spec,grid,map))
   if (nrow(map)>500L || nrow(unique(grid[spec$numeric.cols]))>25L)
     stop("internal bias target block exceeded",call.=FALSE)
   for(j in seq_len(spec$d))grid[[spec$numeric.cols[j]]] <- (grid[[spec$numeric.cols[j]]]-spec$offset[j])/spec$scale[j]
-  L <- .np_bias_original(spec,grid,map)
+  L <- if (is.null(original)) .np_bias_original(spec,grid,map) else {
+    diagnostic <- attr(original,"main.regularization",exact=TRUE)
+    if (!is.matrix(original) || !is.numeric(original) ||
+        !identical(dim(original),c(nrow(map),nrow(spec$x))) ||
+        !is.data.frame(diagnostic) || nrow(diagnostic)!=nrow(map))
+      stop("invalid bounded captured original rows",call.=FALSE)
+    reg <- npValidatedConditionalRegSpec(spec$bws,where="bias main operator",ncon.field="ncon")
+    .np_bias_main_admit(spec,original,diagnostic$ridge,reg)
+    original
+  }
   regularization <- attr(L,"main.regularization",exact=TRUE)
   attr(L,"main.regularization") <- NULL
   op <- .np_bias_stable_prepare(spec,grid,map)
