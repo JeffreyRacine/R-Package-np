@@ -85,6 +85,7 @@ export(b.star
        ,np.pairs.plot
        ,np_boot_control
        ,np_bias_control
+       ,np_udens_bias_control
        ,np_grid_control
        ,np_render_control
        ,npscoef

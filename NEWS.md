@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Add opt-in fixed-bandwidth unconditional density bands via
+  `np_udens_bias_control()`. The positive-covariance construction corrects
+  numeric and categorical smoothing contributions and uses literal inid
+  absolute studentized calibration. Existing defaults and legacy routes are
+  unchanged. Gaussian/NN/dependence extensions remain unqualified; the new
+  construction has an explicit bounded-grid and memory contract.
+
 * Stabilize continuous-only local-to-global bias correction near activation
   using nested weighted polynomial projections. Preserve the main fit, 16-step
   correction, existing calibration laws and mixed-data M1 construction.
