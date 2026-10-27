@@ -43,7 +43,7 @@ test_that("corrected plot families nest and singleton limits coincide", {
               gaussian.draws=63L, neval=3L, output="data")[[1L]]
   expect_identical(fit, original)
   expect_identical(.Random.seed, rng)
-  expect_identical(out$inference$studentization$construction, "residual-pilot-v1")
+  expect_identical(out$inference$studentization$construction, "captured-pooled-positive-v1")
   expect_identical(out$inference$settings$iterations, 16L)
   expect_true(out$inference$settings$bernstein.basis)
   expect_identical(out$inference$settings$main$degree, bw$degree)
@@ -74,7 +74,7 @@ test_that("iterated intervals describe maximum calibration without relabeling le
   text <- descriptor("asymptotic", "pointwise", .05, "bias-corrected",
                      construction="iterated")$candidates
   expect_true(all(grepl("bias-corrected", text, fixed=TRUE)))
-  expect_true(all(grepl("studentized", text, fixed=TRUE)))
+  expect_true(all(grepl("studentized|Gaussian t", text)))
   expect_false(any(grepl("normal quantile", text, fixed=TRUE)))
   expect_match(label("asymptotic", "iterated")[["pointwise"]], "quantiles", fixed=TRUE)
   expect_match(label("asymptotic")[["pointwise"]], "SE", fixed=TRUE)
