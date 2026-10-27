@@ -66,6 +66,9 @@
       simultaneous = matrix(rep(vapply(calibrated, function(z) z$value$critical,
                                       numeric(1L)), each = m), m),
       bonferroni = matrix(rep(qnorm(alpha/(2*m), lower.tail = FALSE), each = m), m))
+    raw.critical <- critical
+    raw.critical$simultaneous <- matrix(rep(vapply(calibrated,
+      function(z) z$value$critical.raw, numeric(1L)), each = m), m)
   } else {
     limits <- .np_bias_limits_prepare(rep("density", m), alpha, law == "gaussian", B)
     center <- original <- empirical <- numeric(m)
@@ -86,6 +89,10 @@
     finished <- .np_bias_limits_finish(limits)
     critical <- lapply(finished$limits, function(z)
       matrix(z[, 2L, ], m, length(alpha)))
+    raw.critical <- list(
+      pointwise = if (law == "gaussian") critical$pointwise else limits$point,
+      simultaneous = matrix(rep(finished$raw_max_critical[, 1L], each = m), m),
+      bonferroni = if (law == "gaussian") critical$bonferroni else limits$bonf)
   }
   available <- if (bonferroni.available) names(critical) else
     setdiff(names(critical), "bonferroni")
@@ -100,7 +107,7 @@
   result <- list(center = center, original.center = original, se = scale,
     empirical.se = empirical, covariance = covariance, bands = intervals,
     intervals = intervals, absolute.intervals = intervals,
-    critical = critical[available],
+    critical = critical[available], raw.critical = raw.critical,
     settings = list(construction = "density-fixed-reference-v1", law = law,
       corrected = TRUE, h = state$h, n = state$n, q = state$q, r = state$r,
       s = state$s, alpha = alpha, B = B, grid.size = m, budget = budget,
