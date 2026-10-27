@@ -148,6 +148,10 @@
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE, main.capture=NULL) {
+  if (!is.null(state$local.inference) && !law %in% c("gaussian","mammen"))
+    stop("captured local calibration requires Gaussian or Mammen; prepare the state for the selected law",call.=FALSE)
+  if (!is.null(state$local.inference) && is.null(main.capture))
+    main.capture <- .np_bias_capture_prepare(state,fit,grid,targets)
   if (!is.null(main.capture)) .np_bias_capture_validate(main.capture,state,grid,targets)
   if (isTRUE(state$categorical.only) && !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
     stop("categorical-only bias correction does not support this calibration law",call.=FALSE)
@@ -192,7 +196,7 @@
     if (!is.null(value$adaptation)) adaptation[[length(adaptation)+1L]] <-
       list(rows=rr,grid=jj,details=value$adaptation)
     diagnostic <- value$main.regularization
-    if(law!="gaussian" && any(diagnostic$ridge>0))
+    if(law!="gaussian" && any(diagnostic$ridge>0) && is.null(state$local.inference))
       stop("bootstrap calibration for regularized generalized-NN main rows remains unqualified; Gaussian inference is available with the qualifications documented in np_bias_control",call.=FALSE)
     diagnostic$row <- jj[diagnostic$row]
     regularization[[length(regularization)+1L]] <- diagnostic
@@ -242,7 +246,8 @@
     covariance=list(operator="complete corrected observation rows",
       variance=if(score.calibration)"exact conditional selected-block score variance" else
         if(law%in%c("fixed","geom"))"empirical residual-score process variance" else
-        if(isTRUE(state$categorical.only))"within-profile residual variance" else "smoothed P0 residual variance",
+        if(isTRUE(state$categorical.only))"within-profile residual variance" else
+        if(!is.null(state$local.inference))"pooled normalized P0 residual variance" else "smoothed P0 residual variance",
       studentization=if(score.calibration) {
         if(studentize)"replicate-specific selected-block score SD" else "observed selected-block score SD"
       } else if(isTRUE(state$categorical.only) && student)"replicate-specific within-profile residual SD" else
@@ -255,7 +260,8 @@
         if(score)"residual score process" else "fixed-factor multiplier process"),
     studentization=if(score.calibration && studentize)list(construction="conditional-block-score-v1",
       draw.block=32L) else if(student)list(construction=if(isTRUE(state$categorical.only))
-      "finite-profile-studentized-v1" else "residual-pilot-v1",
+      "finite-profile-studentized-v1" else if(!is.null(state$local.inference))
+      "captured-pooled-positive-v1" else "residual-pilot-v1",
       draw.block=256L,reuse.block=1024L,training.block=16L) else NULL,
     calibration=calibrated,score.se=if(score)score.se else NULL,
     rng=list(kind=rng.kind,start=rng,end=end,convention="common observation draws across all target blocks"),

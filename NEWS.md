@@ -1,5 +1,13 @@
 # npRmpi 0.80-2 (development)
 
+* Allow bias-corrected Gaussian and Mammen plots to use the original fitted
+  rows for univariate continuous fixed-bandwidth means and first derivatives
+  with inactive local-to-global adaptation, including qualified regularized
+  Bernstein fits. Pooled residual normalization and a positive variance pilot
+  improve endpoint calibration. Some Mammen pointwise undercoverage remains
+  documented; existing mixed, NN, adapted and higher-derivative routes retain
+  their constructions.
+
 * Add opt-in fixed-bandwidth unconditional density bands via
   `np_udens_bias_control()`. The positive-covariance construction corrects
   numeric and categorical smoothing contributions and uses literal inid

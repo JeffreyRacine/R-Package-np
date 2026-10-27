@@ -54,7 +54,8 @@
         jj <- rr[seq.int(first,min(length(rr),first+15L))]
         ii <- index[map$row[jj]]
         H <- operators[[target]](grid[ii,,drop=FALSE],nu,ii)
-        H <- .np_bias_main_admit(spec,H,ridge[ii],reg)
+        H <- .np_bias_main_admit(spec,H,ridge[ii],reg,
+          captured=!is.null(spec$local.inference))
         # Auxiliary correction operates on standardized coordinates. Convert
         # here; the existing final conversion restores physical units once.
         L[jj,] <- H * if(axis)spec$scale[axis] else 1
@@ -64,7 +65,8 @@
       }
     }
     attr(L,"main.regularization") <- do.call(rbind,diagnostic)
-    .np_bias_regression_rows(spec,grid[index,,drop=FALSE],map,original=L)
+    .np_bias_regression_rows(spec,grid[index,,drop=FALSE],map,original=L,
+      captured=!is.null(spec$local.inference))
   }
   structure(list(state=spec,grid=grid,targets=targets,rows=rows),
     class="np_bias_capture_prototype")

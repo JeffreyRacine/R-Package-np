@@ -264,7 +264,7 @@
         gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
         law=if(plot.errors.method=="asymptotic")"gaussian" else
           if(plot.errors.boot.method=="wild")plot.errors.boot.wild else plot.errors.boot.method)) else NULL
-    bias.capture <- !is.null(bias.state$adaptation)
+    bias.capture <- !is.null(bias.state$adaptation) || !is.null(bias.state$local.inference)
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     overlay.ok <- .np_plot_overlay_enabled(
