@@ -1,4 +1,4 @@
-# np 0.80-1
+# np 0.80-2 (development)
 
 * Add opt-in fixed-bandwidth unconditional density bands via
   `np_udens_bias_control()`. The positive-covariance construction corrects
@@ -195,6 +195,8 @@
   and distribution-copula owners, and simultaneous-band calibration. Retain
   existing adaptive-neighbor radius/support-face terms; additional generalized-
   neighbor radius and estimated-coordinate uncertainty remain deferred.
+
+# np 0.80-1
 
 * Improve `data=` diagnostics for directly supplied, unbound native observation
   names across estimator and bandwidth interfaces, including direct default
