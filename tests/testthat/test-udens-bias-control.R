@@ -1,7 +1,9 @@
 test_that("density controls are explicit and do not change regression defaults", {
   control <- np_udens_bias_control()
   expect_s3_class(control, "np_udens_bias_control")
-  expect_identical(control$construction, "positive-covariance")
+  expect_identical(control$construction, "joint-scale")
+  expect_identical(control$version, 3L)
+  expect_identical(np_udens_bias_control("positive-covariance")$version, 1L)
   expect_identical(control$calibration, "absolute")
   expect_identical(np_bias_control()$iterations, 16L)
   control$version <- 9L
@@ -31,4 +33,26 @@ test_that("density correction retains literal law and singleton contracts", {
     center = "bias-corrected", band = "all", B = 49L, neval = 1L,
     boot.control = np_boot_control(blocklen = 2L), output = "data",
     bias.control = np_udens_bias_control()), "bootstrap='inid'", fixed = TRUE)
+})
+
+
+test_that("density construction names retain saved-control meanings", {
+  old <- options(np.messages = FALSE, np.plot.progress = FALSE)
+  on.exit(options(old), add = TRUE)
+  x <- data.frame(x = seq(-2, 2, length.out = 12L))
+  bw <- npudensbw(dat = x, bws = .6, bandwidth.compute = FALSE)
+  prepare <- getFromNamespace(".np_udens_plot_prepare", "np")
+  for (version in 1:3) {
+    saved <- structure(list(construction = "positive-covariance",
+      calibration = "absolute", version = as.integer(version)),
+      class = "np_udens_bias_control")
+    state <- prepare(saved, bw, x, "bias-corrected", "bootstrap", "inid", "pointwise")
+    expect_identical(state$plot.control.version, as.integer(version))
+  }
+  control <- np_udens_bias_control()
+  control$version <- 1L
+  expect_error(prepare(control, bw, x, "bias-corrected", "bootstrap", "inid", "pointwise"),
+    "joint-scale density controls require version 3", fixed = TRUE)
+  expect_null(prepare(np_udens_bias_control("legacy"), bw, x,
+    "bias-corrected", "bootstrap", "inid", "pointwise"))
 })

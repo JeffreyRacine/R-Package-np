@@ -1,25 +1,29 @@
 \name{np_udens_bias_control}
 \alias{np_udens_bias_control}
 \title{Controls for Bias-Corrected Unconditional Density Bands}
-\description{Selects the fixed-bandwidth corrected density construction or explicit legacy bootstrap centering. This detached research candidate has not been qualified for public activation.}
-\usage{np_udens_bias_control(construction = c("positive-covariance", "legacy"))}
-\arguments{\item{construction}{The corrected contribution and covariance construction, or the existing smooth-bootstrap centering route.}}
+\description{Selects joint-scale bias-corrected density intervals, the earlier positive-covariance construction, or legacy bootstrap centering.}
+\usage{np_udens_bias_control(construction = c("joint-scale", "positive-covariance", "legacy"))}
+\arguments{\item{construction}{The joint-scale envelope, earlier positive-covariance construction, or existing smooth-bootstrap centering route.}}
 \details{
 With \code{center="bias-corrected"}, omitting \code{bias.control} selects the
-new construction. The default \code{center="estimate"} is unchanged.
+joint-scale construction. The default \code{center="estimate"} is unchanged.
 Use \code{errors="asymptotic"} for Gaussian calibration or
 \code{errors="bootstrap"}, \code{bootstrap="inid"} for literal independent
 resampling. Explicit \code{construction="legacy"} retains the previous
-bootstrap correction. Previously saved version-1 controls retain their F4
-bootstrap construction and its limitations. Saved version-2 controls retain the fixed reference construction.
-Newly created private controls have version 3 and add a joint log-scale
+bootstrap correction. Explicit \code{construction="positive-covariance"}
+creates a version-1 control retaining the earlier F4 bootstrap construction
+and its mixed-data scope and limitations. Saved positive-covariance controls
+with versions 1, 2 and 3 retain their original constructions; version 2 is the
+fixed reference and version 3 is the joint-scale envelope.
+New \code{construction="joint-scale"} controls have version 3 and add a joint log-scale
 uncertainty envelope with fixed scale-tail probability 0.05. The F3 center
 and F4 marginal scales remain unchanged; the complete influence of both
 pilot variances supplies the additional scale uncertainty. This is a
-practical envelope under evaluation, not a finite-sample coverage guarantee.
+practical envelope with bounded empirical qualification, not a finite-sample
+coverage guarantee.
 Regression iterations and residual/pilot assumptions do not apply.
 
-The candidate supports fixed, unbounded, second-order Gaussian continuous
+The joint-scale construction supports fixed, unbounded, second-order Gaussian continuous
 kernels for one or two numeric variables. Mixed-data qualification of the
 new envelope remains deferred; saved controls retain their previous scope.
 Selected bandwidths remain fixed. The corrected center and complete
@@ -53,11 +57,23 @@ tails. Singleton bands coincide.
 
 Nearest-neighbor bandwidths, dependent bootstrap laws, higher-order or bounded
 continuous kernels, \code{pmzsd}, factor boxplots and derivatives remain outside
-this candidate. Unsupported corrected requests fail clearly. Existing estimate
+the joint-scale construction. Unsupported corrected requests fail clearly. Existing estimate
 and explicit legacy routes retain their previous contracts and limitations.
 
-The full-sample-range empirical coverage of this recovery candidate remains
-under investigation. Earlier interior-grid evidence does not qualify it.
+Full-sample-range tests use ordinary per-dataset bandwidth selection and the
+public plot calls, with 50 points per axis. At 95 percent nominal coverage,
+normal and smooth-mixture univariate cases had simultaneous coverage from
+96.9 to 99.2 percent; a correlated bivariate normal case with 800 observations
+had 97.7 percent for both calibrations. The continuing cells used 128 datasets.
+Smaller bivariate normal and mixture cases stopped at 64 datasets because
+bands exceeded the prespecified width criteria. Local pointwise coverage can
+remain weak: the bivariate mixture minimum was 81.3 percent despite favorable
+simultaneous coverage. These finite-grid results do not establish arbitrary
+sample-size, distribution or continuum coverage. At 90 percent nominal, the
+univariate normal 100-observation Gaussian case covered 97.7 percent on 128
+retained datasets, so substantial conservatism remains possible.
+Full bivariate calibration can take materially longer than a univariate plot.
+Earlier interior-grid evidence is not used to qualify sample-range plots.
 The fitted density is unchanged; the corrected center and confidence endpoints
 may be negative and are not clipped or renormalized. For version-2 and version-3 outputs,
 \code{bias.corrected + derr[,1]} and \code{bias.corrected + derr[,2]} recover

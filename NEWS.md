@@ -8,15 +8,18 @@
   documented; existing mixed, NN, adapted and higher-derivative routes retain
   their constructions.
 
-- Private density recovery candidate: `center="bias-corrected"` selects a
-  fixed-reference corrected process for fixed Gaussian-kernel bandwidths,
-  with Gaussian or literal inid calibration. The complete default q=2 grid
-  uses bounded factor tiles. Version-2 surfaces return signed offsets;
-  saved version-1 controls and explicit legacy output retain their contracts.
-  Underresolved bootstrap Bonferroni requests fail explicitly. Full-range
-  coverage qualification and public activation remain pending.
+* Density plots with `center="bias-corrected"` now select joint-scale
+  intervals without a separate control argument. Gaussian asymptotic and
+  literal inid bootstrap calibration support fixed second-order Gaussian
+  bandwidths with one or two numeric variables over the full sample range.
+  Returned corrected centers plus signed error offsets reconstruct both
+  endpoints for curves and surfaces. Coverage can be conservative; small
+  bivariate samples can have wide bands and weak individual locations.
+  Explicit `positive-covariance` and `legacy` selections retain their earlier
+  constructions. Unsupported routes and underresolved bootstrap Bonferroni
+  requests fail clearly.
 
-- Plot argument validation now accepts explicit `center="estimate"` with
+* Plot argument validation now accepts explicit `center="estimate"` with
   `errors="asymptotic"`, including density and copula plots. Actual bootstrap
   controls still require `errors="bootstrap"`.
 
@@ -24,7 +27,8 @@
   `np_udens_bias_control()`. The positive-covariance construction corrects
   numeric and categorical smoothing contributions and uses literal inid
   absolute studentized calibration. Existing defaults and legacy routes are
-  unchanged. Gaussian/NN/dependence extensions remain unqualified; the new
+  unchanged when this construction is selected explicitly. Its Gaussian, NN
+  and dependence extensions remain unqualified; the positive-covariance
   construction has an explicit bounded-grid and memory contract.
 
 * Stabilize continuous-only local-to-global bias correction near activation

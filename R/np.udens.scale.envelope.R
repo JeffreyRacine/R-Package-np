@@ -1,4 +1,4 @@
-# Private S envelope: preserve the F3 center and F4 observed scale, and
+# Joint scale envelope: preserve the F3 center and F4 observed scale, and
 # separately account for uncertainty in that scale. beta is deliberately
 # fixed across confidence levels; it is not a second coverage guarantee.
 .np_udens_scale_rows <- function(state, grid) {
@@ -63,7 +63,7 @@
     bands = c("pointwise", "simultaneous", "bonferroni")) {
   law <- match.arg(law)
   if (!state$q %in% 1:2 || state$r != 0L || state$s != 0L || !identical(state$metadata$type, "fixed"))
-    stop("joint scale density envelope is qualified for investigation only with fixed q=1 or q=2 numeric data", call. = FALSE)
+    stop("joint-scale density bounds require fixed bandwidths and one or two numeric variables", call. = FALSE)
   existed <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
   previous <- if (existed) get(".Random.seed", .GlobalEnv) else NULL
   success <- FALSE
@@ -139,7 +139,7 @@
   base$intervals <- base$absolute.intervals <- base$bands
   base$settings$construction <- "density-joint-scale-envelope-S-v1"
   base$settings$budget <- budget
-  base$settings$calibration.status <- "private fresh public-call validation candidate"
+  base$settings$calibration.status <- "bounded full-range qualification; conservative and local limitations documented"
   base$rng$end <- end
   assign(".Random.seed", end, .GlobalEnv)
   success <- TRUE
