@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+- Plot argument validation now accepts explicit `center="estimate"` with
+  `errors="asymptotic"`, including density and copula plots. Actual bootstrap
+  controls still require `errors="bootstrap"`.
+
 * Add opt-in fixed-bandwidth unconditional density bands via
   `np_udens_bias_control()`. The positive-covariance construction corrects
   numeric and categorical smoothing contributions and uses literal inid
