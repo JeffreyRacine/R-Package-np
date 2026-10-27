@@ -251,6 +251,12 @@ np_render_control <- function(style = c("band", "bar"),
   identical(layout, "auto")
 }
 
+.np_plot_center_needs_bootstrap <- function(center, method,
+                                             allow_asymptotic_bias = FALSE) {
+  !(identical(method, "asymptotic") &&
+      (identical(center, "estimate") || allow_asymptotic_bias))
+}
+
 .np_plot_normalize_public_dots <- function(dots, context = "plot", allow_asymptotic_bias = FALSE) {
   supplied <- names(dots)
   has <- function(x) x %in% supplied
@@ -427,7 +433,9 @@ np_render_control <- function(style = c("band", "bar"),
   boot.only <- c("plot.errors.boot.method", "plot.errors.boot.num",
                  "plot.errors.boot.nonfixed", "plot.errors.boot.wild",
                  "plot.errors.boot.blocklen")
-  center.only <- if (allow_asymptotic_bias && identical(method,"asymptotic")) character() else c("center","plot.errors.center")
+  center.only <- if (.np_plot_center_needs_bootstrap(
+    dots[["plot.errors.center", exact = TRUE]], method, allow_asymptotic_bias))
+    c("center", "plot.errors.center") else character()
   boot.supplied <- any(c("bootstrap", "B", "boot.control", center.only, boot.only) %in% supplied)
   if (!identical(method, "bootstrap") && boot.supplied)
     stop("bootstrap controls require errors = \"bootstrap\"",
