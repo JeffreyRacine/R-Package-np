@@ -302,7 +302,7 @@
 
       if (plot.behavior != "plot"){
         d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens,
-                        derr = if (new.bias && identical(bias.state$plot.control.version, 2L))
+                        derr = if (new.bias && bias.state$plot.control.version %in% c(2L, 3L))
                           cbind(-terr[,1L], terr[,2L]) else terr[,1:2],
                         ntrain = nrow(xdat), se = plot.errors)
         if (joint.eligible)
