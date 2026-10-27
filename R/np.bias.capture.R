@@ -7,7 +7,7 @@
     stop("captured local bias prototype requires an inactive continuous fixed Gaussian2 request",call.=FALSE)
   request <- fit[["fit.request",exact=TRUE]]
   if (!is.list(request) || !identical(request$exdat,grid) ||
-      !identical(request$ydat,spec$y))
+      !is.numeric(request$ydat) || !identical(as.double(request$ydat),spec$y))
     stop("captured local bias request does not match its grid or response",call.=FALSE)
   x <- request$xdat
   if (!is.data.frame(x) || !identical(names(x),names(spec$x)) ||

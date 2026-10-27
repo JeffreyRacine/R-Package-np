@@ -14,3 +14,20 @@ test_that("local calibration neighborhoods preserve units, rows and constant var
   expect_error(a$raw(seq_len(17)),"invalid local calibration neighborhood tile")
   expect_error(owner(matrix(1,24,1),q),"invalid local calibration neighborhood geometry")
 })
+
+test_that("capture response identity follows numeric data and rejects changed values", {
+  if (!spawn_mpi_slaves(n=1L)) skip("MPI pool unavailable in this test context")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
+  x <- data.frame(x=seq(-1,1,length.out=24))
+  y <- setNames(1+x$x+x$x^2+.1*sin(seq_len(24)),rownames(x))
+  b <- npregbw(xdat=x,ydat=y,bws=.4,bandwidth.compute=FALSE,
+                regtype="lp",degree=2L,bernstein.basis=TRUE)
+  state <- npRmpi:::.np_bias_regression_prepare(b,x,y,law="gaussian")
+  grid <- x[c(1L,12L,24L),,drop=FALSE]
+  fit <- npreg(bws=b,txdat=x,tydat=y,exdat=grid,se=TRUE,.np.fit.inference=TRUE)
+  expect_s3_class(npRmpi:::.np_bias_capture_prepare(state,fit,grid),"np_bias_capture_prototype")
+  changed <- fit; changed$fit.request$ydat[1L] <- changed$fit.request$ydat[1L]+1
+  expect_error(npRmpi:::.np_bias_capture_prepare(state,changed,grid),"grid or response")
+  changed$fit.request$ydat <- rev(fit$fit.request$ydat)
+  expect_error(npRmpi:::.np_bias_capture_prepare(state,changed,grid),"grid or response")
+})
