@@ -86,6 +86,7 @@ complete covariance or its factor-representation description, raw and adjusted
 criticals, effective calibration settings and random-stream provenance.}
 \seealso{\code{\link{npudens}}, \code{\link[=plot.np]{npplot}}, \code{\link{np_bias_control}}}
 \examples{
+npRmpi.init(nslaves = 1)
 set.seed(123)
 x <- data.frame(x = rnorm(80))
 bw <- npudensbw(dat = x, bws = 0.45, bandwidth.compute = FALSE)
@@ -93,5 +94,6 @@ z <- plot(bw, xdat = x, errors = "bootstrap", bootstrap = "inid",
           center = "bias-corrected", band = "all", B = 399,
           neval = 3, output = "data")
 z[[1]]$inference$settings$primary
+npRmpi.quit()
 }
 \keyword{nonparametric}
