@@ -11,8 +11,8 @@
     return(FALSE)
   reg <- npValidatedConditionalRegSpec(state$bws,
     where="local bias calibration",ncon.field="ncon")
-  identical(reg[["basis.engine"]],"glp") &&
-    (all(reg[["degree.engine"]]<=1L) || isTRUE(reg[["bernstein.basis.engine"]]))
+  # Replay the fitted main representation; auxiliary basis policy is separate.
+  identical(reg[["basis.engine"]],"glp")
 }
 
 # Design-only neighborhood geometry, storing O(n) radii and normalizers.

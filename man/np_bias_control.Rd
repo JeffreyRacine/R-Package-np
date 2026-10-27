@@ -327,7 +327,10 @@ np_bias_control(construction = c("iterated", "legacy"),
   A separate fixed-bandwidth extension uses the complete original fitted
   observation rows for univariate continuous Gaussian or Mammen inference,
   with inactive local-to-global adaptation, means and first derivatives.
-  Main polynomials above degree one require the stored Bernstein basis.
+  Both raw and stored Bernstein main bases are supported; the auxiliary
+Bernstein basis policy is unchanged. Captured rows preserve the fitted
+representation and its accepted regularization, including any inherited
+numerical conditioning limitations of a raw main basis.
   The accepted numerical ridge and intercept restoration are retained.
   This route pools raw P0 residual squares before dividing by pooled residual
   row-variance factors, using the same normalization in replicate studentization.
