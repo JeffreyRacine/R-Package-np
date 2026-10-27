@@ -147,7 +147,8 @@
 
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
-                               studentize=TRUE) {
+                               studentize=TRUE, main.capture=NULL) {
+  if (!is.null(main.capture)) .np_bias_capture_validate(main.capture,state,grid,targets)
   if (isTRUE(state$categorical.only) && !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
     stop("categorical-only bias correction does not support this calibration law",call.=FALSE)
   if (!is.null(state$mixed) && !law %in% c("gaussian","mammen"))
@@ -186,7 +187,7 @@
   for(batch in blocks) {
     jj <- batch$grid;rr <- batch$rows
     local.map <- map[rr,,drop=FALSE];local.map$row <- match(local.map$row,jj)
-    value <- if (is.null(adapted.rows)) .np_bias_regression_rows(state,grid[jj,,drop=FALSE],local.map) else
+    value <- if (!is.null(main.capture)) main.capture$rows(jj,local.map) else if (is.null(adapted.rows)) .np_bias_regression_rows(state,grid[jj,,drop=FALSE],local.map) else
       adapted.rows(jj,local.map)
     if (!is.null(value$adaptation)) adaptation[[length(adaptation)+1L]] <-
       list(rows=rr,grid=jj,details=value$adaptation)
