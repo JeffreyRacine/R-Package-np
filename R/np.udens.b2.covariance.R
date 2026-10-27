@@ -108,6 +108,8 @@
     mu[i] <- mean(.np_udens_b2_pilot_moment(state,grid[i,,drop=FALSE],corrected=corrected))
     for (j in seq_len(i)) C[i,j] <- C[j,i] <-
       mean(.np_udens_b2_pilot_moment(state,grid[i,,drop=FALSE],grid[j,,drop=FALSE],corrected))
+    .np_plot_progress_notify(stage = "Constructing density covariance",
+      done = i, total = m, unit = "targets")
   }
   C <- (C-tcrossprod(mu))/state$n
   if (any(!is.finite(C)) || any(diag(C)<=0))

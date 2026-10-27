@@ -34,6 +34,8 @@
   a<-.np_udens_b4_pilot_moment(state,grid[i,,drop=FALSE],tau=2,corrected=corrected)
   b<-.np_udens_b4_pilot_moment(state,grid[i,,drop=FALSE],grid[i,,drop=FALSE],tau=2,corrected=corrected)
   wide[i]<-(mean(b)-mean(a)^2)/state$n
+  .np_plot_progress_notify(stage = "Correcting density scales",
+    done = i, total = m, unit = "targets")
  }
  if(any(!is.finite(wide))||any(wide<=0))stop('F4 requires positive finite widened-pilot variances',call.=FALSE)
  d<-sqrt(diag(model$covariance)/wide)
