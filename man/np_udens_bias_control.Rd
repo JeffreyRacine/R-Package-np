@@ -33,7 +33,8 @@ construction. Existing large-grid and boxplot routes remain available with
 the legacy construction.
 
 Gaussian calibration, nearest-neighbor bandwidths, dependent resampling,
-higher-order kernels, bounded continuous kernels and derivatives are not
+higher-order kernels, bounded continuous kernels, near-constant
+large-bandwidth shortcuts and derivatives are not
 admitted to the new public construction. Unsupported requests fail rather
 than changing their law or bandwidth type. Existing plot routes for those
 settings are unchanged.
@@ -45,7 +46,9 @@ bands can be conservative and wide, especially for sparse mixed regions.
 A zero replicate scale with nonzero centered numerator produces an infinite
 pivot; undefined zero-over-zero pivots or uncertified zero scales fail the
 request. Infinite endpoints are reported, not discarded or replaced by a
-variance floor. The fitted density itself is unchanged; the corrected center
+variance floor. Nonfinite interval segments are not drawn; inspect the
+returned \code{inference} component to identify unbounded intervals.
+The fitted density itself is unchanged; the corrected center
 can be signed and is not clipped or renormalized.
 }
 \value{A family-specific control object. Returned plot-data density objects
