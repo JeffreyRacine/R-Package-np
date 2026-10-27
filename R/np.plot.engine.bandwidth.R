@@ -125,6 +125,8 @@
       common.scale = common.scale,
       ylim = ylim,
       allow_asymptotic_simultaneous = joint.eligible,
+      # Preserve the request for the density-specific admission check below.
+      allow_asymptotic_bias = TRUE,
       error.request = error.request
     )
 
@@ -146,6 +148,7 @@
     bias.state <- .np_udens_plot_prepare(bias.control, bws, xdat,
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type)
     new.bias <- !is.null(bias.state)
+    joint.eligible <- joint.eligible && !new.bias
     if (new.bias && isTRUE(plot.bxp))
       stop("positive-covariance density bounds require factor.boxplot=FALSE", call. = FALSE)
     first.render <- .np_plot_first_render_state()
@@ -233,9 +236,10 @@
       lerr.all <- NULL
       herr.all <- NULL
 
-      if (plot.errors.method == "bootstrap"){
+      if (new.bias || plot.errors.method == "bootstrap"){
         terr.obj <- if (new.bias) .np_udens_plot_errors(bias.state, x.eval,
-          plot.errors.alpha, plot.errors.boot.num, plot.errors.type) else compute.bootstrap.errors(xdat = xdat,
+          plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
+            gaussian.draws else plot.errors.boot.num, plot.errors.type) else compute.bootstrap.errors(xdat = xdat,
           exdat = x.eval,
           cdf = FALSE,
           slice.index = 0,
@@ -311,7 +315,9 @@
 
       if (plot.behavior != "plot"){
         d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens,
-                        derr = terr[,1:2], ntrain = nrow(xdat), se = plot.errors)
+                        derr = if (new.bias && bias.state$plot.control.version %in% c(2L, 3L))
+                          cbind(-terr[,1L], terr[,2L]) else terr[,1:2],
+                        ntrain = nrow(xdat), se = plot.errors)
         if (joint.eligible)
           d1 <- .np_plot_density_band_fields(d1, terr.obj)
         if (new.bias) d1$inference <- terr.obj$inference
@@ -554,7 +560,14 @@
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){
-          if (plot.errors.method == "asymptotic") {
+          if (new.bias) {
+            temp.boot.raw <- .np_udens_plot_errors(bias.state, eval.slice,
+              plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
+                gaussian.draws else plot.errors.boot.num, plot.errors.type)
+            temp.err[seq_len(xi.neval),] <- temp.boot.raw$boot.err
+            temp.all.err <- temp.boot.raw$boot.all.err
+            temp.boot <- temp.boot.raw$bxp
+          } else if (plot.errors.method == "asymptotic") {
             asym.obj <- .np_plot_asymptotic_error_from_se(
               se = tobj$derr,
               alpha = plot.errors.alpha,
@@ -570,7 +583,8 @@
             temp.all.err <- asym.obj$all.err
           } else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- if (new.bias) .np_udens_plot_errors(bias.state, eval.slice,
-              plot.errors.alpha, plot.errors.boot.num, plot.errors.type) else compute.bootstrap.errors(
+              plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
+            gaussian.draws else plot.errors.boot.num, plot.errors.type) else compute.bootstrap.errors(
                       xdat = xdat,
                       exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                       cdf = FALSE,

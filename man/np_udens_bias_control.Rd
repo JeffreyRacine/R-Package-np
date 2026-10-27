@@ -1,70 +1,81 @@
 \name{np_udens_bias_control}
 \alias{np_udens_bias_control}
 \title{Controls for Bias-Corrected Unconditional Density Bands}
-\description{Selects an optional positive-covariance construction for fixed-bandwidth unconditional density plotting. Existing plot defaults are unchanged.}
+\description{Selects the fixed-bandwidth corrected density construction or explicit legacy bootstrap centering. This detached research candidate has not been qualified for public activation.}
 \usage{np_udens_bias_control(construction = c("positive-covariance", "legacy"))}
-\arguments{\item{construction}{The new corrected contribution and covariance construction, or the existing smooth-bootstrap centering route.}}
+\arguments{\item{construction}{The corrected contribution and covariance construction, or the existing smooth-bootstrap centering route.}}
 \details{
-Pass the result as \code{bias.control} to \code{plot} or \code{npplot}, with
-\code{errors="bootstrap"}, \code{bootstrap="inid"},
-\code{center="bias-corrected"} and an explicit \code{band="pointwise"},
-\code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}.
-Omitting \code{bias.control} retains the existing construction, as does an
-explicit \code{construction="legacy"}. Regression controls and iterations
-do not apply to this density construction.
+With \code{center="bias-corrected"}, omitting \code{bias.control} selects the
+new construction. The default \code{center="estimate"} is unchanged.
+Use \code{errors="asymptotic"} for Gaussian calibration or
+\code{errors="bootstrap"}, \code{bootstrap="inid"} for literal independent
+resampling. Explicit \code{construction="legacy"} retains the previous
+bootstrap correction. Previously saved version-1 controls retain their F4
+bootstrap construction and its limitations. Saved version-2 controls retain the fixed reference construction.
+Newly created private controls have version 3 and add a joint log-scale
+uncertainty envelope with fixed scale-tail probability 0.05. The F3 center
+and F4 marginal scales remain unchanged; the complete influence of both
+pilot variances supplies the additional scale uncertainty. This is a
+practical envelope under evaluation, not a finite-sample coverage guarantee.
+Regression iterations and residual/pilot assumptions do not apply.
 
-The new construction supports fixed, unbounded, second-order Gaussian
-continuous kernels with the supported Aitchison--Aitken unordered and
-Li--Racine ordered kernels. Numeric, factor and ordered variables can be
-combined, including nonbinary categories. It corrects continuous and categorical
-smoothing contributions, preserves the selected bandwidths, and uses complete
-replicate studentization under literal independent resampling. Its observed
-positive covariance uses the same-bandwidth pilot and a positive marginal
-congruence correction. Absolute studentized pivots calibrate all three bands;
-there is no normal-critical floor, draw deletion or redraw.
+The candidate supports fixed, unbounded, second-order Gaussian continuous
+kernels for one or two numeric variables. Mixed-data qualification of the
+new envelope remains deferred; saved controls retain their previous scope.
+Selected bandwidths remain fixed. The corrected center and complete
+observation contributions are unchanged from the previous density correction.
+The covariance combines the previous positive-pilot marginal scales with the
+complete empirical corrected correlation. It intentionally differs from the
+previous pilot correlation.
 
-The initial construction is limited to 512 evaluation points per panel and a
-256 MiB forecast for inference storage summed over participating processes,
-in addition to the baseline memory used by R and loaded packages. For a two-dimensional surface,
-\code{neval=20} uses 400 points; the default 50 by 50 surface exceeds the cap.
-Use an explicit smaller grid or slices. No grid is silently reduced. The
-\code{pmzsd} band and bootstrap factor boxplots are not available for this
-construction. Existing large-grid and boxplot routes remain available with
-the legacy construction.
+The independent bootstrap draws literal multinomial counts. Its calibrated
+statistic is the centered corrected observation process transported to the
+observed marginal scales, using a fixed observed normalization. It is not the
+previous replicate-studentized bootstrap and is not the untransformed
+bootstrap distribution of the fitted estimator. Zero or nonfinite observed
+scales fail explicitly; there are no variance floors, deleted draws or redraws.
 
-Gaussian calibration, nearest-neighbor bandwidths, dependent resampling,
-higher-order kernels, bounded continuous kernels, near-constant
-large-bandwidth shortcuts and derivatives are not
-admitted to the new public construction. Unsupported requests fail rather
-than changing their law or bandwidth type. Existing plot routes for those
-settings are unchanged.
+Gaussian grids of at most 512 targets use the existing covariance calibrator.
+Larger grids use bounded observation-factor tiles with common innovations
+across the entire grid. The default two-dimensional 50 by 50 surface retains
+all targets and corners. No training-size-squared matrix or full grid-by-draw
+matrix is retained. The inference-storage forecast remains limited to 256 MiB
+summed over participating processes, excluding baseline R/package memory.
 
-Finite-grid coverage improved substantially in bounded fixed-bandwidth,
-data-selected-bandwidth experiments with one or two numeric variables and
-mixed data. This is not a uniform honesty claim. Simultaneous and Bonferroni
-bands can be conservative and wide, especially for sparse mixed regions.
-A zero replicate scale with nonzero centered numerator produces an infinite
-pivot; undefined zero-over-zero pivots or uncertified zero scales fail the
-request. Infinite endpoints are reported, not discarded or replaced by a
-variance floor. Nonfinite interval segments are not drawn; inspect the
-returned \code{inference} component to identify unbounded intervals.
-The fitted density itself is unchanged; the corrected center
-can be signed and is not clipped or renormalized.
+Bootstrap Bonferroni requests fail when \code{alpha * B / m < 1}, where
+\code{m} is the panel grid size. In particular the default 2,500-target grid
+and 9,999 draws do not admit the new bootstrap Bonferroni or \code{band="all"}
+route. Pointwise and simultaneous requests remain distinct admitted routes.
+No law or draw count is silently changed. Raw empirical tail quantiles do not
+establish a finite-sample Bonferroni guarantee; raw and nesting-adjusted
+criticals are retained separately. Gaussian Bonferroni uses analytic normal
+tails. Singleton bands coincide.
+
+Nearest-neighbor bandwidths, dependent bootstrap laws, higher-order or bounded
+continuous kernels, \code{pmzsd}, factor boxplots and derivatives remain outside
+this candidate. Unsupported corrected requests fail clearly. Existing estimate
+and explicit legacy routes retain their previous contracts and limitations.
+
+The full-sample-range empirical coverage of this recovery candidate remains
+under investigation. Earlier interior-grid evidence does not qualify it.
+The fitted density is unchanged; the corrected center and confidence endpoints
+may be negative and are not clipped or renormalized. For version-2 and version-3 outputs,
+\code{bias.corrected + derr[,1]} and \code{bias.corrected + derr[,2]} recover
+lower and upper endpoints for curves and surfaces. Legacy/version-1 surfaces
+retain their historical positive lower-width convention.
 }
-\value{A family-specific control object. Returned plot-data density objects
-include an \code{inference} component with the corrected center, covariance,
-absolute bands, bandwidths, effective calibration settings, degeneracy counts
-and random-stream provenance.}
+\value{A family-specific control object. Corrected plot-data objects include an
+\code{inference} component with the center, marginal scales, absolute bands,
+complete covariance or its factor-representation description, raw and adjusted
+criticals, effective calibration settings and random-stream provenance.}
 \seealso{\code{\link{npudens}}, \code{\link[=plot.np]{npplot}}, \code{\link{np_bias_control}}}
 \examples{
-npRmpi.init(nslaves = 1)
 set.seed(123)
 x <- data.frame(x = rnorm(80))
 bw <- npudensbw(dat = x, bws = 0.45, bandwidth.compute = FALSE)
 z <- plot(bw, xdat = x, errors = "bootstrap", bootstrap = "inid",
           center = "bias-corrected", band = "all", B = 399,
-          neval = 3, output = "data", bias.control = np_udens_bias_control())
+          neval = 3, output = "data")
 z[[1]]$inference$settings$primary
-npRmpi.quit()
 }
 \keyword{nonparametric}

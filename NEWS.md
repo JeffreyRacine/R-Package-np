@@ -8,6 +8,18 @@
   documented; existing mixed, NN, adapted and higher-derivative routes retain
   their constructions.
 
+- Private density recovery candidate: `center="bias-corrected"` selects a
+  fixed-reference corrected process for fixed Gaussian-kernel bandwidths,
+  with Gaussian or literal inid calibration. The complete default q=2 grid
+  uses bounded factor tiles. Version-2 surfaces return signed offsets;
+  saved version-1 controls and explicit legacy output retain their contracts.
+  Underresolved bootstrap Bonferroni requests fail explicitly. Full-range
+  coverage qualification and public activation remain pending.
+
+- Plot argument validation now accepts explicit `center="estimate"` with
+  `errors="asymptotic"`, including density and copula plots. Actual bootstrap
+  controls still require `errors="bootstrap"`.
+
 * Add opt-in fixed-bandwidth unconditional density bands via
   `np_udens_bias_control()`. The positive-covariance construction corrects
   numeric and categorical smoothing contributions and uses literal inid

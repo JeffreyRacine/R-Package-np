@@ -184,3 +184,20 @@ test_that("plot contract: package legends are user-controllable on band-all plot
     "legend must be TRUE/FALSE"
   )
 })
+
+
+test_that("estimate centering is not a bootstrap control for asymptotics", {
+  normalize <- getFromNamespace(".np_plot_normalize_public_dots", "npRmpi")
+  for (key in c("center", "plot.errors.center")) {
+    args <- list(errors = "asymptotic")
+    args[[key]] <- "estimate"
+    expect_identical(normalize(args)$plot.errors.center, "estimate")
+    args$B <- 19L
+    expect_error(normalize(args), 'bootstrap controls require errors', fixed = TRUE)
+  }
+  expect_error(normalize(list(errors = "asymptotic", center = "bias-corrected")),
+               'bootstrap controls require errors', fixed = TRUE)
+  expect_identical(normalize(list(errors = "asymptotic", center = "bias-corrected"),
+                             allow_asymptotic_bias = TRUE)$plot.errors.center,
+                   "bias-corrected")
+})
