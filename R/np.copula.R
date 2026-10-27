@@ -984,7 +984,7 @@ plot.npcopula <- function(x,
     intersect(.np_plot_dot_names(substitute(list(...))[-1L]), "neval"),
     character()
   )
-  bootstrap.supplied <- !missing(bootstrap) || !missing(B) || !missing(center)
+  bootstrap.supplied <- !missing(bootstrap) || !missing(B)
   interval.supplied <- !missing(band) || !missing(alpha)
   view <- match.arg(view)
   surface.view <- view %in% c("rotate", "fixed", "surface")
@@ -1012,7 +1012,9 @@ plot.npcopula <- function(x,
   zlim <- .npcopula_validate_zlim(zlim)
   if (!inherits(boot.control, "np_boot_control"))
     stop("boot.control must be created by np_boot_control()", call. = FALSE)
-  if (!identical(errors, "bootstrap") && bootstrap.supplied)
+  center.supplied <- !missing(center) &&
+    .np_plot_center_needs_bootstrap(center, errors)
+  if (!identical(errors, "bootstrap") && (bootstrap.supplied || center.supplied))
     stop("bootstrap controls require errors = \"bootstrap\"", call. = FALSE)
   if (identical(errors, "none") && interval.supplied)
     stop("band and alpha require errors != \"none\"", call. = FALSE)

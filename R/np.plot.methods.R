@@ -251,6 +251,12 @@ np_render_control <- function(style = c("band", "bar"),
   identical(layout, "auto")
 }
 
+.np_plot_center_needs_bootstrap <- function(center, method,
+                                             allow_asymptotic_bias = FALSE) {
+  !(identical(method, "asymptotic") &&
+      (identical(center, "estimate") || allow_asymptotic_bias))
+}
+
 .np_plot_normalize_public_dots <- function(dots, context = "plot", allow_asymptotic_bias = FALSE) {
   supplied <- names(dots)
   has <- function(x) x %in% supplied
@@ -427,7 +433,9 @@ np_render_control <- function(style = c("band", "bar"),
   boot.only <- c("plot.errors.boot.method", "plot.errors.boot.num",
                  "plot.errors.boot.nonfixed", "plot.errors.boot.wild",
                  "plot.errors.boot.blocklen")
-  center.only <- if (allow_asymptotic_bias && identical(method,"asymptotic")) character() else c("center","plot.errors.center")
+  center.only <- if (.np_plot_center_needs_bootstrap(
+    dots[["plot.errors.center", exact = TRUE]], method, allow_asymptotic_bias))
+    c("center", "plot.errors.center") else character()
   boot.supplied <- any(c("bootstrap", "B", "boot.control", center.only, boot.only) %in% supplied)
   if (!identical(method, "bootstrap") && boot.supplied)
     stop("bootstrap controls require errors = \"bootstrap\"",
@@ -454,8 +462,10 @@ np_render_control <- function(style = c("band", "bar"),
   )
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = .plot_context,
-    allow_asymptotic_bias = identical(method,.np_plot_rbandwidth_engine) ||
-      (identical(method,.np_plot_compat_dispatch) && inherits(bws,"rbandwidth")))
+    allow_asymptotic_bias = identical(method, .np_plot_rbandwidth_engine) ||
+      identical(method, .np_plot_bandwidth_engine) ||
+      (identical(method, .np_plot_compat_dispatch) &&
+       (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth"))))
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 
@@ -682,7 +692,8 @@ np_render_control <- function(style = c("band", "bar"),
     stop("unused plot argument: plot.rug; did you mean data.rug?",
          call. = FALSE)
   dots <- list(...)
-  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity")
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity",
+    allow_asymptotic_bias = TRUE)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_condensity <- function(object, ..., .plot_dots_call = NULL) {
