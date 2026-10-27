@@ -202,7 +202,7 @@ Named options passed via \code{\dots} include:
         corresponding corrected construction. The default estimate center is
         unchanged. Explicit \code{construction="legacy"} retains the previous
         bootstrap correction. Density Gaussian/inid support, finite-draw
-        restrictions and private recovery status are detailed in
+        restrictions and practical coverage limitations are detailed in
         \code{\link{np_udens_bias_control}}.
       }
       \item{\code{bootstrap}}{

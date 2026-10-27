@@ -1,7 +1,8 @@
 # Family-specific controls; regression iterations and pilot controls do not apply.
-np_udens_bias_control <- function(construction = c("positive-covariance", "legacy")) {
+np_udens_bias_control <- function(construction = c("joint-scale", "positive-covariance", "legacy")) {
   construction <- match.arg(construction)
-  structure(list(construction = construction, calibration = "absolute", version = 3L),
+  version <- if (identical(construction, "positive-covariance")) 1L else 3L
+  structure(list(construction = construction, calibration = "absolute", version = version),
             class = "np_udens_bias_control")
 }
 
@@ -14,10 +15,12 @@ np_udens_bias_control <- function(construction = c("positive-covariance", "legac
   if (!inherits(control, "np_udens_bias_control") || !is.list(control) ||
       !is.character(control[["construction", exact = TRUE]]) ||
       length(control[["construction", exact = TRUE]]) != 1L ||
-      !control[["construction", exact = TRUE]] %in% c("positive-covariance", "legacy") ||
+      !control[["construction", exact = TRUE]] %in% c("joint-scale", "positive-covariance", "legacy") ||
       length(version) != 1L || !is.integer(version) ||
       is.na(version) || !version %in% c(1L, 2L, 3L))
     stop("bias.control must be created by np_udens_bias_control()", call. = FALSE)
+  if (identical(control[["construction", exact = TRUE]], "joint-scale") && version != 3L)
+    stop("joint-scale density controls require version 3", call. = FALSE)
   expected <- np_udens_bias_control(control[["construction", exact = TRUE]])
   expected$version <- version
   if (!identical(control, expected) || !is.integer(version))
