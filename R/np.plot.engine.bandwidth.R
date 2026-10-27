@@ -361,6 +361,7 @@
             }
             if (plot.errors) {
               .np_plot_error_surfaces_rgl(
+                construction = if (new.bias) "positive-covariance" else NULL,
                 x = x1.eval,
                 y = x2.eval,
                 plot.errors.type = plot.errors.type,
