@@ -1,5 +1,5 @@
 # Private IID hybrid: empirical bootstrap-t pivots, smoothed observed scale.
-# This is an explicit research construction, not a public/default replacement.
+# Internal calibration stage; public density plotting applies the F4 scale map.
 .np_udens_b3_inid <- function(state, grid, alpha = c(.05, .1), B = 9999L,
                                tile = 25L, corrected = TRUE) {
   existed <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)

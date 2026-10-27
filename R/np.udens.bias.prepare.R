@@ -1,4 +1,4 @@
-# Private fixed-model density research adapter. No public caller or registration.
+# Internal fixed-model state for the opt-in density construction.
 .np_udens_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2) {
   if (!inherits(bws, "bandwidth") ||
       !identical(bws[["type", exact = TRUE]], "fixed") ||
