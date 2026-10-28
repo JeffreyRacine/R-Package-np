@@ -185,8 +185,35 @@ function (spec, grid, map, op)
     out
 }
 
+.np_bias_pilot_qr <- function(Q, k, v) {
+    # Keep the established auxiliary identification/ridge policy. QR changes
+    # arithmetic only; it must not admit a system rejected by the fitted policy.
+    .np_bias_solve(Q, k, v, "P1 auxiliary pilot")
+    if (any(!is.finite(k)) || any(k < 0))
+        stop("P1 auxiliary pilot requires finite nonnegative weights")
+    root.weight <- sqrt(k)
+    A <- Q * root.weight
+    scale <- sqrt(colSums(A * A))
+    if (any(!is.finite(scale)) || any(scale <= 0) || nrow(A) < ncol(A))
+        stop("P1 auxiliary pilot requires an identified weighted design")
+    factor <- qr(sweep(A, 2L, scale, "/"), LAPACK = TRUE)
+    R <- qr.R(factor)
+    p <- ncol(Q)
+    apply.value <- function(value) {
+        rhs <- (value/scale)[factor$pivot]
+        z <- backsolve(R, rhs, transpose = TRUE)
+        drop(qr.qy(factor, c(z, numeric(nrow(Q) - p))))
+    }
+    project <- function(value) {
+        z <- qr.qty(factor, value)
+        if (length(z) > p) z[seq.int(p + 1L, length(z))] <- 0
+        drop(qr.qy(factor, z))
+    }
+    list(root.weight = root.weight, value = apply.value, project = project)
+}
+
 .np_bias_pilot_rows <-
-function (spec, at, derivatives = TRUE, orders = NULL)
+function (spec, at, derivatives = TRUE, orders = NULL, .training = FALSE)
 {
     ii <- spec$groups[[.np_bias_key(spec, at)]]
     if (is.null(ii))
@@ -200,7 +227,17 @@ function (spec, at, derivatives = TRUE, orders = NULL)
     Q <- basis(u, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein)
     v <- drop(basis(u, exdat = zero, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein))
     k <- drop(.np_kernel_weights_direct(spec$pilot.bws, txdat = x, exdat = at[spec$numeric.cols], bandwidth.divide = TRUE))
-    h <- .np_bias_solve(Q, k, v, "P1 auxiliary pilot")
+    # Retain training and univariate arithmetic. This bounded precision path
+    # is qualified for multivariate evaluation targets, including sparse tails.
+    precise <- !.training && spec$d > 1L
+    if (.training && derivatives) stop("training P1 owner requests mean rows only")
+    if (!precise) {
+        h <- .np_bias_solve(Q, k, v, "P1 auxiliary pilot")
+    } else {
+        factor <- .np_bias_pilot_qr(Q, k, v)
+        value <- factor$value(v)
+        h <- factor$root.weight * value
+    }
     dh <- list()
     if (derivatives)
         for (d in seq_len(spec$d)) {
@@ -219,10 +256,17 @@ function (spec, at, derivatives = TRUE, orders = NULL)
             nu[d] <- 1L
             dv <- drop(basis(u, exdat = zero, degree = spec$q, gradient.vec = nu, basis = "glp",
                 bernstein.basis = spec$bernstein))/spec$b[d]
-            coefficient <- .np_bias_solve(Q, k, dv, "P1 auxiliary derivative pilot")
-            w <- h * u[[d]]/spec$b[d]
-            dh[[d]] <- coefficient + w - .np_bias_solve(Q, k, drop(crossprod(Q, w)), "P1 auxiliary derivative pilot")
+            if (precise) {
+                w <- value * u[[d]]/spec$b[d]
+                dh[[d]] <- factor$root.weight * (factor$value(dv) + w - factor$project(w))
+            } else {
+                coefficient <- .np_bias_solve(Q, k, dv, "P1 auxiliary derivative pilot")
+                w <- h * u[[d]]/spec$b[d]
+                dh[[d]] <- coefficient + w - .np_bias_solve(Q, k, drop(crossprod(Q, w)), "P1 auxiliary derivative pilot")
+            }
         }
+    if (any(!is.finite(h)) || any(!is.finite(unlist(dh))))
+        stop("P1 auxiliary pilot produced non-finite rows")
     list(indices = ii, mean = h, derivatives = dh)
 }
 
@@ -255,7 +299,7 @@ function (spec)
             stop("invalid pilot row request")
         ans <- matrix(0, length(ii), nrow(spec$x))
         for (j in seq_along(ii)) {
-            row <- .np_bias_pilot_rows(spec, spec$x[ii[j], , drop = FALSE], FALSE)
+            row <- .np_bias_pilot_rows(spec, spec$x[ii[j], , drop = FALSE], FALSE, .training = TRUE)
             ans[j, row$indices] <- row$mean
         }
         ans
