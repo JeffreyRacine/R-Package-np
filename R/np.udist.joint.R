@@ -3,7 +3,7 @@
 .np_udist_joint_inference <- function(state, grid, law = "gaussian", alpha = .05,
                                      B = 9999L, tile = 25L,
                                      bands = c("pointwise", "simultaneous", "bonferroni"),
-                                     corrected = TRUE) {
+                                     corrected = TRUE, blocklen = NULL, selection = NULL) {
   existed <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
   entry <- if (existed) get(".Random.seed", .GlobalEnv, inherits = FALSE) else NULL
   kind <- RNGkind(); success <- FALSE
@@ -13,7 +13,16 @@
     else if (exists(".Random.seed", .GlobalEnv, inherits = FALSE))
       rm(list = ".Random.seed", envir = .GlobalEnv)
   }, add = TRUE)
-  law <- match.arg(law, c("gaussian", "inid"))
+  law <- match.arg(law, c("gaussian", "inid", "fixed"))
+  dependent <- law == "fixed"
+  if (dependent) {
+    if (is.null(selection)) selection <- .np_udist_bc_block_request(state$x, law, blocklen)
+    if (!is.list(selection) || !identical(selection$law, law))
+      stop("invalid CDF block selection", call. = FALSE)
+    .np_udist_bc_block_request(state$x, law, selection$length)
+    blocklen <- selection$length
+  } else if (!is.null(selection) || !is.null(blocklen))
+    stop("CDF block controls require a dependent bootstrap law", call. = FALSE)
   if (!identical(state$type, "fixed"))
     stop("absolute CDF process requires fixed bandwidths", call. = FALSE)
   bands <- match.arg(bands, c("pointwise", "simultaneous", "bonferroni"), several.ok = TRUE)
@@ -33,10 +42,12 @@
   for (block in .np_bias_target_blocks(m, 1L, anchors = tile)) {
     ii <- block$grid
     rows <- .np_udist_bc_rows(state, grid[ii, , drop = FALSE], corrected)
-    center[ii] <- rows$center; original[ii] <- rows$original.center; se[ii] <- rows$se
+    center[ii] <- rows$center; original[ii] <- rows$original.center
+    se[ii] <- if (dependent)
+      sqrt(.np_bias_score_variance(rows$factor, blocklen, law)) else rows$se
     if (stochastic) {
       stream <- .np_bias_stream(start,
-        .np_bias_process_draws(rows$factor, B, law, NULL))
+        .np_bias_process_draws(rows$factor, B, law, blocklen))
       if (!is.null(end) && !identical(end, stream$end))
         stop("absolute CDF tile RNG mismatch", call. = FALSE)
       end <- stream$end
@@ -52,7 +63,7 @@
     joint <- if (stochastic) pmin(apply(bonf, 2L, max),
       pmax(apply(point, 2L, max), raw)) else apply(point, 2L, max)
   }
-  if (law == "inid") {
+  if (law != "gaussian") {
     point <- limits$point; bonf <- limits$bonf; joint <- raw
   }
   joint <- matrix(rep(joint, each = m), m, length(alpha))
@@ -73,7 +84,7 @@
     zero.marginals = which(se == 0), degeneracy = integer(m), cancellation = integer(m),
     settings = list(construction = "cdf-absolute-process-v1", critical.units = "CDF",
       bwtype = state$type, h = state$h, law = law, n = state$n, alpha = alpha,
-      B = B, corrected = corrected, budget = budget,
+      B = B, corrected = corrected, budget = budget, selection = selection,
       representation = "bounded observation factors", metadata = state$metadata,
       target.ids = rownames(grid), scope = "declared finite family"),
     rng = list(kind = kind, entry = entry, start = start, end = end))
