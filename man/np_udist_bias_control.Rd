@@ -2,34 +2,43 @@
 \alias{np_udist_bias_control}
 \title{Private Controls for Bias-Corrected Unconditional Distribution Bands}
 \description{Selects the research CDF construction or legacy bootstrap centering.}
-\usage{np_udist_bias_control(construction = c("cdf", "legacy"))}
+\usage{np_udist_bias_control(construction = c("joint-process", "cdf", "legacy"))}
 \arguments{\item{construction}{The joint corrected CDF process or legacy correction.}}
 \details{
 This private research implementation is undergoing full empirical-range
 qualification. It does not establish a finite-sample coverage guarantee.
 With \code{center="bias-corrected"}, omitting \code{bias.control} selects
-\code{"cdf"}. The default estimate center remains unchanged. Use
+\code{"joint-process"}. The default estimate center remains unchanged. Use
 \code{errors="asymptotic"} for Gaussian calibration or \code{errors="bootstrap"}
 with \code{bootstrap="inid"} for literal independent resampling. Explicit
 \code{construction="legacy"} retains previous bootstrap correction.
 
-The new construction currently admits fixed unbounded second-order Gaussian
-continuous kernels and normalized Li--Racine ordered smoothing, preserving
-integer lattice distances and declared levels. Unordered factors are excluded.
-Selected bandwidths and ordered smoothing parameters stay fixed within a fit.
-Joint continuous bias correction and the complete corrected observation
-covariance are used. Small Gaussian families use bounded covariance calibration;
-larger families use target tiles with common observation innovations. No
-training-size-squared or unrestricted target covariance matrix is retained.
+The default joint-process construction admits fixed unbounded second-order
+Gaussian kernels with one or two numeric variables. It calibrates the maximum
+absolute corrected CDF displacement, with complete covariance and common
+observation innovations across target tiles. Gaussian and literal multinomial
+inid processes use the same centered observation factor. Critical values are in
+CDF probability units, not standardized units. Selected bandwidths stay fixed.
+No local or replicate studentizer division, variance floor, trimming, endpoint
+clipping or resampling-law substitution is used. An entirely zero observed
+process is unavailable; zero marginal scales are reported explicitly.
 
-Independent bootstrap draws are literal multinomial resamples. Each replicate
-uses its own complete corrected scale. Certified zero replicate scale with
-nonzero displacement gives an infinite pivot; undefined zero over zero fails
-the intact family. Draws are never removed or replaced and scales are not floored.
-Bootstrap quantiles use type one. Bonferroni empirical tail resolution is limited
-by the requested draw count; the raw and nesting-adjusted critical values are
-retained. Gaussian pointwise and Bonferroni quantiles are analytic. Bands coincide
-for singleton families and nest pointwise, simultaneous, Bonferroni.
+Gaussian marginal quantiles are analytic. Joint critical values use type-one
+quantiles bounded by the analytic marginal and Bonferroni maximum bounds.
+Inid marginal and joint quantiles use type one. Bonferroni intervals envelope
+the joint band. Singleton bands coincide. Standalone Gaussian Bonferroni uses
+the default joint draws for its envelope; request \code{band="all"} to set
+\code{gaussian.draws} and obtain all bands from the same process. Finite-draw
+Bonferroni tail resolution and marginal sparse-tail coverage remain limitations.
+The maximum-process draws are retained as \code{inference$process.maximum}.
+
+Explicit \code{construction="cdf"} retains the preceding private studentized
+construction, including normalized Li--Racine ordered smoothing and bounded
+small-grid covariance calibration. Its bootstrap uses replicate scales and
+retains the extended degenerate-pivot contract. This explicit construction does
+not inherit qualification from the absolute process. Explicit \code{"legacy"}
+retains the historical bootstrap center. All constructions remain research
+candidates; full empirical-range screening is distinct from confirmation.
 
 Use an explicit \code{band} of \code{"pointwise"}, \code{"simultaneous"},
 \code{"bonferroni"} or \code{"all"}. Nearest-neighbor bandwidths, fixed/geom

@@ -8,6 +8,8 @@ test_that("distribution correction uses the public center and signed surface off
       band = "all", neval = 7L, output = "data")
     args[[if (method == "asymptotic") "gaussian.draws" else "B"]] <- 49L
     z <- suppressWarnings(do.call(plot, args))$d1
+    expect_identical(z$inference$settings$construction, "cdf-absolute-process-v1")
+    expect_identical(z$inference$settings$critical.units, "CDF")
     expect_equal(nrow(z$eval), 49L)
     expect_equal(range(z$eval[[1L]]), range(x$x1), tolerance = 0)
     expect_equal(range(z$eval[[2L]]), range(x$x2), tolerance = 0)
@@ -23,6 +25,7 @@ test_that("distribution correction uses the public center and signed surface off
 test_that("distribution controls reject altered objects and retain regression settings", {
   prepare <- getFromNamespace(".np_udist_plot_prepare", "npRmpi")
   expect_identical(np_udist_bias_control()$version, 1L)
+  expect_identical(np_udist_bias_control()$construction, "joint-process")
   expect_identical(np_bias_control()$iterations, 16L)
   expect_null(prepare(NULL, NULL, NULL, "estimate", "asymptotic", "inid", "pointwise"))
   expect_null(prepare(np_udist_bias_control("legacy"), NULL, NULL,

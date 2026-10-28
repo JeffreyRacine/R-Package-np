@@ -14,6 +14,10 @@
   coordinates. Main fits, rank decisions, pilot settings, variance rules and
   the default 16 correction iterations are unchanged.
 
+* Private distribution plots can select absolute-process bias-corrected bands
+  for fixed Gaussian kernels with one or two numeric variables. Explicit
+  studentized and legacy constructions remain available; qualification is ongoing.
+
 * Extend the fixed-bandwidth univariate Gaussian/Mammen bias-corrected plot
   construction to raw main polynomial bases, for means and first derivatives,
   using the original fitted rows and the existing variance calibration.
