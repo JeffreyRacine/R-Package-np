@@ -13,7 +13,7 @@
     else if (exists(".Random.seed", .GlobalEnv, inherits = FALSE))
       rm(list = ".Random.seed", envir = .GlobalEnv)
   }, add = TRUE)
-  law <- match.arg(law, "gaussian")
+  law <- match.arg(law, c("gaussian", "inid"))
   if (!identical(state$type, "fixed"))
     stop("absolute CDF process requires fixed bandwidths", call. = FALSE)
   bands <- match.arg(bands, c("pointwise", "simultaneous", "bonferroni"), several.ok = TRUE)
@@ -51,6 +51,9 @@
     bonf <- outer(se, qnorm(alpha/(2*m), lower.tail = FALSE))
     joint <- if (stochastic) pmin(apply(bonf, 2L, max),
       pmax(apply(point, 2L, max), raw)) else apply(point, 2L, max)
+  }
+  if (law == "inid") {
+    point <- limits$point; bonf <- limits$bonf; joint <- raw
   }
   joint <- matrix(rep(joint, each = m), m, length(alpha))
   raw.bonf <- bonf; bonf <- pmax(bonf, joint)
