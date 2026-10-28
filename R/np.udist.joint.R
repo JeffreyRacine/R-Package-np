@@ -13,8 +13,8 @@
     else if (exists(".Random.seed", .GlobalEnv, inherits = FALSE))
       rm(list = ".Random.seed", envir = .GlobalEnv)
   }, add = TRUE)
-  law <- match.arg(law, c("gaussian", "inid", "fixed"))
-  dependent <- law == "fixed"
+  law <- match.arg(law, c("gaussian", "inid", "fixed", "geom"))
+  dependent <- law %in% c("fixed", "geom")
   if (dependent) {
     if (is.null(selection)) selection <- .np_udist_bc_block_request(state$x, law, blocklen)
     if (!is.list(selection) || !identical(selection$law, law))
