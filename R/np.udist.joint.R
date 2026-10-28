@@ -85,7 +85,6 @@
     out
   })
   if (stochastic) assign(".Random.seed", end, .GlobalEnv) else end <- entry
-  success <- TRUE
   answer <- list(center = center, original.center = original, se = se,
     intervals = intervals, critical = widths[bands], raw.max = raw,
     raw.bonf = raw.bonf, envelope = bonf > raw.bonf,
@@ -105,5 +104,9 @@
       "literal exact GNN center displacement" else "complete GNN influence process"
     if (gnn.bootstrap) answer$settings$scale <- "selected-law empirical SD of exact center displacements"
   }
+  if (isTRUE(corrected) && identical(state$type, "fixed") &&
+      state$q %in% 1:2 && state$s == 0L && identical(law, "gaussian"))
+    answer <- .np_udist_marginal_envelope(answer, widths, state$n, state$q, alpha)
+  success <- TRUE
   answer
 }
