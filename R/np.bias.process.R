@@ -148,9 +148,9 @@
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE, main.capture=NULL) {
-  if (!is.null(state$local.inference) && !law %in% c("gaussian","mammen"))
+  if ((!is.null(state$local.inference) || !is.null(state$main.capture) || !is.null(main.capture)) && !law %in% c("gaussian","mammen"))
     stop("captured local calibration requires Gaussian or Mammen; prepare the state for the selected law",call.=FALSE)
-  if (!is.null(state$local.inference) && is.null(main.capture))
+  if ((!is.null(state$local.inference) || !is.null(state$main.capture)) && is.null(main.capture))
     main.capture <- .np_bias_capture_prepare(state,fit,grid,targets)
   if (!is.null(main.capture)) .np_bias_capture_validate(main.capture,state,grid,targets)
   if (isTRUE(state$categorical.only) && !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
@@ -196,7 +196,7 @@
     if (!is.null(value$adaptation)) adaptation[[length(adaptation)+1L]] <-
       list(rows=rr,grid=jj,details=value$adaptation)
     diagnostic <- value$main.regularization
-    if(law!="gaussian" && any(diagnostic$ridge>0) && is.null(state$local.inference))
+    if(law!="gaussian" && any(diagnostic$ridge>0) && is.null(state$local.inference) && is.null(main.capture))
       stop("bootstrap calibration for regularized generalized-NN main rows remains unqualified; Gaussian inference is available with the qualifications documented in np_bias_control",call.=FALSE)
     diagnostic$row <- jj[diagnostic$row]
     regularization[[length(regularization)+1L]] <- diagnostic

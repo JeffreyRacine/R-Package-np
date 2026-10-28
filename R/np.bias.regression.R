@@ -107,6 +107,12 @@
       spec$variance <- .np_bias_variance(spec,spec$residual)
   }
   if (!is.null(policy)) spec$settings$adaptation <- policy
+  if (.np_bias_main_capture_supported(spec,law)) {
+    spec$main.capture <- list(version="fixed-multivariate-fitted-v1")
+    spec$settings$main.capture <- list(version="fixed-multivariate-fitted-v1",
+      main="complete original fitted capture",variance="unchanged smoothed P0 residual variance",
+      qualification="continuous fixed Gaussian2, inactive adaptation, mean/first derivative, Gaussian/Mammen")
+  }
   spec
 }
 
@@ -174,8 +180,10 @@
   admitted <- spec$bws[["type"]]=="generalized_nn" &&
     any(reg[["degree.engine"]]>1L) && isTRUE(reg[["bernstein.basis.engine"]])
   admitted <- admitted || (isTRUE(captured) && !is.null(spec$local.inference))
+  admitted <- admitted || (!is.null(spec$main.capture) && inherits(captured,"np_bias_main_capture_certificate") &&
+    identical(captured$state,spec))
   if (any(ridge!=0) && !admitted)
-    stop("regularized main rows are qualified only for generalized-NN GLP models with a stored Bernstein basis; the fitted model has not been changed",call.=FALSE)
+    stop("regularized main rows require a qualified fitted capture or generalized-NN GLP model with a stored Bernstein basis; the fitted model has not been changed",call.=FALSE)
   attr(H,"ridge.used") <- ridge
   H
 }

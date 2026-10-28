@@ -1,3 +1,18 @@
+# Acquisition policy only; multivariate variance/studentization is unchanged.
+.np_bias_main_capture_supported <- function(state, law) {
+  if (!is.character(law) || length(law)!=1L ||
+      !law %in% c("gaussian","mammen") || state$d<2L ||
+      length(state$factor.cols) || isTRUE(state$pooled) ||
+      isTRUE(state$categorical.only) || !is.null(state$adaptation) ||
+      !is.null(state$mixed) ||
+      !.np_plot_regression_capture_supported(state$bws) ||
+      (!is.null(state$gradient.order) && any(state$gradient.order!=1L)))
+    return(FALSE)
+  reg <- npValidatedConditionalRegSpec(state$bws,
+    where="captured main bias rows",ncon.field="ncon")
+  identical(reg[["basis.engine"]],"glp")
+}
+
 # Private, explicit integration seam for an already captured original fit.
 # Acquisition belongs to the existing plot evaluator. Replay never refits.
 .np_bias_capture_prepare <- function(spec, fit, grid, targets = "mean") {
@@ -37,6 +52,10 @@
   }),targets)
   ridge <- fit[["fit.inference",exact=TRUE]][[3L]]
   reg <- npValidatedConditionalRegSpec(spec$bws,where="bias main operator",ncon.field="ncon")
+  # The complete request was validated above. Bind admission to this exact
+  # correction state without selecting a variance or calibration policy.
+  certificate <- if (!is.null(spec$local.inference)) TRUE else
+    structure(list(state=spec), class="np_bias_main_capture_certificate")
   # The immutable complete grid is indexed by occurrence, never value-matched.
   rows <- function(index,map) {
     index <- .np_plot_lsq_gate_indices(index,nrow(grid))
@@ -55,7 +74,7 @@
         ii <- index[map$row[jj]]
         H <- operators[[target]](grid[ii,,drop=FALSE],nu,ii)
         H <- .np_bias_main_admit(spec,H,ridge[ii],reg,
-          captured=!is.null(spec$local.inference))
+          captured=certificate)
         # Auxiliary correction operates on standardized coordinates. Convert
         # here; the existing final conversion restores physical units once.
         L[jj,] <- H * if(axis)spec$scale[axis] else 1
@@ -66,7 +85,7 @@
     }
     attr(L,"main.regularization") <- do.call(rbind,diagnostic)
     .np_bias_regression_rows(spec,grid[index,,drop=FALSE],map,original=L,
-      captured=!is.null(spec$local.inference))
+      captured=certificate)
   }
   structure(list(state=spec,grid=grid,targets=targets,rows=rows),
     class="np_bias_capture_prototype")

@@ -264,7 +264,7 @@
         gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
         law=if(plot.errors.method=="asymptotic")"gaussian" else
           if(plot.errors.boot.method=="wild")plot.errors.boot.wild else plot.errors.boot.method)) else NULL
-    bias.capture <- !is.null(bias.state$adaptation) || !is.null(bias.state$local.inference)
+    bias.capture <- !is.null(bias.state$adaptation) || !is.null(bias.state$local.inference) || !is.null(bias.state$main.capture)
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     overlay.ok <- .np_plot_overlay_enabled(
@@ -377,7 +377,7 @@
               fields = list(slice = 0L, gradients = gradients, n_eval = nrow(x.eval))
             )
             tobj = npreg(txdat = xdat, tydat = ydat,
-              exdat = x.eval, bws = bws,
+              exdat = if(!is.null(bias.state$main.capture))setNames(x.eval,names(xdat)) else x.eval, bws = bws,
               se = TRUE,
               gradient.order = gradient.order,
               warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE,
