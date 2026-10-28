@@ -504,7 +504,15 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   deviations or pointwise tail quantiles. With \code{band="all"}, these
   distinct bootstrap families are displayed together where supported.
 
-  Outside iterated bias-corrected regression, asymptotic \code{"pmzsd"}
+  Corrected unconditional density and distribution plots also support the
+  default \code{"pmzsd"}: the corrected center plus or minus
+  \eqn{z_{1-\alpha/2}} times the family-owned corrected scale. This normal
+  rule is separate from their calibrated pointwise and joint envelopes;
+  see \code{\link{np_udens_bias_control}} and
+  \code{\link{np_udist_bias_control}}. Their explicit quantile-band
+  constructions are unchanged.
+
+  Outside these corrected constructions, asymptotic \code{"pmzsd"}
   and \code{"pointwise"} are two names for the same symmetric normal
   construction. Let \eqn{T(x)} denote
   the plotted functional (mean, gradient, density, distribution, etc.) and
