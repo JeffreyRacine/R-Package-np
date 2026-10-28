@@ -30,8 +30,8 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
     stop("new distribution bounds require an explicit quantile band", call. = FALSE)
   state <- .np_udist_bc_prepare(bws, x)
   if (identical(construction, "joint-process") &&
-      (state$s != 0L || !state$q %in% 1:2))
-    stop("joint CDF process currently admits numeric q=1 or q=2 only; use an explicit qualified construction", call. = FALSE)
+      (!state$q %in% 0:2 || !state$s %in% 0:2))
+    stop("joint CDF process currently admits at most two numeric and two ordered variables; use an explicit qualified construction", call. = FALSE)
   state$plot.construction <- construction
   state$plot.law <- if (identical(method, "asymptotic")) "gaussian" else "inid"
   state
