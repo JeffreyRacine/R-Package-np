@@ -16,7 +16,9 @@ independent, circular fixed-length or stationary geometric-block resampling. Exp
 
 The default joint-process construction admits fixed and generalized-nearest-neighbor
 unbounded second-order Gaussian kernels with at most two numeric and two ordered variables. Ordered
-smoothing uses the normalized Li--Racine kernel and the complete joint corrected
+smoothing retains the canonical categorical representation: nonnumeric ordered
+labels use ordinal ranks, while numeric labels retain their metric gaps. It
+uses the normalized Li--Racine kernel and the complete joint corrected
 contribution, retaining declared levels and integer gaps. It calibrates the maximum
 absolute corrected CDF displacement, with complete covariance and common
 observation innovations across target tiles. For fixed bandwidths, Gaussian and literal multinomial

@@ -39,7 +39,7 @@
   categorical <- rep(1, state$n)
   for (category in state$category)
     categorical <- categorical * .np_udist_bc_ordered(
-      as.numeric(as.character(block$profile[[category$index]])) - category$training,
+      as.double(toMatrix(block$profile[category$index])) - category$training,
       category$lambda, corrected)
   list(cache = cache, category = categorical, map = block$map,
     n = state$n, corrected = corrected)
@@ -116,7 +116,7 @@
   }
   original <- P; G <- if (corrected) P + .5 * Q else P
   for (cat in state$category) {
-    distance <- outer(as.numeric(as.character(grid[[cat$index]])), cat$training, "-")
+    distance <- outer(as.double(toMatrix(grid[cat$index])), cat$training, "-")
     original <- original * .np_udist_bc_ordered(distance, cat$lambda, FALSE)
     G <- G * .np_udist_bc_ordered(distance, cat$lambda, corrected)
   }
