@@ -144,7 +144,8 @@
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
     bias.state <- .np_udist_plot_prepare(bias.control, bws, xdat,
-      plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type)
+      plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
+      plot.errors.boot.blocklen)
     new.bias <- !is.null(bias.state)
     joint.eligible <- joint.eligible && !new.bias
     if (new.bias && isTRUE(plot.bxp))
