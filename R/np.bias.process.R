@@ -143,7 +143,13 @@
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE, main.capture=NULL,
                                resolution.bands=c("pointwise","simultaneous","bonferroni"),
-                               resolution.warn=TRUE, calibration="absolute") {
+                               resolution.warn=TRUE, calibration="absolute", refinement="none") {
+  if (!is.character(refinement) || length(refinement)!=1L || is.na(refinement) ||
+      !refinement %in% c("none","pilot-block"))
+    stop("unknown regression provider refinement",call.=FALSE)
+  pilot.block <- identical(refinement,"pilot-block")
+  if (pilot.block && !law %in% c("fixed","geom"))
+    stop("pilot-block refinement requires fixed or geom",call.=FALSE)
   tail.calibration <- calibration %in% c("tail-envelope","separate-tails")
   if(tail.calibration && !law %in% c("mammen","rademacher","inid","fixed","geom"))
     stop("private separate-tail regression requires a supported bootstrap law",call.=FALSE)
@@ -192,6 +198,7 @@
   calibration.state <- .np_bias_limits_prepare(map$target,alpha,law=="gaussian" && !student,B)
   prepared <- NULL
   regularization <- adaptation <- list()
+  block.refinement <- if(pilot.block)list() else NULL
   adapted.rows <- if (!is.null(state$mixed)) .np_bias_mixed_capture(state,fit,grid,targets) else if (!is.null(state$adaptation))
     .np_bias_adaptation_capture(state,fit,grid,targets) else NULL
   score <- law%in%c("inid","fixed","geom")
@@ -264,6 +271,11 @@
       score.se[rr] <- s
       divisor <- ifelse(s==0,1,s)
       if(law!="inid")se[rr] <- s
+      if (pilot.block) {
+        anchored <- .np_bias_pilot_block_scale(F,value$se,selection$length,law)
+        se[rr] <- anchored$se
+        if (pass==1L) block.refinement[[length(block.refinement)+1L]] <- c(list(rows=rr),anchored)
+      }
     }
     if(rank.calibration) {
       if(!student && !score.calibration) part$value <- part$value/divisor
@@ -351,6 +363,12 @@
     calibration=calibrated,score.se=if(score)score.se else NULL,
     rng=list(kind=rng.kind,start=rng,end=end,convention="common observation draws across all target blocks"),
     scope="finite grid within each scalar-target family",owner="bounded corrected observation factors")
+  if (pilot.block) {
+    result$provider.refinement <- list(method=refinement,
+      owner=if(score.calibration)"unchanged pooled score studentizer" else "pilot times selected-block to iid covariance ratio",
+      blocks=block.refinement)
+    if (!score.calibration) result$covariance$variance <- "pilot-anchored exact selected-block relative covariance"
+  }
   if(rank.calibration) {
     result$absolute.reference <- absolute.reference
     result$calibration.method <- calibration
