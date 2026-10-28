@@ -1,5 +1,16 @@
 # np 0.80-2 (development)
 
+- Bias-corrected regression bootstrap bands now offer raw asymmetric
+  `np_boot_control(calibration="separate-tails")` and conservative
+  `calibration="tail-envelope"` choices for wild, inid, fixed and geom.
+  Existing method defaults and Mammen weights are preserved. Corrected fixed
+  and geom empirical bands use a pilot-anchored selected-block scale; pooled
+  studentization and normal-scale intervals retain their existing behavior.
+  Finite-sample undercoverage and localized width limitations remain documented.
+- Defined regression empirical bands are returned at low draw counts with one
+  aggregate resolution warning and saved diagnostics, including Bonferroni.
+  Genuine undefined-variance and invalid-input errors remain distinct.
+
 - Corrected unconditional density and distribution plots now accept the
   default `band="pmzsd"`, using the corrected scale and the normal critical
   value determined by `alpha`. Explicit calibrated bands and legacy routes
