@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+- Corrected unconditional density and distribution plots now accept the
+  default `band="pmzsd"`, using the corrected scale and the normal critical
+  value determined by `alpha`. Explicit calibrated bands and legacy routes
+  retain their existing behavior.
+
 * Extend fitted-row bias correction to continuous multivariate fixed-bandwidth
   Gaussian/Mammen means and first derivatives with inactive local-to-global
   adaptation, including accepted regularized raw and Bernstein main fits.

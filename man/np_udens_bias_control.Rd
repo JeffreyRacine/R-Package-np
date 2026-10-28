@@ -23,6 +23,16 @@ practical envelope with bounded empirical qualification, not a finite-sample
 coverage guarantee.
 Regression iterations and residual/pilot assumptions do not apply.
 
+Omitting \code{band}, or selecting \code{band="pmzsd"}, uses the existing
+normal-quantile convention: the corrected center plus or minus
+\eqn{z_{1-\alpha/2}} times \code{inference$se}. The family provider supplies
+the corrected scale; its pointwise calibration work and RNG contract are
+retained. These normal intervals do not apply the joint-scale uncertainty
+envelope and do not inherit its empirical coverage results. Their endpoints
+are in \code{inference$bands$pmzsd}; \code{inference$normal.band} records the
+rule. Explicit \code{"pointwise"}, \code{"simultaneous"},
+\code{"bonferroni"} and \code{"all"} retain their calibrated constructions.
+
 The joint-scale construction supports fixed, unbounded, second-order Gaussian continuous
 kernels for one or two numeric variables. Mixed-data qualification of the
 new envelope remains deferred; saved controls retain their previous scope.
@@ -56,7 +66,7 @@ criticals are retained separately. Gaussian Bonferroni uses analytic normal
 tails. Singleton bands coincide.
 
 Nearest-neighbor bandwidths, dependent bootstrap laws, higher-order or bounded
-continuous kernels, \code{pmzsd}, factor boxplots and derivatives remain outside
+continuous kernels, factor boxplots and derivatives remain outside
 the joint-scale construction. Unsupported corrected requests fail clearly. Existing estimate
 and explicit legacy routes retain their previous contracts and limitations.
 

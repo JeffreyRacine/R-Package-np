@@ -36,8 +36,8 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
     stop("saved version-1 density controls require errors='bootstrap'", call. = FALSE)
   if (identical(method, "bootstrap") && !identical(bootstrap, "inid"))
     stop("positive-covariance density bounds require bootstrap='inid'; other laws remain unqualified", call. = FALSE)
-  if (!band %in% c("pointwise", "simultaneous", "bonferroni", "all"))
-    stop("positive-covariance density bounds require an explicit quantile band", call. = FALSE)
+  if (!band %in% c("pmzsd", "pointwise", "simultaneous", "bonferroni", "all"))
+    stop("unsupported bias-corrected density band", call. = FALSE)
   state <- .np_udens_bc_prepare(bws, x)
   state$plot.control.version <- version
   state$plot.law <- if (identical(method, "asymptotic")) "gaussian" else "inid"
@@ -46,18 +46,20 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
 
 .np_udens_plot_errors <- function(state, grid, alpha, B, band) {
   names(grid) <- names(state$x)
+  provider.band <- if (band == "pmzsd") "pointwise" else band
   inference <- .np_plot_activity_run("Constructing bias-corrected density intervals",
     if (identical(state$plot.control.version, 3L))
       .np_udens_scale_inference(state, grid, law = state$plot.law,
         alpha = alpha, B = B,
-        bands = if (band == "all") c("pointwise", "simultaneous", "bonferroni") else band)
+        bands = if (provider.band == "all") c("pointwise", "simultaneous", "bonferroni") else provider.band)
     else if (identical(state$plot.control.version, 2L))
       .np_udens_reference_inference(state, grid, law = state$plot.law,
         alpha = alpha, B = B,
-        bands = if (band == "all") c("pointwise", "simultaneous", "bonferroni") else band)
+        bands = if (provider.band == "all") c("pointwise", "simultaneous", "bonferroni") else provider.band)
     else .np_udens_b4_inference(state, grid, law = "inid", alpha = alpha, B = B))
   inference$settings$primary <- "absolute"
   inference$bands <- inference$absolute.intervals
+  if (band == "pmzsd") inference <- .np_plot_bias_normal(inference, alpha)
   all <- lapply(inference$bands, function(z)
     cbind(inference$center - z[, 1L, 1L], z[, 2L, 1L] - inference$center))
   width <- all[[if (band == "all") "pointwise" else band]]

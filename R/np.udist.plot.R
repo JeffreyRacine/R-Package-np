@@ -30,8 +30,8 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   if (identical(method, "bootstrap") &&
       !bootstrap %in% if (construction == "joint-process") c("inid", "fixed", "geom") else "inid")
     stop("selected bootstrap law is not qualified for this distribution construction", call. = FALSE)
-  if (!band %in% c("pointwise", "simultaneous", "bonferroni", "all"))
-    stop("new distribution bounds require an explicit quantile band", call. = FALSE)
+  if (!band %in% c("pmzsd", "pointwise", "simultaneous", "bonferroni", "all"))
+    stop("unsupported bias-corrected distribution band", call. = FALSE)
   state <- .np_udist_bc_prepare(bws, x)
   if (identical(construction, "joint-process") &&
       (!state$q %in% 0:2 || !state$s %in% 0:2))
@@ -51,15 +51,17 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
 
 .np_udist_plot_errors <- function(state, grid, alpha, B, band) {
   names(grid) <- names(state$x)
+  provider.band <- if (band == "pmzsd") "pointwise" else band
   infer <- if (identical(state$plot.construction, "joint-process"))
     .np_udist_joint_inference else .np_udist_bc_inference
   inference <- .np_plot_activity_run("Constructing bias-corrected distribution intervals",
     do.call(infer, c(list(state = state, grid = grid, law = state$plot.law,
       alpha = alpha, B = B,
-      bands = if (band == "all") c("pointwise", "simultaneous", "bonferroni") else band),
+      bands = if (provider.band == "all") c("pointwise", "simultaneous", "bonferroni") else provider.band),
       if (identical(state$plot.construction, "joint-process"))
         list(selection = state$plot.block.selection) else list())))
   inference$bands <- inference$intervals
+  if (band == "pmzsd") inference <- .np_plot_bias_normal(inference, alpha)
   all <- lapply(inference$bands, function(z)
     cbind(inference$center - z[, 1L, 1L], z[, 2L, 1L] - inference$center))
   width <- all[[if (band == "all") "pointwise" else band]]

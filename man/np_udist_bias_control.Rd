@@ -91,8 +91,16 @@ not inherit qualification from the absolute process. Explicit \code{"legacy"}
 retains the historical bootstrap center. All constructions remain research
 candidates; full empirical-range screening is distinct from confirmation.
 
-Use an explicit \code{band} of \code{"pointwise"}, \code{"simultaneous"},
-\code{"bonferroni"} or \code{"all"}. Numeric adaptive nearest-neighbor bandwidths, unordered factors,
+Omitting \code{band}, or selecting \code{band="pmzsd"}, uses the corrected
+center plus or minus \eqn{z_{1-\alpha/2}} times \code{inference$se}.
+The existing pointwise provider supplies the selected-law scale, retaining
+block dependence and exact GNN resampling where applicable. Its computation
+and RNG contract are retained. Zero marginal scales give zero normal width.
+These normal intervals do not apply the score or joint envelopes and do not
+inherit their coverage results. Endpoints are in \code{inference$bands$pmzsd};
+\code{inference$normal.band} records the rule. Explicit \code{"pointwise"},
+\code{"simultaneous"}, \code{"bonferroni"} and \code{"all"} retain their
+calibrated constructions. Numeric adaptive nearest-neighbor bandwidths, unordered factors,
 bounded or higher-order kernels, large-bandwidth limits and
 factor boxplots remain unqualified for this private corrected route and fail
 clearly. Their legacy routes remain available. No explicit law is substituted.
