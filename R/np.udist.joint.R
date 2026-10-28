@@ -27,7 +27,7 @@
       (identical(state$type, "adaptive_nn") && state$q > 0L))
     stop("absolute CDF process has no qualified numeric ANN construction", call. = FALSE)
   nearest <- !identical(state$type, "fixed")
-  if (nearest && law != "gaussian")
+  if (nearest && !law %in% c("gaussian", "inid"))
     stop("selected nearest-neighbor CDF bootstrap law remains unqualified", call. = FALSE)
   bands <- match.arg(bands, c("pointwise", "simultaneous", "bonferroni"), several.ok = TRUE)
   if (!is.numeric(alpha) || !length(alpha) || any(!is.finite(alpha)) ||
@@ -43,7 +43,12 @@
   end <- NULL
   center <- original <- se <- numeric(m)
   limits <- .np_bias_limits_prepare(rep("cdf", m), alpha, law == "gaussian", B)
-  for (block in .np_bias_target_blocks(m, 1L, anchors = tile)) {
+  gnn.bootstrap <- nearest && state$q > 0L && law != "gaussian"
+  if (gnn.bootstrap) {
+    exact <- .np_udist_gnn_stream(state, grid, law, alpha, B, corrected, blocklen, start)
+    center <- exact$center; original <- exact$original; se <- exact$se
+    limits <- exact$limits; end <- exact$end; budget <- exact$budget
+  } else for (block in .np_bias_target_blocks(m, 1L, anchors = tile)) {
     ii <- block$grid
     rows <- .np_udist_bc_rows(state, grid[ii, , drop = FALSE], corrected)
     center[ii] <- rows$center; original[ii] <- rows$original.center
@@ -96,6 +101,9 @@
     answer$settings$h <- NULL
     answer$settings$counts <- state$requested
     answer$settings$radius <- "sample-specific query kth distance"
+    answer$settings$calibration <- if (gnn.bootstrap)
+      "literal exact GNN center displacement" else "complete GNN influence process"
+    if (gnn.bootstrap) answer$settings$scale <- "selected-law empirical SD of exact center displacements"
   }
   answer
 }
