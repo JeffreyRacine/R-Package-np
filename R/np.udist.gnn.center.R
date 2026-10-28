@@ -1,51 +1,82 @@
 # Exact GNN geometry and center algebra on bounded marginal-coordinate blocks.
-.np_udist_gnn_blocks <- function(state, grid, size=25L) {
- numeric<-which(state$numeric);categories<-vapply(state$category,`[[`,integer(1),'index')
- groups<-if(length(categories))split(seq_len(nrow(grid)),interaction(grid[categories],drop=TRUE))else list(seq_len(nrow(grid)))
- out<-list()
- for(ii in groups) {
-  axes<-lapply(numeric,function(j)unique(grid[[j]][ii]))
-  chunks<-lapply(axes,function(a)split(seq_along(a),ceiling(seq_along(a)/size)))
-  for(a in chunks[[1]])for(b in if(length(axes)==2)chunks[[2]]else list(1L)) {
-   u<-list(axes[[1]][a]);if(length(axes)==2)u[[2]]<-axes[[2]][b]
-   keep<-grid[[numeric[1]]][ii]%in%u[[1]]
-   if(length(axes)==2)keep<-keep&grid[[numeric[2]]][ii]%in%u[[2]]
-   jj<-ii[keep];if(!length(jj))next
-   out[[length(out)+1]]<-list(rows=jj,axes=u,map=lapply(seq_along(numeric),function(k)match(grid[[numeric[k]]][jj],u[[k]])),profile=grid[jj[1],,drop=FALSE])
+.np_udist_gnn_blocks <- function(state, grid, size = 25L) {
+  columns <- which(state$numeric)
+  categories <- vapply(state$category, `[[`, integer(1), "index")
+  groups <- if (length(categories))
+    split(seq_len(nrow(grid)), interaction(grid[categories], drop = TRUE)) else
+    list(seq_len(nrow(grid)))
+  out <- list()
+  for (ii in groups) {
+    axes <- lapply(columns, function(j) unique(grid[[j]][ii]))
+    chunks <- lapply(axes, function(a)
+      split(seq_along(a), ceiling(seq_along(a) / size)))
+    for (a in chunks[[1L]]) for (b in if (length(axes) == 2L) chunks[[2L]] else list(1L)) {
+      coordinates <- list(axes[[1L]][a])
+      if (length(axes) == 2L) coordinates[[2L]] <- axes[[2L]][b]
+      keep <- grid[[columns[1L]]][ii] %in% coordinates[[1L]]
+      if (length(axes) == 2L)
+        keep <- keep & grid[[columns[2L]]][ii] %in% coordinates[[2L]]
+      jj <- ii[keep]
+      if (!length(jj)) next
+      # Only requested pairs enter the process, including duplicate targets.
+      out[[length(out) + 1L]] <- list(rows = jj, axes = coordinates,
+        map = lapply(seq_along(columns), function(k)
+          match(grid[[columns[k]]][jj], coordinates[[k]])),
+        profile = grid[jj[1L], , drop = FALSE])
+    }
   }
- }
- out
+  out
 }
+
 .np_udist_gnn_block <- function(state, block, corrected = TRUE) {
- numeric<-which(state$numeric)
- cache<-lapply(seq_along(numeric),function(k) {
-  delta<-outer(block$axes[[k]],state$x[[numeric[k]]],'-')
-  order<-t(apply(abs(delta),1L,order))
-  if(nrow(delta)==1)order<-matrix(order,1L)
-  list(delta=delta,order=order,k=state$rank$lookup[k])
- })
- cat<-rep(1,state$n)
- for(c in state$category)cat<-cat*.np_udist_bc_ordered(
-   as.numeric(as.character(block$profile[[c$index]]))-c$training,c$lambda,corrected)
- list(cache=cache,category=cat,map=block$map,n=state$n,corrected=corrected)
+  columns <- which(state$numeric)
+  cache <- lapply(seq_along(columns), function(k) {
+    delta <- outer(block$axes[[k]], state$x[[columns[k]]], "-")
+    ordering <- t(apply(abs(delta), 1L, order))
+    if (nrow(delta) == 1L) ordering <- matrix(ordering, 1L)
+    list(delta = delta, order = ordering, k = state$rank$lookup[k])
+  })
+  categorical <- rep(1, state$n)
+  for (category in state$category)
+    categorical <- categorical * .np_udist_bc_ordered(
+      as.numeric(as.character(block$profile[[category$index]])) - category$training,
+      category$lambda, corrected)
+  list(cache = cache, category = categorical, map = block$map,
+    n = state$n, corrected = corrected)
 }
-.np_udist_gnn_center <- function(prepared,counts) {
- stopifnot(length(counts)==prepared$n,sum(counts)==prepared$n,all(counts>=0))
- h<-list();margins<-lapply(prepared$cache,function(c) {
-  radii<-vapply(seq_len(nrow(c$delta)),function(i){o<-c$order[i,];abs(c$delta[i,o[which(cumsum(counts[o])>=c$k)[1]]])},numeric(1))
-  if(any(!is.finite(radii))||any(radii<=0))stop('exact GNN center unavailable: nonpositive physical radius')
-  h[[length(h)+1]]<<-radii
-  z<-c$delta/radii;D<-z*dnorm(z);D[is.infinite(z)]<-0;list(H=pnorm(z),D=D)
- })
- w<-counts*prepared$category
- A<-margins[[1]]
- if(length(margins)==1)center<-drop((if(prepared$corrected)A$H+.5*A$D else A$H)%*%w)/prepared$n
- else {
-  B<-margins[[2]];AH<-sweep(A$H,2L,w,'*');AD<-sweep(A$D,2L,w,'*')
-  center<-(AH%*%t(B$H)+if(prepared$corrected).5*(AD%*%t(B$H)+AH%*%t(B$D))else 0)/prepared$n
- }
- list(center=if(length(margins)==1)center[prepared$map[[1]]]else center[cbind(prepared$map[[1]],prepared$map[[2]])],
-      radii=do.call(cbind,lapply(seq_along(h),function(k)h[[k]][prepared$map[[k]]])))
+
+.np_udist_gnn_center <- function(prepared, counts) {
+  stopifnot(length(counts) == prepared$n, sum(counts) == prepared$n, all(counts >= 0))
+  radii <- list()
+  margins <- lapply(prepared$cache, function(cache) {
+    radius <- vapply(seq_len(nrow(cache$delta)), function(i) {
+      ordering <- cache$order[i, ]
+      donor <- ordering[which(cumsum(counts[ordering]) >= cache$k)[1L]]
+      abs(cache$delta[i, donor])
+    }, numeric(1))
+    if (any(!is.finite(radius)) || any(radius <= 0))
+      stop("exact GNN center unavailable: nonpositive physical radius", call. = FALSE)
+    radii[[length(radii) + 1L]] <<- radius
+    z <- cache$delta / radius
+    D <- z * dnorm(z); D[is.infinite(z)] <- 0
+    list(H = pnorm(z), D = D)
+  })
+  weights <- counts * prepared$category
+  first <- margins[[1L]]
+  if (length(margins) == 1L) {
+    contribution <- if (prepared$corrected) first$H + .5 * first$D else first$H
+    center <- drop(contribution %*% weights) / prepared$n
+  } else {
+    second <- margins[[2L]]
+    weighted.H <- sweep(first$H, 2L, weights, "*")
+    weighted.D <- sweep(first$D, 2L, weights, "*")
+    center <- (weighted.H %*% t(second$H) + if (prepared$corrected)
+      .5 * (weighted.D %*% t(second$H) + weighted.H %*% t(second$D)) else 0) / prepared$n
+  }
+  list(center = if (length(margins) == 1L) center[prepared$map[[1L]]] else
+      center[cbind(prepared$map[[1L]], prepared$map[[2L]])],
+    radii = do.call(cbind, lapply(seq_along(radii), function(k)
+      radii[[k]][prepared$map[[k]]])))
 }
 
 # Preserve the observed center's original recurrence and shifted summation.
