@@ -45,7 +45,7 @@
            plot.par.mfrow = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, gaussian.draws = 9999L){
+           random.seed, gaussian.draws = 9999L, bias.control = NULL){
 
     if (.np_data_formal_supplied(sys.call(), sys.function()))
       .np_plot_data_error()
@@ -125,6 +125,7 @@
       common.scale = common.scale,
       ylim = ylim,
       allow_asymptotic_simultaneous = joint.eligible,
+      allow_asymptotic_bias = TRUE,
       error.request = error.request
     )
 
@@ -143,6 +144,12 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
+    bias.state <- .np_udist_plot_prepare(bias.control, bws, xdat,
+      plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type)
+    new.bias <- !is.null(bias.state)
+    joint.eligible <- joint.eligible && !new.bias
+    if (new.bias && isTRUE(plot.bxp))
+      stop("new distribution bounds require factor.boxplot=FALSE", call. = FALSE)
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
@@ -228,8 +235,10 @@
       lerr.all <- NULL
       herr.all <- NULL
 
-      if (plot.errors.method == "bootstrap"){
-        terr.obj <- compute.bootstrap.errors(xdat = xdat, 
+      if (new.bias || plot.errors.method == "bootstrap"){
+        terr.obj <- if (new.bias) .np_udist_plot_errors(bias.state, x.eval,
+          plot.errors.alpha, if (plot.errors.method == "asymptotic") gaussian.draws else plot.errors.boot.num,
+          plot.errors.type) else compute.bootstrap.errors(xdat = xdat,
           exdat = x.eval,
           slice.index = 0,
           target.dist = tobj$dist,
@@ -241,8 +250,8 @@
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
           bws = bws)
-        terr <- terr.obj[["boot.err"]]
-        terr.all <- terr.obj[["boot.all.err"]]
+        terr <- if (new.bias) terr.obj$err else terr.obj[["boot.err"]]
+        terr.all <- if (new.bias) terr.obj$all.err else terr.obj[["boot.all.err"]]
 
         pc = (.np_plot_center_is_bias_corrected(plot.errors.center))
         center.val <- if (pc) terr[,3] else tobj$dist
@@ -305,10 +314,12 @@
 
       if (plot.behavior != "plot"){
         d1 <- npdistribution(bws = bws, eval = x.eval,
-                             dist = tobj$dist, derr = terr[,1:2],
+                             dist = tobj$dist,
+                             derr = if (new.bias) cbind(-terr[,1], terr[,2]) else terr[,1:2],
                              ntrain = nrow(xdat), se = plot.errors)
         if (joint.eligible)
           d1 <- .np_plot_density_band_fields(d1, terr.obj)
+        if (new.bias) d1$inference <- terr.obj$inference
         d1$bias = NA
         d1$bias.corrected = NA
 
@@ -549,7 +560,13 @@
         temp.dens[seq_len(xi.neval)] <- tobj$dist
 
         if (plot.errors){
-          if (plot.errors.method == "asymptotic") {
+          if (new.bias) {
+            temp.payload <- .np_udist_plot_errors(bias.state, eval.slice,
+              plot.errors.alpha, if (plot.errors.method == "asymptotic") gaussian.draws else plot.errors.boot.num,
+              plot.errors.type)
+            temp.err[seq_len(xi.neval),] <- temp.payload$err
+            temp.all.err <- temp.payload$all.err
+          } else if (plot.errors.method == "asymptotic") {
             asym.obj <- .np_plot_asymptotic_error_from_se(
               se = tobj$derr,
               alpha = plot.errors.alpha,
@@ -710,6 +727,7 @@
               joint.eligible, plot.errors.type),
             ntrain = bws$nobs, se = plot.errors
           )
+          if (new.bias) plot.out[[i]]$inference <- temp.payload$inference
           plot.out[[i]]$bias = NA
           plot.out[[i]]$bias.corrected = NA
           if (.np_plot_center_is_bias_corrected(plot.errors.center))

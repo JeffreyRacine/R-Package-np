@@ -465,8 +465,10 @@ np_render_control <- function(style = c("band", "bar"),
   dots <- .np_plot_normalize_public_dots(dots, context = .plot_context,
     allow_asymptotic_bias = identical(method, .np_plot_rbandwidth_engine) ||
       identical(method, .np_plot_bandwidth_engine) ||
+      identical(method, .np_plot_dbandwidth_engine) ||
       (identical(method, .np_plot_compat_dispatch) &&
-       (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth"))))
+       (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth") ||
+        inherits(bws, "dbandwidth"))))
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 

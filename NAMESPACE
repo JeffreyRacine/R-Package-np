@@ -47,6 +47,7 @@ export(b.star
        ,npudenshat
        ,npudisthat
 	       ,npudist
+       ,np_udist_bias_control
 	       ,npregbw
 	       ,npreg
 	       ,nplsqregbw
