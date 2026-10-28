@@ -109,6 +109,7 @@
     joint.eligible <- joint.request
     if (joint.request)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+    block.automatic <- is.null(plot.errors.boot.blocklen)
     normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
@@ -145,7 +146,7 @@
     plot.errors <- normalized.opts$plot.errors
     bias.state <- .np_udist_plot_prepare(bias.control, bws, xdat,
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
-      plot.errors.boot.blocklen)
+      plot.errors.boot.blocklen, block.automatic)
     new.bias <- !is.null(bias.state)
     joint.eligible <- joint.eligible && !new.bias
     if (new.bias && isTRUE(plot.bxp))

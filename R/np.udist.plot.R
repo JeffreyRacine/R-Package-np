@@ -4,7 +4,7 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
             class = "np_udist_bias_control")
 }
 
-.np_udist_plot_prepare <- function(control, bws, x, center, method, bootstrap, band, blocklen = NULL) {
+.np_udist_plot_prepare <- function(control, bws, x, center, method, bootstrap, band, blocklen = NULL, block.automatic = FALSE) {
   if (is.null(control)) {
     if (!identical(center, "bias-corrected")) return(NULL)
     control <- np_udist_bias_control()
@@ -35,8 +35,14 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
     stop("joint CDF process currently admits at most two numeric and two ordered variables; use an explicit qualified construction", call. = FALSE)
   state$plot.construction <- construction
   state$plot.law <- if (identical(method, "asymptotic")) "gaussian" else bootstrap
-  if (state$plot.law %in% c("fixed", "geom"))
+  if (state$plot.law %in% c("fixed", "geom")) {
     state$plot.block.selection <- .np_udist_bc_block_request(x, state$plot.law, blocklen)
+    if (isTRUE(block.automatic) && !is.null(blocklen)) {
+      state$plot.block.selection$automatic <- TRUE
+      state$plot.block.selection$source <- "b.star(xdat, round=TRUE)[1,1]"
+      state$plot.block.selection$owner <- "shared plot normalization"
+    }
+  }
   state
 }
 
