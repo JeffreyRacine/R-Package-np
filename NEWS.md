@@ -1,5 +1,10 @@
 # np 0.80-2 (development)
 
+* Improve numerical precision of higher-order P1 bias-pilot derivatives by
+  differentiating the same weighted polynomial system in orthonormal
+  coordinates. Main fits, rank decisions, pilot settings, variance rules and
+  the default 16 correction iterations are unchanged.
+
 * Extend the fixed-bandwidth univariate Gaussian/Mammen bias-corrected plot
   construction to raw main polynomial bases, for means and first derivatives,
   using the original fitted rows and the existing variance calibration.

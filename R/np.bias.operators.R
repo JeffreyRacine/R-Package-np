@@ -212,6 +212,45 @@ function (spec, grid, map, op)
     list(root.weight = root.weight, value = apply.value, project = project)
 }
 
+# P1-specific same-system recurrence in fixed orthonormal QR coordinates.
+# Generic derivative owners, first derivatives and training rows are retained.
+# Differentiate in fixed orthonormal coordinates at the evaluation point.
+# The zeroth augmented Gram matrix is identity; only observation rows enter
+# its derivatives. This avoids repeatedly applying an ill-conditioned Gram
+# inverse while retaining the existing weighted system and rank decision.
+.np_bias_pilot_higher <- function(Q, weight, value, ratios, penalty=NULL,
+                             role="P1 auxiliary higher derivative pilot",rank.tolerance=1e-12) {
+ P<-ncol(Q);n<-nrow(Q);order<-nrow(value)-1L
+ if (!is.matrix(value) || ncol(value)!=P || order<1L ||
+      !is.matrix(ratios) || !identical(dim(ratios),c(n,order+1L)) ||
+      length(weight)!=n || any(!is.finite(weight)) || any(weight<0))
+    stop("invalid higher-order weighted-pilot geometry",call.=FALSE)
+ if(is.null(penalty))penalty<-numeric(P)
+ if (length(penalty)!=P || any(!is.finite(penalty)) || any(penalty<0))
+    stop("invalid fixed auxiliary penalty",call.=FALSE)
+ weighted<-Q*sqrt(weight)
+ augmented<-if(any(penalty>0))rbind(weighted,diag(sqrt(penalty),P)) else weighted
+ norm<-sqrt(colSums(augmented^2))
+ if(any(!is.finite(norm))||any(norm<=0))stop(role," has an unsupported column",call.=FALSE)
+ fit<-qr(sweep(augmented,2L,norm,"/"),tol=rank.tolerance,LAPACK=FALSE)
+ if(fit$rank!=P)stop(role," is numerically unidentified",call.=FALSE)
+ R<-qr.R(fit);U<-qr.Q(fit)[seq_len(n),,drop=FALSE]
+ V<-sweep(value,2L,norm,"/")
+ target<-t(forwardsolve(t(R),t(V[,fit$pivot,drop=FALSE])))
+ A<-G<-vector('list',order+1L)
+ A[[1L]]<-t(U)*rep(sqrt(weight),each=P)
+ for(j in seq_len(order))G[[j+1L]]<-crossprod(U,U*ratios[,j+1L])
+ for(j in seq_len(order)){
+  rhs<-t(U)*rep(sqrt(weight)*ratios[,j+1L],each=P)
+  for(k in seq_len(j))rhs<-rhs-choose(j,k)*(G[[k+1L]]%*%A[[j-k+1L]])
+  A[[j+1L]]<-rhs
+ }
+ out<-matrix(0,1L,n)
+ for(j in 0:order)out<-out+choose(order,j)*(target[j+1L,,drop=FALSE]%*%A[[order-j+1L]])
+ if(any(!is.finite(out)))stop(role," produced nonfinite derivative rows",call.=FALSE)
+ drop(out)
+}
+
 .np_bias_pilot_rows <-
 function (spec, at, derivatives = TRUE, orders = NULL, .training = FALSE)
 {
@@ -249,7 +288,7 @@ function (spec, at, derivatives = TRUE, orders = NULL, .training = FALSE)
                         basis="glp",bernstein.basis=spec$bernstein))/spec$b[d]^j
                 }))
                 ratios <- .np_bias_gaussian_derivatives(u[[d]],spec$b[d],order)
-                dh[[d]] <- .np_bias_weighted_derivative(Q,k,values,ratios,role="P1 auxiliary higher derivative pilot")
+                dh[[d]] <- .np_bias_pilot_higher(Q,k,values,ratios,role="P1 auxiliary higher derivative pilot")
                 next
             }
             nu <- integer(spec$d)
