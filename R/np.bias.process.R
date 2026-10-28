@@ -279,6 +279,9 @@
     }
     if(rank.calibration) {
       if(!student && !score.calibration) part$value <- part$value/divisor
+      # A zero target may share nonzero family cutoffs, but never nonzero draws.
+      for(zero in which(se[rr]==0)) if(any(part$value[zero,]!=0))
+        stop("zero target scale with nonzero signed process draws",call.=FALSE)
       if(retain.tile)signed.tile[match(rr,family.rows),] <- part$value
       for(g in seq_along(family)) {
         local <- which(map$target[rr]==targets[family[g]])
@@ -317,7 +320,7 @@
       c(.np_band_tail_protect(root.limits,absolute.reference$limits),list(families=rank.results)) else
       list(limits=root.limits,families=rank.results)
   }
-  bands <- if(rank.calibration).np_band_rank_invert(center,se,calibrated$limits) else lapply(calibrated$limits,function(x) {
+  bands <- if(rank.calibration).np_band_rank_invert(center,se,calibrated$limits,deterministic=se==0) else lapply(calibrated$limits,function(x) {
     for(k in seq_along(alpha))for(side in 1:2)x[,side,k] <- center+se*x[,side,k]
     x
   })
@@ -372,6 +375,7 @@
   if(rank.calibration) {
     result$absolute.reference <- absolute.reference
     result$calibration.method <- calibration
+    if(any(se==0)) result$deterministic.targets <- which(se==0)
   }
   result
 }
