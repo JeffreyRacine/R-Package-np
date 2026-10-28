@@ -14,15 +14,15 @@ with \code{bootstrap="inid"}, \code{"fixed"} or \code{"geom"} for literal
 independent, circular fixed-length or stationary geometric-block resampling. Explicit
 \code{construction="legacy"} retains previous bootstrap correction.
 
-The default joint-process construction admits fixed unbounded second-order
-Gaussian kernels with at most two numeric and two ordered variables. Ordered
+The default joint-process construction admits fixed and generalized-nearest-neighbor
+unbounded second-order Gaussian kernels with at most two numeric and two ordered variables. Ordered
 smoothing uses the normalized Li--Racine kernel and the complete joint corrected
 contribution, retaining declared levels and integer gaps. It calibrates the maximum
 absolute corrected CDF displacement, with complete covariance and common
-observation innovations across target tiles. Gaussian and literal multinomial
+observation innovations across target tiles. For fixed bandwidths, Gaussian and literal multinomial
 inid processes use the same centered observation factor. Critical values are in
-CDF probability units, not standardized units. Selected bandwidths stay fixed.
-Fixed/geom processes use literal selected-law block counts and the corresponding
+CDF probability units, not standardized units. Selected bandwidths or neighbor counts and categorical smoothing parameters stay fixed.
+With fixed bandwidths, fixed/geom processes use literal selected-law block counts and the corresponding
 finite-sample covariance; their reported scales are not IID scales. The automatic
 block length remains \code{b.star(xdat, round=TRUE)[1,1]}, selected once per plot.
 The first input series may not represent dependence elsewhere in multivariate
@@ -32,6 +32,21 @@ blocks with zero process variance are unavailable.
 No local or replicate studentizer division, variance floor, trimming, endpoint
 clipping or resampling-law substitution is used. An entirely zero observed
 process is unavailable; zero marginal scales are reported explicitly.
+
+For generalized nearest-neighbor bandwidths, Gaussian calibration retains the
+complete influence of the sample-specific query radii. Bootstrap calibration
+recomputes every physical radius and corrected center using the literal selected
+law, and uses their absolute displacements. The displayed corrected center retains
+its original summation; paired evaluations of the same algebraic sums ensure
+zero displacement for an unchanged sample. Reported bootstrap scales are empirical
+standard deviations under that selected law, including radius randomness.
+This construction has no replicate studentizing divisor and does not qualify
+the preceding spacing-pilot bootstrap-t method. A zero physical radius is
+unavailable, including when produced by ordinary CV and literal resampling;
+no draw is discarded, replaced or floored. Pure ordered NN inputs retain the
+fixed-geometry identity. Numeric adaptive NN remains parked at its population
+bias-remainder gate. These extensions require their own public-call coverage
+screen and do not inherit coverage from fixed bandwidths.
 
 Gaussian marginal quantiles are analytic. Joint critical values use type-one
 quantiles bounded by the analytic marginal and Bonferroni maximum bounds.
@@ -51,7 +66,7 @@ retains the historical bootstrap center. All constructions remain research
 candidates; full empirical-range screening is distinct from confirmation.
 
 Use an explicit \code{band} of \code{"pointwise"}, \code{"simultaneous"},
-\code{"bonferroni"} or \code{"all"}. Nearest-neighbor bandwidths, unordered factors,
+\code{"bonferroni"} or \code{"all"}. Numeric adaptive nearest-neighbor bandwidths, unordered factors,
 bounded or higher-order kernels, large-bandwidth limits and
 factor boxplots remain unqualified for this private corrected route and fail
 clearly. Their legacy routes remain available. No explicit law is substituted.
