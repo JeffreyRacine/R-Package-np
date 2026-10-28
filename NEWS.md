@@ -1,5 +1,14 @@
 # np 0.80-2 (development)
 
+* Extend fitted-row bias correction to continuous multivariate fixed-bandwidth
+  Gaussian/Mammen means and first derivatives with inactive local-to-global
+  adaptation, including accepted regularized raw and Bernstein main fits.
+  One capture per fit supplies the complete correction and covariance; the
+  existing multivariate variance and studentization rules remain unchanged.
+  Full-surface qualification retains sparse-region width and marginal-coverage
+  limitations. No new nearest-neighbor, mixed-data or higher-derivative
+  regularized-row admission is implied.
+
 * Improve numerical precision of higher-order P1 bias-pilot derivatives by
   differentiating the same weighted polynomial system in orthonormal
   coordinates. Main fits, rank decisions, pilot settings, variance rules and

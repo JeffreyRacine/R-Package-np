@@ -349,8 +349,23 @@ numerical conditioning limitations of a raw main basis.
   observations, including an ordinary unregularized control. This limitation
   is not removed by more calibration draws or established to be removed by
   more correction iterations. These results do not establish uniform coverage,
-  random-design or bandwidth-selection validity. Other regularized main rows
-  remain unqualified.
+  random-design or bandwidth-selection validity.
+  For two or more continuous predictors, the corresponding fixed-bandwidth
+  Gaussian/Mammen extension also uses the original fitted rows, for means and
+  coordinatewise first derivatives with inactive local-to-global adaptation.
+  Both raw and stored Bernstein main bases are admitted. It retains the
+  existing multivariate smoothed P0 residual variance and replicate
+  studentization; it does not apply the univariate variance-pilot rule above.
+  The acquisition policy is recorded in \code{inference$settings$main.capture}.
+  Bounded qualification used three fixed two-predictor designs and complete
+  50 by 50 empirical-range surfaces, with 128 responses per design. Estimated-
+  variance simultaneous coverage was encouraging, but bands were very wide in
+  sparse regions and some individual locations had inadequate marginal
+  coverage. These are conditional fixed-design results, not evidence of
+  arbitrary-dimensional, random-design or uniform coverage. Higher-order,
+  categorical and active-adaptation regularized-row extensions remain
+  separate qualifications; their previously supported routes are unchanged.
+
   Per-target/frame numerical ridge values are returned in
   \code{inference$main.regularization}, and \code{inference$covariance}
   describes the variance and calibration construction.
