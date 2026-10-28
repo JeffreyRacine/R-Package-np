@@ -25,7 +25,7 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   if (!identical(bws[["type", exact = TRUE]], "fixed"))
     stop("new distribution bounds for nearest-neighbor bandwidths remain unqualified", call. = FALSE)
   if (identical(method, "bootstrap") &&
-      !bootstrap %in% if (construction == "joint-process") c("inid", "fixed") else "inid")
+      !bootstrap %in% if (construction == "joint-process") c("inid", "fixed", "geom") else "inid")
     stop("selected bootstrap law is not qualified for this distribution construction", call. = FALSE)
   if (!band %in% c("pointwise", "simultaneous", "bonferroni", "all"))
     stop("new distribution bounds require an explicit quantile band", call. = FALSE)
@@ -35,7 +35,7 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
     stop("joint CDF process currently admits at most two numeric and two ordered variables; use an explicit qualified construction", call. = FALSE)
   state$plot.construction <- construction
   state$plot.law <- if (identical(method, "asymptotic")) "gaussian" else bootstrap
-  if (state$plot.law == "fixed")
+  if (state$plot.law %in% c("fixed", "geom"))
     state$plot.block.selection <- .np_udist_bc_block_request(x, state$plot.law, blocklen)
   state
 }
