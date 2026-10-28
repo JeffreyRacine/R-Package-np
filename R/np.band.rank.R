@@ -67,14 +67,17 @@
     ties=state$ties,map=state$map,orientation="estimate minus truth; root-inverted endpoints")
 }
 
-.np_band_rank_invert <- function(center, scale, limits) {
+.np_band_rank_invert <- function(center, scale, limits, deterministic=rep(FALSE,length(scale))) {
   if(!is.numeric(center)||!is.numeric(scale)||length(center)!=length(scale)||
      any(!is.finite(center))||any(!is.finite(scale))||any(scale<0))
     stop("invalid rank center or scale",call.=FALSE)
+  if(!is.logical(deterministic)||length(deterministic)!=length(scale)||
+     anyNA(deterministic)||any(deterministic & scale!=0))
+    stop("invalid deterministic target certificate",call.=FALSE)
   lapply(limits,function(x) {
     if(length(dim(x))!=3L||dim(x)[1L]!=length(center)||dim(x)[2L]!=2L||any(!is.finite(x)))
       stop("invalid root endpoint dimensions",call.=FALSE)
-    if(any(scale==0) && any(x[scale==0,,,drop=FALSE]!=0))
+    if(any(scale==0 & !deterministic) && any(x[scale==0 & !deterministic,,,drop=FALSE]!=0))
       stop("zero target scale with nonzero signed roots",call.=FALSE)
     out<-x
     for(a in seq_len(dim(x)[3L])) {

@@ -43,3 +43,14 @@ test_that("pilot block scale has the independent-block identity", {
   }
   expect_error(.np_bias_pilot_block_scale(F,c(3,0),4L,"fixed"),"variance")
 })
+
+
+test_that("certified zero targets can share active family cutoffs", {
+  limits <- list(simultaneous=array(c(-2,-2,3,3),c(2,2,1)))
+  expect_error(.np_band_rank_invert(c(0,4),c(0,1),limits),"zero target scale")
+  z <- .np_band_rank_invert(c(0,4),c(0,1),limits,c(TRUE,FALSE))
+  expect_identical(as.numeric(z$simultaneous[1,,]),c(0,0))
+  expect_identical(as.numeric(z$simultaneous[2,,]),c(1,6))
+  expect_error(.np_band_rank_invert(c(0,4),c(0,1),limits,c(TRUE,TRUE)),"certificate")
+  expect_error(.np_band_rank_invert(c(0,4),c(0,1),limits,TRUE),"certificate")
+})

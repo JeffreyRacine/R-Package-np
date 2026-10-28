@@ -87,7 +87,9 @@ and estimator-specific qualifications.
   other laws. No uniform coverage guarantee or dominance is asserted.
   Returned \code{inference} records requested/effective calibration, signed
   root orientation, raw/protected root limits where applicable, and the
-  block-scale refinement. It does not retain the full draws.
+  block-scale refinement. Certified deterministic targets, including a
+  categorical contrast against its own reference, retain zero-width intervals
+  and remain in the simultaneous family. The object does not retain full draws.
 
   Regression auxiliary bias controls are supplied separately through
   \code{\link{np_bias_control}}.
