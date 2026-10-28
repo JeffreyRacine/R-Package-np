@@ -41,9 +41,12 @@ its original summation; paired evaluations of the same algebraic sums ensure
 zero displacement for an unchanged sample. Reported bootstrap scales are empirical
 standard deviations under that selected law, including radius randomness.
 This construction has no replicate studentizing divisor and does not qualify
-the preceding spacing-pilot bootstrap-t method. A zero physical radius is
-unavailable, including when produced by ordinary CV and literal resampling;
-no draw is discarded, replaced or floored. Pure ordered NN inputs retain the
+the preceding spacing-pilot bootstrap-t method. If a bootstrap query radius
+collapses to zero, the Gaussian integrated kernel uses its exact one-sided limit:
+one below the query, one half at a tie, zero above it; its correction moment is
+zero. Positive-radius coordinates retain their original arithmetic. This is an
+extension of the bootstrap CDF statistic, with no draw discarded, replaced or
+floored. Observed zero radii and invalid Gaussian spacing pilots remain unavailable. Pure ordered NN inputs retain the
 fixed-geometry identity. Numeric adaptive NN remains parked at its population
 bias-remainder gate. These extensions require their own public-call coverage
 screen and do not inherit coverage from fixed bandwidths.
