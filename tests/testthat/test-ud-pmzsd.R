@@ -16,6 +16,8 @@ test_that("normal corrected bands use alpha and retain provider evidence", {
 })
 
 test_that("omitted corrected density and CDF bands retain pmzsd semantics", {
+  skip_if_not(spawn_mpi_slaves(1L))
+  on.exit(close_mpi_slaves(), add = TRUE)
   old <- options(np.messages = FALSE, np.plot.progress = FALSE)
   on.exit(options(old), add = TRUE)
   x <- data.frame(x = seq(-2, 2, length.out = 25))
