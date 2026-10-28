@@ -127,7 +127,7 @@
     root.variance * .np_bias_draws(length(root.variance),length(ii),law))
 }
 
-.np_bias_student_chunk <- function(prepared, W, target, size, law) {
+.np_bias_student_chunk <- function(prepared, W, target, size, law, signed=FALSE) {
   n <- ncol(W)
   slices <- .np_bias_student_slices(size)
   errors <- .np_bias_student_errors(.np_bias_student_error_scale(prepared,law),size,law)
@@ -150,17 +150,17 @@
     # Only deterministic zero rows get a harmless divisor: their numerator and
     # returned pivot are exactly zero. Active scales are never floored.
     if (any(!target$active)) scale[!target$active,] <- 1
-    out[,ii] <- abs(numerator[[b]]/scale)
+    out[,ii] <- if(signed) numerator[[b]]/scale else abs(numerator[[b]]/scale)
   }
   out
 }
 
-.np_bias_student_draws <- function(prepared, W, se, B, law) {
+.np_bias_student_draws <- function(prepared, W, se, B, law, signed=FALSE) {
   target <- .np_bias_student_target(prepared,W,se)
   out <- matrix(0,nrow(W),B)
   for (first in seq.int(1L,B,by=1024L)) {
     ii <- seq.int(first,min(B,first+1023L))
-    out[,ii] <- .np_bias_student_chunk(prepared,W,target,length(ii),law)
+    out[,ii] <- .np_bias_student_chunk(prepared,W,target,length(ii),law,signed=signed)
     .np_plot_progress_notify(stage="Calibrating studentized process",
       done=max(ii),total=B,unit="draws")
   }

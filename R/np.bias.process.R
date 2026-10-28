@@ -143,7 +143,15 @@
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE, main.capture=NULL,
                                resolution.bands=c("pointwise","simultaneous","bonferroni"),
-                               resolution.warn=TRUE) {
+                               resolution.warn=TRUE, calibration="absolute") {
+  tail.calibration <- calibration %in% c("tail-envelope","separate-tails")
+  if(tail.calibration && !law %in% c("mammen","rademacher","inid","fixed","geom"))
+    stop("private separate-tail regression requires a supported bootstrap law",call.=FALSE)
+  rank.calibration <- identical(calibration,"rank") || tail.calibration
+  if(!rank.calibration && !identical(calibration,"absolute"))
+    stop("unknown private regression calibration",call.=FALSE)
+  if(identical(calibration,"rank") && (!identical(law,"mammen") || !isTRUE(studentize)))
+    stop("private signed-rank regression requires studentized Mammen",call.=FALSE)
   if ((!is.null(state$local.inference) || !is.null(state$main.capture) || !is.null(main.capture)) && !law %in% c("gaussian","mammen"))
     stop("captured local calibration requires Gaussian or Mammen; prepare the state for the selected law",call.=FALSE)
   if ((!is.null(state$local.inference) || !is.null(state$main.capture)) && is.null(main.capture))
@@ -171,6 +179,9 @@
   if(!identical(names(grid),names(state$x))||!nrow(grid)||anyNA(grid))stop("invalid bias evaluation grid",call.=FALSE)
   if(!is.character(targets)||!length(targets)||anyNA(targets)||anyDuplicated(targets))
     stop("invalid or duplicate bias target family",call.=FALSE)
+  if(rank.calibration &&
+     8*as.double(B)*(length(targets)+10*min(8L,length(targets)))>128*1024^2)
+    stop("rank workspace exceeds declared byte budget before allocation",call.=FALSE)
   blocks <- .np_bias_target_blocks(nrow(grid),length(targets))
   map <- expand.grid(row=seq_len(nrow(grid)),target=targets,stringsAsFactors=FALSE)
   M <- nrow(map);B <- as.integer(B)
@@ -187,31 +198,57 @@
   selection <- if(law%in%c("fixed","geom")) .np_bias_block_selection(state$residual_raw,law,blocklen) else NULL
   if(!exists(".Random.seed",.GlobalEnv,inherits=FALSE))runif(1L)
   rng <- get(".Random.seed",.GlobalEnv,inherits=FALSE);rng.kind <- RNGkind();end <- rng
-  for(batch in blocks) {
+  rank.results <- if(rank.calibration)vector("list",length(targets)) else NULL
+  families <- if(rank.calibration)split(seq_along(targets),ceiling(seq_along(targets)/8L)) else list(1L)
+  for(family in families) {
+   if(rank.calibration) {
+    rank.states <- lapply(family,function(g)
+      (if(tail.calibration).np_band_tail_prepare else .np_band_rank_prepare)(B,map[map$target==targets[g],,drop=FALSE],alpha,
+        byte.limit=128*1024^2/length(family)))
+    family.rows <- which(map$target %in% targets[family])
+    # One capped signed tile can span several existing 25-anchor row blocks.
+    # If it fits, retain this tile only and avoid recomputing the process.
+    # The cap is independent of grid size; larger families use exact replay.
+    retain.tile <- !tail.calibration && length(family.rows)<=128L &&
+      16*as.double(length(family.rows))*B+80*as.double(B)*length(family)<=128*1024^2
+    signed.tile <- if(retain.tile)matrix(0,length(family.rows),B) else NULL
+    tile.rows <- floor((128*1024^2-(if(tail.calibration)96 else 72)*as.double(B)*length(family)-
+      if(tail.calibration)48*M*length(alpha) else 0)/(8*B))
+    if(tile.rows<length(family))stop("rank workspace exceeds declared byte budget before allocation",call.=FALSE)
+    family.blocks <- .np_bias_target_blocks(nrow(grid),length(family),
+      anchors=min(25L,tile.rows %/% length(family)),rows=min(500L,tile.rows))
+    family.blocks <- lapply(family.blocks,function(b) {b$rows<-family.rows[b$rows];b})
+   } else {family.blocks <- blocks;retain.tile <- FALSE}
+   for(pass in seq_len(if(rank.calibration && !tail.calibration && !retain.tile)2L else 1L)) {
+    if(rank.calibration && pass==2L)rank.states <- lapply(rank.states,.np_band_rank_cutoff)
+    for(batch in family.blocks) {
     jj <- batch$grid;rr <- batch$rows
     local.map <- map[rr,,drop=FALSE];local.map$row <- match(local.map$row,jj)
     value <- if (!is.null(main.capture)) main.capture$rows(jj,local.map) else if (is.null(adapted.rows)) .np_bias_regression_rows(state,grid[jj,,drop=FALSE],local.map) else
       adapted.rows(jj,local.map)
-    if (!is.null(value$adaptation)) adaptation[[length(adaptation)+1L]] <-
+    if (pass==1L && !is.null(value$adaptation)) adaptation[[length(adaptation)+1L]] <-
       list(rows=rr,grid=jj,details=value$adaptation)
     diagnostic <- value$main.regularization
     if(law!="gaussian" && any(diagnostic$ridge>0) && is.null(state$local.inference) && is.null(main.capture))
       stop("bootstrap calibration for regularized generalized-NN main rows remains unqualified; Gaussian inference is available with the qualifications documented in np_bias_control",call.=FALSE)
     diagnostic$row <- jj[diagnostic$row]
-    regularization[[length(regularization)+1L]] <- diagnostic
+    if(pass==1L)regularization[[length(regularization)+1L]] <- diagnostic
     center[rr] <- value$center;original[rr] <- value$original_center;se[rr] <- value$se
     divisor <- ifelse(value$se==0,1,value$se)
     if (student) {
       if (is.null(prepared)) prepared <- .np_bias_student_prepare(state)
-      part <- .np_bias_stream(rng,
-        .np_bias_student_draws(prepared,value$W,value$se,B,law))
+      part <- if(rank.calibration) .np_bias_stream(rng,
+        .np_bias_student_draws(prepared,value$W,value$se,B,law,signed=TRUE)) else
+        .np_bias_stream(rng,.np_bias_student_draws(prepared,value$W,value$se,B,law))
     } else if (score.calibration) {
       F <- sweep(value$W,2L,state$residual,"*")
       F <- F-rowMeans(F)
-      part <- .np_bias_stream(rng,
-        .np_bias_score_student_draws(F,B,law,selection$length,value$se>0,studentize))
+      part <- if(rank.calibration) .np_bias_stream(rng,
+        .np_bias_score_student_draws(F,B,law,selection$length,value$se>0,studentize,signed=TRUE)) else
+        .np_bias_stream(rng,
+          .np_bias_score_student_draws(F,B,law,selection$length,value$se>0,studentize))
       se[rr] <- score.se[rr] <- part$value$se
-      part$value <- part$value$absolute
+      part$value <- if(rank.calibration) part$value$signed else part$value$absolute
     } else {
       F <- if(score)sweep(value$W,2L,state$residual,"*") else value$factor
       if(score)F <- F-rowMeans(F)
@@ -228,17 +265,56 @@
       divisor <- ifelse(s==0,1,s)
       if(law!="inid")se[rr] <- s
     }
-    calibration.state <- .np_bias_limits_update(calibration.state,
+    if(rank.calibration) {
+      if(!student && !score.calibration) part$value <- part$value/divisor
+      if(retain.tile)signed.tile[match(rr,family.rows),] <- part$value
+      for(g in seq_along(family)) {
+        local <- which(map$target[rr]==targets[family[g]])
+        if(length(local)) rank.states[[g]] <- if(tail.calibration)
+          .np_band_tail_update(rank.states[[g]],part$value[local,,drop=FALSE],
+            map[rr[local],,drop=FALSE],seq_len(B)) else
+          .np_band_rank_update(rank.states[[g]],part$value[local,,drop=FALSE],
+            map[rr[local],,drop=FALSE],seq_len(B),replay=pass==2L)
+      }
+      if(pass==1L)calibration.state <- .np_bias_limits_update(calibration.state,abs(part$value),rr)
+    } else calibration.state <- .np_bias_limits_update(calibration.state,
       if(student || score.calibration)part$value else abs(part$value/divisor),rr)
+    }
+   }
+   if(rank.calibration && retain.tile) {
+    rank.states <- lapply(rank.states,.np_band_rank_cutoff)
+    for(g in seq_along(family)) {
+      local <- which(map$target[family.rows]==targets[family[g]])
+      rank.states[[g]] <- .np_band_rank_update(rank.states[[g]],
+        signed.tile[local,,drop=FALSE],map[family.rows[local],,drop=FALSE],seq_len(B),replay=TRUE)
+    }
+    signed.tile <- NULL
+   }
+   if(rank.calibration)for(g in seq_along(family))rank.results[[family[g]]] <-
+      (if(tail.calibration).np_band_tail_finish else .np_band_rank_finish)(rank.states[[g]])
   }
   assign(".Random.seed",end,.GlobalEnv)
   calibrated <- .np_bias_limits_finish(calibration.state)
-  bands <- lapply(calibrated$limits,function(x) {
+  absolute.reference <- NULL
+  if(rank.calibration) {
+    absolute.reference <- calibrated
+    root.limits <- calibrated$limits
+    for(g in seq_along(targets))for(band in names(root.limits))
+      root.limits[[band]][map$target==targets[g],,] <- rank.results[[g]]$limits[[band]]
+    calibrated <- if(identical(calibration,"tail-envelope"))
+      c(.np_band_tail_protect(root.limits,absolute.reference$limits),list(families=rank.results)) else
+      list(limits=root.limits,families=rank.results)
+  }
+  bands <- if(rank.calibration).np_band_rank_invert(center,se,calibrated$limits) else lapply(calibrated$limits,function(x) {
     for(k in seq_along(alpha))for(side in 1:2)x[,side,k] <- center+se*x[,side,k]
     x
   })
   resolution <- if(length(resolution.bands))
-    .np_band_resolution(B,map$target,alpha,se>0,resolution.bands) else NULL
+    .np_band_resolution(B,map$target,alpha,se>0,resolution.bands,
+      signed=rank.calibration,simultaneous.index=if(rank.calibration) {
+        k <- do.call(rbind,lapply(rank.results,function(x)x$kS));rownames(k)<-targets
+        k[names(split(seq_along(map$target),map$target)),,drop=FALSE]
+      } else NULL) else NULL
   if(!is.null(resolution) && law=="gaussian" && !student) {
     analytic <- resolution$band %in% c("pointwise","bonferroni")
     resolution$nominal_tail_draws[analytic] <- NA_real_
@@ -247,7 +323,7 @@
     resolution$calibration[analytic] <- "analytic Gaussian"
   }
   if(isTRUE(resolution.warn)) .np_band_resolution_warn(resolution)
-  list(resolution=resolution,construction="iterated",version=if(score.calibration)3L else if(student)2L else 1L,estimate=original,center=center,
+  result <- list(resolution=resolution,construction="iterated",version=if(score.calibration)3L else if(student)2L else 1L,estimate=original,center=center,
     correction=original-center,se=se,bands=bands,map=map,grid=grid,
     settings=state$settings,law=law,block.selection=selection,draws=B,alpha=alpha,
     main.regularization=do.call(rbind,regularization),
@@ -275,6 +351,11 @@
     calibration=calibrated,score.se=if(score)score.se else NULL,
     rng=list(kind=rng.kind,start=rng,end=end,convention="common observation draws across all target blocks"),
     scope="finite grid within each scalar-target family",owner="bounded corrected observation factors")
+  if(rank.calibration) {
+    result$absolute.reference <- absolute.reference
+    result$calibration.method <- calibration
+  }
+  result
 }
 
 .np_bias_plot_errors <- function(state, grid, target, method, bootstrap, wild,
