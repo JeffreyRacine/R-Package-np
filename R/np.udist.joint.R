@@ -27,7 +27,7 @@
       (identical(state$type, "adaptive_nn") && state$q > 0L))
     stop("absolute CDF process has no qualified numeric ANN construction", call. = FALSE)
   nearest <- !identical(state$type, "fixed")
-  if (nearest && !law %in% c("gaussian", "inid"))
+  if (nearest && !law %in% c("gaussian", "inid", "fixed"))
     stop("selected nearest-neighbor CDF bootstrap law remains unqualified", call. = FALSE)
   bands <- match.arg(bands, c("pointwise", "simultaneous", "bonferroni"), several.ok = TRUE)
   if (!is.numeric(alpha) || !length(alpha) || any(!is.finite(alpha)) ||
