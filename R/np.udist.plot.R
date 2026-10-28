@@ -32,8 +32,6 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   if (identical(construction, "joint-process") &&
       (state$s != 0L || !state$q %in% 1:2))
     stop("joint CDF process currently admits numeric q=1 or q=2 only; use an explicit qualified construction", call. = FALSE)
-  if (identical(construction, "joint-process") && method == "bootstrap")
-    stop("joint CDF inid admission pending", call. = FALSE)
   state$plot.construction <- construction
   state$plot.law <- if (identical(method, "asymptotic")) "gaussian" else "inid"
   state
