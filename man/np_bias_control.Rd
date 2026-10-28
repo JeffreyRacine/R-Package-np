@@ -255,6 +255,9 @@ np_bias_control(construction = c("iterated", "legacy"),
   their separately stated law support. The complete weighted P1 pilot is
   differentiated analytically, including its weight and coefficient dependence,
   and all correction covariance terms and derivative units are retained.
+  For the original profile-specific P1 construction, higher-order derivatives
+  use fixed orthonormal coordinates for numerical precision; this does not
+  change the weighted polynomial system or its rank criterion.
   The effective vector is recorded in \code{inference$settings$gradient.order}.
   Numerical support does not imply well-determined high derivatives at small
   sample sizes; intervals can be wide and sparse pilot geometry can fail.
