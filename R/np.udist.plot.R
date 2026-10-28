@@ -25,7 +25,7 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   nearest <- !identical(bws[["type", exact = TRUE]], "fixed")
   if (nearest && !identical(construction, "joint-process"))
     stop("explicit cdf construction for nearest-neighbor bandwidths remains unqualified", call. = FALSE)
-  if (nearest && identical(method, "bootstrap"))
+  if (nearest && identical(method, "bootstrap") && bootstrap != "inid")
     stop("selected nearest-neighbor CDF bootstrap law remains unqualified", call. = FALSE)
   if (identical(method, "bootstrap") &&
       !bootstrap %in% if (construction == "joint-process") c("inid", "fixed", "geom") else "inid")
