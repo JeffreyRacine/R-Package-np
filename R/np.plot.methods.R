@@ -37,14 +37,31 @@
 
 np_boot_control <- function(nonfixed = c("exact", "frozen"),
                             wild = c("mammen", "rademacher"),
-                            blocklen = NULL) {
+                            blocklen = NULL,
+                            calibration = c("default", "absolute", "separate-tails", "tail-envelope")) {
+  calibration <- if (missing(calibration)) "default" else
+    .np_plot_scalar_match(calibration,
+      c("default", "absolute", "separate-tails", "tail-envelope"), "calibration")
+  if (is.null(calibration)) stop("calibration must be a single supported name", call. = FALSE)
   nonfixed <- match.arg(nonfixed)
   wild <- match.arg(wild)
   blocklen <- .np_plot_validate_count(blocklen, "blocklen")
   structure(
-    list(nonfixed = nonfixed, wild = wild, blocklen = blocklen),
+    list(nonfixed = nonfixed, wild = wild, blocklen = blocklen, calibration = calibration),
     class = "np_boot_control"
   )
+}
+
+.np_plot_boot_calibration <- function(control) {
+  if (!inherits(control, "np_boot_control") || anyDuplicated(names(control)) ||
+      any(!names(control) %in% c("nonfixed", "wild", "blocklen", "calibration")))
+    stop("invalid np_boot_control object", call. = FALSE)
+  if (!"calibration" %in% names(control)) return("default")
+  value <- control[["calibration", exact = TRUE]]
+  if (!is.character(value) || length(value) != 1L || is.na(value) ||
+      !value %in% c("default", "absolute", "separate-tails", "tail-envelope"))
+    stop("invalid bootstrap calibration control", call. = FALSE)
+  value
 }
 
 np_grid_control <- function(xtrim = NULL, xq = NULL, slices = NULL) {
@@ -385,7 +402,11 @@ np_render_control <- function(style = c("band", "bar"),
     if (!inherits(dots$boot.control, "np_boot_control"))
       stop("boot.control must be created by np_boot_control()", call. = FALSE)
     ctrl <- dots$boot.control
+    calibration <- .np_plot_boot_calibration(ctrl)
     dots$boot.control <- NULL
+    if (calibration != "default")
+      dots <- .np_plot_set_normalized_arg(dots, "boot.control$calibration",
+                                          "plot.errors.boot.calibration", calibration)
     dots <- .np_plot_set_normalized_arg(dots, "boot.control$nonfixed",
                                         "plot.errors.boot.nonfixed",
                                         ctrl$nonfixed)
@@ -432,7 +453,7 @@ np_render_control <- function(style = c("band", "bar"),
     "none"
   boot.only <- c("plot.errors.boot.method", "plot.errors.boot.num",
                  "plot.errors.boot.nonfixed", "plot.errors.boot.wild",
-                 "plot.errors.boot.blocklen")
+                 "plot.errors.boot.blocklen", "plot.errors.boot.calibration")
   center.only <- if (.np_plot_center_needs_bootstrap(
     dots[["plot.errors.center", exact = TRUE]], method, allow_asymptotic_bias))
     c("center", "plot.errors.center") else character()
@@ -469,6 +490,9 @@ np_render_control <- function(style = c("band", "bar"),
       (identical(method, .np_plot_compat_dispatch) &&
        (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth") ||
         inherits(bws, "dbandwidth"))))
+  if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&
+      !inherits(bws, "rbandwidth"))
+    stop("explicit bootstrap calibration currently requires bias-corrected regression", call. = FALSE)
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 

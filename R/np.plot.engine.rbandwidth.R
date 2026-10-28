@@ -53,7 +53,7 @@
            plot.rug = FALSE,
            ...,
            random.seed, .np.empty.report = NULL, gaussian.draws = 9999L,
-           bias.control = NULL){
+           bias.control = NULL, plot.errors.boot.calibration = "default"){
 
     if (.np_data_formal_supplied(sys.call(), sys.function()))
       .np_plot_data_error()
@@ -201,6 +201,13 @@
     if (bias.request && is.null(bias.control)) bias.control <- np_bias_control()
     if (bias.request) bias.control <- .np_bias_validate_control(bias.control)
     new.bias <- bias.request && identical(bias.control[["construction"]],"iterated")
+    if (!is.character(plot.errors.boot.calibration) || length(plot.errors.boot.calibration)!=1L ||
+        is.na(plot.errors.boot.calibration) ||
+        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope"))
+      stop("invalid bootstrap calibration control",call.=FALSE)
+    if (plot.errors.boot.calibration!="default" &&
+        (!new.bias || error.request$method!="bootstrap" || error.request$type=="pmzsd"))
+      stop("explicit bootstrap calibration requires iterated bias-corrected regression and empirical bands",call.=FALSE)
     if (bias.request && !new.bias && error.request$method=="asymptotic")
       stop("legacy bias correction requires errors='bootstrap'",call.=FALSE)
     if (new.bias && isTRUE(.npRmpi_autodispatch_called_from_bcast()))
@@ -450,7 +457,7 @@
       if (new.bias || plot.errors.method == "bootstrap"){
         terr.obj <- if(new.bias).np_bias_plot_errors(bias.state,setNames(x.eval,names(xdat)),"mean",plot.errors.method,
           plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tobj,resolution.context=resolution.context) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tobj,resolution.context=resolution.context,calibration=plot.errors.boot.calibration) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = x.eval,
           fit.mean.train = fit.mean.train,
           gradients = FALSE,
@@ -918,7 +925,7 @@
             corrected <- .np_bias_plot_errors(bias.state,
               subcol(exdat,ei,i)[seq_len(xi.neval),,drop=FALSE],target,plot.errors.method,
               plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tr,resolution.context=resolution.context)
+              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tr,resolution.context=resolution.context,calibration=plot.errors.boot.calibration)
             temp.err[seq_len(xi.neval),] <- corrected[["boot.err"]]
             temp.all.err <- corrected[["boot.all.err"]]
             bias.inference <- corrected[["inference"]]

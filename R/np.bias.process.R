@@ -384,15 +384,23 @@
 
 .np_bias_plot_errors <- function(state, grid, target, method, bootstrap, wild,
                                  alpha, B, gaussian.draws, blocklen, band, fit=NULL,
-                                 resolution.context=NULL) {
+                                 resolution.context=NULL, calibration="default") {
   law <- if(method=="asymptotic")"gaussian" else if(bootstrap=="wild")wild else bootstrap
+  effective <- if(calibration=="default")"absolute" else calibration
+  refinement <- if(law %in% c("fixed","geom") && band!="pmzsd")"pilot-block" else "none"
   inference <- .np_plot_activity_run("Constructing bias-corrected intervals",
     .np_bias_inference(state,grid,target,alpha,
       if(method=="asymptotic")gaussian.draws else B,law,blocklen,fit,
       studentize=band!="pmzsd",
       resolution.bands=if(band=="pmzsd")character() else if(band=="all")
         c("pointwise","simultaneous","bonferroni") else band,
-      resolution.warn=is.null(resolution.context)))
+      resolution.warn=is.null(resolution.context),calibration=effective,refinement=refinement))
+  inference$calibration.requested <- calibration
+  inference$calibration.method <- effective
+  if (effective %in% c("separate-tails","tail-envelope")) {
+    inference$root.orientation <- "estimate minus truth; root-inverted endpoints"
+    inference$resolution$calibration <- effective
+  }
   if(!is.null(resolution.context) && !is.null(inference$resolution))
     resolution.context$rows[[length(resolution.context$rows)+1L]] <- inference$resolution
   all <- lapply(inference$bands,function(x)cbind(inference$center-x[,1,1],x[,2,1]-inference$center))
