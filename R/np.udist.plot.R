@@ -22,8 +22,11 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
       stop("legacy distribution bias correction requires errors='bootstrap'", call. = FALSE)
     return(NULL)
   }
-  if (!identical(bws[["type", exact = TRUE]], "fixed"))
-    stop("new distribution bounds for nearest-neighbor bandwidths remain unqualified", call. = FALSE)
+  nearest <- !identical(bws[["type", exact = TRUE]], "fixed")
+  if (nearest && !identical(construction, "joint-process"))
+    stop("explicit cdf construction for nearest-neighbor bandwidths remains unqualified", call. = FALSE)
+  if (nearest && identical(method, "bootstrap"))
+    stop("selected nearest-neighbor CDF bootstrap law remains unqualified", call. = FALSE)
   if (identical(method, "bootstrap") &&
       !bootstrap %in% if (construction == "joint-process") c("inid", "fixed", "geom") else "inid")
     stop("selected bootstrap law is not qualified for this distribution construction", call. = FALSE)

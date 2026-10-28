@@ -23,8 +23,12 @@
     blocklen <- selection$length
   } else if (!is.null(selection) || !is.null(blocklen))
     stop("CDF block controls require a dependent bootstrap law", call. = FALSE)
-  if (!identical(state$type, "fixed"))
-    stop("absolute CDF process requires fixed bandwidths", call. = FALSE)
+  if (!state$type %in% c("fixed", "generalized_nn", "adaptive_nn") ||
+      (identical(state$type, "adaptive_nn") && state$q > 0L))
+    stop("absolute CDF process has no qualified numeric ANN construction", call. = FALSE)
+  nearest <- !identical(state$type, "fixed")
+  if (nearest && law != "gaussian")
+    stop("selected nearest-neighbor CDF bootstrap law remains unqualified", call. = FALSE)
   bands <- match.arg(bands, c("pointwise", "simultaneous", "bonferroni"), several.ok = TRUE)
   if (!is.numeric(alpha) || !length(alpha) || any(!is.finite(alpha)) ||
       any(alpha <= 0 | alpha >= .5) || anyDuplicated(alpha))
@@ -77,7 +81,7 @@
   })
   if (stochastic) assign(".Random.seed", end, .GlobalEnv) else end <- entry
   success <- TRUE
-  list(center = center, original.center = original, se = se,
+  answer <- list(center = center, original.center = original, se = se,
     intervals = intervals, critical = widths[bands], raw.max = raw,
     raw.bonf = raw.bonf, envelope = bonf > raw.bonf,
     process.maximum = if (stochastic) drop(limits$maximum) else NULL,
@@ -88,4 +92,10 @@
       representation = "bounded observation factors", metadata = state$metadata,
       target.ids = rownames(grid), scope = "declared finite family"),
     rng = list(kind = kind, entry = entry, start = start, end = end))
+  if (nearest) {
+    answer$settings$h <- NULL
+    answer$settings$counts <- state$requested
+    answer$settings$radius <- "sample-specific query kth distance"
+  }
+  answer
 }
