@@ -1,5 +1,5 @@
 # Private distribution-specific inference controls; no regression pilot state.
-np_udist_bias_control <- function(construction = c("cdf", "legacy")) {
+np_udist_bias_control <- function(construction = c("joint-process", "cdf", "legacy")) {
   structure(list(construction = match.arg(construction), version = 1L),
             class = "np_udist_bias_control")
 }
@@ -12,7 +12,7 @@ np_udist_bias_control <- function(construction = c("cdf", "legacy")) {
   construction <- if (is.list(control)) control[["construction", exact = TRUE]] else NULL
   if (!inherits(control, "np_udist_bias_control") || length(construction) != 1L ||
       !is.character(construction) || is.na(construction) ||
-      !construction %in% c("cdf", "legacy") ||
+      !construction %in% c("joint-process", "cdf", "legacy") ||
       !identical(control, np_udist_bias_control(construction)))
     stop("bias.control must be created by np_udist_bias_control()", call. = FALSE)
   if (!identical(center, "bias-corrected") || !method %in% c("asymptotic", "bootstrap"))
@@ -29,14 +29,22 @@ np_udist_bias_control <- function(construction = c("cdf", "legacy")) {
   if (!band %in% c("pointwise", "simultaneous", "bonferroni", "all"))
     stop("new distribution bounds require an explicit quantile band", call. = FALSE)
   state <- .np_udist_bc_prepare(bws, x)
+  if (identical(construction, "joint-process") &&
+      (state$s != 0L || !state$q %in% 1:2))
+    stop("joint CDF process currently admits numeric q=1 or q=2 only; use an explicit qualified construction", call. = FALSE)
+  if (identical(construction, "joint-process") && method == "bootstrap")
+    stop("joint CDF inid admission pending", call. = FALSE)
+  state$plot.construction <- construction
   state$plot.law <- if (identical(method, "asymptotic")) "gaussian" else "inid"
   state
 }
 
 .np_udist_plot_errors <- function(state, grid, alpha, B, band) {
   names(grid) <- names(state$x)
+  infer <- if (identical(state$plot.construction, "joint-process"))
+    .np_udist_joint_inference else .np_udist_bc_inference
   inference <- .np_plot_activity_run("Constructing bias-corrected distribution intervals",
-    .np_udist_bc_inference(state, grid, law = state$plot.law, alpha = alpha, B = B,
+    infer(state, grid, law = state$plot.law, alpha = alpha, B = B,
       bands = if (band == "all") c("pointwise", "simultaneous", "bonferroni") else band))
   inference$bands <- inference$intervals
   all <- lapply(inference$bands, function(z)
