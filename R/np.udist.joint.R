@@ -105,7 +105,7 @@
     if (gnn.bootstrap) answer$settings$scale <- "selected-law empirical SD of exact center displacements"
   }
   if (isTRUE(corrected) && identical(state$type, "fixed") &&
-      state$q %in% 1:2 && state$s == 0L && identical(law, "gaussian"))
+      state$q %in% 1:2 && state$s == 0L && law %in% c("gaussian", "inid"))
     answer <- .np_udist_marginal_envelope(answer, widths, state$n, state$q, alpha)
   success <- TRUE
   answer
