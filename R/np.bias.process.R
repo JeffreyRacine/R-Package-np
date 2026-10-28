@@ -141,7 +141,9 @@
 
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
-                               studentize=TRUE, main.capture=NULL) {
+                               studentize=TRUE, main.capture=NULL,
+                               resolution.bands=c("pointwise","simultaneous","bonferroni"),
+                               resolution.warn=TRUE) {
   if ((!is.null(state$local.inference) || !is.null(state$main.capture) || !is.null(main.capture)) && !law %in% c("gaussian","mammen"))
     stop("captured local calibration requires Gaussian or Mammen; prepare the state for the selected law",call.=FALSE)
   if ((!is.null(state$local.inference) || !is.null(state$main.capture)) && is.null(main.capture))
@@ -158,8 +160,11 @@
   if (isTRUE(state$pooled) &&
       !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
     stop("pooled mixed-data bias correction currently supports Gaussian, Mammen, Rademacher, fixed, geom or inid calibration only",call.=FALSE)
-  if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<2||B!=floor(B)||B>.Machine$integer.max)
-    stop("bias calibration draws must be an integer >= 2",call.=FALSE)
+  if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<1||B!=floor(B)||B>.Machine$integer.max)
+    stop("bias calibration draws must be a positive integer",call.=FALSE)
+  if(B<2 && law %in% c("inid","fixed","geom") &&
+     !(isTRUE(state$pooled) && law %in% c("fixed","geom")))
+    stop("score-bootstrap variance requires at least two draws",call.=FALSE)
   if(!length(alpha)||any(!is.finite(alpha))||any(alpha<=0|alpha>=.5)||anyDuplicated(alpha))
     stop("alpha must contain distinct values in (0, 0.5)",call.=FALSE)
   if(!law%in%c("gaussian","mammen","rademacher","inid","fixed","geom"))stop("unsupported corrected inference law",call.=FALSE)
@@ -232,7 +237,17 @@
     for(k in seq_along(alpha))for(side in 1:2)x[,side,k] <- center+se*x[,side,k]
     x
   })
-  list(construction="iterated",version=if(score.calibration)3L else if(student)2L else 1L,estimate=original,center=center,
+  resolution <- if(length(resolution.bands))
+    .np_band_resolution(B,map$target,alpha,se>0,resolution.bands) else NULL
+  if(!is.null(resolution) && law=="gaussian" && !student) {
+    analytic <- resolution$band %in% c("pointwise","bonferroni")
+    resolution$nominal_tail_draws[analytic] <- NA_real_
+    resolution$order_index[analytic] <- NA_real_
+    resolution$resolution_limited[analytic] <- FALSE
+    resolution$calibration[analytic] <- "analytic Gaussian"
+  }
+  if(isTRUE(resolution.warn)) .np_band_resolution_warn(resolution)
+  list(resolution=resolution,construction="iterated",version=if(score.calibration)3L else if(student)2L else 1L,estimate=original,center=center,
     correction=original-center,se=se,bands=bands,map=map,grid=grid,
     settings=state$settings,law=law,block.selection=selection,draws=B,alpha=alpha,
     main.regularization=do.call(rbind,regularization),
@@ -263,12 +278,18 @@
 }
 
 .np_bias_plot_errors <- function(state, grid, target, method, bootstrap, wild,
-                                 alpha, B, gaussian.draws, blocklen, band, fit=NULL) {
+                                 alpha, B, gaussian.draws, blocklen, band, fit=NULL,
+                                 resolution.context=NULL) {
   law <- if(method=="asymptotic")"gaussian" else if(bootstrap=="wild")wild else bootstrap
   inference <- .np_plot_activity_run("Constructing bias-corrected intervals",
     .np_bias_inference(state,grid,target,alpha,
       if(method=="asymptotic")gaussian.draws else B,law,blocklen,fit,
-      studentize=band!="pmzsd"))
+      studentize=band!="pmzsd",
+      resolution.bands=if(band=="pmzsd")character() else if(band=="all")
+        c("pointwise","simultaneous","bonferroni") else band,
+      resolution.warn=is.null(resolution.context)))
+  if(!is.null(resolution.context) && !is.null(inference$resolution))
+    resolution.context$rows[[length(resolution.context$rows)+1L]] <- inference$resolution
   all <- lapply(inference$bands,function(x)cbind(inference$center-x[,1,1],x[,2,1]-inference$center))
   width <- if(band=="pmzsd")cbind(inference$se,inference$se)*qnorm(alpha/2,lower.tail=FALSE) else
     all[[if(band=="all")"pointwise" else band]]

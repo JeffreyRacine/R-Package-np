@@ -262,6 +262,12 @@
         gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
          law=if(plot.errors.method=="asymptotic")"gaussian" else
            if(plot.errors.boot.method=="wild")plot.errors.boot.wild else plot.errors.boot.method)) else NULL
+    resolution.context <- if(new.bias) new.env(parent=emptyenv()) else NULL
+    if(new.bias) {
+      resolution.context$rows <- list();resolution.context$success <- FALSE
+      on.exit(if(resolution.context$success)
+        .np_band_resolution_warn(resolution.context$rows),add=TRUE)
+    }
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     overlay.ok <- .np_plot_overlay_enabled(
@@ -359,7 +365,7 @@
       if (new.bias || plot.errors.method == "bootstrap"){
         terr.obj <- if(new.bias).np_bias_plot_errors(bias.state,setNames(x.eval,names(xdat)),"mean",plot.errors.method,
           plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tobj) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tobj,resolution.context=resolution.context) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = x.eval,
           fit.mean.train = fit.mean.train,
           gradients = FALSE,
@@ -477,8 +483,10 @@
         if (.np_plot_center_is_bias_corrected(plot.errors.center))
           r1 <- .np_plot_add_bias_fields(r1, as.double(treg), terr[,3])
 
-        if (plot.behavior == "data")
+        if (plot.behavior == "data") {
+          if(new.bias) resolution.context$success <- TRUE
           return ( list(r1 = r1) )
+        }
 
       }
 
@@ -548,6 +556,7 @@
           }
         )
         .np_plot_first_render_end(first.render)
+        if(new.bias) resolution.context$success <- TRUE
         return(.np_plot_rgl_finalize(
           rgl.out = rgl.out,
           plot.behavior = plot.behavior,
@@ -664,8 +673,10 @@
           Sys.sleep(if (isTRUE(rotate)) rotation.sleep else 0.5)
       }
 
-      if (plot.behavior == "plot-data")
+      if (plot.behavior == "plot-data") {
+        if(new.bias) resolution.context$success <- TRUE
         return ( list(r1 = r1) )
+      }
 
     } else {
 
@@ -755,7 +766,7 @@
             corrected <- .np_bias_plot_errors(bias.state,
               subcol(exdat,ei,i)[seq_len(xi.neval),,drop=FALSE],target,plot.errors.method,
               plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tr)
+              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tr,resolution.context=resolution.context)
             temp.err[seq_len(xi.neval),] <- corrected[["boot.err"]]
             temp.all.err <- corrected[["boot.all.err"]]
             bias.inference <- corrected[["inference"]]
@@ -1376,8 +1387,12 @@
           else
             paste("r",seq_len(bws$ndim),sep="")
         
+        if(new.bias) resolution.context$success <- TRUE
+
         return (plot.out)
       }
 
     }
+    if(new.bias) resolution.context$success <- TRUE
+    invisible(NULL)
   }
