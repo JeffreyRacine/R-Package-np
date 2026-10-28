@@ -128,7 +128,7 @@
     root.variance * .np_bias_draws(length(root.variance),length(ii),law))
 }
 
-.np_bias_student_chunk <- function(prepared, W, target, size, law) {
+.np_bias_student_chunk <- function(prepared, W, target, size, law, signed=FALSE) {
   n <- ncol(W)
   slices <- .np_bias_student_slices(size)
   errors <- .np_bias_student_errors(.np_bias_student_error_scale(prepared,law),size,law)
@@ -151,24 +151,24 @@
     # Only deterministic zero rows get a harmless divisor: their numerator and
     # returned pivot are exactly zero. Active scales are never floored.
     if (any(!target$active)) scale[!target$active,] <- 1
-    out[,ii] <- abs(numerator[[b]]/scale)
+    out[,ii] <- if(signed) numerator[[b]]/scale else abs(numerator[[b]]/scale)
   }
   out
 }
 
-.np_bias_student_draws <- function(prepared, W, se, B, law) {
+.np_bias_student_draws <- function(prepared, W, se, B, law, signed=FALSE) {
   target <- .np_bias_student_target(prepared,W,se)
   .npRmpi_bootstrap_fanout_enabled(n=ncol(W),B=B,chunk.size=1024L,
     what="studentized corrected process")
   tasks <- .npRmpi_bootstrap_chunk_tasks(B,1024L,with.seeds=FALSE)
   tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks,function(task)
     invisible(.np_bias_student_errors(.np_bias_student_error_scale(prepared,law),task$bsz,law)))
-  worker <- function(task,prepared,W,target,law) {
+  worker <- function(task,prepared,W,target,law,signed) {
     .npRmpi_bootstrap_use_task_rng(task)
-    t(.np_bias_student_chunk(prepared,W,target,task$bsz,law))
+    t(.np_bias_student_chunk(prepared,W,target,task$bsz,law,signed=signed))
   }
   t(.npRmpi_bootstrap_run_fanout(tasks,worker,ncol.out=nrow(W),
     what="studentized corrected process",profile.where="mpi.applyLB:bias-student",
     progress.label="Calibrating studentized process",progress.unit="draws",
-    prepared=prepared,W=W,target=target,law=law))
+    prepared=prepared,W=W,target=target,law=law,signed=signed))
 }
