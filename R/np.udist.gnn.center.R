@@ -45,6 +45,21 @@
     n = state$n, corrected = corrected)
 }
 
+# Exact one-sided Gaussian CDF limit, used only by literal GNN bootstrap.
+.np_udist_gnn_zero_margin <- function(delta, radius) {
+  H <- D <- matrix(0, nrow(delta), ncol(delta))
+  positive <- radius > 0
+  if (any(positive)) {
+    z <- delta[positive, , drop = FALSE] / radius[positive]
+    H[positive, ] <- pnorm(z)
+    moment <- z * dnorm(z); moment[is.infinite(z)] <- 0
+    D[positive, ] <- moment
+  }
+  zero <- delta[!positive, , drop = FALSE]
+  H[!positive, ] <- (zero > 0) + .5 * (zero == 0)
+  list(H = H, D = D)
+}
+
 .np_udist_gnn_center <- function(prepared, counts) {
   stopifnot(length(counts) == prepared$n, sum(counts) == prepared$n, all(counts >= 0))
   radii <- list()
@@ -54,8 +69,12 @@
       donor <- ordering[which(cumsum(counts[ordering]) >= cache$k)[1L]]
       abs(cache$delta[i, donor])
     }, numeric(1))
-    if (any(!is.finite(radius)) || any(radius <= 0))
-      stop("exact GNN center unavailable: nonpositive physical radius", call. = FALSE)
+    if (any(!is.finite(radius)) || any(radius <= 0)) {
+      if (!isTRUE(prepared$zero.limit) || any(!is.finite(radius)) || any(radius < 0))
+        stop("exact GNN center unavailable: nonpositive physical radius", call. = FALSE)
+      radii[[length(radii) + 1L]] <<- radius
+      return(.np_udist_gnn_zero_margin(cache$delta, radius))
+    }
     radii[[length(radii) + 1L]] <<- radius
     z <- cache$delta / radius
     D <- z * dnorm(z); D[is.infinite(z)] <- 0
