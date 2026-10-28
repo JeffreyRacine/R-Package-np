@@ -62,6 +62,27 @@ the default joint draws for its envelope; request \code{band="all"} to set
 Bonferroni tail resolution and marginal sparse-tail coverage remain limitations.
 The maximum-process draws are retained as \code{inference$process.maximum}.
 
+For numeric-only fixed bandwidths with one or two variables, Gaussian and inid
+pointwise bands additionally envelope a signed-contribution score interval.
+The contribution has a certified range: writing \eqn{t=\sqrt{1+2/q}}, its
+lower bound is \eqn{a=\Phi(-t)-(q/2)t\phi(t)} and upper bound is \eqn{1-a}.
+A Wilson score interval for the rescaled contribution mean is mapped back to
+this range. This is approximate inference for the fixed-bandwidth contribution
+expectation, not an exact confidence interval for the unsmoothed CDF.
+Data-selected bandwidths and evaluation ranges require separate empirical
+qualification. The inid interval is a hybrid marginal envelope: literal draws
+and quantiles are unchanged, but the final endpoints can be wider and asymmetric.
+The corrected center is unchanged. Simultaneous bands retain their raw process
+calibration and expand only by the minimum uniform amount required to contain
+the revised pointwise bands. Bonferroni bands retain nesting; singleton bands
+coincide. \code{inference$reference.bands} and
+\code{inference$reference.critical} retain the preceding intervals and criticals.
+Final \code{critical} values report maximum one-sided extents around the
+preserved center; use \code{bands} for the asymmetric endpoints. Settings record
+the contribution range and nesting expansion. Mixed, NN and block routes do
+not receive this marginal envelope. An entirely zero observed process remains
+unavailable.
+
 Explicit \code{construction="cdf"} retains the preceding private studentized
 construction, including normalized Li--Racine ordered smoothing and bounded
 small-grid covariance calibration. Its bootstrap uses replicate scales and
