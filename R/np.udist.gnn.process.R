@@ -1,6 +1,6 @@
 # Exact resampling of the GNN statistic; no bootstrap studentizing pilot.
 .np_udist_gnn_chunk <- function(prepared, base, first, last, B, law, blocklen) {
-  prepared$zero.limit <- identical(law, "inid")
+  prepared$zero.limit <- law %in% c("inid", "fixed")
   counts <- .np_bias_process_innovations(prepared$n, first, last, B, law, blocklen) + 1
   out <- matrix(0, length(base), last - first + 1L)
   for (j in seq_len(ncol(counts))) {
