@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+- Density smoothed-percentile plot subtitles and legends now identify
+  corrected bootstrap curves and calibrated percentile ranks, without
+  changing calculations, returned objects or the existing SD-method labels.
+
 - Bias-corrected bootstrap calibration uses common `symmetric-sd` and
   `asymmetric-sd` names across regression, unconditional density and CDFs,
   preserving existing defaults and older public names. CDF asymmetric
