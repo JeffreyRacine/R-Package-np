@@ -38,10 +38,10 @@
 np_boot_control <- function(nonfixed = c("exact", "frozen"),
                             wild = c("mammen", "rademacher"),
                             blocklen = NULL,
-                            calibration = c("default", "absolute", "separate-tails", "tail-envelope")) {
+                            calibration = c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile")) {
   calibration <- if (missing(calibration)) "default" else
     .np_plot_scalar_match(calibration,
-      c("default", "absolute", "separate-tails", "tail-envelope"), "calibration")
+      c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile"), "calibration")
   if (is.null(calibration)) stop("calibration must be a single supported name", call. = FALSE)
   nonfixed <- match.arg(nonfixed)
   wild <- match.arg(wild)
@@ -59,8 +59,15 @@ np_boot_control <- function(nonfixed = c("exact", "frozen"),
   if (!"calibration" %in% names(control)) return("default")
   value <- control[["calibration", exact = TRUE]]
   if (!is.character(value) || length(value) != 1L || is.na(value) ||
-      !value %in% c("default", "absolute", "separate-tails", "tail-envelope"))
+      !value %in% c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile"))
     stop("invalid bootstrap calibration control", call. = FALSE)
+  value
+}
+
+.np_plot_calibration_method <- function(value, family) {
+  if (identical(value, "symmetric-sd")) return("absolute")
+  if (identical(value, "asymmetric-sd"))
+    return(if (identical(family, "density")) "percentile-tails" else "separate-tails")
   value
 }
 
@@ -482,6 +489,8 @@ np_render_control <- function(style = c("band", "bar"),
     context = .plot_context
   )
   dots <- list(...)
+  if (!is.null(dots[["bias.control", exact = TRUE]]))
+    .np_udist_score_scope(dots[["bias.control", exact = TRUE]], inherits(bws, "dbandwidth"))
   dots <- .np_plot_normalize_public_dots(dots, context = .plot_context,
     allow_asymptotic_bias = identical(method, .np_plot_rbandwidth_engine) ||
       identical(method, .np_plot_bandwidth_engine) ||
@@ -490,8 +499,11 @@ np_render_control <- function(style = c("band", "bar"),
        (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth") ||
         inherits(bws, "dbandwidth"))))
   if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&
-      !inherits(bws, "rbandwidth"))
-    stop("explicit bootstrap calibration currently requires bias-corrected regression", call. = FALSE)
+      !inherits(bws, c("rbandwidth", "bandwidth", "dbandwidth")))
+    stop("explicit bootstrap calibration currently requires bias-corrected regression or supported density/distribution inference", call. = FALSE)
+  if (isTRUE(dots[["plot.errors.boot.calibration", exact = TRUE]] %in% c("percentile-tails", "smoothed-percentile")) &&
+      !inherits(bws, "bandwidth"))
+    stop("percentile density calibration requires supported density inference", call. = FALSE)
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 
@@ -553,6 +565,11 @@ np_render_control <- function(style = c("band", "bar"),
            "conbandwidth", "condbandwidth") %in% class(bws)))
   progress.enabled <- identical(dots$plot.errors.method, "bootstrap") &&
     !identical(dots$plot.errors.boot.nonfixed, "frozen")
+  if (!owns.empty.rows && inherits(bws, c("bandwidth", "dbandwidth")))
+    return(.np_plot_progress_run(
+      .np_with_seed(random.seed, .np_udens_resolution_run(
+        do.call(method, c(list(bws = bws), dots)))),
+      enabled = progress.enabled))
   if(!owns.empty.rows)
     return(.np_plot_progress_run(
       .np_with_seed(random.seed, do.call(method, c(list(bws = bws), dots))),

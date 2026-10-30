@@ -2,8 +2,13 @@
 \alias{np_udist_bias_control}
 \title{Private Controls for Bias-Corrected Unconditional Distribution Bands}
 \description{Selects the research CDF construction or legacy bootstrap centering.}
-\usage{np_udist_bias_control(construction = c("joint-process", "cdf", "legacy"))}
-\arguments{\item{construction}{The joint corrected CDF process or legacy correction.}}
+\usage{np_udist_bias_control(construction = c("joint-process", "cdf", "legacy"),
+                      calibration = c("default", "score-envelope"))}
+\arguments{
+\item{construction}{The joint corrected CDF process or legacy correction.}
+\item{calibration}{The default construction or the explicit, side-specific
+score envelope for supported fixed numeric Gaussian asymptotic bands.}
+}
 \details{
 This private research implementation is undergoing full empirical-range
 qualification. It does not establish a finite-sample coverage guarantee.
@@ -60,6 +65,13 @@ the joint band. Singleton bands coincide. Standalone Gaussian Bonferroni uses
 the default joint draws for its envelope; request \code{band="all"} to set
 \code{gaussian.draws} and obtain all bands from the same process. Finite-draw
 Bonferroni tail resolution and marginal sparse-tail coverage remain limitations.
+Every positive draw count is supported when the provider arithmetic is defined.
+Poorly resolved empirical quantiles return all requested bands with one aggregated
+warning and retained \code{inference$resolution} diagnostics. No draw count is
+increased and no requested band is omitted for resolution alone. Numeric GNN
+bootstrap scales are empirical standard deviations across draws, so fewer than
+two draws remains a distinct undefined-arithmetic error. Analytic Gaussian
+marginal quantiles do not require empirical tail resolution.
 The maximum-process draws are retained as \code{inference$process.maximum}.
 
 For numeric-only fixed bandwidths with one or two variables, Gaussian and inid
@@ -82,6 +94,41 @@ preserved center; use \code{bands} for the asymmetric endpoints. Settings record
 the contribution range and nesting expansion. Mixed, NN and block routes do
 not receive this marginal envelope. An entirely zero observed process remains
 unavailable.
+
+For supported corrected empirical bootstrap bands, explicit
+\code{boot.control=np_boot_control(calibration="separate-tails")} uses signed
+lower and upper empirical tails in CDF units. The simultaneous roots are
+separate quantiles of the family minimum and maximum; endpoints invert those
+signed estimate displacements. \code{calibration="tail-envelope"} additionally
+takes the interval hull with the unchanged absolute construction. The default
+is unchanged, and \code{calibration="absolute"} requests it explicitly.
+These options preserve the selected inid, fixed or geom law, the complete
+contribution process, block choice, corrected center and displayed variance.
+They currently admit fixed and purely ordered NN geometry; numeric NN
+asymmetric calibration requires separate qualification. Density's
+\code{"percentile-tails"} choice is not a CDF method.
+
+For fixed numeric Gaussian2 inputs with one or two variables, the inid signed
+bands retain the existing marginal score protection. Its two sides are nested
+outward separately, preserving asymmetry instead of imposing the larger
+uniform displacement on both sides. An explicit asymptotic option,
+\code{bias.control=np_udist_bias_control(calibration="score-envelope")},
+uses this same side-specific composition with the unchanged Gaussian process.
+Gaussian draws remain reflection-symmetric; this option's possible asymmetry
+comes from the deterministic score envelope, and some bands can remain
+symmetric. Default pointwise numeric bands already include score protection.
+The new Gaussian option changes how that protection extends to the simultaneous
+and Bonferroni bands; it does not simulate a skewed Gaussian law.
+
+Explicit asymmetric options require \code{band="pointwise"},
+\code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}; they do not
+silently alter normal-scale \code{"pmzsd"} intervals. Singleton bands coincide,
+and the declared family remains the full returned grid within each panel.
+Results retain \code{absolute.intervals}, \code{raw.process.intervals},
+\code{raw.intervals}, signed tail orientation where applicable and side-specific
+nesting diagnostics. No [0,1] clipping or monotonicity projection is applied.
+These are private candidates requiring their own coverage evidence; containing
+a baseline interval is not a proof of nominal coverage.
 
 Explicit \code{construction="cdf"} retains the preceding private studentized
 construction, including normalized Li--Racine ordered smoothing and bounded

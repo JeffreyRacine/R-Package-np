@@ -58,12 +58,13 @@
   list(maxima = maximum, end = end, rank = canonical$value$rank)
 }
 
-.np_udens_scale_inference <- function(state, grid, law = c("gaussian", "inid"),
+.np_udens_scale_inference <- function(state, grid, law = c("gaussian", "inid", "fixed", "geom"),
     alpha = .05, B = 9999L, tile = 25L,
-    bands = c("pointwise", "simultaneous", "bonferroni")) {
+    bands = c("pointwise", "simultaneous", "bonferroni"), calibration = NULL,
+    blocklen = NULL) {
   law <- match.arg(law)
-  if (!state$q %in% 1:2 || state$r != 0L || state$s != 0L || !identical(state$metadata$type, "fixed"))
-    stop("joint-scale density bounds require fixed bandwidths and one or two numeric variables", call. = FALSE)
+  if (!identical(state$metadata$type, "fixed"))
+    stop("joint-scale density bounds require fixed bandwidths", call. = FALSE)
   existed <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
   previous <- if (existed) get(".Random.seed", .GlobalEnv) else NULL
   success <- FALSE
@@ -75,11 +76,30 @@
   m <- nrow(grid); small <- law == "gaussian" && m <= 512L
   budget <- .np_udens_b2_budget(state, m, B, tile, small)
   extra <- 8*(if (small) 4*as.double(m)*state$n else 0) + 8*32*m
+  if (!is.null(calibration) && calibration %in% c("separate-tails", "tail-envelope", "percentile-tails"))
+    extra <- extra + .np_udens_tail_bytes(B, m, alpha, tile)
+  if (identical(calibration, "percentile-tails")) extra <- extra + 48*as.double(m)*length(alpha)
   budget$per.process <- budget$per.process + extra
   budget$bytes <- budget$per.process * budget$processes
   if (budget$bytes > state$max.bytes)
     stop("density scale envelope live-byte forecast exceeds the requested budget", call. = FALSE)
-  base <- .np_udens_reference_inference(state, grid, law, alpha, B, tile, bands)
+  dependent <- law %in% c("fixed", "geom")
+  cache <- NULL
+  if (dependent) {
+    request <- .np_udens_block_request(state$x, law, blocklen)
+    blocklen <- request$blocklen
+    if (!existed) runif(1L)
+    cache <- .np_udens_block_cache(state$n, B, m, tile, law, blocklen,
+                                  budget, state$max.bytes)
+    if (!is.null(cache)) {
+      budget$per.process <- budget$per.process + cache$plan$extra.bytes
+      budget$bytes <- cache$plan$bytes
+      budget$innovation.cache <- cache$plan
+    }
+  }
+  base <- .np_udens_reference_inference(state, grid, law, alpha, B, tile, bands, calibration,
+                                        blocklen = blocklen, process.cache = cache)
+  if (dependent) base$rng$entry <- previous
   start <- if (small) base$rng$end else base$rng$start
   point <- tau <- numeric(m); maximum <- rep(-Inf, B); end <- NULL
   for (first in seq.int(1L, m, by = if (small) m else tile)) {
@@ -93,7 +113,9 @@
       maximum <- draw$value$maxima; end <- draw$end
       point[ii] <- ifelse(z$t > 0, qnorm(.95), 0)
     } else {
-      draw <- .np_bias_stream(start, .np_bias_process_draws(z$factor, B, law, NULL))
+      draw <- .np_bias_stream(start,
+        if (dependent) .np_udens_block_draws(z$factor, B, law, blocklen, cache)
+        else .np_bias_process_draws(z$factor, B, law, NULL))
       if (!is.null(end) && !identical(end, draw$end))
         stop("density scale tiles consumed inconsistent streams", call. = FALSE)
       end <- draw$end
@@ -137,9 +159,34 @@
     out
   })
   base$intervals <- base$absolute.intervals <- base$bands
+  if (!is.null(base[["tail", exact = TRUE]])) {
+    base$location.raw.intervals <- base$raw.intervals
+    endpoint.roots <- if (identical(calibration, "percentile-tails"))
+      .np_band_percentile_roots(base$tail$limits) else base$tail$limits
+    base$raw.intervals <- .np_band_scale_union(base$center, base$se, endpoint.roots,
+      list(pointwise = inflation$pointwise, simultaneous = inflation$simultaneous,
+           bonferroni = inflation$simultaneous))
+    base$raw.intervals$simultaneous <- .np_band_tail_protect(
+      list(band = base$raw.intervals$simultaneous),
+      list(band = base$raw.intervals$pointwise))$limits$band
+    base$raw.intervals$bonferroni <- .np_band_tail_protect(
+      list(band = base$raw.intervals$bonferroni),
+      list(band = base$raw.intervals$simultaneous))$limits$band
+    base$bands <- if (calibration == "tail-envelope")
+      .np_band_tail_protect(base$raw.intervals, base$absolute.intervals)$limits else base$raw.intervals
+    base$intervals <- base$bands
+  }
   base$settings$construction <- "density-joint-scale-envelope-S-v1"
   base$settings$budget <- budget
   base$settings$calibration.status <- "bounded full-range qualification; conservative and local limitations documented"
+  if (law != "gaussian")
+    base$resolution <- rbind(base$resolution, .np_udens_resolution_scale(B, m, tau))
+  if (!is.null(base[["tail", exact = TRUE]]))
+    base$settings$calibration.status <- "private asymmetric candidate; coverage unqualified"
+  if (dependent) {
+    base$settings$block.selection <- request
+    base$settings$calibration.status <- "private block-scale transport; coverage unqualified"
+  }
   base$rng$end <- end
   assign(".Random.seed", end, .GlobalEnv)
   success <- TRUE

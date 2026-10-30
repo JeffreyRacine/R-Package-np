@@ -45,7 +45,8 @@
            plot.par.mfrow = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, gaussian.draws = 9999L, bias.control = NULL){
+           random.seed, gaussian.draws = 9999L, bias.control = NULL,
+           plot.errors.boot.calibration = NULL){
 
     if (.np_data_formal_supplied(sys.call(), sys.function()))
       .np_plot_data_error()
@@ -146,7 +147,7 @@
     plot.errors <- normalized.opts$plot.errors
     bias.state <- .np_udist_plot_prepare(bias.control, bws, xdat,
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
-      plot.errors.boot.blocklen, block.automatic)
+      plot.errors.boot.blocklen, block.automatic, plot.errors.boot.calibration)
     new.bias <- !is.null(bias.state)
     joint.eligible <- joint.eligible && !new.bias
     if (new.bias && isTRUE(plot.bxp))

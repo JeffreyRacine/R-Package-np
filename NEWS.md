@@ -1,5 +1,26 @@
 # np 0.80-2 (development)
 
+- Bias-corrected bootstrap calibration uses common `symmetric-sd` and
+  `asymmetric-sd` names across regression, unconditional density and CDFs,
+  preserving existing defaults and older public names. CDF asymmetric
+  fixed-bandwidth inid/fixed/geom support and low-draw diagnostics are included.
+- Density `smoothed-percentile` selects the refined calibrated unshifted
+  OP1+SC1 construction with multivariate/mixed-data, finite categorical
+  near-pooling and ordered-lattice extensions. The original fit is unchanged;
+  39 fresh outer samples reselect CV bandwidths for calibration. This opt-in
+  method uses direct corrected-curve ranks, companion hulls and certified
+  support completion, with explicit resolution/attainability diagnostics.
+  It requires ks, fixed Gaussian2 bandwidths, at least one numeric coordinate,
+  and inid or unit-block resampling. CDF/regression percentile adaptation and
+  nonunit-block/NN calibration remain future work. The private centered
+  experiment is preserved in research artifacts, not selected by this name.
+  Gaussian q1 paired evidence and broader capability proof are distinguished
+  from still-limited multivariate/mixed coverage evidence.
+
+- Defined corrected density reference/joint-scale bootstrap bands now return
+  all requested finite bands at low draw counts, including Bonferroni, with
+  one aggregate warning and location/scale resolution diagnostics.
+
 - Bias-corrected regression bootstrap bands now offer raw asymmetric
   `np_boot_control(calibration="separate-tails")` and conservative
   `calibration="tail-envelope"` choices for wild, inid, fixed and geom.

@@ -17,9 +17,10 @@
   }, numeric(1L))
 }
 
-.np_udens_reference_inference <- function(state, grid, law = c("gaussian", "inid"),
+.np_udens_reference_inference <- function(state, grid, law = c("gaussian", "inid", "fixed", "geom"),
     alpha = .05, B = 9999L, tile = 25L,
-    bands = c("pointwise", "simultaneous", "bonferroni")) {
+    bands = c("pointwise", "simultaneous", "bonferroni"), calibration = NULL,
+    blocklen = NULL, process.cache = NULL) {
   existed <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
   previous <- if (existed) get(".Random.seed", .GlobalEnv, inherits = FALSE) else NULL
   kind <- RNGkind(); success <- FALSE
@@ -32,19 +33,39 @@
     }
   }, add = TRUE)
   law <- match.arg(law)
+  dependent <- law %in% c("fixed", "geom")
+  if (dependent) blocklen <- .np_udens_block_request(state$x, law, blocklen)$blocklen
+  if (!is.null(calibration) && (!is.character(calibration) || length(calibration) != 1L ||
+      is.na(calibration) || !calibration %in% c("absolute", "separate-tails", "tail-envelope", "percentile-tails") ||
+      !law %in% c("inid", "fixed", "geom")))
+    stop("explicit density calibration requires an admitted empirical provider", call. = FALSE)
+  signed.calibration <- !is.null(calibration) && calibration != "absolute"
   bands <- match.arg(bands, c("pointwise", "simultaneous", "bonferroni"), several.ok = TRUE)
   if (!is.numeric(alpha) || !length(alpha) || any(!is.finite(alpha)) ||
       any(alpha <= 0 | alpha >= .5) || anyDuplicated(alpha))
     stop("density alpha values must be unique and in (0, .5)", call. = FALSE)
   B <- .np_plot_gaussian_integer(B, "density draws", .Machine$integer.max)
-  if (B < 2L) stop("density calibration requires at least two draws", call. = FALSE)
   .np_udens_bc_grid(state, grid)
   m <- nrow(grid)
-  bonferroni.available <- law == "gaussian" || all(alpha * B / m >= 1)
-  if (!bonferroni.available && "bonferroni" %in% bands)
-    stop("fixed-reference density bootstrap Bonferroni is unqualified at this grid/draw resolution; no calibration law or draw count was changed", call. = FALSE)
   covariance.mode <- law == "gaussian" && m <= 512L
   budget <- .np_udens_b2_budget(state, m, B, tile, covariance.mode)
+  if (signed.calibration) {
+    extra <- .np_udens_tail_bytes(B, m, alpha, tile)
+    if (identical(calibration, "percentile-tails")) extra <- extra + 48*as.double(m)*length(alpha)
+    budget$per.process <- budget$per.process + extra
+    budget$bytes <- budget$per.process * budget$processes
+    if (budget$bytes > state$max.bytes)
+      stop("density tail workspace exceeds the requested budget", call. = FALSE)
+    map <- data.frame(row = seq_len(m), target = "density")
+    tails <- .np_band_tail_prepare(B, map, alpha, byte.limit = extra)
+  }
+  if (!is.null(process.cache)) {
+    budget$per.process <- budget$per.process + process.cache$plan$extra.bytes
+    budget$bytes <- budget$bytes + process.cache$plan$extra.bytes
+    if (budget$bytes > state$max.bytes)
+      stop("density block cache exceeds the requested budget", call. = FALSE)
+    budget$innovation.cache <- process.cache$plan
+  }
   scale <- .np_udens_reference_scale(state, grid)
   if (any(!is.finite(scale)) || any(scale <= 0))
     stop("fixed-reference density requires positive finite observed scales", call. = FALSE)
@@ -78,11 +99,15 @@
       if (any(!is.finite(value$se)) || any(value$se <= 0))
         stop("fixed-reference density requires positive finite empirical scales", call. = FALSE)
       stream <- .np_bias_stream(start,
-        .np_bias_process_draws(value$factor, B, law, NULL))
+        if (dependent) .np_udens_block_draws(value$factor, B, law, blocklen, process.cache)
+        else .np_bias_process_draws(value$factor, B, law, NULL))
       if (!is.null(end) && !identical(end, stream$end))
         stop("density process tiles consumed inconsistent streams", call. = FALSE)
       end <- stream$end
       limits <- .np_bias_limits_update(limits, abs(stream$value/value$se), ii)
+      if (signed.calibration)
+        tails <- .np_band_tail_update(tails, stream$value/value$se,
+          map[ii, , drop = FALSE], seq_len(B))
       center[ii] <- value$center; original[ii] <- value$original.center
       empirical[ii] <- value$se
     }
@@ -94,8 +119,7 @@
       simultaneous = matrix(rep(finished$raw_max_critical[, 1L], each = m), m),
       bonferroni = if (law == "gaussian") critical$bonferroni else limits$bonf)
   }
-  available <- if (bonferroni.available) names(critical) else
-    setdiff(names(critical), "bonferroni")
+  available <- names(critical)
   intervals <- lapply(critical[available], function(k) {
     out <- array(0, c(m, 2L, length(alpha)),
                  dimnames = list(NULL, c("lower", "upper"), as.character(alpha)))
@@ -119,7 +143,39 @@
       bonferroni.raw.rank = ceiling(B * (1-alpha/m)),
       calibration.status = "private recovery candidate; coverage unqualified"),
     rng = list(kind = kind, entry = previous, start = start, end = end))
+  if (law != "gaussian")
+    result$resolution <- .np_udens_resolution(B, m, alpha, bands)
+  if (signed.calibration) {
+    tail.result <- .np_band_tail_finish(tails)
+    for (band in names(tail.result$limits))
+      dimnames(tail.result$limits[[band]]) <- dimnames(intervals[[band]])
+    result$tail <- tail.result
+    endpoint.roots <- if (identical(calibration, "percentile-tails"))
+      .np_band_percentile_roots(tail.result$limits) else tail.result$limits
+    result$raw.intervals <- .np_band_rank_invert(center, scale, endpoint.roots)
+    result$absolute.resolution <- result$resolution
+    result$resolution <- .np_udens_resolution(B, m, alpha, bands, "separate-tails")
+    result$bands <- if (calibration == "tail-envelope")
+      .np_band_tail_protect(result$raw.intervals, intervals)$limits else result$raw.intervals
+    result$intervals <- result$bands
+  }
+  if (!is.null(calibration)) {
+    result$settings$calibration.requested <- calibration
+    result$settings$calibration.method <- calibration
+    if (identical(calibration, "percentile-tails"))
+      result$settings$endpoint.construction <- "transported density-scale percentile tails"
+  }
+  if (dependent) {
+    result$settings$blocklen <- blocklen
+    result$settings$covariance <- "F4 reference-scale transport of the complete selected-block location process"
+    result$settings$bootstrap.statistic <- "F4 reference-scale transport of literal centered block process"
+  }
   assign(".Random.seed", end, .GlobalEnv)
   success <- TRUE
   result
+}
+
+# Conservative bounded live workspace, including one signed target tile.
+.np_udens_tail_bytes <- function(B, m, alpha, tile) {
+  96*as.double(B) + 48*as.double(m)*length(alpha) + 8*min(tile, m)*as.double(B)
 }

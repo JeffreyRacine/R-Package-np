@@ -29,10 +29,17 @@ test_that("density correction retains literal law and singleton contracts", {
   expect_identical(out$inference$settings$primary, "absolute")
   expect_identical(out$inference$bands$pointwise, out$inference$bands$simultaneous)
   expect_identical(out$inference$bands$pointwise, out$inference$bands$bonferroni)
-  expect_error(plot(bw, xdat = x, errors = "bootstrap", bootstrap = "fixed",
-    center = "bias-corrected", band = "all", B = 49L, neval = 1L,
-    boot.control = np_boot_control(blocklen = 2L), output = "data",
-    bias.control = np_udens_bias_control()), "bootstrap='inid'", fixed = TRUE)
+  for (law in c("fixed", "geom")) {
+    block <- plot(bw, xdat = x, errors = "bootstrap", bootstrap = law,
+      center = "bias-corrected", band = "all", B = 49L, neval = 1L,
+      boot.control = np_boot_control(blocklen = 2L), output = "data",
+      bias.control = np_udens_bias_control())[[1L]]$inference
+    expect_identical(block$settings$law, law)
+    expect_true(all(is.finite(unlist(block$bands))))
+    expect_identical(block$bands$pointwise, block$bands$simultaneous)
+    expect_identical(block$bands$pointwise, block$bands$bonferroni)
+    expect_identical(.Random.seed, rng)
+  }
 })
 
 
