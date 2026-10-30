@@ -621,14 +621,31 @@
       all=sprintf("%s Gaussian studentized bands", level))
   }
 
+  smoothed.percentile <- identical(method, "bootstrap") &&
+    identical(construction, "smoothed-percentile")
+  if (smoothed.percentile) {
+    candidates <- switch(band,
+      pointwise = sprintf("%s pointwise smoothed-percentile band", level),
+      simultaneous = sprintf("%s simultaneous calibrated smoothed-percentile band", level),
+      bonferroni = sprintf("%s Bonferroni smoothed-percentile band (companion envelope)", level),
+      all = sprintf("%s smoothed-percentile bands (calibrated simultaneous)", level))
+    compact <- switch(band,
+      pointwise = sprintf("%s pointwise smoothed-percentile; corrected curves", level),
+      simultaneous = sprintf("%s simultaneous smoothed-percentile; corrected curves", level),
+      bonferroni = sprintf("%s Bonferroni smoothed-percentile envelope; corrected curves", level),
+      all = sprintf("%s smoothed-percentile bands; corrected curves", level))
+    candidates <- c(paste0(candidates, "; bias-corrected bootstrap curves"), compact)
+  }
+
   if (isTRUE(shared)) {
     candidates <- gsub("\\bbands?\\b", "intervals", candidates)
-    if (identical(key, "bootstrap:simultaneous")) {
+    if (identical(key, "bootstrap:simultaneous") && !smoothed.percentile) {
       candidates <- c(
         sprintf("%s bootstrap variability intervals; simultaneous within each panel (rank-based)", level),
         sprintf("%s bootstrap intervals; simultaneous within each panel (rank-based)", level)
       )
-    } else if (band %in% c("bonferroni", "all")) {
+    } else if (band %in% c("bonferroni", "all") ||
+               (smoothed.percentile && identical(band, "simultaneous"))) {
       candidates <- paste0(candidates, "; within each panel")
     }
   } else if (!isTRUE(continuous)) {
@@ -650,7 +667,8 @@
     candidates <- paste0(candidates, "; within each quantile curve")
   }
 
-  if ((identical(method, "bootstrap") || identical(construction, "iterated")) &&
+  if (!smoothed.percentile &&
+      (identical(method, "bootstrap") || identical(construction, "iterated")) &&
       identical(center, "bias-corrected")) {
     suffix <- if (length(candidates) >= 3L) {
       c(rep.int("; bias-corrected center", length(candidates) - 1L),
@@ -12806,6 +12824,11 @@ plotFactor <- function(f, y, ...){
 .np_plot_all_band_legend_labels <- function(plot.errors.method, construction = NULL) {
   method <- match.arg(as.character(plot.errors.method)[1L],
                       c("bootstrap", "asymptotic"))
+  if (identical(method, "bootstrap") && identical(construction, "smoothed-percentile")) {
+    return(c(pointwise = "Pointwise (percentiles)",
+      simultaneous = "Simultaneous (calibrated percentile ranks)",
+      bonferroni = "Bonferroni (percentile envelope)"))
+  }
   if (identical(construction, "iterated") || identical(construction, "positive-covariance")) {
     return(c(pointwise="Pointwise (quantiles)",
       simultaneous="Simultaneous (maximum, finite grid)",

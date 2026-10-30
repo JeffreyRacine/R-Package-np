@@ -332,3 +332,20 @@ test_that("base annotation uses existing subtitle space without changing geometr
   after <- graphics::par(c("mar", "oma", "fig", "fin", "pin", "plt", "usr"))
   expect_identical(after, before)
 })
+
+
+test_that("smoothed-percentile annotations describe curves without a center claim", {
+  descriptor <- getFromNamespace(".np_plot_variability_descriptor", .plot_annotation_package)
+  labels <- getFromNamespace(".np_plot_all_band_legend_labels", .plot_annotation_package)
+  for (band in c("pointwise", "simultaneous", "bonferroni", "all")) {
+    for (shared in c(FALSE, TRUE)) {
+      text <- descriptor("bootstrap", band, 0.05, "bias-corrected",
+                         shared = shared, construction = "smoothed-percentile")$candidates
+      expect_true(all(grepl("smoothed-percentile", text, fixed = TRUE)))
+      expect_true(all(grepl("corrected.*curves", text)))
+      expect_false(any(grepl("maximum|bias-corrected center", text)))
+    }
+  }
+  expect_match(labels("bootstrap", "smoothed-percentile")[["simultaneous"]],
+               "calibrated percentile ranks", fixed = TRUE)
+})

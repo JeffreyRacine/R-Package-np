@@ -159,6 +159,11 @@
       plot.errors.boot.calibration, blocklen = plot.errors.boot.blocklen,
       block.automatic = density.block.automatic)
     new.bias <- !is.null(bias.state)
+    # Presentation only: percentile endpoints are not a maximum-root band.
+    annotation.construction <- if (new.bias) {
+      if (identical(bias.state[["plot.calibration", exact = TRUE]],
+                    "smoothed-percentile")) "smoothed-percentile" else "positive-covariance"
+    } else NULL
     joint.eligible <- joint.eligible && !new.bias
     if (new.bias && isTRUE(plot.bxp))
       stop("positive-covariance density bounds require factor.boxplot=FALSE", call. = FALSE)
@@ -378,7 +383,7 @@
             }
             if (plot.errors) {
               .np_plot_error_surfaces_rgl(
-                construction = if (new.bias) "positive-covariance" else NULL,
+                construction = annotation.construction,
                 x = x1.eval,
                 y = x2.eval,
                 plot.errors.type = plot.errors.type,
@@ -466,7 +471,7 @@
               border = scalar_default(border, .np_plot_color("context_border")),
               lwd = scalar_default(lwd, par()$lwd),
               annotation = .np_plot_variability_annotation_spec(
-                construction = if (new.bias) "positive-covariance" else NULL,
+                construction = annotation.construction,
                 plot.errors.method = plot.errors.method,
                 plot.errors.type = plot.errors.type,
                 plot.errors.alpha = plot.errors.alpha,
@@ -480,7 +485,7 @@
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
-                construction = if (new.bias) "positive-covariance" else NULL,
+                construction = annotation.construction,
                 legend = plot.legend,
                 x = "topright",
                 lty = .np_plot_lty("solid"),
@@ -683,7 +688,7 @@
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             panel.annotation <- .np_plot_variability_annotation_spec(
-                construction = if (new.bias) "positive-covariance" else NULL,
+                construction = annotation.construction,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -695,7 +700,7 @@
             )
             if (plot.errors.type == "all") {
               .np_plot_draw_all_errors_with_gaps(
-                construction = if (new.bias) "positive-covariance" else NULL,
+                construction = annotation.construction,
                 ex = as.numeric(ei),
                 center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
                 all.err = temp.all.err,
@@ -846,7 +851,7 @@
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             err.block <- data.err[, seq(3*i - 2L, length.out = 3L), drop = FALSE]
             panel.annotation <- .np_plot_variability_annotation_spec(
-                construction = if (new.bias) "positive-covariance" else NULL,
+                construction = annotation.construction,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -858,7 +863,7 @@
             )
             if (plot.errors.type == "all") {
               .np_plot_draw_all_errors_with_gaps(
-                construction = if (new.bias) "positive-covariance" else NULL,
+                construction = annotation.construction,
                 ex = as.numeric(allei[,i]),
                 center = .np_plot_error_center(data.eval[,i], err.block, plotOnEstimate),
                 all.err = data.err.all[[i]],
