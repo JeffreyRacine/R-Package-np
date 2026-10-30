@@ -203,7 +203,7 @@
     new.bias <- bias.request && identical(bias.control[["construction"]],"iterated")
     if (!is.character(plot.errors.boot.calibration) || length(plot.errors.boot.calibration)!=1L ||
         is.na(plot.errors.boot.calibration) ||
-        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope"))
+        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope","symmetric-sd","asymmetric-sd"))
       stop("invalid bootstrap calibration control",call.=FALSE)
     if (plot.errors.boot.calibration!="default" &&
         (!new.bias || error.request$method!="bootstrap" || error.request$type=="pmzsd"))

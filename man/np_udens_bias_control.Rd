@@ -33,9 +33,12 @@ are in \code{inference$bands$pmzsd}; \code{inference$normal.band} records the
 rule. Explicit \code{"pointwise"}, \code{"simultaneous"},
 \code{"bonferroni"} and \code{"all"} retain their calibrated constructions.
 
-The joint-scale construction supports fixed, unbounded, second-order Gaussian continuous
-kernels for one or two numeric variables. Mixed-data qualification of the
-new envelope remains deferred; saved controls retain their previous scope.
+The joint-scale construction supports fixed, unbounded, second-order Gaussian
+continuous kernels, including multivariate and mixed-data layouts with unordered
+Aitchison--Aitken and ordered Li--Racine kernels. Mathematical and implementation
+support is distinct from statistical coverage qualification: one or two continuous
+variables remain the primary assessment, and mixed/higher-dimensional evidence
+is limited. Saved controls retain their construction semantics.
 Selected bandwidths remain fixed. The corrected center and complete
 observation contributions are unchanged from the previous density correction.
 The covariance combines the previous positive-pilot marginal scales with the
@@ -56,16 +59,52 @@ all targets and corners. No training-size-squared matrix or full grid-by-draw
 matrix is retained. The inference-storage forecast remains limited to 256 MiB
 summed over participating processes, excluding baseline R/package memory.
 
-Bootstrap Bonferroni requests fail when \code{alpha * B / m < 1}, where
-\code{m} is the panel grid size. In particular the default 2,500-target grid
-and 9,999 draws do not admit the new bootstrap Bonferroni or \code{band="all"}
-route. Pointwise and simultaneous requests remain distinct admitted routes.
+Defined version-2/3 bootstrap bands are returned at every positive draw count,
+including Bonferroni bands on the full surface. Coarse location or fixed-beta
+scale quantiles produce one aggregate warning and retained
+\code{inference$resolution} diagnostics. Small draw counts do not establish
+statistical qualification. Invalid inputs and undefined arithmetic remain errors.
 No law or draw count is silently changed. Raw empirical tail quantiles do not
 establish a finite-sample Bonferroni guarantee; raw and nesting-adjusted
 criticals are retained separately. Gaussian Bonferroni uses analytic normal
 tails. Singleton bands coincide.
 
-Nearest-neighbor bandwidths, dependent bootstrap laws, higher-order or bounded
+Bootstrap \code{inid}, \code{fixed} and \code{geom} share the same corrected
+provider. Explicit block length one reproduces independent resampling exactly;
+longer fixed/geometric blocks remain different laws. Mixed-data block requests
+require an explicit \code{np_boot_control(blocklen=...)} while automatic mixed
+block-length selection remains unqualified. Dependent-data coverage has not been
+established by the independent-data evidence below.
+
+Select bootstrap calibration through \code{\link{np_boot_control}}:
+\code{"symmetric-sd"} retains absolute-root bands;
+\code{"asymmetric-sd"} retains transported asymmetric tail bands;
+\code{"smoothed-percentile"} uses outer-calibrated percentiles of complete
+unshifted corrected smoothed-bootstrap curves, with companion-band nesting and
+certified full-support completion. The last method is the refined OP1+SC1
+construction with multivariate/mixed-data and categorical-kernel extensions;
+it replaces the earlier private centered-smoothed experiment as the public
+percentile candidate. Its empirical SD is descriptive and does not scale
+endpoints. The original fit and bandwidth are unchanged; the 39 fresh outer
+samples receive their own CV bandwidth selection. Returned settings distinguish
+the construction and retain pilot, support, resolution and stream provenance.
+This method requires \pkg{ks}, at least one numeric coordinate, and inid or
+unit-length fixed/geometric blocks. Nonunit-block calibration and NN are not
+implemented. Its conditional bootstrap curves can be signed. Public surface
+and slice family definitions are preserved, and no grid is trimmed implicitly.
+Full-support intervals may be wide. A still-unattainable calibration remains
+explicitly diagnostic-only. The q=1 Gaussian comparison is an outcome-informed
+paired assessment; multivariate/mixed capability proof is broader than current
+coverage evidence. The SD-method evidence below does not qualify percentile
+coverage in those other domains.
+
+An unused pure categorical target may have zero empirical variance, making SD
+studentization undefined. Such requests retain their explicit arithmetic error;
+this is different from a small-draw resolution warning. Direct percentile bands
+remain available when their corrected curves are finite, including constant
+curves. No variance floor or silent method substitution is used.
+
+Nearest-neighbor bandwidths, higher-order or bounded
 continuous kernels, factor boxplots and derivatives remain outside
 the joint-scale construction. Unsupported corrected requests fail clearly. Existing estimate
 and explicit legacy routes retain their previous contracts and limitations.
@@ -91,9 +130,11 @@ lower and upper endpoints for curves and surfaces. Legacy/version-1 surfaces
 retain their historical positive lower-width convention.
 }
 \value{A family-specific control object. Corrected plot-data objects include an
-\code{inference} component with the center, marginal scales, absolute bands,
+\code{inference} component with the center, marginal scales where applicable, bands,
 complete covariance or its factor-representation description, raw and adjusted
-criticals, effective calibration settings and random-stream provenance.}
+criticals, effective calibration settings and random-stream provenance.
+Smoothed percentiles retain the selected pilot, outer calibration records,
+rank/content/support diagnostics and separate stream provenance; they do not retain the full draw matrix.}
 \seealso{\code{\link{npudens}}, \code{\link[=plot.np]{npplot}}, \code{\link{np_bias_control}}}
 \examples{
 npRmpi.init(nslaves = 1)

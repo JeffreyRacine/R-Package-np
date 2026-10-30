@@ -1,5 +1,13 @@
 # Internal fixed-model state for the opt-in density construction.
-.np_udens_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2) {
+.np_udens_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2,
+                                  admit.effective.constant = FALSE,
+                                  admit.ordered.literal = FALSE) {
+  if (!is.logical(admit.effective.constant) || length(admit.effective.constant) != 1L ||
+      is.na(admit.effective.constant))
+    stop("invalid effective categorical operator admission", call. = FALSE)
+  if (!is.logical(admit.ordered.literal) || length(admit.ordered.literal) != 1L ||
+      is.na(admit.ordered.literal))
+    stop("invalid literal ordered operator admission", call. = FALSE)
   if (!inherits(bws, "bandwidth") ||
       !identical(bws[["type", exact = TRUE]], "fixed") ||
       !identical(bws[["ckertype", exact = TRUE]], "gaussian") ||
@@ -13,7 +21,7 @@
       !is.finite(max.bytes) || max.bytes <= 0)
     stop("density correction memory budget must be positive and finite", call. = FALSE)
   if (!all(vapply(x, is.numeric, logical(1L))))
-    return(.np_udens_bc_mixed_prepare(bws, x, max.bytes))
+    return(.np_udens_bc_mixed_prepare(bws, x, max.bytes, admit.effective.constant, admit.ordered.literal))
   if (any(!is.finite(as.matrix(x))))
     stop("density correction requires finite numeric coordinates", call. = FALSE)
   h <- .np_physical_bandwidth(bws)

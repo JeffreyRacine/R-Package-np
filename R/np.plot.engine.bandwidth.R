@@ -45,7 +45,8 @@
            plot.par.mfrow = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed, gaussian.draws = 9999L, bias.control = NULL){
+           random.seed, gaussian.draws = 9999L, bias.control = NULL,
+           plot.errors.boot.calibration = NULL){
 
     if (.np_data_formal_supplied(sys.call(), sys.function()))
       .np_plot_data_error()
@@ -110,6 +111,14 @@
     joint.eligible <- joint.request
     if (joint.request)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+    density.block.automatic <- is.null(plot.errors.boot.blocklen)
+    if (density.block.automatic && identical(plot.errors.center, "bias-corrected") &&
+        identical(error.request$method, "bootstrap") &&
+        length(plot.errors.boot.method) == 1L && plot.errors.boot.method %in% c("fixed", "geom") &&
+        any(vapply(xdat, is.factor, logical(1L))) &&
+        (is.null(bias.control) || (is.list(bias.control) &&
+          identical(bias.control[["construction", exact = TRUE]], "joint-scale"))))
+      stop("corrected mixed density block bootstrap requires an explicit np_boot_control(blocklen=...); automatic mixed block selection is not qualified", call. = FALSE)
     normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
@@ -146,7 +155,9 @@
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
     bias.state <- .np_udens_plot_prepare(bias.control, bws, xdat,
-      plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type)
+      plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
+      plot.errors.boot.calibration, blocklen = plot.errors.boot.blocklen,
+      block.automatic = density.block.automatic)
     new.bias <- !is.null(bias.state)
     joint.eligible <- joint.eligible && !new.bias
     if (new.bias && isTRUE(plot.bxp))
@@ -239,7 +250,7 @@
       if (new.bias || plot.errors.method == "bootstrap"){
         terr.obj <- if (new.bias) .np_udens_plot_errors(bias.state, x.eval,
           plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
-            gaussian.draws else plot.errors.boot.num, plot.errors.type) else compute.bootstrap.errors(xdat = xdat,
+            gaussian.draws else plot.errors.boot.num, plot.errors.type, design = list(vary = seq_len(ncol(xdat)), xtrim = xtrim, xq = xq)) else compute.bootstrap.errors(xdat = xdat,
           exdat = x.eval,
           cdf = FALSE,
           slice.index = 0,
@@ -563,7 +574,7 @@
           if (new.bias) {
             temp.boot.raw <- .np_udens_plot_errors(bias.state, eval.slice,
               plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
-                gaussian.draws else plot.errors.boot.num, plot.errors.type)
+                gaussian.draws else plot.errors.boot.num, plot.errors.type, design = list(vary = i, xtrim = xtrim, xq = xq))
             temp.err[seq_len(xi.neval),] <- temp.boot.raw$boot.err
             temp.all.err <- temp.boot.raw$boot.all.err
             temp.boot <- temp.boot.raw$bxp
@@ -584,7 +595,7 @@
           } else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- if (new.bias) .np_udens_plot_errors(bias.state, eval.slice,
               plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
-            gaussian.draws else plot.errors.boot.num, plot.errors.type) else compute.bootstrap.errors(
+            gaussian.draws else plot.errors.boot.num, plot.errors.type, design = list(vary = i, xtrim = xtrim, xq = xq)) else compute.bootstrap.errors(
                       xdat = xdat,
                       exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                       cdf = FALSE,

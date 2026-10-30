@@ -1107,6 +1107,9 @@ plot.npcopula <- function(x,
   zlim <- .npcopula_validate_zlim(zlim)
   if (!inherits(boot.control, "np_boot_control"))
     stop("boot.control must be created by np_boot_control()", call. = FALSE)
+  if (isTRUE(boot.control[["calibration", exact = TRUE]] %in%
+      c("percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile")))
+    stop("this calibration requires supported bias-corrected density, distribution or regression inference", call. = FALSE)
   center.supplied <- !missing(center) &&
     .np_plot_center_needs_bootstrap(center, errors)
   if (!identical(errors, "bootstrap") && (bootstrap.supplied || center.supplied))
@@ -1116,6 +1119,8 @@ plot.npcopula <- function(x,
   if (identical(errors, "bootstrap"))
     .np_plot_reject_wild_unsupervised(bootstrap, "copula estimators")
   dots <- list(...)
+  if (!is.null(dots[["bias.control", exact = TRUE]]))
+    .np_udist_score_scope(dots[["bias.control", exact = TRUE]], FALSE)
   sub.supplied <- "sub" %in% names(dots)
   target <- x$target
   target.label <- if (identical(target, "density")) "Copula Density" else "Copula"

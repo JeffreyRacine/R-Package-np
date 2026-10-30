@@ -12,7 +12,8 @@ test_that("corrected density surfaces expose signed endpoint offsets", {
                  band = "all", neval = 2L, output = "data")
     args[[if (method == "asymptotic") "gaussian.draws" else "B"]] <- 199L
     if (method == "asymptotic")
-      expect_warning(out <- do.call(plot, args), "gaussian.draws=199", fixed = TRUE)
+      expect_warning(expect_warning(out <- do.call(plot, args),
+        "gaussian.draws=199", fixed = TRUE), "gaussian.draws=199", fixed = TRUE)
     else out <- do.call(plot, args)
     r <- out$d1
     expect_identical(.Random.seed, rng)
@@ -34,9 +35,11 @@ test_that("underresolved corrected bootstrap Bonferroni is explicit", {
   bw <- npudensbw(dat = x, bws = .5, bandwidth.compute = FALSE)
   set.seed(731120022)
   rng <- .Random.seed
-  expect_error(plot(bw, xdat = x, errors = "bootstrap",
+  expect_warning(out <- plot(bw, xdat = x, errors = "bootstrap",
     center = "bias-corrected", band = "bonferroni", B = 49L, neval = 3L,
-    output = "data"), "unqualified at this grid/draw resolution", fixed = TRUE)
+    output = "data"), "limited draw resolution", fixed = TRUE)
+  expect_true(all(is.finite(out$d1$inference$bands$bonferroni)))
+  expect_true(any(out$d1$inference$resolution$resolution_limited))
   expect_identical(.Random.seed, rng)
   # The same explicit law and draw count still admit the distinct maximum band.
   expect_s3_class(plot(bw, xdat = x, errors = "bootstrap",
