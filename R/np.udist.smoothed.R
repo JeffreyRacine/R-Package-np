@@ -47,6 +47,15 @@
 
 .np_udist_smoothed_provider <- function(state, grid, B, streams, law = "inid",
                                        blocklen = NULL, tile = 25L, chunk = 32L) {
+  existed <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
+  previous <- if (existed) base::get(".Random.seed", .GlobalEnv, inherits = FALSE) else NULL
+  kind <- RNGkind()
+  on.exit({
+    do.call(RNGkind, as.list(kind))
+    if (existed) assign(".Random.seed", previous, .GlobalEnv)
+    else if (exists(".Random.seed", .GlobalEnv, inherits = FALSE))
+      rm(list = ".Random.seed", envir = .GlobalEnv)
+  }, add = TRUE)
   .np_udist_bc_grid(state, grid)
   B <- .np_plot_gaussian_integer(B, "smoothed CDF draws", 9999L)
   tile <- .np_plot_gaussian_integer(tile, "smoothed CDF tile", 25L)
@@ -67,6 +76,7 @@
   budget$bytes <- budget$per.process * budget$processes + budget$retained.outer.bytes
   if (!is.finite(budget$bytes) || budget$bytes > state$max.bytes)
     stop("smoothed CDF resident memory forecast exceeds budget", call. = FALSE)
+  if (!existed) assign(".Random.seed", streams$count, .GlobalEnv)
   x <- as.matrix(state$x)
   tasks <- .np_udens_smoothed_plan(x, state$h, B, law, blocklen, streams, chunk, FALSE)
   get <- function(ii) {
@@ -115,6 +125,7 @@
   .np_udist_smoothed_stream_check(all.streams)
   if (anyDuplicated(vapply(all.streams, paste, "", collapse = ":")))
     stop("smoothed CDF stream starts must be distinct", call. = FALSE)
+  if (!existed) assign(".Random.seed", streams$count, .GlobalEnv)
   state <- .np_udist_smoothed_prepare(fit, x, max.bytes)
   .np_udist_bc_grid(state, grid)
   m <- nrow(grid)
