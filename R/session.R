@@ -504,9 +504,7 @@ npRmpi.init <- function(...,
   .npRmpi_attach_state_reset()
 
   {
-    disposition.confirmed <- FALSE
-  on.exit(if (!disposition.confirmed) .npRmpi_lease_poison(), add = TRUE)
-  clear.fun <- tryCatch(
+    clear.fun <- tryCatch(
       get(".npRmpi_profile_clear", envir = asNamespace("npRmpi"), inherits = FALSE),
       error = function(e) NULL
     )
