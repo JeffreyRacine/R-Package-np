@@ -1171,7 +1171,7 @@ npscoefbw.NULL <-
   options(np.messages = FALSE)
   on.exit(options(np.messages = old.messages), add = TRUE)
 
-  ctx <- get(REF, envir = .GlobalEnv, inherits = FALSE)
+  ctx <- .npRmpi_lease_scoped_value(REF)
 
   repeat {
     msg <- mpi.recv.Robj(source = 0L, tag = REQ_BASE + rank, comm = COMM)

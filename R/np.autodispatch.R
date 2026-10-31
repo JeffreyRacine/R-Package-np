@@ -244,12 +244,6 @@
   ids <- unique(as.character(ids))
   ids <- ids[nzchar(ids)]
   for (id in ids) {
-    meta <- if (exists(id, envir = .npRmpi_lease_state$registry, inherits = FALSE))
-      get(id, envir = .npRmpi_lease_state$registry, inherits = FALSE) else NULL
-    if (is.list(meta) && identical(meta$kind, "scoped_internal") &&
-        is.character(meta$remote_name) && length(meta$remote_name) == 1L &&
-        exists(meta$remote_name, envir = .GlobalEnv, inherits = FALSE))
-      rm(list = meta$remote_name, envir = .GlobalEnv)
     if (exists(id, envir = .npRmpi_lease_state$store, inherits = FALSE))
       rm(list = id, envir = .npRmpi_lease_state$store)
     if (exists(id, envir = .npRmpi_lease_state$registry, inherits = FALSE))
@@ -335,8 +329,7 @@
   if (!isTRUE(class.ok))
     stop(sprintf("autodispatch capability '%s' returned unexpected class", plan$capability), call. = FALSE)
   if (exists(plan$id, envir = .npRmpi_lease_state$registry, inherits = FALSE) ||
-      exists(plan$id, envir = .npRmpi_lease_state$store, inherits = FALSE) ||
-      exists(plan$remote_name, envir = .GlobalEnv, inherits = FALSE))
+      exists(plan$id, envir = .npRmpi_lease_state$store, inherits = FALSE))
     stop("autodispatch publication identity collision", call. = FALSE)
   fingerprint <- .npRmpi_autodispatch_fingerprint(value, policy = plan$fingerprint_policy)
   if (!is.character(fingerprint) || length(fingerprint) != 1L || is.na(fingerprint))
@@ -361,17 +354,26 @@
   meta <- get(plan$id, envir = .npRmpi_lease_state$registry, inherits = FALSE)
   if (!identical(meta$state, "provisional") || !identical(meta$capability, plan$capability))
     stop("autodispatch commit found contradictory provisional state", call. = FALSE)
-  if (identical(plan$kind, "scoped_internal")) {
-    if (exists(plan$remote_name, envir = .GlobalEnv, inherits = FALSE))
-      stop("autodispatch scoped publication would overwrite an existing binding", call. = FALSE)
-    assign(plan$remote_name,
-           get(plan$id, envir = .npRmpi_lease_state$store, inherits = FALSE),
-           envir = .GlobalEnv)
-    rm(list = plan$id, envir = .npRmpi_lease_state$store)
-  }
   meta$state <- "live"
   assign(plan$id, meta, envir = .npRmpi_lease_state$registry)
   invisible(TRUE)
+}
+
+.npRmpi_lease_scoped_value <- function(ref) {
+  .npRmpi_lease_require_open()
+  prefix <- ".__npRmpi_scoped_"
+  if (!is.character(ref) || length(ref) != 1L || is.na(ref) ||
+      !startsWith(ref, prefix))
+    stop("invalid scoped autodispatch reference", call. = FALSE)
+  id <- substring(ref, nchar(prefix) + 1L)
+  meta <- get0(id, envir = .npRmpi_lease_state$registry, inherits = FALSE)
+  if (!is.list(meta) || !identical(meta$kind, "scoped_internal") ||
+      !identical(meta$capability, "internal.npscoef.nomad_context") ||
+      !identical(meta$remote_name, ref) || !identical(meta$state, "live") ||
+      !identical(meta$session, .npRmpi_lease_state$session) ||
+      !exists(id, envir = .npRmpi_lease_state$store, inherits = FALSE))
+    stop("scoped autodispatch context is unavailable", call. = FALSE)
+  get(id, envir = .npRmpi_lease_state$store, inherits = FALSE)
 }
 
 .npRmpi_lease_rollback_local <- function(ids) {
@@ -2597,21 +2599,11 @@
     is.list(meta) && identical(meta$kind, "scoped_internal") &&
       is.character(meta$remote_name) && meta$remote_name %in% tmpnames
   }, logical(1))]
-  scoped.names <- if (length(scoped.ids)) vapply(scoped.ids, function(id) {
-    get(id, envir = .npRmpi_lease_state$registry, inherits = FALSE)$remote_name
-  }, character(1)) else character()
   if (length(scoped.ids))
     .npRmpi_lease_run_lifecycle(
       "autodispatch.lifecycle.retire", list(ids = scoped.ids), comm = comm,
       where = "autodispatch scoped context retirement"
     )
-  ordinary <- setdiff(tmpnames, scoped.names)
-  if (length(ordinary)) {
-    .npRmpi_rm_existing(ordinary, envir = .GlobalEnv)
-    cmd.rm <- substitute(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(TMPS, envir = .GlobalEnv),
-                         list(TMPS = ordinary))
-    .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
-  }
   invisible(TRUE)
 }
 
@@ -3225,119 +3217,3 @@
   .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = FALSE)
 }
 
-.npRmpi_bootstrap_compute_payload <- function(payload, comm = 1L) {
-  .npRmpi_require_active_slave_pool(
-    comm = comm,
-    where = "bootstrap payload computation"
-  )
-
-  if (!is.list(payload))
-    stop("bootstrap payload must be a list")
-
-  tmp <- ".__npRmpi_boot_payload"
-  .GlobalEnv[[tmp]] <- payload
-  .npRmpi_bcast_robj_by_name(tmp, caller_env = .GlobalEnv)
-  on.exit({
-    .npRmpi_rm_existing(tmp, envir = .GlobalEnv)
-    cmd.rm <- substitute(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(TMP, envir = .GlobalEnv), list(TMP = tmp))
-    .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
-  }, add = TRUE)
-
-  cmd <- substitute({
-    old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
-    old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
-    options(npRmpi.autodispatch.context = TRUE)
-    options(npRmpi.autodispatch.disable = TRUE)
-    on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
-    on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
-
-    p <- .__npRmpi_boot_payload
-    B <- nrow(p$indices)
-    if (is.null(p$family) || is.null(p$out.field))
-      stop("invalid bootstrap payload: missing family/out.field")
-
-    fit_one <- function(ix) {
-      switch(
-        p$family,
-        npreg = suppressWarnings(npreg(
-          txdat = p$xdat[ix, , drop = FALSE],
-          tydat = p$ydat[ix],
-          exdat = p$exdat,
-          bws = p$bws,
-          gradients = p$gradients,
-          gradient.order = p$gradient.order,
-          warn.glp.gradient = FALSE)),
-        npcdens = suppressWarnings(npcdens(
-          txdat = p$xdat[ix, , drop = FALSE],
-          tydat = p$ydat[ix, , drop = FALSE],
-          exdat = p$exdat,
-          eydat = p$eydat,
-          bws = p$bws,
-          gradients = p$gradients)),
-        npcdist = suppressWarnings(npcdist(
-          txdat = p$xdat[ix, , drop = FALSE],
-          tydat = p$ydat[ix, , drop = FALSE],
-          exdat = p$exdat,
-          eydat = p$eydat,
-          bws = p$bws,
-          gradients = p$gradients)),
-        npqreg = suppressWarnings(npqreg(
-          txdat = p$xdat[ix, , drop = FALSE],
-          tydat = p$ydat[ix, , drop = FALSE],
-          exdat = p$exdat,
-          tau = p$tau,
-          bws = p$bws,
-          gradients = p$gradients)),
-        npscoef = suppressWarnings(npscoef(
-          txdat = p$xdat[ix, , drop = FALSE],
-          tydat = p$ydat[ix],
-          tzdat = if (is.null(p$zdat)) NULL else p$zdat[ix, , drop = FALSE],
-          exdat = p$exdat,
-          ezdat = p$ezdat,
-          bws = p$bws)),
-        npplreg = suppressWarnings(npplreg(
-          txdat = p$xdat[ix, , drop = FALSE],
-          tydat = p$ydat[ix],
-          tzdat = p$zdat[ix, , drop = FALSE],
-          exdat = p$exdat,
-          ezdat = p$ezdat,
-          bws = p$bws)),
-        npindex = suppressWarnings(npindex(
-          txdat = p$xdat[ix, , drop = FALSE],
-          tydat = p$ydat[ix],
-          exdat = p$exdat,
-          bws = p$bws,
-          gradients = p$gradients)),
-        npudens = suppressWarnings(npudens(
-          tdat = p$xdat[ix, , drop = FALSE],
-          edat = p$exdat,
-          bws = p$bws)),
-        npudist = suppressWarnings(npudist(
-          tdat = p$xdat[ix, , drop = FALSE],
-          edat = p$exdat,
-          bws = p$bws)),
-        stop("unsupported bootstrap payload family"))
-    }
-
-    extract_stat <- function(obj) {
-      out <- obj[[p$out.field]]
-      if (!is.null(p$out.index))
-        out <- out[, p$out.index]
-      as.numeric(out)
-    }
-
-    base.fit <- fit_one(seq_len(nrow(p$xdat)))
-    t0 <- extract_stat(base.fit)
-
-    t.mat <- matrix(NA_real_, nrow = B, ncol = length(t0))
-    for (b in seq_len(B)) {
-      idx <- as.integer(p$indices[b, ])
-      fit.b <- fit_one(idx)
-      t.mat[b, ] <- extract_stat(fit.b)
-    }
-
-    list(t0 = as.numeric(t0), t = t.mat)
-  })
-
-  .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
-}
