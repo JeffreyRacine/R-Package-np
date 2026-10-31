@@ -614,11 +614,18 @@ npplreg.plbandwidth <-
       if (!is.null(out))
         return(as.vector(out))
 
-      args <- list(txdat = tzdat, tydat = ytrain, bws = regbw)
+      # The parent owns this auxiliary response. Prepare its established score
+      # before a public MPI fit entry; keep the retained child data unchanged.
+      fit.response <- ytrain
+      if (.npRmpi_autodispatch_active() && is.factor(ytrain)) {
+        fit.response <- .np_plreg_numeric_response(ytrain, regbw$ydati)
+        names(fit.response) <- names(ytrain)
+      }
+      args <- list(txdat = tzdat, tydat = fit.response, bws = regbw)
       if (!is.null(zeval))
         args$exdat <- zeval
       args$.np.defer.empty.rows <- TRUE
-      fit <- do.call(npreg, args)
+      fit <- do.call(.npreg_auxiliary, args)
       empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows,
         attr(fit, ".np.empty.rows", exact = TRUE))
       as.vector(fitted(fit))

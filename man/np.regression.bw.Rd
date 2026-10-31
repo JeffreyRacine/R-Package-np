@@ -131,6 +131,8 @@ These arguments identify the data and whether bandwidths are supplied or compute
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
     \code{xdat}.
+    Factors and ordered factors are not supported. Select a numeric outcome
+    scale explicitly; categorical predictors remain supported.
   }
 
   \item{bws}{

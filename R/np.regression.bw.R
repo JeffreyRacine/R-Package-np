@@ -55,9 +55,18 @@ npregbw.NULL <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            bws, ...){
-  .np_reject_native_data(substitute(list(...))[-1L])
+  .np_regression_forward(.npregbw_null_impl, environment(),
+    match.call(expand.dots = FALSE), match.call(), parent.frame(),
+    substitute(ydat), substitute(list(...))[-1L], TRUE)
+}
 
-    mc <- match.call(expand.dots = FALSE)
+.npregbw_null_impl <-
+  function(xdat = stop("invoked without data 'xdat'"),
+           ydat = stop("invoked without data 'ydat'"),
+           bws, ..., .np.context){
+  .np_reject_native_data(.np.context$dots)
+
+    mc <- .np.context$call
     dots <- list(...)
     legacy.remin <- "remin" %in% names(dots)
     if (isTRUE(legacy.remin)) {
@@ -117,21 +126,21 @@ npregbw.NULL <-
         !isTRUE(legacy.remin))
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_as_generic_call("npregbw", mc),
-        parent.frame(), owner.name = "npregbw.NULL"))
+        .np.context$caller, owner.name = "npregbw.NULL"))
 
     xdat <- toFrame(xdat)
 
     bws = double(dim(xdat)[2])
 
-    tbw <- do.call(npregbw.default,
+    tbw <- do.call(if (.np.context$public) npregbw.default else .npregbw_auxiliary,
                    c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
-    environment(mc) <- parent.frame()
+    environment(mc) <- .np.context$caller
     tbw$call <- mc
 
     tbw <- updateBwNameMetadata(nameList =
-                                list(ynames = deparse(substitute(ydat))),
+                                list(ynames = deparse(.np.context$response)),
                                 bws = tbw)
 
     tbw
@@ -170,7 +179,45 @@ npregbw.rbandwidth <-
            transform.bounds = FALSE,
            ...,
            nomad.opts = list()){
-  .np_reject_native_data(substitute(list(...))[-1L])
+  .np_regression_forward(.npregbw_bandwidth_impl, environment(),
+    match.call(expand.dots = FALSE), match.call(), parent.frame(),
+    substitute(ydat), substitute(list(...))[-1L], TRUE)
+}
+
+.npregbw_bandwidth_impl <-
+  function(xdat = stop("invoked without data 'xdat'"),
+           ydat = stop("invoked without data 'ydat'"),
+           bws,
+           bandwidth.compute = TRUE,
+           cfac.dir = 2.5*(3.0-sqrt(5)),
+           scale.factor.init = 0.5,
+           dfac.dir = 0.25*(3.0-sqrt(5)),
+           dfac.init = 0.375,
+           dfc.dir = 3,
+           ftol = 1.490116e-07,
+           scale.factor.init.upper = 2.0,
+           hbd.dir = 1,
+           hbd.init = 0.9,
+           initc.dir = 1.0,
+           initd.dir = 1.0,
+           invalid.penalty = c("baseline","dbmax"),
+           itmax = 10000,
+           lbc.dir = 0.5,
+           scale.factor.init.lower = 0.1,
+           lbd.dir = 0.1,
+           lbd.init = 0.1,
+           nmulti,
+           penalty.multiplier = 10,
+           powell.remin = TRUE,
+           bwsolver = c("powell", "mads", "mads+powell"),
+           scale.init.categorical.sample = FALSE,
+           scale.factor.search.lower = NULL,
+           small = 1.490116e-05,
+           tol = 1.490116e-04,
+           transform.bounds = FALSE,
+           ...,
+           nomad.opts = list(), .np.context){
+  .np_reject_native_data(.np.context$dots)
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     .np_nomad_native_reject_unsupported_options_for_route(
@@ -207,11 +254,24 @@ npregbw.rbandwidth <-
       on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
       .npRmpi_local_entry_begin(.np.local.entry)
     }
-    if (.npRmpi_autodispatch_active())
+    if (.npRmpi_autodispatch_active()) {
+      # Private children have an explicit response scale and a fully formed
+      # bandwidth template. Preserve that template's factor metadata while
+      # sending its established numeric scores through the public RPC owner.
+      # The same conversion otherwise occurs below on every participating rank.
+      dispatch.call <- .npRmpi_autodispatch_as_generic_call(
+        "npregbw", .np.context$expanded)
+      if (!.np.context$public && is.factor(ydat)) {
+        scores <- dlev(ydat)[as.integer(ydat)]
+        names(scores) <- names(ydat)
+        dispatch.call[["ydat"]] <- scores
+      }
       return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
-        parent.frame(), owner.name = "npregbw.rbandwidth"))
+        dispatch.call, .np.context$caller, owner.name = "npregbw.rbandwidth"))
+    }
 
+    if (.np.context$public)
+      .np_require_numeric_response(ydat, "npregbw", "ydat")
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
 
@@ -532,6 +592,46 @@ npregbw.rbandwidth <-
     tbw$initial.fval <- if (!is.null(initial.fval)) initial.fval else NA_real_
     tbw
   }
+
+.npregbw_auxiliary_rbandwidth <-
+  function(xdat = stop("invoked without data 'xdat'"),
+           ydat = stop("invoked without data 'ydat'"),
+           bws,
+           bandwidth.compute = TRUE,
+           cfac.dir = 2.5*(3.0-sqrt(5)),
+           scale.factor.init = 0.5,
+           dfac.dir = 0.25*(3.0-sqrt(5)),
+           dfac.init = 0.375,
+           dfc.dir = 3,
+           ftol = 1.490116e-07,
+           scale.factor.init.upper = 2.0,
+           hbd.dir = 1,
+           hbd.init = 0.9,
+           initc.dir = 1.0,
+           initd.dir = 1.0,
+           invalid.penalty = c("baseline","dbmax"),
+           itmax = 10000,
+           lbc.dir = 0.5,
+           scale.factor.init.lower = 0.1,
+           lbd.dir = 0.1,
+           lbd.init = 0.1,
+           nmulti,
+           penalty.multiplier = 10,
+           powell.remin = TRUE,
+           bwsolver = c("powell", "mads", "mads+powell"),
+           scale.init.categorical.sample = FALSE,
+           scale.factor.search.lower = NULL,
+           small = 1.490116e-05,
+           tol = 1.490116e-04,
+           transform.bounds = FALSE,
+           ...,
+           nomad.opts = list()){
+  call <- match.call(expand.dots = FALSE)
+  expanded <- match.call()
+  call[[1L]] <- expanded[[1L]] <- quote(npregbw.rbandwidth)
+  .np_regression_forward(.npregbw_bandwidth_impl, environment(), call, expanded,
+    parent.frame(), substitute(ydat), substitute(list(...))[-1L], FALSE)
+}
 
 .npregbw_build_rbandwidth <- function(xdat,
                                       ydat,
@@ -864,7 +964,7 @@ npregbw.rbandwidth <-
   tbw$invalid.history <- core$invalid.history
   tbw$timing <- core$timing
 
-  payload <- npregbw.rbandwidth(
+  payload <- .npregbw_auxiliary_rbandwidth(
     xdat = xdat,
     ydat = ydat,
     bws = tbw,
@@ -995,7 +1095,7 @@ npregbw.rbandwidth <-
     yname = yname
   )
 
-  do.call(npregbw.rbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
+  do.call(.npregbw_auxiliary_rbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
 }
 
 .npregbw_eval_only <- function(xdat,
@@ -3324,7 +3424,70 @@ npregbw.default <-
            ukertype,
            ...,
            nomad.opts = list()){
-  .np_reject_native_data(substitute(list(...))[-1L])
+  .np_regression_forward(.npregbw_default_impl, environment(),
+    match.call(expand.dots = FALSE), match.call(), parent.frame(),
+    substitute(ydat), substitute(list(...))[-1L], TRUE)
+}
+
+.npregbw_default_impl <-
+  function(xdat = stop("invoked without data 'xdat'"),
+           ydat = stop("invoked without data 'ydat'"),
+           bws,
+           bandwidth.compute = TRUE,
+           basis,
+           bernstein.basis,
+           bwmethod,
+           bwscaling,
+           bwtype,
+           cfac.dir,
+           scale.factor.init,
+           ckerbound,
+           ckerlb,
+           ckerorder,
+           ckertype,
+           ckerub,
+           degree,
+           degree.select = c("manual", "coordinate", "exhaustive"),
+           search.engine = c("nomad+powell", "cell", "nomad"),
+           nomad = FALSE,
+           nomad.nmulti = 0L,
+           degree.min = NULL,
+           degree.max = NULL,
+           degree.start = NULL,
+           degree.restarts = 0L,
+           degree.max.cycles = 20L,
+           degree.verify = FALSE,
+           dfac.dir,
+           dfac.init,
+           dfc.dir,
+           ftol,
+           scale.factor.init.upper,
+           hbd.dir,
+           hbd.init,
+           initc.dir,
+           initd.dir,
+           invalid.penalty = c("baseline","dbmax"),
+           itmax,
+           lbc.dir,
+           scale.factor.init.lower,
+           lbd.dir,
+           lbd.init,
+           nmulti,
+           okertype,
+           penalty.multiplier = 10,
+           regtype,
+           nomad.remin = FALSE,
+           powell.remin,
+           bwsolver = c("powell", "mads", "mads+powell"),
+           scale.init.categorical.sample,
+           scale.factor.search.lower = NULL,
+           small,
+           tol,
+           transform.bounds = FALSE,
+           ukertype,
+           ...,
+           nomad.opts = list(), .np.context){
+  .np_reject_native_data(.np.context$dots)
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     .np_nomad_native_reject_unsupported_options_for_route(
@@ -3359,9 +3522,9 @@ npregbw.default <-
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
 
     xdat <- toFrame(xdat)
-    yname <- deparse(substitute(ydat))
+    yname <- deparse(.np.context$response)
 
-    mc.names <- names(match.call(expand.dots = FALSE))
+    mc.names <- names(.np.context$call)
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
       call_names = mc.names,
@@ -3433,8 +3596,8 @@ npregbw.default <-
 
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
       return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
-        parent.frame(), owner.name = "npregbw.default"))
+        .npRmpi_autodispatch_as_generic_call("npregbw", .np.context$expanded),
+        .np.context$caller, owner.name = "npregbw.default"))
 
     npWarnIgnoredUniformKernelOrder(
       call.names = mc.names,
@@ -3442,6 +3605,8 @@ npregbw.default <-
       order.arg = "ckerorder"
     )
 
+    if (.np.context$public)
+      .np_require_numeric_response(ydat, "npregbw", "ydat")
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
 
@@ -3468,7 +3633,7 @@ npregbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
 
-    mc.names <- names(match.call(expand.dots = FALSE))
+    mc.names <- names(.np.context$call)
     margs <- c("nmulti", "nomad.remin", "powell.remin", "bwsolver", "itmax", "ftol", "tol",
                "nomad.opts",
                "small",
@@ -3637,12 +3802,12 @@ npregbw.default <-
       bwsel.args <- c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args)
       tbw <- .np_progress_select_bandwidth_enhanced(
         "Selecting regression bandwidth",
-        do.call(npregbw.rbandwidth, bwsel.args)
+        do.call(.npregbw_auxiliary_rbandwidth, bwsel.args)
       )
     }
 
-    mc <- match.call(expand.dots = FALSE)
-    environment(mc) <- parent.frame()
+    mc <- .np.context$call
+    environment(mc) <- .np.context$caller
     tbw$call <- mc
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 

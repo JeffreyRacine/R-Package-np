@@ -436,7 +436,19 @@ npreg.rbandwidth <-
            exdat, eydat, gradient.order = 1L, gradients = FALSE,
            residuals = FALSE, se = FALSE,
            ...){
-  .np_reject_native_data(substitute(list(...))[-1L])
+  .np_regression_forward(.npreg_fit_impl, environment(),
+    match.call(expand.dots = FALSE), match.call(), parent.frame(),
+    substitute(tydat), substitute(list(...))[-1L], TRUE)
+}
+
+.npreg_fit_impl <-
+  function(bws,
+           txdat = stop("training data 'txdat' missing"),
+           tydat = stop("training data 'tydat' missing"),
+           exdat, eydat, gradient.order = 1L, gradients = FALSE,
+           residuals = FALSE, se = FALSE,
+           ..., .np.context){
+  .np_reject_native_data(.np.context$dots)
 
     fit.start <- proc.time()[3]
     gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -578,9 +590,9 @@ npreg.rbandwidth <-
       return(.npRmpi_autodispatch_tag_result(result, mode = "auto"))
     }
     if (.npRmpi_autodispatch_active()) {
-      dispatch.call <- match.call()
+      dispatch.call <- .np.context$expanded
       dispatch.call$.np.defer.empty.rows <- TRUE
-      result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npreg.rbandwidth")
+      result <- .npRmpi_autodispatch_call(dispatch.call, .np.context$caller, owner.name = "npreg.rbandwidth")
       if (is.list(result) && is.list(bws)) {
         has.nomad.optim <- (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) ||
           (!is.null(bws$powell.time) && is.finite(bws$powell.time))
@@ -630,6 +642,12 @@ npreg.rbandwidth <-
     inference.bws <- if (isTRUE(dots[[".np.fit.inference", exact = TRUE]])) bws else NULL
     txdat = toFrame(txdat)
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
+
+    if (.np.context$public) {
+      .np_require_numeric_response(tydat, "npreg", "tydat")
+      if (!no.ey)
+        .np_require_numeric_response(eydat, "npreg", "eydat")
+    }
 
     if (!(is.vector(tydat) || is.factor(tydat)))
       stop("'tydat' must be a vector or a factor")
@@ -1203,8 +1221,8 @@ npreg.rbandwidth <-
     ev$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
 
 
-    ev$call <- match.call(expand.dots = FALSE)
-    environment(ev$call) <- parent.frame()
+    ev$call <- .np.context$call
+    environment(ev$call) <- .np.context$caller
     if (length(invalid.rows))
       .np_undefined_fit_rows(invalid.rows, "npreg()", external = !no.ex,
                              reason = "kernel weight sum is zero")
@@ -1213,6 +1231,20 @@ npreg.rbandwidth <-
       defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]),
       row.labels = row.names(teval)))
   }
+
+.npreg_auxiliary <-
+  function(bws,
+           txdat = stop("training data 'txdat' missing"),
+           tydat = stop("training data 'tydat' missing"),
+           exdat, eydat, gradient.order = 1L, gradients = FALSE,
+           residuals = FALSE, se = FALSE,
+           ...){
+  call <- match.call(expand.dots = FALSE)
+  expanded <- match.call()
+  call[[1L]] <- expanded[[1L]] <- quote(npreg.rbandwidth)
+  .np_regression_forward(.npreg_fit_impl, environment(), call, expanded,
+    parent.frame(), substitute(tydat), substitute(list(...))[-1L], FALSE)
+}
 
 npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
                           se = FALSE, ...){

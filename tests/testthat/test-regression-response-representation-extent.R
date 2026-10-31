@@ -30,8 +30,8 @@ test_that("regression rejects incompatible coding while explicit hat payloads re
   y <- rep(c(10, 30, 50), 8L)
   f <- ordered(y)
   b <- npregbw(xdat = x, ydat = y, bws = .25, bandwidth.compute = FALSE)
-  expect_error(npreg(b, txdat = x, tydat = f, se = FALSE), "factor response requires")
-  expect_error(npreg(b, txdat = x, tydat = y, eydat = f, se = FALSE), "factor response requires")
+  expect_error(npreg(b, txdat = x, tydat = f, se = FALSE), "must be a numeric")
+  expect_error(npreg(b, txdat = x, tydat = y, eydat = f, se = FALSE), "must be a numeric")
   H <- npreghat(b, txdat = x)
   expect_equal(as.numeric(npreghat(b, txdat = x, y = f, output = "apply")),
                as.numeric(H %*% as.numeric(f)), tolerance = 1e-11)
@@ -53,7 +53,7 @@ test_that("native regression response extents are checked independently of R cod
   b <- npregbw(xdat = x, ydat = y, bws = .25, bandwidth.compute = FALSE)
   # Intercept a valid argument builder before native entry. The MPI overrides
   # are capture-only: no computational claim is made from this local seam.
-  fn <- get("npreg.rbandwidth", ns)
+  fn <- get(".npreg_fit_impl", ns)
   env <- new.env(parent = environment(fn))
   environment(fn) <- env
   captured <- NULL
@@ -71,7 +71,8 @@ test_that("native regression response extents are checked independently of R cod
     env$.npRmpi_rank_local_regression_context <- function(...) FALSE
     env$mpi.comm.size <- function(...) 1L
   }
-  expect_error(fn(b, txdat = x, tydat = y, eydat = y, se = FALSE), class = "response_capture")
+  expect_error(fn(b, txdat = x, tydat = y, eydat = y, se = FALSE,
+                  .np.context = list(public = TRUE, dots = pairlist())), class = "response_capture")
   expect_length(captured, 26L)
   # Never pass a short buffer to a live communicator on the master alone.
   # REG_CATCOMPI (C index 17) is an independent pre-computation fence after
