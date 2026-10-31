@@ -1,5 +1,10 @@
 # np 0.80-2 (development)
 
+- Regression smoothed-percentile calibration now carries explicit RNG state
+  with each outer task, retaining the selected generator and sampling kind
+  when workers have different RNG settings. Calibration seeds and statistical
+  calculations are unchanged.
+
 - Add experimental CDF and regression `smoothed-percentile` opt-ins through
   `np_boot_control()`. CDF retains the univariate corrected smoothed-bootstrap
   prototype; regression exposes calibrated unshifted standardized-residual

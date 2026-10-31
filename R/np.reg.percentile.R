@@ -8,6 +8,46 @@
  on.exit({do.call(RNGkind,as.list(kind));if(had)assign('.Random.seed',old,.GlobalEnv) else if(exists('.Random.seed',.GlobalEnv,inherits=FALSE))rm('.Random.seed',envir=.GlobalEnv)})
  set.seed(seed);force(code)
 }
+# Capture opaque runtime state without selecting a different generator.
+.np_reg_percentile_rng_mode <- function() {
+  if (identical(RNGkind()[1L], 'user-supplied')) 'legacy-local-custom' else 'state'
+}
+.np_reg_percentile_rng_state <- function(seed) {
+  had <- exists('.Random.seed', .GlobalEnv, inherits = FALSE)
+  old <- if (had) get('.Random.seed', .GlobalEnv, inherits = FALSE) else NULL
+  on.exit(if (had) assign('.Random.seed', old, .GlobalEnv) else
+    if (exists('.Random.seed', .GlobalEnv, inherits = FALSE))
+      rm('.Random.seed', envir = .GlobalEnv))
+  set.seed(seed)
+  get('.Random.seed', .GlobalEnv, inherits = FALSE)
+}
+.np_reg_percentile_rng_validate <- function(state, contract) {
+  if (!is.integer(state) || length(state) < 2L || is.na(state[1L]) ||
+      !is.list(contract) ||
+      !identical(contract$runtime, paste(R.version$major, R.version$minor, sep = '.')) ||
+      !identical(contract$header, state[1L]) ||
+      !identical(contract$length, length(state)) ||
+      !is.character(contract$kind) || length(contract$kind) != 3L ||
+      identical(contract$kind[1L], 'user-supplied'))
+    stop('invalid regression percentile task RNG state', call. = FALSE)
+  invisible(TRUE)
+}
+.np_reg_percentile_with_state <- function(state, contract, code) {
+  .np_reg_percentile_rng_validate(state, contract)
+  had <- exists('.Random.seed', .GlobalEnv, inherits = FALSE)
+  old <- if (had) get('.Random.seed', .GlobalEnv, inherits = FALSE) else NULL
+  kind <- RNGkind(); primary <- NULL
+  on.exit({
+    cleanup <- tryCatch(do.call(RNGkind, as.list(kind)), error = identity)
+    if (had) assign('.Random.seed', old, .GlobalEnv) else
+      if (exists('.Random.seed', .GlobalEnv, inherits = FALSE))
+        rm('.Random.seed', envir = .GlobalEnv)
+    if (inherits(cleanup, 'error') && is.null(primary)) stop(cleanup)
+  })
+  assign('.Random.seed', state, .GlobalEnv)
+  tryCatch(force(code), error = function(e) { primary <<- e; stop(e) },
+           interrupt = function(e) { primary <<- e; stop(e) })
+}
 .np_reg_percentile_rank_bands <- function(curves,map,alpha=.05) {
  B<-ncol(curves); families<-unique(map$target)
  bands<-setNames(lapply(1:3,function(i)array(0,c(nrow(map),2L,length(alpha)))),c('pointwise','simultaneous','bonferroni'))
@@ -162,7 +202,9 @@
   u <- .np_reg_percentile_shape(p)$u; n <- length(u)
   matrix(u[floor(n * runif(n * size)) + 1L], n, size)
 }
-.np_reg_percentile_curve_draws <- function(p, B, seed) .np_reg_percentile_with_seed(seed, {
+.np_reg_percentile_curve_draws <- function(p, B, seed, rng.mode = 'seed',
+                                             rng.state = NULL, rng.contract = NULL) {
+  draw <- function() {
   curves <- matrix(0, nrow(p$A), B)
   for (first in seq.int(1L, B, 256L)) {
     jj <- seq.int(first, min(B, first + 255L))
@@ -170,7 +212,13 @@
     curves[, jj] <- p$A %*% sweep(ep, 1L, p$mu, '+')
   }
   list(curves = curves, end = .Random.seed)
-})
+  }
+  if (identical(rng.mode, 'state'))
+    return(.np_reg_percentile_with_state(rng.state, rng.contract, draw()))
+  if (!rng.mode %in% c('seed', 'legacy-local-custom'))
+    stop('invalid regression percentile task RNG mode', call. = FALSE)
+  .np_reg_percentile_with_seed(seed, draw())
+}
 .np_reg_percentile_curve_support <- function(p) {
   u <- range(.np_reg_percentile_shape(p)$u); a <- sweep(p$A, 2L, p$sigma, '*')
   mu <- drop(p$A %*% p$mu)
@@ -182,7 +230,11 @@
 }
 .np_reg_percentile_outer_score <- function(task, p, B) {
   p$mu <- task$mu; p$sigma <- task$sigma; p$residual <- task$raw
-  curves <- .np_reg_percentile_curve_draws(p, B, task$seed)$curves
+  if (!identical(task$rng.mode, 'state') &&
+      !identical(task$rng.mode, 'legacy-local-custom'))
+    stop('missing regression percentile task RNG mode', call. = FALSE)
+  curves <- .np_reg_percentile_curve_draws(p, B, task$seed,
+    task$rng.mode, task$rng.state, task$rng.contract)$curves
   support <- .np_reg_percentile_curve_support(p)
   scores <- empirical <- numeric()
   for (target in unique(p$map$target)) {
@@ -220,6 +272,7 @@
   forecast <- 8 * (10 * m * B + 10 * n * 39 + 6 * m * n + 20 * n * 256)
   if (!is.finite(forecast) || forecast > 256 * 1024^2)
     stop('regression percentile memory forecast exceeds 256 MiB; reduce the requested grid or B', call. = FALSE)
+  rng.mode <- .np_reg_percentile_rng_mode()
   g <- .np_reg_percentile_refresh_geometry(p)
   bank <- .np_reg_percentile_outer_response_bank(p, g, outer_data, 'residual')
   original <- .np_reg_percentile_curve_draws(p, B, seed)$curves
@@ -227,6 +280,16 @@
   tasks <- lapply(seq_len(39L), function(o) list(start = o, bsz = 1L,
     seed = outer_inner[o], mu = bank$y[[o]] - bank$raw[, o],
     sigma = sqrt(bank$v[, o]), raw = bank$raw[, o]))
+  for (o in seq_along(tasks)) {
+    tasks[[o]]$rng.mode <- rng.mode
+    if (identical(rng.mode, 'state')) {
+      state <- .np_reg_percentile_rng_state(outer_inner[o])
+      tasks[[o]]$rng.state <- state
+      tasks[[o]]$rng.contract <- list(
+        runtime = paste(R.version$major, R.version$minor, sep = '.'),
+        header = state[1L], length = length(state), kind = RNGkind())
+    }
+  }
   payload <- p[c('A', 'mu', 'sigma', 'residual', 'row.variance', 'pilot.eval', 'map')]
   rows <- .np_reg_percentile_outer_dispatch(tasks, payload, B)
   rows[rows == B + 1] <- Inf
