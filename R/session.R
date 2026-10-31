@@ -660,9 +660,14 @@ npRmpi.quit <- function(force = FALSE,
       .np_warning("attach-mode close already in progress; ignoring duplicate npRmpi.quit(mode='attach') call.", call. = FALSE)
       return(invisible(FALSE))
     }
+    # Attach shutdown has always owned communicator 1, even when the caller
+    # supplied another communicator. Its rank set must come from that owner.
+    size.attach <- .npRmpi_safe_int(mpi.comm.size(comm))
+    if (length(size.attach) != 1L || is.na(size.attach) || size.attach < 2L)
+      fail("npRmpi cannot confirm the attach communicator; session remains poisoned")
     lease.drain.ok <- drain.leases()
     options(npRmpi.attach.close.state = "closing")
-    expected <- seq_len(size.comm - 1L)
+    expected <- seq_len(size.attach - 1L)
     sid <- suppressWarnings(as.integer(getOption("npRmpi.attach.session.id", NA_integer_))[1L])
     recv.timeout <- .npRmpi_session_recv_timeout()
     if (recv.timeout > 0) base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
