@@ -219,6 +219,16 @@ Further arguments are passed to \code{\link{npplregbw}} and its component \code{
   }
 }
 \details{
+  The primary response must be a one-dimensional numeric (integer or double)
+  vector. Factors and ordered factors are not accepted as primary responses,
+  including retained responses used in a new fit or bandwidth search.
+  The same requirement applies to explicitly selected evaluation responses.
+  Prediction without selected evaluation outcomes does not require a response
+  column. An explicit formula transformation that returns numeric values is
+  accepted; numerical scores are a modeling choice made by the user.
+  Categorical predictors retain their existing support. Internal auxiliary
+  responses used to represent predictors retain their established encoding.
+
   With a formula-derived bandwidth object, supplying only \code{tydat}
   replaces the evaluated response in retained-training-sample order: one row
   per observation retained after the original subset and missing-value selection.

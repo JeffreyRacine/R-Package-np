@@ -507,6 +507,9 @@ npplreg.plbandwidth <-
 
     txdat = toFrame(txdat)
     tzdat = toFrame(tzdat)
+    .np_require_numeric_response(tydat, "npplreg", "tydat")
+    if (!missing(eydat))
+      .np_require_numeric_response(eydat, "npplreg", "eydat")
     .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
     .np_require_paired_rows(txdat, tzdat, "txdat", "tzdat")
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat, zdat = tzdat)

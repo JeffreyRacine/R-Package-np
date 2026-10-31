@@ -637,6 +637,7 @@ npscoefbw.scbandwidth <-
     if (!identical(reg.engine, "lc") && cv.iterate)
       stop("cv.iterate currently supports regtype='lc' for npscoefbw")
 
+    .np_require_numeric_response(ydat, "npscoefbw", "ydat")
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
 
@@ -2992,6 +2993,7 @@ npscoefbw.default <-
     miss.z <- missing(zdat)
     xdat <- toFrame(xdat)
     
+    .np_require_numeric_response(ydat, "npscoefbw", "ydat")
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
     .np_require_paired_rows(xdat, ydat, "xdat", "ydat")

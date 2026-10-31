@@ -1394,6 +1394,9 @@ npscoef.scbandwidth <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     npRejectLegacyBooleanErrors(list(...), "npscoef")
+    .np_require_numeric_response(tydat, "npscoef", "tydat")
+    if (!missing(eydat))
+      .np_require_numeric_response(eydat, "npscoef", "eydat")
     .np_scoef_fit_internal(
       bws = bws,
       txdat = txdat,

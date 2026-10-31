@@ -255,6 +255,16 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   }
 }
 \details{
+  The primary response must be a one-dimensional numeric (integer or double)
+  vector. Factors and ordered factors are not accepted as primary responses,
+  including retained responses used in a new fit or bandwidth search.
+  The same requirement applies to explicitly selected evaluation responses.
+  Prediction without selected evaluation outcomes does not require a response
+  column. An explicit formula transformation that returns numeric values is
+  accepted; numerical scores are a modeling choice made by the user.
+  Categorical predictors retain their existing support. Internal auxiliary
+  responses used to represent predictors retain their established encoding.
+
   Prediction with \code{se.fit = TRUE} reports known training mean squared
   error in \code{residual.scale}, retaining MSE units, or \code{NA} when
   training provenance is unavailable. Evaluation outcomes do not replace this

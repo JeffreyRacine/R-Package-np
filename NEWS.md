@@ -1,5 +1,12 @@
 # np 0.80-2 (development)
 
+- `npplreg`, `npscoef`, and `npindex`, including their bandwidth selectors,
+  now require numeric integer/double primary responses and explicitly selected
+  evaluation responses. Formerly accepted factor and ordered responses error.
+  Categorical predictors and internal auxiliary response encodings are preserved;
+  Klein--Spady retains its numeric 0/1 rule. Unusable automatically discovered
+  single-index scoring outcomes leave predictions available without scores.
+
 - Regression smoothed-percentile calibration now carries explicit RNG state
   with each outer task, retaining the selected generator and sampling kind
   when workers have different RNG settings. Calibration seeds and statistical

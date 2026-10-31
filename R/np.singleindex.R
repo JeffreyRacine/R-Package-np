@@ -572,6 +572,8 @@ npindex.sibandwidth <-
       .npindex_check_binary_response(tydat, "npindex() 'tydat'")
       if (!no.ey)
         .npindex_check_binary_response(eydat, "npindex() 'eydat'")
+    } else {
+      .np_require_numeric_response(tydat, "npindex", "tydat")
     }
 
     tydat <- if (is.factor(tydat)) {

@@ -533,6 +533,13 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+  The primary response must be a one-dimensional numeric (integer or double)
+  vector. Factors and ordered factors are not accepted as primary responses,
+  including retained responses used in a new fit or bandwidth search.
+  Categorical predictors retain their existing support. Internal auxiliary
+  responses used to represent predictors retain their established encoding.
+  Klein--Spady retains its stricter numeric 0/1 response requirement.
+
   \subsection{Factors and Index Coordinates}{
     For newly constructed bandwidth objects, factors enter the linear index
     through R model-matrix contrasts. An unordered factor with \eqn{k} observed
@@ -626,8 +633,8 @@ or standard-deviation factors.
   (1993) method maximizing the leave-one-out log likelihood function
   jointly with respect to the bandwidth and coefficient vector. Note
   that Klein and Spady's (1993) method is for \emph{binary outcomes
-    only}, while Ichimura's (1993) method can be applied for any outcome
-  data type (i.e., continuous or discrete).
+    only}, while Ichimura's (1993) method accepts numeric outcomes, whether
+  continuous or discrete-valued.
 
   Invalid outer-search guidance uses the exact declared leave-one-out null:
   the constant-model least-squares null for Ichimura and the clipped

@@ -31,15 +31,14 @@ test_that("explicit and cached hat factor application matches its numeric operat
 })
 
 
-test_that("single-index fitting retains alphanumeric response coding", {
-
-  old <- options(np.messages = FALSE)
-  on.exit(options(old), add = TRUE)
+test_that("single-index primary responses require an explicit numeric scale", {
+  withr::local_options(np.messages = FALSE)
   x <- data.frame(x = seq(.05, .95, length.out = 24), z = sin(seq_len(24)))
   y <- ordered(rep(c("a", "b", "c"), 8))
-  b <- npindexbw(xdat = x, ydat = y, bws = c(1, .4, .3),
-                 bandwidth.compute = FALSE)
-  fit <- npindex(b, txdat = x, tydat = y, se = FALSE)
-  numeric.fit <- npindex(b, txdat = x, tydat = as.numeric(y), se = FALSE)
-  expect_equal(fitted(fit), fitted(numeric.fit), tolerance = 2e-11)
+  expect_error(npindexbw(xdat=x, ydat=y, bws=c(1,.4,.3),
+                         bandwidth.compute=FALSE), "must be a numeric")
+  scores <- rep(c(10, 30, 50), 8)
+  b <- npindexbw(xdat=x, ydat=scores, bws=c(1,.4,.3), bandwidth.compute=FALSE)
+  expect_identical(fitted(npindex(b,se=FALSE)),
+                   fitted(npindex(b,txdat=x,tydat=scores,se=FALSE)))
 })

@@ -149,16 +149,13 @@ test_that("npplreg evaluation rows retain alignment and external GOF is explicit
   expect_true(is.finite(fit.ey$MSE))
 })
 
-test_that("npplreg factor response and factor linear regressor routes remain usable", {
+test_that("npplreg rejects factor outcomes and preserves factor linear regressors", {
   if (!npplreg_audit_ready()) skip("Could not initialize npplreg audit context")
 
   dat <- npplreg_audit_fixture()
   factor.y <- dat
   factor.y$ydat <- factor(ifelse(dat$ydat > median(dat$ydat), "hi", "lo"))
-  fit.y <- npplreg(bws = npplreg_audit_bw(factor.y))
-  expect_s3_class(fit.y, "plregression")
-  expect_true(all(is.finite(fit.y$mean)))
-  expect_true(all(is.finite(coef(fit.y))))
+  expect_error(npplreg_audit_bw(factor.y), "must be a numeric")
 
   factor.x <- dat
   factor.x$xdat <- data.frame(x = factor(ifelse(dat$xdat$x > median(dat$xdat$x), "high", "low")))

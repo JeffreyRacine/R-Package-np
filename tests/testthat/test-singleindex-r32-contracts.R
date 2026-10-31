@@ -128,7 +128,12 @@ test_that("automatic factor outcomes cannot prevent Ichimura prediction", {
   e <- d[1:20,]; e$y <- factor(e$y)
   for (factor.train in c(FALSE,TRUE)) {
     tr <- d
-    if (factor.train) {tr$y <- factor(tr$y); e$y <- factor(rep("99",20))}
+    if (factor.train) {
+      tr$y <- factor(tr$y)
+      expect_error(npindexbw(y ~ x + z, data=tr, bws=c(1,.5,.8),
+                             bandwidth.compute=FALSE), "must be a numeric")
+      next
+    }
     b <- npindexbw(y ~ x + z, data=tr, bws=c(1,.5,.8), bandwidth.compute=FALSE)
     f <- npindex(b,se=FALSE)
     expected <- predict(f,newdata=e,y.eval=FALSE)

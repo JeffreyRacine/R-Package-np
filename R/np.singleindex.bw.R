@@ -2034,6 +2034,8 @@ npindexbw.default <-
       match.arg(dots[["method", exact = TRUE]], c("ichimura", "kleinspady")) == "kleinspady"
     if (kleinspady)
       .npindex_check_binary_response(ydat, "npindexbw()")
+    else
+      .np_require_numeric_response(ydat, "npindexbw", "ydat")
     if (kleinspady && bandwidth.compute && !is.null(degree.search)) {
       # NOMAD bounds need a valid response before the first objective callback.
       # Use the same joint complete sample as the ordinary bandwidth owner.
@@ -2258,6 +2260,8 @@ npindexbw.sibandwidth <-
 
     if (bws$method == "kleinspady")
       .npindex_check_binary_response(ydat, "npindexbw()")
+    else
+      .np_require_numeric_response(ydat, "npindexbw", "ydat")
 
     if (ncol(xdat) < 2) {
       if (coarseclass(xdat[,1]) != "numeric")
