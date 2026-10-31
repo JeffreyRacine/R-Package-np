@@ -323,7 +323,7 @@ np_render_control <- function(style = c("band", "bar"),
       stop("unused plot argument: bootstrap list; use scalar bootstrap, B, and boot.control",
            call. = FALSE)
     bootstrap <- .np_plot_scalar_match(dots$bootstrap,
-                                       c("wild", "inid", "fixed", "geom"),
+                                       c("wild", "inid", "fixed", "geom", "residual"),
                                        "bootstrap")
     dots$bootstrap <- NULL
     dots <- .np_plot_set_normalized_arg(dots, "bootstrap",
@@ -502,9 +502,13 @@ np_render_control <- function(style = c("band", "bar"),
   if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&
       !inherits(bws, c("rbandwidth", "bandwidth", "dbandwidth")))
     stop("explicit bootstrap calibration currently requires bias-corrected regression or supported density/distribution inference", call. = FALSE)
-  if (isTRUE(dots[["plot.errors.boot.calibration", exact = TRUE]] %in% c("percentile-tails", "smoothed-percentile")) &&
+  if (isTRUE(dots[["plot.errors.boot.calibration", exact = TRUE]] %in% "percentile-tails") &&
       !inherits(bws, "bandwidth"))
     stop("percentile density calibration requires supported density inference", call. = FALSE)
+  if (identical(dots[["plot.errors.boot.method", exact = TRUE]], "residual") &&
+      !(inherits(bws, "rbandwidth") &&
+        identical(dots[["plot.errors.boot.calibration", exact = TRUE]], "smoothed-percentile")))
+    stop('bootstrap="residual" requires regression calibration="smoothed-percentile"', call. = FALSE)
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 

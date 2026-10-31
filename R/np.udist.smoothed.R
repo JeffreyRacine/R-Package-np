@@ -1,5 +1,5 @@
-# CDS1 private univariate CDF prototype. No public/default route enters here.
-# The external caller owns fresh outer-sample CV; plot dispatch stays unchanged.
+# Experimental CDS1 univariate CDF percentile owner. Existing defaults do not enter.
+# The caller owns fresh outer-sample CV; original fitted geometry is immutable.
 .np_udist_smoothed_support <- function() {
   a <- stats::pnorm(-sqrt(3)) - sqrt(3) * stats::dnorm(sqrt(3)) / 2
   c(lower = a, upper = 1 - a)
@@ -111,7 +111,7 @@
                                          B = 9999L, alpha = .05, law = "inid",
                                          blocklen = NULL, max.bytes = 256 * 1024^2,
                                          tile = 25L, chunk = 32L, warn = TRUE,
-                                         progress = NULL) {
+                                         progress = NULL, prepared = NULL) {
   existed <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
   previous <- if (existed) base::get(".Random.seed", .GlobalEnv, inherits = FALSE) else NULL
   kind <- RNGkind()
@@ -133,7 +133,13 @@
   if (anyDuplicated(vapply(all.streams, paste, "", collapse = ":")))
     stop("smoothed CDF stream starts must be distinct", call. = FALSE)
   if (!existed) assign(".Random.seed", streams$count, .GlobalEnv)
-  state <- .np_udist_smoothed_prepare(fit, x, max.bytes)
+  state <- if (is.null(prepared)) .np_udist_smoothed_prepare(fit, x, max.bytes) else {
+    if (!is.list(prepared) || !identical(prepared$x, x) ||
+        !identical(prepared$bws, fit[["bws", exact=TRUE]]) ||
+        !identical(prepared$max.bytes, max.bytes))
+      stop("prepared CDF percentile state does not match its fitted inputs", call.=FALSE)
+    prepared
+  }
   .np_udist_bc_grid(state, grid)
   m <- nrow(grid)
   family <- function(y) {

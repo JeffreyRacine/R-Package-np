@@ -394,7 +394,10 @@
     .np_plot_calibration_method(calibration, "regression")
   refinement <- if(law %in% c("fixed","geom") && band!="pmzsd")"pilot-block" else "none"
   inference <- .np_plot_activity_run("Constructing bias-corrected intervals",
-    .np_bias_inference(state,grid,target,alpha,
+    if (identical(effective, "smoothed-percentile"))
+      .np_reg_percentile_plot(state, fit, grid, target, B,
+        if (band=="all") c("pointwise","simultaneous","bonferroni") else band,
+        resolution.context=resolution.context) else .np_bias_inference(state,grid,target,alpha,
       if(method=="asymptotic")gaussian.draws else B,law,blocklen,fit,
       studentize=band!="pmzsd",
       resolution.bands=if(band=="pmzsd")character() else if(band=="all")

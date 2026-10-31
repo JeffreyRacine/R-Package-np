@@ -1,5 +1,14 @@
 # npRmpi 0.80-2 (development)
 
+- Add experimental CDF and regression `smoothed-percentile` opt-ins through
+  `np_boot_control()`. CDF retains the univariate corrected smoothed-bootstrap
+  prototype; regression exposes calibrated unshifted standardized-residual
+  percentiles for LC/LL/Bernstein LP means and first derivatives. Regression
+  uses the explicit residual law, not wild/Mammen. Existing defaults and SD
+  constructions remain unchanged; supported scopes and coverage limits are
+  documented. Exact partial selection and bounded outer geometry reuse retain
+  the private regression candidate's arithmetic and RNG.
+
 - Density smoothed-percentile plot subtitles and legends now identify
   corrected bootstrap curves and calibrated percentile ranks, without
   changing calculations, returned objects or the existing SD-method labels.

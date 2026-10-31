@@ -15884,7 +15884,8 @@ compute.default.error.range <- function(center, err) {
                                              allow_asymptotic_simultaneous = FALSE,
                                              error.request = NULL,
                                              allow_asymptotic_bias = FALSE,
-                                             defer_block_selection = FALSE) {
+                                             defer_block_selection = FALSE,
+                                               allow_residual = FALSE) {
   scalar_choice <- function(value, default) {
     if (is.null(value) || length(value) < 1L || is.na(value[1L])) default else value[1L]
   }
@@ -15899,7 +15900,7 @@ compute.default.error.range <- function(center, err) {
   plot.errors.method <- error.request$method
   plot.errors.boot.method <- match.arg(
     scalar_choice(plot.errors.boot.method, "wild"),
-    c("wild", "inid", "fixed", "geom")
+    c("wild", "inid", "fixed", "geom", if (isTRUE(allow_residual)) "residual")
   )
   plot.errors.boot.nonfixed <- match.arg(
     scalar_choice(plot.errors.boot.nonfixed, "exact"),

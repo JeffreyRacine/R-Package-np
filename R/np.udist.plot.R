@@ -17,7 +17,7 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   calibration <- .np_plot_calibration_method(calibration, "distribution")
   if (identical(calibration, "default")) calibration <- NULL
   if (!is.null(calibration) && (!is.character(calibration) || length(calibration) != 1L ||
-      is.na(calibration) || !calibration %in% c("absolute", "separate-tails", "tail-envelope") ||
+      is.na(calibration) || !calibration %in% c("absolute", "separate-tails", "tail-envelope", "smoothed-percentile") ||
       !identical(center, "bias-corrected") || !identical(method, "bootstrap") ||
       !bootstrap %in% c("inid", "fixed", "geom") ||
       !band %in% c("pointwise", "simultaneous", "bonferroni", "all")))
@@ -60,6 +60,9 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
     stop("selected bootstrap law is not qualified for this distribution construction", call. = FALSE)
   if (!band %in% c("pmzsd", "pointwise", "simultaneous", "bonferroni", "all"))
     stop("unsupported bias-corrected distribution band", call. = FALSE)
+  if (identical(calibration, "smoothed-percentile") &&
+      (ncol(x) != 1L || !is.numeric(x[[1L]]) || !identical(bws$type, "fixed")))
+    stop("CDF smoothed-percentile requires a fixed univariate numeric fit", call.=FALSE)
   state <- .np_udist_bc_prepare(bws, x)
   if (identical(construction, "joint-process") &&
       (!state$q %in% 0:2 || !state$s %in% 0:2))
@@ -84,6 +87,9 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
       state$plot.block.selection$owner <- "shared plot normalization"
     }
   }
+  if (identical(calibration, "smoothed-percentile") &&
+      state$plot.law != "inid" && state$plot.block.selection$length != 1L)
+    stop("CDF smoothed-percentile admits fixed/geom only with blocklen=1", call.=FALSE)
   state
 }
 
@@ -93,6 +99,9 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   infer <- if (identical(state$plot.construction, "joint-process"))
     .np_udist_joint_inference else .np_udist_bc_inference
   inference <- .np_plot_activity_run("Constructing bias-corrected distribution intervals",
+    if (identical(state[["plot.calibration", exact=TRUE]], "smoothed-percentile"))
+      .np_udist_smoothed_plot(state, grid, alpha, B,
+        if(provider.band=="all") c("pointwise","simultaneous","bonferroni") else provider.band) else
     do.call(infer, c(list(state = state, grid = grid, law = state$plot.law,
       alpha = alpha, B = B,
       bands = if (provider.band == "all") c("pointwise", "simultaneous", "bonferroni") else provider.band),
@@ -103,7 +112,7 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
     inference$settings$calibration.requested <- state$plot.calibration.requested
   inference$bands <- inference$intervals
   if (band == "pmzsd") inference <- .np_plot_bias_normal(inference, alpha)
-  if (band != "pmzsd") .np_band_resolution_warn(inference$resolution)
+  if (band != "pmzsd" && !identical(state[["plot.calibration", exact=TRUE]], "smoothed-percentile")) .np_band_resolution_warn(inference$resolution)
   all <- lapply(inference$bands, function(z)
     cbind(inference$center - z[, 1L, 1L], z[, 2L, 1L] - inference$center))
   width <- all[[if (band == "all") "pointwise" else band]]
