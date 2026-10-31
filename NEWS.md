@@ -8,6 +8,13 @@
 - Single-index bandwidth reentry retains native training data before publication,
   allowing its unchanged result to reuse a lease in subsequent fitting calls.
 
+- Regression smoothed-percentile calibration now carries explicit RNG state
+  with each outer task, retaining the selected generator and sampling kind
+  when workers have different RNG settings. Calibration seeds and statistical
+  calculations are unchanged.
+  A user-supplied uniform RNG is rejected before distributed preparation;
+  serial and explicitly supported local execution retain their existing route.
+
 - Require every started smooth-coefficient search worker to acknowledge service
   shutdown before context retirement or the next collective. Uncertain service
   cleanup prevents pool reuse and preserves the original computation condition.

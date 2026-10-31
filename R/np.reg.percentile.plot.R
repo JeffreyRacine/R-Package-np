@@ -13,6 +13,7 @@
       !isTRUE(alpha == .05))
     stop('regression smoothed-percentile currently requires alpha=0.05, 16 iterations and bias.control=np_bias_control(adaptation="none")', call. = FALSE)
   .np_plot_gaussian_integer(B, 'regression percentile draws', 9999L)
+  .np_reg_percentile_rng_mode()
   invisible(NULL)
 }
 .np_reg_percentile_prepare <- function(state, fit, grid) {
