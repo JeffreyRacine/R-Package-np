@@ -35,9 +35,9 @@ np_render_control(style = c("band", "bar"),
     \code{"symmetric-sd"} selects the existing absolute-root construction and
     \code{"asymmetric-sd"} selects separate empirical tails with the family's
     existing scale treatment. These names apply to regression, unconditional
-    density and unconditional distribution estimation. For density only,
+    density and unconditional distribution estimation. The experimental option
     \code{"smoothed-percentile"} selects calibrated unshifted corrected
-    smoothed-bootstrap curves. Existing defaults and older names retain their
+    bootstrap curves, with family-specific resampling described below. Existing defaults and older names retain their
     meanings. See Details for supported configurations.}
   \item{xtrim}{Optional two-element trim range for evaluation grids.}
   \item{xq}{Optional evaluation quantiles.}
@@ -86,7 +86,45 @@ Symmetric/asymmetric density SD methods retain their existing admitted
 require explicit block lengths. Asymmetric CDF bands support admitted fixed
 bandwidth joint-process \code{inid}/\code{fixed}/\code{geom} inference;
 numeric nearest-neighbor asymmetric CDF inference remains unqualified.
-\code{"smoothed-percentile"} is not yet implemented for CDFs or regression.
+The experimental CDF \code{"smoothed-percentile"} option uses a
+Gaussian derivative-three smoothing pilot, 39 fresh outer-sample CV fits,
+complete bias-corrected CDF curves and calibrated family ranks. Its current
+scope is one numeric variable, fixed unbounded Gaussian2 bandwidths,
+\code{inid} or literal block length one, and the complete untrimmed sample-range
+evaluation grid. All three companion bands are returned when requested.
+Useful population coverage for this CDF prototype has not been established;
+it is exposed for experimentation. Fresh outer CV may select slightly different
+bandwidths across serial and MPI fits, as with the existing estimator.
+
+For regression, the common \code{"smoothed-percentile"} label selects the
+E1 mean / E6 first-derivative calibrated percentile construction. This is a
+fixed-design standardized empirical-residual bootstrap: residual innovations
+are centered and normalized, then resampled with replacement and multiplied by
+the fitted error scale. No kernel jitter is added to the residual distribution.
+The smooth fitted pilot generates responses, and the complete correction
+operator acts on every response draw. Curves are not recentered on the observed
+corrected estimate. The 39 outer responses refresh the pilot, residual shape
+and variance using the original selected geometry; they do not reselect
+bandwidths. Derivative marginal and whole-family contents are calibrated
+separately; means retain their tested pointwise companion floor.
+
+Selecting this regression option with \code{bootstrap} omitted uses
+\code{bootstrap="residual"}; explicitly choosing a different bootstrap law is
+an error. The residual law is exclusive to this option and does not replace
+wild/Mammen or the existing pairs/block laws. With \code{bias.control} omitted,
+the option uses \code{np_bias_control(adaptation="none")}. Initial scope is
+fixed Gaussian2, one or two numeric predictors, local constant, local linear,
+or Bernstein local polynomial degrees at most three, first derivatives,
+16 correction iterations, \code{alpha=0.05} and \code{B<=9999}. Explicit
+incompatible controls are rejected. Resident work is bounded by a forecast;
+no training-square matrix or outer-by-draw-by-grid bank is retained.
+
+Regression Gaussian q=1 evidence is promising, q=2 is conservative, and some
+heteroskedastic sensitivity/control-loss gates failed. These limitations remain;
+public availability is not a general coverage guarantee. All percentile methods
+preserve support-completion and unattainability diagnostics. Percentile bounds
+need not be symmetric about or contain the corrected estimate. Existing
+symmetric/asymmetric SD methods and omitted calibration defaults are unchanged.
 See \code{\link{np_udens_bias_control}} and \code{\link{np_udist_bias_control}}.
 
 Gaussian simultaneous variability bands use the Gaussian-multiplier framework

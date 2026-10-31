@@ -210,6 +210,9 @@ Named options passed via \code{\dots} include:
         \code{"wild"}, \code{"inid"}, \code{"fixed"}, and
         \code{"geom"}; density/distribution-family plots support
         \code{"inid"}, \code{"fixed"}, and \code{"geom"}.
+        Experimental regression \code{calibration="smoothed-percentile"}
+        additionally uses \code{bootstrap="residual"}; see
+        \code{\link{np_boot_control}} for its scope and defaults.
       }
       \item{\code{boxplot.outliers}, \code{factor.boxplot}}{
         boxplot-style bootstrap summary controls for factor/categorical

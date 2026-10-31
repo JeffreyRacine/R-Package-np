@@ -441,6 +441,7 @@
               border = scalar_default(border, .np_plot_color("context_border")),
               lwd = scalar_default(lwd, par()$lwd),
               annotation = .np_plot_variability_annotation_spec(
+                construction = if(identical(plot.errors.boot.calibration,"smoothed-percentile")) "smoothed-percentile" else NULL,
                 plot.errors.method = plot.errors.method,
                 plot.errors.type = plot.errors.type,
                 plot.errors.alpha = plot.errors.alpha,
@@ -454,6 +455,7 @@
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
+                construction = if(identical(plot.errors.boot.calibration,"smoothed-percentile")) "smoothed-percentile" else NULL,
                 legend = plot.legend,
                 x = "topright",
                 lty = .np_plot_lty("solid"),
@@ -653,6 +655,7 @@
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             panel.annotation <- .np_plot_variability_annotation_spec(
+                construction = if(identical(plot.errors.boot.calibration,"smoothed-percentile")) "smoothed-percentile" else NULL,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -667,6 +670,7 @@
 
             if (plot.errors.type == "all") {
               .np_plot_draw_all_errors_with_gaps(
+                construction = if(identical(plot.errors.boot.calibration,"smoothed-percentile")) "smoothed-percentile" else NULL,
                 ex = as.numeric(ei),
                 center = as.numeric(if (plotOnEstimate) temp.dens else temp.err[,3]),
                 all.err = temp.all.err,
@@ -821,6 +825,7 @@
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             panel.annotation <- .np_plot_variability_annotation_spec(
+                construction = if(identical(plot.errors.boot.calibration,"smoothed-percentile")) "smoothed-percentile" else NULL,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -835,6 +840,7 @@
 
             if (plot.errors.type == "all") {
               .np_plot_draw_all_errors_with_gaps(
+                construction = if(identical(plot.errors.boot.calibration,"smoothed-percentile")) "smoothed-percentile" else NULL,
                 ex = as.numeric(allei[,i]),
                 center = as.numeric(if (plotOnEstimate) data.eval[,i] else data.err[,3*i]),
                 all.err = data.err.all[[i]],

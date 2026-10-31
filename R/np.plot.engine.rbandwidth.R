@@ -201,12 +201,15 @@
       stop("bias.control must be created by np_bias_control()",call.=FALSE)
     if (!is.null(bias.control) && !bias.request)
       stop("bias.control requires center='bias-corrected' and inference errors",call.=FALSE)
-    if (bias.request && is.null(bias.control)) bias.control <- np_bias_control()
+    percentile.request <- identical(plot.errors.boot.calibration, "smoothed-percentile")
+    if (percentile.request && missing(plot.errors.boot.method)) plot.errors.boot.method <- "residual"
+    if (bias.request && is.null(bias.control)) bias.control <- if (percentile.request)
+      np_bias_control(adaptation="none") else np_bias_control()
     if (bias.request) bias.control <- .np_bias_validate_control(bias.control)
     new.bias <- bias.request && identical(bias.control[["construction"]],"iterated")
     if (!is.character(plot.errors.boot.calibration) || length(plot.errors.boot.calibration)!=1L ||
         is.na(plot.errors.boot.calibration) ||
-        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope","symmetric-sd","asymmetric-sd"))
+        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope","symmetric-sd","asymmetric-sd","smoothed-percentile"))
       stop("invalid bootstrap calibration control",call.=FALSE)
     if (plot.errors.boot.calibration!="default" &&
         (!new.bias || error.request$method!="bootstrap" || error.request$type=="pmzsd"))
@@ -217,6 +220,14 @@
       stop("factor.boxplot is unavailable for iterated bias-corrected intervals",call.=FALSE)
     if (new.bias && as.character(plot.errors.boot.nonfixed)[1L]!="exact")
       stop("nonfixed='frozen' controls legacy resampling; omit it for iterated correction",call.=FALSE)
+    if (percentile.request) {
+      .np_reg_percentile_admit(bws, bias.control, plot.errors.alpha, plot.errors.boot.num,
+        plot.errors.boot.method, plot.errors.boot.blocklen)
+      if (gradients && any(plot.gradient.order.label[which(bws$icon)] != 1L))
+        stop("regression smoothed-percentile supports first derivatives only", call.=FALSE)
+      if (!identical(as.character(plot.errors.boot.wild)[1L], "mammen"))
+        stop("wild weight controls do not apply to regression smoothed-percentile", call.=FALSE)
+    }
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all") && !new.bias
     if (!missing(gaussian.draws) && !joint.request && !(new.bias && error.request$method=="asymptotic"))
@@ -245,7 +256,7 @@
       allow_asymptotic_simultaneous = joint.eligible || new.bias,
       error.request = error.request,
       allow_asymptotic_bias = new.bias,
-      defer_block_selection = new.bias
+      defer_block_selection = new.bias, allow_residual = percentile.request
     )
 
     plot.behavior <- normalized.opts$plot.behavior
@@ -267,13 +278,20 @@
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
       .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE,
         gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
-         law=if(plot.errors.method=="asymptotic")"gaussian" else
+         law=if(percentile.request)"mammen" else if(plot.errors.method=="asymptotic")"gaussian" else
            if(plot.errors.boot.method=="wild")plot.errors.boot.wild else plot.errors.boot.method)) else NULL
     resolution.context <- if(new.bias) new.env(parent=emptyenv()) else NULL
     if(new.bias) {
       resolution.context$rows <- list();resolution.context$success <- FALSE
-      on.exit(if(resolution.context$success)
-        .np_band_resolution_warn(resolution.context$rows),add=TRUE)
+      on.exit(if(resolution.context$success) {
+        if (percentile.request) {
+          messages <- resolution.context$percentile.messages
+          withCallingHandlers(.np_band_resolution_warn(resolution.context$rows), warning=function(w) {
+            messages <<- c(messages, conditionMessage(w)); invokeRestart("muffleWarning")
+          })
+          if (length(messages)) warning(paste(unique(messages), collapse="; "), call.=FALSE)
+        } else .np_band_resolution_warn(resolution.context$rows)
+      },add=TRUE)
     }
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
@@ -353,6 +371,7 @@
         xdat = xdat,
         ydat = ydat,
         exdat = if(!is.null(bias.state$main.capture))setNames(x.eval,names(xdat)) else x.eval,
+        gradients = percentile.request,
         gradient.order = gradient.order,
         need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
         .np.empty.report = .np.empty.report, need.joint = joint.eligible,
@@ -539,7 +558,7 @@
             }
             if (plot.errors) {
               .np_plot_error_surfaces_rgl(
-                construction = if(new.bias) "iterated" else NULL,
+                construction = if(percentile.request) "smoothed-percentile" else if(new.bias) "iterated" else NULL,
                 x = x1.eval,
                 y = x2.eval,
                 plot.errors.type = plot.errors.type,
@@ -642,7 +661,7 @@
               border = scalar_default(border, .np_plot_color("context_border")),
               lwd = scalar_default(lwd, par()$lwd),
               annotation = .np_plot_variability_annotation_spec(
-                construction = if(new.bias) "iterated" else NULL,
+                construction = if(percentile.request) "smoothed-percentile" else if(new.bias) "iterated" else NULL,
                 plot.errors.method = plot.errors.method,
                 plot.errors.type = plot.errors.type,
                 plot.errors.alpha = plot.errors.alpha,
@@ -657,7 +676,7 @@
 
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
-                construction = if(new.bias) "iterated" else NULL,
+                construction = if(percentile.request) "smoothed-percentile" else if(new.bias) "iterated" else NULL,
                 legend = plot.legend,
                 x = "topright",
                 lty = .np_plot_lty("solid"),
@@ -756,7 +775,7 @@
           xdat = xdat,
           ydat = ydat,
           exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-          gradients = gradients,
+          gradients = gradients || percentile.request,
           gradient.order = gradient.order,
           need.asymptotic = identical(plot.errors.method, "asymptotic") && !new.bias,
           .np.empty.report = .np.empty.report,
@@ -1023,7 +1042,7 @@
           if (plot.errors && component.available &&
               !(xi.factor && plot.bootstrap && plot.bxp)){
             panel.annotation <- .np_plot_variability_annotation_spec(
-                construction = if(new.bias) "iterated" else NULL,
+                construction = if(percentile.request) "smoothed-percentile" else if(new.bias) "iterated" else NULL,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -1047,7 +1066,7 @@
 
             if (plot.errors.type == "all") {
               draw.all.error.types(
-                construction = if(new.bias) "iterated" else NULL,
+                construction = if(percentile.request) "smoothed-percentile" else if(new.bias) "iterated" else NULL,
                 ex = as.numeric(na.omit(ei)),
                 center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
                 all.err = temp.all.err,
@@ -1322,7 +1341,7 @@
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             panel.annotation <- .np_plot_variability_annotation_spec(
-                construction = if(new.bias) "iterated" else NULL,
+                construction = if(percentile.request) "smoothed-percentile" else if(new.bias) "iterated" else NULL,
               plot.errors.method = plot.errors.method,
               plot.errors.type = plot.errors.type,
               plot.errors.alpha = plot.errors.alpha,
@@ -1346,7 +1365,7 @@
             
             if (plot.errors.type == "all") {
               draw.all.error.types(
-                construction = if(new.bias) "iterated" else NULL,
+                construction = if(percentile.request) "smoothed-percentile" else if(new.bias) "iterated" else NULL,
                 ex = as.numeric(na.omit(allei[,i])),
                 center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,i] else data.err[,3*i])),
                 all.err = data.err.all[[i]],
