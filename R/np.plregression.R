@@ -597,7 +597,7 @@ npplreg.plbandwidth <-
       if (!is.null(zeval))
         args$exdat <- zeval
       args$.np.defer.empty.rows <- TRUE
-      fit <- do.call(npreg, args)
+      fit <- do.call(.npreg_auxiliary, args)
       empty.state$rows <- .npreg_merge_empty_rows(
         empty.state$rows, attr(fit, ".np.empty.rows", exact = TRUE))
       as.vector(fitted(fit))

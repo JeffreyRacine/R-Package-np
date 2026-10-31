@@ -49,7 +49,7 @@ test_that("semiparametric public outcomes are numeric and predictors keep their 
                    bws=matrix(.6,2,1), bandwidth.compute=FALSE)
     expect_identical(b$bw[[2L]][[".np.native.training"]]$ydat, cat)
     expect_length(fitted(npplreg(b)), n)
-    expect_length(fitted(npreg(unserialize(serialize(b$bw[[2L]],NULL)))), n)
+    expect_error(npreg(unserialize(serialize(b$bw[[2L]],NULL))), "must be a numeric")
   }
 })
 

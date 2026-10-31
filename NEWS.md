@@ -1,9 +1,11 @@
 # np 0.80-2 (development)
 
-- `npplreg`, `npscoef`, and `npindex`, including their bandwidth selectors,
+- `npreg`, `npplreg`, `npscoef`, and `npindex`, including their bandwidth selectors,
   now require numeric integer/double primary responses and explicitly selected
   evaluation responses. Formerly accepted factor and ordered responses error.
-  Categorical predictors and internal auxiliary response encodings are preserved;
+  Categorical predictors and internal auxiliary response encodings are preserved.
+  Extracted categorical `npplreg` child bandwidths also require an explicitly
+  numeric response when used through public `npreg` or `npregbw`.
   Klein--Spady retains its numeric 0/1 rule. Unusable automatically discovered
   single-index scoring outcomes leave predictions available without scores.
 

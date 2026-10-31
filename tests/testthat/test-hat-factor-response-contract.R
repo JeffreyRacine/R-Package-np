@@ -22,7 +22,9 @@ test_that("explicit and cached hat factor application matches its numeric operat
   on.exit(options(old), add = TRUE)
   x <- data.frame(x = seq(.05, .95, length.out = 24))
   y <- ordered(rep(c(10, 30, 50), 8))
-  b <- npregbw(xdat = x, ydat = y, bws = .3, bandwidth.compute = FALSE)
+  b <- npplregbw(xdat = data.frame(cat = y), ydat = seq_along(y),
+                  zdat = x, bws = matrix(.3, 2, 1),
+                  bandwidth.compute = FALSE)$bw[[2L]]
   H <- npreghat(b, txdat = x)
   expected <- as.vector(H %*% rep(c(10, 30, 50), 8))
   expect_equal(as.vector(npreghat(b, txdat = x, y = y, output = "apply")),

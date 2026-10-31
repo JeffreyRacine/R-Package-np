@@ -7,9 +7,14 @@ test_that("implicit hat responses use the retained regression coding", {
     for (type in c("fixed", "generalized_nn", "adaptive_nn")) for (rt in c("lc", "ll")) {
       settings <- list(bws = if (type == "fixed") .25 else 12,
                        bwtype = type, regtype = rt, bandwidth.compute = FALSE)
-      b <- do.call(npregbw, c(list(xdat = d["x"], ydat = y), settings))
-      bf <- do.call(npregbw, c(list(formula = y ~ x, data = d), settings))
-      model <- npreg(b, se = FALSE)
+      child.settings <- settings
+      child.settings$bws <- matrix(settings$bws, 2, 1)
+      b <- do.call(npplregbw, c(list(xdat = data.frame(cat = y),
+                     ydat = numeric.y, zdat = d["x"]), child.settings))$bw[[2L]]
+      bf <- do.call(npplregbw, c(list(formula = score ~ y | x,
+                     data = transform(d, score = numeric.y)), child.settings))$bw[[2L]]
+      expect_error(npreg(b, se = FALSE), "must be a numeric")
+      model <- npreg(b, txdat = d["x"], tydat = numeric.y, se = FALSE)
       H <- npreghat(b, txdat = d["x"])
       expected <- as.vector(H %*% numeric.y)
       expect_equal(expected, as.numeric(fitted(model)), tolerance = 1e-11)
@@ -33,7 +38,9 @@ test_that("implicit factor response mapping preserves retained omission rows", {
   d <- data.frame(x = seq(.1, .9, length.out = 24),
                   y = ordered(rep(c(10, 30, 50), 8)))
   d$x[3L] <- NA_real_; d$y[9L] <- NA
-  b <- npregbw(y ~ x, data = d, bws = .3, bandwidth.compute = FALSE)
+  d$score <- seq_len(nrow(d))
+  b <- npplregbw(score ~ y | x, data = d, bws = matrix(.3, 2, 1),
+                  bandwidth.compute = FALSE)$bw[[2L]]
   keep <- complete.cases(d)
   H <- npreghat(b)
   expected <- as.numeric(H %*% as.numeric(as.character(d$y[keep])))

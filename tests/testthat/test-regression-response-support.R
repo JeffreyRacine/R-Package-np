@@ -31,7 +31,7 @@ test_that("conditional support retains Y then X and unconditional retains X", {
   }
 })
 
-test_that("factor-response bandwidth searches and partially linear children run", {
+test_that("public factor responses are rejected and partially linear children run", {
   skip_on_cran()
   # Serial public-route counterpart of the MPI extended test.
   old <- options(np.messages = FALSE)
@@ -46,15 +46,8 @@ test_that("factor-response bandwidth searches and partially linear children run"
     sin(z2) + rnorm(n)
   z <- data.frame(z1 = z1, z2 = z2)
   for (response in list(x2, factor(x2))) {
-    encoded <- dlev(response)[as.integer(response)]
-    set.seed(23)
-    b <- npregbw(xdat = z, ydat = response, nmulti = 1L)
-    set.seed(23)
-    reference <- npregbw(xdat = z, ydat = encoded, nmulti = 1L)
-    expect_equal(b$bw, reference$bw, tolerance = 2e-10)
-    expect_equal(b$fval, reference$fval, tolerance = 2e-10)
-    expect_equal(as.numeric(fitted(npreg(b))), as.numeric(fitted(npreg(reference))),
-                 tolerance = 2e-10)
+    expect_error(npregbw(xdat = z, ydat = response, nmulti = 1L),
+                 "must be a numeric")
   }
   b <- npplregbw(y ~ x1 + x2 | z1 + z2, nmulti = 1L)
   expect_s3_class(b, "plbandwidth")

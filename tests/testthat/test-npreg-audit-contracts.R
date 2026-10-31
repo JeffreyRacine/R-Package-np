@@ -95,7 +95,7 @@ test_that("npreg residuals reuse the training fit result for training-data fits"
     expect_equal(fit$resid, y - fit$mean, tolerance = 1e-12)
     expect_equal(fit$mean, nores$mean, tolerance = 1e-12)
 
-    fn.body <- paste(deparse(body(getFromNamespace("npreg.rbandwidth", "np")),
+    fn.body <- paste(deparse(body(getFromNamespace(".npreg_fit_impl", "np")),
                              width.cutoff = 500L), collapse = " ")
     expect_match(fn.body, "compute\\.resid\\.from\\.fit")
     expect_match(fn.body, "resid <- as\\.double\\(resid\\.response\\) - myout\\$mean")
@@ -104,19 +104,14 @@ test_that("npreg residuals reuse the training fit result for training-data fits"
   })
 })
 
-test_that("npreg factor response and external-evaluation GOF sentinels remain stable", {
+test_that("npreg rejects categorical outcomes and retains external-evaluation GOF", {
   local_npreg_quiet({
     tx <- data.frame(x = seq(0, 1, length.out = 36))
     ty <- factor(rep(c("a", "b", "c"), length.out = 36))
     ex <- data.frame(x = seq(0.05, 0.95, length.out = 9))
     ey <- factor(rep(c("c", "a", "b"), length.out = 9), levels = levels(ty))
-    bw.factor <- np::npregbw(xdat = tx, ydat = ty, bws = 0.4, bandwidth.compute = FALSE)
-    fit.factor <- np::npreg(bws = bw.factor, txdat = tx, tydat = ty,
-                            exdat = ex, eydat = ey, se = TRUE)
-    expect_equal(length(fit.factor$mean), nrow(ex))
-    expect_equal(length(fit.factor$merr), nrow(ex))
-    expect_null(fit.factor$xtra)
-    expect_true(all(is.finite(fit.factor$mean)))
+    expect_error(np::npregbw(xdat = tx, ydat = ty, bws = 0.4,
+                               bandwidth.compute = FALSE), "must be a numeric")
 
     y <- 1 + tx$x + rnorm(nrow(tx), sd = 0.01)
     bw.numeric <- np::npregbw(xdat = tx, ydat = y, bws = 0.35, bandwidth.compute = FALSE)

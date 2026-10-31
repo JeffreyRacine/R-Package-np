@@ -89,10 +89,8 @@ These arguments identify the bandwidth specification, formula/data interface, an
   \item{tydat}{
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{txdat}. A factor response is also supported when the bandwidth
-    object retains the fitted factor-response coding. A bandwidth object
-    fitted to a numeric response cannot supply that coding and is rejected
-    when reused with a factor response. Defaults to the corresponding
+    \code{txdat}. Factors and ordered factors are not supported, including
+    categorical child bandwidths extracted from a partially linear model. Defaults to the corresponding
     training data recoverable from the bandwidth object in the current
     session.
   }
@@ -150,6 +148,8 @@ These arguments control where the regression is evaluated and which fitted quant
     outcomes, goodness-of-fit scores (including \code{R2} and \code{MSE}) are
     unavailable and reported as \code{NA}; no additional training fit is
     performed for these diagnostics.
+    When supplied, this response must also be numeric; factors and ordered
+    factors are not supported.
   }
 
 
