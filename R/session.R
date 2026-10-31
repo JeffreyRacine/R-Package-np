@@ -504,7 +504,9 @@ npRmpi.init <- function(...,
   .npRmpi_attach_state_reset()
 
   {
-    clear.fun <- tryCatch(
+    disposition.confirmed <- FALSE
+  on.exit(if (!disposition.confirmed) .npRmpi_lease_poison(), add = TRUE)
+  clear.fun <- tryCatch(
       get(".npRmpi_profile_clear", envir = asNamespace("npRmpi"), inherits = FALSE),
       error = function(e) NULL
     )
@@ -569,6 +571,22 @@ npRmpi.init <- function(...,
 # Cleanup diagnostics must not invoke an outer condition handler that can
 # prevent teardown or replace the primary condition. Ordinary progress and
 # healthy warnings keep their existing message/warning contracts.
+.npRmpi_session_runtime_state <- function() {
+  runtime <- tryCatch(.npRmpi_mpi_runtime_state(), error = function(e) {
+    .npRmpi_lease_poison()
+    .npRmpi_fanout_rethrow(e)
+  }, interrupt = function(e) {
+    .npRmpi_lease_poison()
+    .npRmpi_fanout_rethrow(e)
+  })
+  if (!is.logical(runtime) || length(runtime) != 2L || anyNA(runtime) ||
+      !identical(names(runtime), c("initialized", "finalized"))) {
+    .npRmpi_lease_poison()
+    stop("npRmpi cannot confirm MPI runtime state; session remains poisoned", call. = FALSE)
+  }
+  runtime
+}
+
 .npRmpi_shutdown_notice <- function(text) {
   tryCatch(writeLines(text, con = stderr()), error = function(e) NULL,
            interrupt = function(e) NULL)
@@ -593,10 +611,7 @@ npRmpi.quit <- function(force = FALSE,
     .npRmpi_attach_state_reset()
     options(npRmpi.master.only = FALSE, npRmpi.pool.active = active)
   }
-  runtime <- tryCatch(.npRmpi_mpi_runtime_state(), error = function(e) NULL)
-  if (!is.logical(runtime) || length(runtime) != 2L || anyNA(runtime) ||
-      !identical(names(runtime), c("initialized", "finalized")))
-    fail("npRmpi cannot confirm MPI runtime state; session remains poisoned")
+  runtime <- .npRmpi_session_runtime_state()
   if (!runtime[["initialized"]] || runtime[["finalized"]]) {
     .npRmpi_lease_require_open()
     reset()
@@ -614,6 +629,8 @@ npRmpi.quit <- function(force = FALSE,
     reset()
     return(invisible(FALSE))
   }
+  disposition.confirmed <- FALSE
+  on.exit(if (!disposition.confirmed) .npRmpi_lease_poison(), add = TRUE)
   clear.fun <- tryCatch(get(".npRmpi_profile_clear", envir = asNamespace("npRmpi"),
                             inherits = FALSE), error = function(e) NULL)
   if (is.function(clear.fun)) tryCatch(clear.fun(), error = function(e) NULL)
@@ -677,6 +694,7 @@ npRmpi.quit <- function(force = FALSE,
       identical(freed, 1L) && identical(null, 1L)
     if (!complete) fail("attach shutdown did not confirm ACK/release/barrier/communicator completion; session remains poisoned", primary)
     reset()
+    disposition.confirmed <- TRUE
     if (!is.null(primary)) .npRmpi_fanout_rethrow(primary)
     return(invisible(TRUE))
   }
@@ -691,6 +709,7 @@ npRmpi.quit <- function(force = FALSE,
   if (!soft.kept.pool && !released)
     fail("worker shutdown did not confirm pool disposition; session remains poisoned", primary)
   reset(active = isTRUE(soft.kept.pool))
+  disposition.confirmed <- TRUE
   if (!is.null(primary)) .npRmpi_fanout_rethrow(primary)
   invisible(close.status)
 }

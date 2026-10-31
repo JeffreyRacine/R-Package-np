@@ -113,3 +113,17 @@ test_that("shutdown notice cannot invoke a throwing outer message handler", {
     capture.output(.npRmpi_shutdown_notice("shutdown diagnostic"), type = "message"),
     message = function(m) stop("outer message handler")))
 })
+
+test_that("unknown runtime observations poison before any communicator query", {
+  for (kind in c("missing", "malformed", "error")) {
+    z <- service_shutdown_fixture()
+    fn <- getFromNamespace(".npRmpi_session_runtime_state", "npRmpi")
+    environment(fn) <- z$e
+    z$e$.npRmpi_mpi_runtime_state <- function() {
+      switch(kind, missing = NULL, malformed = c(initialized = 1, finalized = 0),
+             error = stop("runtime observation failed"))
+    }
+    expect_error(fn())
+    expect_identical(z$s$status, "poisoned")
+  }
+})

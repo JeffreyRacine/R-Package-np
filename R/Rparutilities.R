@@ -93,7 +93,7 @@ mpi.spawn.Rslaves <-
     if (!is.loaded("mpi_comm_spawn"))
         stop("You cannot use MPI_Comm_spawn API")   
     .npRmpi_lease_require_open()
-    runtime <- .npRmpi_mpi_runtime_state()
+    runtime <- .npRmpi_session_runtime_state()
     if (!isTRUE(runtime[["initialized"]]) || !identical(runtime[["finalized"]], FALSE))
         stop("MPI runtime is inactive; restart R before spawning workers", call. = FALSE)
     if (mpi.comm.size(comm) > 1){
@@ -466,10 +466,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
 mpi.close.Rslaves <- function(dellog=TRUE, comm=1, force=FALSE){
     soft <- isTRUE(getOption("npRmpi.reuse.slaves", FALSE)) && !isTRUE(force)
     if (soft) .npRmpi_lease_require_open()
-    runtime <- tryCatch(.npRmpi_mpi_runtime_state(), error = function(e) {
-        .npRmpi_lease_poison()
-        .npRmpi_fanout_rethrow(e)
-    })
+    runtime <- .npRmpi_session_runtime_state()
     if (!isTRUE(runtime[["initialized"]]) || !identical(runtime[["finalized"]], FALSE))
         stop("MPI runtime is inactive; no worker communicator can be closed", call. = FALSE)
     .npRmpi_fanout_quiesce(comm, resume = isTRUE(force))
