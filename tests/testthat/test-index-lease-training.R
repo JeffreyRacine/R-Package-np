@@ -1,5 +1,6 @@
 test_that("single-index bandwidth reentry retains untransformed native training", {
-  withr::local_options(npRmpi.local.regression.mode = TRUE, np.messages = FALSE)
+  withr::local_options(npRmpi.local.regression.mode = TRUE,
+                       npRmpi.autodispatch.disable = TRUE, np.messages = FALSE)
   x <- data.frame(a = seq(.05, .95, length.out = 36), b = sin(seq_len(36)))
   y <- cos(x$a) + x$b
   x$a[3] <- NA_real_
