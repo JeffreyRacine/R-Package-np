@@ -104,13 +104,13 @@
 
 .np_index_diagnostics_response <- function(value, method, required = FALSE,
                                            training.info = NULL) {
-  if (is.null(value)) return(NULL)
+  if (is.null(value) && (!required || !identical(method, "ichimura")))
+    return(NULL)
   .np_diagnostics_optional({
     if (match.arg(method, c("ichimura", "kleinspady")) == "kleinspady")
       .npindex_check_binary_response(value, "npindex() evaluation response")
-    else if (!(is.numeric(value) || is.factor(value)) || !is.null(dim(value)))
-      stop("npindex() evaluation response must be a numeric vector or factor",
-           call. = FALSE)
+    else
+      .np_require_numeric_response(value, "npindex", "evaluation response")
     if (identical(method, "ichimura") && !is.factor(value) &&
         !is.null(training.info) &&
         (any(training.info$iuno) ||

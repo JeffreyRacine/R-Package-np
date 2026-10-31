@@ -1479,6 +1479,9 @@ npscoef.scbandwidth <-
       return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
     }
 
+    .np_require_numeric_response(tydat, "npscoef", "tydat")
+    if (!missing(eydat))
+      .np_require_numeric_response(eydat, "npscoef", "eydat")
     .np_scoef_fit_internal(
       bws = bws,
       txdat = txdat,

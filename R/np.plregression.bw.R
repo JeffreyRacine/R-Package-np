@@ -157,6 +157,7 @@ npplregbw.plbandwidth =
 
     xdat = toFrame(xdat)
     zdat = toFrame(zdat)
+    .np_require_numeric_response(ydat, "npplregbw", "ydat")
 
     ## catch and destroy NA's
     keep.rows <- rep_len(TRUE, nrow(xdat))
@@ -825,6 +826,7 @@ npplregbw.default =
 
     ## maintain z names and 'toFrame'
     zdat <- toFrame(zdat)
+    .np_require_numeric_response(ydat, "npplregbw", "ydat")
 
     dots <- list(...)
     npRejectUnsupportedBwsolver(dots, "npplregbw")

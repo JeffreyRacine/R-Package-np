@@ -1,5 +1,12 @@
 # npRmpi 0.80-2 (development)
 
+- `npplreg`, `npscoef`, and `npindex`, including their bandwidth selectors,
+  now require numeric integer/double primary responses and explicitly selected
+  evaluation responses. Formerly accepted factor and ordered responses error.
+  Categorical predictors and internal auxiliary response encodings are preserved;
+  Klein--Spady retains its numeric 0/1 rule. Unusable automatically discovered
+  single-index scoring outcomes leave predictions available without scores.
+
 - Autodispatch arguments and temporary service contexts now live in
   package-owned environments, preserving caller lookup and explicit user
   broadcasts without creating temporary bindings in the global workspace.

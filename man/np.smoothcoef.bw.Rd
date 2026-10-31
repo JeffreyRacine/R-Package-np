@@ -640,6 +640,12 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+  The primary response must be a one-dimensional numeric (integer or double)
+  vector. Factors and ordered factors are not accepted as primary responses,
+  including retained responses used in a new fit or bandwidth search.
+  Categorical predictors retain their existing support. Internal auxiliary
+  responses used to represent predictors retain their established encoding.
+
 Formula bandwidth objects retain the prepared training sample (after alignment,
 subsetting and missing-value handling) and the resolved missing-value policy.
 Later refits use that sample even if constructor variables are rebound.
