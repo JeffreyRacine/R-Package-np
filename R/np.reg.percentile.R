@@ -22,31 +22,52 @@
   get('.Random.seed', .GlobalEnv, inherits = FALSE)
 }
 .np_reg_percentile_rng_validate <- function(state, contract) {
+  invalid <- function() stop('invalid regression percentile task RNG state', call. = FALSE)
   if (!is.integer(state) || length(state) < 2L || is.na(state[1L]) ||
       !is.list(contract) ||
       !identical(contract$runtime, paste(R.version$major, R.version$minor, sep = '.')) ||
       !identical(contract$header, state[1L]) ||
       !identical(contract$length, length(state)) ||
       !is.character(contract$kind) || length(contract$kind) != 3L ||
-      identical(contract$kind[1L], 'user-supplied'))
-    stop('invalid regression percentile task RNG state', call. = FALSE)
+      anyNA(contract$kind)) invalid()
+  # R_ext/Random.h kind codes; state tail words remain opaque integer bits.
+  uniform <- match(contract$kind[1L], c('Wichmann-Hill', 'Marsaglia-Multicarry',
+    'Super-Duper', 'Mersenne-Twister', 'Knuth-TAOCP', 'user-supplied',
+    'Knuth-TAOCP-2002', "L'Ecuyer-CMRG")) - 1L
+  normal <- match(contract$kind[2L], c('Buggy Kinderman-Ramage', 'Ahrens-Dieter',
+    'Box-Muller', 'user-supplied', 'Inversion', 'Kinderman-Ramage')) - 1L
+  sample <- match(contract$kind[3L], c('Rounding', 'Rejection')) - 1L
+  if (anyNA(c(uniform, normal, sample)) || uniform == 5L ||
+      !identical(state[1L], uniform + 100L * normal + 10000L * sample) ||
+      length(state) != c(4L, 3L, 3L, 626L, 102L, 0L, 102L, 7L)[uniform + 1L]) invalid()
   invisible(TRUE)
 }
 .np_reg_percentile_with_state <- function(state, contract, code) {
   .np_reg_percentile_rng_validate(state, contract)
   had <- exists('.Random.seed', .GlobalEnv, inherits = FALSE)
   old <- if (had) get('.Random.seed', .GlobalEnv, inherits = FALSE) else NULL
-  kind <- RNGkind(); primary <- NULL
+  kind <- RNGkind(); complete <- FALSE
   on.exit({
-    cleanup <- tryCatch(do.call(RNGkind, as.list(kind)), error = identity)
+    warnings <- list()
+    # Restore before notifying caller handlers, which may themselves throw.
+    cleanup <- tryCatch(withCallingHandlers(do.call(RNGkind, as.list(kind)),
+      warning = function(w) {
+        warnings[[length(warnings) + 1L]] <<- w
+        invokeRestart('muffleWarning')
+      }), error = identity, interrupt = identity)
     if (had) assign('.Random.seed', old, .GlobalEnv) else
       if (exists('.Random.seed', .GlobalEnv, inherits = FALSE))
         rm('.Random.seed', envir = .GlobalEnv)
-    if (inherits(cleanup, 'error') && is.null(primary)) stop(cleanup)
+    # Never replace a condition already unwinding through the draw body.
+    if (complete) {
+      if (inherits(cleanup, 'condition')) stop(cleanup)
+      for (w in warnings) warning(w)
+    }
   })
   assign('.Random.seed', state, .GlobalEnv)
-  tryCatch(force(code), error = function(e) { primary <<- e; stop(e) },
-           interrupt = function(e) { primary <<- e; stop(e) })
+  value <- force(code)
+  complete <- TRUE
+  value
 }
 .np_reg_percentile_rank_bands <- function(curves,map,alpha=.05) {
  B<-ncol(curves); families<-unique(map$target)
