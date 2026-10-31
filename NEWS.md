@@ -1,5 +1,13 @@
 # npRmpi 0.80-2 (development)
 
+- Autodispatch arguments and temporary service contexts now live in
+  package-owned environments, preserving caller lookup and explicit user
+  broadcasts without creating temporary bindings in the global workspace.
+- Serialized bandwidth objects remain usable through normal argument transport;
+  only their original in-memory handles can reuse a session lease.
+- Single-index bandwidth reentry retains native training data before publication,
+  allowing its unchanged result to reuse a lease in subsequent fitting calls.
+
 - Require every started smooth-coefficient search worker to acknowledge service
   shutdown before context retirement or the next collective. Uncertain service
   cleanup prevents pool reuse and preserves the original computation condition.
