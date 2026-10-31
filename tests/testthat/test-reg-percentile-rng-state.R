@@ -1,4 +1,5 @@
 test_that("regression percentile tasks replay the coordinator generator", {
+  skip_if(getRversion() < "3.6.0")
   kind <- RNGkind(); had <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
   old <- if (had) get(".Random.seed", .GlobalEnv) else NULL
   on.exit({do.call(RNGkind, as.list(kind)); if (had) assign(".Random.seed", old, .GlobalEnv)
@@ -21,6 +22,7 @@ test_that("regression percentile tasks replay the coordinator generator", {
 
 
 test_that("task RNG cleanup survives throwing warning handlers", {
+  skip_if(getRversion() < "3.6.0")
   kind <- RNGkind(); had <- exists('.Random.seed', .GlobalEnv, inherits = FALSE)
   old <- if (had) get('.Random.seed', .GlobalEnv) else NULL
   on.exit({suppressWarnings(do.call(RNGkind, as.list(kind)))
@@ -47,4 +49,18 @@ test_that("task RNG cleanup survives throwing warning handlers", {
     expect_identical(if (exists('.Random.seed', .GlobalEnv, inherits = FALSE)) .Random.seed else NULL, entry)
     expect_identical(RNGkind(), expected.kind)
   }
+})
+
+
+test_that("task RNG validation respects the runtime kind layout", {
+  # R before 3.6 has two kind fields and the Rounding sampler is implicit.
+  validate <- .np_reg_percentile_rng_validate
+  environment(validate) <- list2env(list(getRversion = function() numeric_version('3.5.0')),
+    parent = environment(validate))
+  state <- c(403L, rep.int(1L, 625L))
+  contract <- list(runtime = paste(R.version$major, R.version$minor, sep = '.'),
+    header = state[1L], length = length(state), kind = c('Mersenne-Twister', 'Inversion'))
+  expect_silent(validate(state, contract))
+  contract$kind <- c(contract$kind, 'Rounding')
+  expect_error(validate(state, contract), 'invalid regression percentile')
 })
