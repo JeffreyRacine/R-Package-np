@@ -1073,8 +1073,12 @@ npscoefbw.NULL <-
     .npRmpi_fanout_rethrow(condition)
   }
   start <- function() {
-    .npRmpi_lease_require_open()
-    if (identical(state$phase, "active")) return(state$pool)
+    if (identical(state$phase, "active")) {
+      .npRmpi_lease_require_open()
+      return(state$pool)
+    }
+    # The pool helper guards remote activation after its established local and
+    # collective-owner no-op branches. Preserve those execution contracts here.
     if (!state$phase %in% c("unstarted", "stopped"))
       stop("NOMAD service owner cannot start from this lifecycle state", call. = FALSE)
     state$phase <- "starting"

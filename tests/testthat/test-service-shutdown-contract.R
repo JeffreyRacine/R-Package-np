@@ -127,3 +127,21 @@ test_that("unknown runtime observations poison before any communicator query", {
     expect_identical(z$s$status, "poisoned")
   }
 })
+
+test_that("service owner preserves local execution and guards active reuse", {
+  z <- service_shutdown_fixture()
+  z$s$status <- "poisoned"
+  z$e$.npscoefbw_nomad_pool_start <- function(...) NULL
+  z$e$.npscoefbw_nomad_context_cleanup <- function(...) invisible(NULL)
+  owner <- z$e$.npscoefbw_nomad_service_owner(list())
+  expect_null(owner$start())
+  expect_null(owner$cleanup())
+  expect_identical(z$s$status, "poisoned")
+
+  z <- service_shutdown_fixture()
+  z$e$.npscoefbw_nomad_pool_start <- function(...) z$pool
+  owner <- z$e$.npscoefbw_nomad_service_owner(list())
+  expect_identical(owner$start(), z$pool)
+  z$s$status <- "poisoned"
+  expect_error(owner$start(), "not reusable", fixed = TRUE)
+})
