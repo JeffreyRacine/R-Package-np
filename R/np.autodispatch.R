@@ -108,6 +108,69 @@
   .npRmpi_eval_scmd(call, envir = caller_env)
 }
 
+.npRmpi_invocations <- new.env(parent = emptyenv())
+
+.npRmpi_invocation_frame <- function(id, create = FALSE) {
+  if (!is.character(id) || length(id) != 1L || is.na(id) || !nzchar(id))
+    stop("invalid autodispatch invocation identity", call. = FALSE)
+  if (!exists(id, envir = .npRmpi_invocations, inherits = FALSE)) {
+    if (!isTRUE(create))
+      stop("autodispatch invocation is unavailable", call. = FALSE)
+    # This is the incumbent ambient lookup root, not a payload store.
+    assign(id, new.env(parent = .GlobalEnv), envir = .npRmpi_invocations)
+  }
+  get(id, envir = .npRmpi_invocations, inherits = FALSE)
+}
+
+.npRmpi_invocation_drop <- function(id) {
+  if (exists(id, envir = .npRmpi_invocations, inherits = FALSE)) {
+    frame <- get(id, envir = .npRmpi_invocations, inherits = FALSE)
+    .npRmpi_rm_existing(ls(frame, all.names = TRUE), envir = frame)
+    rm(list = id, envir = .npRmpi_invocations)
+  }
+  invisible(TRUE)
+}
+
+.npRmpi_invocation_receive <- function(id, comm = 1L) {
+  # Consume the scheduled collective before local validation/installation.
+  packet <- mpi.bcast.Robj(comm = comm)
+  frame <- .npRmpi_invocation_frame(id, create = TRUE)
+  if (exists(".npRmpi.incoming", envir = frame, inherits = FALSE))
+    stop("autodispatch receiver has an unconsumed publication", call. = FALSE)
+  assign(".npRmpi.incoming", packet, envir = frame)
+  invisible(NULL)
+}
+
+.npRmpi_invocation_publish <- function(id) {
+  frame <- .npRmpi_invocation_frame(id)
+  packet <- get(".npRmpi.incoming", envir = frame, inherits = FALSE)
+  if (!is.list(packet) || !identical(names(packet), c("objname", "obj")) ||
+      !is.character(packet$objname) || length(packet$objname) != 1L ||
+      is.na(packet$objname) || !nzchar(packet$objname) ||
+      exists(packet$objname, envir = frame, inherits = FALSE))
+    stop("invalid autodispatch private publication", call. = FALSE)
+  assign(packet$objname, packet$obj, envir = frame)
+  rm(list = ".npRmpi.incoming", envir = frame)
+  invisible(NULL)
+}
+
+.npRmpi_invocation_bcast <- function(id, name, value, comm = 1L) {
+  frame <- .npRmpi_invocation_frame(id)
+  if (exists(name, envir = frame, inherits = FALSE))
+    stop("autodispatch private publication collision", call. = FALSE)
+  assign(name, value, envir = frame)
+  receive <- substitute(
+    get(".npRmpi_invocation_receive", envir = asNamespace("npRmpi"),
+        inherits = FALSE)(ID, comm = COMM), list(ID = id, COMM = comm))
+  publish <- substitute(
+    get(".npRmpi_invocation_publish", envir = asNamespace("npRmpi"),
+        inherits = FALSE)(ID), list(ID = id))
+  .npRmpi_bcast_cmd_expr(receive, comm = comm, caller.execute = FALSE)
+  mpi.bcast.Robj(list(objname = name, obj = value), rank = 0L, comm = comm)
+  .npRmpi_bcast_cmd_expr(publish, comm = comm, caller.execute = FALSE)
+  invisible(NULL)
+}
+
 .npRmpi_lease_process_state <- new.env(parent = emptyenv())
 .npRmpi_lease_process_state$counter <- 0
 
@@ -1006,14 +1069,20 @@
     }
   }
 
+  invocation <- payload[["invocation", exact = TRUE]]
+  eval.env <- if (is.null(invocation)) new.env(parent = .GlobalEnv) else
+    .npRmpi_invocation_frame(invocation, create = TRUE)
+  if (!is.null(invocation))
+    on.exit(.npRmpi_invocation_drop(invocation), add = TRUE)
+
   if (!is.null(tmpvals) && length(tmpvals)) {
     for (nm in names(tmpvals))
-      .GlobalEnv[[nm]] <- tmpvals[[nm]]
+      assign(nm, tmpvals[[nm]], envir = eval.env)
   }
   if (!is.null(lease.bindings) && length(lease.bindings)) {
     for (nm in names(lease.bindings)) {
       id <- as.character(lease.bindings[[nm]])[1L]
-      if (exists(nm, envir = .GlobalEnv, inherits = FALSE))
+      if (exists(nm, envir = eval.env, inherits = FALSE))
         stop(sprintf("autodispatch lease binding collision for '%s'", nm), call. = FALSE)
       if (!exists(id, envir = .npRmpi_lease_state$store, inherits = FALSE))
         stop(sprintf("autodispatch lease '%s' is unavailable", id), call. = FALSE)
@@ -1022,7 +1091,7 @@
       if (!is.list(meta) || !identical(meta$state, "live"))
         stop(sprintf("autodispatch lease '%s' is not live", id), call. = FALSE)
       assign(nm, get(id, envir = .npRmpi_lease_state$store, inherits = FALSE),
-             envir = .GlobalEnv)
+             envir = eval.env)
     }
   }
 
@@ -1032,40 +1101,38 @@
   options(npRmpi.autodispatch.disable = TRUE)
   on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
   on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
-  if (!is.null(tmpnames) && length(tmpnames))
-    on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(tmpnames, envir = .GlobalEnv), add = TRUE)
-  if (!is.null(lease.bindings) && length(lease.bindings))
-    on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(names(lease.bindings), envir = .GlobalEnv), add = TRUE)
 
   # npksum's prepared inputs can share one existing object publication. Keep
   # the individual bindings so evaluation and returned-call sanitization use
   # exactly the same names as the unbundled route.
   bundle.name <- payload[["prepublish.bundle", exact = TRUE]]
   if (!is.null(bundle.name)) {
-    bundle <- get(bundle.name, envir = .GlobalEnv, inherits = FALSE)
+    bundle <- get(bundle.name, envir = eval.env, inherits = FALSE)
     if (!is.list(bundle) || !identical(names(bundle), prepublish.names))
       stop("invalid npksum prepared-input bundle", call. = FALSE)
     for (nm in prepublish.names)
-      .GlobalEnv[[nm]] <- bundle[[nm]]
+      assign(nm, bundle[[nm]], envir = eval.env)
   }
 
-  eval.env <- .GlobalEnv
   call.owner <- payload[["call.owner", exact = TRUE]]
   if (!is.null(call.owner)) {
     # Preserve the already selected package definition even when a rank has
     # a same-name global binding. Keep a symbolic call and its original data
     # lookup parent; no closure head or temporary global function is needed.
-    eval.env <- new.env(parent = .GlobalEnv)
     assign(call.owner, get(call.owner, envir = asNamespace("npRmpi"),
                            mode = "function", inherits = FALSE), envir = eval.env)
   }
+  required <- unique(c(tmpnames, names(lease.bindings)))
+  if (length(required) && !all(vapply(required, exists, logical(1),
+                                     envir = eval.env, inherits = FALSE)))
+    stop("autodispatch invocation is missing a private argument", call. = FALSE)
   res <- .npRmpi_eval_scmd(call.obj, envir = eval.env)
   tmpreplace <- tmpvals
   if (!is.null(prepublish.names) && length(prepublish.names)) {
     prepublish.names <- unique(as.character(prepublish.names))
     for (nm in prepublish.names) {
-      if (nzchar(nm) && exists(nm, envir = .GlobalEnv, inherits = FALSE))
-        tmpreplace[[nm]] <- get(nm, envir = .GlobalEnv, inherits = FALSE)
+      if (nzchar(nm) && exists(nm, envir = eval.env, inherits = FALSE))
+        tmpreplace[[nm]] <- get(nm, envir = eval.env, inherits = FALSE)
     }
   }
   if (!is.null(tmpreplace) && length(tmpreplace))
@@ -2512,7 +2579,15 @@
   invisible(TRUE)
 }
 
-.npRmpi_autodispatch_cleanup <- function(tmpnames, comm = 1L) {
+.npRmpi_autodispatch_cleanup <- function(tmpnames, comm = 1L, invocation = NULL) {
+  if (!is.null(invocation)) {
+    .npRmpi_invocation_drop(invocation)
+    cmd <- substitute(
+      get(".npRmpi_invocation_drop", envir = asNamespace("npRmpi"),
+          inherits = FALSE)(ID), list(ID = invocation))
+    .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = FALSE)
+    return(invisible(TRUE))
+  }
   if (!length(tmpnames))
     return(invisible(TRUE))
   tmpnames <- unique(as.character(tmpnames))
@@ -2836,13 +2911,17 @@
     bundle.name <- ".__npRmpi_autod_npksum_bundle"
     prepared$tmpnames <- c(prepared$tmpnames, bundle.name)
   }
+  invocation <- .npRmpi_lease_next_id("invocation")
+  if (exists(invocation, envir = .npRmpi_invocations, inherits = FALSE))
+    stop("autodispatch invocation identity collision", call. = FALSE)
   cleaned <- FALSE
-  if (length(prepared$tmpnames))
-    on.exit({
+  on.exit({
       if (!isTRUE(cleaned))
-        rec.comm(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm),
+        rec.comm(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm,
+                                                   invocation = invocation),
                  note = "autodispatch.cleanup")
     }, add = TRUE)
+  .npRmpi_invocation_frame(invocation, create = TRUE)
   if (length(prepared$tmpnames))
     for (nm in prepared$tmpnames)
       if (!is.null(prepared$tmpvals[[nm]]))
@@ -2854,8 +2933,8 @@
     publications <- if (is.null(bundle.name)) prepared$prepublish else
       setNames(list(prepared$prepublish), bundle.name)
     for (nm in names(publications)) {
-      .GlobalEnv[[nm]] <- publications[[nm]]
-      rec.comm(.npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv),
+      rec.comm(.npRmpi_invocation_bcast(invocation, nm, publications[[nm]],
+                                       comm = comm),
                note = "mpi.bcast.Robj2slave")
     }
   }
@@ -2881,6 +2960,7 @@
     timeout_class = timeout.class
   )
   payload <- list(
+    invocation = invocation,
     call = prepared$call,
     tmpvals = prepared$tmpvals,
     tmpnames = prepared$tmpnames,
@@ -2962,8 +3042,7 @@
       stop(paste(as.character(committed), collapse = " "), call. = FALSE)
     }
   }
-  if (length(prepared$tmpnames))
-    cleaned <- TRUE
+  cleaned <- TRUE
   tmpreplace <- c(prepared$tmpvals, prepared$prepublish,
                   prepared$lease.replacements)
   rec <- make.rec()
