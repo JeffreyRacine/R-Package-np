@@ -18,3 +18,33 @@ test_that("regression percentile tasks replay the coordinator generator", {
   state[20L] <- NA_integer_
   expect_silent(.np_reg_percentile_rng_validate(state, contract))
 })
+
+
+test_that("task RNG cleanup survives throwing warning handlers", {
+  kind <- RNGkind(); had <- exists('.Random.seed', .GlobalEnv, inherits = FALSE)
+  old <- if (had) get('.Random.seed', .GlobalEnv) else NULL
+  on.exit({suppressWarnings(do.call(RNGkind, as.list(kind)))
+    if (had) assign('.Random.seed', old, .GlobalEnv) else
+      if (exists('.Random.seed', .GlobalEnv, inherits = FALSE)) rm('.Random.seed', envir = .GlobalEnv)})
+  RNGkind('Mersenne-Twister', 'Inversion', 'Rejection')
+  state <- .np_reg_percentile_rng_state(91)
+  contract <- list(runtime = paste(R.version$major, R.version$minor, sep = '.'),
+    header = state[1L], length = length(state), kind = RNGkind())
+  bad <- state; bad[1L] <- 99999L; invalid <- contract; invalid$header <- bad[1L]
+  expect_error(.np_reg_percentile_rng_validate(bad, invalid), 'invalid regression percentile')
+  invalid <- contract; invalid$kind[1L] <- 'Super-Duper'
+  expect_error(.np_reg_percentile_rng_validate(state, invalid), 'invalid regression percentile')
+  for (absent in c(FALSE, TRUE)) {
+    suppressWarnings(RNGkind("L'Ecuyer-CMRG", 'Inversion', 'Rounding'))
+    set.seed(42)
+    if (absent) rm('.Random.seed', envir = .GlobalEnv)
+    entry <- if (!absent) .Random.seed else NULL
+    expected.kind <- RNGkind()
+    err <- tryCatch(withCallingHandlers(
+      .np_reg_percentile_with_state(state, contract, {runif(3); warning('body')}),
+      warning = function(w) stop('handler primary')), error = identity)
+    expect_identical(conditionMessage(err), 'handler primary')
+    expect_identical(if (exists('.Random.seed', .GlobalEnv, inherits = FALSE)) .Random.seed else NULL, entry)
+    expect_identical(RNGkind(), expected.kind)
+  }
+})
