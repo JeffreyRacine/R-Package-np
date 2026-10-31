@@ -3257,6 +3257,10 @@ npindexbw.sibandwidth <-
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npindexbw.sibandwidth"))
 
+    # Preserve the same native representation the estimator consumes. The
+    # reconstructed bandwidth is published before outer wrappers can add it.
+    native.training <- list(xdat = xdat, ydat = ydat)
+
     if (bws$method == "kleinspady")
       .npindex_check_binary_response(ydat, "npindexbw()")
 
@@ -3892,6 +3896,8 @@ npindexbw.sibandwidth <-
     bws$nn.cache <- nn.cache
     if (!is.null(index.design)) bws[["index.design"]] <- index.design
     bws <- npSetScaleFactorSearchLower(bws, scale.factor.search.lower)
+    bws <- .np_bws_retain_native_training(
+      bws, xdat = native.training$xdat, ydat = native.training$ydat)
 
     if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
       service.done <- TRUE
