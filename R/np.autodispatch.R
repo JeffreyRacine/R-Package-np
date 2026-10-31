@@ -173,6 +173,7 @@
 
 .npRmpi_lease_process_state <- new.env(parent = emptyenv())
 .npRmpi_lease_process_state$counter <- 0
+.npRmpi_lease_origin <- new.env(parent = emptyenv())
 
 .npRmpi_lease_state <- new.env(parent = emptyenv())
 .npRmpi_lease_state$session <- NULL
@@ -402,6 +403,7 @@
 
 .npRmpi_lease_attach_handle <- function(value, plan, fingerprint) {
   handle <- new.env(parent = emptyenv())
+  handle$origin <- .npRmpi_lease_origin
   handle$id <- plan$id
   handle$session <- plan$session
   handle$capability <- plan$capability
@@ -418,7 +420,9 @@
 .npRmpi_lease_handle_fields <- function(value) {
   handle <- tryCatch(attr(value, "npRmpi.autodispatch.lease", exact = TRUE),
                      error = function(e) NULL)
-  if (!is.environment(handle))
+  if (!is.environment(handle) ||
+      !identical(get0("origin", envir = handle, inherits = FALSE),
+                 .npRmpi_lease_origin))
     return(NULL)
   needed <- c("id", "session", "capability", "fingerprint")
   if (!all(vapply(needed, exists, logical(1), envir = handle, inherits = FALSE)))
@@ -3216,4 +3220,3 @@
     caller_env <- parent.frame()
   .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = FALSE)
 }
-

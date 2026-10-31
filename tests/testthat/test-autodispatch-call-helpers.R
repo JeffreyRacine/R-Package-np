@@ -574,3 +574,22 @@ test_that(".npRmpi_rm_existing removes only existing names", {
   expect_silent(.npRmpi_rm_existing(c("foo", "bar"), envir = env))
   expect_false(exists("foo", envir = env, inherits = FALSE))
 })
+
+
+test_that("serialized lease handles lose authority without retiring originals", {
+  attach <- getFromNamespace(".npRmpi_lease_attach_handle", "npRmpi")
+  fields <- getFromNamespace(".npRmpi_lease_handle_fields", "npRmpi")
+  next.id <- getFromNamespace(".npRmpi_lease_next_id", "npRmpi")
+  plan <- list(id = next.id("origin_test"), session = "test",
+               capability = "bw.npreg")
+  original <- attach(list(value = 1), plan, "fingerprint")
+  copied <- original
+  expect_identical(fields(copied), fields(original))
+  expect_identical(fields(list(original)[[1L]]), fields(original))
+  for (version in 2:3)
+    expect_null(fields(unserialize(serialize(original, NULL, version = version))))
+  expect_false(is.null(fields(original)))
+  handle <- attr(original, "npRmpi.autodispatch.lease", exact = TRUE)
+  expect_identical(parent.env(handle$origin), emptyenv())
+  expect_length(ls(handle$origin, all.names = TRUE), 0L)
+})
