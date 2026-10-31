@@ -925,8 +925,10 @@ npscoefbw.NULL <-
 
 .npscoefbw_nomad_context_cleanup <- function(ctx, comm = 1L) {
   ref <- .npRmpi_autodispatch_remote_ref(ctx)
-  if (!is.null(ref))
+  if (!is.null(ref)) {
+    .npRmpi_lease_require_open()
     .npRmpi_autodispatch_cleanup(ref, comm = comm)
+  }
   invisible(NULL)
 }
 
@@ -938,6 +940,7 @@ npscoefbw.NULL <-
     return(NULL)
   }
 
+  .npRmpi_lease_require_open()
   ref <- .npRmpi_autodispatch_remote_ref(ctx)
   if (is.null(ref))
     stop("invalid NOMAD smooth-coefficient context: missing remote reference")
@@ -965,7 +968,10 @@ npscoefbw.NULL <-
     RES_BASE = res.base,
     PRESERVE_EVAL_ERROR = preserve.eval.error
   ))
+  activated <- FALSE
+  on.exit(if (!activated) .npRmpi_lease_poison(), add = TRUE)
   .npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = FALSE)
+  activated <- TRUE
 
   list(
     comm = comm,
@@ -979,48 +985,138 @@ npscoefbw.NULL <-
 .npscoefbw_nomad_pool_stop <- function(pool) {
   if (is.null(pool) || !is.list(pool) || is.null(pool$nslaves) || pool$nslaves < 1L)
     return(invisible(NULL))
-
-  ack.tag <- function(rank) {
-    .npRmpi_protocol_rank_tag("scoef_ack_base", rank, min_rank = 1L,
-                              where = "npscoefbw NOMAD service stop acknowledgement")
-  }
-
-  sent <- integer(0)
-  for (rk in seq_len(pool$nslaves)) {
-    ok <- try(
-      mpi.send.Robj(
-        obj = list(type = "stop"),
-        dest = rk,
-        tag = pool$req.base + rk,
-        comm = pool$comm
-      ),
-      silent = TRUE
-    )
-    if (!inherits(ok, "try-error"))
-      sent <- c(sent, rk)
-  }
-
-  if (!length(sent))
-    return(invisible(NULL))
-
-  deadline <- as.numeric(Sys.time()) + .npRmpi_attach_close_ack_timeout()
-  pending <- as.integer(sent)
-  while (length(pending) && as.numeric(Sys.time()) < deadline) {
-    for (rk in pending) {
-      tag <- ack.tag(rk)
-      if (!isTRUE(.npRmpi_safe(mpi.iprobe(source = rk, tag = tag, comm = pool$comm),
-                               fallback = FALSE)))
-        next
-      msg <- .npRmpi_safe(mpi.recv.Robj(source = rk, tag = tag, comm = pool$comm),
-                          fallback = NULL)
-      if (is.list(msg) && identical(as.character(msg$type)[1L], "stopped"))
-        pending <- pending[pending != rk]
+  .npRmpi_lease_require_open()
+  expected <- seq_len(pool[["nslaves", exact = TRUE]])
+  sent <- acked <- integer(0)
+  failures <- list()
+  complete <- FALSE
+  on.exit({
+    if (!complete) {
+      .npRmpi_lease_poison()
+      .npRmpi_shutdown_notice(sprintf(
+        "NOMAD service stop is uncertain; missing ranks: %s. The session cannot be reused.",
+        paste(setdiff(expected, acked), collapse = ",")))
     }
-    if (length(pending))
-      Sys.sleep(0.01)
+  }, add = TRUE)
+  attempt <- function(expr, rank, phase) {
+    tryCatch(list(ok = TRUE, value = force(expr)), error = function(e) {
+      .npRmpi_lease_poison()
+      failures[[length(failures) + 1L]] <<- list(rank = rank, phase = phase,
+                                               message = conditionMessage(e))
+      list(ok = FALSE, value = NULL)
+    })
   }
-
+  for (rk in expected) {
+    out <- attempt(mpi.send.Robj(list(type = "stop"), dest = rk,
+      tag = pool[["req.base", exact = TRUE]] + rk,
+      comm = pool[["comm", exact = TRUE]]), rk, "send")
+    if (out$ok) sent <- c(sent, rk)
+  }
+  # Every started rank remains in the denominator, even after a failed send.
+  deadline <- as.numeric(Sys.time()) + .npRmpi_attach_close_ack_timeout()
+  pending <- expected
+  pollable <- sent
+  while (length(pending) && length(pollable) && as.numeric(Sys.time()) < deadline) {
+    for (rk in intersect(pending, pollable)) {
+      tag <- .npRmpi_protocol_rank_tag("scoef_ack_base", rk, min_rank = 1L,
+        where = "npscoefbw NOMAD service stop acknowledgement")
+      ready <- attempt(mpi.iprobe(source = rk, tag = tag, comm = pool$comm), rk, "probe")
+      if (!ready$ok) {
+        pollable <- setdiff(pollable, rk)
+        next
+      }
+      if (!isTRUE(ready$value)) next
+      received <- attempt(mpi.recv.Robj(source = rk, tag = tag, comm = pool$comm), rk, "receive")
+      msg <- received$value
+      if (!received$ok) pollable <- setdiff(pollable, rk)
+      if (received$ok && is.list(msg) &&
+          identical(msg[["type", exact = TRUE]], "stopped") &&
+          identical(msg[["rank", exact = TRUE]], as.integer(rk))) {
+        acked <- c(acked, rk)
+        pending <- setdiff(expected, acked)
+      } else if (received$ok) {
+        .npRmpi_lease_poison()
+        pollable <- setdiff(pollable, rk)
+        failures[[length(failures) + 1L]] <- list(rank = rk, phase = "ack",
+                                               message = "invalid stop acknowledgement")
+      }
+    }
+    if (length(pending)) Sys.sleep(0.01)
+  }
+  if (length(pending) || length(failures)) {
+    outcome <- list(expected = expected, sent = sent, acknowledged = acked,
+      missing = setdiff(expected, acked), failed.sends = setdiff(expected, sent),
+      failed = sort(unique(vapply(failures, function(x) as.integer(x$rank), integer(1)))),
+      failures = failures, comm = pool$comm, phase = "stopping")
+    stop(structure(list(message = sprintf(
+      "NOMAD service shutdown was not acknowledged by every worker; missing ranks: %s",
+      paste(outcome$missing, collapse = ",")), call = NULL, outcome = outcome),
+      class = c("npRmpi_service_stop_error", "error", "condition")))
+  }
+  complete <- TRUE
   invisible(NULL)
+}
+
+# Invocation-local lifecycle only. No numerical body or persistent cache lives
+# here; the context is retained by reference until its one acknowledged retire.
+.npscoefbw_nomad_service_owner <- function(ctx, comm = 1L,
+                                          preserve.eval.error = TRUE) {
+  state <- new.env(parent = emptyenv())
+  state$phase <- "unstarted"
+  state$pool <- NULL
+  state$outcome <- NULL
+  uncertain <- function(condition) {
+    state$phase <- "uncertain"
+    if (inherits(condition, "npRmpi_service_stop_error"))
+      state$outcome <- condition[["outcome", exact = TRUE]]
+    .npRmpi_lease_poison()
+    .npRmpi_fanout_rethrow(condition)
+  }
+  start <- function() {
+    .npRmpi_lease_require_open()
+    if (identical(state$phase, "active")) return(state$pool)
+    if (!state$phase %in% c("unstarted", "stopped"))
+      stop("NOMAD service owner cannot start from this lifecycle state", call. = FALSE)
+    state$phase <- "starting"
+    value <- tryCatch(.npscoefbw_nomad_pool_start(ctx, comm = comm,
+      preserve.eval.error = preserve.eval.error), error = uncertain, interrupt = uncertain)
+    suspendInterrupts({
+      state$pool <- value
+      state$phase <- if (is.null(value)) "unstarted" else "active"
+    })
+    value
+  }
+  stop.pool <- function() {
+    if (state$phase %in% c("unstarted", "stopped", "retired")) return(invisible(NULL))
+    .npRmpi_lease_require_open()
+    if (!identical(state$phase, "active"))
+      stop("NOMAD service owner cannot repeat an uncertain stop", call. = FALSE)
+    state$phase <- "stopping"
+    tryCatch(.npscoefbw_nomad_pool_stop(state$pool), error = uncertain, interrupt = uncertain)
+    suspendInterrupts({ state$pool <- NULL; state$phase <- "stopped" })
+    invisible(NULL)
+  }
+  cleanup <- function(primary = NULL) {
+    if (identical(state$phase, "retired")) return(invisible(NULL))
+    failure <- tryCatch({
+      if (state$phase %in% c("starting", "stopping", "retiring", "uncertain"))
+        stop("NOMAD service cleanup is uncertain; context retained for terminal teardown", call. = FALSE)
+      stop.pool()
+      state$phase <- "retiring"
+      .npscoefbw_nomad_context_cleanup(ctx, comm = comm)
+      state$phase <- "retired"
+      NULL
+    }, error = function(e) e, interrupt = function(e) e)
+    if (!is.null(failure)) {
+      state$phase <- "uncertain"
+      .npRmpi_lease_poison()
+      if (is.null(primary)) .npRmpi_fanout_rethrow(failure)
+      .npRmpi_shutdown_notice(paste("NOMAD service cleanup failed while preserving the original condition:",
+                                 conditionMessage(failure)))
+    }
+    invisible(NULL)
+  }
+  list(start = start, stop = stop.pool, cleanup = cleanup, state = state)
 }
 
 .npscoefbw_nomad_service_task_error <- function(message,
@@ -1171,6 +1267,7 @@ npscoefbw.NULL <-
                                  invalid.penalty = c("baseline", "large"),
                                  penalty.multiplier = 10,
                                  invalid.objective = NULL) {
+  if (!is.null(pool)) .npRmpi_lease_require_open()
   penalty <- .npscoefbw_nomad_invalid_objective(
     bws = bws,
     invalid.penalty = invalid.penalty,
@@ -1375,23 +1472,18 @@ npscoefbw.NULL <-
   else
     0L
   collective.state <- if (collective.owner) .npscoefbw_collective_state() else NULL
-  pool <- NULL
-  on.exit({
-    if (!is.null(pool))
-      .npscoefbw_nomad_pool_stop(pool)
-    .npscoefbw_nomad_context_cleanup(ctx, comm = 1L)
-  }, add = TRUE)
-  pool <- .npscoefbw_nomad_pool_start(ctx, comm = 1L, preserve.eval.error = TRUE)
+  service <- .npscoefbw_nomad_service_owner(ctx, comm = 1L, preserve.eval.error = TRUE)
+  primary.condition <- NULL
+  on.exit(service$cleanup(primary.condition), add = TRUE)
+  withCallingHandlers({
+  pool <- service$start()
   start_pool_if_needed <- function() {
-    if (!collective.owner && is.null(pool))
-      pool <<- .npscoefbw_nomad_pool_start(ctx, comm = 1L, preserve.eval.error = TRUE)
+    if (!collective.owner && is.null(pool)) pool <<- service$start()
     invisible(pool)
   }
   stop_pool_before_collective <- function() {
-    if (!is.null(pool)) {
-      .npscoefbw_nomad_pool_stop(pool)
-      pool <<- NULL
-    }
+    service$stop()
+    pool <<- NULL
     invisible(NULL)
   }
   point.key <- function(point) {
@@ -1806,6 +1898,8 @@ npscoefbw.NULL <-
     }
   }
   search.result
+  }, error = function(e) { primary.condition <<- e },
+     interrupt = function(e) { primary.condition <<- e })
 }
 
 .npscoefbw_degree_search_controls <- function(regtype,

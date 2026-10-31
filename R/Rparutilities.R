@@ -92,6 +92,10 @@ mpi.spawn.Rslaves <-
 	sleep=0.1) {
     if (!is.loaded("mpi_comm_spawn"))
         stop("You cannot use MPI_Comm_spawn API")   
+    .npRmpi_lease_require_open()
+    runtime <- .npRmpi_mpi_runtime_state()
+    if (!isTRUE(runtime[["initialized"]]) || !identical(runtime[["finalized"]], FALSE))
+        stop("MPI runtime is inactive; restart R before spawning workers", call. = FALSE)
     if (mpi.comm.size(comm) > 1){
          if (isTRUE(getOption("npRmpi.reuse.slaves", FALSE))) {
              existing <- mpi.comm.size(comm) - 1L
@@ -460,80 +464,68 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
 }
 
 mpi.close.Rslaves <- function(dellog=TRUE, comm=1, force=FALSE){
+    soft <- isTRUE(getOption("npRmpi.reuse.slaves", FALSE)) && !isTRUE(force)
+    if (soft) .npRmpi_lease_require_open()
+    runtime <- tryCatch(.npRmpi_mpi_runtime_state(), error = function(e) {
+        .npRmpi_lease_poison()
+        .npRmpi_fanout_rethrow(e)
+    })
+    if (!isTRUE(runtime[["initialized"]]) || !identical(runtime[["finalized"]], FALSE))
+        stop("MPI runtime is inactive; no worker communicator can be closed", call. = FALSE)
     .npRmpi_fanout_quiesce(comm, resume = isTRUE(force))
-    if (mpi.comm.size(comm) < 2){
-    err <-paste("It seems no slaves running on comm", comm)
-    stop(err)
+    size <- .npRmpi_safe_int(mpi.comm.size(comm))
+    if (length(size) != 1L || is.na(size) || size < 0L) {
+        .npRmpi_lease_poison()
+        stop("npRmpi cannot confirm communicator state; session remains poisoned", call. = FALSE)
     }
-    if (isTRUE(getOption("npRmpi.reuse.slaves", FALSE)) && !isTRUE(force)) {
-        # Soft-close: keep the slave daemons alive for reuse in this session.
-        # This avoids repeated spawn/merge/teardown cycles that can hang/crash
-        # on some MPI stacks (notably MPICH on macOS).
+    if (size < 2L) stop(paste("It seems no slaves running on comm", comm))
+    if (soft) {
         reset.ok <- tryCatch({
           fn <- get(".npRmpi_session_reset_spmd_state_allranks",
-                    envir = asNamespace("npRmpi"),
-                    mode = "function",
-                    inherits = FALSE)
+                    envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
           isTRUE(fn(comm = comm, strict = FALSE, where = "mpi.close.Rslaves() soft-close reset"))
         }, error = function(e) FALSE)
-        if (isTRUE(reset.ok))
-            return(invisible(0L))
-        .np_warning(
-            "soft-close SPMD reset failed; falling back to hard-close to avoid stale sequence state",
-            call. = FALSE
-        )
+        if (reset.ok) return(invisible(0L))
+        .npRmpi_shutdown_notice("soft-close SPMD reset failed; proceeding with hard-close to avoid stale sequence state")
     }
-    # Tell slaves to exit their daemon loop cleanly.
-    # The spawned slave daemon (`inst/slavedaemon.R`) treats the character
-    # token "kaerb" as a shutdown signal.
+    complete <- FALSE
+    on.exit(if (!complete) .npRmpi_lease_poison(), add = TRUE)
+    primary <- NULL
+    attempt <- function(expr) tryCatch(force(expr), error = function(e) {
+      if (is.null(primary)) primary <<- e
+      NULL
+    }, interrupt = function(e) {
+      if (is.null(primary)) primary <<- e
+      NULL
+    })
     recv.timeout <- tryCatch({
       fn <- get0(".npRmpi_session_recv_timeout", envir = asNamespace("npRmpi"), inherits = FALSE)
       if (is.function(fn)) as.numeric(fn()) else 0
     }, error = function(e) 0)
-    if (!is.finite(recv.timeout) || recv.timeout <= 0)
-      recv.timeout <- 0
-
-    if (recv.timeout > 0)
-      base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
-    shut <- try(mpi.bcast.cmd(cmd="kaerb", rank=0, comm=comm), silent=TRUE)
-    if (recv.timeout > 0)
-      base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
-    if (inherits(shut, "try-error")) {
-      msg <- as.character(shut)
-      .np_warning(
-        paste(
-          "timed out or failed while broadcasting slave shutdown token.",
-          "Proceeding with communicator teardown;",
-          "ensure stale mpiexec/slave daemons are cleaned if this recurs.",
-          paste(msg, collapse = " ")
-        ),
-        call. = FALSE
-      )
+    if (!is.finite(recv.timeout) || recv.timeout <= 0) recv.timeout <- 0
+    if (recv.timeout > 0) base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
+    attempt(mpi.bcast.cmd(cmd = "kaerb", rank = 0, comm = comm))
+    if (recv.timeout > 0) base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
+    # Reporting cannot bypass the existing terminal release attempt.
+    attempt({
+    if (.Platform$OS != "windows" && dellog && mpi.comm.size(0) < mpi.comm.size(comm)) {
+        tmp <- paste(Sys.getpid(), "+", comm, sep = "")
+        logfiles <- Sys.glob(paste("*.", tmp, ".*.log", sep = ""))
+        if (length(logfiles)) unlink(logfiles)
     }
-    if (.Platform$OS!="windows"){
-        if (dellog && mpi.comm.size(0) < mpi.comm.size(comm)){
-        tmp <- paste(Sys.getpid(),"+",comm,sep="")  
-        logfile <- paste("*.",tmp,".*.log", sep="")
-        logfiles <- Sys.glob(logfile)
-        if (length(logfiles) >= 1)
-            unlink(logfiles)
-        }
+    })
+    res <- NULL
+    if (comm > 0) {
+        # Retain the incumbent intracommunicator free/disconnect choice.
+        res <- attempt(if (is.loaded("mpi_comm_free")) mpi.comm.free(comm)
+                       else if (is.loaded("mpi_comm_disconnect")) mpi.comm.disconnect(comm)
+                       else mpi.comm.free(comm))
     }
-#     mpi.barrier(comm)
-    if (comm > 0){
-        # `comm` is an intracommunicator created via `MPI_Intercomm_merge()`.
-        # Using `MPI_Comm_disconnect()` here has been observed to destabilize
-        # subsequent spawn/merge cycles with MPICH; `MPI_Comm_free()` is the
-        # correct teardown for an intracommunicator.
-        if (is.loaded("mpi_comm_free")) {
-            res <- mpi.comm.free(comm)
-        } else if (is.loaded("mpi_comm_disconnect")) {
-            res <- mpi.comm.disconnect(comm)
-        } else {
-            res <- mpi.comm.free(comm)
-        }
-    }
-#   mpi.comm.set.errhandler(0)
+    null <- attempt(.Call("mpi_comm_is_null", as.integer(comm), PACKAGE = "npRmpi"))
+    if (!is.null(primary)) .npRmpi_fanout_rethrow(primary)
+    if (!identical(res, 1L) || !identical(null, 1L))
+        stop("npRmpi worker shutdown did not confirm local communicator release; session remains poisoned", call. = FALSE)
+    complete <- TRUE
     invisible(res)
 }
 

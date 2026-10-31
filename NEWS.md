@@ -1,5 +1,11 @@
 # npRmpi 0.80-2 (development)
 
+- Require every started smooth-coefficient search worker to acknowledge service
+  shutdown before context retirement or the next collective. Uncertain service
+  cleanup prevents pool reuse and preserves the original computation condition.
+  Session shutdown now checks affirmative teardown results before resetting
+  state; cleanup diagnostics cannot prevent the terminal teardown attempt.
+
 - Add experimental CDF and regression `smoothed-percentile` opt-ins through
   `np_boot_control()`. CDF retains the univariate corrected smoothed-bootstrap
   prototype; regression exposes calibrated unshifted standardized-residual

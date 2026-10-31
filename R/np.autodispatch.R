@@ -2105,6 +2105,7 @@
 
 .npRmpi_autodispatch_preflight <- function(comm = 1L) {
   .npRmpi_abort_if_rmpi_attached(where = "npRmpi auto-dispatch")
+  .npRmpi_lease_require_open()
   strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
   if (!.npRmpi_has_active_slave_pool(comm = comm)) {
     msg <- "npRmpi auto-dispatch requires an active slave pool; call npRmpi.init(...) first"

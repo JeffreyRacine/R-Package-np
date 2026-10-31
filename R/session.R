@@ -483,6 +483,7 @@ npRmpi.init <- function(...,
 
   mode <- match.arg(mode)
   autodispatch.option.sync <- match.arg(autodispatch.option.sync)
+  .npRmpi_lease_require_open()
   world.size <- .npRmpi_safe_int(mpi.comm.size(0))
   world.size <- if (is.na(world.size)) 1L else as.integer(world.size)
 
@@ -565,6 +566,15 @@ npRmpi.init <- function(...,
   .npRmpi_session_attach_worker_loop(comm = comm, nonblock = nonblock, sleep = sleep, session_id = sid)
 }
 
+# Cleanup diagnostics must not invoke an outer condition handler that can
+# prevent teardown or replace the primary condition. Ordinary progress and
+# healthy warnings keep their existing message/warning contracts.
+.npRmpi_shutdown_notice <- function(text) {
+  tryCatch(writeLines(text, con = stderr()), error = function(e) NULL,
+           interrupt = function(e) NULL)
+  invisible(NULL)
+}
+
 npRmpi.quit <- function(force = FALSE,
                         dellog = TRUE,
                         comm = 1,
@@ -573,155 +583,115 @@ npRmpi.quit <- function(force = FALSE,
   dellog <- npValidateScalarLogical(dellog, "dellog")
   comm <- npValidatePositiveInteger(comm, "comm")
   mode <- match.arg(mode)
-  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+  fail <- function(message, condition = NULL) {
+    .npRmpi_lease_poison()
+    if (!is.null(condition)) .npRmpi_fanout_rethrow(condition)
+    stop(message, call. = FALSE)
+  }
+  reset <- function(active = FALSE) {
     .npRmpi_session_reset_spmd_state()
     .npRmpi_attach_state_reset()
-    options(npRmpi.master.only = FALSE)
-    options(npRmpi.pool.active = FALSE)
+    options(npRmpi.master.only = FALSE, npRmpi.pool.active = active)
+  }
+  runtime <- tryCatch(.npRmpi_mpi_runtime_state(), error = function(e) NULL)
+  if (!is.logical(runtime) || length(runtime) != 2L || anyNA(runtime) ||
+      !identical(names(runtime), c("initialized", "finalized")))
+    fail("npRmpi cannot confirm MPI runtime state; session remains poisoned")
+  if (!runtime[["initialized"]] || runtime[["finalized"]]) {
+    .npRmpi_lease_require_open()
+    reset()
     return(invisible(FALSE))
   }
   size.comm <- .npRmpi_safe_int(mpi.comm.size(comm))
-  size.comm <- if (is.na(size.comm)) 0L else as.integer(size.comm)
   size.world <- .npRmpi_safe_int(mpi.comm.size(0))
-  size.world <- if (is.na(size.world)) 1L else as.integer(size.world)
-
-  if (identical(mode, "auto")) {
+  if (length(size.comm) != 1L || is.na(size.comm) || size.comm < 0L ||
+      length(size.world) != 1L || is.na(size.world) || size.world < 1L)
+    fail("npRmpi cannot confirm communicator state; session remains poisoned")
+  if (identical(mode, "auto"))
     mode <- if (size.world > 1L && size.comm > 1L) "attach" else "spawn"
-  }
-
-  {
-    clear.fun <- tryCatch(
-      get(".npRmpi_profile_clear", envir = asNamespace("npRmpi"), inherits = FALSE),
-      error = function(e) NULL
-    )
-    if (is.function(clear.fun))
-      tryCatch(clear.fun(), error = function(e) NULL)
-  }
-  options(npRmpi.autodispatch.option.snapshot = NULL)
-
-  if (size.comm < 2L)
-  {
-    .npRmpi_session_reset_spmd_state()
-    .npRmpi_attach_state_reset()
-    options(npRmpi.master.only = FALSE)
-    options(npRmpi.pool.active = FALSE)
+  if (size.comm < 2L) {
+    .npRmpi_lease_require_open()
+    reset()
     return(invisible(FALSE))
   }
-
-  drain.leases <- function(comm) {
+  clear.fun <- tryCatch(get(".npRmpi_profile_clear", envir = asNamespace("npRmpi"),
+                            inherits = FALSE), error = function(e) NULL)
+  if (is.function(clear.fun)) tryCatch(clear.fun(), error = function(e) NULL)
+  options(npRmpi.autodispatch.option.snapshot = NULL)
+  primary <- NULL
+  attempt <- function(expr) tryCatch(force(expr), error = function(e) {
+    if (is.null(primary)) primary <<- e
+    NULL
+  }, interrupt = function(e) {
+    if (is.null(primary)) primary <<- e
+    NULL
+  })
+  drain.leases <- function() {
+    # Keep the existing quarantined-fanout consent/cleanup boundary.
     .npRmpi_fanout_quiesce(comm, resume = force)
-    lease.drain <- try(.npRmpi_lease_session_drain(comm = comm), silent = TRUE)
-    ok <- !inherits(lease.drain, "try-error")
+    ok <- isTRUE(attempt(.npRmpi_lease_session_drain(comm = comm)))
     if (!ok) {
-      .np_warning(
-        paste(
-          "autodispatch lease drain failed before MPI shutdown;",
-          "the session is poisoned and worker teardown will continue.",
-          paste(as.character(lease.drain), collapse = " ")
-        ),
-        call. = FALSE
-      )
+      .npRmpi_lease_poison()
+      .npRmpi_shutdown_notice("autodispatch lease drain failed before MPI shutdown; terminal teardown will continue")
     }
     ok
   }
-
   if (identical(mode, "attach")) {
     comm <- 1L
     attach.state <- as.character(getOption("npRmpi.attach.close.state", "open"))[1L]
-    if (identical(attach.state, "closed")) {
-      .npRmpi_session_reset_spmd_state()
-      .npRmpi_attach_state_reset()
-      options(npRmpi.master.only = FALSE)
-      options(npRmpi.pool.active = FALSE)
-      return(invisible(TRUE))
-    }
+    if (identical(attach.state, "closed"))
+      fail("attach close state contradicts an active communicator; session remains poisoned")
     if (identical(attach.state, "closing")) {
-      .np_warning("attach-mode close already in progress; ignoring duplicate npRmpi.quit(mode='attach') call.",
-              call. = FALSE)
+      .np_warning("attach-mode close already in progress; ignoring duplicate npRmpi.quit(mode='attach') call.", call. = FALSE)
       return(invisible(FALSE))
     }
-    lease.drain.ok <- drain.leases(comm)
+    lease.drain.ok <- drain.leases()
     options(npRmpi.attach.close.state = "closing")
-
-    size.attach <- .npRmpi_safe_int(mpi.comm.size(comm))
-    size.attach <- if (is.na(size.attach)) 0L else as.integer(size.attach)
-    expected <- if (size.attach >= 2L) seq_len(size.attach - 1L) else integer(0)
+    expected <- seq_len(size.comm - 1L)
     sid <- suppressWarnings(as.integer(getOption("npRmpi.attach.session.id", NA_integer_))[1L])
-
     recv.timeout <- .npRmpi_session_recv_timeout()
-    if (recv.timeout > 0)
-      base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
-    shut <- try(mpi.bcast.cmd(cmd = "kaerb", rank = 0, comm = comm, caller.execute = FALSE),
-                silent = TRUE)
-    if (recv.timeout > 0)
-      base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
-    if (inherits(shut, "try-error")) {
-      msg <- as.character(shut)
-      .np_warning(
-        paste(
-          "attach-mode worker shutdown broadcast failed or timed out;",
-          "continuing communicator teardown.",
-          paste(msg, collapse = " ")
-        ),
-        call. = FALSE
-      )
-    }
-
-    ack.info <- .npRmpi_attach_collect_close_acks(
-      comm = comm,
-      session_id = sid,
-      expected = expected,
-      timeout_sec = .npRmpi_attach_close_ack_timeout()
-    )
-    release.info <- .npRmpi_attach_send_close_release(
-      comm = comm,
-      ranks = ack.info$acked,
-      session_id = sid,
-      barrier = isTRUE(ack.info$ok)
-    )
-    if (!isTRUE(ack.info$ok)) {
-      .np_warning(
-        sprintf(
-          "attach-mode worker shutdown ACK incomplete for session %s; missing ranks: %s",
-          if (is.na(sid)) "NA" else as.character(sid),
-          paste(ack.info$missing, collapse = ",")
-        ),
-        call. = FALSE
-      )
-    }
-    if (!isTRUE(release.info$ok)) {
-      .np_warning(
-        sprintf(
-          "attach-mode worker shutdown release incomplete for session %s; failed ranks: %s",
-          if (is.na(sid)) "NA" else as.character(sid),
-          paste(release.info$failed, collapse = ",")
-        ),
-        call. = FALSE
-      )
-    }
-    if (isTRUE(ack.info$ok) && isTRUE(release.info$ok))
-      .npRmpi_safe(mpi.barrier(0), fallback = NULL)
-
-    if (comm != 0L) {
-      .npRmpi_safe(mpi.comm.free(comm), fallback = NULL)
-    }
-    .npRmpi_session_reset_spmd_state()
-    .npRmpi_attach_state_reset()
-    options(npRmpi.master.only = FALSE)
-    options(npRmpi.pool.active = FALSE)
+    if (recv.timeout > 0) base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
+    broadcast.ok <- isTRUE(attempt({
+      mpi.bcast.cmd(cmd = "kaerb", rank = 0, comm = comm, caller.execute = FALSE)
+      TRUE
+    }))
+    if (recv.timeout > 0) base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
+    ack.info <- attempt(.npRmpi_attach_collect_close_acks(comm = comm,
+      session_id = sid, expected = expected, timeout_sec = .npRmpi_attach_close_ack_timeout()))
+    acked <- if (is.list(ack.info)) ack.info[["acked", exact = TRUE]] else integer()
+    ack.ok <- !is.na(sid) && is.list(ack.info) && isTRUE(ack.info$ok) &&
+      identical(sort(acked), expected) && all(vapply(expected, function(rk) {
+        msg <- ack.info$payloads[[as.character(rk)]]
+        is.list(msg) && identical(msg[["kind", exact = TRUE]], "attach_close_ack") &&
+          identical(msg[["rank", exact = TRUE]], as.integer(rk)) &&
+          identical(msg[["session_id", exact = TRUE]], sid)
+      }, logical(1)))
+    release.info <- attempt(.npRmpi_attach_send_close_release(comm = comm,
+      ranks = acked, session_id = sid, barrier = isTRUE(ack.ok)))
+    release.ok <- is.list(release.info) && isTRUE(release.info$ok) &&
+      identical(sort(release.info$sent), expected)
+    barrier <- if (ack.ok && release.ok) attempt(mpi.barrier(0)) else NULL
+    freed <- attempt(mpi.comm.free(comm))
+    null <- attempt(.Call("mpi_comm_is_null", as.integer(comm), PACKAGE = "npRmpi"))
+    complete <- broadcast.ok && ack.ok && release.ok && identical(barrier, 1L) &&
+      identical(freed, 1L) && identical(null, 1L)
+    if (!complete) fail("attach shutdown did not confirm ACK/release/barrier/communicator completion; session remains poisoned", primary)
+    reset()
+    if (!is.null(primary)) .npRmpi_fanout_rethrow(primary)
     return(invisible(TRUE))
   }
-
-  lease.drain.ok <- drain.leases(comm)
-  close.status <- mpi.close.Rslaves(dellog = dellog, comm = comm,
-                                    force = isTRUE(force) || !lease.drain.ok)
-  soft.kept.pool <- lease.drain.ok && !isTRUE(force) &&
-    isTRUE(getOption("npRmpi.reuse.slaves", FALSE)) &&
+  lease.drain.ok <- drain.leases()
+  close.status <- attempt(mpi.close.Rslaves(dellog = dellog, comm = comm,
+    force = isTRUE(force) || !lease.drain.ok))
+  soft.kept.pool <- lease.drain.ok && !force &&
+    isTRUE(getOption("npRmpi.reuse.slaves", FALSE)) && identical(close.status, 0L) &&
     .npRmpi_session_has_active_pool(comm = comm)
-  .npRmpi_session_reset_spmd_state()
-  .npRmpi_attach_state_reset()
-  options(npRmpi.master.only = FALSE)
-  options(npRmpi.pool.active = isTRUE(soft.kept.pool))
+  released <- identical(close.status, 1L) &&
+    identical(attempt(.Call("mpi_comm_is_null", as.integer(comm), PACKAGE = "npRmpi")), 1L)
+  if (!soft.kept.pool && !released)
+    fail("worker shutdown did not confirm pool disposition; session remains poisoned", primary)
+  reset(active = isTRUE(soft.kept.pool))
+  if (!is.null(primary)) .npRmpi_fanout_rethrow(primary)
   invisible(close.status)
 }
 
