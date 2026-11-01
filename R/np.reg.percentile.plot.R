@@ -16,10 +16,11 @@
   .np_reg_percentile_rng_mode()
   invisible(NULL)
 }
-.np_reg_percentile_prepare <- function(state, fit, grid) {
+.np_reg_percentile_prepare <- function(state, fit, grid, B = NULL) {
   targets <- c('mean', paste0('d', seq_len(state$d)))
   map <- expand.grid(row = seq_len(nrow(grid)), target = targets, stringsAsFactors = FALSE)
   n <- length(state$y); m <- nrow(map)
+  if (!is.null(B)) .np_reg_percentile_forecast(n, m, B)
   if (8 * (6 * as.double(m) * n + 10 * n * 39 + 20 * n * 256) > 256 * 1024^2)
     stop('regression percentile preparation exceeds its 256 MiB memory budget', call. = FALSE)
   capture <- .np_bias_capture_prepare(state, fit, grid, targets)
@@ -44,7 +45,7 @@
 }
 .np_reg_percentile_plot <- function(state, fit, grid, target, B, bands, resolution.context = NULL) {
   names(grid) <- names(state$x)
-  p <- .np_reg_percentile_prepare(state, fit, grid)
+  p <- .np_reg_percentile_prepare(state, fit, grid, B = B)
   start <- get('.Random.seed', .GlobalEnv, inherits = FALSE)
   seeds <- .np_bias_stream(start, sample.int(2147483646L, 79L, replace = FALSE))$value
   z <- .np_reg_percentile_infer(p, B, seeds[1L], seeds[2:40], seeds[41:79])
