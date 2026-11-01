@@ -54,3 +54,35 @@ test_that('stale, unsafe and malformed replay descriptors reject before fitting'
   expect_error(.np_bw_outer_selection(bad, 'density'), 'invalid or stale')
   expect_error(.np_bw_outer_selection(v, 'distribution'), 'invalid or stale')
 })
+
+test_that('outer fitting preserves CV starts and avoids unnecessary public entries', {
+  calls <- list()
+  estimator <- function(tdat, ...) { calls[[length(calls) + 1L]] <<- c(list(owner = 'fit'), list(...)); tdat }
+  selector <- function(dat, ...) { calls[[length(calls) + 1L]] <<- c(list(owner = 'select'), list(...)); 'selected' }
+  local_mocked_bindings(npudens = estimator, npudist = estimator,
+    npudensbw = selector, npudistbw = selector)
+  for (family in c('density', 'distribution')) {
+    for (case in c('manual', 'normal-reference', 'cv-zero', 'cv-start')) {
+      b <- procedure_fixture(if (case == 'normal-reference') case else
+        if (family == 'density') 'cv.ml' else 'cv.cdf', manual = case == 'manual')
+      args <- .np_bw_procedure_kernel(b)
+      args$bws <- if (case == 'cv-zero') 0 else .4
+      args$bandwidth.compute <- case != 'manual'
+      b$selection.procedure <- list(version = 1L, family = family,
+        complete = TRUE, rule = if (grepl('^cv', case)) 'cv' else case,
+        arguments = args, signature = .np_bw_procedure_signature(b))
+      calls <- list(); data <- data.frame(x = 1:3)
+      expect_identical(.np_bw_outer_selection(b, family)$fit(data), data)
+      if (case == 'cv-start') {
+        expect_identical(vapply(calls, `[[`, '', 'owner'), c('select', 'fit'))
+        expect_identical(calls[[1L]][['bws', exact = TRUE]], .4)
+        expect_true(calls[[1L]]$bandwidth.compute)
+        expect_identical(calls[[2L]][['bws', exact = TRUE]], 'selected')
+      } else {
+        expect_length(calls, 1L)
+        expect_identical(calls[[1L]]$owner, 'fit')
+        expect_identical(calls[[1L]][['bws', exact = TRUE]], if (case == 'manual') .4 else NULL)
+      }
+    }
+  }
+})
