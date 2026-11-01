@@ -1,5 +1,9 @@
 # npRmpi 0.80-2 (development)
 
+* Retire acknowledged autodispatch publications when an interrupt or a
+  returned-object assembly error prevents transfer to the caller. Preserve
+  the original condition and poison lease ownership if rollback fails.
+
 * Public regression, single-index, smooth-coefficient and partial-linear plots
   enforce the numeric-response contract before coercion or NA indexing.
   Klein-Spady plots retain the numeric 0/1 requirement.

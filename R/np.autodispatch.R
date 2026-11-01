@@ -2911,7 +2911,29 @@
   if (exists(invocation, envir = .npRmpi_invocations, inherits = FALSE))
     stop("autodispatch invocation identity collision", call. = FALSE)
   cleaned <- FALSE
+  publication <- NULL
+  publication.acknowledged <- FALSE
+  publication.released <- FALSE
   on.exit({
+      # Only an acknowledged command is safe to follow with a collective
+      # rollback. Keep ownership until the finalized result reaches its caller.
+      if (isTRUE(publication.acknowledged) && !isTRUE(publication.released) &&
+          !identical(publication$kind, "none")) {
+        rollback.ok <- tryCatch({
+            rec.comm(.npRmpi_lease_run_lifecycle(
+              "autodispatch.lifecycle.rollback", list(ids = publication$id),
+              comm = comm, where = "autodispatch abandoned publication rollback"
+            ), note = "autodispatch.lease.rollback")
+            TRUE
+          },
+          error = function(e) .npRmpi_lease_poison(),
+          interrupt = function(e) .npRmpi_lease_poison()
+        )
+        if (!isTRUE(rollback.ok)) {
+          .npRmpi_invocation_drop(invocation)
+          cleaned <- TRUE  # Do not send another cleanup command to uncertain peers.
+        }
+      }
       if (!isTRUE(cleaned))
         rec.comm(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm,
                                                    invocation = invocation),
@@ -2992,9 +3014,18 @@
           COMM = comm,
           WHERE = .npRmpi_autodispatch_call_name(mc)))
 
+  execute <- function() {
+    value <- rec.step(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),
+                      note = "mpi.bcast.cmd.execute")
+    # Intentional closure write: the outer exit guard owns this acknowledgement.
+    publication.acknowledged <<- TRUE
+    value
+  }
   eval.out <- try(
-    rec.step(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),
-             note = "mpi.bcast.cmd.execute"),
+    if (identical(publication$kind, "none")) execute() else
+      # The nested command scope must not deliver a pending interrupt before
+      # we record that every rank has acknowledged the publication.
+      .npRmpi_with_command_interrupt_scope(execute()),
     silent = TRUE
   )
   if (inherits(eval.out, "try-error")) {
@@ -3009,6 +3040,7 @@
       )
       if (inherits(rolled, "try-error"))
         .npRmpi_lease_poison()
+      publication.released <- TRUE
     }
     if (inherits(eval.condition, "np_nn_zero_radius"))
       stop(eval.condition)
@@ -3035,6 +3067,7 @@
       )
       if (inherits(rolled, "try-error"))
         .npRmpi_lease_poison()
+      publication.released <- TRUE
       stop(paste(as.character(committed), collapse = " "), call. = FALSE)
     }
   }
@@ -3043,22 +3076,24 @@
                   prepared$lease.replacements)
   rec <- make.rec()
 
-  if (is.list(result))
-    return(.npRmpi_autodispatch_attach_timing(
+  if (is.list(result)) {
+    result <- .npRmpi_autodispatch_attach_timing(
       .npRmpi_autodispatch_tag_result(
         .npRmpi_autodispatch_sanitize_object(result, tmpvals = tmpreplace),
         mode = "auto", publication = publication
       ),
       rec
-    ))
-
-  if (is.call(result))
-    return(.npRmpi_autodispatch_tag_result(
+    )
+  } else if (is.call(result)) {
+    result <- .npRmpi_autodispatch_tag_result(
       .npRmpi_autodispatch_replace_tmps(result, tmpvals = tmpreplace),
       mode = "auto", publication = publication
-    ))
-
-  .npRmpi_autodispatch_tag_result(result, mode = "auto", publication = publication)
+    )
+  } else {
+    result <- .npRmpi_autodispatch_tag_result(result, mode = "auto", publication = publication)
+  }
+  publication.released <- TRUE
+  result
 }
 
 .npRmpi_autodispatch_bind_data_promises <- function(mc, owner, owner.call,
