@@ -72,7 +72,7 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
 .np_udens_plot_errors <- function(state, grid, alpha, B, band, design = NULL) {
   names(grid) <- names(state$x)
   provider.band <- if (band == "pmzsd") "pointwise" else band
-  inference <- .np_plot_activity_run("Constructing bias-corrected density intervals",
+  inference <- .np_plot_corrected_activity_run("Constructing bias-corrected density intervals",
     if (identical(state[["plot.calibration", exact = TRUE]], "smoothed-percentile"))
       .np_udens_calibrated_plot(state, grid, alpha, B,
         bands = if (provider.band == "all") c("pointwise", "simultaneous", "bonferroni") else provider.band,

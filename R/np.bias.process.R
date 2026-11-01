@@ -387,7 +387,7 @@
   effective <- if(calibration=="default")"absolute" else
     .np_plot_calibration_method(calibration, "regression")
   refinement <- if(law %in% c("fixed","geom") && band!="pmzsd")"pilot-block" else "none"
-  inference <- .np_plot_activity_run("Constructing bias-corrected intervals",
+  inference <- .np_plot_corrected_activity_run("Constructing bias-corrected intervals",
     if (identical(effective, "smoothed-percentile"))
       .np_reg_percentile_plot(state, fit, grid, target, B,
         if (band=="all") c("pointwise","simultaneous","bonferroni") else band,

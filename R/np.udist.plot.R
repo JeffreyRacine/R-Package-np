@@ -98,7 +98,7 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   provider.band <- if (band == "pmzsd") "pointwise" else band
   infer <- if (identical(state$plot.construction, "joint-process"))
     .np_udist_joint_inference else .np_udist_bc_inference
-  inference <- .np_plot_activity_run("Constructing bias-corrected distribution intervals",
+  inference <- .np_plot_corrected_activity_run("Constructing bias-corrected distribution intervals",
     if (identical(state[["plot.calibration", exact=TRUE]], "smoothed-percentile"))
       .np_udist_smoothed_plot(state, grid, alpha, B,
         if(provider.band=="all") c("pointwise","simultaneous","bonferroni") else provider.band) else
