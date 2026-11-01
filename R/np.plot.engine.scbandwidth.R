@@ -151,6 +151,7 @@
       umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args)
       
       ydat <- model.response(tmf)
+      .np_plot_require_response(ydat, bws, "plot.scbandwidth")
       xdat <- tmf[, .np_formula_term_names(bws$chromoly[[2]]), drop = FALSE]
       if (!miss.z)
         zdat <- tmf[, .np_formula_term_names(bws$chromoly[[3]]), drop = FALSE]
@@ -162,6 +163,8 @@
           zdat <- data.frame(.np_eval_bws_call_arg(bws, "zdat"))
       }
           
+      .np_plot_require_response(ydat, bws, "plot.scbandwidth")
+
       ## catch and destroy NA's
       xdat = toFrame(xdat)
       if(!miss.z)

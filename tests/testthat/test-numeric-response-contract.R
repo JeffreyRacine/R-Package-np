@@ -1,3 +1,43 @@
+test_that("plot response policy preserves numeric vectors and Klein-Spady coding", {
+  ordinary <- structure(list(), class = "rbandwidth")
+  binary <- structure(list(method = "kleinspady"), class = "sibandwidth")
+  expect_null(.np_plot_require_response(c(1, NA_real_, 3), ordinary, "plot"))
+  expect_null(.np_plot_require_response(c(0L, 1L, NA_integer_), binary, "plot"))
+  expect_null(.np_plot_require_response(rep(1L, 4), binary, "plot"))
+  expect_error(.np_plot_require_response(c(0, 2), binary, "plot"), "requires a numeric")
+  for (y in list(factor(0:1), ordered(0:1), c(TRUE, FALSE), matrix(0:1, 2))) {
+    expect_error(.np_plot_require_response(y, ordinary, "plot"), "must be a numeric")
+    expect_error(.np_plot_require_response(y, binary, "plot"), "requires a numeric")
+  }
+})
+
+test_that("public plot engines reject raw outcomes before indexing and scoring", {
+  withr::local_options(np.messages = FALSE)
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) stop("numeric plot response test requires its MPI pool")
+  withr::defer(close_mpi_slaves(force = TRUE))
+  n <- 24L
+  d <- data.frame(x = seq(.05, .95, length.out = n), w = sin(seq_len(n)),
+    y = cos(seq_len(n) / 3))
+  objects <- list(
+    reg = npregbw(xdat = d["x"], ydat = d$y, bws = .4, bandwidth.compute = FALSE),
+    index = npindexbw(xdat = d[c("x", "w")], ydat = d$y,
+      bws = c(1, .2, .4), bandwidth.compute = FALSE),
+    scoef = npscoefbw(xdat = d["w"], ydat = d$y, zdat = d["x"],
+      bws = .4, bandwidth.compute = FALSE),
+    plreg = npplregbw(xdat = d["w"], ydat = d$y, zdat = d["x"],
+      bws = matrix(.4, 2, 1), bandwidth.compute = FALSE))
+  for (family in names(objects)) {
+    args <- list(x = objects[[family]], xdat = if (family == "reg") d["x"] else
+      if (family == "index") d[c("x", "w")] else d["w"], output = "data", neval = 5)
+    if (family %in% c("scoef", "plreg")) args$zdat <- d["x"]
+    for (y in list(factor(d$y > 0), d$y > 0, matrix(d$y, n))) {
+      args$ydat <- y
+      expect_error(do.call(plot, args), "must be a numeric")
+    }
+  }
+})
+
 test_that("numeric response validation is non-coercing and shape-specific", {
   good <- list(1:4, c(1, NA_real_, NaN, Inf), setNames(1:4, letters[1:4]),
                numeric(), ts(1:4))
