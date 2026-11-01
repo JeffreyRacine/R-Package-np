@@ -420,6 +420,14 @@
   invisible(NULL)
 }
 
+# Corrected adapters bypass the ordinary bootstrap target scope. Keep their
+# lifecycle at this shared boundary; standalone/asymptotic calls have no owner.
+.np_plot_corrected_activity_run <- function(label, expr) {
+  target <- .np_plot_progress_target_begin()
+  on.exit(.np_plot_progress_target_end(target), add = TRUE)
+  .np_plot_activity_run(label, expr)
+}
+
 .np_plot_activity_run <- function(label, expr) {
   activity <- .np_plot_activity_begin(label)
   on.exit(.np_plot_activity_end(activity), add = TRUE)
