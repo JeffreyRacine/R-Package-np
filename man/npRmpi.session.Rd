@@ -53,10 +53,13 @@ MPI startup, shutdown, worker-count, and worker-status controls.
     \code{"never"}.}
   \item{np.messages}{Logical; if non-\code{NULL}, sets
     \code{options(np.messages=...)} inside \code{npRmpi.init()}.}
-  \item{nonblock}{Logical passed to the internal attach-mode worker loop
-    receive path.}
-  \item{sleep}{Polling sleep interval (seconds) for nonblocking attach-mode
-    worker-loop receives.}
+  \item{nonblock}{Logical passed to the worker-loop receive path in both spawn
+    and attach modes.}
+  \item{sleep}{Polling sleep interval (seconds) for nonblocking worker-loop
+    receives in both spawn and attach modes. The default is 0.1 seconds.
+    For repeated small jobs, a smaller explicit value (for example,
+    \code{sleep = 0.001}) reduces command latency at the cost of more frequent
+    polling. This setting does not change numerical work or its rank ownership.}
   \item{quiet}{Logical; suppress host-info printing when \code{FALSE}.}
   \item{force}{Logical; when \code{TRUE}, close slave daemons instead of keeping
     them for reuse, resuming pending cooperative cleanup if necessary. This is

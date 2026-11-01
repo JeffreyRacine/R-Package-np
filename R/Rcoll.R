@@ -158,8 +158,10 @@ mpi.allgather.Robj <- function(obj=NULL, comm=1){
     allbiobj<-mpi.allgatherv(biobj,type=4,rdata=raw(sum(rcounts))
         ,rcounts=rcounts,comm=comm)
     cutobj <- .npRmpi_split_raw_by_counts(allbiobj, rcounts, "mpi.allgather.Robj")
+    # Blocking collectives have finished; R owns these buffers until return.
+    # Let ordinary allocation pressure collect them instead of forcing a full
+    # collection for every small SPMD acknowledgement.
     out <- sapply(cutobj,unserialize, USE.NAMES = FALSE)
-	gc()
 	out
    # bistrcut<-sapply(rcounts,string)
    # bistr<-string.cut(allbiobj,bistrcut)

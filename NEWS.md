@@ -1,5 +1,8 @@
 # npRmpi 0.80-2 (development)
 
+- Small MPI object exchanges no longer force a full R garbage collection after
+  every all-gather. Payloads, rank order and numerical computation are unchanged.
+
 - `npreg`, `npplreg`, `npscoef`, and `npindex`, including their bandwidth selectors,
   now require numeric integer/double primary responses and explicitly selected
   evaluation responses. Formerly accepted factor and ordered responses error.
