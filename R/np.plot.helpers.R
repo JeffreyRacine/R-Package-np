@@ -1970,7 +1970,8 @@
   wrapper.env <- new.env(parent = asNamespace("npRmpi"))
   wrapper.env$worker <- worker.prepared
   wrapper.env$comm <- comm
-  wrapper.env$preserve <- .npRmpi_bootstrap_preserve_worker_rng
+  preserve <- .npRmpi_bootstrap_preserve_worker_rng
+  wrapper.env$preserve <- preserve
   wrapped <- function(...) {
     if (mpi.comm.rank(comm) == 0L) return(worker(...))
     preserve(worker, ...)
