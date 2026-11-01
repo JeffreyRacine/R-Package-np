@@ -8821,6 +8821,7 @@ plotFactor <- function(f, y, ...){
     tmf <- .np_bws_formula_model_frame(bws, mf.args)
 
     ydat <- model.response(tmf)
+    .np_plot_require_response(ydat, bws, "plot.sibandwidth")
     xdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"), "term.labels")), drop = FALSE]
     return(list(xdat = xdat, ydat = ydat))
   }
@@ -8830,6 +8831,7 @@ plotFactor <- function(f, y, ...){
     ydat <- .np_eval_bws_call_arg(bws, "ydat")
   }
 
+  .np_plot_require_response(ydat, bws, "plot.sibandwidth")
   xdat <- toFrame(xdat)
   goodrows <- seq_len(nrow(xdat))
   rows.omit <- attr(na.omit(data.frame(xdat, ydat)), "na.action")

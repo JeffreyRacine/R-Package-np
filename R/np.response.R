@@ -9,6 +9,17 @@
   invisible(NULL)
 }
 
+# Plot engines resolve public outcomes independently of the estimator entries.
+# Check that raw value before NA indexing or factor scoring can change its shape.
+.np_plot_require_response <- function(y, bws, where) {
+  if (inherits(bws, "sibandwidth") &&
+      identical(bws[["method", exact = TRUE]], "kleinspady"))
+    .npindex_check_binary_response(y, paste0(where, "() 'ydat'"))
+  else
+    .np_require_numeric_response(y, where, "ydat")
+  invisible(NULL)
+}
+
 # Forward only supplied arguments through their existing promises. The private
 # context records call semantics; it is neither an object flag nor a public option.
 .np_regression_forward <- function(implementation, frame, call, expanded,

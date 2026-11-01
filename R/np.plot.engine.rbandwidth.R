@@ -155,6 +155,7 @@
     umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args)
 
       ydat <- model.response(tmf)
+      .np_plot_require_response(ydat, bws, "plot.rbandwidth")
       xdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
     } else {
       if(all(miss.xy) && (!is.null(bws$call) ||
@@ -163,6 +164,8 @@
         ydat = .np_eval_bws_call_arg(bws, "ydat")
       }
           
+      .np_plot_require_response(ydat, bws, "plot.rbandwidth")
+
       ## catch and destroy NA's
       xdat = toFrame(xdat)
       keep.rows <- rep_len(TRUE, nrow(xdat))

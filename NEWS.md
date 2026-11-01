@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Public regression, single-index, smooth-coefficient and partial-linear plots
+  enforce the numeric-response contract before coercion or NA indexing.
+  Klein-Spady plots retain the numeric 0/1 requirement.
+
 * Legacy density/CDF smoothed-percentile outer fits use their generated data
   directly, including transformed formula terms, without looking up the
   original variables in the global environment.

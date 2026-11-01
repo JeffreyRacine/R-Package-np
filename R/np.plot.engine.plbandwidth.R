@@ -107,6 +107,7 @@
       training <- .np_plreg_formula_training(bws, data)
       xdat <- training$txdat
       ydat <- training$tydat
+      .np_plot_require_response(ydat, bws, "plot.plbandwidth")
       zdat <- training$tzdat
     } else {
       if(all(miss.xyz) && !is.null(bws$call)){
@@ -114,6 +115,7 @@
         ydat = .np_eval_bws_call_arg(bws, "ydat")
         zdat <- data.frame(.np_eval_bws_call_arg(bws, "zdat"), check.names = FALSE)
       }
+      .np_plot_require_response(ydat, bws, "plot.plbandwidth")
       xdat = toFrame(xdat)
       zdat = toFrame(zdat)
       
