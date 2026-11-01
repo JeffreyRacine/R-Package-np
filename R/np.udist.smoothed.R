@@ -174,7 +174,7 @@
       context$grid <- gy; context$stage <- "inner corrected CDF curves and ranks"
       py <- .np_udist_smoothed_provider(sy, gy, B, list(count = os$count, jitter = os$jitter),
                                         law, blocklen, tile, chunk)
-      z <- .np_udens_mx1$scan(py, truth, nominal = 1 - alpha)
+      z <- .np_udens_mx1$scan(py, truth, nominal = 1 - alpha, nominal.alpha = alpha)
       list(row = list(index = j, h = sy$h, q.required = z$required), truth = truth,
            support = py$bound, depth = z$target.depth, kS = z$k$simultaneous,
            grid = gy, bandwidth = sy$h, data.end = sample$end, cv.end = cv$value$end,
@@ -187,7 +187,7 @@
     if (!is.null(progress)) progress(j, 39L)
   }
   })
-  reduced <- .np_udens_mx1$reduce(original, records, warn = FALSE, nominal = 1 - alpha)
+  reduced <- .np_udens_mx1$reduce(original, records, warn = FALSE, nominal = 1 - alpha, nominal.alpha = alpha)
   reduced$calibration <- "CDF derivative-three pilot with CDF support completion"
   messages <- unique(c(reduced$messages, pilot$warnings,
                        unlist(lapply(records, function(z) z$warnings), use.names = FALSE)))

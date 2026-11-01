@@ -1,5 +1,10 @@
 # np 0.80-2 (development)
 
+* Density/CDF smoothed-percentile ranks retain the original nominal tail
+  probability, avoiding an extra subtraction from one at integer rank
+  boundaries (for example alpha=0.1). This can narrow affected nondefault-alpha
+  companion bands; the default alpha=0.05 construction is unchanged.
+
 * Calibrated smoothed-percentile resolution diagnostics now report the empirical
   indices actually used after companion enlargement. Regression rank details
   retain point-specific indices and the actual included-curve count. Endpoints,
