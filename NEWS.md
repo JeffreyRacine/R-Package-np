@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+* Distributed bootstrap routes that replay raw RNG states now reject an
+  effective user-supplied uniform generator before advancing the draw bank.
+  Built-in substreams, precomputed/deterministic fanout and explicit supported
+  local execution retain their existing behavior; no generator is substituted.
+
 * Density/CDF smoothed-percentile ranks retain the original nominal tail
   probability, avoiding an extra subtraction from one at integer rank
   boundaries (for example alpha=0.1). This can narrow affected nondefault-alpha

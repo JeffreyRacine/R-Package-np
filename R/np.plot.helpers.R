@@ -2029,6 +2029,14 @@
     return(tasks)
   if (!is.function(advance))
     stop("advance must be a function")
+  # Raw seed vectors do not transport a caller's custom uniform generator.
+  # Inspect the effective stream here, after any family-owned substream setup;
+  # deterministic/precomputed fanout never enters this replay owner.
+  if (identical(RNGkind()[1L], "user-supplied") &&
+      (isTRUE(.npRmpi_has_active_slave_pool()) ||
+       !isTRUE(.npRmpi_master_only_mode())))
+    stop("distributed bootstrap cannot reproduce a user-supplied uniform RNG on workers; use a built-in RNG or an explicitly selected supported local execution route",
+         call. = FALSE)
   if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
     sample.int(1L, 0L)
 
