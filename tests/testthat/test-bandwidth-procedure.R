@@ -7,6 +7,30 @@ procedure_fixture <- function(method = 'cv.ml', manual = FALSE, scaled = FALSE) 
     xnames = 'x', icon = TRUE, iuno = FALSE, iord = FALSE)
 }
 
+
+test_that('legacy outer samples are passed as data without evaluating term labels', {
+  calls <- list()
+  estimator <- function(tdat, ...) {
+    calls[[length(calls) + 1L]] <<- list(data = tdat, dots = list(...))
+    tdat
+  }
+  local_mocked_bindings(npudens = estimator, npudist = estimator)
+  outer <- setNames(data.frame(c(.1, .3, .6)), 'sqrt(missing_outer_source)')
+  for (family in c('density', 'distribution')) {
+    b <- procedure_fixture(if (family == 'density') 'cv.ml' else 'cv.cdf')
+    b$xnames <- names(outer)
+    before <- serialize(b, NULL)
+    p <- .np_bw_outer_selection(b, family)
+    expect_identical(p$diagnostics$status, 'legacy-unresolved')
+    expect_length(p$messages, 1L)
+    expect_identical(p$fit(outer), outer)
+    expect_identical(calls[[length(calls)]]$data, outer)
+    expect_length(calls[[length(calls)]]$dots, 0L)
+    expect_identical(serialize(b, NULL), before)
+  }
+  expect_length(calls, 2L)
+})
+
 test_that('outer bandwidth provenance is value-only and never evaluates a call', {
   b <- procedure_fixture(manual = TRUE, scaled = TRUE)
   b$call <- quote(stop('must not be evaluated'))

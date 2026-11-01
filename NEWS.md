@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Legacy density/CDF smoothed-percentile outer fits use their generated data
+  directly, including transformed formula terms, without looking up the
+  original variables in the global environment.
+
 * Plain `npcopula` plots now preserve an omitted `center` argument instead of
   incorrectly requiring bootstrap errors. Explicit control validation is unchanged.
 
