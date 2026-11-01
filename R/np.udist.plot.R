@@ -14,6 +14,8 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
 
 .np_udist_plot_prepare <- function(control, bws, x, center, method, bootstrap, band, blocklen = NULL, block.automatic = FALSE, calibration = NULL) {
   requested <- calibration
+  control <- .np_plot_legacy_bias_control(calibration, control, "distribution", center, method)
+  if (identical(calibration, "legacy")) calibration <- NULL
   calibration <- .np_plot_calibration_method(calibration, "distribution")
   if (identical(calibration, "default")) calibration <- NULL
   if (!is.null(calibration) && (!is.character(calibration) || length(calibration) != 1L ||
