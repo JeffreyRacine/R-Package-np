@@ -1,4 +1,6 @@
 test_that("public regression checks selected outcomes without changing predictors", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  withr::defer(close_mpi_slaves(force = TRUE))
   withr::local_options(np.messages = FALSE)
   n <- 24L
   x <- data.frame(x = seq(.05, .95, length.out = n),
@@ -33,6 +35,8 @@ test_that("public regression checks selected outcomes without changing predictor
 })
 
 test_that("categorical children retain their scales only inside auxiliary and operator roles", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  withr::defer(close_mpi_slaves(force = TRUE))
   withr::local_options(np.messages = FALSE)
   n <- 24L
   z <- data.frame(z = seq(.05, .95, length.out = n))
@@ -67,6 +71,8 @@ test_that("categorical children retain their scales only inside auxiliary and op
 
 
 test_that("regression forwarding preserves public errors and signals them once", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  withr::defer(close_mpi_slaves(force = TRUE))
   withr::local_options(np.messages = FALSE)
   x <- data.frame(x = seq(0, 1, length.out = 24))
   y <- sin(x$x)

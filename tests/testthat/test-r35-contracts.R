@@ -74,28 +74,27 @@ test_that("LSQ training controls cannot silently reuse frozen pseudo responses",
   expect_equal(g$bws$ydat,d$y[idx],tolerance=0)
 })
 
-test_that("index explicit diagnostics preserve the training response scale", {
+test_that("index explicit diagnostics preserve numeric outcomes and selected samples", {
   set.seed(263);n<-90L;d<-data.frame(x=rnorm(n),z=rnorm(n));latent<-d$x+.5*d$z+rnorm(n,sd=.5)
-  y<-factor(cut(latent,quantile(latent,0:4/4),include.lowest=TRUE,labels=FALSE)-1L,levels=0:3)
+  y<-as.double(cut(latent,quantile(latent,0:4/4),include.lowest=TRUE,labels=FALSE)-1L)
+  b<-npindexbw(xdat=d,ydat=y,bws=c(1,.5,.4),bandwidth.compute=FALSE)
+  E<-d[1:15,];ey<-y[1:15]
+  f<-npindex(b,exdat=E,eydat=ey,se=FALSE)
+  training<-data.frame(y=y,d)
+  bf<-npindexbw(y~x+z,data=training,bws=c(1,.5,.4),bandwidth.compute=FALSE)
+  auto<-npindex(bf,newdata=data.frame(y=ey,E),se=FALSE)
+  oracle<-mean((ey-fitted(f))^2)
+  expect_equal(fitted(auto),fitted(f),tolerance=1e-12)
+  expect_identical(f$diagnostics.sample,'evaluation')
+  expect_equal(f$diagnostics.nobs,length(ey))
+  expect_equal(f$MSE,oracle,tolerance=1e-12)
+  expect_equal(auto$MSE,oracle,tolerance=1e-12)
+  expect_equal(npindex(b,exdat=E,eydat=ey,y.eval=TRUE,se=FALSE)$MSE,oracle,tolerance=1e-12)
   for (ordered in c(FALSE,TRUE)) {
-    yy<-if(ordered)ordered(y,levels=levels(y))else y
-    b<-npindexbw(xdat=d,ydat=yy,bws=c(1,.5,.4),bandwidth.compute=FALSE)
-    E<-d[1:15,];ey<-yy[1:15];numeric.ey<-as.numeric(as.character(ey))
-    f<-npindex(b,exdat=E,eydat=ey,se=FALSE)
-    training <- data.frame(y=yy,d)
-    bf <- npindexbw(y~x+z,data=training,bws=c(1,.5,.4),bandwidth.compute=FALSE)
-    eval <- data.frame(y=numeric.ey,E)
-    auto <- npindex(bf,newdata=eval,se=FALSE)
-    expect_equal(fitted(auto),fitted(f),tolerance=1e-12)
-    if(ordered) expect_equal(auto$MSE,f$MSE,tolerance=1e-12) else expect_true(is.na(auto$MSE))
-    oracle<-mean(((if(ordered)numeric.ey else as.integer(ey))-fitted(f))^2)
-    expect_equal(f$MSE,oracle,tolerance=1e-12)
-    if(ordered) {
-      expect_equal(npindex(b,exdat=E,eydat=numeric.ey,y.eval=TRUE,se=FALSE)$MSE,oracle,tolerance=1e-12)
-    } else {
-      expect_error(npindex(b,exdat=E,eydat=numeric.ey,y.eval=TRUE,se=FALSE),"must be a factor")
-      expect_error(npindex(b,exdat=E,eydat=as.character(ey),se=FALSE),"must be a numeric vector or factor")
-    }
+    yy<-factor(y,levels=0:3,ordered=ordered)
+    expect_error(npindexbw(xdat=d,ydat=yy,bws=c(1,.5,.4),
+                          bandwidth.compute=FALSE),'must be a numeric')
+    expect_error(npindex(b,exdat=E,eydat=yy[1:15],se=FALSE),'must be a numeric')
   }
 })
 

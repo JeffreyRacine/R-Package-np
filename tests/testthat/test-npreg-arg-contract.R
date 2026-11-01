@@ -21,8 +21,8 @@ test_that("npreg rejects non-logical gradients and residuals under autodispatch"
                "'residuals' must be TRUE or FALSE")
 })
 
-test_that("npreg.rbandwidth validates gradient flags before autodispatch branch", {
-  npreg_rbandwidth <- getFromNamespace("npreg.rbandwidth", "npRmpi")
+test_that(".npreg_fit_impl validates gradient flags before autodispatch branch", {
+  npreg_rbandwidth <- getFromNamespace(".npreg_fit_impl", "npRmpi")
   fn.body <- paste(deparse(body(npreg_rbandwidth), width.cutoff = 500L), collapse = " ")
   pos.grad <- regexpr("gradients <- npValidateScalarLogical\\(gradients, \"gradients\"\\)", fn.body)[1]
   pos.resid <- regexpr("residuals <- npValidateScalarLogical\\(residuals, \"residuals\"\\)", fn.body)[1]
@@ -117,8 +117,8 @@ test_that("lc gradients reject higher-order derivative requests under autodispat
   )
 })
 
-test_that("npreg.rbandwidth no longer contains bernstein OOS direct fallback", {
-  npreg_rbandwidth <- getFromNamespace("npreg.rbandwidth", "npRmpi")
+test_that(".npreg_fit_impl contains no Bernstein OOS direct fallback", {
+  npreg_rbandwidth <- getFromNamespace(".npreg_fit_impl", "npRmpi")
   fn.body <- paste(deparse(body(npreg_rbandwidth), width.cutoff = 500L), collapse = " ")
   expect_no_match(fn.body, "bernstein\\.oos")
   expect_no_match(fn.body, "\\.np_kernel_weights_direct")
@@ -144,9 +144,23 @@ test_that("lp bernstein OOS warns but keeps canonical npreg path under autodispa
     bernstein.basis = TRUE
   )
   ex <- data.frame(x = c(-0.2, 1.2))
+  ns <- asNamespace("npRmpi")
+  witness <- new.env(parent = emptyenv()); witness$native <- 0L
+  withr::local_options(list(np.test.regression.owner = witness))
+  trace(".npreg_fit_impl", where = ns, print = FALSE, tracer = quote({
+    .Call <- function(.NAME, ...) {
+      if (identical(.NAME, "C_np_regression")) {
+        state <- getOption("np.test.regression.owner")
+        state$native <- state$native + 1L
+      }
+      base::.Call(.NAME, ...)
+    }
+  }))
+  withr::defer(untrace(".npreg_fit_impl", where = ns))
   expect_warning(
     fit <- npRmpi::npreg(bws = bw, txdat = dat["x"], tydat = dat$y, exdat = ex),
     "outside training support"
   )
   expect_identical(fit$bws$regtype, "lp")
+  expect_identical(witness$native, 1L)
 })

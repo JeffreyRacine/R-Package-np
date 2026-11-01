@@ -10,19 +10,24 @@ test_that("retained LSQ subsets require an explicit sample", {
   expect_equal(retained$nobs,80)
 })
 
-test_that("Ichimura scoring respects the factor training scale", {
+test_that("Ichimura scoring uses explicit numeric evaluation outcomes", {
   set.seed(5101); d <- data.frame(x=rnorm(90),z=rnorm(90))
-  d$y <- factor(sample(0:3,90,TRUE)); e <- d[1:12,]
+  d$y <- as.double(sample(0:3,90,TRUE)); e <- d[1:12,]
   b <- npindexbw(y~x+z,data=d,bws=c(1,.5,.5),bandwidth.compute=FALSE)
   f <- npindex(b,newdata=e,se=FALSE)
-  expected <- mean((as.integer(e$y)-fitted(f))^2)
-  expect_equal(f$MSE,expected,tolerance=1e-14)
-  e$y <- as.numeric(as.character(e$y))
-  unscored <- npindex(b,newdata=e,se=FALSE)
+  expect_identical(f$diagnostics.sample,'evaluation')
+  expect_equal(f$MSE,mean((e$y-fitted(f))^2),tolerance=1e-14)
+  unscored <- npindex(b,newdata=e[c('x','z')],se=FALSE)
   expect_identical(unscored$diagnostics.sample,'unavailable')
   expect_true(is.na(unscored$MSE))
   expect_equal(fitted(unscored),fitted(f),tolerance=0)
-  expect_error(npindex(b,newdata=e,y.eval=TRUE,se=FALSE),'must be a factor')
+  for (ordered in c(FALSE,TRUE)) {
+    bad <- d; bad$y <- factor(d$y,ordered=ordered)
+    expect_error(npindexbw(y~x+z,data=bad,bws=c(1,.5,.5),
+                          bandwidth.compute=FALSE),'must be a numeric')
+    bad <- e; bad$y <- factor(e$y,ordered=ordered)
+    expect_error(npindex(b,newdata=bad,y.eval=TRUE,se=FALSE),'must be a numeric')
+  }
 })
 
 test_that("smooth coefficient predictions retain actual training MSE", {
