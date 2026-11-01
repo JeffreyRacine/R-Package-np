@@ -11,6 +11,9 @@
 * Plain `npcopula` plots now preserve an omitted `center` argument instead of
   incorrectly requiring bootstrap errors. Explicit control validation is unchanged.
 
+- Ordinary bootstrap fan-out now restores remote workers' entry random seed
+  and generator kind after each task, including errors and interrupts, while
+  preserving coordinator stream ownership and the bootstrap draws.
 - Density/CDF smoothed-percentile outer fits now repeat retained bandwidth
   selection rules; new bandwidth objects retain value-only provenance. Older
   CV objects without a complete recipe retain explicitly warned compatibility

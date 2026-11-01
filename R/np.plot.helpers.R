@@ -1929,8 +1929,28 @@
   invisible(TRUE)
 }
 
+.npRmpi_bootstrap_preserve_worker_rng <- function(worker, ...) {
+  had.seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  seed <- if (had.seed) get(".Random.seed", envir = .GlobalEnv, inherits = FALSE) else NULL
+  kind <- RNGkind()
+  on.exit({
+    if (had.seed) {
+      # The retained header restores the kind on the next RNG access, too.
+      # Avoid an unnecessary RNGkind() reset of a pending normal cache.
+      assign(".Random.seed", seed, envir = .GlobalEnv)
+    } else {
+      if (!identical(RNGkind(), kind))
+        suppressWarnings(do.call(RNGkind, as.list(kind)))
+      if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+        rm(".Random.seed", envir = .GlobalEnv)
+    }
+  }, add = TRUE)
+  worker(...)
+}
+
 .npRmpi_bootstrap_prepare_worker <- function(worker,
-                                             required.bindings = NULL) {
+                                             required.bindings = NULL,
+                                             comm = 1L) {
   if (!is.function(worker))
     stop("worker must be a function")
 
@@ -1945,7 +1965,18 @@
 
   worker.prepared <- worker
   environment(worker.prepared) <- bind.env
-  worker.prepared
+  # Keep wrapper bindings separate from the worker's required bindings. The
+  # coordinator retains its existing stream-advancement and final-state owner.
+  wrapper.env <- new.env(parent = asNamespace("npRmpi"))
+  wrapper.env$worker <- worker.prepared
+  wrapper.env$comm <- comm
+  wrapper.env$preserve <- .npRmpi_bootstrap_preserve_worker_rng
+  wrapped <- function(...) {
+    if (mpi.comm.rank(comm) == 0L) return(worker(...))
+    preserve(worker, ...)
+  }
+  environment(wrapped) <- wrapper.env
+  wrapped
 }
 
 .npRmpi_bootstrap_fanout_enabled <- function(comm = 1L,
@@ -2273,7 +2304,8 @@
   )
   worker.exec <- .npRmpi_bootstrap_prepare_worker(
     worker = worker,
-    required.bindings = required.bindings
+    required.bindings = required.bindings,
+    comm = comm
   )
 
   .npRmpi_bootstrap_phase_mark(
