@@ -15,7 +15,7 @@ np_boot_control(nonfixed = c("exact", "frozen"),
                 blocklen = NULL,
                 calibration = c("default", "absolute", "separate-tails",
                                 "tail-envelope", "percentile-tails",
-                                "symmetric-sd", "asymmetric-sd", "smoothed-percentile"))
+                                "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"))
 
 np_grid_control(xtrim = NULL, xq = NULL, slices = NULL)
 
@@ -57,6 +57,14 @@ CDFs, and transported \code{"percentile-tails"} for density. The suffix
 bootstrap calibration. Existing \code{"tail-envelope"} remains the conservative
 hull with the absolute-root interval; it is distinct from the raw asymmetric
 choice. Omitted/default controls preserve their earlier behavior.
+
+The \code{"legacy"} selection retains the pre-iterated regression and
+pre-joint density/CDF bias-corrected bootstrap constructions. It is shorthand
+for the corresponding family \code{bias.control} with
+\code{construction="legacy"}; it is not a fourth new calibration algorithm.
+It requires corrected bootstrap inference, preserves that legacy route's
+supported bands, laws and returned-error conventions, and rejects an explicitly
+supplied nonlegacy bias control. Omitted calibration remains unchanged.
 
 For density, \code{"smoothed-percentile"} uses complete unshifted corrected
 curves, a data-selected outer smoothing pilot and 39 outer calibration samples.

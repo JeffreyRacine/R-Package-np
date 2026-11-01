@@ -38,10 +38,10 @@
 np_boot_control <- function(nonfixed = c("exact", "frozen"),
                             wild = c("mammen", "rademacher"),
                             blocklen = NULL,
-                            calibration = c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile")) {
+                            calibration = c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy")) {
   calibration <- if (missing(calibration)) "default" else
     .np_plot_scalar_match(calibration,
-      c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile"), "calibration")
+      c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"), "calibration")
   if (is.null(calibration)) stop("calibration must be a single supported name", call. = FALSE)
   nonfixed <- match.arg(nonfixed)
   wild <- match.arg(wild)
@@ -59,9 +59,24 @@ np_boot_control <- function(nonfixed = c("exact", "frozen"),
   if (!"calibration" %in% names(control)) return("default")
   value <- control[["calibration", exact = TRUE]]
   if (!is.character(value) || length(value) != 1L || is.na(value) ||
-      !value %in% c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile"))
+      !value %in% c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"))
     stop("invalid bootstrap calibration control", call. = FALSE)
   value
+}
+
+.np_plot_legacy_bias_control <- function(calibration, control, family, center, method) {
+  if (!identical(calibration, "legacy")) return(control)
+  if (!identical(center, "bias-corrected") || !identical(method, "bootstrap"))
+    stop('calibration="legacy" requires center="bias-corrected" and errors="bootstrap"', call.=FALSE)
+  constructor <- switch(family, regression=np_bias_control,
+    density=np_udens_bias_control, distribution=np_udist_bias_control,
+    stop("legacy calibration is unavailable for this estimator", call.=FALSE))
+  expected <- constructor(construction="legacy")
+  if (is.null(control)) return(expected)
+  if (!inherits(control, class(expected)) || !is.list(control) ||
+      !identical(control[["construction", exact=TRUE]], "legacy"))
+    stop('calibration="legacy" conflicts with the supplied nonlegacy bias.control', call.=FALSE)
+  control # The family's existing validator checks the complete retained control.
 }
 
 .np_plot_calibration_method <- function(value, family) {

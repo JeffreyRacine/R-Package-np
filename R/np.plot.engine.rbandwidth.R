@@ -194,6 +194,8 @@
                                                       plot.errors.type)
     bias.request <- identical(as.character(plot.errors.center)[1L],"bias-corrected") &&
       error.request$method %in% c("asymptotic","bootstrap")
+    bias.control <- .np_plot_legacy_bias_control(plot.errors.boot.calibration,
+      bias.control, "regression", as.character(plot.errors.center)[1L], error.request$method)
     if (!is.null(bias.control) && !inherits(bias.control,"np_bias_control"))
       stop("bias.control must be created by np_bias_control()",call.=FALSE)
     if (!is.null(bias.control) && !bias.request)
@@ -206,9 +208,9 @@
     new.bias <- bias.request && identical(bias.control[["construction"]],"iterated")
     if (!is.character(plot.errors.boot.calibration) || length(plot.errors.boot.calibration)!=1L ||
         is.na(plot.errors.boot.calibration) ||
-        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope","symmetric-sd","asymmetric-sd","smoothed-percentile"))
+        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope","symmetric-sd","asymmetric-sd","smoothed-percentile","legacy"))
       stop("invalid bootstrap calibration control",call.=FALSE)
-    if (plot.errors.boot.calibration!="default" &&
+    if (!plot.errors.boot.calibration %in% c("default","legacy") &&
         (!new.bias || error.request$method!="bootstrap" || error.request$type=="pmzsd"))
       stop("explicit bootstrap calibration requires iterated bias-corrected regression and empirical bands",call.=FALSE)
     if (bias.request && !new.bias && error.request$method=="asymptotic")

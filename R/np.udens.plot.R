@@ -9,6 +9,8 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
 .np_udens_plot_prepare <- function(control, bws, x, center, method, bootstrap, band,
     calibration = NULL, blocklen = NULL, block.automatic = FALSE) {
   requested <- calibration
+  control <- .np_plot_legacy_bias_control(calibration, control, "density", center, method)
+  if (identical(calibration, "legacy")) calibration <- NULL
   calibration <- .np_plot_calibration_method(calibration, "density")
   if (!is.null(calibration) && (!identical(center, "bias-corrected") ||
       !identical(method, "bootstrap") || !bootstrap %in% c("inid", "fixed", "geom") ||
