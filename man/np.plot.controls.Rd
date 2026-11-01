@@ -72,7 +72,12 @@ The complete density and its correction vary jointly. Each fresh outer sample
 gets its own ordinary CV bandwidth selection; the original fitted object and
 selected bandwidth remain unchanged. Inclusive family ranks select the
 simultaneous content. Companion hulls preserve pointwise/simultaneous/Bonferroni
-nesting and singleton equality. Certified conditional bootstrap support supplies
+nesting and singleton equality. For a family with more than one grid point,
+pointwise bands are nominal marginal percentile bands; the outer calibration
+chooses simultaneous content, with a pointwise floor. The Bonferroni companion
+contains both the nominal Bonferroni and calibrated simultaneous bands. For a
+singleton all three coincide, including any support-completed endpoint.
+Certified conditional bootstrap support supplies
 the full-content endpoint when needed. No centering shift, SD transport,
 zero clipping or forced point-estimate containment is applied.
 
@@ -86,6 +91,9 @@ nonunit-block outer calibration is not implemented. The requested draw count
 is retained, up to the prototype's 9999-draw limit. Low resolution returns every
 requested band with diagnostics. Unattainable outer calibration is explicitly
 flagged as diagnostic-only; support completion can yield wide intervals.
+A support-completed band is distinct from empirical-tail calibration and can
+be effectively uninformative. It is retained with a warning and diagnostics;
+it does not mean that calibration unattainability has been silently discarded.
 The Gaussian q=1 assessment is stronger than the current multivariate/mixed
 coverage evidence. No uniform coverage or dominance claim is made.
 
@@ -99,7 +107,8 @@ Gaussian derivative-three smoothing pilot, 39 fresh outer-sample CV fits,
 complete bias-corrected CDF curves and calibrated family ranks. Its current
 scope is one numeric variable, fixed unbounded Gaussian2 bandwidths,
 \code{inid} or literal block length one, and the complete untrimmed sample-range
-evaluation grid. All three companion bands are returned when requested.
+evaluation grid. All three companion bands are returned when requested, with the same nominal
+pointwise and calibrated simultaneous companion convention as density.
 Useful population coverage for this CDF prototype has not been established;
 it is exposed for experimentation. Fresh outer CV may select slightly different
 bandwidths across serial and MPI fits, as with the existing estimator.
@@ -114,7 +123,11 @@ operator acts on every response draw. Curves are not recentered on the observed
 corrected estimate. The 39 outer responses refresh the pilot, residual shape
 and variance using the original selected geometry; they do not reselect
 bandwidths. Derivative marginal and whole-family contents are calibrated
-separately; means retain their tested pointwise companion floor.
+separately. For regression means with more than one grid point the pointwise
+band is the nominal marginal percentile band, not an outer-calibrated marginal
+band; it remains a floor for the calibrated simultaneous band. Derivative
+pointwise content is separately outer-calibrated. Bonferroni companions include
+the simultaneous envelope; singleton equality is enforced.
 
 Selecting this regression option with \code{bootstrap} omitted uses
 \code{bootstrap="residual"}; explicitly choosing a different bootstrap law is
