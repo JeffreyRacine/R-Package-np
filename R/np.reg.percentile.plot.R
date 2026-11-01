@@ -61,7 +61,7 @@
     residual.smoothing = FALSE, B = B, alpha = .05, outer = 39L, rank = 38L,
     iterations = 16L, geometry = 'fixed selected bandwidths and degrees',
     endpoint.construction = 'unshifted corrected curves; E1 mean / E6 derivative companion ranks',
-    coverage.status = 'experimental; q1 evidence and conservative q2 cells; sensitivity and control-loss failures retained')
+    coverage.status = 'experimental; limited q1/q2 evidence; localized-signal, sensitivity and control-loss failures retained')
   z$warnings <- character()
   if (isTRUE(z$calibration[[target]]$support.used))
     z$warnings <- c(z$warnings, 'Full bootstrap-support endpoint used; bounds may be very wide')

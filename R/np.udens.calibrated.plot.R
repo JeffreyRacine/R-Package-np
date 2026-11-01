@@ -98,7 +98,7 @@
   settings$calibration.method <- "OP1+SC1 with MX1/NPA1/OLR1"
   settings$alpha <- alpha; settings$budget <- value$budget
   settings$family <- design; settings$available.bands <- names(intervals)
-  settings$coverage.status <- "Gaussian q1 paired evidence; multivariate/mixed capability proof with bounded coverage assessment in progress"
+  settings$coverage.status <- "Gaussian q1 paired evidence; multivariate/mixed capability proof and stopped bounded assessments; general coverage unqualified"
   settings$bootstrap.statistic <- "complete unshifted bias-corrected smoothed curves"
   settings$endpoint.construction <- "outer-calibrated empirical ranks with companion hulls and certified full-support completion"
   settings$block.selection <- if (state$plot.law %in% c("fixed", "geom"))
