@@ -316,6 +316,66 @@ npplregbw.plbandwidth =
   tbw
 }
 
+.npplregbw_build_plbandwidth_bcast_payload <- function(xdat, ydat, zdat,
+                                                       bws, reg.args,
+                                                       outer.args,
+                                                       child.degree = NULL) {
+  old.messages <- getOption("np.messages")
+  if (!identical(as.integer(mpi.comm.rank(1L)), 0L))
+    options(np.messages = FALSE)
+  on.exit(options(np.messages = old.messages), add = TRUE)
+
+  # Child construction here is metadata-only (bandwidth.compute = FALSE
+  # in reg.args). Complete the error exchange before leaving the broadcast;
+  # workers must return normally to their existing command loop.
+  value <- .npRmpi_capture_local_work(.npplregbw_build_plbandwidth(
+    xdat = xdat, ydat = ydat, zdat = zdat, bws = bws,
+    bandwidth.compute = TRUE, reg.args = reg.args,
+    outer.args = outer.args, child.degree = child.degree
+  ))
+  rank <- as.integer(mpi.comm.rank(1L))
+  size <- as.integer(mpi.comm.size(1L))
+  failed.rank <- mpi.allreduce(
+    if (inherits(value, "npRmpi_local_failure")) rank else size,
+    type = 1L, op = "min", comm = 1L
+  )
+  if (failed.rank < size)
+    return(mpi.bcast.Robj(if (rank == failed.rank) value else NULL,
+                          rank = failed.rank, comm = 1L))
+  value
+}
+
+.npplregbw_build_plbandwidth_collective <- function(xdat, ydat, zdat,
+                                                    bws, reg.args,
+                                                    outer.args,
+                                                    child.degree = NULL) {
+  # Only preparation is collective here. The following public parent RPC
+  # remains the numerical search and result-publication owner.
+  if (.npRmpi_autodispatch_active() &&
+      .npRmpi_has_active_slave_pool(comm = 1L) &&
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    mc <- substitute(
+      get(".npplregbw_build_plbandwidth_bcast_payload",
+          envir = asNamespace("npRmpi"), inherits = FALSE)(
+        XDAT, YDAT, ZDAT, BWS, REGARGS, OUTERARGS, CHILDDEGREE),
+      list(XDAT = xdat, YDAT = ydat, ZDAT = zdat, BWS = bws,
+           REGARGS = reg.args, OUTERARGS = outer.args,
+           CHILDDEGREE = child.degree)
+    )
+    value <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
+    if (inherits(value, "npRmpi_local_failure"))
+      .npRmpi_raise_completed_failure(value)
+    return(value)
+  }
+
+  .npplregbw_build_plbandwidth(
+    xdat = xdat, ydat = ydat, zdat = zdat, bws = bws,
+    bandwidth.compute = TRUE, reg.args = reg.args,
+    outer.args = outer.args, child.degree = child.degree
+  )
+}
+
 .npplregbw_run_fixed_degree <- function(xdat,
                                         ydat,
                                         zdat,
@@ -324,12 +384,11 @@ npplregbw.plbandwidth =
                                         outer.args,
                                         opt.args,
                                         child.degree = NULL) {
-  tbw <- .npplregbw_build_plbandwidth(
+  tbw <- .npplregbw_build_plbandwidth_collective(
     xdat = xdat,
     ydat = ydat,
     zdat = zdat,
     bws = bws,
-    bandwidth.compute = TRUE,
     reg.args = reg.args,
     outer.args = outer.args,
     child.degree = child.degree
