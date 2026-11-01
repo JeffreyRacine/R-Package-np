@@ -163,6 +163,7 @@
   if (length(g) != 1L || !is.finite(g) || g <= 0)
     stop("smoothed CDF derivative-three pilot is undefined", call. = FALSE)
   records <- vector("list", 39L)
+  .np_plot_progress_outer_run({
   for (j in seq_len(39L)) {
     os <- outer[[j]]; context <- list(index = j, stage = "outer sample", streams = os, g = g)
     records[[j]] <- tryCatch({
@@ -192,6 +193,7 @@
     })
     if (!is.null(progress)) progress(j, 39L)
   }
+  })
   reduced <- .np_udens_mx1$reduce(original, records, warn = FALSE, nominal = 1 - alpha)
   reduced$calibration <- "CDF derivative-three pilot with CDF support completion"
   messages <- unique(c(reduced$messages, pilot$warnings,
