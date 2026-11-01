@@ -1081,6 +1081,7 @@ plot.npcopula <- function(x,
   )
   bootstrap.supplied <- !missing(bootstrap) || !missing(B)
   interval.supplied <- !missing(band) || !missing(alpha)
+  center.argument.supplied <- !missing(center)
   view <- match.arg(view)
   surface.view <- view %in% c("rotate", "fixed", "surface")
   rotate.surface <- identical(view, "rotate")
@@ -1110,7 +1111,7 @@ plot.npcopula <- function(x,
   if (isTRUE(boot.control[["calibration", exact = TRUE]] %in%
       c("percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile")))
     stop("this calibration requires supported bias-corrected density, distribution or regression inference", call. = FALSE)
-  center.supplied <- !missing(center) &&
+  center.supplied <- center.argument.supplied &&
     .np_plot_center_needs_bootstrap(center, errors)
   if (!identical(errors, "bootstrap") && (bootstrap.supplied || center.supplied))
     stop("bootstrap controls require errors = \"bootstrap\"", call. = FALSE)
