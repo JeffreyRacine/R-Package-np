@@ -1,5 +1,16 @@
 # npRmpi 0.80-2 (development)
 
+- Corrected bootstrap plotting now completes its target lifecycle and reports
+  an evolving ETA for the 39 outer calibration samples. Numerical results,
+  RNG state, and computational ownership are unchanged.
+- `np_boot_control(calibration = "legacy")` selects the retained legacy
+  bias-corrected bootstrap construction for regression, density, and CDFs.
+  It is an explicit compatibility option; existing defaults are unchanged.
+- Regression smoothed-percentile capacity is checked before corrected-row
+  capture using the existing memory forecast and limit. Documentation now
+  distinguishes companion bands and support completion, and records the
+  unresolved nondefault-selection and regression coverage limitations.
+
 - Small MPI object exchanges no longer force a full R garbage collection after
   every all-gather. Payloads, rank order and numerical computation are unchanged.
 
