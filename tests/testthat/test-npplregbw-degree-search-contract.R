@@ -26,10 +26,50 @@ test_that("npplreg child searches use the canonical native regression owner", {
 
   expect_match(child.search.text, ".npplregbw_child_nomad_call_args",
                fixed = TRUE)
-  expect_match(child.search.text, "do.call(npregbw, child.args)", fixed = TRUE)
+  expect_match(child.search.text, "do.call(.npregbw_auxiliary, child.args)", fixed = TRUE)
   expect_match(child.args.text, "nomad = TRUE", fixed = TRUE)
   expect_match(child.args.text, "search.engine = degree.search$engine",
                fixed = TRUE)
+})
+
+test_that("categorical child search executes the canonical constructor and native NOMAD", {
+  skip_if_not_installed("crs")
+
+  ns <- asNamespace("np")
+  state <- new.env(parent = emptyenv()); state$private.factor <- 0L; state$native <- 0L
+  withr::local_options(list(np.messages = FALSE, np.tree = FALSE,
+                           np.test.child.owner = state))
+  trace(".npregbw_default_impl", where = ns, print = FALSE, tracer = quote({
+    if (!.np.context$public && is.factor(ydat)) {
+      witness <- getOption("np.test.child.owner")
+      witness$private.factor <- witness$private.factor + 1L
+    }
+  }))
+  withr::defer(untrace(".npregbw_default_impl", where = ns))
+  trace("npNomadNativeSearchRegression", where = ns, print = FALSE, tracer = quote({
+    .Call <- function(.NAME, ...) {
+      if (identical(.NAME, "C_np_regression_nomad_native_search")) {
+        witness <- getOption("np.test.child.owner")
+        witness$native <- witness$native + 1L
+      }
+      base::.Call(.NAME, ...)
+    }
+  }))
+  withr::defer(untrace("npNomadNativeSearchRegression", where = ns))
+  n <- 24L
+  z <- data.frame(z = seq(.05, .95, length.out = n))
+  x <- data.frame(x = factor(rep(c("30", "10", "50"), 8),
+                            levels = c("50", "10", "30", "70")))
+  b <- npplregbw(xdat = x, ydat = sin(z$z), zdat = z,
+    regtype = "lp", degree.select = "coordinate", degree.min = 0L,
+    degree.max = 1L, search.engine = "nomad", nmulti = 1L, itmax = 2L,
+    nomad.opts = list(MAX_BB_EVAL = 8L))
+  expect_gt(state$private.factor, 0L)
+  expect_gte(state$native, 2L)
+  expect_s3_class(b, "plbandwidth")
+  expect_error(npreg(b$bw[[2L]]), "must be a numeric")
+  expect_error(npregbw(xdat = z, ydat = x$x, bws = .3,
+                       bandwidth.compute = FALSE), "must be a numeric")
 })
 
 test_that("npplregbw exhaustive degree search matches manual profile minimum", {
