@@ -114,6 +114,18 @@
       }
       return(npudist(stats::reformulate(names(y)), data = y))
     }
+    # Keep selection and estimation inside one public entry when that API
+    # expresses the retained rule. A named nonzero CV start is different:
+    # estimator default methods interpret numeric bws as manual bandwidths.
+    # Such starts therefore require the explicit selector below.
+    combined <- !args$bandwidth.compute || args$bwmethod == 'normal-reference' ||
+      all(args$bws == 0)
+    if (combined) {
+      fit.args <- args
+      if (isTRUE(args$bandwidth.compute)) fit.args$bws <- NULL
+      estimator <- if (family == 'density') npudens else npudist
+      return(do.call(estimator, c(list(tdat = y), fit.args)))
+    }
     # Native data entry avoids re-evaluating the original formula/subset/call.
     selector <- if (family == 'density') npudensbw else npudistbw
     selected <- do.call(selector, c(list(dat = y), args))
