@@ -290,7 +290,10 @@ sc1 <- local({
     }
     list(get=get,m=m,B=B,tile=tile,bound=bound,start=streams,end=end,budget=budget)
   })
-  scan <- function(p,truth=NULL,nominal=.95) {
+  scan <- function(p,truth=NULL,nominal=.95,nominal.alpha=1-nominal) {
+    if(!is.numeric(nominal.alpha)||length(nominal.alpha)!=1L||!is.finite(nominal.alpha)||
+       nominal.alpha<0||nominal.alpha>=.5||abs(nominal+nominal.alpha-1)>4*.Machine$double.eps)
+      stop('invalid MX1 nominal tail probability',call.=FALSE)
     m<-p$m;B<-p$B;depth<-rep(B,B);target.depth<-B
     empirical<-matrix(0,m,2L,dimnames=list(NULL,c('lower','upper')))
     if(!is.null(truth)&&(!is.numeric(truth)||length(truth)!=m||any(!is.finite(truth))))
@@ -310,6 +313,11 @@ sc1 <- local({
     }
     q<-sort(unique(c(legacy$wfc_levels,nominal)))
     kp<-1+floor(B*(1-q)/2);kb<-1+floor(B*(1-q)/(2*m))
+    # Preserve the supplied alpha at its nominal level: subtracting it from
+    # one twice can cross an integer order-statistic boundary.
+    nominal.at<-match(nominal,q)
+    kp[nominal.at]<-1+floor(B*nominal.alpha/2)
+    kb[nominal.at]<-1+floor(B*nominal.alpha/(2*m))
     ks<-pmin(kp,sort(depth,method='radix')[B-ceiling(B*q)+1])
     z<-legacy$wfc_companion(list(B=B,m=m,q=q,k=list(pointwise=kp,simultaneous=ks,bonferroni=kb),depth=depth),nominal)
     z$support<-cbind(lower=pmin(rep(p$bound[1],m),empirical[,1]),upper=pmax(rep(p$bound[2],m),empirical[,2]))
@@ -319,14 +327,14 @@ sc1 <- local({
     z$required<-if(length(ok))q[ok[1]] else Inf
     z
   }
-  reduce <- function(p,outer,warn=TRUE,nominal=.95) {
+  reduce <- function(p,outer,warn=TRUE,nominal=.95,nominal.alpha=1-nominal) {
     if(!is.list(outer)||length(outer)!=39L)stop('MX1 requires exactly 39 outer records',call.=FALSE)
     if(!is.logical(warn)||length(warn)!=1L||is.na(warn))stop('invalid MX1 warning control',call.=FALSE)
     retained<-vapply(outer,function(a)a$row$q.required,0)
     scores<-vapply(outer,function(a)complete(a$row$q.required,a$truth,
       if(!is.null(a$support))a$support else sc1$support(a$row$h)),0)
     selection<-legacy$wfc_select(scores,coverage=nominal)
-    z<-scan(p,nominal=nominal);attainable<-is.finite(selection$q);q<-if(attainable)selection$q else 1
+    z<-scan(p,nominal=nominal,nominal.alpha=nominal.alpha);attainable<-is.finite(selection$q);q<-if(attainable)selection$q else 1
     at<-match(q,z$q);indices<-vapply(z$k,function(k)k[at],0)
     out<-lapply(indices,function(k)matrix(0,p$m,2L,dimnames=list(NULL,c('lower','upper'))))
     for(a in seq.int(1L,p$m,by=p$tile)) {
@@ -491,7 +499,7 @@ sc1 <- local({
       truth<-pilot_value(state,selected$g,gy)
       context$grid<-gy;context$stage<-'inner corrected draws and ranks'
       py<-provider(sy,gy,B,list(count=os$count,jitter=os$jitter),law,blocklen,tile,chunk)
-      scan.y<-scan(py,truth,nominal=1-alpha)
+      scan.y<-scan(py,truth,nominal=1-alpha,nominal.alpha=alpha)
       record<-list(row=list(index=j,h=sy$h,q.required=scan.y$required),truth=truth,
         support=py$bound,depth=scan.y$target.depth,kS=scan.y$k$simultaneous,
         data.end=sample$end,cv.end=cv$value$end,draw.end=py$end,warnings=cv$warnings,
@@ -511,7 +519,7 @@ sc1 <- local({
       if(!is.null(progress))progress(j,39L)
     }
     })
-    answer<-reduce(original,records,warn,nominal=1-alpha)
+    answer<-reduce(original,records,warn,nominal=1-alpha,nominal.alpha=alpha)
     list(inference=answer,pilot=selected,outer=records,pilot.warnings=unique(c(selection$messages,pilot.capture$warnings)),
       rng=list(start=original$start,end=original$end),grid=grid,
       budget=original$budget,
