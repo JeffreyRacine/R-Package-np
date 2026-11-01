@@ -15,7 +15,8 @@ np_boot_control(nonfixed = c("exact", "frozen"),
                 blocklen = NULL,
                 calibration = c("default", "absolute", "separate-tails",
                                 "tail-envelope", "percentile-tails",
-                                "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"))
+                                "symmetric-sd", "asymmetric-sd",
+                                     "smoothed-percentile", "legacy"))
 
 np_grid_control(xtrim = NULL, xq = NULL, slices = NULL)
 
