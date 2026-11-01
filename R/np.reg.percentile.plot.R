@@ -16,27 +16,41 @@
   .np_reg_percentile_rng_mode()
   invisible(NULL)
 }
-.np_reg_percentile_prepare <- function(state, fit, grid, B = NULL) {
-  targets <- c('mean', paste0('d', seq_len(state$d)))
+.np_reg_percentile_prepare <- function(state, fit, grid, B = NULL,
+                                        targets = c('mean', paste0('d', seq_len(state$d)))) {
+  valid <- c('mean', paste0('d', seq_len(state$d)))
+  if (!is.character(targets) || !length(targets) || anyNA(targets) ||
+      anyDuplicated(targets) || any(!targets %in% valid))
+    stop('invalid regression percentile target family', call.=FALSE)
   map <- expand.grid(row = seq_len(nrow(grid)), target = targets, stringsAsFactors = FALSE)
   n <- length(state$y); m <- nrow(map)
   if (!is.null(B)) .np_reg_percentile_forecast(n, m, B)
   if (8 * (6 * as.double(m) * n + 10 * n * 39 + 20 * n * 256) > 256 * 1024^2)
     stop('regression percentile preparation exceeds its 256 MiB memory budget', call. = FALSE)
-  capture <- .np_bias_capture_prepare(state, fit, grid, targets)
+  # Preserve the qualified bounded arithmetic tile shape. Reducing its RHS
+  # width changes BLAS rounding, even for rows retained by both preparations.
+  full.map <- expand.grid(row=seq_len(nrow(grid)), target=valid, stringsAsFactors=FALSE)
+  capture <- .np_bias_capture_prepare(state, fit, grid, valid)
   A <- matrix(0, m, n); center <- se <- numeric(m)
-  for (batch in .np_bias_target_blocks(nrow(grid), length(targets))) {
-    jj <- batch$grid; rr <- batch$rows; lm <- map[rr, , drop = FALSE]
+  key <- paste(map$target, map$row)
+  for (batch in .np_bias_target_blocks(nrow(grid), length(valid))) {
+    jj <- batch$grid; lm <- full.map[batch$rows, , drop=FALSE]
+    at <- match(paste(lm$target, lm$row), key)
     lm$row <- match(lm$row, jj); v <- capture$rows(jj, lm)
-    A[rr, ] <- v$W; center[rr] <- v$center; se[rr] <- v$se
+    keep <- which(!is.na(at)); rr <- at[keep]
+    A[rr, ] <- v$W[keep,,drop=FALSE]
+    center[rr] <- v$center[keep]; se[rr] <- v$se[keep]
   }
   sp <- .np_bias_student_prepare(state); pilot <- numeric(m); eg <- grid
   for (k in seq_len(state$d)) eg[[k]] <- (eg[[k]] - state$offset[k]) / state$scale[k]
   for (j in seq_len(nrow(grid))) {
     v <- .np_bias_pilot_rows(state, eg[j, , drop = FALSE], derivatives = TRUE)
-    pilot[j] <- drop(v$mean %*% state$y[v$indices])
-    for (k in seq_len(state$d))
-      pilot[j + k * nrow(grid)] <- drop(v$derivatives[[k]] %*% state$y[v$indices]) / state$scale[k]
+    for (t in seq_along(targets)) {
+      k <- if (targets[t] == 'mean') 0L else as.integer(substring(targets[t], 2L))
+      pilot[j + (t - 1L) * nrow(grid)] <- if (k == 0L)
+        drop(v$mean %*% state$y[v$indices]) else
+        drop(v$derivatives[[k]] %*% state$y[v$indices]) / state$scale[k]
+    }
   }
   list(state = state, A = A, center = center, se = se, y = state$y,
     map = map, mu = state$y - state$residual_raw,
@@ -45,7 +59,7 @@
 }
 .np_reg_percentile_plot <- function(state, fit, grid, target, B, bands, resolution.context = NULL) {
   names(grid) <- names(state$x)
-  p <- .np_reg_percentile_prepare(state, fit, grid, B = B)
+  p <- .np_reg_percentile_prepare(state, fit, grid, B = B, targets = target)
   start <- get('.Random.seed', .GlobalEnv, inherits = FALSE)
   seeds <- .np_bias_stream(start, sample.int(2147483646L, 79L, replace = FALSE))$value
   z <- .np_reg_percentile_infer(p, B, seeds[1L], seeds[2:40], seeds[41:79])
