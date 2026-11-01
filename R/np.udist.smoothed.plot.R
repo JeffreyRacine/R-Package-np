@@ -20,7 +20,8 @@
     array(z, c(nrow(grid), 2L, 1L), list(NULL, c('lower', 'upper'), as.character(alpha))))
   resolution <- .np_band_resolution(B, rep('cdf', nrow(grid)), alpha, rep(TRUE, nrow(grid)),
     bands, signed = TRUE, simultaneous.index = matrix(value$inference$order.index[['simultaneous']], 1L))
-  resolution$calibration <- 'smoothed-percentile'
+  resolution <- .np_band_resolution_use_indices(resolution,
+    as.list(value$inference$order.index[resolution$band]))
   messages <- unique(c(selection$messages, value$warnings))
   withCallingHandlers(.np_band_resolution_warn(resolution), warning = function(w) {
     messages <<- c(messages, conditionMessage(w)); invokeRestart('muffleWarning')

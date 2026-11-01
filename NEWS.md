@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+* Calibrated smoothed-percentile resolution diagnostics now report the empirical
+  indices actually used after companion enlargement. Regression rank details
+  retain point-specific indices and the actual included-curve count. Endpoints,
+  calibration selections, resampling and RNG behavior are unchanged.
+
 * Package-generated MPI commands keep their temporary bindings in private
   child frames, preserving worker global objects and explicit user broadcasts.
 
