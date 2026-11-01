@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+- Density/CDF smoothed-percentile outer fits now repeat retained bandwidth
+  selection rules; new bandwidth objects retain value-only provenance. Older
+  CV objects without a complete recipe retain explicitly warned compatibility
+  behavior. Stopped assessment status is now accurately described.
+
 - Corrected bootstrap plotting now completes its target lifecycle and reports
   an evolving ETA for the 39 outer calibration samples. Numerical results,
   RNG state, and computational ownership are unchanged.

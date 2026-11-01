@@ -925,7 +925,7 @@ npudensbw.bandwidth <-
     )
 
     if (bandwidth.compute && !eval.only && npBwsolverUsesMads(bwsolver)) {
-      return(.npudensbw_run_mads(
+      return(.np_bw_procedure_record(.npudensbw_run_mads(
         dat = dat.frame,
         bws = bws,
         opt.args = list(
@@ -953,7 +953,7 @@ npudensbw.bandwidth <-
           nomad.opts = dot.args$nomad.opts
         ),
         bwsolver = bwsolver
-      ))
+      ), bws, "density", environment()))
     }
 
     if (bandwidth.compute){
@@ -1151,7 +1151,7 @@ npudensbw.bandwidth <-
         where = "beta range density CVLS certification"
       )
     }
-    tbw
+    .np_bw_procedure_record(tbw, bws, "density", environment())
     })
   }
 

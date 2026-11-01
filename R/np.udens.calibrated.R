@@ -447,6 +447,7 @@ sc1 <- local({
       stop('smoothed-percentile requires one alpha in (0, .5)',call.=FALSE)
     if(!is.null(family.builder)&&!is.function(family.builder))
       stop('invalid calibrated family builder',call.=FALSE)
+    selection<-.np_bw_outer_selection(fit$bws,'density')
     state<-if(is.null(prepared)) .np_udens_bc_prepare(fit$bws,x,max.bytes,admit.effective.constant=TRUE,admit.ordered.literal=TRUE) else prepared
     if(state$q<1L)stop('MX1 pure categorical calibration is not yet admitted',call.=FALSE)
     if(!is.list(outer)||length(outer)!=39L||!all(vapply(outer,function(z)
@@ -481,11 +482,8 @@ sc1 <- local({
       context<-list(index=j,stage='outer sample',seeds=os,pilot=selected)
       records[[j]]<-tryCatch({
       sample<-outer_sample(state,selected$g,os$data);y<-sample$value
-      context$data<-y;context$stage<-'outer CV'
-      cv<-capture(.np_bias_stream(os$cv,{
-        if(legacy_domain(state)&&identical(names(y),'X1'))npudens(~X1,data=y) else
-          npudens(stats::reformulate(names(y)),data=y)
-      }))
+      context$data<-y;context$stage<-'outer bandwidth selection'
+      cv<-capture(.np_bias_stream(os$cv,selection$fit(y)))
       fy<-cv$value$value;context$bandwidth<-fy$bws;context$stage<-'corrected provider preparation'
       sy<-.np_udens_bc_prepare(fy$bws,y,max.bytes,admit.effective.constant=TRUE,admit.ordered.literal=TRUE)
       context$stage<-'outer family and pilot target'
@@ -514,12 +512,13 @@ sc1 <- local({
     }
     })
     answer<-reduce(original,records,warn,nominal=1-alpha)
-    list(inference=answer,pilot=selected,outer=records,pilot.warnings=pilot.capture$warnings,
+    list(inference=answer,pilot=selected,outer=records,pilot.warnings=unique(c(selection$messages,pilot.capture$warnings)),
       rng=list(start=original$start,end=original$end),grid=grid,
       budget=original$budget,
       resolution=list(B=B,nominal=1-alpha,family.size=nrow(grid),order.index=answer$order.index,
         nominal.tail.draws=c(pointwise=B*alpha/2,bonferroni=B*alpha/(2*nrow(grid))),
         limited=any(answer$order.index==1)),settings=list(method='MX1 refined calibrated unshifted percentile',
+        bandwidth.procedure=selection$diagnostics,
         B=B,outer=39L,rank=as.integer(answer$selection$k),q=state$q,r=state$r,s=state$s,law=law,blocklen=blocklen,
         coverage.status='capability prototype; new-domain coverage unassessed'))
   }

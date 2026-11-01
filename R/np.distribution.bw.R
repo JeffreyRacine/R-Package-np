@@ -1003,7 +1003,7 @@ npudistbw.dbandwidth <-
     penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
 
     if (bandwidth.compute && !eval.only && npBwsolverUsesMads(bwsolver)) {
-      return(.npudistbw_run_mads(
+      return(.np_bw_procedure_record(.npudistbw_run_mads(
         dat = dat.frame,
         bws = bws,
         gdat = gdat,
@@ -1035,7 +1035,7 @@ npudistbw.dbandwidth <-
           nomad.opts = dot.args$nomad.opts
         ),
         bwsolver = bwsolver
-      ))
+      ), bws, "distribution", environment()))
     }
 
     if (bandwidth.compute){
@@ -1230,7 +1230,7 @@ npudistbw.dbandwidth <-
         where = "beta range distribution CDF certification"
       )
     }
-    tbw
+    .np_bw_procedure_record(tbw, bws, "distribution", environment())
   }
 
 npudistbw.default <-

@@ -69,12 +69,21 @@ supplied nonlegacy bias control. Omitted calibration remains unchanged.
 
 For density, \code{"smoothed-percentile"} uses complete unshifted corrected
 curves, a data-selected outer smoothing pilot and 39 outer calibration samples.
-The complete density and its correction vary jointly. Each fresh outer sample
-gets its own ordinary CV bandwidth selection; the original fitted object and
-selected bandwidth remain unchanged. The outer fits currently use the default
-CV procedure even when the original fit used a manually supplied bandwidth,
-normal-reference selection or a nondefault CV procedure; coverage under these
-nondefault selection procedures has not been qualified. Inclusive family ranks select the
+The complete density and its correction vary jointly. The original fitted
+object and selected bandwidth remain unchanged. Fresh outer samples repeat the
+original bandwidth rule when its selection provenance is available: manual
+physical bandwidths stay fixed, manual scale factors retain their units,
+normal-reference bandwidths are recomputed, and CV repeats its retained
+objective and search settings. Newly selected density and distribution
+bandwidth objects retain these evaluated settings in \code{selection.procedure};
+no stored call or calling environment is evaluated to recover them.
+Older manual and normal-reference objects retain enough information to recover
+those rules. Older CV objects without a complete descriptor retain historical
+default-CV outer calibration with an aggregated warning and
+\code{legacy-unresolved} provenance diagnostics. Refit such objects to obtain
+faithful replay. Coverage for nondefault selection procedures remains
+unqualified; matching the procedure is not itself a coverage theorem.
+Inclusive family ranks select the
 simultaneous content. Companion hulls preserve pointwise/simultaneous/Bonferroni
 nesting and singleton equality. For a family with more than one grid point,
 pointwise bands are nominal marginal percentile bands; the outer calibration
@@ -107,7 +116,8 @@ require explicit block lengths. Asymmetric CDF bands support admitted fixed
 bandwidth joint-process \code{inid}/\code{fixed}/\code{geom} inference;
 numeric nearest-neighbor asymmetric CDF inference remains unqualified.
 The experimental CDF \code{"smoothed-percentile"} option uses a
-Gaussian derivative-three smoothing pilot, 39 fresh outer-sample CV fits,
+Gaussian derivative-three smoothing pilot, 39 fresh outer-sample fits using
+the same bandwidth-procedure policy described above,
 complete bias-corrected CDF curves and calibrated family ranks. Its current
 scope is one numeric variable, fixed unbounded Gaussian2 bandwidths,
 \code{inid} or literal block length one, and the complete untrimmed sample-range
