@@ -314,7 +314,8 @@
     }
   }
   payload <- p[c('A', 'mu', 'sigma', 'residual', 'row.variance', 'pilot.eval', 'map')]
-  rows <- .np_reg_percentile_outer_dispatch(tasks, payload, B)
+  rows <- .np_plot_progress_outer_run(
+    .np_reg_percentile_outer_dispatch(tasks, payload, B))
   rows[rows == B + 1] <- Inf
   size <- ncol(rows) / 2L
   scores <- rows[, seq_len(size), drop = FALSE]

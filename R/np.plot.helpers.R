@@ -158,6 +158,7 @@
   context$rep <- NULL
   context$stage <- "preparing"
   context$finished <- FALSE
+  context$phase <- NULL
   context$state <- .np_progress_begin("Plot bootstrap", domain = "plot",
                                        surface = "plot_bounded")
   if (!isTRUE(context$state$visible))
@@ -170,10 +171,18 @@
       if (work >= context$total) "finishing" else
       paste0(.np_progress_fmt_num(elapsed *
         max(0, context$total - work) / work), "s")
+    eta.label <- "eta"
+    if (!context$finished && !is.null(context$phase)) {
+      phase <- context$phase
+      eta.label <- "outer eta"
+      eta <- if (phase$done <= 0) "estimating" else if (phase$done >= phase$total)
+        "finishing" else paste0(.np_progress_fmt_num(
+          max(0, now - phase$started) * (phase$total - phase$done) / phase$done), "s")
+    }
     fields <- c(if (is.null(context$total)) "targets pending" else
         sprintf("target %d/%d", context$target, context$total),
       context$rep, paste0("elapsed ", .np_progress_fmt_num(elapsed), "s"),
-      paste("eta", eta))
+      paste(eta.label, eta))
     # Width fitting belongs to the shared renderer, not the work coordinator.
     stage <- sub("^Plot bootstrap[ :]*", "", context$stage)
     c(fields, paste("detail", stage))
@@ -234,6 +243,16 @@
   if (is.null(context))
     return(invisible(NULL))
   if (!is.null(stage)) context$stage <- stage
+  if (!is.null(context$phase)) {
+    # Inner draws/fit activity cannot replace completed outer work. Repeated
+    # collector notifications credit no additional samples.
+    if (identical(unit, context$phase$unit) && !is.null(done) &&
+        !is.null(total) && identical(as.integer(total), context$phase$total))
+      context$phase$done <- max(context$phase$done, min(total, max(0, done)))
+    context$rep <- sprintf("%s %d/%d", context$phase$unit,
+                           context$phase$done, context$phase$total)
+    return(invisible(NULL))
+  }
   if (!is.null(done) && !is.null(total) && total > 0) {
     context$rep <- sprintf("%s %d/%d", unit, done, total)
     # A bias bootstrap can reset the local counter within the same target.
@@ -242,6 +261,25 @@
       context$fraction <- max(context$fraction, done / total)
   }
   invisible(NULL)
+}
+
+# One nested work phase in the existing display owner, with its own rate
+# origin but the unchanged whole-call elapsed clock. No statistical state.
+.np_plot_progress_outer_run <- function(expr, total = 39L) {
+  context <- .np_plot_progress_runtime$context
+  if (is.null(context)) return(force(expr))
+  previous <- context$phase
+  on.exit({
+    context$phase <- previous
+    context$rep <- NULL
+    context$fraction <- 0
+    context$stage <- "constructing intervals"
+  }, add = TRUE)
+  context$phase <- list(started = .np_progress_now(), done = 0L,
+                        total = as.integer(total), unit = "samples")
+  .np_plot_progress_notify(stage = "calibrating outer samples", done = 0L,
+                           total = total, unit = "samples")
+  force(expr)
 }
 
 .np_plot_progress_notify <- function(stage = NULL, done = NULL, total = NULL,

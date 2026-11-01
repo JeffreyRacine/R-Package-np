@@ -475,6 +475,7 @@ sc1 <- local({
     original$budget$bytes<-original$budget$bytes+retained.bytes
     pilot.capture<-capture(pilot(state));selected<-pilot.capture$value
     records<-vector('list',39L)
+    .np_plot_progress_outer_run({
     for(j in seq_len(39L)) {
       os<-outer[[j]]
       context<-list(index=j,stage='outer sample',seeds=os,pilot=selected)
@@ -511,6 +512,7 @@ sc1 <- local({
       })
       if(!is.null(progress))progress(j,39L)
     }
+    })
     answer<-reduce(original,records,warn,nominal=1-alpha)
     list(inference=answer,pilot=selected,outer=records,pilot.warnings=pilot.capture$warnings,
       rng=list(start=original$start,end=original$end),grid=grid,
