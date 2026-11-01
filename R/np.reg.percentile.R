@@ -287,14 +287,23 @@
   })
   do.call(rbind, out)
 }
+.np_reg_percentile_forecast <- function(n, m, B) {
+  if (any(!is.finite(c(n,m,B))) || any(c(n,m,B)<1) ||
+      any(c(n,m,B)!=floor(c(n,m,B))))
+    stop("invalid regression percentile forecast dimensions", call.=FALSE)
+  n <- as.double(n); m <- as.double(m); B <- as.double(B)
+  bytes <- 8 * (10 * m * B + 10 * n * 39 + 6 * m * n + 20 * n * 256)
+  if (!is.finite(bytes) || bytes > 256 * 1024^2)
+    stop("regression percentile memory forecast exceeds 256 MiB; reduce the requested grid or B", call.=FALSE)
+  bytes
+}
+
 .np_reg_percentile_infer <- function(p, B, seed, outer_data, outer_inner) {
   B <- .np_plot_gaussian_integer(B, 'regression percentile draws', 9999L)
   stopifnot(length(outer_data) == 39L, length(outer_inner) == 39L)
   n <- length(p$y); m <- nrow(p$A)
   # Original and current banks, sorting temporaries, bounded geometry and tasks.
-  forecast <- 8 * (10 * m * B + 10 * n * 39 + 6 * m * n + 20 * n * 256)
-  if (!is.finite(forecast) || forecast > 256 * 1024^2)
-    stop('regression percentile memory forecast exceeds 256 MiB; reduce the requested grid or B', call. = FALSE)
+  forecast <- .np_reg_percentile_forecast(n, m, B)
   rng.mode <- .np_reg_percentile_rng_mode()
   g <- .np_reg_percentile_refresh_geometry(p)
   bank <- .np_reg_percentile_outer_response_bank(p, g, outer_data, 'residual')
