@@ -22,14 +22,15 @@
   if (!is.character(targets) || !length(targets) || anyNA(targets) ||
       anyDuplicated(targets) || any(!targets %in% valid))
     stop('invalid regression percentile target family', call.=FALSE)
-  map <- expand.grid(row = seq_len(nrow(grid)), target = targets, stringsAsFactors = FALSE)
+  full.map <- expand.grid(row=seq_len(nrow(grid)), target=valid, stringsAsFactors=FALSE)
+  map <- full.map[unlist(lapply(targets, function(t) which(full.map$target == t)),
+                        use.names=FALSE), , drop=FALSE]
   n <- length(state$y); m <- nrow(map)
   if (!is.null(B)) .np_reg_percentile_forecast(n, m, B)
   if (8 * (6 * as.double(m) * n + 10 * n * 39 + 20 * n * 256) > 256 * 1024^2)
     stop('regression percentile preparation exceeds its 256 MiB memory budget', call. = FALSE)
   # Preserve the qualified bounded arithmetic tile shape. Reducing its RHS
   # width changes BLAS rounding, even for rows retained by both preparations.
-  full.map <- expand.grid(row=seq_len(nrow(grid)), target=valid, stringsAsFactors=FALSE)
   capture <- .np_bias_capture_prepare(state, fit, grid, valid)
   A <- matrix(0, m, n); center <- se <- numeric(m)
   key <- paste(map$target, map$row)
@@ -69,6 +70,11 @@
   z$center <- z$center[ii]; z$se <- z$se[ii]; z$expectation <- z$expectation[ii]
   z$variance <- z$variance[ii]; z$map <- z$map[ii, , drop = FALSE]
   z$ranks <- z$ranks[target]; z$calibration <- z$calibration[target]
+  # Retain the original full-family diagnostic row identities after reducing
+  # persistent storage to the requested family. Arithmetic and RNG are unchanged.
+  families <- sort(c('mean', paste0('d', seq_len(state$d))))
+  rownames(z$resolution) <- (match(target, families) - 1L) * nrow(z$resolution) +
+    seq_len(nrow(z$resolution))
   z$resolution <- z$resolution[z$resolution$family == target & z$resolution$band %in% bands, , drop = FALSE]
   z$settings <- list(construction = 'regression-calibrated-residual-percentile-E1-E6',
     calibration.requested = 'smoothed-percentile', law = 'standardized-empirical-residual',
