@@ -1,5 +1,8 @@
 # npRmpi 0.80-2 (development)
 
+* Package-generated MPI commands keep their temporary bindings in private
+  child frames, preserving worker global objects and explicit user broadcasts.
+
 * Retire acknowledged autodispatch publications when an interrupt or a
   returned-object assembly error prevents transfer to the caller. Preserve
   the original condition and poison lease ownership if rollback fails.

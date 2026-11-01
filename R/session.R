@@ -24,11 +24,11 @@
 .npRmpi_session_reset_spmd_state_allranks <- function(comm = 1L,
                                                       strict = TRUE,
                                                       where = "npRmpi session state reset") {
-  cmd <- quote({
+  cmd <- quote(base::local({
     fn <- get(".npRmpi_session_reset_spmd_state", envir = asNamespace("npRmpi"), inherits = FALSE)
     fn()
     invisible(TRUE)
-  })
+  }))
   out <- try(
     .npRmpi_bcast_cmd_expr(expr = cmd, comm = comm, caller.execute = TRUE),
     silent = TRUE

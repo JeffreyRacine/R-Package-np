@@ -1876,7 +1876,7 @@
     timeout_class = "smoke"
   )
   payload <- list(label = as.character(label)[1L], comm = as.integer(comm))
-  cmd <- substitute({
+  cmd <- substitute(base::local({
     exec.step <- get(".npRmpi_spmd_execute_step", envir = asNamespace("npRmpi"), inherits = FALSE)
     exec.step(
       envelope = ENVELOPE,
@@ -1884,7 +1884,7 @@
       comm = COMM,
       where = "SPMD tiny smoke"
     )
-  }, list(ENVELOPE = envelope, PAYLOAD = payload, COMM = comm))
+  }), list(ENVELOPE = envelope, PAYLOAD = payload, COMM = comm))
 
   .npRmpi_bcast_cmd_expr(expr = cmd, comm = comm, caller.execute = TRUE)
 }
@@ -2536,10 +2536,10 @@
     args_ref = if (is.list(payload)) payload$ids else NULL,
     timeout_class = "default"
   )
-  cmd <- substitute({
+  cmd <- substitute(base::local({
     run <- get(".npRmpi_spmd_execute_step", envir = asNamespace("npRmpi"), inherits = FALSE)
     run(envelope = ENVELOPE, payload = PAYLOAD, comm = COMM, where = WHERE)
-  }, list(ENVELOPE = envelope, PAYLOAD = payload, COMM = comm, WHERE = where))
+  }), list(ENVELOPE = envelope, PAYLOAD = payload, COMM = comm, WHERE = where))
   .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
 }
 
@@ -3000,7 +3000,9 @@
     attr(payload$call, ".npRmpi.bound.call.owner") <- NULL
   }
 
-  cmd <- substitute({
+  # Package command temporaries belong to this child frame, never a worker's
+  # global environment. Explicit user broadcasts keep their own semantics.
+  cmd <- substitute(base::local({
     exec.step <- get(".npRmpi_spmd_execute_step", envir = asNamespace("npRmpi"), inherits = FALSE)
     ans <- exec.step(
       envelope = ENVELOPE,
@@ -3009,7 +3011,7 @@
       where = WHERE
     )
     ans$result
-  }, list(ENVELOPE = envelope,
+  }), list(ENVELOPE = envelope,
           PAYLOAD = payload,
           COMM = comm,
           WHERE = .npRmpi_autodispatch_call_name(mc)))
