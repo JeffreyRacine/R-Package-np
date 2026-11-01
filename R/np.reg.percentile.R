@@ -299,8 +299,8 @@
     ".np_reg_percentile_draw_innovations", ".np_reg_percentile_shape",
     ".np_reg_percentile_least_content_fast", ".np_reg_percentile_e6_scores"),
     envir=environment(.np_reg_percentile_outer_dispatch), inherits=TRUE)
-  size <- 1L + sum(vapply(setdiff(unique(p$map$target),"mean"),
-    function(target) sum(p$map$target==target)+1L, integer(1L)))
+  size <- sum(vapply(unique(p$map$target), function(target)
+    if (target == "mean") 1L else sum(p$map$target == target) + 1L, integer(1L)))
   worker <- function(task, percentile.state, B)
     .np_reg_percentile_outer_score(task, percentile.state, B)
   .npRmpi_bootstrap_run_fanout(tasks, worker,
