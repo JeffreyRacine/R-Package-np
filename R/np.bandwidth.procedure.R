@@ -108,11 +108,10 @@
   force(args); force(family)
   fit <- function(y) {
     if (is.null(args)) {
-      if (family == 'density') {
-        if (identical(names(y), 'X1')) return(npudens(~X1, data = y))
-        return(npudens(stats::reformulate(names(y)), data = y))
-      }
-      return(npudist(stats::reformulate(names(y)), data = y))
+      # Outer columns already contain the generated observations. Their names
+      # may be transformed formula terms; never evaluate those terms again.
+      estimator <- if (family == 'density') npudens else npudist
+      return(estimator(tdat = y))
     }
     # Keep selection and estimation inside one public entry when that API
     # expresses the retained rule. A named nonzero CV start is different:
