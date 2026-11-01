@@ -93,3 +93,34 @@ test_that("malformed copula grid metadata cannot select training coordinates", {
     expect_error(coordinates(bad), "evaluation coordinates.*refit", ignore.case = TRUE)
   }
 })
+
+
+test_that("copula plain plots preserve omitted center suppliedness", {
+  if (exists("spawn_mpi_slaves", mode = "function")) {
+    if (!spawn_mpi_slaves()) skip("Could not initialize MPI context")
+    on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  }
+  set.seed(72)
+  dat <- data.frame(x = rnorm(24), y = rnorm(24))
+  for (density in c(FALSE, TRUE)) {
+    fit <- npcopula(~ x + y, data = dat, bws = c(.7, .8),
+      bandwidth.compute = FALSE, target = if (density) "density" else "distribution",
+      neval = 3L,
+      n.quasi.inv = 20L, se = TRUE)
+    retained <- fit
+    rng <- .Random.seed
+    plain <- plot(fit, output = "data")
+    expect_identical(plain, as.data.frame(fit))
+    expect_identical(plot(fit, errors = "none", output = "data"), plain)
+    expect_identical(plot(fit, errors = "asymptotic", output = "data"),
+      plot(fit, errors = "asymptotic", center = "estimate", output = "data"))
+    expect_error(plot(fit, center = "estimate", output = "data"),
+      'bootstrap controls require errors = "bootstrap"', fixed = TRUE)
+    expect_error(plot(fit, center = "bias-corrected", output = "data"),
+      'bootstrap controls require errors = "bootstrap"', fixed = TRUE)
+    expect_error(plot(fit, B = 3L, output = "data"),
+      'bootstrap controls require errors = "bootstrap"', fixed = TRUE)
+    expect_identical(fit, retained)
+    expect_identical(.Random.seed, rng)
+  }
+})

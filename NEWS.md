@@ -1,5 +1,8 @@
 # np 0.80-2 (development)
 
+* Plain `npcopula` plots now preserve an omitted `center` argument instead of
+  incorrectly requiring bootstrap errors. Explicit control validation is unchanged.
+
 - Density/CDF smoothed-percentile outer fits now repeat retained bandwidth
   selection rules; new bandwidth objects retain value-only provenance. Older
   CV objects without a complete recipe retain explicitly warned compatibility
