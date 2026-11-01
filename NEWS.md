@@ -1,5 +1,10 @@
 # np 0.80-2 (development)
 
+* Calibrated smoothed-percentile resolution diagnostics now report the empirical
+  indices actually used after companion enlargement. Regression rank details
+  retain point-specific indices and the actual included-curve count. Endpoints,
+  calibration selections, resampling and RNG behavior are unchanged.
+
 * Public regression, single-index, smooth-coefficient and partial-linear plots
   enforce the numeric-response contract before coercion or NA indexing.
   Klein-Spady plots retain the numeric 0/1 requirement.

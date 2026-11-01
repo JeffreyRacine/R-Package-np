@@ -85,8 +85,8 @@
   resolution <- .np_band_resolution(B, rep("density", nrow(grid)), alpha,
     rep(TRUE, nrow(grid)), bands, signed = TRUE,
     simultaneous.index = matrix(reduced$order.index[["simultaneous"]], 1L))
-  resolution$order_index <- unname(reduced$order.index[resolution$band])
-  resolution$calibration <- "smoothed-percentile"
+  resolution <- .np_band_resolution_use_indices(resolution,
+    as.list(reduced$order.index[resolution$band]))
   messages <- unique(c(reduced$messages, value$pilot.warnings,
     unlist(lapply(value$outer, function(z) z$warnings), use.names = FALSE)))
   if (length(messages)) warning(structure(list(message = paste(messages, collapse = "; "),

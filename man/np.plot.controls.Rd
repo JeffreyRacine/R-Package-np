@@ -204,6 +204,14 @@ and estimator-specific qualifications.
   \code{pmzsd} retain their existing owners. Low draw counts return every
   defined requested band with one aggregated resolution warning and retained
   \code{inference$resolution} diagnostics. Undefined variances still error.
+  For smoothed-percentile bands, \code{order_index} is the minimum empirical
+  index actually used over the family after companion-band enlargement;
+  \code{resolution_limited} indicates that this index is one.
+  \code{nominal_tail_draws} retains its nominal meaning. Regression rank
+  details also retain point-specific \code{used.indices}; mean-family
+  \code{content} counts original curves contained by the final simultaneous
+  band, which can differ from the selected calibration score. Analytic support
+  enlargement is recorded separately and does not create additional draws.
 
   Raw asymmetric bands remain an optional method with limited finite-sample
   evidence. Exposed regression replays show improvements from the block-scale

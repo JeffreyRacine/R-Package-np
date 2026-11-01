@@ -352,6 +352,13 @@
         selected = s, q = s / B, rank = 38L, J = 39L, attainable = is.finite(s),
         support.used = boundary, outer.completions = sum(!is.finite(ee) & is.finite(ss)),
         floor = sum(ss == ceiling(.501 * B)), support = support[ii, , drop = FALSE], law = 'residual')
+      ks <- if (is.finite(s)) .np_reg_percentile_companion_k(info, s) else 1
+      kp <- nominal$ranks[[target]]$kP
+      kb <- min(nominal$ranks[[target]]$kB, ks)
+      if (m == 1L) kp <- kb <- ks
+      z$ranks[[target]][c('kP', 'kS', 'kB', 'content')] <-
+        list(kp, ks, kb, sum(info$K >= ks))
+      used <- list(pointwise = rep(kp, m), simultaneous = rep(ks, m), bonferroni = rep(kb, m))
     } else {
       out <- .np_reg_percentile_e6_materialize(info, sel[seq_len(m)], sel[m + 1L], support[ii, , drop = FALSE],
         matrix(nominal$bands$bonferroni[ii, , , drop = FALSE], m, 2L))
@@ -363,7 +370,15 @@
         support.used = out$support.used, outer.completions = sum(!is.finite(ee) & is.finite(ss)),
         floor = sum(ss[, m + 1L] == 0), support = support[ii, , drop = FALSE], law = 'residual', minimum.content = 0)
       z$ranks[[target]] <- list(kP = out$kp, kS = out$ks, calibration = 'E6 marginal and family rank38; conservative hulls')
+      kp <- out$kp; ks <- pmin(kp, out$ks)
+      kb <- pmin(nominal$ranks[[target]]$kB, ks)
+      if (m == 1L) kp <- kb <- ks
+      used <- list(pointwise = kp, simultaneous = ks, bonferroni = kb)
     }
+    z$ranks[[target]]$used.indices <- used
+    rr <- which(z$resolution$family == target)
+    z$resolution[rr, ] <- .np_band_resolution_use_indices(
+      z$resolution[rr, , drop = FALSE], used[z$resolution$band[rr]])
     for (b in names(bands)) z$bands[[b]][ii, , ] <- bands[[b]][, , 1L]
   }
   z$center <- p$center; z$se <- p$se; z$expectation <- drop(p$A %*% p$mu)

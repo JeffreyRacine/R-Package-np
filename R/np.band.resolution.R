@@ -20,6 +20,25 @@
   do.call(rbind,rows)
 }
 
+# Calibrated percentile families are active at every requested row. A row may
+# use a different companion index at each point; report the weakest tail.
+# nominal_tail_draws deliberately retains its nominal meaning.
+.np_band_resolution_use_indices <- function(diagnostics, indices) {
+  if (!is.data.frame(diagnostics) || !is.list(indices) ||
+      length(indices) != nrow(diagnostics) ||
+      !all(vapply(indices, function(x) is.numeric(x) && length(x) > 0L &&
+        all(is.finite(x)) && all(x == floor(x)), logical(1))))
+    stop("invalid calibrated percentile resolution indices", call. = FALSE)
+  lower <- vapply(indices, min, numeric(1))
+  upper <- vapply(indices, max, numeric(1))
+  if (any(lower < 1 | upper > ceiling(diagnostics$B / 2)))
+    stop("calibrated percentile resolution index outside draw bank", call. = FALSE)
+  diagnostics$order_index <- unname(lower)
+  diagnostics$resolution_limited <- unname(lower == 1)
+  diagnostics$calibration <- "smoothed-percentile"
+  diagnostics
+}
+
 .np_band_resolution_warn <- function(diagnostics) {
   if(is.list(diagnostics) && !is.data.frame(diagnostics)) {
     if(!length(diagnostics))return(invisible(NULL))
