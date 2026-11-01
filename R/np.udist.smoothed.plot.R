@@ -1,10 +1,11 @@
 # CDF public bridge to the unchanged CDS1 statistical construction.
 .np_udist_smoothed_plot <- function(state, grid, alpha, B, bands) {
+  selection <- .np_bw_outer_selection(state$bws, 'distribution')
   streams <- .np_udens_calibrated_streams(get('.Random.seed', .GlobalEnv, inherits = FALSE))
   blocklen <- if (state$plot.law == 'inid') NULL else state$plot.block.selection$length
   value <- .np_udist_smoothed_percentile(list(bws = state$bws), state$x, grid,
     streams$original, streams$outer,
-    outer.fit = function(y) npudist(stats::reformulate(names(y)), data = y),
+    outer.fit = selection$fit,
     B = B, alpha = alpha, law = state$plot.law, blocklen = blocklen,
     max.bytes = state$max.bytes, warn = FALSE, prepared = state,
     progress = function(done, total) .np_plot_progress_notify(
@@ -20,12 +21,13 @@
   resolution <- .np_band_resolution(B, rep('cdf', nrow(grid)), alpha, rep(TRUE, nrow(grid)),
     bands, signed = TRUE, simultaneous.index = matrix(value$inference$order.index[['simultaneous']], 1L))
   resolution$calibration <- 'smoothed-percentile'
-  messages <- value$warnings
+  messages <- unique(c(selection$messages, value$warnings))
   withCallingHandlers(.np_band_resolution_warn(resolution), warning = function(w) {
     messages <<- c(messages, conditionMessage(w)); invokeRestart('muffleWarning')
   })
   if (length(messages)) warning(structure(list(message = paste(unique(messages), collapse = '; '),
     call = NULL, diagnostics = resolution), class = c('np_calibrated_percentile_warning', 'warning', 'condition')))
+  value$settings$bandwidth.procedure <- selection$diagnostics
   value$settings$calibration.requested <- 'smoothed-percentile'
   value$settings$scope <- 'experimental q1 fixed Gaussian2; useful population coverage unassessed'
   list(center = center, original.center = original, se = se, covariance = NULL,
