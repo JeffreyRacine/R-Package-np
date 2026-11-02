@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+- Leased regression, index, smooth-coefficient, partially linear and quantile
+  bandwidths finalize public names and formula metadata before publication.
+  Native/formula fits retain supported worker-store reuse; local formula lookup
+  and rejection of mutated or serialized stale handles are preserved.
+
 - Coordinated command and argument errors retain their original classes, calls
   and attributes through evaluation and acknowledgement. This does not change
   the timing of warning delivery or the existing error/interrupt precedence.
