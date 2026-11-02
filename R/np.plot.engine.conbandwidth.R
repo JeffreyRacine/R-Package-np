@@ -133,6 +133,7 @@
 
       ydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
       xdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
+      .np_conditional_training_types(bws, xdat, ydat)
     } else {
       if(all(miss.xy) && !is.null(bws$call)){
         xdat <- data.frame(.np_eval_bws_call_arg(bws, "xdat"))
@@ -142,6 +143,7 @@
       ## catch and destroy NA's
       xdat = toFrame(xdat)
       ydat = toFrame(ydat)
+      .np_conditional_training_types(bws, xdat, ydat)
       
       keep.rows <- rep_len(TRUE, nrow(xdat))
       rows.omit <- attr(na.omit(data.frame(xdat, ydat)), "na.action")
