@@ -1645,19 +1645,10 @@
   .npRmpi_spmd_seq_set(envelope$seq_id)
 
   handler <- .npRmpi_spmd_get_opcode(envelope$opcode)
-  out <- tryCatch(
-    handler(payload, envelope),
-    error = function(e) {
-      if (inherits(e, "np_nn_zero_radius") ||
-          inherits(e, "npRmpi_coordinated_error"))
-        stop(e)
-      stop(
-        sprintf("%s opcode failure [opcode=%s seq_id=%d]: %s",
-                where, envelope$opcode, envelope$seq_id, conditionMessage(e)),
-        call. = FALSE
-      )
-    }
-  )
+  # The outer execution catcher retains the original condition. Replacing it
+  # here with a text-only error discards custom classes, calls and attributes.
+  # Opcode/sequence/rank context is already carried by the acknowledgement.
+  out <- handler(payload, envelope)
   publication <- list(kind = "", id = "", capability = "", fingerprint = "")
   if (inherits(out, "npRmpi_spmd_internal_result")) {
     publication <- out$publication
@@ -2375,7 +2366,7 @@
   )
   if (isTRUE(binding.res$found))
     return(binding.res$value)
-  stop(conditionMessage(eval.res$error), call. = FALSE)
+  stop(eval.res$error)
 }
 
 .npRmpi_autodispatch_materialize_call <- function(mc, caller_env, comm = 1L) {
@@ -3100,6 +3091,8 @@
         cleaned <- TRUE  # Failed rollback leaves peers unsafe for another command.
       }
       publication.released <- TRUE
+      cause <- attr(committed, "condition", exact = TRUE)
+      if (inherits(cause, "condition")) stop(cause)
       stop(paste(as.character(committed), collapse = " "), call. = FALSE)
     }
   }

@@ -1,5 +1,9 @@
 # npRmpi 0.80-2 (development)
 
+- Coordinated command and argument errors retain their original classes, calls
+  and attributes through evaluation and acknowledgement. This does not change
+  the timing of warning delivery or the existing error/interrupt precedence.
+
 - Automatic dispatch retains the package method already selected on entry when
   materializing a generic-looking call. A rank-local same-name S3 method can no
   longer trigger a second, inconsistent dispatch of that transported call.
