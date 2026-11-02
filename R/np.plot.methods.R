@@ -762,7 +762,8 @@ np_render_control <- function(style = c("band", "bar"),
       all(is.finite(object$mean)) &&
       all(is.finite(object$resid))) {
     dots$xdat <- object$eval
-    dots$ydat <- object$mean + object$resid
+    dots$ydat <- .np_plot_reconstruct_response(object, object$bws,
+                                                 "plot.npregression")
     dots$fit.mean.train <- object$mean
   }
 
@@ -2385,7 +2386,8 @@ np_render_control <- function(style = c("band", "bar"),
     } else {
       dots$xdat <- object$eval
     }
-    dots$ydat <- object$mean + object$resid
+    dots$ydat <- .np_plot_reconstruct_response(object, obj.bws,
+                                                 "plot.smoothcoefficient")
   }
 
   do.call(.np_plot_call_method,
@@ -2418,7 +2420,8 @@ np_render_control <- function(style = c("band", "bar"),
       all(is.finite(object$mean)) &&
       all(is.finite(object$resid))) {
     dots$xdat <- object$evalx
-    dots$ydat <- object$mean + object$resid
+    dots$ydat <- .np_plot_reconstruct_response(object, obj.bws,
+                                                 "plot.plregression")
     dots$zdat <- object$evalz
   }
 

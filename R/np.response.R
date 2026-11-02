@@ -3,10 +3,25 @@
 .np_require_numeric_response <- function(y, where, argument) {
   if (!is.numeric(y) || !(is.integer(y) || is.double(y)) ||
       is.factor(y) || !is.null(dim(y)))
-    stop(paste0(where, "(): '", argument,
-                "' must be a numeric (integer or double) response vector; ",
-                "factors and ordered factors are not supported."), call. = FALSE)
+    .np_numeric_response_error(where, argument)
   invisible(NULL)
+}
+
+.np_numeric_response_error <- function(where, argument) {
+  stop(paste0(where, "(): '", argument,
+              "' must be a numeric (integer or double) response vector; ",
+              "factors and ordered factors are not supported."), call. = FALSE)
+}
+
+# Reconstruction must not erase a known categorical response on an older fit.
+# Absent metadata cannot establish the original type; preserve that legacy path.
+.np_plot_reconstruct_response <- function(object, bws, where) {
+  type <- bws[["ydati", exact = TRUE]]
+  if (is.list(type) &&
+      any(c(type[["iuno", exact = TRUE]], type[["iord", exact = TRUE]]),
+          na.rm = TRUE))
+    .np_numeric_response_error(where, "ydat")
+  object[["mean", exact = TRUE]] + object[["resid", exact = TRUE]]
 }
 
 # Plot engines resolve public outcomes independently of the estimator entries.
