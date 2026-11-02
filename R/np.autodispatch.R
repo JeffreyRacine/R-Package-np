@@ -1127,8 +1127,20 @@
     # Preserve the already selected package definition even when a rank has
     # a same-name global binding. Keep a symbolic call and its original data
     # lookup parent; no closure head or temporary global function is needed.
-    assign(call.owner, get(call.owner, envir = asNamespace("npRmpi"),
-                           mode = "function", inherits = FALSE), envir = eval.env)
+    call.binding <- payload[["call.binding", exact = TRUE]]
+    if (is.null(call.binding)) call.binding <- call.owner
+    definition <- get(call.owner, envir = asNamespace("npRmpi"),
+                      mode = "function", inherits = FALSE)
+    # The scoped npscoef opcode binds its own trusted function head locally.
+    # That pre-existing path does not perform a symbolic lookup.
+    direct.owner <- is.function(call.obj[[1L]]) &&
+      identical(call.obj[[1L]], definition) && identical(call.binding, call.owner)
+    if (!is.character(call.binding) || length(call.binding) != 1L ||
+        is.na(call.binding) || (!direct.owner &&
+          (!is.symbol(call.obj[[1L]]) ||
+           !identical(call.binding, as.character(call.obj[[1L]])))))
+      stop("invalid materialized package call binding", call. = FALSE)
+    assign(call.binding, definition, envir = eval.env)
   }
   required <- unique(c(tmpnames, names(lease.bindings)))
   if (length(required) && !all(vapply(required, exists, logical(1),
@@ -2994,11 +3006,15 @@
   )
   if (isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE))) {
     head <- prepared$call[[1L]]
-    if (!is.symbol(head) ||
-        !is.function(get0(as.character(head), envir = asNamespace("npRmpi"),
+    owner <- mc[[1L]]
+    if (!is.symbol(head) || !is.symbol(owner) ||
+        !is.function(get0(as.character(owner), envir = asNamespace("npRmpi"),
                           mode = "function", inherits = FALSE)))
       stop("invalid materialized package call owner", call. = FALSE)
-    payload$call.owner <- as.character(head)
+    # Materialization may retain a generic head for public call syntax. It
+    # must not discard the method already selected before distribution.
+    payload$call.owner <- as.character(owner)
+    payload$call.binding <- as.character(head)
     attr(payload$call, ".npRmpi.bound.call.owner") <- NULL
   }
 

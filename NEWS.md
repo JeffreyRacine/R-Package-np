@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+- Automatic dispatch retains the package method already selected on entry when
+  materializing a generic-looking call. A rank-local same-name S3 method can no
+  longer trigger a second, inconsistent dispatch of that transported call.
+  Initial public method selection and formula lookup are unchanged.
+
 - A computation error now remains primary when an MPI command also receives a
   deferred interrupt. The interrupt is retained as secondary condition evidence,
   and failed publication rollback completes before control returns to the caller.
