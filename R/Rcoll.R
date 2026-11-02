@@ -120,11 +120,14 @@ mpi.scatter.Robj2slave=function (obj, comm = 1) {
         stop("Only list object is allowed to scatter to slaves.")
     if (length(obj) != (mpi.comm.size(comm)-1)) 
         stop("Length of your list object is not the same as total number of slaves.")
+    prepared <- .npRmpi_scatter_prepare(c(list("master"), obj), comm)
     .tmpname <- list(objname=deparse(substitute(obj), width.cutoff = 500))
-    mpi.bcast.Robj2slave(.tmpname)
-    mpi.bcast.cmd(cmd = .tmpRobj <- mpi.scatter.Robj(comm = 1), 
-        rank = 0, comm = comm)
-    mpi.scatter.Robj(obj=c(list("master"),obj), root = 0, comm = comm)
+    mpi.bcast.Robj2slave(.tmpname, comm = comm)
+    receive <- substitute(.tmpRobj <- get("mpi.scatter.Robj",
+        envir = asNamespace("npRmpi"), inherits = FALSE)(comm = COMM),
+        list(COMM = comm))
+    .npRmpi_bcast_cmd_expr(receive, comm = comm, caller.execute = FALSE)
+    .npRmpi_scatter_prepared(prepared, root = 0, comm = comm)
     mpi.bcast.cmd(cmd = assign(.tmpname$objname, .tmpRobj), rank = 0, comm = comm)
 }
 
@@ -402,50 +405,39 @@ mpi.bcast.Robj <- function(obj=NULL, rank=0, comm=1){
     }
 }
 
-mpi.bcast.Robj2slave <- function(obj, comm=1, all=FALSE){
-    if (!all){
-		objname <- deparse(substitute(obj),width.cutoff=500)
-		obj <- list(objname=objname,obj=obj)
-		mpi.bcast.cmd(cmd=.tmpRobj <- mpi.bcast.Robj(comm=1),
-                    rank=0, comm=comm)
-		mpi.bcast.Robj(obj, rank=0, comm=comm)
-		mpi.bcast.cmd(cmd=assign(.tmpRobj$objname,.tmpRobj$obj), rank=0, comm=comm)
-		#mpi.bcast.cmd(rm(.tmpRobj,envir = .GlobalEnv), rank=0, comm=comm) 
-	}
-	else {
-		master.objects <- objects(envir = .GlobalEnv)
-		object.values <- mget(master.objects,
-		                      envir = .GlobalEnv,
-		                      inherits = FALSE,
-		                      ifnotfound = vector("list", length(master.objects)))
-		obj.num=length(master.objects)
-		if (obj.num)
-			for (i in seq_len(obj.num)){
-				mpi.bcast.cmd(cmd=.tmpRobj <- mpi.bcast.Robj(comm=1),
-	                    rank=0, comm=comm)
-				mpi.bcast.Robj(list(objname=master.objects[i], obj=object.values[[i]]), 
-					rank=0, comm=comm)
-				mpi.bcast.cmd(cmd=assign(.tmpRobj$objname,.tmpRobj$obj), rank=0, comm=comm)
-			}
-	}
+.npRmpi_bcast_object_to_slaves <- function(packet, comm) {
+    prepared <- serialize(packet, NULL)
+    receive <- substitute(.tmpRobj <- mpi.bcast.Robj(comm = COMM),
+                          list(COMM = comm))
+    .npRmpi_bcast_cmd_expr(receive, comm = comm, caller.execute = FALSE)
+    .npRmpi_bcast_prepared(prepared, rank = 0L, comm = comm)
+    mpi.bcast.cmd(cmd = assign(.tmpRobj$objname, .tmpRobj$obj), rank = 0, comm = comm)
+    invisible(NULL)
 }
 
-mpi.bcast.Rfun2slave <- function(comm=1){
-	master.fun <- objects(envir = .GlobalEnv)
-	fun.values <- mget(master.fun,
-	                   envir = .GlobalEnv,
-	                   inherits = FALSE,
-	                   ifnotfound = vector("list", length(master.fun)))
-	sync.index <- which(vapply(fun.values, is.function, logical(1)))
-	obj.num=length(sync.index)
-	if (obj.num)
-		for (i in sync.index){
-			mpi.bcast.cmd(cmd=.tmpRobj <- mpi.bcast.Robj(comm=1),
-	                   rank=0, comm=comm)
-			mpi.bcast.Robj(list(objname=master.fun[i], obj=fun.values[[i]]), 
-				rank=0, comm=comm)
-			mpi.bcast.cmd(cmd=assign(.tmpRobj$objname,.tmpRobj$obj), rank=0, comm=comm)
-		}
+mpi.bcast.Robj2slave <- function(obj, comm = 1, all = FALSE) {
+    if (!all) {
+        objname <- deparse(substitute(obj), width.cutoff = 500)
+        .npRmpi_bcast_object_to_slaves(list(objname = objname, obj = obj), comm)
+    } else {
+        master.objects <- objects(envir = .GlobalEnv)
+        object.values <- mget(master.objects, envir = .GlobalEnv,
+                              inherits = FALSE,
+                              ifnotfound = vector("list", length(master.objects)))
+        for (i in seq_along(master.objects))
+            .npRmpi_bcast_object_to_slaves(
+                list(objname = master.objects[i], obj = object.values[[i]]), comm)
+    }
+}
+
+mpi.bcast.Rfun2slave <- function(comm = 1) {
+    master.fun <- objects(envir = .GlobalEnv)
+    fun.values <- mget(master.fun, envir = .GlobalEnv, inherits = FALSE,
+                       ifnotfound = vector("list", length(master.fun)))
+    sync.index <- which(vapply(fun.values, is.function, logical(1)))
+    for (i in sync.index)
+        .npRmpi_bcast_object_to_slaves(
+            list(objname = master.fun[i], obj = fun.values[[i]]), comm)
 }
 
 mpi.bcast.data2slave <- function(obj, comm=1, buffunit=100){

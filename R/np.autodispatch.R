@@ -158,6 +158,8 @@
   frame <- .npRmpi_invocation_frame(id)
   if (exists(name, envir = frame, inherits = FALSE))
     stop("autodispatch private publication collision", call. = FALSE)
+  # A serialization failure must leave workers idle and this frame untouched.
+  prepared <- serialize(list(objname = name, obj = value), NULL)
   assign(name, value, envir = frame)
   receive <- substitute(
     get(".npRmpi_invocation_receive", envir = asNamespace("npRmpi"),
@@ -166,7 +168,7 @@
     get(".npRmpi_invocation_publish", envir = asNamespace("npRmpi"),
         inherits = FALSE)(ID), list(ID = id))
   .npRmpi_bcast_cmd_expr(receive, comm = comm, caller.execute = FALSE)
-  mpi.bcast.Robj(list(objname = name, obj = value), rank = 0L, comm = comm)
+  .npRmpi_bcast_prepared(prepared, rank = 0L, comm = comm)
   .npRmpi_bcast_cmd_expr(publish, comm = comm, caller.execute = FALSE)
   invisible(NULL)
 }

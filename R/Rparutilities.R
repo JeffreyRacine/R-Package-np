@@ -184,9 +184,10 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     #if (length(arg) > 0) 
     #    deparse(arg)
     #tag.ret <- c(tag, ret, simplify)
+    prepared <- serialize(list(scmd = scmd, arg = arg), NULL)
     mpi.bcast.cmd(.mpi.worker.exec, tag=tag, ret=ret, simplify=simplify, comm = comm)
     #mpi.bcast(as.integer(tag.ret), type=1, comm=comm)
-    mpi.bcast.Robj(list(scmd=scmd, arg=arg), comm=comm)
+    .npRmpi_bcast_prepared(prepared, comm = comm)
 
     if (ret){
         size <- mpi.comm.size(comm) 
@@ -579,9 +580,10 @@ mpi.parSim <- function(n=100,rand.gen=rnorm, rand.arg=NULL,
             stop("sim.seq is not in right order")
 
     simplify <- npValidateScalarLogical(simplify, "simplify")
+    prepared <- serialize(list(rand.gen = rand.gen, rand.arg = rand.arg,
+                               stat = statistic, stat.arg = list(...)), NULL)
     mpi.bcast.cmd(.mpi.worker.sim, n=n, nsim=nsim, run=run, comm=comm)  
-    mpi.bcast.Robj(list(rand.gen=rand.gen, rand.arg=rand.arg,
-                        stat=statistic, stat.arg=list(...)), comm=comm)
+    .npRmpi_bcast_prepared(prepared, comm = comm)
 
     #nnr <- c(n,nsim,run)
     #mpi.bcast(as.integer(nnr),type=1, comm=comm)

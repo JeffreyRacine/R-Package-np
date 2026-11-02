@@ -1,5 +1,14 @@
 # npRmpi 0.80-2 (development)
 
+- A computation error now remains primary when an MPI command also receives a
+  deferred interrupt. The interrupt is retained as secondary condition evidence,
+  and failed publication rollback completes before control returns to the caller.
+
+- Scheduled object broadcasts, scatter, remote execution and parallel-simulation
+  helpers prepare their payloads before asking workers to receive them. Local
+  serialization failures therefore leave peers available for subsequent work.
+  The scatter-to-slaves wrapper also resolves its package-owned receiver explicitly.
+
 - Native-vector unconditional density and distribution results now finalize
   generated variable labels consistently in retained training data and bandwidth
   selection metadata. Corrected inference no longer rejects these otherwise
