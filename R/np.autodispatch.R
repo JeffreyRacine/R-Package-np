@@ -1157,6 +1157,11 @@
   }
   if (!is.null(tmpreplace) && length(tmpreplace))
     res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpreplace)
+  metadata <- payload[["public.metadata", exact = TRUE]]
+  if (!is.null(metadata)) {
+    res <- .npRmpi_native_names_apply(res, metadata$names)
+    res <- .npRmpi_bw_formula_apply(res, metadata$formula)
+  }
   publication.ack <- .npRmpi_lease_prepare_local(res, publication)
   if (identical(publication$kind, "leased_public"))
     .npRmpi_lease_commit_local(publication)
@@ -2666,6 +2671,11 @@
     return(x)
   }
 
+  # A formula is also a call. Its symbols belong to its formula owner, not
+  # to the transport argument map, so preserve it before reconstructing calls.
+  if (inherits(x, "formula"))
+    return(x)
+
   # Single-bracket list assignment preserves explicit NULL entries and arity.
   if (is.call(x)) {
     xlist <- as.list(x)
@@ -2696,9 +2706,6 @@
     }
     return(as.pairlist(xlist))
   }
-
-  if (inherits(x, "formula"))
-    return(x)
 
   x
 }
@@ -2810,7 +2817,8 @@
 .npRmpi_distributed_call_impl <- function(mc,
                                           caller_env = parent.frame(),
                                           comm = 1L,
-                                          warn_nested = FALSE) {
+                                          warn_nested = FALSE,
+                                          public.metadata = NULL) {
   .npRmpi_fanout_assert_idle(comm)
   mc <- .npRmpi_autodispatch_expand_dots_call(mc)
   t.start <- proc.time()
@@ -2993,7 +3001,9 @@
     opt.vals = opt.vals,
     opt.verify = opt.verify,
     lease.bindings = prepared$lease.bindings,
-    publication = publication
+    publication = publication,
+    public.metadata = if (is.null(public.metadata)) NULL else
+      .npRmpi_bw_metadata_wire(public.metadata)
   )
   if (isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE))) {
     head <- prepared$call[[1L]]
@@ -3102,11 +3112,14 @@
   rec <- make.rec()
 
   if (is.list(result)) {
+    result <- .npRmpi_autodispatch_sanitize_object(result, tmpvals = tmpreplace)
+    result <- .npRmpi_bw_restore_public_owner(result, prepared$lease.replacements)
+    if (!is.null(public.metadata)) {
+      result <- .npRmpi_native_names_apply(result, public.metadata$names)
+      result <- .npRmpi_bw_formula_apply(result, public.metadata$formula)
+    }
     result <- .npRmpi_autodispatch_attach_timing(
-      .npRmpi_autodispatch_tag_result(
-        .npRmpi_autodispatch_sanitize_object(result, tmpvals = tmpreplace),
-        mode = "auto", publication = publication
-      ),
+      .npRmpi_autodispatch_tag_result(result, mode = "auto", publication = publication),
       rec
     )
   } else if (is.call(result)) {
@@ -3228,7 +3241,13 @@
   mc <- .npRmpi_autodispatch_bind_data_promises(mc, owner = sys.frame(method),
     owner.call = owner.call, definition = definition,
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
-  result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE)
+  producer <- .npRmpi_lease_producer(mc)
+  metadata <- if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw"))
+    list(names = .npRmpi_native_name_plan(definition, sys.frame(method),
+      if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv()),
+      formula = .npRmpi_bw_formula_owner_plan(producer)) else NULL
+  result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env,
+    comm = comm, warn_nested = TRUE, public.metadata = metadata)
   if (inherits(result, c("bandwidth", "dbandwidth", "npdensity", "npdistribution")))
     return(.npRmpi_autodispatch_finalize_unleased_names(result, mc, definition,
       owner = sys.frame(method),

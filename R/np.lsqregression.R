@@ -1341,14 +1341,12 @@ nplsqregbw.formula <-
     train.omit <- attr(mf, "na.action")
     ydat <- model.response(mf)
     xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
+    .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
+      "nplsqregbw", match.call(expand.dots = FALSE), parent.frame(),
+      bws, mf, NULL, ynames = .nplsqreg_formula_response_name(bws),
+      scalar.children = length(tau) > 1L)
     out <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = tau), dots))
-    out <- .nplsqreg_record_omit(out, attr(mf, "na.action"))
-    out <- .nplsqreg_retain_formula_terms(out, bws, attr(mf, "terms"))
-    out <- .nplsqreg_set_response_name(
-      out, .nplsqreg_formula_response_name(bws))
-    out$call <- match.call(expand.dots = FALSE)
-    out$call <- .nplsqreg_describe_call(out$call, parent.frame())
-    out
+    .npRmpi_bw_formula_finish(out, .npRmpi.bw.metadata)
   }
 
 .nplsqreg_stored_training_error <- function(controls) {

@@ -47,24 +47,12 @@ npindexbw.formula <-
     ydat <- model.response(mf)
     xdat <- .np_index_formula_xdat(mf)
 
+    .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
+      "npindexbw", match.call(expand.dots = FALSE), parent.frame(),
+      formula, mf, capture$na.action)
     tbw <- do.call(npindexbw, c(list(xdat = xdat, ydat = quote(ydat)), list(...)))
 
-    ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- match.call(expand.dots = FALSE)
-    environment(tbw$call) <- parent.frame()
-    tbw$formula <- formula
-    tbw$rows.omit <- as.vector(attr(mf,"na.action"))
-    tbw$nobs.omit <- length(tbw$rows.omit)
-    tbw$terms <- attr(mf,"terms")
-    tbw <- .np_bws_retain_formula_training(tbw, mf, capture$na.action)
-
-    tbw <-
-      updateBwNameMetadata(nameList =
-                           list(ynames =
-                                attr(mf, "names")[attr(tbw$terms, "response")]),
-                           bws = tbw)
-
-    tbw
+    .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
 
 npindexbw.NULL <-

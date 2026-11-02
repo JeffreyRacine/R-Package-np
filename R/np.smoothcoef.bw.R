@@ -85,25 +85,12 @@ npscoefbw.formula <-
     dots <- list(...)
     .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], mf)
     dots$.np.formula.state <- NULL
+    .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
+      "npscoefbw", .np_formula_call_public(match.call(expand.dots = FALSE)), parent.frame(),
+      formula, mf, capture$na.action, chromoly = chromoly)
     tbw <- do.call(npscoefbw, c(bw.args, dots))
 
-    ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
-    environment(tbw$call) <- parent.frame()
-    tbw$formula <- formula
-    tbw$rows.omit <- as.vector(attr(mf,"na.action"))
-    tbw$nobs.omit <- length(tbw$rows.omit)
-    tbw$terms <- attr(mf,"terms")
-    tbw <- .np_bws_retain_formula_training(tbw, mf, capture$na.action)
-    tbw$chromoly <- chromoly
-
-    tbw <-
-      updateBwNameMetadata(nameList =
-                           list(ynames =
-                                attr(mf, "names")[attr(tbw$terms, "response")]),
-                           bws = tbw)
-
-    tbw
+    .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
 
 npscoefbw.NULL <-

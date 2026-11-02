@@ -31,24 +31,16 @@ npplregbw.formula <-
     dots <- list(...)
     .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], frame)
     dots$.np.formula.state <- NULL
+    .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
+      "npplregbw", .np_formula_call_public(match.call(expand.dots = FALSE)), parent.frame(),
+      formula, frame, capture$na.action, terms = attr(roles$yz, "terms"), xterms = attr(roles$x, "terms"),
+      chromoly = spec$chromoly, ynames = names(roles$yz)[attr(attr(roles$yz, "terms"), "response")])
     tbw <- do.call(npplregbw,
                   c(list(xdat = roles$x, ydat = model.response(roles$yz),
                          zdat = roles$yz[, .np_formula_term_names(spec$chromoly[[3L]]), drop = FALSE]),
                     dots))
 
-    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
-    environment(tbw$call) <- parent.frame()
-    tbw$formula <- formula
-    tbw$rows.omit <- as.vector(attr(frame, "na.action"))
-    tbw$nobs.omit <- length(tbw$rows.omit)
-    tbw$terms <- attr(roles$yz, "terms")
-    tbw$xterms <- attr(roles$x, "terms")
-    tbw <- .np_bws_retain_formula_training(tbw, frame, capture$na.action)
-    tbw$chromoly <- spec$chromoly
-    tbw <- updateBwNameMetadata(nameList = list(ynames =
-      names(roles$yz)[attr(tbw$terms, "response")]), bws = tbw)
-    tbw$bw$yzbw <- updateBwNameMetadata(list(ynames = tbw$ynames), tbw$bw$yzbw)
-    tbw
+    .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
 
 
