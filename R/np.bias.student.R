@@ -162,7 +162,8 @@
     what="studentized corrected process")
   tasks <- .npRmpi_bootstrap_chunk_tasks(B,1024L,with.seeds=FALSE)
   tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks,function(task)
-    invisible(.np_bias_student_errors(.np_bias_student_error_scale(prepared,law),task$bsz,law)))
+    invisible(.np_bias_student_errors(.np_bias_student_error_scale(prepared,law),task$bsz,law)),
+    normal.draws=identical(law,"gaussian"))
   worker <- function(task,prepared,W,target,law,signed) {
     .npRmpi_bootstrap_use_task_rng(task)
     t(.np_bias_student_chunk(prepared,W,target,task$bsz,law,signed=signed))

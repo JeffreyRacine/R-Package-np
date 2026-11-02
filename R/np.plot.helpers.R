@@ -2025,7 +2025,26 @@
   })
 }
 
-.npRmpi_bootstrap_attach_rng_stream <- function(tasks, advance) {
+.npRmpi_bootstrap_require_normal_rng <- function() {
+  if (!identical(RNGkind()[2L], "user-supplied") ||
+      !isTRUE(.npRmpi_has_active_slave_pool()))
+    return(invisible(NULL))
+  # A seed header does not load the caller's C normal generator on workers.
+  # Query availability without changing any rank's RNG selection or state.
+  command <- quote(base::local({
+    available <- !is.null(tryCatch(getNativeSymbolInfo("user_norm_rand"),
+                                  error = function(e) NULL))
+    get("mpi.allreduce", envir = asNamespace("npRmpi"), inherits = FALSE)(
+      as.integer(available), type = 1L, op = "min", comm = 1L)
+  }))
+  available <- .npRmpi_bcast_cmd_expr(command, comm = 1L, caller.execute = TRUE)
+  if (!identical(as.integer(available), 1L))
+    stop("distributed normal draws require the user-supplied normal RNG implementation on every rank; load the same generator on all ranks or explicitly select a built-in normal RNG",
+         call. = FALSE)
+  invisible(NULL)
+}
+
+.npRmpi_bootstrap_attach_rng_stream <- function(tasks, advance, normal.draws = FALSE) {
   if (!is.list(tasks) || !length(tasks))
     return(tasks)
   if (!is.function(advance))
@@ -2038,10 +2057,15 @@
        !isTRUE(.npRmpi_master_only_mode())))
     stop("distributed bootstrap cannot reproduce a user-supplied uniform RNG on workers; use a built-in RNG or an explicitly selected supported local execution route",
          call. = FALSE)
+  if (isTRUE(normal.draws))
+    .npRmpi_bootstrap_require_normal_rng()
   if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
     sample.int(1L, 0L)
 
+  custom.normal <- isTRUE(normal.draws) &&
+    identical(RNGkind()[2L], "user-supplied")
   for (i in seq_along(tasks)) {
+    if (custom.normal) tasks[[i]]$normal.kind <- "user-supplied"
     tasks[[i]]$rng_state <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
     advance(tasks[[i]])
   }
@@ -2051,6 +2075,8 @@
 }
 
 .npRmpi_bootstrap_use_task_rng <- function(task) {
+  if (identical(task[["normal.kind", exact = TRUE]], "user-supplied"))
+    RNGkind(normal.kind = "user-supplied")
   if (!is.null(task$rng_state)) {
     assign(".Random.seed", as.integer(task$rng_state), envir = .GlobalEnv)
   } else {
