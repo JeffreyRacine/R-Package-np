@@ -15,6 +15,8 @@
 
 * Multi-variable `np.pairs()` validates the numeric-response requirement before
   starting fits; single-variable density panels remain available for factors.
+  Explicit bandwidth values are passed once to each panel constructor and no
+  longer conflict with the fitted bandwidth object during MPI estimation.
 
 * Distributed bootstrap routes that replay raw RNG states now reject an
   effective user-supplied uniform generator before advancing the draw bank.

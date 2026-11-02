@@ -28,11 +28,15 @@ np.pairs <- function(y.vars, y.dat, ...) {
     if (y1 == y2) {
       ddat <- data.frame(v = y_dat[, y1])
       bw <- npudensbw(formula = ~v, dat = ddat, ...)
-      npudens(bws = bw, dat = ddat, ...)
+      # bws in dots belongs to the constructor; the fit uses its result.
+      fit <- function(bws = NULL, ...) npudens(bws = bw, dat = ddat, ...)
+      fit(...)
     } else {
       rdat <- data.frame(y = y_dat[, y2], x = y_dat[, y1])
       bw <- npregbw(formula = y ~ x, data = rdat, ...)
-      npreg(bws = bw, data = rdat, residuals = TRUE, ...)
+      fit <- function(bws = NULL, ...)
+        npreg(bws = bw, data = rdat, residuals = TRUE, ...)
+      fit(...)
     }
   })
   list(y_vars = y_vars, pair_names = pair_names, pair_kerns = pair_kerns)
