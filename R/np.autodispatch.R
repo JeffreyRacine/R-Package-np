@@ -3040,8 +3040,11 @@
         ), note = "autodispatch.lease.rollback"),
         silent = TRUE
       )
-      if (inherits(rolled, "try-error"))
+      if (inherits(rolled, "try-error")) {
         .npRmpi_lease_poison()
+        .npRmpi_invocation_drop(invocation)
+        cleaned <- TRUE  # Failed rollback leaves peers unsafe for another command.
+      }
       publication.released <- TRUE
     }
     if (inherits(eval.condition, "np_nn_zero_radius"))
@@ -3067,8 +3070,11 @@
         ), note = "autodispatch.lease.rollback"),
         silent = TRUE
       )
-      if (inherits(rolled, "try-error"))
+      if (inherits(rolled, "try-error")) {
         .npRmpi_lease_poison()
+        .npRmpi_invocation_drop(invocation)
+        cleaned <- TRUE  # Failed rollback leaves peers unsafe for another command.
+      }
       publication.released <- TRUE
       stop(paste(as.character(committed), collapse = " "), call. = FALSE)
     }
