@@ -1,14 +1,23 @@
 # np 0.80-2 (development)
 
+* Fitted regression plots reject retained categorical-response provenance before
+  reconstructing outcomes from fitted values and residuals. Conditional plots
+  validate supplied training types against bandwidth metadata before grid creation.
+  Valid numeric outcomes and categorical predictors retain their existing behavior.
+
+* Multi-variable `np.pairs()` validates the numeric-response requirement before
+  starting fits; single-variable density panels remain available for factors.
+
 * Density/CDF smoothed-percentile ranks retain the original nominal tail
   probability, avoiding an extra subtraction from one at integer rank
-  boundaries (for example alpha=0.1). This can narrow affected nondefault-alpha
+  boundaries (for example alpha=0.1). This can narrow or widen affected nondefault-alpha
   companion bands; the default alpha=0.05 construction is unchanged.
 
 * Calibrated smoothed-percentile resolution diagnostics now report the empirical
   indices actually used after companion enlargement. Regression rank details
   retain point-specific indices and the actual included-curve count. Endpoints,
-  calibration selections, resampling and RNG behavior are unchanged.
+  calibration selections, resampling and RNG behavior are unchanged. The aggregate
+  limited-resolution warning can consequently list different affected bands.
 
 * Public regression, single-index, smooth-coefficient and partial-linear plots
   enforce the numeric-response contract before coercion or NA indexing.

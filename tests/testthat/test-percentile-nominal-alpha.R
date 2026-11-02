@@ -31,3 +31,26 @@ for(B in c(19L,200L,999L))for(m in c(1L,2L,3L,50L))for(alpha in c(.05,.1,.2,.1-.
 }
 expect_equal(j,60L)
 })
+
+
+test_that("nominal ranks agree with independently enumerated boundary fixtures", {
+  # Expected order statistics are literal enumeration results; dyadic alpha
+  # fixtures have exact binary representations. The .1 row retains the repaired
+  # original-alpha contract. This does not choose decimal snapping for .29.
+  cases <- data.frame(B = c(16L, 16L, 16L, 32L, 32L, 64L, 200L),
+    m = c(1L, 2L, 4L, 1L, 4L, 2L, 1L),
+    alpha = c(.125, .125, .125, .1875, .375, .375, .1),
+    pointwise = c(2L, 2L, 2L, 4L, 7L, 13L, 11L),
+    bonferroni = c(2L, 1L, 1L, 4L, 2L, 7L, 11L))
+  for (i in seq_len(nrow(cases))) {
+    row <- cases[i, ]
+    curves <- matrix(rep(seq_len(row$B), row$m), row$m, byrow = TRUE)
+    p <- list(m = row$m, B = row$B, tile = 17L, bound = c(0, row$B + 1),
+      get = function(ii) curves[ii, , drop = FALSE])
+    result <- .np_udens_mx1$scan(p, nominal = 1 - row$alpha,
+                                nominal.alpha = row$alpha)
+    at <- match(1 - row$alpha, result$q)
+    expect_equal(result$raw.k$pointwise[at], row$pointwise)
+    expect_equal(result$raw.k$bonferroni[at], row$bonferroni)
+  }
+})
