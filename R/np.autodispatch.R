@@ -3047,10 +3047,16 @@
       }
       publication.released <- TRUE
     }
-    if (inherits(eval.condition, "np_nn_zero_radius"))
+    if (inherits(eval.condition, "npRmpi_coordinated_error")) {
+      cause <- eval.condition[["cause", exact = TRUE]]
+      secondary <- attr(eval.condition, ".npRmpi.secondary.interrupt", exact = TRUE)
+      if (!is.null(secondary) &&
+          is.null(attr(cause, ".npRmpi.secondary.interrupt", exact = TRUE)))
+        attr(cause, ".npRmpi.secondary.interrupt") <- secondary
+      stop(cause)
+    }
+    if (inherits(eval.condition, "condition"))
       stop(eval.condition)
-    if (inherits(eval.condition, "npRmpi_coordinated_error"))
-      stop(eval.condition[["cause", exact = TRUE]])
     stop(paste(as.character(eval.out), collapse = " "), call. = FALSE)
   }
   result <- eval.out

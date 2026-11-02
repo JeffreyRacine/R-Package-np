@@ -119,11 +119,19 @@
   )
   scope.interrupted <- .npRmpi_mpi_interrupt_scope(2L)
   scope.closed <- TRUE
+  # A completed command failure owns rollback. Do not let a concurrent SIGINT
+  # replace it before the caller can release its acknowledged publication.
+  if (!is.null(caught)) {
+    if (scope.interrupted && inherits(caught, "error") &&
+        is.null(attr(caught, ".npRmpi.secondary.interrupt", exact = TRUE)))
+      attr(caught, ".npRmpi.secondary.interrupt") <- .np_nomad_interrupt_condition(
+        "MPI-backed computation also interrupted by user"
+      )
+    stop(caught)
+  }
   if (scope.interrupted)
     stop(.np_nomad_interrupt_condition(
       "MPI-backed computation interrupted by user"
     ))
-  if (!is.null(caught))
-    stop(caught)
   value
 }
