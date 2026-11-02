@@ -10,12 +10,14 @@ test_that("package command temporaries do not occupy worker global bindings", {
     for (collision in c(TRUE, FALSE)) {
       if (collision) {
         rexec(local({
-          for (key in c("ans", "exec.step", "run", "fn"))
+          for (key in c("ans", "exec.step", "run", "fn",
+                           "result", "value", "old.ctx", "old.disable"))
             assign(key, paste0("USER_", key), .GlobalEnv)
         }), ret = FALSE)
       } else {
         rexec(local({
-          keys <- intersect(c("ans", "exec.step", "run", "fn"),
+          keys <- intersect(c("ans", "exec.step", "run", "fn",
+                           "result", "value", "old.ctx", "old.disable"),
                             ls(.GlobalEnv, all.names = TRUE))
           if (length(keys)) rm(list = keys, envir = .GlobalEnv)
         }), ret = FALSE)
@@ -27,11 +29,17 @@ test_that("package command temporaries do not occupy worker global bindings", {
       b <- npregbw(y ~ x, data = d, bws = 0.3, bandwidth.compute = FALSE)
       fit <- npreg(bws = b)
       stopifnot(all(is.finite(fitted(fit))))
+      H <- npreghat(b, txdat = d["x"])
+      stopifnot(identical(dim(H), c(31L, 31L)), all(is.finite(H)))
+      failed <- try(npreghat(b, txdat = d["x"], output = "apply"), silent = TRUE)
+      stopifnot(inherits(failed, "try-error"))
+      stopifnot(identical(H, npreghat(b, txdat = d["x"])))
       rm(b, fit)
       invisible(gc())
       get(".npRmpi_lease_drain_pending", ns)()
       seen <- rexec(local({
-        vapply(c("ans", "exec.step", "run", "fn"), function(key) {
+        vapply(c("ans", "exec.step", "run", "fn",
+                           "result", "value", "old.ctx", "old.disable"), function(key) {
           if (!exists(key, .GlobalEnv, inherits = FALSE)) return("absent")
           value <- get(key, .GlobalEnv)
           if (identical(value, paste0("USER_", key))) "sentinel" else "overwritten"

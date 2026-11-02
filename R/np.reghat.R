@@ -2199,7 +2199,7 @@ npreghat.rbandwidth <-
         s = s,
         deriv = deriv
       ))
-      expr <- substitute({
+      expr <- substitute(base::local({
         old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
         old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
         options(npRmpi.autodispatch.context = TRUE)
@@ -2256,7 +2256,7 @@ npreghat.rbandwidth <-
           )
         })
         result
-      }, list(
+      }), list(
         NOEX = no.ex,
         BWS = bws,
         TXDAT = txdat,
