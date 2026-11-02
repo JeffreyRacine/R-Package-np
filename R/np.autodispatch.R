@@ -3212,6 +3212,10 @@
     owner.call = owner.call, definition = definition,
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
   result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE)
+  if (inherits(result, c("bandwidth", "dbandwidth", "npdensity", "npdistribution")))
+    return(.npRmpi_autodispatch_finalize_unleased_names(result, mc, definition,
+      owner = sys.frame(method),
+      caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv()))
   # Transport symbols are implementation details, never public variable names.
   # Change only leaked labels; supplied names and formula metadata stay intact.
   if (is.list(result)) {

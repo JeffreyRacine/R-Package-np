@@ -1,5 +1,11 @@
 # npRmpi 0.80-2 (development)
 
+- Native-vector unconditional density and distribution results now finalize
+  generated variable labels consistently in retained training data and bandwidth
+  selection metadata. Corrected inference no longer rejects these otherwise
+  valid fits because of internal transport names. Supplied column names and
+  external bandwidth provenance are preserved.
+
 * MPI hat-matrix broadcasts keep internal temporaries local to each invocation.
   Failed publication rollback now preserves the primary error and avoids another
   cleanup command after the session has become unsafe to reuse.
