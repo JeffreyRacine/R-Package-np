@@ -21,7 +21,11 @@ These arguments identify the variables, data, and pair specifications to plot.
 
 
   \item{y.dat}{
-    data frame containing the variables listed in \code{y.vars}.
+    data frame containing the variables listed in \code{y.vars}. With two or
+    more distinct selected variables, each must be a numeric (integer or double)
+    response vector, because each appears as an off-diagonal regression outcome.
+    Factors, ordered factors and logical responses are rejected before fitting;
+    their integer codes are not treated as numeric outcomes.
   }
 
 

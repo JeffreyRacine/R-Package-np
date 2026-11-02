@@ -12,6 +12,13 @@ np.pairs <- function(y.vars, y.dat, ...) {
   if (any(!y_vars %in% names(y_dat)))
     stop("all elements of 'y.vars' must be column names in 'y.dat'")
 
+  # Every selected column is a response in an off-diagonal regression.
+  # Diagnose invalid outcomes before starting any bandwidth searches or fits.
+  if (length(unique(y_vars)) > 1L)
+    for (variable in unique(y_vars))
+      .np_require_numeric_response(y_dat[[variable]], "np.pairs",
+        paste0("y.dat[[\"", variable, "\"]]"))
+
   pair_names <- expand.grid(y_vars, y_vars, stringsAsFactors = FALSE)
   pair_kerns <- lapply(seq_len(nrow(pair_names)), function(i) {
     y1 <- pair_names[i, 1]
