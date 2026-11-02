@@ -1,5 +1,21 @@
 # npRmpi 0.80-2 (development)
 
+* MPI hat-matrix broadcasts keep internal temporaries local to each invocation.
+  Failed publication rollback now preserves the primary error and avoids another
+  cleanup command after the session has become unsafe to reuse.
+
+* Normal-consuming distributed calibration checks that a selected custom normal
+  generator is loaded on every rank, then initializes that generator before task
+  replay. Built-in generators and uniform-only paths keep their existing streams.
+
+* Fitted regression plots reject retained categorical-response provenance before
+  reconstructing outcomes from fitted values and residuals. Conditional plots
+  validate supplied training types against bandwidth metadata before grid creation.
+  Valid numeric outcomes and categorical predictors retain their existing behavior.
+
+* Multi-variable `np.pairs()` validates the numeric-response requirement before
+  starting fits; single-variable density panels remain available for factors.
+
 * Distributed bootstrap routes that replay raw RNG states now reject an
   effective user-supplied uniform generator before advancing the draw bank.
   Built-in substreams, precomputed/deterministic fanout and explicit supported
@@ -7,13 +23,14 @@
 
 * Density/CDF smoothed-percentile ranks retain the original nominal tail
   probability, avoiding an extra subtraction from one at integer rank
-  boundaries (for example alpha=0.1). This can narrow affected nondefault-alpha
+  boundaries (for example alpha=0.1). This can narrow or widen affected nondefault-alpha
   companion bands; the default alpha=0.05 construction is unchanged.
 
 * Calibrated smoothed-percentile resolution diagnostics now report the empirical
   indices actually used after companion enlargement. Regression rank details
   retain point-specific indices and the actual included-curve count. Endpoints,
-  calibration selections, resampling and RNG behavior are unchanged.
+  calibration selections, resampling and RNG behavior are unchanged. The aggregate
+  limited-resolution warning can consequently list different affected bands.
 
 * Package-generated MPI commands keep their temporary bindings in private
   child frames, preserving worker global objects and explicit user broadcasts.
