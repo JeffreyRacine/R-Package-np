@@ -51,10 +51,10 @@
     if (family == 'distribution') args <- c(args,
       mget(c('gdat', 'do.full.integral', 'ngrid', 'memfac'), frame, inherits = FALSE))
   }
-  complete <- !evaluation && .np_bw_procedure_values(args)
+  complete <- (!evaluation || !compute) && .np_bw_procedure_values(args)
   value[['selection.procedure']] <- list(version = 1L, family = family,
     rule = rule, complete = complete,
-    reason = if (evaluation) 'evaluation-only object' else if (!complete)
+    reason = if (evaluation && compute) 'evaluation-only object' else if (!complete)
       'selection settings are not value-only data' else NULL,
     arguments = if (complete) args else NULL,
     signature = .np_bw_procedure_signature(value))
@@ -91,6 +91,12 @@
         !all(c('bws', 'bandwidth.compute', 'bwmethod', 'bwscaling', 'bwtype') %in% names(args)) ||
         !identical(args[['bandwidth.compute', exact = TRUE]], descriptor$rule != 'manual') ||
         !identical(args[['bwmethod', exact = TRUE]], bws[['method', exact = TRUE]]))
+      stop('invalid bandwidth selection.procedure arguments', call. = FALSE)
+    kernel <- .np_bw_procedure_kernel(bws)
+    start <- args[['bws', exact = TRUE]]
+    if (!identical(args[names(kernel)], kernel) || !is.numeric(start) ||
+        length(start) != length(bws[['bw', exact = TRUE]]) || any(!is.finite(start)) ||
+        (descriptor$rule == 'manual' && !identical(start, bws[['bw', exact = TRUE]])))
       stop('invalid bandwidth selection.procedure arguments', call. = FALSE)
     status <- 'retained-rule'; rule <- descriptor$rule
   } else if (is.null(descriptor) &&

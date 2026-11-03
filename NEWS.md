@@ -1,5 +1,9 @@
 # npRmpi 0.80-2 (development)
 
+- Density/CDF outer selection rejects replay arguments inconsistent with retained
+  kernel, scaling and manual-bandwidth metadata. Explicit manual selection retains
+  its replay rule when `eval.only = TRUE`.
+
 - Leased regression, index, smooth-coefficient, partially linear and quantile
   bandwidths finalize public names and formula metadata before publication.
   Native/formula fits retain supported worker-store reuse; local formula lookup
