@@ -7,6 +7,65 @@ procedure_fixture <- function(method = 'cv.ml', manual = FALSE, scaled = FALSE) 
     xnames = 'x', icon = TRUE, iuno = FALSE, iord = FALSE)
 }
 
+test_that('density default selection forwards explicit transform.bounds', {
+  calls <- list()
+  selector <- function(dat, bws, ...) {
+    calls[[length(calls) + 1L]] <<- list(...)
+    bws
+  }
+  local_mocked_bindings(npudensbw.bandwidth = selector)
+  d <- data.frame(x = seq(-1, 1, length.out = 8))
+  npudensbw.default(dat = d, bws = .4, bandwidth.compute = FALSE)
+  npudensbw.default(dat = d, bws = .4, bandwidth.compute = FALSE, transform.bounds = FALSE)
+  npudensbw.default(dat = d, bws = .4, bandwidth.compute = FALSE, transform.bounds = TRUE)
+  expect_null(calls[[1L]][['transform.bounds']])
+  expect_identical(calls[[2L]][['transform.bounds']], FALSE)
+  expect_identical(calls[[3L]][['transform.bounds']], TRUE)
+})
+
+test_that('complete replay arguments agree with retained invariant metadata', {
+  replacements <- list(bwscaling = TRUE, bwtype = 'generalized_nn',
+    ckertype = 'epanechnikov', ckerorder = 4L, ckerbound = 'range',
+    ckerlb = -2, ckerub = 2, ukertype = 'liracine', okertype = 'wangvanryzin',
+    bws = .8)
+  for (family in c('density', 'distribution')) {
+    b <- procedure_fixture(if (family == 'density') 'cv.ml' else 'cv.cdf', manual = TRUE)
+    frame <- list2env(list(bandwidth.compute = FALSE, eval.only = FALSE), parent = emptyenv())
+    valid <- .np_bw_procedure_record(b, b, family, frame)
+    for (field in names(replacements)) {
+      bad <- valid
+      bad$selection.procedure$arguments[field] <- replacements[field]
+      expect_error(.np_bw_outer_selection(bad, family), 'invalid.*arguments', info = field)
+    }
+    for (start in list(c(.4, .4), Inf, NA_real_, '0.4')) {
+      bad <- valid; bad$selection.procedure$arguments$bws <- start
+      expect_error(.np_bw_outer_selection(bad, family), 'invalid.*arguments')
+    }
+    bad <- valid; bad$selection.procedure$arguments$ckertype <- NULL
+    expect_error(.np_bw_outer_selection(bad, family), 'invalid.*arguments')
+    expect_identical(.np_bw_outer_selection(valid, family)$diagnostics$rule, 'manual')
+    cv <- valid; cv$selection.procedure$rule <- 'cv'
+    cv$selection.procedure$arguments$bandwidth.compute <- TRUE
+    cv$selection.procedure$arguments$bws <- .25
+    expect_identical(.np_bw_outer_selection(cv, family)$diagnostics$rule, 'cv')
+  }
+})
+
+test_that('evaluation-only does not erase an explicit manual replay rule', {
+  for (family in c('density', 'distribution')) {
+    b <- procedure_fixture(if (family == 'density') 'cv.ml' else 'cv.cdf', manual = TRUE)
+    frame <- list2env(list(bandwidth.compute = FALSE, eval.only = TRUE), parent = emptyenv())
+    value <- .np_bw_procedure_record(b, b, family, frame)
+    expect_true(value$selection.procedure$complete)
+    expect_null(value$selection.procedure$reason)
+    expect_identical(.np_bw_outer_selection(value, family)$diagnostics$rule, 'manual')
+    frame$bandwidth.compute <- TRUE
+    automatic <- .np_bw_procedure_record(b, b, family, frame)
+    expect_false(automatic$selection.procedure$complete)
+    expect_identical(automatic$selection.procedure$reason, 'evaluation-only object')
+  }
+})
+
 
 test_that('legacy outer samples are passed as data without evaluating term labels', {
   calls <- list()

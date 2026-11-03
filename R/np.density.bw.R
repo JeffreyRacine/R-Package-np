@@ -1214,7 +1214,7 @@ npudensbw.default <-
     dot.names <- names(dots)
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bandwidth.compute", "nmulti", "powell.remin", "bwsolver", "itmax", "ftol", "tol",
-               "small",
+               "small", "transform.bounds",
                "lbc.dir","dfc.dir","cfac.dir", "initc.dir", 
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
                "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init", 
