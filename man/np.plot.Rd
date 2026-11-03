@@ -409,6 +409,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
 }
 \details{
+  Experimental local-constant conditional CDF and density corrected bands are
+  available through \code{\link{np_conditional_bias_control}}. They require
+  explicit selection and preserve existing methods. Their bootstrap response law
+  is selected explicitly by \code{bootstrap="conditional-pilot"}, with
+  \code{calibration="symmetric-sd"} or \code{"asymmetric-sd"}; it is not pairs
+  resampling. Read the control help for correction differences, finite-grid
+  limits, signed returned offsets and known coverage limitations.
+
   For MPI startup/performance guidance (including message-passing tradeoffs and the manual-broadcast template), see \code{\link{npRmpi.init}} details and \code{inst/Rprofile}.
   Documentation guide: see \code{\link{np.kernels}} for kernels and
   \code{\link{np.options}} for global options.

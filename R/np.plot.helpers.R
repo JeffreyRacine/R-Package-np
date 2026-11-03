@@ -725,6 +725,11 @@
     candidates <- paste0(candidates, suffix)
   }
 
+  if (identical(construction,"conditional-pilot")) {
+    candidates <- c(sprintf("%s %s conditional-pilot band; corrected center with score safeguard%s", level, band,
+      if(band %in% c("simultaneous","all")) "; finite grid within panel" else ""),
+      sprintf("%s %s conditional-pilot; corrected center, score safeguard",level,band))
+  }
   list(
     method = method,
     band = band,
@@ -12937,6 +12942,10 @@ plotFactor <- function(f, y, ...){
 .np_plot_all_band_legend_labels <- function(plot.errors.method, construction = NULL) {
   method <- match.arg(as.character(plot.errors.method)[1L],
                       c("bootstrap", "asymptotic"))
+  if (identical(construction,"conditional-pilot"))
+    return(c(pointwise="Pointwise (score safeguard)",
+      simultaneous="Simultaneous (finite grid, score safeguard)",
+      bonferroni="Bonferroni (companion envelope)"))
   if (identical(method, "bootstrap") && identical(construction, "smoothed-percentile")) {
     return(c(pointwise = "Pointwise (percentiles)",
       simultaneous = "Simultaneous (calibrated percentile ranks)",
@@ -16000,7 +16009,8 @@ compute.default.error.range <- function(center, err) {
                                              error.request = NULL,
                                              allow_asymptotic_bias = FALSE,
                                              defer_block_selection = FALSE,
-                                               allow_residual = FALSE) {
+                                               allow_residual = FALSE,
+                                               allow_conditional_pilot = FALSE) {
   scalar_choice <- function(value, default) {
     if (is.null(value) || length(value) < 1L || is.na(value[1L])) default else value[1L]
   }
@@ -16015,7 +16025,8 @@ compute.default.error.range <- function(center, err) {
   plot.errors.method <- error.request$method
   plot.errors.boot.method <- match.arg(
     scalar_choice(plot.errors.boot.method, "wild"),
-    c("wild", "inid", "fixed", "geom", if (isTRUE(allow_residual)) "residual")
+    c("wild", "inid", "fixed", "geom", if (isTRUE(allow_residual)) "residual",
+      if (isTRUE(allow_conditional_pilot)) "conditional-pilot")
   )
   plot.errors.boot.nonfixed <- match.arg(
     scalar_choice(plot.errors.boot.nonfixed, "exact"),
