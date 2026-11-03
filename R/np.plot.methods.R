@@ -338,7 +338,7 @@ np_render_control <- function(style = c("band", "bar"),
       stop("unused plot argument: bootstrap list; use scalar bootstrap, B, and boot.control",
            call. = FALSE)
     bootstrap <- .np_plot_scalar_match(dots$bootstrap,
-                                       c("wild", "inid", "fixed", "geom", "residual"),
+                                       c("wild", "inid", "fixed", "geom", "residual", "conditional-pilot"),
                                        "bootstrap")
     dots$bootstrap <- NULL
     dots <- .np_plot_set_normalized_arg(dots, "bootstrap",
@@ -346,6 +346,9 @@ np_render_control <- function(style = c("band", "bar"),
   }
   if (has("B")) {
     B <- dots$B
+    if (inherits(dots[["bias.control",exact=TRUE]],"np_conditional_bias_control") &&
+        (!is.numeric(B) || length(B)!=1L || !is.finite(B) || B<2 || B!=floor(B) || B>.Machine$integer.max))
+      stop("conditional inference B must be an integer from 2 through .Machine$integer.max",call.=FALSE)
     if (!is.numeric(B) || length(B) != 1L || is.na(B) || B < 1)
       stop("B must be a positive numeric scalar", call. = FALSE)
     dots$B <- NULL
@@ -506,15 +509,18 @@ np_render_control <- function(style = c("band", "bar"),
   dots <- list(...)
   if (!is.null(dots[["bias.control", exact = TRUE]]))
     .np_udist_score_scope(dots[["bias.control", exact = TRUE]], inherits(bws, "dbandwidth"))
+  conditional.optin <- inherits(dots[["bias.control", exact=TRUE]], "np_conditional_bias_control")
+  if (conditional.optin && !inherits(bws,c("conbandwidth","condbandwidth")))
+    stop("np_conditional_bias_control requires conditional density/distribution plots",call.=FALSE)
   dots <- .np_plot_normalize_public_dots(dots, context = .plot_context,
-    allow_asymptotic_bias = identical(method, .np_plot_rbandwidth_engine) ||
+    allow_asymptotic_bias = conditional.optin || identical(method, .np_plot_rbandwidth_engine) ||
       identical(method, .np_plot_bandwidth_engine) ||
       identical(method, .np_plot_dbandwidth_engine) ||
       (identical(method, .np_plot_compat_dispatch) &&
        (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth") ||
         inherits(bws, "dbandwidth"))))
   if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&
-      !inherits(bws, c("rbandwidth", "bandwidth", "dbandwidth")))
+      !inherits(bws, c("rbandwidth", "bandwidth", "dbandwidth")) && !conditional.optin)
     stop("explicit bootstrap calibration currently requires bias-corrected regression or supported density/distribution inference", call. = FALSE)
   if (isTRUE(dots[["plot.errors.boot.calibration", exact = TRUE]] %in% "percentile-tails") &&
       !inherits(bws, "bandwidth"))
@@ -523,6 +529,8 @@ np_render_control <- function(style = c("band", "bar"),
       !(inherits(bws, "rbandwidth") &&
         identical(dots[["plot.errors.boot.calibration", exact = TRUE]], "smoothed-percentile")))
     stop('bootstrap="residual" requires regression calibration="smoothed-percentile"', call. = FALSE)
+  if (identical(dots[["plot.errors.boot.method", exact=TRUE]], "conditional-pilot") && !conditional.optin)
+    stop('bootstrap="conditional-pilot" requires np_conditional_bias_control()',call.=FALSE)
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 
@@ -582,7 +590,7 @@ np_render_control <- function(style = c("band", "bar"),
     (identical(method, .np_plot_compat_dispatch) &&
      any(c("rbandwidth", "plbandwidth", "sibandwidth",
            "conbandwidth", "condbandwidth") %in% class(bws)))
-  progress.enabled <- identical(dots$plot.errors.method, "bootstrap") &&
+  progress.enabled <- (identical(dots$plot.errors.method, "bootstrap") || conditional.optin) &&
     !identical(dots$plot.errors.boot.nonfixed, "frozen")
   if (!owns.empty.rows && inherits(bws, c("bandwidth", "dbandwidth")))
     return(.np_plot_progress_run(
@@ -767,7 +775,8 @@ np_render_control <- function(style = c("band", "bar"),
     context = "plot.condensity"
   )
   dots <- list(...)
-  dots <- .np_plot_normalize_public_dots(dots, context = "plot.condensity")
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.condensity",
+    allow_asymptotic_bias = inherits(dots[["bias.control",exact=TRUE]],"np_conditional_bias_control"))
   dots <- .np_conditional_replay_proper(object, dots)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
@@ -779,7 +788,8 @@ np_render_control <- function(style = c("band", "bar"),
     context = "plot.condistribution"
   )
   dots <- list(...)
-  dots <- .np_plot_normalize_public_dots(dots, context = "plot.condistribution")
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.condistribution",
+    allow_asymptotic_bias = inherits(dots[["bias.control",exact=TRUE]],"np_conditional_bias_control"))
   dots <- .np_conditional_replay_proper(object, dots)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }

@@ -1,5 +1,15 @@
 # np 0.80-2 (development)
 
+
+* Add six experimental opt-in LC conditional density/CDF inference routes via
+  `np_conditional_bias_control()`: corrected asymptotic bands and explicit
+  `bootstrap="conditional-pilot"` symmetric/asymmetric SD bands. Existing
+  methods/defaults are unchanged. Density asymptotic uses jackknife correction;
+  density bootstrap and all three CDF routes use analytic correction. Returned
+  inference records absolute endpoints, signed offsets and finite-family scope.
+  Initial scalar Gaussian2/fixed-bandwidth and numerical workspace limits,
+  conservative subfamilies and small-sample coverage failures are documented.
+
 - Density bandwidth selection honors explicit `transform.bounds` through native
   and formula adapters, including outer smoothed-percentile selection.
 - Density/CDF outer selection rejects replay arguments inconsistent with retained
