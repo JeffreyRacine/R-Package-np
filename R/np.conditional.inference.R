@@ -88,7 +88,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
 
 .np_conditional_dispatch <- function(tasks, plan, family, m) {
   out <- matrix(0, sum(vapply(tasks, function(x) x$bsz, 0L)), m)
-  progress <- .np_plot_bootstrap_progress_begin(nrow(out), label="Conditional inference", unit="draws")
+  progress <- .np_plot_bootstrap_progress_begin(nrow(out), label="Conditional inference", unit="rep")
   on.exit(.np_plot_progress_end(progress), add=TRUE)
   for (task in tasks) {
     ii <- seq.int(task$start, length.out=task$bsz)

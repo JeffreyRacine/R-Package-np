@@ -97,6 +97,6 @@ p <- plot(model, errors="bootstrap", bootstrap="conditional-pilot",
           output="plot-data")
 }
 }
-\seealso{\code{\link{np.plot}}, \code{\link{np_boot_control}},
+\seealso{\code{\link{plot.np}}, \code{\link{np_boot_control}},
 \code{\link{npcdist}}, \code{\link{npcdens}}}
 \keyword{nonparametric}
