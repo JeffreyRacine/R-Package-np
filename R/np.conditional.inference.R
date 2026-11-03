@@ -92,7 +92,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   worker <- function(task, plan, family) .np_conditional_root_block(task,plan,family)
   out <- .npRmpi_bootstrap_run_fanout(tasks, worker, ncol.out=m,
     what="conditional inference", profile.where="mpi.applyLB:conditional-inference",
-    progress.label="Conditional inference", progress.unit="draws",
+    progress.label="Conditional inference", progress.unit="rep",
     required.bindings=list(.np_conditional_root_block=.np_conditional_root_block,
       .np_conditional_cp_apply=.np_conditional_cp_apply), plan=plan, family=family)
   t(out)
