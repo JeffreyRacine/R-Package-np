@@ -376,6 +376,15 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 
 \section{Usage Issues}{
 
+  In \pkg{npRmpi}, the distributed bootstrap planner is not qualified for
+  user-supplied uniform RNG replay. Some unsupported cases are not refused,
+  so obtaining a result does not establish reproducibility. Explicitly select
+  a built-in uniform generator, for example
+  \code{RNGkind(kind="Mersenne-Twister")}, and set the desired seed before
+  distributed bootstrap use. See \code{\link{npRmpi.init}} for the current
+  RNG and state-replay limitations. This does not change the selected
+  \code{boot.method}.
+
   If you are using data of mixed types, then it is advisable to use the
   \code{\link{data.frame}} function to construct your input data and not
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work

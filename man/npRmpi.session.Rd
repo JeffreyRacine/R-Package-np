@@ -107,6 +107,33 @@ Workflow quick-start guidance:
   \code{--vanilla}) and provide exactly one startup profile source.
 }
 
+\strong{Random-number generators and distributed replay.} Some bootstrap
+and calibration routes generate random-number states on the coordinator and
+replay them on workers. The current admission guard rejects user-supplied
+uniform generators on these routes, including generators preloaded on every
+worker. This is a limitation of distributed state replay, not a change to the
+requested resampling law. The package does not automatically choose another
+generator. To use a guarded route, explicitly select a built-in uniform
+generator before the call, for example
+\code{RNGkind(kind="Mersenne-Twister")}, and then set the desired seed.
+The plotting argument \code{random.seed} sets a seed; it does not select a
+different RNG implementation.
+
+Loading a generator library is distinct from initializing it for R, and a seed
+vector need not contain all of a custom generator's state. The separate
+\code{\link{npsigtest}} bootstrap planner is not qualified for distributed
+user-supplied uniform replay and does not consistently refuse it. Use a built-in
+uniform generator for that distributed bootstrap; absence of an error does not
+establish reproducibility. Custom normal generators have a separate availability
+requirement when a route draws normal variates: the implementation must be
+available on each participating rank. Availability alone does not establish
+replay of hidden custom-normal state.
+
+These limitations do not redefine unrelated local computations or RNGs that
+do not enter the affected replay routes. In particular,
+\code{options(npRmpi.autodispatch=FALSE)} controls estimator dispatch; it does
+not force bootstrap or plot coordinators to stop using workers.
+
 \strong{Performance note.} Wall-clock can differ across workflows even for
 identical statistical output. The main drivers are MPI message passing and
 startup/teardown behavior:

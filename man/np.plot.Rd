@@ -1164,6 +1164,15 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 }
 
 \section{Usage Issues}{
+
+  In \pkg{npRmpi}, distributed bootstrap or calibration routes that replay
+  RNG states can refuse a user-supplied uniform generator even when its library
+  is loaded on every worker. Select a built-in uniform generator explicitly
+  with \code{RNGkind(kind="Mersenne-Twister")} before invoking such a route.
+  The \code{random.seed} argument alone does not change the RNG implementation.
+  See \code{\link{npRmpi.init}} for the distributed replay limitations,
+  custom-normal distinction, and why disabling estimator auto-dispatch does
+  not necessarily disable bootstrap fanout.
   If you are using data of mixed types, then it is advisable to use the
   \code{\link{data.frame}} function to construct your input data and not
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as

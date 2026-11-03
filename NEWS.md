@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+- Help now explains the current distributed custom-uniform RNG replay refusal,
+  explicit built-in-generator selection, and the separate npsigtest limitation.
+  This is documentation only: it does not change RNG admission or claim to
+  restore preloaded custom-generator support.
+
 - Density/CDF outer selection rejects replay arguments inconsistent with retained
   kernel, scaling and manual-bandwidth metadata. Explicit manual selection retains
   its replay rule when `eval.only = TRUE`.
