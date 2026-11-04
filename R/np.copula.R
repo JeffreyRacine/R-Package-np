@@ -282,11 +282,27 @@ npcopula <- function(bws, ...) {
   )
 }
 
-.npcopula_display_values <- function(values, grid) {
+.npcopula_display_values <- function(values, grid, exact = FALSE) {
   if (length(values) != length(grid$row.order))
     stop("npcopula surface values are incompatible with the rendering grid")
   selected <- values[grid$display.rows]
-  if (!identical(unname(values), unname(selected[grid$display.cell])))
+  expanded <- selected[grid$display.cell]
+  same <- identical(unname(values), unname(expanded))
+  if (!same && !isTRUE(exact) && is.numeric(values)) {
+    # Computed values at exactly identical coordinates may differ by rounding.
+    # Bound the entire group's range (not adjacent pairs), with no absolute
+    # floor and no scale borrowed from another cell. Keep the original owner.
+    groups <- split(seq_along(values), grid$display.cell)
+    same <- all(vapply(groups, function(ii) {
+      v <- unname(values[ii])
+      reference <- unname(expanded[ii])
+      if (identical(v, reference)) return(TRUE)
+      if (any(!is.finite(v)) || any(!is.finite(reference))) return(FALSE)
+      limits <- range(v)
+      diff(limits) <= (32 * .Machine$double.eps) * max(abs(limits))
+    }, logical(1L)))
+  }
+  if (!same)
     stop("npcopula duplicate grid coordinates have conflicting surface values or interval endpoints",
          call. = FALSE)
   selected
