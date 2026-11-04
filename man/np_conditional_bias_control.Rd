@@ -5,12 +5,14 @@
 inference constructions. Existing plots and methods are unchanged when this
 control is omitted.}
 \usage{
-np_conditional_bias_control(construction = c("analytic", "jackknife"))
+np_conditional_bias_control(construction = c("analytic", "jackknife", "jackknife-mp1"))
 }
 \arguments{
 \item{construction}{The corrected functional. Use \code{"analytic"} for
 conditional CDF inference and conditional density bootstrap inference;
-use \code{"jackknife"} for conditional density asymptotic inference.}
+use \code{"jackknife"} for conditional density asymptotic inference.
+Use \code{"jackknife-mp1"} for the separate asymmetric studentized
+conditional density bootstrap described below.}
 }
 \value{A validated control object for the \code{bias.control} argument of
 \code{plot} applied to \code{npcdist} or \code{npcdens} fits or bandwidths.}
@@ -45,9 +47,24 @@ the fitted bandwidths minus the estimate at bandwidths enlarged by
 \eqn{\sqrt{2}} in both coordinates. All cross-covariance terms are retained.
 The density asymptotic and bootstrap corrections therefore differ deliberately.
 
+The separate density construction \code{"jackknife-mp1"} requires
+\code{errors="bootstrap"}, \code{bootstrap="conditional-pilot"} and
+\code{calibration="asymmetric-sd"} in \code{np_boot_control()}.
+It uses the same jackknife corrected functional as density asymptotic inference.
+Each complete corrected bootstrap root is divided by its own MP1 standard
+error. MP1 averages the original and resample pilot covariance matrices and
+adds one quarter of the sum of per-observation mean-difference outer products.
+This is the covariance of independent equal pilot mixtures for each training
+observation, retaining every correction cross term. Its variance is at least
+half the original pilot variance; this is an algebraic property, not a variance
+floor. Nonpositive or nonfinite component variances cause an error.
+Signed studentized roots are inverted using the original standard errors.
+The selector is currently restricted to asymmetric calibration; it does not
+change either existing analytic SD bootstrap construction.
+
 A nominal marginal sharp-score safeguard uses the certified range of each
 signed contribution and its heterogeneous variance bound. It augments the
-Gaussian or bootstrap intervals. The density asymptotic construction uses a
+Gaussian or bootstrap intervals. The density asymptotic and jackknife-MP1 constructions use a
 marginal hull; the other constructions also propagate required widths within
 explanatory slices. Companion hulls protect interval nesting. These are
 approximate confidence constructions, not finite-sample honesty guarantees.
@@ -68,7 +85,8 @@ in \eqn{(0,0.5)}; population coverage evidence is currently for nominal 95\% onl
 
 The returned object's \code{inference} component records absolute endpoints for
 all three bands, correction, pilot law, calibration, physical bandwidths,
-requested grid, scales and covariance provenance. For these new routes,
+requested grid, scales and covariance provenance. Jackknife-MP1 also records
+its construction, studentization, mixture weight and attained scale-ratio range. For these new routes,
 \code{bias.corrected + conderr[,1]} and
 \code{bias.corrected + conderr[,2]} recover the selected absolute endpoints.
 For \code{band="all"}, \code{conderr} represents the simultaneous band;
@@ -79,7 +97,11 @@ and density coverage at n=400 and 800. CDF plot subfamilies and marginal interva
 can be conservative above 99\%. Density bootstrap small-n studies failed lower
 coverage gates. These failures remain limitations; they do not establish
 uniform coverage, robustness to arbitrary DGPs, or adjustment for bandwidth
-selection uncertainty. The options are intended for further experimentation.
+selection uncertainty. Fresh paired Gaussian studies of asymmetric MP1 at n=400 and 800 retained
+481/512 and 488/512 simultaneous coverages, respectively, on the studied
+81-point random grids. These results qualify this experimental opt-in, not
+a general coverage or optimality guarantee. The options are intended for
+further experimentation.
 }
 \examples{
 \dontrun{
@@ -97,6 +119,13 @@ p <- plot(model, errors="bootstrap", bootstrap="conditional-pilot",
           boot.control=np_boot_control(calibration="asymmetric-sd"),
           output="plot-data")
 npRmpi.quit()
+
+model.d <- npcdens(y ~ x, regtype="lc")
+p.d <- plot(model.d, errors="bootstrap", bootstrap="conditional-pilot",
+            center="bias-corrected", band="all", neval=9,
+            bias.control=np_conditional_bias_control("jackknife-mp1"),
+            boot.control=np_boot_control(calibration="asymmetric-sd"),
+            output="plot-data")
 }
 }
 \seealso{\code{\link{plot.np}}, \code{\link{np_boot_control}},

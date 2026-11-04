@@ -1,5 +1,12 @@
 # npRmpi 0.80-2 (development)
 
+* Add an experimental asymmetric jackknife-MP1 conditional density bootstrap
+  through `np_conditional_bias_control("jackknife-mp1")`. Complete corrected
+  roots use per-resample mixture studentizers, signed inversion, a marginal
+  safeguard and companion hulls. This explicit conditional-pilot opt-in leaves
+  existing analytic SD and asymptotic jackknife methods and defaults unchanged.
+  Symmetric MP1 and the original full-t research candidates remain private.
+
 
 * Add six experimental opt-in LC conditional density/CDF inference routes via
   `np_conditional_bias_control()`: corrected asymptotic bands and explicit

@@ -1,5 +1,5 @@
 # Explicit experimental conditional inference; incumbent NULL controls are unchanged.
-np_conditional_bias_control <- function(construction = c("analytic", "jackknife")) {
+np_conditional_bias_control <- function(construction = c("analytic", "jackknife", "jackknife-mp1")) {
   structure(list(construction = match.arg(construction), version = 1L),
             class = "np_conditional_bias_control")
 }
@@ -27,6 +27,12 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
       bws$cxkerorder != 2L || bws$cykerorder != 2L ||
       any(is.finite(c(bws$cxkerlb, bws$cxkerub, bws$cykerlb, bws$cykerub))))
     stop("conditional bias inference requires LC, one continuous X and Y, fixed unbounded Gaussian2 kernels, no gradients/quantiles/proper projection", call. = FALSE)
+  if (identical(control$construction,"jackknife-mp1")) {
+    if (cdf || method!="bootstrap" || !identical(law,"conditional-pilot") ||
+        !identical(calibration,"asymmetric-sd"))
+      stop('jackknife-mp1 requires density bootstrap, explicit conditional-pilot law and asymmetric-sd calibration',call.=FALSE)
+    return(TRUE)
+  }
   construction <- if (!cdf && method == "asymptotic") "jackknife" else "analytic"
   if (!identical(control$construction, construction))
     stop(sprintf('this conditional inference route requires construction="%s"', construction), call. = FALSE)
@@ -75,6 +81,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
 }
 
 .np_conditional_root_block <- function(task, plan, family) {
+  if (family == "jackknife-mp1") return(.np_conditional_mp1_block(task,plan))
   if (family == "gaussian") return(t(plan$factor %*% task$value))
   if (family == "cdf") return(t(.np_conditional_cp_apply(plan, task$value)))
   z <- plan$z; Y <- task$value; out <- matrix(0, z$m, task$bsz)
@@ -90,11 +97,17 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   # Coordinator-generated plain response/innovation blocks preserve the exact
   # serial stream and require no worker-side RNG replay or public refitting.
   worker <- function(task, plan, family) .np_conditional_root_block(task,plan,family)
+  bindings<-list(.np_conditional_root_block=.np_conditional_root_block,
+    .np_conditional_cp_apply=.np_conditional_cp_apply)
+  if (identical(family,"jackknife-mp1")) bindings<-c(bindings,list(
+    .np_conditional_mp1_block=.np_conditional_mp1_block,
+    .np_conditional_mp1_variance=.np_conditional_mp1_variance,
+    .np_conditional_mp1_between=.np_conditional_mp1_between,
+    .np_conditional_den_probabilities=.np_conditional_den_probabilities))
   out <- .npRmpi_bootstrap_run_fanout(tasks, worker, ncol.out=m,
     what="conditional inference", profile.where="mpi.applyLB:conditional-inference",
     progress.label="Conditional inference", progress.unit="rep",
-    required.bindings=list(.np_conditional_root_block=.np_conditional_root_block,
-      .np_conditional_cp_apply=.np_conditional_cp_apply), plan=plan, family=family)
+    required.bindings=bindings, plan=plan, family=family)
   t(out)
 }
 
@@ -115,7 +128,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
 }
 
 .np_conditional_inference <- function(x, y, grid, h, cdf, method, calibration,
-                                      B=9999L, alpha=.05, cdf.centers=NULL) {
+                                      B=9999L, alpha=.05, cdf.centers=NULL, construction=NULL) {
   allocation <- .np_conditional_workspace(x, y, grid, h, B); B <- allocation$B
   if (!is.numeric(alpha) || length(alpha)!=1L || !is.finite(alpha) || alpha<=0 || alpha>=.5)
     stop("alpha must lie in (0, 0.5)", call.=FALSE)
@@ -123,6 +136,13 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
       !method %in% c("asymptotic", "bootstrap") ||
       (method=="bootstrap" && !calibration %in% c("symmetric-sd", "asymmetric-sd")))
     stop("invalid conditional inference method", call.=FALSE)
+  if (identical(construction,"jackknife-mp1")) {
+    if (cdf || method!="bootstrap" || !identical(calibration,"asymmetric-sd"))
+      stop("invalid MP1 inference route",call.=FALSE)
+    .np_conditional_mp1_workspace(x,y,grid,h,B)
+    .np_conditional_runtime_admit(length(x),B)
+    return(.np_conditional_mp1_inference(x,y,grid,h,B,alpha))
+  }
   .np_conditional_runtime_admit(length(x),B)
   if (cdf) {
     z <- .np_conditional_context(x,y,grid,h)
@@ -197,14 +217,14 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
 }
 
 .np_conditional_plot_interval <- function(bws, x, y, ex, ey, cdf, method,
-                                          calibration, B, alpha, band) {
+                                          calibration, B, alpha, band, construction=NULL) {
   .np_plot_corrected_activity_run("Preparing conditional inference", {
   ex <- toFrame(ex); ey <- toFrame(ey)
   grid <- data.frame(x=ex[[1L]], y=ey[[1L]])
   h <- c(.npcdhat_physical_bandwidth(bws,"x"), .npcdhat_physical_bandwidth(bws,"y"))
   .np_conditional_workspace(x[[1L]],y[[1L]],grid,h,B)
   cc <- if(cdf) .np_conditional_cdf_centers(bws,x,y,ex,ey) else NULL
-  a <- .np_conditional_inference(x[[1L]],y[[1L]],grid,h,cdf,method,calibration,B,alpha,cc)
+  a <- .np_conditional_inference(x[[1L]],y[[1L]],grid,h,cdf,method,calibration,B,alpha,cc,construction)
   if(isTRUE(a$resolution.limited)) .np_warning("conditional-pilot Bonferroni tails have limited finite-draw resolution; increase B for better tail resolution")
   widths <- lapply(a$bands,function(v)cbind(lower=a$center-v[,1L],upper=v[,2L]-a$center,center=a$center))
   chosen <- if(band=="all") "simultaneous" else band
