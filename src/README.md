@@ -43,6 +43,12 @@ machinery. These are separate consumer contracts, not interchangeable estimates.
 | Other inference/helpers | [ann_se.c](ann_se.c), [copula_se.c](copula_se.c), [quantile.c](quantile.c), [statmods.c](statmods.c), [entropy_gaussian_integrand.c](entropy_gaussian_integrand.c), [entropy_gaussian_summation.c](entropy_gaussian_summation.c) | Read the registered caller and estimator-specific target before reusing these routines. |
 | Supporting infrastructure | [np_native_safety.h](np_native_safety.h), [kernelcv.c](kernelcv.c), [mat_vec.c](mat_vec.c), [nr.c](nr.c), [hash.c](hash.c), [bspline.c](bspline.c) | Includes checked sizes, CV callbacks, allocation/numerical utilities and basis support; filenames alone do not establish storage ownership. |
 
+## Plot-only D8 covariance
+
+`plot_udens_d8.c` registers `C_np_plot_udens_d8_column`, called only by the
+D8 density plot covariance provider. It has no estimator, search, RNG, MPI or
+persistent-state ownership and uses linear output storage.
+
 ## Ownership and change checklist
 
 - A pointer-bearing struct may be a borrowed view, an owning workspace, or

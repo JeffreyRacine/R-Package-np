@@ -592,6 +592,16 @@ np_render_control <- function(style = c("band", "bar"),
            "conbandwidth", "condbandwidth") %in% class(bws)))
   progress.enabled <- (identical(dots$plot.errors.method, "bootstrap") || conditional.optin) &&
     !identical(dots$plot.errors.boot.nonfixed, "frozen")
+  if (!owns.empty.rows && .np_udens_d8_default(bws, dots$bias.control,
+      dots$plot.errors.center, dots$plot.errors.method,
+      if (is.null(dots$plot.errors.alpha)) .05 else dots$plot.errors.alpha)) {
+    # The D8 entry owns its seed. An outer set.seed scope would destroy the
+    # caller's cached Box-Muller normal even if .Random.seed were restored.
+    npValidateNonNegativeInteger(random.seed, "random.seed")
+    dots$random.seed <- random.seed
+    return(.np_plot_progress_run(.np_udens_resolution_run(
+      do.call(method, c(list(bws = bws), dots))), enabled = TRUE))
+  }
   if (!owns.empty.rows && inherits(bws, c("bandwidth", "dbandwidth")))
     return(.np_plot_progress_run(
       .np_with_seed(random.seed, .np_udens_resolution_run(

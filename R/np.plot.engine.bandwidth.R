@@ -156,7 +156,8 @@
     bias.state <- .np_udens_plot_prepare(bias.control, bws, xdat,
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
       plot.errors.boot.calibration, blocklen = plot.errors.boot.blocklen,
-      block.automatic = density.block.automatic)
+      block.automatic = density.block.automatic, alpha = plot.errors.alpha,
+      random.seed = if (missing(random.seed)) 42L else random.seed)
     new.bias <- !is.null(bias.state)
     # Presentation only: percentile endpoints are not a maximum-root band.
     annotation.construction <- if (new.bias) {
@@ -318,7 +319,7 @@
 
       if (plot.behavior != "plot"){
         d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens,
-                        derr = if (new.bias && bias.state$plot.control.version %in% c(2L, 3L))
+                        derr = if (new.bias && (.np_udens_d8_active(bias.state) || bias.state$plot.control.version %in% c(2L, 3L)))
                           cbind(-terr[,1L], terr[,2L]) else terr[,1:2],
                         ntrain = nrow(xdat), se = plot.errors)
         if (joint.eligible)
@@ -529,6 +530,17 @@
       plot.bootstrap <- plot.errors.method == "bootstrap"
       plotOnEstimate <- (plot.errors.center == "estimate")
 
+      d8.slices <- NULL
+      if (new.bias && .np_udens_d8_active(bias.state)) {
+        grids <- lapply(seq_len(bws$ndim), function(j) {
+          limits <- trim.quantiles(xdat[,j], xtrim[j])
+          subcol(exdat, seq(limits[1L], limits[2L], length.out = neval), j)[
+            seq_len(neval), , drop = FALSE]
+        })
+        d8.slices <- .np_udens_plot_errors(bias.state, do.call(rbind, grids),
+          plot.errors.alpha, gaussian.draws, plot.errors.type)
+      }
+
       ## density / distribution expressions
       for (i in seq_len(bws$ndim)){
         temp.err[,] = NA
@@ -563,7 +575,8 @@
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){
-          bias.raw <- if (new.bias) .np_udens_plot_errors(bias.state, eval.slice,
+          bias.raw <- if (!is.null(d8.slices)) .np_udens_d8_plot_subset(d8.slices,
+            seq.int((i-1L)*neval+1L, i*neval)) else if (new.bias) .np_udens_plot_errors(bias.state, eval.slice,
             plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
           gaussian.draws else plot.errors.boot.num, plot.errors.type, design = list(vary = i, xtrim = xtrim, xq = xq)) else NULL
           temp.payload <- if (new.bias) .np_udens_plot_payload(bias.raw) else .np_plot_interval_payload(

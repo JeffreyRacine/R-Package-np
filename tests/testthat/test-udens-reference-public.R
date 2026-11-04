@@ -1,4 +1,4 @@
-test_that("corrected density surfaces expose signed endpoint offsets", {
+test_that("explicit joint-scale density surfaces expose signed endpoint offsets", {
   old <- options(np.messages = FALSE, np.plot.progress = FALSE)
   on.exit(options(old), add = TRUE)
   x <- data.frame(x1 = c(-2, -.5, .2, 1.4, 2.1),
@@ -9,7 +9,8 @@ test_that("corrected density surfaces expose signed endpoint offsets", {
   rng <- .Random.seed
   for (method in c("asymptotic", "bootstrap")) {
     args <- list(x = fit, errors = method, center = "bias-corrected",
-                 band = "all", neval = 2L, output = "data")
+                 band = "all", neval = 2L, output = "data",
+                 bias.control = np_udens_bias_control())
     args[[if (method == "asymptotic") "gaussian.draws" else "B"]] <- 199L
     if (method == "asymptotic")
       expect_warning(expect_warning(out <- do.call(plot, args),
