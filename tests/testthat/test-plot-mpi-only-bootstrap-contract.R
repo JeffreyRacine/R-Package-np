@@ -103,6 +103,7 @@ test_that("plot method entrypoint fails fast for bootstrap inside mpi.bcast.cmd 
     .npRmpi_guard_no_auto_object_in_manual_bcast = function(obj, where = "plot()") invisible(FALSE),
     .npRmpi_autodispatch_called_from_bcast = function() TRUE,
     .np_with_seed = function(seed, expr) force(expr),
+    .np_plot_data_finish = function(value, ...) value,
     .package = "npRmpi"
   )
 
@@ -128,6 +129,7 @@ test_that("plot method entrypoint allows non-bootstrap inside mpi.bcast.cmd cont
     .npRmpi_guard_no_auto_object_in_manual_bcast = function(obj, where = "plot()") invisible(FALSE),
     .npRmpi_autodispatch_called_from_bcast = function() TRUE,
     .np_with_seed = function(seed, expr) force(expr),
+    .np_plot_data_finish = function(value, ...) value,
     .package = "npRmpi"
   )
 

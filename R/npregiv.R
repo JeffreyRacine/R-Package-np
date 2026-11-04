@@ -2853,7 +2853,7 @@ summary.npregiv <- function(object, ...) {
   supplied <- unique(c(arg.names[nzchar(arg.names)],
                        dot.names[nzchar(dot.names)]))
   if ("plot.data" %in% supplied)
-    stop("plot.data has been removed; use data.overlay", call. = FALSE)
+    stop("plot.data has been removed; use data_overlay", call. = FALSE)
   if ("deriv" %in% supplied)
     stop("deriv has been removed; use gradients", call. = FALSE)
   if ("phi" %in% supplied) {
@@ -2871,13 +2871,15 @@ summary.npregiv <- function(object, ...) {
 
 plot.npregiv <- function(x,
                          gradients = FALSE,
-                         data.overlay = TRUE,
-                         data.rug = FALSE,
+                         data_overlay = TRUE,
+                         data_rug = FALSE,
+                         output = c("plot", "data", "plot-data"),
                          ...) {
+  .np_plot_check_public_names(names(list(...)))
   matched.call <- match.call(expand.dots = FALSE)
   .np_plot_validate_npregiv_call(
     sys.call(),
-    method_args = c("gradients", "data.overlay", "data.rug"),
+    method_args = c("gradients", "data_overlay", "data_rug", "output"),
     context = "plot.npregiv",
     dots_call = matched.call[["..."]]
   )
@@ -2885,9 +2887,14 @@ plot.npregiv <- function(x,
     object = x,
     family = "npregiv",
     gradients = gradients,
-    data_overlay = data.overlay,
-    data_rug = data.rug,
+    data_overlay = data_overlay,
+    data_rug = data_rug,
     dots = list(...)
   )
-  .np_iv_plot_render(spec)
+  output <- match.arg(output)
+  variable <- names(x[["z", exact = TRUE]])[1L]
+  if (is.null(variable) || is.na(variable) || !nzchar(variable)) variable <- "z"
+  result <- .np_plot_data_from_iv(spec, variable)
+  if (!identical(output, "data")) .np_iv_plot_render(spec)
+  if (identical(output, "plot")) invisible(NULL) else result
 }

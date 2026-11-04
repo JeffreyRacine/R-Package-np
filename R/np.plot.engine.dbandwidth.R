@@ -51,6 +51,18 @@
     if (.np_data_formal_supplied(sys.call(), sys.function()))
       .np_plot_data_error()
 
+    saved.plot.style <- list(xlab = xlab, ylab = ylab,
+        main = main, sub = sub, xlim = xlim, ylim = ylim, col = col,
+        lty = lty, lwd = lwd, type = type,
+        theta = theta, phi = phi, zlab = zlab, zlim = zlim)
+    publish.plot <- function(value) .np_plot_data_publish_display(value,
+      coordinates = xdat, roles = rep("X", ncol(xdat)), response = NULL,
+      overlay = FALSE, rug = plot.rug,
+      style = utils::modifyList(plot.user.args, saved.plot.style),
+      points_args = list(), boxplot = plot.bxp,
+      interval_style = list(style = plot.errors.style, bar = plot.errors.bar,
+        bar_num = plot.errors.bar.num, boxplot_outliers = plot.bxp.out))
+
     sub.supplied <- !missing(sub)
 
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
@@ -107,7 +119,7 @@
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all")
     if (!missing(gaussian.draws) && !joint.request)
-      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
+      stop("gaussian_draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- joint.request
     if (joint.request)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
@@ -152,7 +164,7 @@
     new.bias <- !is.null(bias.state)
     joint.eligible <- joint.eligible && !new.bias
     if (new.bias && isTRUE(plot.bxp))
-      stop("new distribution bounds require factor.boxplot=FALSE", call. = FALSE)
+      stop("new distribution bounds require factor_boxplot=FALSE", call. = FALSE)
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
@@ -323,6 +335,12 @@
         if (joint.eligible)
           d1 <- .np_plot_density_band_fields(d1, terr.obj)
         if (new.bias) d1$inference <- terr.obj$inference
+        if (identical(plot.errors.method, "asymptotic"))
+          d1[[".plot_std_error"]] <- tobj$derr
+        if (plot.errors && identical(plot.errors.type, "all"))
+          d1[[".plot_band_widths"]] <- terr.all
+        d1[[".plot_rows"]] <- list(estimate = tobj$dist,
+          corrected = terr[, 3L], widths = terr[, 1:2, drop = FALSE])
         d1$bias = NA
         d1$bias.corrected = NA
 
@@ -330,7 +348,7 @@
           d1 <- .np_plot_add_bias_fields(d1, tobj$dist, terr[,3])
         
         if (plot.behavior == "data")
-          return ( list(d1 = d1) )
+          return(publish.plot(list(d1 = d1)))
       }
 
       xlab.val <- scalar_default(xlab, gen.label(names(xdat)[1], "X1"))
@@ -387,7 +405,7 @@
         return(.np_plot_rgl_finalize(
           rgl.out = rgl.out,
           plot.behavior = plot.behavior,
-          plot.data = list(d1 = d1)
+          plot.data = publish.plot(list(d1 = d1))
         ))
       }
       
@@ -488,7 +506,7 @@
 
 
       if (plot.behavior == "plot-data")
-        return ( list(d1 = d1) )        
+        return(publish.plot(list(d1 = d1)))
 
     } else {
 
@@ -744,6 +762,13 @@
               temp.err[,3]
             )
           plot.out[[i]]$bxp = temp.boot
+          plot.out[[i]][[".plot_rows"]] <- list(estimate = temp.dens[seq_len(xi.neval)],
+            corrected = temp.err[seq_len(xi.neval), 3L],
+            widths = temp.err[seq_len(xi.neval), 1:2, drop = FALSE])
+          if (identical(plot.errors.method, "asymptotic"))
+            plot.out[[i]][[".plot_std_error"]] <- tobj$derr
+          if (identical(plot.errors.type, "all"))
+            plot.out[[i]][[".plot_band_widths"]] <- temp.all.err
           if (joint.eligible)
             plot.out[[i]] <- .np_plot_density_band_fields(plot.out[[i]], asym.obj)
         }
@@ -899,7 +924,7 @@
 
       if (plot.behavior != "plot"){
         names(plot.out) = paste("d",seq_len(bws$ndim),sep="")
-        return (plot.out)
+        return(publish.plot(plot.out))
       }
     }
   }

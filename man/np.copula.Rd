@@ -62,8 +62,8 @@ npcopula(bws, \dots)
      bootstrap = c("inid", "fixed", "geom"),
      B = 9999,
      center = c("estimate", "bias-corrected"),
-     boot.control = np_boot_control(),
-     output = c("plot", "data", "plot-data", "both"),
+     boot_control = np_boot_control(),
+     output = c("plot", "data", "plot-data"),
      legend = TRUE,
      theta = 0.0,
      phi = 20.0,
@@ -74,8 +74,8 @@ npcopula(bws, \dots)
      col = NULL,
      border = .np_plot_color("surface_border"),
      zlim = NULL,
-     gaussian.draws = 9999L,
-     random.seed = 42L,
+     gaussian_draws = 9999L,
+     random_seed = 42L,
      \dots)
 }
 
@@ -223,10 +223,9 @@ displayed.
 
   \item{output}{
     return mode. For \code{plot.npcopula}, \code{"plot"} draws the
-    plot, \code{"data"} returns the plotted data with interval columns
-    when requested, and \code{"plot-data"} draws and returns the
-    plotted data. \code{"both"} is accepted as an alias for
-    \code{"plot-data"}. For \code{predict.npcopula}, \code{"vector"}
+    plot, \code{"data"} returns an \code{\link{np_plot_data}} object
+    with absolute endpoints when requested, and \code{"plot-data"}
+    draws and returns the same object. For \code{predict.npcopula}, \code{"vector"}
     returns fitted copula values, \code{"object"} returns the evaluated
     \code{"npcopula"} object, and \code{"data"} returns
     \code{as.data.frame()} on that object.
@@ -302,7 +301,7 @@ surface plots.
     \code{"geom"}. Wild bootstrap is not defined for copula surfaces.
   }
 
-  \item{boot.control}{
+  \item{boot_control}{
     optional \code{\link{np_boot_control}} object. For copula surfaces
     the block length is used by the \code{"fixed"} and \code{"geom"}
     block bootstrap routes.
@@ -315,7 +314,7 @@ surface plots.
     bootstrap bias-correction combinations fail clearly.
   }
 
-  \item{gaussian.draws, random.seed}{
+  \item{gaussian_draws, random_seed}{
     Gaussian maximum simulation count and reproducible seed for asymptotic
     \code{band="simultaneous"} or \code{band="all"}. The caller's RNG state is
     restored. These controls do not change bootstrap replication counts.
@@ -577,6 +576,23 @@ prediction/evaluation route, or graphics renderer as appropriate.
   Use a \code{\link{data.frame}} rather than \code{\link{cbind}} for
   mixed data so that ordered variables remain ordered. Unordered
   factors are not valid for copula estimation in this implementation.
+}
+
+\section{Experimental status of bias-corrected inference}{
+\strong{All bias-corrected confidence intervals and bands are experimental
+(pre-beta research), incomplete, and not recommended for general-purpose
+inference.} This status remains in effect unless the documentation explicitly
+states otherwise for a particular method and scope. It applies wherever
+bias-corrected bounds are available: asymptotic and bootstrap constructions,
+including legacy methods, pointwise intervals, Bonferroni intervals and
+simultaneous bands, for levels and supported derivatives.
+
+These methods form an ongoing research project. Implementation support,
+numerical checks and favorable simulation results in selected settings do not
+establish generally valid coverage. Coverage can fail outside the studied
+settings, and available options do not constitute a general solution to
+bias-corrected inference. Method-specific assumptions, restrictions and known
+failures must be considered when experimenting with these bounds.
 }
 
 \seealso{

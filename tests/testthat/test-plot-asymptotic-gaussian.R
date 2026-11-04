@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 # These route fixtures deliberately use small explicit draw counts. Precision
 # guidance itself is tested below; other warnings remain visible.
 local({
@@ -41,20 +43,20 @@ test_that("regression joint bands preserve marginal intervals and mean payloads"
   y <- x$x + sin(seq_len(24L)) / 4
   bw <- npregbw(xdat = x, ydat = y, bws = .4, regtype = "ll",
                 bandwidth.compute = FALSE)
-  point <- plot(bw, errors = "asymptotic", band = "pointwise",
-                neval = 7L, output = "data")[[1L]]
-  all <- plot(bw, errors = "asymptotic", band = "all", gaussian.draws = 399L,
-              neval = 7L, output = "data")[[1L]]
+  point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise",
+                neval = 7L, output = "data"))$provider[[1L]]
+  all <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gaussian_draws = 399L,
+              neval = 7L, output = "data"))$provider[[1L]]
   expect_identical(all$mean, point$mean)
   expect_identical(all$merr, point$merr)
   expect_equal(all$band.errors$pointwise, abs(point$merr), ignore_attr = TRUE)
   expect_true(all(is.finite(all$band.errors$simultaneous)))
   expect_identical(all$band.calibration$scope, "finite grid within panel")
-  grad <- plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-               neval = 7L, gaussian.draws = 399L, output = "data")[[1L]]
+  grad <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
+               neval = 7L, gaussian_draws = 399L, output = "data"))$provider[[1L]]
   expect_true(all(is.finite(grad$band.errors$simultaneous)))
   expect_equal(dim(grad$band.errors$simultaneous), c(7L, 2L))
-  expect_error(plot(bw, gaussian.draws = 399L, output = "data"), "requires asymptotic")
+  expect_error(capture_plot_provider(plot(bw, gaussian_draws = 399L, output = "data"))$provider, "requires asymptotic")
   expect_error(plot(bw, errors = "asymptotic", band = "all", B = 199L),
                "bootstrap controls")
 })
@@ -70,16 +72,16 @@ test_that("single-index joint bands condition on fitted coefficients", {
   y <- x$x + .2 * x$z + cos(seq_len(24L)) / 4
   bw <- npindexbw(xdat = x, ydat = y, bws = c(1, .2, .4),
                   bandwidth.compute = FALSE)
-  point <- plot(bw, errors = "asymptotic", band = "pointwise",
-                neval = 7L, output = "data")[[1L]]
-  all <- plot(bw, errors = "asymptotic", band = "all", gaussian.draws = 399L,
-              neval = 7L, output = "data")[[1L]]
+  point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise",
+                neval = 7L, output = "data"))$provider[[1L]]
+  all <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gaussian_draws = 399L,
+              neval = 7L, output = "data"))$provider[[1L]]
   expect_identical(all$mean, point$mean)
   expect_identical(all$merr, point$merr)
   expect_true(all(is.finite(all$band.errors$simultaneous)))
   expect_match(all$band.calibration$conditioning, "fitted index coefficients")
-  grad <- plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-               neval = 7L, gaussian.draws = 399L, output = "data")[[1L]]
+  grad <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
+               neval = 7L, gaussian_draws = 399L, output = "data"))$provider[[1L]]
   expect_equal(dim(grad$band.errors$simultaneous), c(7L, 2L, 2L))
   expect_true(all(is.finite(grad$band.errors$simultaneous)))
   expect_equal(grad$band.errors$simultaneous[, , 2L],
@@ -98,17 +100,17 @@ test_that("smooth-coefficient mean bands retain the accepted marginal errors", {
   y <- x$x + (1 + z$z) * x$w + sin(2 * seq_len(30L)) / 4
   bw <- npscoefbw(xdat = x, ydat = y, zdat = z, bws = .6,
                   bandwidth.compute = FALSE)
-  point <- plot(bw, errors = "asymptotic", band = "pointwise", perspective = FALSE,
-                neval = 7L, output = "data")
-  all <- plot(bw, errors = "asymptotic", band = "all", gaussian.draws = 399L,
-              perspective = FALSE, neval = 7L, output = "data")
+  point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise", perspective = FALSE,
+                neval = 7L, output = "data"))$provider
+  all <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gaussian_draws = 399L,
+              perspective = FALSE, neval = 7L, output = "data"))$provider
   for (i in seq_along(all)) {
     expect_identical(all[[i]]$mean, point[[i]]$mean)
     expect_identical(all[[i]]$merr, point[[i]]$merr)
     expect_true(all(is.finite(all[[i]]$band.errors$simultaneous)))
   }
-  grad <- plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-               perspective = FALSE, neval = 7L, gaussian.draws = 399L, output = "data")
+  grad <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
+               perspective = FALSE, neval = 7L, gaussian_draws = 399L, output = "data"))$provider
   expect_equal(length(grad), 3L)
   for (panel in grad) {
     expect_equal(dim(panel$band.errors$simultaneous), c(7L, 2L))
@@ -116,52 +118,19 @@ test_that("smooth-coefficient mean bands retain the accepted marginal errors", {
   }
 })
 
-for (family in c("npreg", "npindex", "npscoef")) {
-  test_that(paste(family, "joint bands normalize legacy values before admission"), {
-    skip_on_cran()
-    skip_if_not(spawn_mpi_slaves())
-    on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-    old <- options(np.messages = FALSE)
-    on.exit(options(old), add = TRUE)
-    x <- data.frame(x = seq(-1, 1, length.out = 36L), w = sin(seq_len(36L)))
-    z <- data.frame(z = cos(seq_len(36L)))
-    y <- x$x + (1 + z$z) * x$w + sin(2 * seq_len(36L)) / 4
-    bw <- switch(family,
-      npreg = npregbw(xdat = x["x"], ydat = y, bws = .5,
-                      bandwidth.compute = FALSE),
-      npindex = npindexbw(xdat = x, ydat = y, bws = c(1, .2, .5),
-                          bandwidth.compute = FALSE),
-      npscoef = npscoefbw(xdat = x, ydat = y, zdat = z, bws = .6,
-                          bandwidth.compute = FALSE)
-    )
-    args <- list(x = bw, neval = 7L, output = "data")
-    if (family == "npscoef") args$perspective <- FALSE
-    for (band in c("all", "simultaneous")) {
-      full <- do.call(plot, c(args, list(errors = "asymptotic", band = band,
-                                        gaussian.draws = 399L)))
-      legacy <- do.call(plot, c(args, list(plot.errors.method = "asy",
-                                          plot.errors.type = substr(band, 1L, 1L),
-                                          gaussian.draws = 399L)))
-      for (i in seq_along(full)) {
-        expect_identical(legacy[[i]]$band.calibration, full[[i]]$band.calibration)
-        expect_identical(legacy[[i]]$merr, full[[i]]$merr)
-        expect_identical(legacy[[i]]$band.errors, full[[i]]$band.errors)
-      }
-    }
-    full <- do.call(plot, c(args, list(errors = "asymptotic", band = "all")))
-    legacy <- do.call(plot, c(args, list(plot.errors.method = "asy",
-                                        plot.errors.type = "a")))
-    for (i in seq_along(full))
-      expect_identical(legacy[[i]]$band.calibration, full[[i]]$band.calibration)
-    expect_error(do.call(plot, c(args, list(errors = "asy", band = "all"))),
-                 "errors")
-    expect_error(do.call(plot, c(args, list(errors = "asymptotic", band = "a"))),
-                 "band")
-    expect_error(do.call(plot, c(args, list(plot.errors.method = "asy",
-                                           plot.errors.type = "a",
-                                           gaussian.draws = 0))), "integer")
-  })
-}
+test_that("retired plot aliases fail before any computation", {
+  skip_on_cran()
+  skip_if_not(spawn_mpi_slaves())
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  x <- data.frame(x = seq(-1, 1, length.out = 12L))
+  b <- npregbw(xdat=x, ydat=x$x, bws=.5, bandwidth.compute=FALSE)
+  for (args in list(list(plot.errors.method="asy"), list(plot.errors.type="a"),
+                   list(gaussian.draws=99L)))
+    expect_error(do.call(plot, c(list(x=b, output="data"), args)), "retired plot argument")
+  expect_error(plot(b, errors="asy", output="data"), "errors")
+  expect_error(plot(b, errors="asymptotic", band="a", output="data"), "band")
+})
+
 
 test_that("Gaussian mean surfaces calibrate every evaluation point", {
   skip_on_cran()
@@ -177,8 +146,8 @@ test_that("Gaussian mean surfaces calibrate every evaluation point", {
                bandwidth.compute = FALSE)
   )
   for (bw in models) {
-    out <- plot(bw, errors = "asymptotic", band = "all", neval = 5L,
-                gaussian.draws = 999L, output = "data")[[1L]]
+    out <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", neval = 5L,
+                gaussian_draws = 999L, output = "data"))$provider[[1L]]
     expect_identical(out$band.calibration$grid.size, 25L)
     expect_equal(dim(out$band.errors$simultaneous), c(25L, 2L))
     expect_true(all(is.finite(out$band.errors$simultaneous)))
@@ -219,8 +188,8 @@ test_that("NN joint normalization retains training radii", {
       wrong <- drop(external %*% y) / sqrt(rowSums(external^2))
       expect_gt(max(abs(expected - wrong)), 1e-6)
     }
-    out <- plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-                gaussian.draws = 199L, neval = 5L, output = "data")[[1L]]
+    out <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
+                gaussian_draws = 199L, neval = 5L, output = "data"))$provider[[1L]]
     expect_true(all(is.finite(out$band.errors$simultaneous)))
   }
 })
@@ -282,10 +251,10 @@ test_that("partially linear plots include shared-response covariance", {
   E <- diag(nrow(x)) - S
   factor <- sweep(H, 2L, drop(E %*% y) / sqrt(rowSums(E^2)), "*")
   expect_equal(a$influence, unclass(factor), ignore_attr = TRUE, tolerance = 1e-10)
-  out <- plot(bw, errors = "asymptotic", band = "all", perspective = FALSE,
-              gaussian.draws = 199L, neval = 5L, output = "data")
-  point <- plot(bw, errors = "asymptotic", band = "pointwise", perspective = FALSE,
-                neval = 5L, output = "data")
+  out <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", perspective = FALSE,
+              gaussian_draws = 199L, neval = 5L, output = "data"))$provider
+  point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise", perspective = FALSE,
+                neval = 5L, output = "data"))$provider
   for (j in seq_along(out)) {
     expect_identical(out[[j]]$mean, point[[j]]$mean)
     expect_identical(out[[j]]$merr, point[[j]]$merr)
@@ -320,12 +289,12 @@ test_that("categorical joint bands retain endpoint covariance and level semantic
     expect_equal(joint$covariance, tcrossprod(sweep(D, 2L, joint$residual, "*")),
                  ignore_attr = TRUE)
   }
-  levels <- plot(bw, errors = "asymptotic", band = "all", output = "data",
-                 perspective = FALSE, gaussian.draws = 199L)
-  grad <- plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-               output = "data", perspective = FALSE, gaussian.draws = 199L)
-  point <- plot(bw, errors = "asymptotic", band = "pointwise", gradients = TRUE,
-                output = "data", perspective = FALSE)
+  levels <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", output = "data",
+                 perspective = FALSE, gaussian_draws = 199L))$provider
+  grad <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
+               output = "data", perspective = FALSE, gaussian_draws = 199L))$provider
+  point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise", gradients = TRUE,
+                output = "data", perspective = FALSE))$provider
   for (j in seq_len(2L)) {
     expect_true(all(is.finite(levels[[j]]$band.errors$simultaneous)))
     expect_true(all(is.finite(grad[[j]]$band.errors$simultaneous)))
@@ -382,8 +351,8 @@ test_that("unavailable joint limits retain rows and render fitted centers", {
   bw <- npregbw(xdat = x, ydat = y, bws = .5, regtype = "ll",
                 bandwidth.compute = FALSE)
   for (gradient in c(FALSE, TRUE)) {
-    expect_warning(out <- plot(bw, errors = "asymptotic", band = "simultaneous",
-      gradients = gradient, neval = 513L, output = "data")[[1L]], "memory/grid budget")
+    expect_warning(out <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "simultaneous",
+      gradients = gradient, neval = 513L, output = "data"))$provider[[1L]], "memory/grid budget")
     limits <- if (gradient) out$gerr else out$merr
     expect_identical(dim(limits), c(513L, 2L))
     expect_true(all(is.na(limits)))

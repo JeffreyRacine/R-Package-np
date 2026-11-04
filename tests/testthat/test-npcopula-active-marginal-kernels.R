@@ -68,8 +68,9 @@ test_that("mixed beta copula grids support uncertainty and bootstrap replay", {
     expect_identical(predict(fit,u=u,n.quasi.inv=20L),fitted(fit))
     set.seed(937)
     out <- plot(fit,output="data",errors="bootstrap",B=3L,band="pmzsd")
+    out <- as.data.frame(out)
     expect_equal(nrow(out),4L)
-    expect_true(all(is.finite(as.matrix(out[c("center","lower","upper")]))))
+    expect_true(all(is.finite(as.matrix(out[c("estimate","lower","upper")]))))
     expect_true(all(out$lower<=out$upper))
   }
 })

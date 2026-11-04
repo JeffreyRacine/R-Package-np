@@ -17,7 +17,7 @@ test_that("plot coef option: npscoef supports coef=TRUE in plot-data mode", {
     plot(
       fit,
       coef = TRUE,
-      coef.index = 1,
+      coef_index = 1,
       perspective = FALSE,
       neval = 20,
       output = "plot-data",
@@ -27,7 +27,9 @@ test_that("plot coef option: npscoef supports coef=TRUE in plot-data mode", {
 
   expect_type(out, "list")
   expect_true(length(out) > 0)
-  expect_true(all(vapply(out, inherits, logical(1), "smoothcoefficient")))
+  expect_s3_class(out, "np_plot_data")
+  expect_true(all(out$targets$quantity == "coefficient"))
+  expect_true(all(vapply(out$panels, function(p) all(is.finite(p$values$estimate)), logical(1))))
 })
 
 test_that("plot coef option: npplreg supports coef=TRUE plot-data payload", {
@@ -60,7 +62,9 @@ test_that("plot coef option: npplreg supports coef=TRUE plot-data payload", {
   )
 
   expect_type(out, "list")
-  expect_true(all(c("coefficients", "coefficient.stderr", "fit") %in% names(out)))
-  expect_true(is.numeric(out$coefficients))
-  expect_true(length(out$coefficients) >= 1L)
+  expect_s3_class(out, "np_plot_data")
+  expect_identical(out$targets$quantity, "coefficient")
+  expect_true(is.numeric(plot_target(out)$estimate))
+  expect_gte(nrow(plot_target(out)), 1L)
+  expect_equal(plot_target(out)$estimate, unname(coef(fit)))
 })

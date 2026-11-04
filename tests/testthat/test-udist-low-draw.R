@@ -7,17 +7,17 @@ test_that("defined low-draw CDF bands are returned with one resolution warning",
     conditions <- list()
     z <- withCallingHandlers(plot(bw, xdat = x, errors = "bootstrap",
       bootstrap = law, center = "bias-corrected", band = "all", B = 1L,
-      boot.control = np_boot_control(blocklen = if (law == "inid") NULL else 3L),
-      neval = 5L, output = "data", random.seed = 99102905),
+      boot_control = np_boot_control(blocklen = if (law == "inid") NULL else 3L),
+      neval = 5L, output = "data", random_seed = 99102905),
       np_band_resolution_warning = function(w) {
         conditions[[length(conditions) + 1L]] <<- w
         invokeRestart("muffleWarning")
-      })$d1$inference
+      })
     expect_length(conditions, 1L)
-    expect_named(z$bands, c("pointwise", "simultaneous", "bonferroni"))
-    expect_true(all(is.finite(unlist(z$bands))))
-    expect_true(all(z$resolution$computed))
-    expect_true(all(z$resolution$resolution_limited))
+    expect_identical(unique(z$panels[[1L]]$intervals$band), c("pointwise", "simultaneous", "bonferroni"))
+    expect_true(all(is.finite(as.matrix(z$panels[[1L]]$intervals[c("lower", "upper")]))))
+    expect_true(all(z$inference[[1L]]$resolution$computed))
+    expect_true(all(z$inference[[1L]]$resolution$resolution_limited))
   }
 })
 

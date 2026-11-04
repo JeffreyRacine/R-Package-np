@@ -36,7 +36,7 @@ test_that("copula render matrices follow requested coordinates without reorderin
   expect_identical(repeated.grid$xgrid,
                    repeated.data[repeated$xnames])
   expect_identical(serialize(repeated, NULL), repeated.before)
-  expect_identical(plot(repeated, output = "data"), repeated.data)
+  expect_identical(capture_copula_provider(plot(repeated, output = "data"))$provider, repeated.data)
   expect_error(plot(repeated, output = "plot"),
                "at least two distinct values on each probability axis", fixed = TRUE)
   lower <- fitted(repeated) - .05
@@ -92,7 +92,7 @@ test_that("all copula renderers and uncertainty layers share the coordinate map"
   grDevices::pdf(NULL); on.exit(grDevices::dev.off(), add = TRUE)
   for (view in c("contour", "image")) {
     captured$frames <- list()
-    out <- plot(fit, view = view, output = "plot-data")
+    out <- capture_copula_provider(plot(fit, view = view, output = "plot-data"))$provider
     expect_identical(out, original)
     expect_identical(captured$frames[[1L]]$z, expected)
     expect_identical(captured$frames[[1L]]$x, sort(u$u1))
@@ -100,8 +100,8 @@ test_that("all copula renderers and uncertainty layers share the coordinate map"
   }
   check.renderer <- function(renderer) {
     captured$frames <- list(); captured$errors <- NULL
-    out <- plot(fit, view = "fixed", renderer = renderer, output = "plot-data",
-      errors = "asymptotic", band = "all", legend = FALSE)
+    out <- capture_copula_provider(plot(fit, view = "fixed", renderer = renderer, output = "plot-data",
+      errors = "asymptotic", band = "all", legend = FALSE))$provider
     expect_identical(captured$frames[[1L]]$z, expected)
     expect_identical(out[names(original)], original)
     expect_identical(captured$errors$lower, matrix(out$lower[permutation], 3L, 3L))
@@ -115,7 +115,7 @@ test_that("all copula renderers and uncertainty layers share the coordinate map"
   }
   check.renderer("base")
   captured$frames <- list()
-  out <- plot(fit, view = "all", output = "plot-data")
+  out <- capture_copula_provider(plot(fit, view = "all", output = "plot-data"))$provider
   expect_identical(out$copula, original)
   expect_identical(captured$frames[[1L]]$z, expected)
   expect_identical(captured$frames[[2L]]$z, expected)
@@ -123,14 +123,14 @@ test_that("all copula renderers and uncertainty layers share the coordinate map"
   expect_identical(as.data.frame(fit), original)
   captured$frames <- list(); captured$errors <- NULL
   set.seed(121)
-  out <- plot(fit, view = "fixed", output = "plot-data", errors = "bootstrap",
-    B = 3L, band = "pmzsd", legend = FALSE)
+  out <- capture_copula_provider(plot(fit, view = "fixed", output = "plot-data", errors = "bootstrap",
+    B = 3L, band = "pmzsd", legend = FALSE))$provider
   seed <- .Random.seed
   expect_identical(captured$frames[[1L]]$z, expected)
   expect_identical(captured$errors$lower, matrix(out$lower[permutation], 3L, 3L))
   expect_identical(captured$errors$upper, matrix(out$upper[permutation], 3L, 3L))
   set.seed(121)
-  same <- plot(fit, output = "data", errors = "bootstrap", B = 3L, band = "pmzsd")
+  same <- capture_copula_provider(plot(fit, output = "data", errors = "bootstrap", B = 3L, band = "pmzsd"))$provider
   expect_identical(same, out)
   expect_identical(.Random.seed, seed)
   # Run every base/coordinate/bootstrap assertion even without optional rgl.

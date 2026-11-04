@@ -120,6 +120,9 @@
 	A variety of bootstrap methods for computing standard errors,
 	nonparametric confidence bounds, and bias-corrected bounds are
 	implemented.
+	All bias-corrected intervals and bands are experimental (pre-beta
+	research), incomplete, and not recommended for general-purpose inference.
+	See \code{\link{plot.np}} for their research status and limitations.
 
 	A variety of bandwidth methods are implemented including fixed,
 	nearest-neighbor, and adaptive nearest-neighbor.

@@ -33,11 +33,11 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
   rdata <- plot(rfit, output = "data", view = "fixed")
   rplotdata <- with_plot_device(plot(rfit, output = "plot-data", view = "fixed"))
 
-  expect_type(rplotdata, "list")
-  expect_named(rplotdata, names(rdata))
-  expect_s3_class(rplotdata$r1, "npregression")
-  expect_equal(rplotdata$r1$mean, rdata$r1$mean)
-  expect_equal(rplotdata$r1$eval, rdata$r1$eval)
+  expect_s3_class(rplotdata, "np_plot_data")
+  expect_equal(rplotdata$panels, rdata$panels)
+  expect_equal(rplotdata$targets, rdata$targets)
+  expect_equal(rplotdata$inference, rdata$inference)
+  expect_equal(rplotdata$coverage_families, rdata$coverage_families)
 
   cfit <- npcdens(
     bws = npcdensbw(
@@ -63,13 +63,11 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     undercoverage
   )
 
-  expect_type(cplotdata, "list")
-  expect_named(cplotdata, names(cdata))
-  expect_s3_class(cplotdata$cd1, "condensity")
-  expect_equal(cplotdata$cd1$condens, cdata$cd1$condens)
-  expect_equal(cplotdata$cd1$condens.raw, cdata$cd1$condens.raw)
-  expect_equal(cplotdata$cd1$xeval, cdata$cd1$xeval)
-  expect_equal(cplotdata$cd1$yeval, cdata$cd1$yeval)
+  expect_s3_class(cplotdata, "np_plot_data")
+  expect_equal(cplotdata$panels, cdata$panels)
+  expect_equal(cplotdata$targets, cdata$targets)
+  expect_equal(cplotdata$inference, cdata$inference)
+  expect_equal(cplotdata$coverage_families, cdata$coverage_families)
 
   dfit <- npcdist(
     bws = npcdistbw(
@@ -94,13 +92,11 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     character()
   )
 
-  expect_type(dplotdata, "list")
-  expect_named(dplotdata, names(ddata))
-  expect_s3_class(dplotdata$cd1, "condistribution")
-  expect_equal(dplotdata$cd1$condist, ddata$cd1$condist)
-  expect_equal(dplotdata$cd1$condist.raw, ddata$cd1$condist.raw)
-  expect_equal(dplotdata$cd1$xeval, ddata$cd1$xeval)
-  expect_equal(dplotdata$cd1$yeval, ddata$cd1$yeval)
+  expect_s3_class(dplotdata, "np_plot_data")
+  expect_equal(dplotdata$panels, ddata$panels)
+  expect_equal(dplotdata$targets, ddata$targets)
+  expect_equal(dplotdata$inference, ddata$inference)
+  expect_equal(dplotdata$coverage_families, ddata$coverage_families)
 })
 
 test_that("plot return contract: bounded conditional bootstrap data stays available", {
@@ -121,32 +117,34 @@ test_that("plot return contract: bounded conditional bootstrap data stays availa
     cfit,
     output = "data",
     view = "fixed",
-    data.overlay = FALSE,
+    data_overlay = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
     B = 5L,
     band = "pointwise"
   ))
 
-  expect_s3_class(cout$cd1, "condensity")
-  expect_true(all(is.finite(cout$cd1$condens)))
-  expect_true(all(is.finite(cout$cd1$conderr)))
+  expect_s3_class(cout, "np_plot_data")
+  expect_gt(nrow(plot_target(cout, band = "pointwise")), 0L)
+  expect_true(all(is.finite(plot_target(cout)$estimate)))
+  expect_true(all(is.finite(plot_band(cout, "pointwise"))))
 
   dfit <- npcdist(y ~ x, cykerbound = "range")
   dout <- suppressWarnings(plot(
     dfit,
     output = "data",
     view = "fixed",
-    data.overlay = FALSE,
+    data_overlay = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
     B = 5L,
     band = "pointwise"
   ))
 
-  expect_s3_class(dout$cd1, "condistribution")
-  expect_true(all(is.finite(dout$cd1$condist)))
-  expect_true(all(is.finite(dout$cd1$conderr)))
+  expect_s3_class(dout, "np_plot_data")
+  expect_gt(nrow(plot_target(dout, band = "pointwise")), 0L)
+  expect_true(all(is.finite(plot_target(dout)$estimate)))
+  expect_true(all(is.finite(plot_band(dout, "pointwise"))))
 })
 
 test_that("plot return contract: remaining public plot families return plot-data payloads", {
@@ -163,21 +161,17 @@ test_that("plot return contract: remaining public plot families return plot-data
     suppressWarnings(force(expr))
   }
 
-  expect_plot_modes_match <- function(object, fields, ...) {
+  expect_plot_modes_match <- function(object, ...) {
     data.out <- suppressWarnings(plot(object, output = "data", ...))
     plot.out <- with_plot_device(plot(object, output = "plot-data", ...))
 
-    expect_type(plot.out, "list")
-    expect_named(plot.out, names(data.out))
-
-    for (nm in names(data.out)) {
-      expect_s3_class(plot.out[[nm]], class(data.out[[nm]])[1L])
-      for (field in fields) {
-        if (field %in% names(data.out[[nm]]) && field %in% names(plot.out[[nm]])) {
-          expect_equal(plot.out[[nm]][[field]], data.out[[nm]][[field]])
-        }
-      }
-    }
+    expect_s3_class(plot.out, "np_plot_data")
+    expect_s3_class(data.out, "np_plot_data")
+    expect_gt(length(plot.out$panels), 0L)
+    expect_equal(plot.out$panels, data.out$panels)
+    expect_equal(plot.out$targets, data.out$targets)
+    expect_equal(plot.out$inference, data.out$inference)
+    expect_equal(plot.out$coverage_families, data.out$coverage_families)
   }
 
   set.seed(108)
@@ -192,20 +186,20 @@ test_that("plot return contract: remaining public plot families return plot-data
     bws = 0.25,
     bandwidth.compute = FALSE
   )
-  expect_plot_modes_match(bw.ud, fields = c("eval", "dens"), perspective = FALSE)
+  expect_plot_modes_match(bw.ud, perspective = FALSE)
 
   fit.ud <- npudens(bws = bw.ud, tdat = data.frame(x = x))
-  expect_plot_modes_match(fit.ud, fields = c("eval", "dens"), perspective = FALSE)
+  expect_plot_modes_match(fit.ud, perspective = FALSE)
 
   bw.ui <- npudistbw(
     dat = data.frame(x = x),
     bws = 0.25,
     bandwidth.compute = FALSE
   )
-  expect_plot_modes_match(bw.ui, fields = c("eval", "dist"), perspective = FALSE)
+  expect_plot_modes_match(bw.ui, perspective = FALSE)
 
   fit.ui <- npudist(bws = bw.ui, tdat = data.frame(x = x))
-  expect_plot_modes_match(fit.ui, fields = c("eval", "dist"), perspective = FALSE)
+  expect_plot_modes_match(fit.ui, perspective = FALSE)
 
   bw.reg <- npregbw(
     xdat = data.frame(x = x),
@@ -213,7 +207,7 @@ test_that("plot return contract: remaining public plot families return plot-data
     bws = 0.25,
     bandwidth.compute = FALSE
   )
-  expect_plot_modes_match(bw.reg, fields = c("eval", "mean", "merr"), perspective = FALSE)
+  expect_plot_modes_match(bw.reg, perspective = FALSE)
   for (bt in c("generalized_nn", "adaptive_nn")) {
     bw.reg.nn <- do.call(npregbw, list(
       xdat = data.frame(x = x),
@@ -225,7 +219,7 @@ test_that("plot return contract: remaining public plot families return plot-data
     fit.reg.nn <- npreg(bws = bw.reg.nn, txdat = data.frame(x = x), tydat = y)
     expect_plot_modes_match(
       fit.reg.nn,
-      fields = c("eval", "mean", "merr"),
+
       perspective = FALSE,
       errors = "none"
     )
@@ -238,7 +232,7 @@ test_that("plot return contract: remaining public plot families return plot-data
   )
   expect_plot_modes_match(
     bw.cd,
-    fields = c("condens", "xeval", "yeval", "conderr"),
+
     perspective = TRUE,
     view = "fixed"
   )
@@ -251,7 +245,7 @@ test_that("plot return contract: remaining public plot families return plot-data
   )
   expect_plot_modes_match(
     bw.cf,
-    fields = c("condist", "xeval", "yeval", "conderr"),
+
     perspective = TRUE,
     view = "fixed"
   )
@@ -264,7 +258,7 @@ test_that("plot return contract: remaining public plot families return plot-data
   )
   expect_plot_modes_match(
     fit.qr,
-    fields = c("quantile", "xeval", "quanterr"),
+
     perspective = TRUE,
     view = "fixed"
   )
@@ -275,10 +269,10 @@ test_that("plot return contract: remaining public plot families return plot-data
     bws = c(0.25, 0.25, 1),
     bandwidth.compute = FALSE
   )
-  expect_plot_modes_match(bw.si, fields = c("index", "mean", "grad"))
+  expect_plot_modes_match(bw.si)
 
   fit.si <- npindex(bws = bw.si, txdat = data.frame(x = x, x2 = x2), tydat = y)
-  expect_plot_modes_match(fit.si, fields = c("index", "mean", "grad"))
+  expect_plot_modes_match(fit.si)
 
   bw.sc <- npscoefbw(
     xdat = data.frame(x = x),
@@ -287,7 +281,7 @@ test_that("plot return contract: remaining public plot families return plot-data
     bws = 0.25,
     bandwidth.compute = FALSE
   )
-  expect_plot_modes_match(bw.sc, fields = c("eval", "mean", "grad"), perspective = FALSE)
+  expect_plot_modes_match(bw.sc, perspective = FALSE)
 
   fit.sc <- npscoef(
     bws = bw.sc,
@@ -296,7 +290,7 @@ test_that("plot return contract: remaining public plot families return plot-data
     tydat = y,
     se = FALSE
   )
-  expect_plot_modes_match(fit.sc, fields = c("eval", "mean", "grad"), perspective = FALSE)
+  expect_plot_modes_match(fit.sc, perspective = FALSE)
 
   fit.pl <- npplreg(
     bws = npplregbw(
@@ -310,7 +304,7 @@ test_that("plot return contract: remaining public plot families return plot-data
     tzdat = data.frame(x = x),
     tydat = y
   )
-  expect_plot_modes_match(fit.pl, fields = c("mean", "merr"), perspective = FALSE)
+  expect_plot_modes_match(fit.pl, perspective = FALSE)
 })
 
 test_that("plot return contract: npRmpi npscoef fitted perspective path preserves semantic z eval name", {
@@ -356,7 +350,7 @@ test_that("plot return contract: npRmpi npscoef fitted perspective path preserve
     view = "fixed",
     renderer = "base",
     output = "data",
-    data.overlay = FALSE,
+    data_overlay = FALSE,
     errors = "none"
   ))
 
@@ -399,7 +393,7 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
       output = "data",
       renderer = "rgl",
       view = "fixed",
-      data.overlay = FALSE
+      data_overlay = FALSE
     ),
     character()
   )
@@ -410,16 +404,16 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
       output = "plot-data",
       renderer = "rgl",
       view = "fixed",
-      data.overlay = FALSE
+      data_overlay = FALSE
     ),
     character()
   )
 
-  expect_type(rplotdata, "list")
-  expect_named(rplotdata, names(rdata))
-  expect_s3_class(rplotdata$r1, "npregression")
-  expect_equal(rplotdata$r1$mean, rdata$r1$mean)
-  expect_equal(rplotdata$r1$eval, rdata$r1$eval)
+  expect_s3_class(rplotdata, "np_plot_data")
+  expect_equal(rplotdata$panels, rdata$panels)
+  expect_equal(rplotdata$targets, rdata$targets)
+  expect_equal(rplotdata$inference, rdata$inference)
+  expect_equal(rplotdata$coverage_families, rdata$coverage_families)
 
   cfit <- npcdens(
     bws = npcdensbw(
@@ -457,10 +451,9 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
     undercoverage
   )
 
-  expect_type(cplotdata, "list")
-  expect_named(cplotdata, names(cdata))
-  expect_s3_class(cplotdata$cd1, "condensity")
-  expect_equal(cplotdata$cd1$condens, cdata$cd1$condens)
-  expect_equal(cplotdata$cd1$xeval, cdata$cd1$xeval)
-  expect_equal(cplotdata$cd1$yeval, cdata$cd1$yeval)
+  expect_s3_class(cplotdata, "np_plot_data")
+  expect_equal(cplotdata$panels, cdata$panels)
+  expect_equal(cplotdata$targets, cdata$targets)
+  expect_equal(cplotdata$inference, cdata$inference)
+  expect_equal(cplotdata$coverage_families, cdata$coverage_families)
 })

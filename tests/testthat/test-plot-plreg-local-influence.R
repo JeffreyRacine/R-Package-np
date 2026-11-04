@@ -24,7 +24,9 @@ test_that("partially linear plot influence keeps LC row blocks on the master", {
   before <- options()[state.names]
   out <- plot(bw, errors = "asymptotic", output = "data", neval = 7L)
   expect_gt(called, 0L)
-  expect_true(all(is.finite(unlist(lapply(out, function(panel) panel$merr)))))
+  expect_gt(sum(vapply(out$panels, function(p) nrow(p$intervals), integer(1))), 0L)
+  expect_true(all(vapply(out$panels, function(p)
+    all(is.finite(as.matrix(p$intervals[c("lower", "upper")]))), logical(1))))
   expect_identical(options()[state.names], before)
   local_mocked_bindings(.np_plot_plreg_influence = function(...) {
     stop("intentional influence failure")

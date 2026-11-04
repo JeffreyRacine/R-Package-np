@@ -33,8 +33,8 @@ test_that("conditional and semiparametric plots share categorical draw labels", 
   for (name in names(models)) {
     for (gradient in if (name %in% c("cdens", "cdist")) c(FALSE, TRUE) else FALSE) {
       args <- list(x = models[[name]], errors = "bootstrap", B = 7L, neval = 3L,
-                   band = "all", perspective = FALSE, common.scale = FALSE,
-                   plot.behavior = "data")
+                   band = "all", perspective = FALSE, common_scale = FALSE,
+                   output = "data")
       if (name != "plreg") args$gradients <- gradient
       out <- suppressWarnings(do.call(plot, args))
       bp <- boxes(out)
@@ -66,11 +66,11 @@ test_that("unused factor levels remain evaluated and labelled in bootstrap plots
         dens = npudensbw(~ x + f, data = d, bws = c(.4, .2), bandwidth.compute = FALSE),
         dist = npudistbw(~ x + f, data = d, bws = c(.4, .2), bandwidth.compute = FALSE))
       set.seed(7118)
-      out <- suppressWarnings(plot(b, plot.behavior = "data", errors = "bootstrap", B = 7,
-                  neval = 5L, common.scale = FALSE, band = "all", perspective = FALSE))
-      expect_identical(out[[2L]]$bxp$names, lev)
-      expect_equal(ncol(out[[2L]]$bxp$stats), 3L)
-      expect_true(all(is.finite(out[[2L]]$bxp$stats)))
+      out <- suppressWarnings(plot(b, output = "data", errors = "bootstrap", B = 7,
+                  neval = 5L, common_scale = FALSE, band = "all", perspective = FALSE))
+      expect_identical(out$panels[[2L]]$display$boxplots[[1L]]$names, lev)
+      expect_equal(ncol(out$panels[[2L]]$display$boxplots[[1L]]$stats), 3L)
+      expect_true(all(is.finite(out$panels[[2L]]$display$boxplots[[1L]]$stats)))
       expect_identical(levels(d$f), lev)
     }
   }

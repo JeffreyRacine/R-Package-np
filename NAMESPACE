@@ -412,3 +412,7 @@ S3method(npscoef, formula)
 S3method(npscoef, scbandwidth)
 
 export(np_conditional_bias_control)
+
+S3method(print,np_plot_data)
+S3method(as.data.frame,np_plot_data)
+S3method(plot,np_plot_data)

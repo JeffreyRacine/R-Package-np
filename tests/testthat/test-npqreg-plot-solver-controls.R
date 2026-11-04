@@ -7,8 +7,8 @@ test_that("quantile plot replay retains controls and explicit precedence", {
   ctl <- list(tol = 1e-9, small = 1e-10, itmax = 80L)
   for (tau in list(.4, c(.3, .7))) for (grad in c(FALSE, TRUE)) {
     fit <- do.call(npqreg, c(list(bws = b, tau = tau), ctl))
-    out <- plot(fit, output = "data", errors = "none", perspective = FALSE,
-                gradients = grad, neval = 3L)
+    out <- capture_plot_provider(plot(fit, output = "data", errors = "none", perspective = FALSE,
+                gradients = grad, neval = 3L))$provider
     expect_length(out, 1L)
     panel <- out[[1L]]
     ref <- do.call(npqreg, c(list(bws = b, exdat = panel$xeval,
@@ -17,15 +17,15 @@ test_that("quantile plot replay retains controls and explicit precedence", {
     expect_equal(as.vector(panel$quantile), as.vector(ref$quantile), tolerance = 1e-12)
     if (grad) expect_equal(as.vector(panel$quantgrad), as.vector(ref$quantgrad),
                           tolerance = 1e-12)
-    over <- plot(fit, output = "data", errors = "none", perspective = FALSE,
-                 gradients = grad, neval = 3L, tol = .01)[[1L]]
+    over <- capture_plot_provider(plot(fit, output = "data", errors = "none", perspective = FALSE,
+                 gradients = grad, neval = 3L, tol = .01))$provider[[1L]]
     expect_identical(over$fit.controls, modifyList(ctl, list(tol = .01)))
   }
   expect_error(plot(fit, output = "data", tol = NULL), "'tol'")
   expect_error(plot(fit, output = "data", small = NULL), "'small'")
   expect_error(plot(fit, output = "data", itmax = 1L), "failed to converge")
   legacy <- fit; legacy$fit.controls <- NULL
-  a <- plot(legacy, output = "data", neval = 3L)[[1L]]
+  a <- capture_plot_provider(plot(legacy, output = "data", neval = 3L))$provider[[1L]]
   expect_identical(a$fit.controls,
     list(tol = 1.490116e-04, small = 1.490116e-05, itmax = 10000L))
   expect_error(plot(b, output = "data", quantreg = FALSE, tol = .01),
@@ -81,9 +81,9 @@ test_that("quantile public bootstrap carries controls across supported block pat
   fit <- do.call(npqreg,c(list(bws=b,tau=c(.3,.7)),ctl))
   for (method in c("inid","fixed","geom")) {
     set.seed(815)
-    out <- plot(fit,output="data",errors="bootstrap",bootstrap=method,
-                B=3L,plot.errors.boot.blocklen=2L,neval=3L,
-                center="estimate",perspective=FALSE)
+    out <- capture_plot_provider(plot(fit,output="data",errors="bootstrap",bootstrap=method,
+                B=3L,boot_control=np_boot_control(blocklen=2L),neval=3L,
+                center="estimate",perspective=FALSE))$provider
     expect_length(out,1L)
     expect_identical(out[[1L]]$fit.controls,ctl)
     expect_true(all(is.finite(out[[1L]]$quantile)))

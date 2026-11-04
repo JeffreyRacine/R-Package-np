@@ -74,13 +74,13 @@ test_that("single-index fixed wild bootstrap forced block path is finite", {
     neval = 23L,
     output = "data",
     perspective = FALSE,
-    data.overlay = FALSE
-  ))[[1L]]
+    data_overlay = FALSE
+  ))
 
-  expect_equal(length(out$mean), 23L)
-  expect_equal(dim(out$merr), c(23L, 2L))
-  expect_true(all(is.finite(out$mean)))
-  expect_true(all(is.finite(out$merr)))
+  expect_equal(length(plot_target(out)$estimate), 23L)
+  expect_equal(dim(plot_band(out, "pmzsd")), c(23L, 2L))
+  expect_true(all(is.finite(plot_target(out)$estimate)))
+  expect_true(all(is.finite(plot_band(out, "pmzsd"))))
 })
 
 test_that("single-index range-bounded wild bootstrap uses scalar-index bounds", {
@@ -118,7 +118,7 @@ test_that("single-index range-bounded wild bootstrap uses scalar-index bounds", 
 
     expect_type(out, "list")
     expect_true(length(out) >= 1L)
-    expect_true(all(is.finite(out[[1L]]$mean)))
-    expect_true(all(is.finite(out[[1L]]$merr)))
+    expect_true(all(is.finite(plot_target(out)$estimate)))
+    expect_true(all(is.finite(plot_band(out, "pointwise"))))
   }
 })

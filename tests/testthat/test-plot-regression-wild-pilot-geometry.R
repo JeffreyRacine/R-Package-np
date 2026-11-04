@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 b1_wild_case <- function(type, regtype, degree = NULL, basis = "glp",
                          bernstein = FALSE, tree = FALSE) {
   old <- options(np.messages = FALSE, np.tree = tree)
@@ -158,14 +160,14 @@ test_that("public fit and bandwidth plots share an automatic training pilot", {
     model <- npreg(bws = bw, txdat = x, tydat = y)
     for (grad in c(FALSE, TRUE)) {
       set.seed(981)
-      from.fit <- plot(model, output = "data", errors = "bootstrap",
-        plot.errors.boot.method = "wild", B = 7L, neval = 5L,
-        gradients = grad)
+      from.fit <- capture_plot_provider(plot(model, output = "data", errors = "bootstrap",
+        bootstrap = "wild", B = 7L, neval = 5L,
+        gradients = grad))$provider
       fit.rng <- .Random.seed
       set.seed(981)
-      from.bw <- plot(bw, xdat = x, ydat = y, output = "data",
-        errors = "bootstrap", plot.errors.boot.method = "wild",
-        B = 7L, neval = 5L, gradients = grad)
+      from.bw <- capture_plot_provider(plot(bw, xdat = x, ydat = y, output = "data",
+        errors = "bootstrap", bootstrap = "wild",
+        B = 7L, neval = 5L, gradients = grad))$provider
       expect_identical(.Random.seed, fit.rng)
       expect_equal(lapply(from.fit, function(z) z[fields]),
                    lapply(from.bw, function(z) z[fields]), tolerance = 5e-10)

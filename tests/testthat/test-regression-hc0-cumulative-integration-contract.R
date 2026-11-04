@@ -116,15 +116,15 @@ test_that("categorical asymptotic plot panels consume native HC0 errors", {
   out <- suppressWarnings(plot(
     fit, xdat = fixture$x, ydat = fixture$y,
     output = "data", perspective = FALSE, gradients = TRUE,
-    errors = "asymptotic", data.overlay = FALSE, neval = 7L
+    errors = "asymptotic", data_overlay = FALSE, neval = 7L
   ))
 
   expect_type(out, "list")
-  expect_true(all(vapply(out, inherits, logical(1), "npregression")))
-  expect_true(all(is.finite(out[[3L]]$grad)))
-  expect_true(all(is.finite(out[[3L]]$gerr)))
-  expect_true(all(is.finite(out[[4L]]$grad)))
-  expect_true(all(is.finite(out[[4L]]$gerr)))
+  expect_s3_class(out, "np_plot_data")
+  expect_true(all(is.finite(out$panels[[3L]]$values$estimate)))
+  expect_true(all(is.finite(out$panels[[3L]]$values$std_error)))
+  expect_true(all(is.finite(out$panels[[4L]]$values$estimate)))
+  expect_true(all(is.finite(out$panels[[4L]]$values$std_error)))
   })
 })
 

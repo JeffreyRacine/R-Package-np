@@ -179,7 +179,7 @@ test_that("saved conditional formulas are checked only when formula metadata is 
     legacy$call$formula <- legacy$formula
     original <- legacy
     expect_error(fun(bws = legacy), "conditional formula responses", fixed = TRUE)
-    expect_error(plot(legacy, plot.behavior = "data", neval = 5L),
+    expect_error(plot(legacy, output = "data", neval = 5L),
                  "conditional formula responses", fixed = TRUE)
     expect_identical(legacy, original)
     # Explicit native data bypasses formula replay, retaining native precedence.

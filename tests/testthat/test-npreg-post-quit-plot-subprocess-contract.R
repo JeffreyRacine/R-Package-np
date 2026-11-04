@@ -12,12 +12,13 @@ test_that("npregression object-fed data plot works after npRmpi.quit(force=TRUE)
       "x <- data.frame(x = seq(0, 1, length.out = 12))",
       "y <- sin(2 * pi * x$x)",
       "fit <- npreg(txdat = x, tydat = y)",
+      "frozen.fit <- serialize(fit, NULL)",
       "plot.live <- plot(fit, output = \"data\", perspective = FALSE, view = \"fixed\")",
       "npRmpi.quit(force = TRUE)",
       "plot.post <- plot(fit, output = \"data\", perspective = FALSE, view = \"fixed\")",
-      "stopifnot(identical(as.numeric(plot.live$r1$mean), as.numeric(plot.post$r1$mean)))",
-      "stopifnot(identical(as.numeric(plot.live$r1$eval[[1L]]), as.numeric(plot.post$r1$eval[[1L]])))",
-      "stopifnot(identical(as.numeric(plot.live$r1$bws$bw), as.numeric(plot.post$r1$bws$bw)))",
+      "stopifnot(identical(as.numeric(plot.live$panels[[1L]]$values$estimate), as.numeric(plot.post$panels[[1L]]$values$estimate)))",
+      "stopifnot(identical(as.numeric(plot.live$panels[[1L]]$grid$eval_1), as.numeric(plot.post$panels[[1L]]$grid$eval_1)))",
+      "stopifnot(identical(serialize(fit, NULL), frozen.fit))",
       "cat('post_quit_plot_ok\\n')"
     ),
     env = env

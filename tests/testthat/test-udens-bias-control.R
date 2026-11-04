@@ -24,20 +24,20 @@ test_that("density correction retains literal law and singleton contracts", {
   on.exit(grDevices::dev.off(), add = TRUE)
   out <- plot(bw, xdat = x, errors = "bootstrap", bootstrap = "inid",
     center = "bias-corrected", band = "all", B = 49L, neval = 1L,
-    output = "plot-data", bias.control = np_udens_bias_control())[[1L]]
+    output = "plot-data", bias_control = np_udens_bias_control())
   expect_identical(.Random.seed, rng)
-  expect_identical(out$inference$settings$primary, "absolute")
-  expect_identical(out$inference$bands$pointwise, out$inference$bands$simultaneous)
-  expect_identical(out$inference$bands$pointwise, out$inference$bands$bonferroni)
+  expect_identical(out$inference[[1L]]$primary, "absolute")
+  expect_identical(plot_band(out, "pointwise"), plot_band(out, "simultaneous"))
+  expect_identical(plot_band(out, "pointwise"), plot_band(out, "bonferroni"))
   for (law in c("fixed", "geom")) {
     block <- plot(bw, xdat = x, errors = "bootstrap", bootstrap = law,
       center = "bias-corrected", band = "all", B = 49L, neval = 1L,
-      boot.control = np_boot_control(blocklen = 2L), output = "data",
-      bias.control = np_udens_bias_control())[[1L]]$inference
-    expect_identical(block$settings$law, law)
-    expect_true(all(is.finite(unlist(block$bands))))
-    expect_identical(block$bands$pointwise, block$bands$simultaneous)
-    expect_identical(block$bands$pointwise, block$bands$bonferroni)
+      boot_control = np_boot_control(blocklen = 2L), output = "data",
+      bias_control = np_udens_bias_control())
+    expect_identical(block$inference[[1L]]$resampling_law, law)
+    expect_true(all(is.finite(as.matrix(block$panels[[1L]]$intervals[c("lower", "upper")]))))
+    expect_identical(plot_band(block, "pointwise"), plot_band(block, "simultaneous"))
+    expect_identical(plot_band(block, "pointwise"), plot_band(block, "bonferroni"))
     expect_identical(.Random.seed, rng)
   }
 })

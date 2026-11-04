@@ -50,7 +50,7 @@ test_that("plot contract: asymptotic consumer payloads are supported in npRmpi s
     errors = "asymptotic",
     band = "pointwise",
     perspective = FALSE
-  ))[[1]]
+  ))
   out.si.bin <- suppressWarnings(plot(
     sbw.bin,
     xdat = data.frame(x1 = x1, x2 = x2),
@@ -59,7 +59,7 @@ test_that("plot contract: asymptotic consumer payloads are supported in npRmpi s
     errors = "asymptotic",
     band = "pointwise",
     perspective = FALSE
-  ))[[1]]
+  ))
   out.pl <- suppressWarnings(plot(
     pbw,
     xdat = data.frame(x = x1),
@@ -69,15 +69,15 @@ test_that("plot contract: asymptotic consumer payloads are supported in npRmpi s
     errors = "asymptotic",
     band = "pointwise",
     perspective = FALSE
-  ))[[1]]
+  ))
 
-  expect_s3_class(out.si, "singleindex")
-  expect_s3_class(out.si.bin, "singleindex")
-  expect_s3_class(out.pl, "plregression")
-  expect_true(all(is.finite(out.si$mean)))
-  expect_true(all(is.finite(out.si$merr)))
-  expect_true(all(is.finite(out.si.bin$mean)))
-  expect_true(all(is.finite(out.si.bin$merr)))
-  expect_true(all(is.finite(out.pl$mean)))
-  expect_true(all(is.finite(out.pl$merr)))
+  expect_s3_class(out.si, "np_plot_data")
+  expect_s3_class(out.si.bin, "np_plot_data")
+  expect_s3_class(out.pl, "np_plot_data")
+  expect_true(all(is.finite(plot_target(out.si)$estimate)))
+  expect_true(all(is.finite(plot_band(out.si, "pointwise"))))
+  expect_true(all(is.finite(plot_target(out.si.bin)$estimate)))
+  expect_true(all(is.finite(plot_band(out.si.bin, "pointwise"))))
+  expect_true(all(is.finite(plot_target(out.pl)$estimate)))
+  expect_true(all(is.finite(plot_band(out.pl, "pointwise"))))
 })

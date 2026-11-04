@@ -21,18 +21,15 @@ test_that("npcdens plot-data centers stay on predict and bootstrap offsets remai
       bootstrap = "inid",
       B = 39L,
       band = "pointwise",
-      boot.control = np_boot_control(nonfixed = nonfixed_mode)
+      boot_control = np_boot_control(nonfixed = nonfixed_mode)
     ))
 
-    expect_true(length(out) > 0L)
-    for (obj in out) {
-      expect_s3_class(obj, "condensity")
-      pred <- predict(fit, exdat = obj$xeval, eydat = obj$yeval)
-      lower <- obj$condens + obj$conderr[, 1L]
-      upper <- obj$condens + obj$conderr[, 2L]
-
-      expect_equal(obj$condens, as.numeric(pred), tolerance = 1e-8)
-      expect_true(all(lower <= upper + 1e-10, na.rm = TRUE))
+    expect_s3_class(out, "np_plot_data")
+    for (j in seq_along(out$panels)) {
+      pred <- predict(fit, exdat = plot_coordinates(out, j, "X"), eydat = plot_coordinates(out, j, "Y"))
+      d <- plot_target(out, j, band = "pointwise")
+      expect_equal(d$estimate, as.numeric(pred), tolerance = 1e-8)
+      expect_true(all(d$lower <= d$upper + 1e-10, na.rm = TRUE))
     }
 
     out
@@ -45,14 +42,14 @@ test_that("npcdens plot-data centers stay on predict and bootstrap offsets remai
   adaptive.frozen <- check_mode("adaptive_nn", "frozen")
 
   expect_equal(
-    lapply(generalized.exact, `[[`, "condens"),
-    lapply(generalized.frozen, `[[`, "condens"),
+    lapply(generalized.exact$panels, function(p) p$values$estimate),
+    lapply(generalized.frozen$panels, function(p) p$values$estimate),
     tolerance = 1e-12
   )
   expect_equal(
-    lapply(adaptive.exact, `[[`, "condens"),
-    lapply(adaptive.frozen, `[[`, "condens"),
+    lapply(adaptive.exact$panels, function(p) p$values$estimate),
+    lapply(adaptive.frozen$panels, function(p) p$values$estimate),
     tolerance = 1e-12
   )
-  expect_true(all(vapply(fixed.exact, function(obj) is.matrix(obj$conderr), logical(1))))
+  expect_true(all(vapply(fixed.exact$panels, function(p) nrow(p$intervals) == nrow(p$grid), logical(1))))
 })

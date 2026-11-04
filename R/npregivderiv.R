@@ -642,13 +642,15 @@ summary.npregivderiv <- function(object, ...) {
 
 plot.npregivderiv <- function(x,
                               gradients = TRUE,
-                              data.overlay = TRUE,
-                              data.rug = FALSE,
-                              ...) {
+                              data_overlay = TRUE,
+                              data_rug = FALSE,
+                              output = c("plot", "data", "plot-data"),
+                         ...) {
+  .np_plot_check_public_names(names(list(...)))
   matched.call <- match.call(expand.dots = FALSE)
   .np_plot_validate_npregiv_call(
     sys.call(),
-    method_args = c("gradients", "data.overlay", "data.rug"),
+    method_args = c("gradients", "data_overlay", "data_rug", "output"),
     context = "plot.npregivderiv",
     dots_call = matched.call[["..."]]
   )
@@ -656,9 +658,14 @@ plot.npregivderiv <- function(x,
     object = x,
     family = "npregivderiv",
     gradients = gradients,
-    data_overlay = data.overlay,
-    data_rug = data.rug,
+    data_overlay = data_overlay,
+    data_rug = data_rug,
     dots = list(...)
   )
-  .np_iv_plot_render(spec)
+  output <- match.arg(output)
+  variable <- names(x[["z", exact = TRUE]])[1L]
+  if (is.null(variable) || is.na(variable) || !nzchar(variable)) variable <- "z"
+  result <- .np_plot_data_from_iv(spec, variable)
+  if (!identical(output, "data")) .np_iv_plot_render(spec)
+  if (identical(output, "plot")) invisible(NULL) else result
 }

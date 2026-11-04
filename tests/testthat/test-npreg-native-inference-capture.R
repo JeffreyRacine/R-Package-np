@@ -133,14 +133,17 @@ test_that("distributed large-bandwidth public bands preserve marginal widths", {
   bw <- npregbw(xdat=x,ydat=y,bws=700,regtype="ll",bandwidth.compute=FALSE)
   for(grad in c(FALSE,TRUE)) {
     a <- plot(bw,errors="asymptotic",band="all",gradients=grad,
-      output="data",neval=5L)[[1L]]
+      output="data",neval=5L)
     p <- plot(bw,errors="asymptotic",band="pointwise",gradients=grad,
-      output="data",neval=5L)[[1L]]
-    expect_identical(a$mean,p$mean); expect_identical(a$merr,p$merr)
-    bands <- a$band.errors
-    expect_true(all(is.finite(bands$simultaneous)))
-    expect_true(all(bands$pointwise<=bands$simultaneous))
-    expect_true(all(bands$simultaneous<=bands$bonferroni))
+      output="data",neval=5L)
+    expect_identical(plot_target(a, band="pointwise")$estimate, plot_target(p)$estimate)
+    pointwise <- plot_band(a, "pointwise")
+    simultaneous <- plot_band(a, "simultaneous")
+    bonferroni <- plot_band(a, "bonferroni")
+    expect_identical(pointwise, plot_band(p, "pointwise"))
+    expect_true(all(is.finite(simultaneous)))
+    expect_true(all(pointwise[,1L]>=simultaneous[,1L] & pointwise[,2L]<=simultaneous[,2L]))
+    expect_true(all(simultaneous[,1L]>=bonferroni[,1L] & simultaneous[,2L]<=bonferroni[,2L]))
   }
 })
 
@@ -154,5 +157,5 @@ test_that("formula capture provenance survives MPI call materialization", {
   x <- runif(60,-2,2); y <- x+rnorm(60)
   model <- npreg(y~x,regtype="ll")
   bands <- plot(model,errors="asymptotic",band="all",output="data",neval=5L)
-  expect_true(all(is.finite(bands[[1L]]$band.errors$simultaneous)))
+  expect_true(all(is.finite(plot_band(bands, "simultaneous"))))
 })

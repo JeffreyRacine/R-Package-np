@@ -17,7 +17,8 @@ test_that("fixed categorical plots subtract projected endpoint probabilities", {
       expected <- c(0,probability[2]-probability[1])
       # Absolute oracle tolerance: near-zero raw contrasts can amplify a
       # relative comparison despite only 1e-15 absolute summation differences.
-      expect_lte(max(abs(payload$c$effect-expected)),1e-12)
+      expect_length(payload$panels[[2L]]$values$estimate, length(expected))
+      expect_lte(max(abs(payload$panels[[2L]]$values$estimate-expected)),1e-12)
       expect_lte(max(abs(as.vector(gradients(direct)[,"c"])-expected)),1e-12)
     }
   }

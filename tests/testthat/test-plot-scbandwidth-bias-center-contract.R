@@ -23,18 +23,18 @@ test_that("smooth coefficient bootstrap bias centers are component-specific", {
     bootstrap = "wild",
     band = "pointwise",
     B = 19L,
-    data.overlay = FALSE,
+    data_overlay = FALSE,
     perspective = FALSE,
     output = "data"
   ))
 
-  expect_length(out, 2L)
+  expect_length(out$panels, 2L)
   expect_equal(
-    vapply(out, function(x) length(x$bias.corrected), integer(1L)),
-    vapply(out, function(x) length(x$mean), integer(1L))
+    vapply(out$panels, function(x) length(x$values$bias_corrected), integer(1L)),
+    vapply(out$panels, function(x) length(x$values$estimate), integer(1L))
   )
-  expect_true(all(vapply(out, function(x) all(is.finite(x$bias.corrected)), logical(1L))))
-  expect_false(isTRUE(all.equal(out[[1L]]$bias.corrected, out[[2L]]$bias.corrected)))
+  expect_true(all(vapply(out$panels, function(x) all(is.finite(x$values$bias_corrected)), logical(1L))))
+  expect_false(isTRUE(all.equal(out$panels[[1L]]$values$bias_corrected, out$panels[[2L]]$values$bias_corrected)))
 })
 
 test_that("smooth coefficient bias-corrected plot renders center legend", {
@@ -66,7 +66,7 @@ test_that("smooth coefficient bias-corrected plot renders center legend", {
       bootstrap = "wild",
       band = "simultaneous",
       B = 29L,
-      data.overlay = FALSE,
+      data_overlay = FALSE,
       perspective = FALSE
     )),
     NA

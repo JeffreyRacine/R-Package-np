@@ -44,6 +44,9 @@ test_that("saved formula readers resolve data in its constructor owner", {
   a <- plot(sb, output = "data", errors = "none", neval = 5L)
   b <- plot(sb, xdat = d["x"], ydat = d$y, zdat = d["z"],
     output = "data", errors = "none", neval = 5L)
+  # Explicit native data changes request provenance, not computed geometry.
+  expect_identical(setdiff(b$request$supplied, a$request$supplied), c("xdat", "ydat", "zdat"))
+  b$request$supplied <- a$request$supplied
   expect_identical(a, b)
   expect_error(npreghat(make(d), data = data.frame(wrong = 1:36)), "object 'y' not found")
   expect_length(fitted(npreg(make(d))), nrow(d))
@@ -130,8 +133,8 @@ test_that("saved formula readers retain forwarded and caller-local NA policies",
                    predict(direct, newdata = d[1:3, ]))
   a <- plot(model$bws, output = "data", errors = "none", neval = 3L)
   b <- plot(direct$bws, output = "data", errors = "none", neval = 3L)
-  expect_identical(a[[1L]]$mean, b[[1L]]$mean)
-  expect_identical(a[[1L]]$eval, b[[1L]]$eval)
+  expect_identical(a$panels[[1L]]$values$estimate, b$panels[[1L]]$values$estimate)
+  expect_identical(plot_coordinates(a, role="X"), plot_coordinates(b, role="X"))
   fields <- c("In", "In.bootstrap", "P")
   a <- npsigtest(model$bws, B = 9L, random.seed = 1028L)
   rng <- .Random.seed

@@ -140,7 +140,7 @@ test_that("explicit beta density and distribution interval plot routes run", {
         output = "data",
         neval = 13L,
         errors = errors,
-        random.seed = 1703L
+        random_seed = 1703L
       ), extra)
     )
     dist.plot <- do.call(
@@ -150,14 +150,14 @@ test_that("explicit beta density and distribution interval plot routes run", {
         output = "data",
         neval = 13L,
         errors = errors,
-        random.seed = 1703L
+        random_seed = 1703L
       ), extra)
     )
 
     expect_type(dens.plot, "list")
     expect_type(dist.plot, "list")
-    expect_true(all(is.finite(dens.plot$d1$dens)), info = paste("density", errors))
-    expect_true(all(is.finite(dist.plot$d1$dist)), info = paste("distribution", errors))
+    expect_true(all(is.finite(plot_target(dens.plot)$estimate)), info = paste("density", errors))
+    expect_true(all(is.finite(plot_target(dist.plot)$estimate)), info = paste("distribution", errors))
   }
 })
 
@@ -192,9 +192,9 @@ test_that("beta NN frozen bootstrap plots and bivariate plot evaluation run", {
         output = "data",
         neval = 11L,
         errors = "bootstrap",
-        boot.control = np_boot_control(nonfixed = "frozen"),
+        boot_control = np_boot_control(nonfixed = "frozen"),
         B = 2L,
-        random.seed = 1705L
+        random_seed = 1705L
       ),
       "list"
     )
@@ -204,9 +204,9 @@ test_that("beta NN frozen bootstrap plots and bivariate plot evaluation run", {
         output = "data",
         neval = 11L,
         errors = "bootstrap",
-        boot.control = np_boot_control(nonfixed = "frozen"),
+        boot_control = np_boot_control(nonfixed = "frozen"),
         B = 2L,
-        random.seed = 1705L
+        random_seed = 1705L
       ),
       "list"
     )
@@ -226,11 +226,12 @@ test_that("beta NN frozen bootstrap plots and bivariate plot evaluation run", {
     neval = 5L,
     errors = "bootstrap",
     B = 2L,
-    random.seed = 1706L
+    random_seed = 1706L
   )
 
   expect_type(xy.plot, "list")
-  expect_true(all(is.finite(xy.plot$d1$dens)))
+  expect_gt(nrow(xy.plot$panels[[1L]]$values), 0L)
+  expect_true(all(is.finite(xy.plot$panels[[1L]]$values$estimate)))
 })
 
 test_that("ordinary-kernel plot evaluator normalization is unchanged", {

@@ -58,16 +58,16 @@ test_that("categorical-only regression gradient plots are allowed under autodisp
   ord.eval <- data.frame(xo = ordered(levels(dat$xo), levels = levels(dat$xo)))
   ord.direct <- npRmpi::npreg(bws = fit.ord$bws, exdat = ord.eval,
                               gradients = TRUE)$grad[, 1L]
-  ord.plot <- plot(fit.ord, gradients = TRUE, plot.behavior = "data")
-  expect_equal(as.numeric(ord.plot[[1L]]$grad), as.numeric(ord.direct),
+  ord.plot <- plot(fit.ord, gradients = TRUE, output = "data")
+  expect_equal(as.numeric(plot_target(ord.plot)$estimate), as.numeric(ord.direct),
                tolerance = 1e-12)
 
   fit.uno <- npRmpi::npreg(y ~ xu, data = dat)
   uno.eval <- data.frame(xu = factor(levels(dat$xu), levels = levels(dat$xu)))
   uno.direct <- npRmpi::npreg(bws = fit.uno$bws, exdat = uno.eval,
                               gradients = TRUE)$grad[, 1L]
-  uno.plot <- plot(fit.uno, gradients = TRUE, plot.behavior = "data")
-  expect_equal(as.numeric(uno.plot[[1L]]$grad), as.numeric(uno.direct),
+  uno.plot <- plot(fit.uno, gradients = TRUE, output = "data")
+  expect_equal(as.numeric(plot_target(uno.plot)$estimate), as.numeric(uno.direct),
                tolerance = 1e-12)
 
   expect_no_error(plot(fit.ord, gradients = TRUE))

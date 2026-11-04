@@ -39,6 +39,7 @@ test_that("npRmpi rotate bootstrap npudens payload matches np north star", {
 
   ok_tag <- "NPUDENS_ROTATE_NORTHSTAR_OK"
   lines <- c(
+    plot_test_support(),
     "suppressPackageStartupMessages(library(np))",
     "run_case <- function() {",
     "  options(np.messages = FALSE, plot.par.mfrow = FALSE)",
@@ -72,11 +73,11 @@ test_that("npRmpi rotate bootstrap npudens payload matches np north star", {
     "    B = 39L,",
     "    band = 'all'",
     "  ))",
-    "  stopifnot(length(out_np) == length(out_mpi))",
-    "  for (nm in names(out_np)) {",
-    "    stopifnot(isTRUE(all.equal(out_mpi[[nm]]$dens, out_np[[nm]]$dens, tolerance = 1e-8)))",
-    "    rng_np <- range(out_np[[nm]]$derr, finite = TRUE)",
-    "    rng_mpi <- range(out_mpi[[nm]]$derr, finite = TRUE)",
+    "  stopifnot(length(out_np$panels) == length(out_mpi$panels))",
+    "  for (nm in names(out_np$panels)) {",
+    "    stopifnot(isTRUE(all.equal(out_mpi$panels[[nm]]$values$estimate, out_np$panels[[nm]]$values$estimate, tolerance = 1e-8)))",
+    "    rng_np <- range(sweep(plot_band(out_np, 'simultaneous', panel=nm), 1L, plot_target(out_np, panel=nm, band='simultaneous')$estimate, '-'), finite = TRUE)",
+    "    rng_mpi <- range(sweep(plot_band(out_mpi, 'simultaneous', panel=nm), 1L, plot_target(out_mpi, panel=nm, band='simultaneous')$estimate, '-'), finite = TRUE)",
     "    stopifnot(length(rng_np) == 2L, length(rng_mpi) == 2L)",
     "    stopifnot(isTRUE(all.equal(rng_mpi, rng_np, tolerance = 0.05, scale = pmax(abs(rng_np), 1e-12))))",
     "  }",

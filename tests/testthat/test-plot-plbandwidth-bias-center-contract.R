@@ -26,16 +26,16 @@ test_that("partially linear bootstrap bias centers are component-specific", {
 
   for (boot in c("wild", "inid", "fixed", "geom")) {
     set.seed(123)
-    out <- suppressWarnings(plot(
+    out <- suppressWarnings(capture_plot_provider(plot(
       model,
       center = "bias-corrected",
       errors = "bootstrap",
       bootstrap = boot,
       band = "pointwise",
       B = 19L,
-      data.overlay = FALSE,
+      data_overlay = FALSE,
       output = "data"
-    ))
+    ))$provider)
 
     expect_length(out, 4L)
     bc.lengths <- vapply(out, function(x) length(x$bias.corrected), integer(1L))
@@ -81,7 +81,7 @@ test_that("partially linear bias-corrected plot renders continuous and factor pa
       bootstrap = "wild",
       band = "simultaneous",
       B = 29L,
-      data.overlay = FALSE
+      data_overlay = FALSE
     )),
     NA
   )

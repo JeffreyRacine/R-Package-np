@@ -22,11 +22,11 @@ test_that("session-route conditional density/distribution gradient bootstrap ini
       "fit.cdist <- npcdist(bws = bw.cdist)",
       "for (obj in list(bw.cd, bw.cdist)) {",
       "  out <- suppressWarnings(plot(obj, xdat = xdat, ydat = ydat, output = 'data', perspective = FALSE, gradients = TRUE, errors = 'bootstrap', bootstrap = 'inid', B = 5L))",
-      "  stopifnot(is.list(out), length(out[[1L]]$bxp) > 0L)",
+      "  stopifnot(inherits(out, 'np_plot_data'), length(out$panels[[1L]]$display$boxplots) > 0L)",
       "}",
       "for (obj in list(fit.cd, fit.cdist)) {",
       "  out <- suppressWarnings(plot(obj, xdat = xdat, ydat = ydat, output = 'data', perspective = FALSE, gradients = TRUE, errors = 'bootstrap', bootstrap = 'inid', B = 5L))",
-      "  stopifnot(is.list(out), length(out[[1L]]$bxp) > 0L)",
+      "  stopifnot(inherits(out, 'np_plot_data'), length(out$panels[[1L]]$display$boxplots) > 0L)",
       "}",
       "cat('COND_INID_CONTRACT_OK\\n')"
     ),

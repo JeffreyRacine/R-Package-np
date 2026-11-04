@@ -177,14 +177,14 @@ test_that("npqreg plot preserves NOMAD-selected LP degree metadata", {
   expect_false(is.null(bw$degree.engine))
 
   fit <- npqreg(bws = bw, tau = 0.5)
-  out <- plot(
+  out <- capture_plot_provider(plot(
     fit,
     output = "data",
     perspective = FALSE,
     tau = c(0.25, 0.5),
     errors = "none",
     neval = 5L
-  )
+  ))$provider
 
   expect_true(all(vapply(out, inherits, logical(1), "qregression")))
   expect_true(all(vapply(out, function(xi) identical(xi$bws$regtype.engine, "lp"), logical(1))))
@@ -375,7 +375,9 @@ test_that("npqreg plot vector-tau gradients use the coalesced evaluator", {
     errors = "none",
     neval = 12L
   )
-  expect_true(all(vapply(plot.data, inherits, logical(1), "qregression")))
+  expect_s3_class(plot.data, "np_plot_data")
+  expect_true(all(plot.data$targets$order == 1L))
+  expect_setequal(plot.data$targets$tau, c(.25, .5, .75))
 })
 
 test_that("npqreg gradient plots support asymptotic errors", {
@@ -406,7 +408,9 @@ test_that("npqreg gradient plots support asymptotic errors", {
     neval = 8L
   )
 
-  expect_true(all(vapply(out, inherits, logical(1), "qregression")))
+  expect_s3_class(out, "np_plot_data")
+  expect_true(all(out$targets$order == 1L))
+  expect_setequal(out$targets$tau, c(.25, .5, .75))
   grad <- gradients(fit)
   gerr <- gradients(fit, se = TRUE)
   expect_true(any(is.finite(grad)))

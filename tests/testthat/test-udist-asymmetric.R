@@ -1,3 +1,5 @@
+# Raw process/draw invariants are provider contracts; the public result is
+# constructed and validated by capture_plot_provider in every call.
 test_that("CDF raw and protected tails preserve their same-call absolute control", {
   old <- options(np.messages = FALSE, np.plot.progress = FALSE)
   on.exit(options(old), add = TRUE)
@@ -6,14 +8,14 @@ test_that("CDF raw and protected tails preserve their same-call absolute control
   for (law in c("inid", "fixed", "geom")) {
     call <- list(x = bw, xdat = x, center = "bias-corrected", errors = "bootstrap",
       bootstrap = law, B = 199L, band = "all", neval = 5L, output = "data",
-      random.seed = 99102905)
+      random_seed = 99102905)
     block <- if (law == "inid") NULL else 3L
-    call$boot.control <- np_boot_control(blocklen = block)
-    absolute <- suppressWarnings(do.call(plot, call))$d1$inference
-    call$boot.control <- np_boot_control(blocklen = block, calibration = "separate-tails")
-    raw <- suppressWarnings(do.call(plot, call))$d1$inference
-    call$boot.control <- np_boot_control(blocklen = block, calibration = "tail-envelope")
-    protected <- suppressWarnings(do.call(plot, call))$d1$inference
+    call$boot_control <- np_boot_control(blocklen = block)
+    absolute <- capture_plot_provider(suppressWarnings(do.call(plot, call)))$provider$d1$inference
+    call$boot_control <- np_boot_control(blocklen = block, calibration = "separate-tails")
+    raw <- capture_plot_provider(suppressWarnings(do.call(plot, call)))$provider$d1$inference
+    call$boot_control <- np_boot_control(blocklen = block, calibration = "tail-envelope")
+    protected <- capture_plot_provider(suppressWarnings(do.call(plot, call)))$provider$d1$inference
     expect_identical(raw$absolute.intervals, absolute$bands)
     expect_identical(raw$rng, absolute$rng)
     expect_identical(raw$center, absolute$center)
@@ -51,7 +53,7 @@ test_that("CDF side-specific score protection does not impose symmetry", {
 test_that("new CDF score controls are rejected at other public consumers", {
   control <- np_udist_bias_control(calibration = "score-envelope")
   expect_error(plot(structure(list(), class = "npcopula"), errors = "bootstrap", B = 19L, output = "data",
-                    bias.control = control), "requires supported distribution inference")
+                    bias_control = control), "requires supported distribution inference")
   expect_error(.np_udist_score_scope(control, FALSE), "requires supported distribution inference")
   expect_invisible(.np_udist_score_scope(np_udist_bias_control(), FALSE))
   expect_invisible(.np_udist_score_scope(control, TRUE))

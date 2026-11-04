@@ -1,7 +1,11 @@
 \name{np_udist_bias_control}
 \alias{np_udist_bias_control}
 \title{Private Controls for Bias-Corrected Unconditional Distribution Bands}
-\description{Selects the research CDF construction or legacy bootstrap centering.}
+\description{
+\strong{Bias-corrected bounds are experimental (pre-beta research), incomplete,
+and not recommended for general-purpose inference.} See the experimental-status
+section below.
+Selects the research CDF construction or legacy bootstrap centering.}
 \usage{np_udist_bias_control(construction = c("joint-process", "cdf", "legacy"),
                       calibration = c("default", "score-envelope"))}
 \arguments{
@@ -12,7 +16,7 @@ score envelope for supported fixed numeric Gaussian asymptotic bands.}
 \details{
 This private research implementation is undergoing full empirical-range
 qualification. It does not establish a finite-sample coverage guarantee.
-With \code{center="bias-corrected"}, omitting \code{bias.control} selects
+With \code{center="bias-corrected"}, omitting \code{bias_control} selects
 \code{"joint-process"}. The default estimate center remains unchanged. Use
 \code{errors="asymptotic"} for Gaussian calibration or \code{errors="bootstrap"}
 with \code{bootstrap="inid"}, \code{"fixed"} or \code{"geom"} for literal
@@ -33,7 +37,7 @@ With fixed bandwidths, fixed/geom processes use literal selected-law block count
 finite-sample covariance; their reported scales are not IID scales. The automatic
 block length remains \code{b.star(xdat, round=TRUE)[1,1]}, selected once per plot.
 The first input series may not represent dependence elsewhere in multivariate
-data. Explicit \code{boot.control=np_boot_control(blocklen=...)} overrides are
+data. Explicit \code{boot_control=np_boot_control(blocklen=...)} overrides are
 honored. Neither method divides by a replicate studentizer. Full-length fixed
 blocks with zero process variance are unavailable.
 No local or replicate studentizer division, variance floor, trimming, endpoint
@@ -63,16 +67,16 @@ quantiles bounded by the analytic marginal and Bonferroni maximum bounds.
 Inid marginal and joint quantiles use type one. Bonferroni intervals envelope
 the joint band. Singleton bands coincide. Standalone Gaussian Bonferroni uses
 the default joint draws for its envelope; request \code{band="all"} to set
-\code{gaussian.draws} and obtain all bands from the same process. Finite-draw
+\code{gaussian_draws} and obtain all bands from the same process. Finite-draw
 Bonferroni tail resolution and marginal sparse-tail coverage remain limitations.
 Every positive draw count is supported when the provider arithmetic is defined.
 Poorly resolved empirical quantiles return all requested bands with one aggregated
-warning and retained \code{inference$resolution} diagnostics. No draw count is
+warning and retained \code{inference[[1]]$resolution} diagnostics. No draw count is
 increased and no requested band is omitted for resolution alone. Numeric GNN
 bootstrap scales are empirical standard deviations across draws, so fewer than
 two draws remains a distinct undefined-arithmetic error. Analytic Gaussian
 marginal quantiles do not require empirical tail resolution.
-The maximum-process draws are retained as \code{inference$process.maximum}.
+The maximum-process draws are internal computation records, not plot output.
 
 For numeric-only fixed bandwidths with one or two variables, Gaussian and inid
 pointwise bands additionally envelope a signed-contribution score interval.
@@ -87,8 +91,8 @@ and quantiles are unchanged, but the final endpoints can be wider and asymmetric
 The corrected center is unchanged. Simultaneous bands retain their raw process
 calibration and expand only by the minimum uniform amount required to contain
 the revised pointwise bands. Bonferroni bands retain nesting; singleton bands
-coincide. \code{inference$reference.bands} and
-\code{inference$reference.critical} retain the preceding intervals and criticals.
+coincide. The provider retains the preceding intervals and criticals internally for
+construction and diagnostic tests; the plot result publishes only selected endpoints.
 Final \code{critical} values report maximum one-sided extents around the
 preserved center; use \code{bands} for the asymmetric endpoints. Settings record
 the contribution range and nesting expansion. Mixed, NN and block routes do
@@ -96,7 +100,7 @@ not receive this marginal envelope. An entirely zero observed process remains
 unavailable.
 
 For supported corrected empirical bootstrap bands, explicit
-\code{boot.control=np_boot_control(calibration="separate-tails")} uses signed
+\code{boot_control=np_boot_control(calibration="separate-tails")} uses signed
 lower and upper empirical tails in CDF units. The simultaneous roots are
 separate quantiles of the family minimum and maximum; endpoints invert those
 signed estimate displacements. \code{calibration="tail-envelope"} additionally
@@ -112,7 +116,7 @@ For fixed numeric Gaussian2 inputs with one or two variables, the inid signed
 bands retain the existing marginal score protection. Its two sides are nested
 outward separately, preserving asymmetry instead of imposing the larger
 uniform displacement on both sides. An explicit asymptotic option,
-\code{bias.control=np_udist_bias_control(calibration="score-envelope")},
+\code{bias_control=np_udist_bias_control(calibration="score-envelope")},
 uses this same side-specific composition with the unchanged Gaussian process.
 Gaussian draws remain reflection-symmetric; this option's possible asymmetry
 comes from the deterministic score envelope, and some bands can remain
@@ -139,13 +143,12 @@ retains the historical bootstrap center. All constructions remain research
 candidates; full empirical-range screening is distinct from confirmation.
 
 Omitting \code{band}, or selecting \code{band="pmzsd"}, uses the corrected
-center plus or minus \eqn{z_{1-\alpha/2}} times \code{inference$se}.
+center plus or minus \eqn{z_{1-\alpha/2}} times the returned \code{std_error}.
 The existing pointwise provider supplies the selected-law scale, retaining
 block dependence and exact GNN resampling where applicable. Its computation
 and RNG contract are retained. Zero marginal scales give zero normal width.
 These normal intervals do not apply the score or joint envelopes and do not
-inherit their coverage results. Endpoints are in \code{inference$bands$pmzsd};
-\code{inference$normal.band} records the rule. Explicit \code{"pointwise"},
+inherit their coverage results. Endpoints are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"},
 \code{"simultaneous"}, \code{"bonferroni"} and \code{"all"} retain their
 calibrated constructions. Numeric adaptive nearest-neighbor bandwidths, unordered factors,
 bounded or higher-order kernels, large-bandwidth limits and
@@ -158,9 +161,29 @@ coverage over the union of panels or a full multidimensional rectangle. Ordered
 and block extensions have separate qualification gates and do not inherit
 coverage evidence from the numeric IID construction.
 }
-\value{A versioned control object for the plot \code{bias.control} argument.
-For data-returning corrected plots, each panel's \code{inference$bands} contains
-absolute endpoints; \code{bias.corrected + derr[,1]} and
-\code{bias.corrected + derr[,2]} give matching signed-offset endpoints.
-For \code{band="all"}, \code{derr} refers to the pointwise band.}
+\value{A family-specific control object consumed by plot methods.
+Data-returning plots use \code{\link{np_plot_data}}: original and corrected
+values, available standard errors, absolute endpoints and compact method and
+resolution diagnostics. Select a panel, scalar target and band with
+\code{as.data.frame(result, panel=1, target=1, band="simultaneous")}.
+Full fitted state, covariance workspaces, bootstrap draws and RNG states are
+internal computation records, not public plot fields. The fitted object is unchanged.}
+
+\section{Experimental status of bias-corrected inference}{
+\strong{All bias-corrected confidence intervals and bands are experimental
+(pre-beta research), incomplete, and not recommended for general-purpose
+inference.} This status remains in effect unless the documentation explicitly
+states otherwise for a particular method and scope. It applies wherever
+bias-corrected bounds are available: asymptotic and bootstrap constructions,
+including legacy methods, pointwise intervals, Bonferroni intervals and
+simultaneous bands, for levels and supported derivatives.
+
+These methods form an ongoing research project. Implementation support,
+numerical checks and favorable simulation results in selected settings do not
+establish generally valid coverage. Coverage can fail outside the studied
+settings, and available options do not constitute a general solution to
+bias-corrected inference. Method-specific assumptions, restrictions and known
+failures must be considered when experimenting with these bounds.
+}
+
 \seealso{\code{\link{npudist}}, \code{\link[=plot.np]{npplot}}}

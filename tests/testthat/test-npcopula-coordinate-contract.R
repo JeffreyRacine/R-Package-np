@@ -37,7 +37,8 @@ test_that("copula coordinates follow evaluation state, not published column name
         expect_identical(coordinates(unserialize(serialize(portable, NULL))), xy)
         if (grid) {
           pd <- plot(fit, output = "data", errors = "asymptotic")
-          expect_equal(nrow(pd), 25L)
+          expect_s3_class(pd, "np_plot_data")
+          expect_equal(nrow(as.data.frame(pd)), 25L)
           expect_identical(get(".npcopula_grid_eval", ns)(fit)$xgrid, xy)
         }
       }
@@ -68,7 +69,8 @@ test_that("transformed copula formula keeps grid SE and prediction geometry", {
     rng <- .Random.seed
     set.seed(100)
     b <- plot(control, output = "data", errors = "bootstrap", band = "pmzsd", B = 5L)
-    expect_identical(unname(as.matrix(a)), unname(as.matrix(b)))
+    expect_identical(unname(as.matrix(as.data.frame(a)[c("estimate", "lower", "upper")])),
+                     unname(as.matrix(as.data.frame(b)[c("estimate", "lower", "upper")])))
     expect_identical(.Random.seed, rng)
   }
 })
@@ -110,10 +112,14 @@ test_that("copula plain plots preserve omitted center suppliedness", {
     retained <- fit
     rng <- .Random.seed
     plain <- plot(fit, output = "data")
-    expect_identical(plain, as.data.frame(fit))
-    expect_identical(plot(fit, errors = "none", output = "data"), plain)
-    expect_identical(plot(fit, errors = "asymptotic", output = "data"),
-      plot(fit, errors = "asymptotic", center = "estimate", output = "data"))
+    expect_identical(as.data.frame(plain)$estimate, as.numeric(fitted(fit)))
+    expect_identical(unname(as.matrix(as.data.frame(plain)[c("eval_1", "eval_2")])),
+      unname(as.matrix(as.data.frame(fit)[c("u1", "u2")])))
+    explicit.none <- plot(fit, errors = "none", output = "data")
+    expect_identical(explicit.none, plain)
+    implicit.center <- plot(fit, errors = "asymptotic", output = "data")
+    explicit.center <- plot(fit, errors = "asymptotic", center = "estimate", output = "data")
+    expect_identical(implicit.center, explicit.center)
     expect_error(plot(fit, center = "estimate", output = "data"),
       'bootstrap controls require errors = "bootstrap"', fixed = TRUE)
     expect_error(plot(fit, center = "bias-corrected", output = "data"),

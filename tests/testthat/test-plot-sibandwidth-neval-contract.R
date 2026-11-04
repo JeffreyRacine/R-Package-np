@@ -23,11 +23,12 @@ test_that("sibandwidth plot respects bounded neval in session mode", {
     output = "data",
     perspective = FALSE,
     gradients = FALSE
-  ))[[1]]
+  ))
 
-  expect_equal(length(out.mean$index), 13L)
-  expect_equal(length(out.mean$mean), 13L)
-  expect_false(out.mean$trainiseval)
+  expect_s3_class(out.mean, "np_plot_data")
+  expect_equal(nrow(out.mean$panels[[1L]]$grid), 13L)
+  expect_equal(nrow(plot_target(out.mean)), 13L)
+  expect_false(nrow(out.mean$panels[[1L]]$grid) == n)
 
   out.grad <- suppressWarnings(plot(
     bw,
@@ -37,14 +38,19 @@ test_that("sibandwidth plot respects bounded neval in session mode", {
     output = "data",
     perspective = FALSE,
     gradients = TRUE
-  ))[[1]]
+  ))
 
-  expect_equal(length(out.grad$index), 13L)
-  expect_equal(nrow(out.grad$grad), 13L)
-  expect_equal(dim(out.grad$glerr), c(13L, ncol(tx)))
-  expect_equal(dim(out.grad$gherr), c(13L, ncol(tx)))
-  expect_false(out.grad$trainiseval)
-  expect_true(all(is.finite(out.grad$grad)))
+  expect_equal(nrow(out.grad$panels[[1L]]$grid), 13L)
+  expect_equal(nrow(out.grad$targets), ncol(tx))
+  expect_setequal(out.grad$targets$variable, names(tx))
+  for (target in seq_len(ncol(tx))) {
+    d <- plot_target(out.grad, target = target)
+    expect_equal(nrow(d), 13L)
+    expect_true(all(is.finite(d$estimate)))
+    expect_false(any(c("lower", "upper") %in% names(d)))
+    expect_identical(out.grad$request$errors, "none")
+    expect_equal(nrow(out.grad$panels[[1L]]$intervals), 0L)
+  }
 })
 
 test_that("sibandwidth bootstrap helpers honor bounded neval in session mode", {
@@ -81,13 +87,15 @@ test_that("sibandwidth bootstrap helpers honor bounded neval in session mode", {
         errors = "bootstrap",
         bootstrap = boot.method,
         B = 9L
-      ))[[1]]
+      ))
 
-      expect_equal(length(out$mean), 11L, info = paste(bt, boot.method, "mean length"))
-      expect_equal(dim(out$merr), c(11L, 2L), info = paste(bt, boot.method, "merr shape"))
-      expect_false(out$trainiseval, info = paste(bt, boot.method, "trainiseval"))
-      expect_true(all(is.finite(out$mean)), info = paste(bt, boot.method, "mean finite"))
-      expect_true(all(is.finite(out$merr)), info = paste(bt, boot.method, "merr finite"))
+      d <- plot_target(out, band = "pmzsd")
+      expect_equal(nrow(d), 11L, info = paste(bt, boot.method, "mean length"))
+      expect_equal(dim(as.matrix(d[c("lower", "upper")])), c(11L, 2L))
+      expect_false(nrow(out$panels[[1L]]$grid) == n)
+      expect_true(all(is.finite(d$estimate)), info = paste(bt, boot.method, "mean finite"))
+      expect_true(all(is.finite(as.matrix(d[c("lower", "upper")]))),
+                  info = paste(bt, boot.method, "endpoints finite"))
     }
   }
 })

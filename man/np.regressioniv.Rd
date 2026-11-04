@@ -81,7 +81,8 @@ npregiv(y, \dots)
         \dots)
 
 \method{plot}{npregiv}(x, gradients = FALSE,
-        data.overlay = TRUE, data.rug = FALSE, \dots)
+        data_overlay = TRUE, data_rug = FALSE,
+        output = c("plot", "data", "plot-data"), \dots)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
@@ -160,7 +161,10 @@ These arguments identify the response, endogenous variables, instruments, exogen
     coordinate. The default is \code{FALSE}.
   }
 
-  \item{data.overlay}{
+  \item{output}{Plot return mode: \code{"plot"} draws; \code{"data"}
+    returns \code{\link{np_plot_data}}; \code{"plot-data"} does both.}
+
+  \item{data_overlay}{
     logical; overlay the training response on a structural-function display.
     The default is \code{TRUE}, as for \code{plot.npregression}. It is ignored
     for derivative displays because response values and derivatives do not
@@ -168,7 +172,7 @@ These arguments identify the response, endogenous variables, instruments, exogen
     curve and response are both included in the displayed range.
   }
 
-  \item{data.rug}{
+  \item{data_rug}{
     logical; add a rug showing the training \code{z} support. The default is
     \code{FALSE}. A rug may accompany either structural-function or derivative
     displays; categorical endogenous coordinates omit the numerical rug.
@@ -595,7 +599,7 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
     fit-time evaluation grid when \code{phi.eval} is available, and overlays
     the training response by default without replacing that evaluation curve.
     Set \code{gradients=TRUE} for the first derivative and
-    \code{data.rug=TRUE} for the training-support rug.
+    \code{data_rug=TRUE} for the training-support rug.
 
   \code{npregiv} returns a list with components \code{phi},
   \code{phi.mat} and either \code{alpha} when \code{method="Tikhonov"}

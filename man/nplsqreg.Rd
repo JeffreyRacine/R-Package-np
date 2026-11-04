@@ -393,7 +393,7 @@ plot(model.q)
 
 model.med <- nplsqreg(gdp ~ ordered(year), data = Italy, tau = 0.50)
 model.q2 <- nplsqreg(bws = model.med$bws, tau = 0.50)
-plot(model.med, gradient = TRUE)
+plot(model.med, gradients = TRUE)
 }
 }
 \keyword{nonparametric}

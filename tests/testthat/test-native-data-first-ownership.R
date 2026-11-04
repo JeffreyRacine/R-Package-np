@@ -97,18 +97,18 @@ test_that("native regression plots retain the fit's replacement sample", {
   b <- npregbw(xdat = xa, ydat = ya, bws = .5, bandwidth.compute = FALSE)
   for (residuals in c(FALSE, TRUE)) {
     fit <- npreg(bws = b, txdat = xb, tydat = yb, residuals = residuals)
-    actual <- plot(fit, output = "data", neval = 9L)[[1L]]
-    expected <- fitted(npreg(bws = b, txdat = xb, tydat = yb, exdat = actual$eval))
-    expect_equal(range(actual$eval[[1L]]), range(xb$x))
-    expect_equal(actual$mean, expected, tolerance = 1e-12)
+    actual <- plot(fit, output = "data", neval = 9L)
+    expected <- fitted(npreg(bws = b, txdat = xb, tydat = yb, exdat = plot_coordinates(actual, role="X")))
+    expect_equal(range(plot_coordinates(actual, role="X")[[1L]]), range(xb$x))
+    expect_equal(plot_target(actual)$estimate, expected, tolerance = 1e-12)
     # Recovery must not evaluate descriptive call expressions for modern state.
     fit$call$bws <- quote(stop("descriptive call was evaluated"))
-    expect_equal(plot(fit, output = "data", neval = 9L)[[1L]]$mean, expected,
+    expect_equal(plot_target(plot(fit, output = "data", neval = 9L))$estimate, expected,
                  tolerance = 1e-12)
-    override <- plot(fit, xdat = xa, ydat = ya, output = "data", neval = 9L)[[1L]]
-    expect_equal(range(override$eval[[1L]]), range(xa$x))
-    expect_equal(override$mean,
-      fitted(npreg(bws = b, txdat = xa, tydat = ya, exdat = override$eval)),
+    override <- plot(fit, xdat = xa, ydat = ya, output = "data", neval = 9L)
+    expect_equal(range(plot_coordinates(override, role="X")[[1L]]), range(xa$x))
+    expect_equal(plot_target(override)$estimate,
+      fitted(npreg(bws = b, txdat = xa, tydat = ya, exdat = plot_coordinates(override, role="X"))),
       tolerance = 1e-12)
   }
 })

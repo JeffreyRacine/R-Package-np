@@ -357,11 +357,11 @@ test_that("npplreg generalized-nn inid plot helper completes in session mode", {
   )
 
   expect_true(is.list(out))
-  expect_equal(length(out), 2L)
-  expect_true(all(is.finite(out[[1L]]$mean)))
-  expect_true(all(is.finite(out[[1L]]$merr)))
-  expect_true(all(is.finite(out[[2L]]$mean)))
-  expect_true(all(is.finite(out[[2L]]$merr)))
+  expect_equal(length(out$panels), 2L)
+  expect_true(all(is.finite(out$panels[[1L]]$values$estimate)))
+  expect_true(all(is.finite(plot_band(out, "pmzsd", panel=1L))))
+  expect_true(all(is.finite(out$panels[[2L]]$values$estimate)))
+  expect_true(all(is.finite(plot_band(out, "pmzsd", panel=2L))))
 })
 
 test_that("npplreg generalized-nn wild plot helper preserves means in session mode", {
@@ -413,10 +413,10 @@ test_that("npplreg generalized-nn wild plot helper preserves means in session mo
     B = 5
   )
 
-  expect_equal(as.vector(wild.out[[1L]]$mean), as.vector(none.out[[1L]]$mean), tolerance = 1e-10)
-  expect_equal(as.vector(wild.out[[2L]]$mean), as.vector(none.out[[2L]]$mean), tolerance = 1e-10)
-  expect_true(all(is.finite(wild.out[[1L]]$merr)))
-  expect_true(all(is.finite(wild.out[[2L]]$merr)))
+  expect_equal(as.vector(wild.out$panels[[1L]]$values$estimate), as.vector(none.out$panels[[1L]]$values$estimate), tolerance = 1e-10)
+  expect_equal(as.vector(wild.out$panels[[2L]]$values$estimate), as.vector(none.out$panels[[2L]]$values$estimate), tolerance = 1e-10)
+  expect_true(all(is.finite(plot_band(wild.out, "pmzsd", panel=1L))))
+  expect_true(all(is.finite(plot_band(wild.out, "pmzsd", panel=2L))))
 })
 
 test_that("npplreg adaptive-nn wild plot helper preserves means in session mode", {
@@ -468,10 +468,10 @@ test_that("npplreg adaptive-nn wild plot helper preserves means in session mode"
     B = 5
   )
 
-  expect_equal(as.vector(wild.out[[1L]]$mean), as.vector(none.out[[1L]]$mean), tolerance = 1e-10)
-  expect_equal(as.vector(wild.out[[2L]]$mean), as.vector(none.out[[2L]]$mean), tolerance = 1e-10)
-  expect_true(all(is.finite(wild.out[[1L]]$merr)))
-  expect_true(all(is.finite(wild.out[[2L]]$merr)))
+  expect_equal(as.vector(wild.out$panels[[1L]]$values$estimate), as.vector(none.out$panels[[1L]]$values$estimate), tolerance = 1e-10)
+  expect_equal(as.vector(wild.out$panels[[2L]]$values$estimate), as.vector(none.out$panels[[2L]]$values$estimate), tolerance = 1e-10)
+  expect_true(all(is.finite(plot_band(wild.out, "pmzsd", panel=1L))))
+  expect_true(all(is.finite(plot_band(wild.out, "pmzsd", panel=2L))))
 })
 
 test_that("npplreg generalized-nn plot means match public estimator in session mode", {
@@ -510,8 +510,8 @@ test_that("npplreg generalized-nn plot means match public estimator in session m
     errors = "none"
   )
 
-  ex.x <- out[[1L]]$evalx
-  ez.x <- out[[1L]]$evalz
+  ex.x <- plot_coordinates(out, panel=1L, role="X")
+  ez.x <- plot_coordinates(out, panel=1L, role="Z")
   fit.x <- npplreg(
     bws = bw,
     txdat = tx,
@@ -521,8 +521,8 @@ test_that("npplreg generalized-nn plot means match public estimator in session m
     ezdat = ez.x
   )
 
-  ex.z <- out[[2L]]$evalx
-  ez.z <- out[[2L]]$evalz
+  ex.z <- plot_coordinates(out, panel=2L, role="X")
+  ez.z <- plot_coordinates(out, panel=2L, role="Z")
   fit.z <- npplreg(
     bws = bw,
     txdat = tx,
@@ -532,8 +532,8 @@ test_that("npplreg generalized-nn plot means match public estimator in session m
     ezdat = ez.z
   )
 
-  expect_equal(as.vector(out[[1L]]$mean), as.vector(fit.x$mean), tolerance = 1e-10)
-  expect_equal(as.vector(out[[2L]]$mean), as.vector(fit.z$mean), tolerance = 1e-10)
+  expect_equal(as.vector(out$panels[[1L]]$values$estimate), as.vector(fit.x$mean), tolerance = 1e-10)
+  expect_equal(as.vector(out$panels[[2L]]$values$estimate), as.vector(fit.z$mean), tolerance = 1e-10)
 })
 
 test_that("npplreghat supports ll/lp with lp basis variants", {
@@ -1277,7 +1277,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       output = "data",
       errors = "bootstrap",
       bootstrap = "wild",
-      boot.control = np_boot_control(wild = "rademacher"),
+      boot_control = np_boot_control(wild = "rademacher"),
       band = "pointwise",
       B = 19
     )
@@ -1285,8 +1285,8 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
   expect_type(sc.out.rad, "list")
   expect_true(length(sc.out.rad) > 0)
   expect_false(isTRUE(all.equal(
-    sc.out[[1]]$merr,
-    sc.out.rad[[1]]$merr,
+    plot_band(sc.out, "pmzsd"),
+    plot_band(sc.out.rad, "pointwise"),
     tolerance = 0,
     check.attributes = FALSE
   )))
@@ -1348,9 +1348,9 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
   )
   expect_type(si.out, "list")
   expect_true(length(si.out) > 0)
-  expect_true(is.matrix(si.out[[1]]$merr))
-  expect_equal(ncol(si.out[[1]]$merr), 2L)
-  expect_false(all(is.na(si.out[[1]]$merr)))
+  expect_true(is.matrix(plot_band(si.out, "pmzsd")))
+  expect_equal(ncol(plot_band(si.out, "pmzsd")), 2L)
+  expect_false(all(is.na(plot_band(si.out, "pmzsd"))))
 })
 
 test_that("partial linear wild plot bootstrap apply helper matches dense hat contract", {

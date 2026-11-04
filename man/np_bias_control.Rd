@@ -2,6 +2,10 @@
 \alias{np_bias_control}
 \title{Auxiliary Controls for Bias-Corrected Regression Plot Intervals}
 \description{
+\strong{Bias-corrected bounds are experimental (pre-beta research), incomplete,
+and not recommended for general-purpose inference.} See the experimental-status
+section below.
+
   Constructs the auxiliary settings for \code{plot.npregression} and
   regression bandwidth plots with \code{center="bias-corrected"}.
   The fitted model's bandwidths, polynomial degree and basis remain fixed.
@@ -62,7 +66,7 @@ np_bias_control(construction = c("iterated", "legacy"),
     exclusive. Raw bandwidths must be transformed when predictor units change.}
 }
 \details{
-  Supply \code{bias.control=np_bias_control(...)} to the regression plot.
+  Supply \code{bias_control=np_bias_control(...)} to the regression plot.
   Omitting this argument with \code{center="bias-corrected"} uses the iterated
   defaults. \code{center="estimate"} remains the ordinary plot default.
 
@@ -160,7 +164,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   every profile main space must leave positive residual support. Ill-conditioned
   pilots fail explicitly, even with stable bases; no profile is dropped or
   degree reduced. The joint space, profile sizes and rank criterion are recorded
-  in \code{inference$settings$auxiliary_space}. The existing auxiliary controls
+  internally in \code{settings$auxiliary_space}. The existing auxiliary controls
   remain effective, including literal raw-bandwidth overrides. The finite
   column bound is independent of sample size. Wider admitted spaces can be
   computationally expensive; larger capacity does not repair unidentified
@@ -242,7 +246,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   separate 1024-dataset categorical-only confirmation assessed Gaussian/Mammen.
   No categorical profile is dropped or pooled
   further to conceal that limitation. The finite-profile construction and
-  actual variance policy are recorded in the returned inference object.
+  actual variance policy are recorded in the internal inference record.
 
   Higher pure coordinate derivatives, including the pooled categorical path, use
   the existing \code{gradient.order} argument. Each requested order greater than
@@ -258,7 +262,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   For the original profile-specific P1 construction, higher-order derivatives
   use fixed orthonormal coordinates for numerical precision; this does not
   change the weighted polynomial system or its rank criterion.
-  The effective vector is recorded in \code{inference$settings$gradient.order}.
+  The effective vector is recorded internally in \code{settings$gradient.order}.
   Numerical support does not imply well-determined high derivatives at small
   sample sizes; intervals can be wide and sparse pilot geometry can fail.
 
@@ -293,12 +297,12 @@ np_bias_control(construction = c("iterated", "legacy"),
   family. Bands are nested and coincide for a singleton family. Gaussian
   and bootstrap marginal limits use absolute studentized draws and an outward
   Bonferroni envelope. \code{band="pmzsd"} retains
-  its normal-quantile times standard-error meaning. Use \code{gaussian.draws}
+  its normal-quantile times standard-error meaning. Use \code{gaussian_draws}
   or \code{B} to control calibration precision. Increasing the number of
   draws can be necessary for remote empirical Bonferroni tails on large grids.
   If \eqn{\alpha/m < 1/B}, the empirical marginal Bonferroni quantile reaches
   the largest simulated absolute statistic before the outward envelope is
-  applied. Here \eqn{B} denotes \code{gaussian.draws} for Gaussian
+  applied. Here \eqn{B} denotes \code{gaussian_draws} for Gaussian
   calibration or \code{B} for bootstrap calibration. Increasing the draw
   count improves tail resolution; the default count does not ensure precise
   Bonferroni tails for every grid size.
@@ -356,7 +360,7 @@ numerical conditioning limitations of a raw main basis.
   Both raw and stored Bernstein main bases are admitted. It retains the
   existing multivariate smoothed P0 residual variance and replicate
   studentization; it does not apply the univariate variance-pilot rule above.
-  The acquisition policy is recorded in \code{inference$settings$main.capture}.
+  The acquisition policy is recorded internally in \code{settings$main.capture}.
   Bounded qualification used three fixed two-predictor designs and complete
   50 by 50 empirical-range surfaces, with 128 responses per design. Estimated-
   variance simultaneous coverage was encouraging, but bands were very wide in
@@ -367,7 +371,7 @@ numerical conditioning limitations of a raw main basis.
   separate qualifications; their previously supported routes are unchanged.
 
   Per-target/frame numerical ridge values are returned in
-  \code{inference$main.regularization}, and \code{inference$covariance}
+  \code{main.regularization} in the internal provider record, and the internal covariance record
   describes the variance and calibration construction.
   Auxiliary fits require adequate local
   support throughout the retained training sample, including observations
@@ -403,29 +407,39 @@ numerical conditioning limitations of a raw main basis.
   \code{np_boot_control(wild="rademacher")}. Unsupported iterated settings
   never silently select the legacy construction.
 }
-\value{
-  A classed list consumed by the plot method. With \code{output="data"} or
-  \code{"plot-data"}, each returned regression component includes
-  \code{inference}: original and corrected estimates, correction, standard
-  errors, all three bands, evaluation grid and target mapping, requested and
-  effective controls (including the named auxiliary degree vector, its rule
-  and term count in \code{settings$degree_spec}), main-model settings, training-row metadata, calibration
-  law and draw count, block selection and RNG state. For Gaussian/Mammen
-  studentized calibration, \code{inference$studentization} records the
-  construction and bounded training/draw block sizes; \code{inference$covariance}
-  records the denominator and calibration methods. The historical \code{bias}
-  and \code{gbias} sign conventions are preserved. With \code{band="all"},
-  \code{band.errors} also retains the displayed error widths. The original
-  fitted object is unchanged.
+\value{A family-specific control object consumed by plot methods.
+Data-returning plots use \code{\link{np_plot_data}}: original and corrected
+values, available standard errors, absolute endpoints and compact method and
+resolution diagnostics. Select a panel, scalar target and band with
+\code{as.data.frame(result, panel=1, target=1, band="simultaneous")}.
+Full fitted state, covariance workspaces, bootstrap draws and RNG states are
+internal computation records, not public plot fields. The fitted object is unchanged.}
+
+\section{Experimental status of bias-corrected inference}{
+\strong{All bias-corrected confidence intervals and bands are experimental
+(pre-beta research), incomplete, and not recommended for general-purpose
+inference.} This status remains in effect unless the documentation explicitly
+states otherwise for a particular method and scope. It applies wherever
+bias-corrected bounds are available: asymptotic and bootstrap constructions,
+including legacy methods, pointwise intervals, Bonferroni intervals and
+simultaneous bands, for levels and supported derivatives.
+
+These methods form an ongoing research project. Implementation support,
+numerical checks and favorable simulation results in selected settings do not
+establish generally valid coverage. Coverage can fail outside the studied
+settings, and available options do not constitute a general solution to
+bias-corrected inference. Method-specific assumptions, restrictions and known
+failures must be considered when experimenting with these bounds.
 }
+
 \seealso{\code{\link{plot.np}}, \code{\link{np_boot_control}}, \code{\link{b.star}}}
 \examples{
 \dontrun{
 npRmpi.init(nslaves=2)
 plot(fit, errors="asymptotic", center="bias-corrected",
-     band="simultaneous", bias.control=np_bias_control(), output="data")
+     band="simultaneous", bias_control=np_bias_control(), output="data")
 plot(fit, errors="bootstrap", center="bias-corrected", bootstrap="wild",
-     band="all", bias.control=np_bias_control(iterations=32L), output="data")
+     band="all", bias_control=np_bias_control(iterations=32L), output="data")
 npRmpi.quit()
 }
 }

@@ -65,8 +65,11 @@ test_that("direct local ANN corrections share and restore R/native context", {
   set.seed(834)
   out <- plot(bw,xdat=x,ydat=y,output="data",gradients=TRUE,
     errors="bootstrap",bootstrap="wild",B=5,neval=5)
-  expect_length(out,2L)
-  expect_true(all(is.finite(gradients(out[[1L]]))))
+  expect_s3_class(out, "np_plot_data")
+  expect_length(out$panels,2L)
+  expect_identical(out$targets$quantity, c("derivative", "contrast"))
+  expect_length(plot_target(out, panel=1L)$estimate, 5L)
+  expect_true(all(is.finite(plot_target(out, panel=1L)$estimate)))
   expect_identical(b1_context_snapshot(),before)
 })
 

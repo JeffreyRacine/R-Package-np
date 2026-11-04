@@ -5146,7 +5146,7 @@
 
   if (isTRUE(xi.factor)) {
     stop(
-      "boot.control = np_boot_control(nonfixed = \"frozen\") currently supports nonfixed regression means and continuous gradients only; use nonfixed = \"exact\" for categorical slices",
+      "boot_control = np_boot_control(nonfixed = \"frozen\") currently supports nonfixed regression means and continuous gradients only; use nonfixed = \"exact\" for categorical slices",
       call. = FALSE
     )
   }
@@ -5154,7 +5154,7 @@
   if (identical(regtype, "lc")) {
     if (isTRUE(gradients)) {
       stop(
-        "boot.control = np_boot_control(nonfixed = \"frozen\") currently supports nonfixed local-constant regression means only; use nonfixed = \"exact\" for local-constant gradients",
+        "boot_control = np_boot_control(nonfixed = \"frozen\") currently supports nonfixed local-constant regression means only; use nonfixed = \"exact\" for local-constant gradients",
         call. = FALSE
       )
     }
@@ -12092,12 +12092,12 @@ plotFactor <- function(f, y, ...){
     return(FALSE)
   if (isTRUE(gradients)) {
     if (!isTRUE(plot.data.overlay.missing))
-      .np_warning("plot.data.overlay is available only for regression surfaces, not derivatives")
+      .np_warning("data_overlay is available only for regression surfaces, not derivatives")
     return(FALSE)
   }
   if (isTRUE(coef)) {
     if (!isTRUE(plot.data.overlay.missing))
-      .np_warning("plot.data.overlay is available only for regression surfaces, not coefficient plots")
+      .np_warning("data_overlay is available only for regression surfaces, not coefficient plots")
     return(FALSE)
   }
   TRUE
@@ -12215,7 +12215,7 @@ plotFactor <- function(f, y, ...){
                                           supported.route = FALSE,
                                           renderer = "base",
                                           reason = "supported plot routes for the selected renderer") {
-  plot.rug <- .np_plot_match_flag(plot.rug, "plot.rug")
+  plot.rug <- .np_plot_match_flag(plot.rug, "data_rug")
 
   if (!isTRUE(plot.rug))
     return(FALSE)

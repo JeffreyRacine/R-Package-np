@@ -79,7 +79,7 @@ test_that("single-index plots preserve non-syntactic raw design names", {
   b <- npindexbw(xdat=x,ydat=y,bws=c(1,.2,.3,.4,.5),bandwidth.compute=FALSE)
   f <- npindex(b,se=FALSE)
   for (obj in list(b,f)) for (grad in c(FALSE,TRUE)) {
-    p <- plot(obj,plot.behavior="data",plot.errors.method="none",neval=5,gradients=grad)
+    p <- plot(obj,output="data",errors="none",neval=5,gradients=grad)
     expect_true(is.list(p))
     expect_gt(length(p),0L)
   }

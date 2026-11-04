@@ -31,8 +31,8 @@ capture_rbandwidth_panel_ylabs <- function(object, xdat, ydat, ...) {
     ydat = ydat,
     perspective = FALSE,
     errors = "none",
-    data.overlay = FALSE,
-    data.rug = FALSE,
+    data_overlay = FALSE,
+    data_rug = FALSE,
     ...
   ))
 
@@ -89,7 +89,7 @@ test_that("rbandwidth factor gradient panels use Delta labels", {
     xdat = mixed.factor.first$xdat,
     ydat = mixed.factor.first$ydat,
     gradients = TRUE,
-    common.scale = FALSE
+    common_scale = FALSE
   )
   expect_true("Delta y / Delta g" %in% mixed.labels)
 })
@@ -104,7 +104,7 @@ test_that("rbandwidth non-gradient default ylab is unchanged", {
     xdat = fixture$xdat,
     ydat = fixture$ydat,
     gradients = FALSE,
-    common.scale = TRUE
+    common_scale = TRUE
   )
 
   expect_true(length(labels) >= 1L)
@@ -123,7 +123,7 @@ test_that("rbandwidth explicit ylab overrides remain unchanged", {
     ydat = fixture$ydat,
     gradients = TRUE,
     ylab = "custom",
-    common.scale = TRUE
+    common_scale = TRUE
   )
 
   expect_true(length(labels) >= 1L)
@@ -142,13 +142,13 @@ test_that("rbandwidth mixed gradient plot still returns data payloads", {
     ydat = fixture$ydat,
     gradients = TRUE,
     perspective = FALSE,
-    common.scale = FALSE,
+    common_scale = FALSE,
     output = "data",
     errors = "none",
-    data.overlay = FALSE
+    data_overlay = FALSE
   )))
 
-  expect_type(out, "list")
-  expect_length(out, 2L)
-  expect_true(all(vapply(out, inherits, logical(1), "npregression")))
+  expect_s3_class(out, "np_plot_data")
+  expect_length(out$panels, 2L)
+  expect_identical(out$targets$variable, c("g", "x"))
 })

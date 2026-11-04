@@ -35,7 +35,7 @@ test_that("npindex accepts only valid first-order gradient requests", {
   }
 
   expect_error(
-    plot(bw, xdat = x, ydat = y, output = "data", gradient.order = "2"),
+    plot(bw, xdat = x, ydat = y, output = "data", gradient_order = "2"),
     "positive numeric values|finite positive integers"
   )
 })
@@ -135,11 +135,13 @@ test_that("nplsqreg plot treats gradient.order as an order, not a flag", {
     output = "data",
     neval = 7L,
     gradients = TRUE,
-    gradient.order = c(2L, 1L),
+    gradient_order = c(2L, 1L),
     errors = "none",
     perspective = FALSE
   )
-  expect_identical(names(out), c("cd1", "cd2"))
-  expect_s3_class(out$cd1, "lsqregression")
-  expect_identical(out$cd1$gradient.order, c(2L, 1L))
+  expect_s3_class(out, "np_plot_data")
+  expect_length(out$panels, 2L)
+  expect_identical(out$targets$order, c(2L, 2L, 1L, 1L))
+  expect_identical(out$targets$variable, c("x1", "x1", "x2", "x2"))
+  expect_identical(out$targets$tau, rep(c(.25, .75), 2L))
 })
