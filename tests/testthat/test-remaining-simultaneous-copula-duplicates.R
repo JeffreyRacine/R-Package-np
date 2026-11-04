@@ -57,6 +57,7 @@ test_that("repeated copula simultaneous targets are computed once and expanded e
       args$gaussian_draws <- 9999L
       args$random_seed <- 42L
     }
+    if (identical(output, "plot")) return(do.call(plot, args))
     capture_copula_provider(do.call(plot, args))$provider
   }
   dat <- run(fit); reference <- run(one)
@@ -89,7 +90,7 @@ test_that("repeated copula simultaneous targets are computed once and expanded e
   }
 })
 
-test_that("copula quotient rejects conflicting physical targets and exact endpoint conflicts", {
+test_that("copula quotient rejects conflicting physical targets and material endpoint conflicts", {
   pkg <- unname(getNamespaceName(environment(npcopula)))
   interval <- getFromNamespace(".np_plot_copula_interval", pkg)
   matrix.values <- getFromNamespace(".npcopula_grid_matrix", pkg)
@@ -103,10 +104,10 @@ test_that("copula quotient rejects conflicting physical targets and exact endpoi
   expect_error(invoke(x = bad), "conflicting surface values", fixed = TRUE)
   bad <- object; bad$copula[3L] <- NA_real_
   expect_error(invoke(obj = bad), "conflicting surface values", fixed = TRUE)
-  expect_error(invoke(se = c(.1, .1, .1 + .Machine$double.eps)),
+  expect_error(invoke(se = c(.1, .1, .1 + 64 * .Machine$double.eps)),
     "conflicting surface values", fixed = TRUE)
-  # Even a one-ULP contradiction remains an error at the unchanged renderer.
-  expect_error(matrix.values(c(1, 2, 1 + .Machine$double.eps), grid),
+  # A difference beyond the computed-value roundoff budget remains an error.
+  expect_error(matrix.values(c(1, 2, 1 + 64 * .Machine$double.eps), grid),
     "conflicting surface values", fixed = TRUE)
 })
 
@@ -144,4 +145,35 @@ test_that("copula quotient preserves unavailable payloads and avoids duplicate c
   expect_warning(unavailable <- adapter(original, object, NULL, ex, se,
     .05, "all", 9999L, grid), "declared test limitation", fixed = TRUE)
   expect_identical(unavailable, original)
+})
+
+
+test_that("computed copula duplicates admit only bounded within-cell roundoff", {
+  pkg <- unname(getNamespaceName(environment(npcopula)))
+  display <- getFromNamespace(".npcopula_display_values", pkg)
+  grid <- list(display.rows=c(1L,2L),display.cell=c(1L,2L,1L),row.order=1:3)
+  eps <- .Machine$double.eps
+  for (scale in c(2^-900, .125, 1, 2^900)) {
+    for (units in c(1,31,32)) {
+      x <- c(scale, 10*scale, scale*(1+units*eps))
+      expect_identical(display(x,grid),x[1:2])
+      expect_error(display(x,grid,exact=TRUE),"conflicting surface values",fixed=TRUE)
+    }
+    for (units in c(33,64)) expect_error(display(c(scale,scale,scale*(1+units*eps)),grid),"conflicting surface values",fixed=TRUE)
+    # The group range, not successive links, bounds the entire group.
+    chain <- list(display.rows=1L,display.cell=rep(1L,3L),row.order=1:3)
+    expect_error(display(scale*(1+c(0,24,48)*eps),chain),"conflicting surface values",fixed=TRUE)
+  }
+  for (v in c(0,-0,NA_real_,NaN,Inf,-Inf)) {
+    expect_identical(display(c(v,1,v),grid),c(v,1))
+  }
+  for (v in c(.Machine$double.xmin*eps,NA_real_,NaN,Inf,-Inf))
+    expect_error(display(c(0,1,v),grid),"conflicting surface values",fixed=TRUE)
+  expect_error(display(c(NA_real_,1,NaN),grid),"conflicting surface values",fixed=TRUE)
+  expect_error(display(1:2,grid),"incompatible",fixed=TRUE)
+  # A huge unrelated cell must not provide the tolerance for a tiny cell.
+  expect_error(display(c(1e-100,1e100,1.01e-100),grid),"conflicting surface values",fixed=TRUE)
+  v<-c(-1,4,-1+eps);expect_identical(display(v,grid),v[1:2])
+  perm<-c(3,2,1);g<-grid;g$display.cell<-grid$display.cell[perm]
+  expect_identical(display(v[perm],g),v[perm][1:2])
 })

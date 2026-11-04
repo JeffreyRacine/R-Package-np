@@ -584,7 +584,7 @@
       # Gaussian maximum. Evaluate once, before tile-dependent roundoff can
       # separate their influence rows. Keep the renderer's exact conflict gate.
       for (j in seq_len(ncol(ex)))
-        .npcopula_display_values(ex[[j]], grid)
+        .npcopula_display_values(ex[[j]], grid, exact = TRUE)
       object$copula <- .npcopula_display_values(object$copula, grid)
       se <- .npcopula_display_values(se, grid)
       ex <- ex[grid$display.rows, , drop = FALSE]
