@@ -753,12 +753,6 @@ npindex.sibandwidth <-
       .np_require_numeric_response(tydat, "npindex", "tydat")
     }
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
-    tydat <- if (is.factor(tydat)) {
-      if (any(bws$ydati$iord | bws$ydati$iuno))
-        .np_plreg_numeric_response(tydat, bws$ydati)
-      else
-        as.numeric(levels(tydat))[as.integer(tydat)]
-    } else as.double(tydat)
     if (!no.ex)
       exdat <- toFrame(exdat)
 
@@ -815,6 +809,16 @@ npindex.sibandwidth <-
       return(.npreg_finish_empty_rows(.npRmpi_restore_nomad_fit_bws_metadata(result, bws),
         defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]), owner = "npindex"))
     }
+
+    # Retention and MPI reentry must see the caller's original response type
+    # and names. Arithmetic conversion before dispatch would make a worker
+    # rebuild an unchanged integer-response formula frame as a replacement.
+    tydat <- if (is.factor(tydat)) {
+      if (any(bws$ydati$iord | bws$ydati$iuno))
+        .np_plreg_numeric_response(tydat, bws$ydati)
+      else
+        as.numeric(levels(tydat))[as.integer(tydat)]
+    } else as.double(tydat)
 
     fit.activity <- .np_progress_activity_begin(
       label = "Fitting single-index model", detail = "fitted values")
