@@ -21,7 +21,8 @@ static void finite_values(SEXP x) {
 }
 
 SEXP C_np_plot_udens_d8_column(SEXP xs, SEXP gs, SEXP hs, SEXP mus, SEXP js) {
-  SEXP xd=Rf_getAttrib(xs,R_DimSymbol), gd=Rf_getAttrib(gs,R_DimSymbol);
+  SEXP xd=PROTECT(Rf_getAttrib(xs,R_DimSymbol));
+  SEXP gd=PROTECT(Rf_getAttrib(gs,R_DimSymbol));
   if (TYPEOF(xs)!=REALSXP || TYPEOF(gs)!=REALSXP ||
       TYPEOF(xd)!=INTSXP || XLENGTH(xd)!=2 ||
       TYPEOF(gd)!=INTSXP || XLENGTH(gd)!=2)
@@ -63,5 +64,5 @@ SEXP C_np_plot_udens_d8_column(SEXP xs, SEXP gs, SEXP hs, SEXP mus, SEXP js) {
     if (!R_FINITE(REAL(ans)[a])) Rf_error("nonfinite complete D8 covariance column");
     if (a % 32 == 0) R_CheckUserInterrupt();
   }
-  UNPROTECT(1); return ans;
+  UNPROTECT(3); return ans;
 }
