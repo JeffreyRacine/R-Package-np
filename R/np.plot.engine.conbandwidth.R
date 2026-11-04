@@ -377,7 +377,7 @@
           x.eval[,1L,drop=FALSE],x.eval[,2L,drop=FALSE],cdf,plot.errors.method,
           plot.errors.boot.calibration,
           if(plot.errors.method=="bootstrap") plot.errors.boot.num else gaussian.draws,
-          plot.errors.alpha,plot.errors.type)
+          plot.errors.alpha,plot.errors.type,construction=bias.control$construction)
         terr <- conditional.interval$err; terr.all <- conditional.interval$all.err
         center.val <- conditional.interval$inference$center
         lerr <- matrix(center.val-terr[,1L],x1.neval,x2.neval)
@@ -865,7 +865,7 @@
                 subcol(exdat,ei,i)[seq_len(xi.neval),,drop=FALSE],eydat[seq_len(xi.neval),,drop=FALSE],cdf,plot.errors.method,
                 plot.errors.boot.calibration,
                 if(plot.errors.method=="bootstrap") plot.errors.boot.num else gaussian.draws,
-                plot.errors.alpha,plot.errors.type)
+                plot.errors.alpha,plot.errors.type,construction=bias.control$construction)
               temp.err[seq_len(xi.neval),] <- conditional.interval$err
               temp.all.err <- conditional.interval$all.err
               if(plot.behavior!="plot") plot.out[[plot.index]] <-
@@ -1192,7 +1192,7 @@
                 exdat[seq_len(xi.neval),,drop=FALSE],subcol(eydat,ei,i)[seq_len(xi.neval),,drop=FALSE],cdf,plot.errors.method,
                 plot.errors.boot.calibration,
                 if(plot.errors.method=="bootstrap") plot.errors.boot.num else gaussian.draws,
-                plot.errors.alpha,plot.errors.type)
+                plot.errors.alpha,plot.errors.type,construction=bias.control$construction)
               temp.err[seq_len(xi.neval),] <- conditional.interval$err
               temp.all.err <- conditional.interval$all.err
               if(plot.behavior!="plot") plot.out[[plot.index]] <-
