@@ -77,6 +77,10 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     }
     tasks[[a]] <- list(start = first, bsz = size, value = value)
   }
+  # Deterministic transport may consume a tag draw. Keep the statistical stream
+  # at the end of this complete bank, just as the serial conditional owner does.
+  attr(tasks, "rng_final_state") <- get(".Random.seed", envir = .GlobalEnv,
+                                       inherits = FALSE)
   tasks
 }
 
