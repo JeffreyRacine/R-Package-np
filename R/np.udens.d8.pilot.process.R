@@ -1,7 +1,7 @@
 # Explicit seeded private plot entry. Public dispatch must call this directly,
 # never from inside the incumbent .np_with_seed wrapper under Box-Muller.
 .np_udens_d8_pilot_seeded <- function(state, grid, alpha = .05, B = 9999L,
-                                      tile = 32L, panel = 32L, batch = 256L,
+                                      tile = NULL, panel = 32L, batch = 256L,
                                       pointwise.only = FALSE, random.seed = 42L) {
   npValidateNonNegativeInteger(random.seed, "random.seed")
   kind <- RNGkind()
@@ -37,7 +37,7 @@
 }
 
 .np_udens_d8_pilot_inference <- function(state, grid, alpha = .05, B = 9999L,
-                                         tile = 32L, panel = 32L, batch = 256L,
+                                         tile = NULL, panel = 32L, batch = 256L,
                                          pointwise.only = FALSE, .normal.request = NULL) {
   if (!identical(state$construction, "density-d8-positive-pilot-v2") ||
       state$r != 0L || state$s != 0L || !state$q %in% 1:3)
@@ -70,6 +70,8 @@
     store <- .np_udens_d8_store(m)
     on.exit(.np_udens_d8_store_close(store), add = TRUE)
     factor <- .np_udens_d8_pilot_factor(state, grid, moments, store, budget$panel)
+    budget <- .np_udens_d8_pilot_draw_budget(state, m, factor$rank, budget)
+    .np_udens_d8_store_for_draws(store, budget$tile)
     normal.stream <- NULL
     if (!is.null(.normal.request)) {
       normal.stream <- .np_plot_normal_stream(.normal.request$seed,

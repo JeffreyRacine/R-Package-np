@@ -5,8 +5,15 @@
 \usage{np_udens_bias_control(construction = c("joint-scale", "positive-covariance", "legacy"))}
 \arguments{\item{construction}{The joint-scale envelope, earlier positive-covariance construction, or existing smooth-bootstrap centering route.}}
 \details{
-With \code{center="bias-corrected"}, omitting \code{bias.control} selects the
-joint-scale construction. The default \code{center="estimate"} is unchanged.
+With \code{center="bias-corrected"}, \code{errors="asymptotic"}, and
+omitted or \code{NULL} \code{bias.control}, fixed unbounded second-order
+Gaussian density plots with one to three continuous numeric variables use the
+D8 positive-pilot construction described below, for \eqn{10^{-4}<\alpha<0.5}.
+Other previously supported requests retain their existing construction and
+admission rules. Supplying \code{np_udens_bias_control()} explicitly selects
+the joint-scale construction, including for asymptotic inference. Omitted
+controls for bootstrap inference continue to select joint-scale.
+The default \code{center="estimate"} is unchanged.
 Use \code{errors="asymptotic"} for Gaussian calibration or
 \code{errors="bootstrap"}, \code{bootstrap="inid"} for literal independent
 resampling. Explicit \code{construction="legacy"} retains the previous
@@ -32,6 +39,45 @@ envelope and do not inherit its empirical coverage results. Their endpoints
 are in \code{inference$bands$pmzsd}; \code{inference$normal.band} records the
 rule. Explicit \code{"pointwise"}, \code{"simultaneous"},
 \code{"bonferroni"} and \code{"all"} retain their calibrated constructions.
+
+
+\subsection{Default D8 asymptotic density inference}{
+Let \eqn{H=\mathrm{diag}(h_1^2,\ldots,h_q^2)} and
+\eqn{D_H=\sum_j h_j^2\partial_{jj}}. The plotted corrected curve averages
+\eqn{L_8=(I-D_H/2+D_H^2/8-D_H^3/48)G_H} over the observations.
+This total-degree radial correction includes multivariate cross terms; it is
+not a product of univariate eighth-order kernels. The fitted density,
+bandwidths and estimator standard errors are unchanged.
+
+The working covariance is \eqn{\mathrm{Cov}_P(L_8(g-X),L_8(g'-X))/n},
+where the positive pilot \eqn{P} is the Gaussian mixture centered at the
+observations with the same fitted bandwidths. Both pilot means are subtracted.
+Pointwise and \code{pmzsd} intervals use normal critical values and these
+complete corrected scales. Simultaneous bands calibrate the standardized
+absolute Gaussian maximum on the complete requested grid. All slices from
+one plot call form one union; a surface uses its full Cartesian grid.
+Bonferroni bands use normal tails and an outward nesting adjustment.
+Corrected curves and endpoints remain signed, without clipping or renormalization.
+
+Bounded resident panels and invocation-owned temporary factor files avoid an
+unrestricted resident grid-square matrix. A row-major draw workspace reduces
+repeated file seeks; peak temporary disk can be twice the completed factor
+size. The resident allocation forecast is distinct from total R heap/RSS.
+A residual covariance bound is included in maximum calibration. Requested
+Gaussian draw counts are retained, with the existing precision warning when
+small. Seeded calls preserve ordinary caller RNG continuation, including
+Box--Muller via an isolated base-R normal stream; no RNG kind is remapped.
+
+Coverage evidence is strongest for one and two continuous variables. In the
+retained ordinary cases, nominal 95 percent simultaneous coverage ranged from
+93.4 to 97.2 percent for univariate cases (500 replications per cell) and from
+92.8 to 98.0 percent for bivariate cases (250 per cell). Narrow-spike and
+sparse-tail limitations remain. Three-dimensional support has arithmetic and
+engineering checks, not comparable broad coverage qualification. These are
+finite-grid, fixed-bandwidth approximations, not uniform honesty guarantees or
+uncertainty for bandwidth selection. Bootstrap and explicit saved controls
+retain the distinct constructions documented below.
+}
 
 The joint-scale construction supports fixed, unbounded, second-order Gaussian
 continuous kernels, including multivariate and mixed-data layouts with unordered

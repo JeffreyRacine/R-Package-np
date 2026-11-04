@@ -572,6 +572,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   construction; see \code{\link{npqreg}} for its supported level and
   gradient targets and conditioning assumptions.
 
+  Default bias-corrected unconditional Gaussian density plots use the D8
+  positive-pilot construction for eligible asymptotic requests; see
+  \code{\link{np_udens_bias_control}}. It uses complete corrected covariance
+  and a standardized full-grid Gaussian maximum, combining all slices in one
+  plot call. Explicit density controls and bootstrap inference retain their
+  existing constructions. The following incumbent-scale description applies
+  to the other density-family Gaussian bands.
+
   These density-family bands use the incumbent marginal standard errors and
   the correlation of centered observation-level empirical influence rows.
   Writing \eqn{D} for the diagonal matrix of those standard errors and

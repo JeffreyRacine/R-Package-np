@@ -62,29 +62,10 @@
 }
 
 .np_udens_d8_pilot_column <- function(state, grid, mean, column, tile = 32L, donors = 256L) {
-  m <- nrow(grid); n <- state$n; q <- state$q; total <- numeric(m)
-  log.normal <- -q*log(2*pi)-q*log(3)/2-2*sum(log(state$h))
-  for (first in seq.int(1L,m,by=tile)) {
-    ii <- seq.int(first,min(m,first+tile-1L))
-    for (donor in seq.int(1L,n,by=donors)) {
-      jj <- seq.int(donor,min(n,donor+donors-1L))
-      A <- B <- D <- exponent <- matrix(0,length(ii),length(jj))
-      for (j in seq_len(q)) {
-        left <- outer(grid[[j]][ii],state$x[[j]][jj],"-")/state$h[j]
-        right <- matrix(rep((grid[[j]][column]-state$x[[j]][jj])/state$h[j],each=length(ii)),length(ii))
-        u <- (2*left-right)/3;v <- (2*right-left)/3
-        A <- A+u^2;B <- B+v^2;D <- D+u*v
-        exponent <- exponent+((left-right)^2+left^2+right^2)/6
-      }
-      polynomial <- .np_udens_d8_cross_polynomial(q,A,B,D)
-      product <- polynomial*exp(log.normal-exponent)
-      if (any(!is.finite(product))) stop("nonfinite complete D8 covariance product",call.=FALSE)
-      total[ii] <- total[ii]+rowSums(product)
-    }
-  }
-  out <- (total/n-mean*mean[column])/n
-  if (any(!is.finite(out))) stop("nonfinite complete D8 covariance column",call.=FALSE)
-  out
+  x <- as.matrix(state$x); g <- as.matrix(grid)
+  storage.mode(x) <- storage.mode(g) <- "double"
+  .Call(C_np_plot_udens_d8_column, x, g, as.double(state$h),
+    as.double(mean), as.integer(column))
 }
 
 # Complete radial Gaussian-product polynomial; fixed pilot variance H.
