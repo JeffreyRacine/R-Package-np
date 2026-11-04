@@ -46,9 +46,20 @@ test_that(".npRmpi_bcast_cmd_expr resolves mpi.bcast.cmd from caller frame", {
   expect_match(fn.body, "get\\(\"mpi\\.bcast\\.cmd\", envir = parent\\.frame\\(\\), mode = \"function\", inherits = TRUE\\)")
 })
 
-test_that(".npRmpi_autodispatch_call delegates to shared distributed-call helper", {
-  fn.body <- paste(deparse(body(.npRmpi_autodispatch_call), width.cutoff = 500L), collapse = " ")
-  expect_match(fn.body, "\\.npRmpi_distributed_call_impl\\(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE\\)")
+test_that(".npRmpi_autodispatch_call delegates with public metadata", {
+  calls <- list()
+  visit <- function(x) {
+    if (is.call(x)) {
+      if (identical(x[[1L]], as.name(".npRmpi_distributed_call_impl")))
+        calls[[length(calls) + 1L]] <<- x
+      for (part in as.list(x)) if (!.npRmpi_is_missing_call_arg(part)) visit(part)
+    }
+  }
+  visit(body(.npRmpi_autodispatch_call))
+  expect_length(calls, 1L)
+  expect_identical(calls[[1L]], quote(.npRmpi_distributed_call_impl(
+    mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE,
+    public.metadata = metadata)))
 })
 
 test_that(".npRmpi_manual_distributed_call delegates to shared distributed-call helper", {

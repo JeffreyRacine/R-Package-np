@@ -1,5 +1,17 @@
 # npRmpi 0.80-2 (development)
 
+* Copula displays tolerate bounded floating-point rounding in computed values
+  at exactly duplicate coordinates. Conflicting values and distinct coordinates
+  still fail; fitted values and interval calculations are unchanged.
+
+* MPI bandwidth fingerprints now account for R's serialization of evaluated
+  arguments captured by local NA-policy functions. Callback objects, lexical
+  ownership, mutation checks and the lease protocol are preserved.
+* Single-index MPI reentry preserves integer-response types and names until the
+  arithmetic stage, avoiding false retained-training-metadata conflicts.
+* Conditional inference preserves coordinator statistical RNG advancement
+  across deterministic MPI transport, so later panels follow serial draw order.
+
 * Document all bias-corrected intervals and bands as experimental (pre-beta
   research), incomplete and not recommended for general-purpose inference.
   This includes asymptotic, bootstrap and legacy constructions; favorable

@@ -554,7 +554,15 @@
   restart.collections <- c(
     "nomad.restarts", "nomad.restart.results", "restart.results"
   )
+  has.local.closure <- FALSE
   normalize <- function(z) {
+    if (identical(policy, "bandwidth.v1") && is.function(z) && !is.primitive(z)) {
+      owner <- environment(z)
+      if (!isNamespace(owner) && !identical(owner, globalenv()) &&
+          !identical(owner, baseenv()) && !identical(owner, emptyenv()))
+        # Intentional closure write: this flag belongs to this hash operation.
+        has.local.closure <<- TRUE
+    }
     if (is.environment(z))
       return(sprintf("<environment:%s>", environmentName(z)))
     if (inherits(z, "formula")) {
@@ -626,7 +634,15 @@
   attr(y, "npRmpi.autodispatch.fingerprint") <- NULL
   attr(y, "npRmpi.autodispatch.lease") <- NULL
   y <- normalize(y)
-  raw <- tryCatch(serialize(y, connection = NULL, xdr = FALSE), error = function(e) raw())
+  raw <- tryCatch({
+    bytes <- serialize(y, connection = NULL, xdr = FALSE)
+    # R restores an evaluated promise's NULL environment as baseenv().
+    # Canonicalize a hash-only snapshot; never replace the user's closure or
+    # force its captured promises/bindings. Ordinary/context bytes stay intact.
+    if (has.local.closure)
+      serialize(unserialize(bytes), connection = NULL, xdr = FALSE)
+    else bytes
+  }, error = function(e) raw())
   if (!length(raw))
     return(NA_character_)
   digest <- tryCatch(.npRmpi_autodispatch_raw_md5(raw), error = function(e) NA_character_)
