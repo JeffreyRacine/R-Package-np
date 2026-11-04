@@ -8,6 +8,8 @@
   Symmetric MP1 and the original full-t research candidates remain private.
 
 
+* Bias-corrected asymptotic Gaussian density plots now use a complete D8 positive-pilot covariance and full-grid maximum calibration for eligible continuous data. Explicit density bias controls and bootstrap constructions retain their meanings.
+
 * Add six experimental opt-in LC conditional density/CDF inference routes via
   `np_conditional_bias_control()`: corrected asymptotic bands and explicit
   `bootstrap="conditional-pilot"` symmetric/asymmetric SD bands. Existing

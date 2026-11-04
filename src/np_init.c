@@ -5,6 +5,7 @@
 /* Routine registration for the serial np shared library. */
 
 /* .Call calls */
+extern SEXP C_np_plot_udens_d8_column(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_nomad_condition_raise(SEXP);
 extern SEXP C_np_ordered_rly_matrix(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_copula_density_se(SEXP);
@@ -94,6 +95,7 @@ extern SEXP C_np_plot_nn_response_jet(SEXP,SEXP,SEXP,SEXP,SEXP,SEXP,SEXP);
 extern SEXP C_np_plot_ann_rank_decode(SEXP, SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_plot_udens_d8_column", (DL_FUNC) &C_np_plot_udens_d8_column, 5},
     {"C_np_plot_ann_rank_decode", (DL_FUNC) &C_np_plot_ann_rank_decode, 2},
     {"C_np_plot_regression_gradient_projection", (DL_FUNC) &C_np_plot_regression_gradient_projection, 1},
     {"C_np_plot_beta_moment_weights", (DL_FUNC) &C_np_plot_beta_moment_weights, 1},
