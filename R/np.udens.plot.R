@@ -7,7 +7,8 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
 }
 
 .np_udens_plot_prepare <- function(control, bws, x, center, method, bootstrap, band,
-    calibration = NULL, blocklen = NULL, block.automatic = FALSE) {
+    calibration = NULL, blocklen = NULL, block.automatic = FALSE,
+    alpha = .05, random.seed = 42L) {
   requested <- calibration
   control <- .np_plot_legacy_bias_control(calibration, control, "density", center, method)
   if (identical(calibration, "legacy")) calibration <- NULL
@@ -16,6 +17,14 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
       !identical(method, "bootstrap") || !bootstrap %in% c("inid", "fixed", "geom") ||
       !band %in% c("pointwise", "simultaneous", "bonferroni", "all")))
     stop("explicit density calibration requires corrected empirical bands", call. = FALSE)
+  if (.np_udens_d8_default(bws, control, center, method, alpha)) {
+    if (!band %in% c("pmzsd", "pointwise", "simultaneous", "bonferroni", "all"))
+      stop("unsupported bias-corrected density band", call. = FALSE)
+    state <- .np_udens_d8_pilot_prepare(bws, x)
+    state$plot.law <- "gaussian"
+    state$plot.random.seed <- random.seed
+    return(state)
+  }
   if (is.null(control)) {
     if (!identical(center, "bias-corrected")) return(NULL)
     control <- np_udens_bias_control()
@@ -75,7 +84,11 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
   names(grid) <- names(state$x)
   provider.band <- if (band == "pmzsd") "pointwise" else band
   inference <- .np_plot_corrected_activity_run("Constructing bias-corrected density intervals",
-    if (identical(state[["plot.calibration", exact = TRUE]], "smoothed-percentile"))
+    if (.np_udens_d8_active(state))
+      .np_udens_d8_pilot_seeded(state, grid, alpha, B,
+        pointwise.only = provider.band == "pointwise",
+        random.seed = state$plot.random.seed)
+    else if (identical(state[["plot.calibration", exact = TRUE]], "smoothed-percentile"))
       .np_udens_calibrated_plot(state, grid, alpha, B,
         bands = if (provider.band == "all") c("pointwise", "simultaneous", "bonferroni") else provider.band,
         design = design)
@@ -90,6 +103,8 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
         alpha = alpha, B = B,
         bands = if (provider.band == "all") c("pointwise", "simultaneous", "bonferroni") else provider.band)
     else .np_udens_b4_inference(state, grid, law = "inid", alpha = alpha, B = B))
+  if (.np_udens_d8_active(state))
+    inference$settings$calibration.status <- "default D8 positive-pilot density plot inference"
   if (state$plot.law %in% c("fixed", "geom")) {
     inference$settings$block.selection$automatic <- state$plot.block.automatic
     inference$settings$block.selection$source <- if (state$plot.block.automatic)
