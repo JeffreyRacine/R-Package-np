@@ -197,8 +197,10 @@ test_that("npplreg plot-data asymptotic and bootstrap intervals are comparable",
   )
   fit <- npplreg(bws = bw)
   extract_err <- function(obj)
-    unlist(lapply(obj, function(x) rowMeans(abs(x$merr[, 1:2, drop = FALSE]))),
-           use.names = FALSE)
+    unlist(lapply(seq_along(obj$panels), function(j) {
+      d <- plot_target(obj, j, band = "pointwise")
+      rowMeans(abs(cbind(d$lower - d$estimate, d$upper - d$estimate)))
+    }), use.names = FALSE)
 
   asym <- plot(
     fit,
@@ -215,7 +217,7 @@ test_that("npplreg plot-data asymptotic and bootstrap intervals are comparable",
     errors = "bootstrap",
     band = "pointwise",
     B = 39L,
-    random.seed = 202605062,
+    random_seed = 202605062,
     neval = 8L
   )
 

@@ -315,7 +315,7 @@ test_that("npcopula zlim caps plotted surface without changing data", {
   fit$eval$copula[1L] <- 5
   fit$copula <- fit$eval$copula
 
-  expect_gt(max(plot(fit, output = "data")$copula), 1)
+  expect_gt(max(as.data.frame(plot(fit, output = "data"))$estimate), 1)
   pdf(file = tempfile(fileext = ".pdf"))
   on.exit(dev.off(), add = TRUE)
   expect_warning(plot(fit, view = "fixed", zlim = c(0, 1)), NA)
@@ -327,13 +327,15 @@ test_that("npcopula plot intervals work for grid surfaces", {
   fit <- npcopula(~ x + y, data = dat, neval = 3, nmulti = 1)
 
   asym <- plot(fit, output = "data", errors = "asymptotic", band = "all")
-  expect_true(all(c("lower", "upper", "pointwise.lower",
-                    "bonferroni.upper") %in% names(asym)))
-  expect_equal(nrow(asym), nrow(as.data.frame(fit)))
+  expect_s3_class(asym, "np_plot_data")
+  expect_setequal(unique(asym$panels[[1L]]$intervals$band), c("pointwise", "simultaneous", "bonferroni"))
+  for (band in c("pointwise", "simultaneous", "bonferroni"))
+    expect_equal(nrow(as.data.frame(asym, band = band)), nrow(as.data.frame(fit)))
 
   boot <- plot(fit, output = "data", errors = "bootstrap",
                bootstrap = "inid", B = 3, band = "pmzsd")
-  expect_true(all(c("center", "lower", "upper") %in% names(boot)))
+  boot <- as.data.frame(boot)
+  expect_true(all(c("estimate", "lower", "upper") %in% names(boot)))
   expect_equal(nrow(boot), nrow(as.data.frame(fit)))
 
   dens.bw <- npudensbw(dat = dat, bws = c(0.7, 0.7),
@@ -347,7 +349,8 @@ test_that("npcopula plot intervals work for grid surfaces", {
   )
   dens <- plot(dens.fit, output = "data", errors = "bootstrap",
                bootstrap = "inid", B = 3, band = "pmzsd")
-  expect_true(all(c("center", "lower", "upper") %in% names(dens)))
+  dens <- as.data.frame(dens)
+  expect_true(all(c("estimate", "lower", "upper") %in% names(dens)))
   expect_equal(nrow(dens), nrow(as.data.frame(dens.fit)))
 
   sample.fit <- npcopula(~ x + y, data = dat, evaluation = "sample", nmulti = 1)
@@ -378,13 +381,14 @@ test_that("npcopula plots mixed ordered grids on requested probability axes", {
   expect_silent(plot(fit, view = "contour", output = "data"))
 
   empirical <- plot(fit, view = "empirical", output = "data")
+  empirical <- as.data.frame(empirical)
   expect_equal(nrow(empirical), n)
-  expect_true(all(c("u1", "u2") %in% names(empirical)))
+  expect_true(all(c("eval_1", "eval_2") %in% names(empirical)))
 
   all.payload <- plot(fit, view = "all", output = "data")
-  expect_equal(nrow(all.payload$copula), n.eval * n.eval)
-  expect_equal(nrow(all.payload$empirical), n)
-  expect_equal(nrow(all.payload$density), n.eval * n.eval)
+  expect_equal(nrow(all.payload$panels[[1L]]$grid), n.eval * n.eval)
+  expect_equal(nrow(all.payload$panels[[2L]]$grid), n)
+  expect_equal(nrow(all.payload$panels[[3L]]$grid), n.eval * n.eval)
   expect_error(plot(fit, view = "all", renderer = "rgl"), "renderer='base'")
 
   dens <- npcopula(~ x + y, data = dat, target = "density",

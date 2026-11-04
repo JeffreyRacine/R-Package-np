@@ -204,7 +204,7 @@ test_that("npreg lp mixed-degree derivatives preserve partial availability", {
   on.exit(dev.off(), add = TRUE)
   expect_warning(
     plot.out <- plot(bw, xdat = tx, ydat = y, gradients = TRUE,
-                     gradient.order = 2L, errors = "none",
+                     gradient_order = 2L, errors = "none",
                      output = "data", neval = 8L),
     "exceed polynomial degree"
   )

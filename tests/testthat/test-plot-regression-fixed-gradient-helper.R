@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 test_that("fixed ll gradient helper matches explicit refits without direct regression calls", {
   skip_if_not_installed("np")
 
@@ -92,7 +94,7 @@ test_that("public ll bootstrap-gradient plot consumes the validated LP1 engine s
   fit.ll <- npreg(bws = bw.ll)
 
   set.seed(20260820)
-  out.ll <- plot(
+  out.ll <- capture_plot_provider(plot(
     fit.ll,
     perspective = FALSE,
     errors = "bootstrap",
@@ -100,7 +102,7 @@ test_that("public ll bootstrap-gradient plot consumes the validated LP1 engine s
     output = "data",
     gradients = TRUE,
     neval = 8L
-  )
+  ))$provider
 
   bw.lp1 <- npregbw(
     xdat = tx,
@@ -114,7 +116,7 @@ test_that("public ll bootstrap-gradient plot consumes the validated LP1 engine s
   )
   fit.lp1 <- npreg(bws = bw.lp1)
   set.seed(20260820)
-  out.lp1 <- plot(
+  out.lp1 <- capture_plot_provider(plot(
     fit.lp1,
     perspective = FALSE,
     errors = "bootstrap",
@@ -122,7 +124,7 @@ test_that("public ll bootstrap-gradient plot consumes the validated LP1 engine s
     output = "data",
     gradients = TRUE,
     neval = 8L
-  )
+  ))$provider
 
   expect_type(out.ll, "list")
   expect_true(length(out.ll) >= 1L)
@@ -138,7 +140,7 @@ test_that("public ll bootstrap-gradient plot consumes the validated LP1 engine s
   bw.bad <- bw.ll
   bw.bad$degree.engine <- 2L
   expect_error(
-    plot(
+    capture_plot_provider(plot(
       bw.bad,
       xdat = tx,
       ydat = y,
@@ -148,7 +150,7 @@ test_that("public ll bootstrap-gradient plot consumes the validated LP1 engine s
       output = "data",
       gradients = TRUE,
       neval = 4L
-    ),
+    ))$provider,
     "incoherent public and canonical engine metadata"
   )
 })
@@ -261,14 +263,14 @@ test_that("fixed lp plot output records requested gradient order", {
 
   pdf(NULL)
   on.exit(dev.off(), add = TRUE)
-  out <- plot(
+  out <- capture_plot_provider(plot(
     fit,
     gradients = TRUE,
-    gradient.order = 2L,
+    gradient_order = 2L,
     errors = "none",
     output = "data",
     neval = 20
-  )
+  ))$provider
 
   expect_equal(as.vector(out[[1L]]$grad), rep(6, 20), tolerance = 1e-8)
   expect_identical(out[[1L]]$gradient.order, 2L)

@@ -61,11 +61,11 @@
   minimum <- ceiling(qnorm(.975)^2 * (1 - alpha) / (.1^2 * alpha))
   draws <- .np_plot_gaussian_integer(draws, "gaussian.draws")
   if (draws < minimum)
-    .np_warning(sprintf(paste0("gaussian.draws=%.0f is below the recommended Monte Carlo ",
+    .np_warning(sprintf(paste0("gaussian_draws=%.0f is below the recommended Monte Carlo ",
       "precision count %.0f (alpha=%g, m=%.0f evaluation points). This approximate ",
       "95%% target limits relative simulation error in the maximum's upper-tail ",
       "probability to 10%%; it does not guarantee endpoint accuracy or statistical ",
-      "coverage. Increase gaussian.draws for greater precision; retaining the requested count."),
+      "coverage. Increase gaussian_draws for greater precision; retaining the requested count."),
       draws, minimum, alpha, m), call. = FALSE)
   draws
 }

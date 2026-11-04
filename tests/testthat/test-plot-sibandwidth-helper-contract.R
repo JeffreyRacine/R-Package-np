@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 expected_singleindex_plot <- function(bw, tx, y, neval = 50L, gradients = FALSE) {
   eval_grid <- getFromNamespace(".np_plot_singleindex_eval_grid", "np")
   local_eval <- getFromNamespace(".np_plot_singleindex_local_eval", "np")
@@ -28,7 +30,7 @@ run_singleindex_bootstrap_plot <- function(bw,
                                            output = "data",
                                            boot_num = 9L,
                                            neval = 50L) {
-  suppressWarnings(plot(
+  suppressWarnings(capture_plot_provider(plot(
     bw,
     xdat = xdat,
     ydat = ydat,
@@ -39,7 +41,7 @@ run_singleindex_bootstrap_plot <- function(bw,
     errors = "bootstrap",
     bootstrap = boot_method,
     B = boot_num
-  ))[[1]]
+  ))$provider)[[1]]
 }
 
 test_that("sibandwidth plot/helper route is free of public core re-entry", {
@@ -241,7 +243,7 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         gradients = FALSE
       )
 
-      out.data.mean <- suppressWarnings(plot(
+      out.data.mean <- suppressWarnings(capture_plot_provider(plot(
         bw,
         xdat = tx,
         ydat = y,
@@ -249,8 +251,8 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         output = "data",
         perspective = FALSE,
         gradients = FALSE
-      ))[[1]]
-      out.plot.mean <- with_plot_device(plot(
+      ))$provider)[[1]]
+      out.plot.mean <- with_plot_device(capture_plot_provider(plot(
         bw,
         xdat = tx,
         ydat = y,
@@ -258,7 +260,7 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         output = "plot-data",
         perspective = FALSE,
         gradients = FALSE
-      ))[[1]]
+      ))$provider)[[1]]
 
       expect_equal(
         out.data.mean$index,
@@ -289,7 +291,7 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         gradients = TRUE
       )
 
-      out.data.grad <- suppressWarnings(plot(
+      out.data.grad <- suppressWarnings(capture_plot_provider(plot(
         bw,
         xdat = tx,
         ydat = y,
@@ -297,8 +299,8 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         output = "data",
         perspective = FALSE,
         gradients = TRUE
-      ))[[1]]
-      out.plot.grad <- with_plot_device(plot(
+      ))$provider)[[1]]
+      out.plot.grad <- with_plot_device(capture_plot_provider(plot(
         bw,
         xdat = tx,
         ydat = y,
@@ -306,7 +308,7 @@ test_that("sibandwidth plot payload matches single-index fits across regtype and
         output = "plot-data",
         perspective = FALSE,
         gradients = TRUE
-      ))[[1]]
+      ))$provider)[[1]]
 
       expect_equal(
         out.data.grad$index,

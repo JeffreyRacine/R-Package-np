@@ -36,13 +36,13 @@ test_that("RLY categorical bootstrap profiles preserve fixed-draw plot bands", {
     results<-list(); seeds<-list()
     for(compress in c(FALSE,TRUE)) {
       options(np.categorical.compress=compress);set.seed(831)
-      expect_warning(results[[as.character(compress)]]<-plot(fit,plot.behavior="data",
-        gradients=grad,errors="bootstrap",plot.errors.boot.method="inid",
-        plot.errors.boot.num=9L,band="all"),"B=9 is below the recommended tail-resolution floor")
+      expect_warning(results[[as.character(compress)]]<-plot(fit,output="data",
+        gradients=grad,errors="bootstrap",bootstrap="inid",
+        B=9L,band="all"),"B=9 is below the recommended tail-resolution floor")
       seeds[[as.character(compress)]]<-.Random.seed
     }
-    expect_equal(results[["TRUE"]][[1]]$mean,results[["FALSE"]][[1]]$mean,tolerance=2e-12)
-    expect_equal(results[["TRUE"]][[1]]$merr,results[["FALSE"]][[1]]$merr,tolerance=2e-12)
+    expect_equal(results[["TRUE"]]$panels[[1]]$values,results[["FALSE"]]$panels[[1]]$values,tolerance=2e-12)
+    expect_equal(results[["TRUE"]]$panels[[1]]$intervals,results[["FALSE"]]$panels[[1]]$intervals,tolerance=2e-12)
     expect_identical(seeds[["TRUE"]],seeds[["FALSE"]])
   }
 })

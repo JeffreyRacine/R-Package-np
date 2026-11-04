@@ -104,8 +104,14 @@ families. The intentional exception is `npindex`, whose default
 `se = TRUE, se.type = "asymptotic"` includes coefficient covariance;
 `se = FALSE` requests a point-only fit. Gradients remain a separate request.
 
-Use current dotted argument names such as `gradient.order`, `data.overlay`
-and `data.rug`, and `B` for bootstrap replication counts where documented.
+For plot calls, use snake_case names such as `gradient_order`, `data_overlay`
+and `data_rug`, and `B` for bootstrap replication counts. Estimator and control
+constructor arguments retain their documented names, including `gradient.order`.
+With `output = "data"` or `"plot-data"`, the returned `np_plot_data` object stores
+the evaluation grid, target values and absolute interval endpoints. For example,
+`as.data.frame(out, panel = 1L, band = "simultaneous")` returns one row per
+evaluation point for the selected target; its `lower` and `upper` columns are
+grid-aligned vectors, not scalar critical values. See `?np_plot_data`.
 Unknown named arguments are rejected with a spelling hint where available;
 an old misspelling that was previously ignored can therefore surface now.
 The full package NEWS (`news(package = "np")`) lists the replacements and

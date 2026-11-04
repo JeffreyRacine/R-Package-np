@@ -309,18 +309,18 @@ test_that("all-categorical regression tree route preserves deterministic plot pa
   on.exit(grDevices::dev.off(), add = TRUE)
 
   options(np.tree = FALSE, np.categorical.compress = FALSE)
-  plot.dense <- plot(fit, plot.behavior = "data",
-                     plot.errors.method = "none")
+  plot.dense <- plot(fit, output = "data",
+                     errors = "none")
 
   options(np.tree = FALSE, np.categorical.compress = TRUE)
-  plot.profile <- plot(fit, plot.behavior = "data",
-                       plot.errors.method = "none")
+  plot.profile <- plot(fit, output = "data",
+                       errors = "none")
 
   expect_equal(names(plot.profile), names(plot.dense))
-  for (j in seq_along(plot.dense)) {
-    expect_equal(plot.profile[[j]]$mean, plot.dense[[j]]$mean,
+  for (j in seq_along(plot.dense$panels)) {
+    expect_equal(plot.profile$panels[[j]]$values$estimate, plot.dense$panels[[j]]$values$estimate,
                  tolerance = 1e-8)
-    expect_equal(plot.profile[[j]]$eval, plot.dense[[j]]$eval)
+    expect_equal(plot.profile$panels[[j]]$grid, plot.dense$panels[[j]]$grid)
   }
 })
 
@@ -414,12 +414,12 @@ test_that("all-categorical regression tree route preserves bootstrap plot payloa
   compare_bootstrap_payloads <- function(method, seed) {
     common <- list(
       x = fit,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = method,
-      plot.errors.boot.num = 41L,
-      plot.errors.boot.blocklen = 3L,
-      plot.errors.type = "pointwise"
+      output = "data",
+      errors = "bootstrap",
+      bootstrap = method,
+      B = 41L,
+      boot_control = np_boot_control(blocklen = 3L),
+      band = "pointwise"
     )
 
     set.seed(seed)
@@ -436,12 +436,12 @@ test_that("all-categorical regression tree route preserves bootstrap plot payloa
 
     expect_equal(names(profile), names(dense))
     expect_equal(profile.repeat, profile, tolerance = 1e-8)
-    for (j in seq_along(profile)) {
-      expect_equal(profile[[j]]$mean, dense[[j]]$mean, tolerance = 1e-8)
-      expect_equal(profile[[j]]$eval, dense[[j]]$eval)
-      expect_true(all(is.finite(profile[[j]]$merr)))
-      expect_identical(is.finite(profile[[j]]$bias), is.finite(dense[[j]]$bias))
-      expect_equal(profile[[j]]$bias, dense[[j]]$bias, tolerance = 1e-8)
+    for (j in seq_along(profile$panels)) {
+      expect_equal(profile$panels[[j]]$values$estimate, dense$panels[[j]]$values$estimate, tolerance = 1e-8)
+      expect_equal(profile$panels[[j]]$grid, dense$panels[[j]]$grid)
+      expect_true(all(is.finite(plot_band(profile, "pointwise", panel=j))))
+      expect_identical(is.finite((profile$panels[[j]]$values$estimate - profile$panels[[j]]$values$bias_corrected)), is.finite((dense$panels[[j]]$values$estimate - dense$panels[[j]]$values$bias_corrected)))
+      expect_equal((profile$panels[[j]]$values$estimate - profile$panels[[j]]$values$bias_corrected), (dense$panels[[j]]$values$estimate - dense$panels[[j]]$values$bias_corrected), tolerance = 1e-8)
     }
   }
 
@@ -523,28 +523,28 @@ test_that("all-categorical regression tree route preserves finite RLY bootstrap 
   set.seed(885L)
   options(np.tree = FALSE, np.categorical.compress = FALSE)
   dense <- plot(fit,
-                plot.behavior = "data",
-                plot.errors.method = "bootstrap",
-                plot.errors.boot.method = "inid",
-                plot.errors.boot.num = 41L,
-                plot.errors.type = "pointwise")
+                output = "data",
+                errors = "bootstrap",
+                bootstrap = "inid",
+                B = 41L,
+                band = "pointwise")
 
   set.seed(885L)
   options(np.tree = FALSE, np.categorical.compress = TRUE)
   tree <- plot(fit,
-               plot.behavior = "data",
-               plot.errors.method = "bootstrap",
-               plot.errors.boot.method = "inid",
-               plot.errors.boot.num = 41L,
-               plot.errors.type = "pointwise")
+               output = "data",
+               errors = "bootstrap",
+               bootstrap = "inid",
+               B = 41L,
+               band = "pointwise")
 
   expect_equal(names(tree), names(dense))
-  for (j in seq_along(dense)) {
-    expect_equal(tree[[j]]$mean, dense[[j]]$mean, tolerance = 1e-8)
-    expect_equal(tree[[j]]$eval, dense[[j]]$eval)
-    expect_true(all(is.finite(tree[[j]]$merr)))
-    expect_identical(is.finite(tree[[j]]$bias), is.finite(dense[[j]]$bias))
-    expect_equal(tree[[j]]$bias, dense[[j]]$bias, tolerance = 1e-8)
+  for (j in seq_along(dense$panels)) {
+    expect_equal(tree$panels[[j]]$values$estimate, dense$panels[[j]]$values$estimate, tolerance = 1e-8)
+    expect_equal(tree$panels[[j]]$grid, dense$panels[[j]]$grid)
+    expect_true(all(is.finite(plot_band(tree, "pointwise", panel=j))))
+    expect_identical(is.finite((tree$panels[[j]]$values$estimate - tree$panels[[j]]$values$bias_corrected)), is.finite((dense$panels[[j]]$values$estimate - dense$panels[[j]]$values$bias_corrected)))
+    expect_equal((tree$panels[[j]]$values$estimate - tree$panels[[j]]$values$bias_corrected), (dense$panels[[j]]$values$estimate - dense$panels[[j]]$values$bias_corrected), tolerance = 1e-8)
   }
 })
 

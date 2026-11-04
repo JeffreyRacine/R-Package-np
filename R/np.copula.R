@@ -964,8 +964,8 @@ plot.npcopula <- function(x,
                           bootstrap = c("inid", "fixed", "geom"),
                           B = 9999,
                           center = c("estimate", "bias-corrected"),
-                          boot.control = np_boot_control(),
-                          output = c("plot", "data", "plot-data", "both"),
+                          boot_control = np_boot_control(),
+                          output = c("plot", "data", "plot-data"),
                           legend = TRUE,
                           theta = 0.0,
                           phi = 20.0,
@@ -976,10 +976,13 @@ plot.npcopula <- function(x,
                           col = NULL,
                           border = .np_plot_color("surface_border"),
                           zlim = NULL,
-                          gaussian.draws = 9999L,
-                          random.seed = 42L,
+                          gaussian_draws = 9999L,
+                          random_seed = 42L,
                           ...) {
-  .np_plot_reject_retired_spelling(substitute(list(...))[-1L], "boot.control")
+  boot.control <- boot_control
+  gaussian.draws <- gaussian_draws
+  random.seed <- random_seed
+  .np_plot_check_public_names(.np_plot_dot_names(substitute(list(...))[-1L]))
   .np_plot_stop_unused_args(
     intersect(.np_plot_dot_names(substitute(list(...))[-1L]), "neval"),
     character()
@@ -994,7 +997,7 @@ plot.npcopula <- function(x,
   errors <- match.arg(errors)
   band <- match.arg(band)
   joint.request <- identical(errors, "asymptotic") && band %in% c("simultaneous", "all")
-  if ((!missing(gaussian.draws) || !missing(random.seed)) && !joint.request)
+  if ((!missing(gaussian_draws) || !missing(random_seed)) && !joint.request)
     stop("Gaussian controls require asymptotic simultaneous or all bands", call. = FALSE)
   if (joint.request) {
     gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
@@ -1002,9 +1005,11 @@ plot.npcopula <- function(x,
   }
   bootstrap <- match.arg(bootstrap)
   center <- match.arg(center)
+  finish.data <- function(value, selected.view = view) .np_plot_data_from_copula(
+    value, list(errors = errors, band = band, alpha = alpha, center = center,
+                bootstrap = bootstrap, B = B, gaussian_draws = gaussian.draws,
+                random_seed = random.seed), density = isTRUE(x$density), view = selected.view)
   output <- match.arg(output)
-  if (identical(output, "both"))
-    output <- "plot-data"
   if (!is.numeric(alpha) || length(alpha) != 1L ||
       is.na(alpha) || alpha <= 0 || alpha >= 0.5)
     stop("alpha must lie in (0, 0.5)", call. = FALSE)
@@ -1012,7 +1017,7 @@ plot.npcopula <- function(x,
     stop("B must be a positive numeric scalar", call. = FALSE)
   zlim <- .npcopula_validate_zlim(zlim)
   if (!inherits(boot.control, "np_boot_control"))
-    stop("boot.control must be created by np_boot_control()", call. = FALSE)
+    stop("boot_control must be created by np_boot_control()", call. = FALSE)
   if (isTRUE(boot.control[["calibration", exact = TRUE]] %in%
       c("percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile")))
     stop("this calibration requires supported bias-corrected density, distribution or regression inference", call. = FALSE)
@@ -1024,7 +1029,7 @@ plot.npcopula <- function(x,
     stop("band and alpha require errors != \"none\"", call. = FALSE)
   if (identical(errors, "bootstrap"))
     .np_plot_reject_wild_unsupervised(bootstrap, "copula estimators")
-  dots <- list(...)
+  dots <- .np_plot_internal_names(list(...))
   if (!is.null(dots[["bias.control", exact = TRUE]]))
     .np_udist_score_scope(dots[["bias.control", exact = TRUE]], FALSE)
   sub.supplied <- "sub" %in% names(dots)
@@ -1063,8 +1068,8 @@ plot.npcopula <- function(x,
       draw = !identical(output, "data")
     )
     if (identical(output, "data") || identical(output, "plot-data"))
-      return(all.data)
-    return(invisible(x))
+      return(finish.data(all.data))
+    return(invisible(NULL))
   }
 
   if (identical(view, "empirical")) {
@@ -1076,14 +1081,14 @@ plot.npcopula <- function(x,
            call. = FALSE)
     empirical <- .npcopula_empirical_eval(x)
     if (identical(output, "data"))
-      return(empirical)
+      return(finish.data(empirical, "empirical"))
     do.call(graphics::plot, c(list(x = empirical$u1, y = empirical$u2,
                                    xlab = xlab, ylab = ylab, cex = .np_plot_cex("copula_pair"),
                                    main = main),
                               dots))
     if (identical(output, "plot-data"))
-      return(empirical)
-    return(invisible(x))
+      return(finish.data(empirical, "empirical"))
+    return(invisible(NULL))
   }
 
   evaluation <- x$evaluation
@@ -1095,13 +1100,13 @@ plot.npcopula <- function(x,
       stop("renderer='rgl' is supported only for grid surface displays in plot.npcopula",
            call. = FALSE)
     if (identical(output, "data"))
-      return(as.data.frame(x))
+      return(finish.data(as.data.frame(x), "sample"))
     do.call(graphics::plot, c(list(x = x$u1, y = x$u2,
                                    xlab = xlab, ylab = ylab, main = main),
                               dots))
     if (identical(output, "plot-data"))
-      return(as.data.frame(x))
-    return(invisible(x))
+      return(finish.data(as.data.frame(x), "sample"))
+    return(invisible(NULL))
   }
 
   if (!identical(errors, "none") &&
@@ -1132,7 +1137,7 @@ plot.npcopula <- function(x,
   payload <- if (joint.request) .np_with_seed(random.seed, interval.compute()) else interval.compute()
   plot.data <- .npcopula_add_interval_columns(x, payload)
   if (identical(output, "data"))
-    return(plot.data)
+    return(finish.data(plot.data))
 
   lerr <- herr <- lerr.all <- herr.all <- NULL
   if (!is.null(payload)) {
@@ -1214,7 +1219,7 @@ plot.npcopula <- function(x,
       return(.np_plot_rgl_finalize(
         rgl.out = rgl.out,
         plot.behavior = output,
-        plot.data = plot.data
+        plot.data = if (identical(output, "plot-data")) finish.data(plot.data) else NULL
       ))
     }
     persp.args <- .np_plot_user_args(dots, "persp")
@@ -1308,8 +1313,8 @@ plot.npcopula <- function(x,
                                dots))
   }
   if (identical(output, "plot-data"))
-    return(plot.data)
-  invisible(x)
+    return(finish.data(plot.data))
+  invisible(NULL)
 }
 
 .npcopula_formula_bandwidth <- function(bw.args, target, u, evaluation, neval,

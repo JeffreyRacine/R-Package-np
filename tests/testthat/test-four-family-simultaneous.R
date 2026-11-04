@@ -102,15 +102,15 @@ test_that("mixed class panels retain complete probability support and row shape"
   fit <- npconmode(b, txdat = x, tydat = y, probabilities = TRUE, se = TRUE)
   seed <- .Random.seed
   z <- plot(fit, errors = "asymptotic", band = "all", output = "data",
-    view = "fixed", neval = 5, level = "b", gaussian.draws = 9999L)
+    view = "fixed", neval = 5, level = "b", gaussian_draws = 9999L)
   expect_identical(.Random.seed, seed)
-  expect_length(z, 2L)
-  expect_equal(nrow(z[[1]]), 5L)
-  expect_equal(nrow(z[[2]]), 3L)
-  expect_true(all(vapply(z, function(v) all(is.finite(v$simultaneous.lower)), logical(1))))
+  expect_length(z$panels, 2L)
+  expect_equal(nrow(z$panels[[1]]$grid), 5L)
+  expect_equal(nrow(z$panels[[2]]$grid), 3L)
+  expect_true(all(vapply(seq_along(z$panels), function(j) all(is.finite(plot_band(z, "simultaneous", j))), logical(1))))
   marginal <- plot(fit, errors = "asymptotic", band = "pointwise",
     output = "data", view = "fixed", neval = 5, level = "b")
-  for (j in seq_along(z)) expect_equal(z[[j]]$pointwise.lower, marginal[[j]]$lower)
+  for (j in seq_along(z$panels)) expect_equal(plot_band(z, "pointwise", j), plot_band(marginal, "pointwise", j))
 })
 
 test_that("copula ratio factor retains numerator and marginal covariance", {

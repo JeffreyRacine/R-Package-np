@@ -165,6 +165,6 @@ test_that("constant categorical copula margins retain marginal bands and allow j
   expect_identical(all.bands$pointwise.upper, pointwise$upper)
   expect_identical(all.bands$bonferroni.lower, bonferroni$lower)
   expect_identical(all.bands$bonferroni.upper, bonferroni$upper)
-  expect_identical(attr(joint, "band.calibration")$critical, 0)
+  expect_identical(joint$inference[[1L]]$critical_value, 0)
 })
 

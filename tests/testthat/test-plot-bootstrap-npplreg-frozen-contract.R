@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 library(np)
 
 quiet_eval <- function(expr) {
@@ -101,7 +103,7 @@ test_that("npplreg bootstrap plot payload stays finite across frozen nonfixed bw
     fit <- npplreg(y ~ x | z, nmulti = 1, bwtype = bwtype)
 
     for (mode in c("exact", "frozen")) {
-      out <- quiet_eval(plot(
+      out <- quiet_eval(capture_plot_provider(plot(
         fit,
         errors = "bootstrap",
         view = "fixed",
@@ -109,9 +111,9 @@ test_that("npplreg bootstrap plot payload stays finite across frozen nonfixed bw
         neval = 12,
         B = 61,
         band = "pointwise",
-        boot.control = np_boot_control(nonfixed = mode),
+        boot_control = np_boot_control(nonfixed = mode),
         output = "data"
-      ))
+      ))$provider)
 
       expect_true(all(is.finite(out$r1$merr)), info = paste(bwtype, mode))
       expect_true(max(abs(out$r1$merr)) < 1e4, info = paste(bwtype, mode))

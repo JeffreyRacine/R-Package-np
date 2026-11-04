@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 test_that("conditional categorical gradient bootstrap helper matches explicit local refits", {
   skip_if_not_installed("np")
 
@@ -36,14 +38,14 @@ test_that("conditional categorical gradient bootstrap helper matches explicit lo
     counts <- matrix(counts, nrow = n)
 
   for (fixture in fixtures) {
-    slice <- suppressWarnings(plot(
+    slice <- suppressWarnings(capture_plot_provider(plot(
       fixture$bw,
       xdat = xdat,
       ydat = ydat,
       gradients = TRUE,
       perspective = FALSE,
       output = "data"
-    ))[[1L]]
+    ))$provider)[[1L]]
 
     boot <- helper(
       xdat = xdat,
@@ -117,7 +119,7 @@ test_that("conditional density/distribution categorical bootstrap gradients work
         ),
         case$args
       )
-      out <- suppressWarnings(do.call(plot, plot.args))
+      out <- suppressWarnings(capture_plot_provider(do.call(plot, plot.args))$provider)
       expect_true(is.list(out), info = paste(case$label, boot.method))
       expect_true(length(out) >= 1L, info = paste(case$label, boot.method))
       expect_true(length(out[[1L]]$bxp) > 0L, info = paste(case$label, boot.method))

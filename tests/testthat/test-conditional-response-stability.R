@@ -112,6 +112,6 @@ test_that("conditional CDF response factors retain their native operator", {
   expect_true(all(abs(gradients(z)[, 1L]-expected.gradient) <= bound))
   p <- plot(z, errors = "asymptotic", band = "all", gradients = TRUE,
             neval = 5L, output = "data")
-  expect_length(p[[1]]$band.errors[[1]]$simultaneous, 10L)
-  expect_true(all(is.finite(p[[1]]$band.errors[[1]]$simultaneous)))
+  expect_length(plot_band(p, "simultaneous"), 10L)
+  expect_true(all(is.finite(plot_band(p, "simultaneous"))))
 })

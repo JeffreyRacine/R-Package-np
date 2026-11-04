@@ -1,5 +1,29 @@
 # np 0.80-2 (development)
 
+* Document all bias-corrected intervals and bands as experimental (pre-beta
+  research), incomplete and not recommended for general-purpose inference.
+  This includes asymptotic, bootstrap and legacy constructions; favorable
+  bounded evidence is not a general coverage guarantee. Calculations, defaults
+  and returned objects are unchanged.
+
+* Consolidate plot-only return values across estimator families into
+  `np_plot_data`. `output="data"` and `output="plot-data"` return the same
+  computed geometry: named panels and targets, absolute interval endpoints,
+  compact inference metadata and explicit finite coverage families. Use
+  `as.data.frame(result, panel=..., target=..., band=...)` for a tidy target.
+  Plot objects no longer masquerade as fitted estimators or expose overloaded
+  error offsets, bootstrap draws, covariance workspaces or fitted objects.
+  `plot(result)` replays the retained geometry without refitting or resampling.
+* Compound plot arguments now use snake_case (`bias_control`, `boot_control`,
+  `gaussian_draws`, `random_seed`, `gradient_order`, etc.). Retired plot
+  spellings and `output="both"` fail explicitly. Estimator APIs, control
+  constructor arguments, numerical methods and defaults are unchanged.
+  Package examples, tests and demos follow the new plot contract.
+* Coefficient displays retain their existing geometry: partially linear
+  coefficient bars represent one standard error, and smooth-coefficient
+  coefficient curves have no confidence bands. Explicit incompatible inference
+  requests now fail clearly instead of being ignored.
+
 * Add an experimental asymmetric jackknife-MP1 conditional density bootstrap
   through `np_conditional_bias_control("jackknife-mp1")`. Complete corrected
   roots use per-resample mixture studentizers, signed inversion, a marginal
@@ -14,8 +38,8 @@
   `np_conditional_bias_control()`: corrected asymptotic bands and explicit
   `bootstrap="conditional-pilot"` symmetric/asymmetric SD bands. Existing
   methods/defaults are unchanged. Density asymptotic uses jackknife correction;
-  density bootstrap and all three CDF routes use analytic correction. Returned
-  inference records absolute endpoints, signed offsets and finite-family scope.
+  density bootstrap and all three CDF routes use analytic correction. Plot
+  inference records absolute endpoints and finite-family scope.
   Initial scalar Gaussian2/fixed-bandwidth and numerical workspace limits,
   conservative subfamilies and small-sample coverage failures are documented.
 

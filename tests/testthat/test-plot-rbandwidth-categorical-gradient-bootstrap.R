@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 test_that("wild categorical regression gradient helper matches explicit refits", {
   skip_if_not_installed("np")
 
@@ -21,14 +23,14 @@ test_that("wild categorical regression gradient helper matches explicit refits",
     bandwidth.compute = FALSE
   )
 
-  exdat <- plot(
+  exdat <- capture_plot_provider(plot(
     bw,
     xdat = xdat,
     ydat = y,
     gradients = TRUE,
     output = "data",
     perspective = FALSE
-  )[[1L]]$eval
+  ))$provider[[1L]]$eval
   H <- npreghat(
     bws = bw,
     txdat = xdat,
@@ -116,12 +118,12 @@ test_that("ordered regression gradient wild bootstrap targets adjacent differenc
     gradients = TRUE,
     se = TRUE
   )
-  base <- plot(
+  base <- capture_plot_provider(plot(
     fit,
     output = "data",
     perspective = FALSE,
     gradients = TRUE
-  )[[1L]]
+  ))$provider[[1L]]
   exdat <- base$eval
   H <- npreghat(
     bws = bw,
@@ -150,18 +152,18 @@ test_that("ordered regression gradient wild bootstrap targets adjacent differenc
   expected.t0 <- ordered_gradient_vector(expected.level$t0)
 
   set.seed(33)
-  out <- plot(
+  out <- capture_plot_provider(plot(
     fit,
     output = "data",
     perspective = FALSE,
     gradients = TRUE,
     errors = "bootstrap",
-    plot.errors.type = "pmzsd",
-    plot.errors.boot.method = "wild",
-    plot.errors.boot.wild = "rademacher",
-    plot.errors.boot.num = B,
-    random.seed = 33
-  )[[1L]]
+    band = "pmzsd",
+    bootstrap = "wild",
+    boot_control = np_boot_control(wild = "rademacher"),
+    B = B,
+    random_seed = 33
+  ))$provider[[1L]]
   expected.hw <- qnorm(0.05 / 2, lower.tail = FALSE) *
     apply(expected.t, 2L, stats::sd)
 
@@ -208,7 +210,7 @@ test_that("categorical regression gradient bootstrap works for default, inid, an
     if (!identical(boot.method, "default"))
       args$bootstrap <- boot.method
 
-    out <- suppressWarnings(do.call(plot, args))
+    out <- suppressWarnings(capture_plot_provider(do.call(plot, args))$provider)
     expect_type(out, "list")
     expect_true(length(out) >= 1L, info = boot.method)
     expect_true(length(out[[1L]]$bxp) > 0L, info = boot.method)
@@ -262,14 +264,14 @@ test_that("categorical regression gradient asymptotic intervals use native HC0 e
   on.exit(untrace(".np_plot_regression_eval", where = asNamespace("np")),
           add = TRUE)
 
-  out <- expect_no_error(suppressWarnings(plot(
+  out <- expect_no_error(suppressWarnings(capture_plot_provider(plot(
     fit,
     output = "data",
     perspective = FALSE,
     gradients = TRUE,
     errors = "asymptotic",
-    data.overlay = FALSE
-  )))
+    data_overlay = FALSE
+  ))$provider))
   expect_type(out, "list")
   expect_true(all(vapply(out, inherits, logical(1), "npregression")))
   expect_true(all(is.finite(out[[1L]]$grad)))
@@ -304,14 +306,14 @@ test_that("continuous regression gradient asymptotic intervals remain available"
     se = TRUE
   )
 
-  out <- expect_no_error(suppressWarnings(plot(
+  out <- expect_no_error(suppressWarnings(capture_plot_provider(plot(
     fit,
     output = "data",
     perspective = FALSE,
     gradients = TRUE,
     errors = "asymptotic",
-    data.overlay = FALSE
-  )))
+    data_overlay = FALSE
+  ))$provider))
   expect_type(out, "list")
   expect_true(all(vapply(out, inherits, logical(1), "npregression")))
 })

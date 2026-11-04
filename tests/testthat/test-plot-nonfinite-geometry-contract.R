@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 test_that("plot geometry normalizes non-finite coordinates without mutating inputs", {
   input <- matrix(
     c(-Inf, 1, NA_real_, NaN, Inf, 2),
@@ -54,11 +56,11 @@ test_that("beta endpoint infinities remain in returns but not plot geometry", {
   for (common in c(FALSE, TRUE)) {
     plotted <- NULL
     expect_warning(
-      plotted <- plot(
+      plotted <- capture_plot_provider(plot(
         bw, xdat = training, ydat = response,
         gradients = TRUE, errors = "none", output = "plot-data",
-        common.scale = common, neval = 11L, xtrim = 0
-      ),
+        common_scale = common, neval = 11L, xtrim = 0
+      ))$provider,
       "infinite endpoint"
     )
     returned <- as.double(gradients(plotted[[1L]]))
@@ -70,11 +72,11 @@ test_that("beta endpoint infinities remain in returns but not plot geometry", {
   for (common in c(FALSE, TRUE)) {
     plotted <- NULL
     expect_warning(
-      plotted <- plot(
+      plotted <- capture_plot_provider(plot(
         bw, xdat = training, ydat = response,
         gradients = TRUE, errors = "asymptotic", output = "plot-data",
-        common.scale = common, neval = 2L, xtrim = 0
-      ),
+        common_scale = common, neval = 2L, xtrim = 0
+      ))$provider,
       "infinite endpoint"
     )
     expect_true(all(is.infinite(as.double(gradients(plotted[[1L]])))))
@@ -125,11 +127,11 @@ test_that("conditional beta endpoint gradients plot and retain infinities", {
     plotted <- NULL
     endpoint_warnings <- character()
     plotted <- withCallingHandlers(
-      plot(
+      capture_plot_provider(plot(
         bw, xdat = training.x, ydat = training.y,
         gradients = TRUE, errors = "none", output = "plot-data",
-        common.scale = TRUE, neval = 11L, xtrim = 0, ytrim = 0
-      ),
+        common_scale = TRUE, neval = 11L, xtrim = 0, ytrim = 0
+      ))$provider,
       warning = function(condition) {
         endpoint_warnings <<- c(
           endpoint_warnings,

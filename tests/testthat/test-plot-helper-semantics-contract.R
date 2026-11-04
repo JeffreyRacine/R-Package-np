@@ -7,13 +7,8 @@ quiet_capture <- function(expr) {
 }
 
 flatten_plot_mean <- function(plot_obj) {
-  vals <- unlist(lapply(plot_obj, function(comp) {
-    keys <- c("mean", "dens", "dist", "condens", "condist")
-    hit <- keys[keys %in% names(comp)]
-    if (!length(hit))
-      return(numeric(0))
-    as.double(comp[[hit[1L]]])
-  }), use.names = FALSE)
+  expect_s3_class(plot_obj, "np_plot_data")
+  vals <- unlist(lapply(plot_obj$panels, function(p) p$values$estimate), use.names=FALSE)
   vals[is.finite(vals)]
 }
 

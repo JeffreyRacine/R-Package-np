@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 library(np)
 
 quiet_eval <- function(expr) {
@@ -80,16 +82,16 @@ test_that("npindex public frozen plot-data mean stays on the exact scale", {
   )
 
   get_obj <- function(mode) {
-    suppressWarnings(plot(
+    suppressWarnings(capture_plot_provider(plot(
       fit,
       output = "data",
       neval = 40L,
       errors = "bootstrap",
       bootstrap = "inid",
-      boot.control = np_boot_control(nonfixed = mode),
+      boot_control = np_boot_control(nonfixed = mode),
       B = 39L,
       band = "pointwise"
-    ))[[1L]]
+    ))$provider)[[1L]]
   }
 
   frozen <- get_obj("frozen")
@@ -130,7 +132,7 @@ test_that("npindex nonfixed frozen bootstrap still supports gradient slices", {
       neval = 20L,
       errors = "bootstrap",
       bootstrap = "inid",
-      boot.control = np_boot_control(nonfixed = "frozen"),
+      boot_control = np_boot_control(nonfixed = "frozen"),
       B = 41L,
       band = "pointwise",
       gradients = TRUE

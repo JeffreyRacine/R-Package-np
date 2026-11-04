@@ -293,16 +293,15 @@ test_that("nplsqreg plot uses quantile plot contract for multiple slices", {
   expect_false(fit$bws$bernstein.basis.engine)
 
   out <- plot(fit, output = "data", perspective = FALSE, neval = 6L)
-  expect_identical(names(out), c("cd1", "cd2"))
-  expect_s3_class(out$cd1, "lsqregression")
-  expect_s3_class(out$cd2, "lsqregression")
-  expect_true(is.matrix(out$cd1$quantile))
-  expect_identical(colnames(out$cd1$quantile), c("tau=0.25", "tau=0.50"))
-
+  expect_s3_class(out, "np_plot_data")
+  expect_length(out$panels, 2L)
+  expect_identical(out$targets$tau, rep(c(.25, .5), 2L))
+  expect_equal(nrow(plot_target(out, panel=1L, target=1L)), 6L)
   gout <- plot(fit, output = "data", perspective = FALSE, neval = 6L,
                gradients = TRUE)
-  expect_identical(names(gout), c("cd1", "cd2"))
-  expect_true(length(dim(gout$cd1$quantgrad)) == 3L)
+  expect_length(gout$panels, 2L)
+  expect_identical(gout$targets$tau, out$targets$tau)
+  expect_identical(gout$targets$variable, rep(c("x", "z"), each=2L))
 
   dat.lp <- data.frame(x = seq(0, 1, length.out = 40L))
   dat.lp$y <- dat.lp$x + dat.lp$x^2 + rnorm(nrow(dat.lp), sd = 0.01)
@@ -310,12 +309,12 @@ test_that("nplsqreg plot uses quantile plot contract for multiple slices", {
                      scale = rep(1, nrow(dat.lp)), regtype = "lp",
                      degree = 1L, nmulti = 1L,
                      optim.control = list(maxit = 2L))
-  q.lp <- plot(fit.lp, output = "data", perspective = FALSE, neval = 41L)$cd1
+  q.lp <- plot(fit.lp, output = "data", perspective = FALSE, neval = 41L)
   g.lp <- plot(fit.lp, output = "data", perspective = FALSE, neval = 41L,
-               gradients = TRUE)$cd1
-  x.eval <- q.lp$xeval[[1L]]
-  q.mat <- fitted(q.lp)
-  g.arr <- gradients(g.lp)
+               gradients = TRUE)
+  x.eval <- plot_target(q.lp, target=1L)$eval_1
+  q.mat <- sapply(1:2, function(j) plot_target(q.lp, target=j)$estimate)
+  g.mat <- sapply(1:2, function(j) plot_target(g.lp, target=j)$estimate)
   fd.center <- function(x, y) {
     n <- length(y)
     out <- numeric(n)
@@ -325,16 +324,18 @@ test_that("nplsqreg plot uses quantile plot contract for multiple slices", {
     out
   }
   for (j in seq_len(ncol(q.mat))) {
-    expect_lt(max(abs(g.arr[, 1L, j] - fd.center(x.eval, q.mat[, j]))), 0.05)
+    expect_lt(max(abs(g.mat[, j] - fd.center(x.eval, q.mat[, j]))), 0.05)
   }
 
   aout <- plot(fit, output = "data", perspective = FALSE, neval = 6L,
                errors = "asymptotic")
-  expect_true(all(c("quanterr", "bias") %in% names(aout$cd1)))
+  expect_equal(nrow(aout$panels[[1L]]$intervals), 2L * nrow(aout$panels[[1L]]$grid))
+  expect_true(all(c("bias_corrected", "std_error") %in% names(aout$panels[[1L]]$values)))
 
   bout <- plot(fit, output = "data", perspective = FALSE, neval = 5L,
                errors = "bootstrap", B = 3L)
-  expect_true(all(c("quanterr", "bias") %in% names(bout$cd1)))
+  expect_equal(nrow(bout$panels[[1L]]$intervals), 2L * nrow(bout$panels[[1L]]$grid))
+  expect_true(all(c("bias_corrected", "std_error") %in% names(bout$panels[[1L]]$values)))
 
   dat2 <- data.frame(
     y = dat$y,
@@ -345,9 +346,9 @@ test_that("nplsqreg plot uses quantile plot contract for multiple slices", {
                    scale = scale0, nmulti = 1L,
                    optim.control = list(maxit = 2L))
   out2 <- plot(fit2, output = "data", perspective = FALSE, neval = 6L)
-  expect_identical(names(out2), c("cd1", "cd2"))
-  expect_s3_class(out2$cd1, "lsqregression")
-  expect_s3_class(out2$cd2, "lsqregression")
+  expect_s3_class(out2, "np_plot_data")
+  expect_length(out2$panels, 2L)
+  expect_identical(out2$targets$tau, c(.5, .5))
 
   expect_error(
     plot(fit$tau.fits[[1L]], tau = c(0.25, 0.5), output = "data",

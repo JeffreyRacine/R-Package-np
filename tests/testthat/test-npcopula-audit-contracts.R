@@ -69,10 +69,10 @@ test_that("copula density adapter preserves normalized ordered Li-Racine semanti
   )
   fit <- npcopula(bws = cdf.bw, data = d, u = u, n.quasi.inv = 40L)
   payload <- plot(fit, view = "all", output = "data")
-  expect_equal(nrow(payload$copula), 25L)
-  expect_equal(nrow(payload$empirical), nrow(d))
-  expect_equal(nrow(payload$density), 25L)
-  expect_true(all(is.finite(payload$density$copula)))
+  expect_equal(nrow(payload$panels[[1L]]$grid), 25L)
+  expect_equal(nrow(payload$panels[[2L]]$grid), nrow(d))
+  expect_equal(nrow(payload$panels[[3L]]$grid), 25L)
+  expect_true(all(is.finite(payload$panels[[3L]]$values$estimate)))
 })
 
 test_that("npcopula print and summary forward explicit formatting arguments", {

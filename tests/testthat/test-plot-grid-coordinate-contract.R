@@ -55,14 +55,14 @@ test_that("conditional-mode numeric grids retain fractions regardless of storage
                   level = "yes", gradients = gradient, xq = c(.5, .5))
       ref <- plot(reference, view = "fixed", neval = count, output = "data",
                   level = "yes", gradients = gradient, xq = c(.5, .5))
-      expect_equal(out$x$x, seq(0, 4, length.out = count))
-      expect_equal(out$z$x, seq(0, 3, length.out = count))
+      expect_equal(out$panels[[1L]]$grid$eval_1, seq(0, 4, length.out = count))
+      expect_equal(out$panels[[2L]]$grid$eval_2, seq(0, 3, length.out = count))
       expect_equal(out, ref, tolerance = 1e-12)
     }
   }
   surface <- plot(fit, perspective = TRUE, neval = 7L, output = "data", level = "yes")
-  expect_equal(sort(unique(surface$surface$x1)), seq(0, 4, length.out = 7L))
-  expect_equal(sort(unique(surface$surface$x2)), seq(0, 3, length.out = 7L))
+  expect_equal(sort(unique(surface$panels[[1L]]$grid$eval_1)), seq(0, 4, length.out = 7L))
+  expect_equal(sort(unique(surface$panels[[1L]]$grid$eval_2)), seq(0, 3, length.out = 7L))
   expect_equal(surface, plot(reference, perspective = TRUE, neval = 7L,
                             output = "data", level = "yes"), tolerance = 1e-12)
 })

@@ -12,6 +12,10 @@
 \title{General Purpose Plotting of Nonparametric Objects}
 
 \description{
+\strong{Bias-corrected bounds are experimental (pre-beta research), incomplete,
+and not recommended for general-purpose inference.} See the experimental-status
+section below.
+
   Plotting is provided via \code{\link{plot}} S3 methods, which generate
   plots of
   nonparametric statistical objects such as regressions, quantile
@@ -65,7 +69,7 @@ Named options passed via \code{\dots} include:
         \code{NULL}. Refit with the intended data before plotting; see
         \code{\link{np-data-interfaces}}.
       }
-      \item{\code{grid.control}}{
+      \item{\code{grid_control}}{
         optional detailed grid controls created by
         \code{\link{np_grid_control}}.
       }
@@ -97,18 +101,18 @@ Named options passed via \code{\dots} include:
 
     \strong{Plot content controls}
     \describe{
-      \item{\code{coef}, \code{coef.index}}{
+      \item{\code{coef}, \code{coef_index}}{
         coefficient-function plotting controls for semiparametric
         families where supported.
       }
-      \item{\code{common.scale}}{
+      \item{\code{common_scale}}{
         a logical value specifying whether multiple panels should share a
         common plotting scale when feasible.
       }
-      \item{\code{gradient.order}, \code{gradients}}{
+      \item{\code{gradient_order}, \code{gradients}}{
         derivative plotting controls for families that support
         gradients/derivatives. For \code{npreg} local-polynomial
-        objects, \code{gradient.order} requests the continuous-predictor
+        objects, \code{gradient_order} requests the continuous-predictor
         derivative order to generate on the plot evaluation grid; if
         omitted the first derivative/effect is plotted. Location-scale
         quantile-regression \code{nplsqreg} objects use the same
@@ -132,10 +136,8 @@ Named options passed via \code{\dots} include:
         notably \code{plot.conmode}. If omitted, the default for
         \code{npconmode} objects is the base/reference response level
         \code{levels(y)[1]}. These plots require probabilities stored by
-        \code{npconmode(..., probabilities=TRUE)}. Currently
-        \code{plot.conmode} displays stored object-fed probability/effect
-        payloads only; probability/effect interval bands and surface grids are
-        not yet implemented for this route.
+        \code{npconmode(..., probabilities=TRUE)}. Supported probability/effect intervals and surface grids use the
+        selected response level; see \code{\link{npconmode}} for eligibility.
       }
       \item{\code{layout}}{
         \code{"auto"} or \code{TRUE} requests automatic
@@ -144,11 +146,10 @@ Named options passed via \code{\dots} include:
         graphics layout.
       }
       \item{\code{output}}{
-        one of \code{"plot"}, \code{"data"}, or \code{"both"}.
-        \code{"both"} is the public spelling for the historical
-        \code{"plot-data"} behavior.
+        one of \code{"plot"}, \code{"data"}, or \code{"plot-data"}.
+        Data-returning modes use the common \code{\link{np_plot_data}} schema.
       }
-      \item{\code{proper}, \code{proper.control}, \code{proper.method}}{
+      \item{\code{proper}, \code{proper_control}, \code{proper_method}}{
         controls for proper conditional density/distribution handling
         where implemented.
       }
@@ -188,13 +189,13 @@ Named options passed via \code{\dots} include:
         name depends on whether \code{errors="bootstrap"} or
         \code{errors="asymptotic"}; see Details.
       }
-      \item{\code{boot.control}}{
+      \item{\code{boot_control}}{
         optional detailed bootstrap controls created by
         \code{\link{np_boot_control}}. This controls non-fixed bootstrap
         behavior, wild-bootstrap multipliers, and dependent-bootstrap
         block length.
       }
-      \item{\code{bias.control}}{
+      \item{\code{bias_control}}{
         regression auxiliary settings created by \code{\link{np_bias_control}},
         or optional fixed-bandwidth density settings created by
         \code{\link{np_udens_bias_control}}. Used with
@@ -214,7 +215,7 @@ Named options passed via \code{\dots} include:
         additionally uses \code{bootstrap="residual"}; see
         \code{\link{np_boot_control}} for its scope and defaults.
       }
-      \item{\code{boxplot.outliers}, \code{factor.boxplot}}{
+      \item{\code{boxplot_outliers}, \code{factor_boxplot}}{
         boxplot-style bootstrap summary controls for factor/categorical
         displays when available.
       }
@@ -244,7 +245,7 @@ Named options passed via \code{\dots} include:
 
     \strong{Rendering and view controls}
     \describe{
-      \item{\code{data.overlay}}{
+      \item{\code{data_overlay}}{
         logical; when \code{TRUE}, overlay raw data on regression,
         quantile-regression, single-index, partially linear, and smooth
         coefficient plot surfaces and expand plot limits to include the data. For
@@ -271,22 +272,22 @@ Named options passed via \code{\dots} include:
         \code{legend=list(tau=list(x="topright"), bands=FALSE)} may
         be used when a route distinguishes those legend roles.
       }
-      \item{\code{data.rug}}{
+      \item{\code{data_rug}}{
         logical; when \code{TRUE}, draw a rug-style support cue for the
         plotted coordinates. For ordinary 1D base plots this behaves
         like a standard rug. For eligible 2D surface plots, the base
         renderer draws short floor-rug ticks and
         \code{renderer="rgl"} draws the analogous 3D floor-rug ticks
         on supported surface routes. In this rollout tranche,
-        \code{data.rug=TRUE} is implemented across the current base
+        \code{data_rug=TRUE} is implemented across the current base
         plot families and across supported \code{rgl} surface routes;
         unsupported renderer/geometry combinations still fail clearly
         rather than being ignored silently. On mixed base plot layouts,
         rug marks are drawn for continuous panels and omitted for
         categorical panels.
-        This option is distinct from \code{data.overlay}:
-        \code{data.rug} shows where observations lie in the plotted
-        covariate support, while \code{data.overlay} is the
+        This option is distinct from \code{data_overlay}:
+        \code{data_rug} shows where observations lie in the plotted
+        covariate support, while \code{data_overlay} is the
         regression-only 3D response overlay used on supported surface
         plots. On supported regression surfaces, both options may be
         used together. Default is \code{FALSE}.
@@ -298,7 +299,7 @@ Named options passed via \code{\dots} include:
       \item{\code{phi}, \code{theta}, \code{view}}{
         view controls for bivariate continuous surface plots.
       }
-      \item{\code{render.control}}{
+      \item{\code{render_control}}{
         optional detailed rendering controls created by
         \code{\link{np_render_control}}, including band-versus-bar
         uncertainty display controls.
@@ -337,7 +338,7 @@ Named options passed via \code{\dots} include:
         high-DPI displays. Axis titles retain rgl's native screen-facing text
         orientation while the scene is rotated. For the currently supported \code{npreg},
         \code{npplreg}, and plain mean-surface
-        \code{npscoef} surface routes, \code{data.overlay=TRUE}
+        \code{npscoef} surface routes, \code{data_overlay=TRUE}
         adds observed data as an interactive point cloud. For all
         currently supported \code{rgl} surface routes,
         \code{errors != "none"} adds interval surfaces;
@@ -389,7 +390,7 @@ Named options passed via \code{\dots} include:
 
     \strong{Reproducibility controls}
     \describe{
-      \item{\code{random.seed}}{
+      \item{\code{random_seed}}{
         an optional random seed used to make bootstrap plotting
         reproducible.
       }
@@ -613,11 +614,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   NA simultaneous limits, preserving other available bands. Unexpected
   calculation errors and material target reconstruction failures remain errors.
 
-  The separately named plot argument \code{gaussian.draws} has a fixed default
+  The separately named plot argument \code{gaussian_draws} has a fixed default
   of 9999 and accepts positive integer counts subject to representability and
   workspace limits, without a fixed one-million upper cap. It applies only to asymptotic
   simultaneous/all requests; \code{B} remains bootstrap-only. The usual
-  \code{random.seed} (default 42) controls calibration without changing the
+  \code{random_seed} (default 42) controls calibration without changing the
   caller's random-number state. A count below
   \code{ceiling(qnorm(.975)^2 * (1-alpha) / (.1^2 * alpha))} warns and is used
   unchanged. This is an approximate 95 percent Monte Carlo target for relative
@@ -632,7 +633,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Simulation uses bounded blocks and the bootstrap progress mechanism to
   report completed draws, elapsed time and estimated time remaining during
   interactive computation. It uses a conservative 64 MiB workspace budget;
-  reduce \code{neval} or \code{gaussian.draws} if the workspace is too large.
+  reduce \code{neval} or \code{gaussian_draws} if the workspace is too large.
   Regression, single-index and smooth-coefficient slice covariance calibration
   is limited to 512 grid points. Density-family plots switch to an
   observation-level factor above 512 points and budget up to 128 MiB for
@@ -653,7 +654,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   For regression derivatives, replace \eqn{L} by the corresponding derivative
   influence map; the training smoother and normalized residuals remain those
   of the fitted mean. Available higher-order continuous partials use the
-  existing \code{gradient.order} contract. For categorical regression
+  existing \code{gradient_order} contract. For categorical regression
   gradients, use the difference of the two endpoint influence rows. Unordered
   factors compare each level with the first retained level; ordered factors
   use adjacent-level differences, with the first forward difference repeated
@@ -688,10 +689,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   convention and does not by itself establish bias correction or honest
   confidence coverage.
 
-  Density-family output objects retain \code{band.calibration} and, for
-  \code{band="all"}, \code{band.errors}. With conditional gradients these
-  are lists indexed by the explanatory-variable component. Calibration records
-  the draw count, grid size, critical value and working dependence contract.
+  Returned \code{\link{np_plot_data}} records identify each scalar target,
+  its absolute interval endpoints and compact calibration metadata, including
+  available draw counts, grid sizes, critical values and dependence contracts.
 
   Single-index bands additionally condition on the fitted index coefficients;
   gradient panels multiply the scalar-index derivative by the corresponding
@@ -700,7 +700,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bootstrap intervals before scaling.
   They retain the scalar-index regression standard-error convention. Smooth-coefficient bands describe the
   noniterated plotted mean or existing slope-coefficient gradient selected by
-  \code{coef.index}, and use fitted raw training residuals in place
+  \code{coef_index}, and use fitted raw training residuals in place
   of the normalized residuals above. These gradients hold the smoothing
   coordinates fixed, including when explanatory and smoothing variables
   overlap; they are not total derivatives through those coordinates.
@@ -741,13 +741,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Bandwidths and the polynomial specification are held fixed. This construction
   neither corrects smoothing bias nor guarantees finite-sample confidence
   coverage. It does not cover points between the grid or jointly cover different
-  panels. Returned data include compact \code{band.calibration} metadata;
-  \code{band="all"} also returns the three width matrices in \code{band.errors}.
-  Surface widths follow the flattened evaluation-grid order. For a single-index
-  gradient object, each width family is an evaluation-point by bound by
-  coefficient array, aligned with the returned gradient columns. Factor-based
-  calibration reports \code{rank=NA} because no eigendecomposition is
-  computed.
+  panels. Returned interval tables follow the explicit flattened grid
+  row identifiers. Single-index gradient targets retain their coefficient
+  identity. Calibration reports \code{rank=NA} when no eigendecomposition is computed.
 
   On an eligible single-panel plot rendered by base graphics,
   a missing \code{sub} argument allows the plot method to add a concise
@@ -804,20 +800,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   presentation: it adds no automatic footer or subtitle, and panning, zooming,
   responsive sizing, and widget geometry are unchanged.
 
-  When \code{center="bias-corrected"} and \code{output="data"} (or
-  \code{output="both"}) is requested, returned
-  plot objects that support bootstrap bias correction include \code{bias} and
-  \code{bias.corrected} components where available. The sign convention
-  is \code{bias = estimate - bias.corrected}, so the corrected estimate
-  can be recovered as \code{estimate - bias}. For example, regression
-  plot objects use \code{mean - bias}; density objects use
-  \code{dens - bias}; and distribution objects use \code{dist - bias}.
-  Regression-gradient plot objects use the analogous convention
-  \code{gbias = grad - gradient.bias.corrected}, so the corrected
-  gradient can be recovered as \code{grad - gbias}.
-  Two-dimensional plots do not draw a second corrected surface in this
-  tranche; use \code{output="data"} to recover the corrected surface
-  values.
+  In data-returning modes, \code{values$estimate} and
+  \code{values$bias_corrected} contain the original and corrected scalar
+  targets. The latter is \code{NA} when not computed. Absolute endpoints
+  are in \code{intervals$lower} and \code{intervals$upper}; use
+  \code{as.data.frame(result, panel=1, target=1, band="simultaneous")}
+  for a joined table. This convention applies to levels and derivatives.
+  Two-dimensional estimator plots do not draw a second corrected surface;
+  corrected surface values remain available in the returned table.
 
   Kernel estimators are generally biased because smoothing trades
   variance reduction for bias. For this reason, pointwise and
@@ -829,8 +819,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   sufficient accuracy.
 
   Ordinary regression now uses the iterated construction described in
-  \code{\link{np_bias_control}}. Its returned \code{inference} component
-  records the complete corrected process and every effective setting.
+  \code{\link{np_bias_control}}. The plot result records the corrected values, requested endpoints and
+  compact construction metadata; internal process workspaces are not returned.
   Pointwise, simultaneous and Bonferroni bands share this construction.
   The following legacy centering discussion applies to the other supported
   families and to explicit regression \code{construction="legacy"}.
@@ -854,12 +844,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   estimates the bias center from a second pilot bootstrap matrix while
   retaining the ordinary bootstrap matrix for variability widths. These
   combinations can behave differently in finite samples, so the returned
-  \code{bias} and \code{bias.corrected} components should be inspected
-  when bias correction is scientifically important. For supported fixed
-  regression gradient plots, inspect \code{gbias},
-  \code{gradient.bias.corrected}, or route-specific gradient-bias
-  components such as \code{gc1bias}; different bootstrap schemes can
-  give materially different derivative-bias corrections.
+  original and corrected values should be inspected when bias correction
+  is scientifically important. Derivative and categorical-effect rows use the
+  same columns and explicit target identities.
 
   The pilot rule is family-specific. For fixed-bandwidth regression
   plots, the non-wild pilot uses the full oversmoothing-rate rule:
@@ -973,13 +960,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   For non-fixed density/distribution bootstrap, an explicit experimental
   approximation is available via
   Raw asymmetric iterated regression bands are available with
-  \code{boot.control=np_boot_control(calibration="separate-tails")};
+  \code{boot_control=np_boot_control(calibration="separate-tails")};
   \code{calibration="tail-envelope"} adds empirical absolute-root protection.
   These options require bootstrap bias-corrected empirical bands and retain
   the selected wild/inid/fixed/geom law. See \code{\link{np_boot_control}}
   for scope and finite-sample limitations.
-  \code{boot.control = np_boot_control(nonfixed = "exact")} or
-  \code{boot.control = np_boot_control(nonfixed = "frozen")}. The default
+  \code{boot_control = np_boot_control(nonfixed = "exact")} or
+  \code{boot_control = np_boot_control(nonfixed = "frozen")}. The default
   \code{"exact"} route recomputes the non-fixed geometry for each resample.
   The experimental \code{"frozen"} route reuses the original-sample
   non-fixed geometry throughout the bootstrap run. This option is currently
@@ -1071,27 +1058,25 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   plot(fit, errors="bootstrap", bootstrap="inid")
   }
 
-  Compound public plot argument names use dots, consistent with the package
-  interface. Retired underscore spellings are not accepted. Use \code{errors},
+  Compound public plot argument names use snake_case. Retired dotted plot
+  spellings are rejected with migration guidance. Non-plot APIs and control
+  constructor arguments retain their existing names. Use \code{errors},
   \code{bootstrap}, \code{B}, \code{band}, \code{alpha}, \code{center},
-  \code{output}, \code{data.overlay}, \code{data.rug}, \code{layout}, and the
+  \code{output}, \code{data_overlay}, \code{data_rug}, \code{layout}, and the
   control constructors documented in \code{\link{np_boot_control}},
   \code{\link{np_grid_control}}, and \code{\link{np_render_control}}.
 
 }
 
 \value{
-  Setting \code{output} will instruct \code{plot} what data
-  to return. Option summary:\cr
-  \code{plot}: instruct \code{plot} to just plot the data and
-  return \code{NULL} \cr
-  \code{both}: instruct \code{plot} to plot the data and return
-  the data used to generate the plots. The data will be a \code{list} of
-  objects of the appropriate type, with one object per plot. For
-  example, invoking \code{plot} on 3D density data will have it
-  return a list of three npdensity objects. If biases were calculated,
-  they are stored in a component named \code{bias}\cr
-  \code{data}: instruct \code{plot} to generate data only and no plots
+  \code{output="data"} returns a \code{\link{np_plot_data}} object without
+  drawing; \code{output="plot-data"} draws and returns the same data.
+  \code{output="plot"} draws and invisibly returns \code{NULL} for base
+  graphics, or retains the existing interactive renderer result. The plot-data
+  object contains explicit grids, scalar targets, absolute intervals, compact
+  inference metadata and finite-grid coverage-family definitions. It does not
+  inherit a fitted-estimator class. See \code{\link{np_plot_data}} for the
+  schema, extraction, derivative and replay contracts.
 }
 
 \references{
@@ -1279,105 +1264,32 @@ plot(fit,
      center="bias-corrected",
      band="simultaneous")
 
-# EXAMPLE 3: This example demonstrates how to retrieve plotting data from
-# plot(). When plot() is called with the arguments
-# `output="both"' (or "data"), it returns plotting objects
-# named r1, r2, and so on (rg1, rg2, and so on when `gradients=TRUE' is
-# set).  Each plotting object's index (1,2,...) corresponds to the index
-# of the explanatory data data frame xdat (and zdat if appropriate).
-
-# Take the cps71 data by way of example. In this case, there is only one
-# object returned by default, `r1', since xdat is univariate.
-
+# EXAMPLE 3: Common extraction for a level and a derivative target.
 data("cps71", package = "np")
-
-# Compute bandwidths for local linear regression using cv.aic...
-
 bw <- npregbw(xdat=cps71$age, ydat=cps71$logwage,
               regtype="ll", bwmethod="cv.aic")
 fit <- npreg(bws=bw)
+plot.out <- plot(fit, perspective=FALSE, errors="bootstrap",
+                 B=25, band="pointwise", output="plot-data")
+d <- as.data.frame(plot.out, panel=1, target=1)
+age.eval <- d$eval_1
+logwage.eval <- d$estimate
+logwage.lower.ci <- d$lower
+logwage.upper.ci <- d$upper
 
-# Generate the plot and return plotting data, and store output in
-# `plot.out' (NOTE: the call to `output' is necessary).
+# Corrected values are descriptive targets, not offsets to add to endpoints.
+p <- plot(fit, perspective=FALSE, errors="bootstrap",
+          center="bias-corrected", B=25, band="pointwise", output="data")
+d <- as.data.frame(p, panel=1, target=1)
+logwage.bc <- d$bias_corrected
+logwage.bias <- d$estimate - d$bias_corrected
 
-plot.out <- plot(fit,
-                 perspective=FALSE,
-                 errors="bootstrap",
-                 B=25,
-                 output="both")
-
-# Now grab the r1 object that plot plotted on the screen, and take
-# what you need. First, take the output, lower error bound and upper
-# error bound...
-
-logwage.eval <- fitted(plot.out$r1)
-logwage.se <- se(plot.out$r1)
-logwage.lower.ci <- logwage.eval + logwage.se[,1]
-logwage.upper.ci <- logwage.eval + logwage.se[,2]
-
-# Next grab the x data evaluation data. xdat is a data.frame(), so we
-# need to coerce it into a vector (take the `first column' of data frame
-# even though there is only one column)
-
-age.eval <- plot.out$r1$eval[,1]
-
-# Now we could plot this if we wished, or direct it to whatever end use
-# we envisioned. We plot the results using R's plot() routines...
-
-with(cps71, plot(age, logwage, cex=0.2, xlab="Age", ylab="log(Wage)"))
-lines(age.eval,logwage.eval)
-lines(age.eval,logwage.lower.ci,lty=3)
-lines(age.eval,logwage.upper.ci,lty=3)
-
-# Bias-corrected bootstrap output includes the estimated bias and the
-# bias-corrected center when available. The sign convention is
-# bias = estimate - bias.corrected, so bias.corrected = estimate - bias.
-
-plot.out <- plot(fit,
-                 perspective=FALSE,
-                 errors="bootstrap",
-                 center="bias-corrected",
-                 B=25,
-                 output="data")
-
-logwage.eval <- fitted(plot.out$r1)
-logwage.bias <- plot.out$r1$bias
-logwage.bc <- plot.out$r1$bias.corrected
-stopifnot(all.equal(logwage.bc, logwage.eval - logwage.bias))
-
-# If you wanted plot() data for gradients, you would use the argument
-# `gradients=TRUE' in the call to plot() as the following
-# demonstrates...
-
-plot.out <- plot(fit,
-                 perspective=FALSE,
-                 errors="bootstrap",
-                 B=25,
-                 output="both",
-                 gradients=TRUE)
-
-# Now grab object that plot() plotted on the screen. First, take the
-# output, lower error bound and upper error bound... note that gradients
-# are stored in objects rg1, rg2 etc.
-
-grad.eval <- gradients(plot.out$rg1)
-grad.se <- gradients(plot.out$rg1, se = TRUE)
-grad.lower.ci <- grad.eval + grad.se[,1]
-grad.upper.ci <- grad.eval + grad.se[,2]
-
-# Next grab the x evaluation data. xdat is a data.frame(), so we need to
-# coerce it into a vector (take `first column' of data frame even though
-# there is only one column)
-
-age.eval <- plot.out$rg1$eval[,1]
-
-# We plot the results using R's plot() routines...
-
-plot(age.eval,grad.eval,cex=0.2,
-     ylim=c(min(grad.lower.ci),max(grad.upper.ci)),
-     xlab="Age",ylab="d log(Wage)/d Age",type="l")
-lines(age.eval,grad.lower.ci,lty=3)
-lines(age.eval,grad.upper.ci,lty=3)
+# The same extraction works for derivatives. Inspect the target identity.
+g <- plot(fit, perspective=FALSE, gradients=TRUE, errors="bootstrap",
+          B=25, band="pointwise", output="data")
+g$targets
+grad <- as.data.frame(g, panel=1, target=1)
+plot(g)
 
 # EXAMPLE 4: Variations on local polynomial conditional density
 # estimation with proper = TRUE.
@@ -1483,6 +1395,24 @@ pred_both <- predict(
 plot(fhat_both)
 })
 } % enddontrun
+}
+
+
+\section{Experimental status of bias-corrected inference}{
+\strong{All bias-corrected confidence intervals and bands are experimental
+(pre-beta research), incomplete, and not recommended for general-purpose
+inference.} This status remains in effect unless the documentation explicitly
+states otherwise for a particular method and scope. It applies wherever
+bias-corrected bounds are available: asymptotic and bootstrap constructions,
+including legacy methods, pointwise intervals, Bonferroni intervals and
+simultaneous bands, for levels and supported derivatives.
+
+These methods form an ongoing research project. Implementation support,
+numerical checks and favorable simulation results in selected settings do not
+establish generally valid coverage. Coverage can fail outside the studied
+settings, and available options do not constitute a general solution to
+bias-corrected inference. Method-specific assumptions, restrictions and known
+failures must be considered when experimenting with these bounds.
 }
 
 \seealso{

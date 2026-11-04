@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 align_singleindex_grad_index <- function(fit, target_index, beta) {
   fit_index <- as.vector(fit$index)
   ord <- match(target_index, fit_index)
@@ -173,7 +175,7 @@ test_that("sibandwidth fixed gradient bootstrap now works for helper methods", {
   )
 
   for (boot.method in c("inid", "fixed", "geom")) {
-    out <- suppressWarnings(plot(
+    out <- suppressWarnings(capture_plot_provider(plot(
       bw,
       xdat = tx,
       ydat = y,
@@ -183,7 +185,7 @@ test_that("sibandwidth fixed gradient bootstrap now works for helper methods", {
       errors = "bootstrap",
       bootstrap = boot.method,
       B = 9L
-    ))[[1]]
+    ))$provider)[[1]]
 
     expect_true(all(is.finite(out$grad)))
     expect_true(all(is.finite(out$glerr)))
@@ -209,7 +211,7 @@ test_that("single-index nonfixed gradient helper methods still fail fast", {
 
     for (boot.method in c("inid", "fixed", "geom")) {
       expect_error(
-        suppressWarnings(plot(
+        suppressWarnings(capture_plot_provider(plot(
           bw,
           xdat = tx,
           ydat = y,
@@ -219,7 +221,7 @@ test_that("single-index nonfixed gradient helper methods still fail fast", {
           errors = "bootstrap",
           bootstrap = boot.method,
           B = 9L
-        )),
+        ))$provider),
         "requires helper mode with gradients=FALSE",
         info = paste(bt, boot.method, "gradient helper guard")
       )

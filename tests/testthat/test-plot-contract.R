@@ -20,11 +20,11 @@ test_that("plot contract: regression and conditional estimators return data payl
     )
   )
 
-  expect_type(rout, "list")
-  expect_true(length(rout) > 0)
-  expect_true(all(vapply(rout, inherits, logical(1), "npregression")))
-  expect_true(all(vapply(rout, function(xi) !is.null(xi$mean), logical(1))))
-  expect_true(all(vapply(rout, function(xi) !is.null(xi$merr), logical(1))))
+  expect_s3_class(rout, "np_plot_data")
+  expect_true(length(rout$panels) > 0)
+  expect_true(all(rout$targets$quantity == "mean"))
+  expect_true(all(vapply(rout$panels, function(p) nrow(p$values) > 0L &&
+    setequal(unique(p$intervals$band), c("pointwise", "simultaneous", "bonferroni")), logical(1L))))
 })
 
 test_that("plot contract: legend defaults are role-sized and user-overridable", {
@@ -111,11 +111,11 @@ test_that("plot contract: npcdens/npcdist support bootstrap all in data mode", {
     )
   )
 
-  expect_type(cout, "list")
-  expect_true(length(cout) > 0)
-  expect_true(all(vapply(cout, inherits, logical(1), "condensity")))
-  expect_true(all(vapply(cout, function(xi) !is.null(xi$condens), logical(1))))
-  expect_true(all(vapply(cout, function(xi) !is.null(xi$conderr), logical(1))))
+  expect_s3_class(cout, "np_plot_data")
+  expect_true(length(cout$panels) > 0)
+  expect_true(all(cout$targets$quantity == "conditional_density"))
+  expect_true(all(vapply(cout$panels, function(p) nrow(p$values) > 0L &&
+    setequal(unique(p$intervals$band), c("pointwise", "simultaneous", "bonferroni")), logical(1L))))
 
   dbw <- npcdistbw(y ~ x, nmulti = 1, bwmethod = "cv.ls")
   dout <- suppressWarnings(
@@ -130,11 +130,12 @@ test_that("plot contract: npcdens/npcdist support bootstrap all in data mode", {
     )
   )
 
-  expect_type(dout, "list")
-  expect_true(length(dout) > 0)
-  expect_true(all(vapply(dout, inherits, logical(1), "condistribution")))
-  expect_true(all(vapply(dout, function(xi) !is.null(xi$condist), logical(1))))
-  expect_true(all(vapply(dout, function(xi) !is.null(xi$conderr), logical(1))))
+  expect_s3_class(dout, "np_plot_data")
+  expect_true(length(dout$panels) > 0)
+  expect_true(all(dout$targets$quantity == "conditional_cdf"))
+  expect_true(all(vapply(dout$panels, function(p) nrow(p$values) > 0L &&
+    setequal(unique(p$intervals$band), c("pointwise", "simultaneous", "bonferroni")), logical(1L))))
+
 })
 
 test_that("plot contract: 3D plot-data matches data mode for regression and conditional estimators", {
@@ -168,9 +169,8 @@ test_that("plot contract: 3D plot-data matches data mode for regression and cond
 
   expect_type(rplotdata, "list")
   expect_named(rplotdata, names(rdata))
-  expect_s3_class(rplotdata$r1, "npregression")
-  expect_equal(rplotdata$r1$mean, rdata$r1$mean)
-  expect_equal(rplotdata$r1$eval, rdata$r1$eval)
+  expect_s3_class(rplotdata, "np_plot_data")
+  expect_identical(rplotdata, rdata)
 
   cfit <- npcdens(
     bws = npcdensbw(
@@ -192,11 +192,8 @@ test_that("plot contract: 3D plot-data matches data mode for regression and cond
 
   expect_type(cplotdata, "list")
   expect_named(cplotdata, names(cdata))
-  expect_s3_class(cplotdata$cd1, "condensity")
-  expect_equal(cplotdata$cd1$condens, cdata$cd1$condens)
-  expect_equal(cplotdata$cd1$condens.raw, cdata$cd1$condens.raw)
-  expect_equal(cplotdata$cd1$xeval, cdata$cd1$xeval)
-  expect_equal(cplotdata$cd1$yeval, cdata$cd1$yeval)
+  expect_s3_class(cplotdata, "np_plot_data")
+  expect_identical(cplotdata, cdata)
 
   dfit <- npcdist(
     bws = npcdistbw(
@@ -217,11 +214,8 @@ test_that("plot contract: 3D plot-data matches data mode for regression and cond
 
   expect_type(dplotdata, "list")
   expect_named(dplotdata, names(ddata))
-  expect_s3_class(dplotdata$cd1, "condistribution")
-  expect_equal(dplotdata$cd1$condist, ddata$cd1$condist)
-  expect_equal(dplotdata$cd1$condist.raw, ddata$cd1$condist.raw)
-  expect_equal(dplotdata$cd1$xeval, ddata$cd1$xeval)
-  expect_equal(dplotdata$cd1$yeval, ddata$cd1$yeval)
+  expect_s3_class(dplotdata, "np_plot_data")
+  expect_identical(dplotdata, ddata)
 })
 
 test_that("plot contract: remaining public plot families return plot-data payloads", {
@@ -240,14 +234,8 @@ test_that("plot contract: remaining public plot families return plot-data payloa
     expect_type(plot.out, "list")
     expect_named(plot.out, names(data.out))
 
-    for (nm in names(data.out)) {
-      expect_s3_class(plot.out[[nm]], class(data.out[[nm]])[1L])
-      for (field in fields) {
-        if (field %in% names(data.out[[nm]]) && field %in% names(plot.out[[nm]])) {
-          expect_equal(plot.out[[nm]][[field]], data.out[[nm]][[field]])
-        }
-      }
-    }
+    expect_s3_class(plot.out, "np_plot_data")
+    expect_identical(plot.out, data.out)
   }
 
   set.seed(108)
@@ -361,16 +349,16 @@ test_that("plot contract: remaining public plot families return plot-data payloa
     perspective = FALSE
   )
 
-  expect_true(all(vapply(fit.qr.alt.fixed, inherits, logical(1), "qregression")))
-  expect_true(all(vapply(fit.qr.alt.slice, inherits, logical(1), "qregression")))
-  expect_true(all(vapply(fit.qr.alt.fixed, function(xi) identical(xi$tau, 0.4), logical(1))))
-  expect_true(all(vapply(fit.qr.alt.slice, function(xi) identical(xi$tau, 0.4), logical(1))))
-  expect_equal(fit.qr.alt.fixed[[1L]]$quantile, bw.qr.alt.fixed[[1L]]$quantile)
-  expect_equal(fit.qr.alt.fixed[[1L]]$xeval, bw.qr.alt.fixed[[1L]]$xeval)
-  expect_equal(fit.qr.alt.fixed[[1L]]$quanterr, bw.qr.alt.fixed[[1L]]$quanterr)
-  expect_equal(fit.qr.alt.slice[[1L]]$quantile, bw.qr.alt.slice[[1L]]$quantile)
-  expect_equal(fit.qr.alt.slice[[1L]]$xeval, bw.qr.alt.slice[[1L]]$xeval)
-  expect_equal(fit.qr.alt.slice[[1L]]$quanterr, bw.qr.alt.slice[[1L]]$quanterr)
+  for (pair in list(list(fit.qr.alt.fixed, bw.qr.alt.fixed),
+                    list(fit.qr.alt.slice, bw.qr.alt.slice))) {
+    expect_s3_class(pair[[1L]], "np_plot_data")
+    expect_true(all(pair[[1L]]$targets$tau == .4))
+    # Fitted-quantile and bandwidth-quantreg routes have distinct incumbent
+    # overlay defaults. Their numerical tables must agree exactly.
+    expect_equal(lapply(pair[[1L]]$panels, function(p) p[c("grid", "variables", "values", "intervals")]),
+                 lapply(pair[[2L]]$panels, function(p) p[c("grid", "variables", "values", "intervals")]))
+    expect_equal(pair[[1L]]$targets, pair[[2L]]$targets)
+  }
 
   bw.si <- npindexbw(
     xdat = data.frame(x = x, x2 = x2),
@@ -442,7 +430,7 @@ test_that("plot contract: rgl plot-data returns the usual data payload", {
     output = "data",
     renderer = "rgl",
     view = "fixed",
-    data.overlay = FALSE
+    data_overlay = FALSE
   ))
 
   rplotdata <- suppressWarnings(plot(
@@ -450,14 +438,13 @@ test_that("plot contract: rgl plot-data returns the usual data payload", {
     output = "plot-data",
     renderer = "rgl",
     view = "fixed",
-    data.overlay = FALSE
+    data_overlay = FALSE
   ))
 
   expect_type(rplotdata, "list")
   expect_named(rplotdata, names(rdata))
-  expect_s3_class(rplotdata$r1, "npregression")
-  expect_equal(rplotdata$r1$mean, rdata$r1$mean)
-  expect_equal(rplotdata$r1$eval, rdata$r1$eval)
+  expect_s3_class(rplotdata, "np_plot_data")
+  expect_identical(rplotdata, rdata)
 
   cfit <- npcdens(
     bws = npcdensbw(
@@ -490,10 +477,8 @@ test_that("plot contract: rgl plot-data returns the usual data payload", {
 
   expect_type(cplotdata, "list")
   expect_named(cplotdata, names(cdata))
-  expect_s3_class(cplotdata$cd1, "condensity")
-  expect_equal(cplotdata$cd1$condens, cdata$cd1$condens)
-  expect_equal(cplotdata$cd1$xeval, cdata$cd1$xeval)
-  expect_equal(cplotdata$cd1$yeval, cdata$cd1$yeval)
+  expect_s3_class(cplotdata, "np_plot_data")
+  expect_identical(cplotdata, cdata)
 })
 
 test_that("plot contract: alpha is enforced in (0,0.5)", {
@@ -563,7 +548,7 @@ test_that("plot contract: npscoef supports coef=TRUE plot path", {
     plot(
       fit,
       coef = TRUE,
-      coef.index = 1,
+      coef_index = 1,
       perspective = FALSE,
       neval = 20,
       output = "plot-data",
@@ -573,8 +558,9 @@ test_that("plot contract: npscoef supports coef=TRUE plot path", {
 
   expect_type(out, "list")
   expect_true(length(out) > 0)
-  expect_true(all(vapply(out, inherits, logical(1), "smoothcoefficient")))
-  expect_true(all(vapply(out, function(xi) !is.null(xi$mean), logical(1))))
+  expect_s3_class(out, "np_plot_data")
+  expect_true(all(out$targets$quantity == "coefficient"))
+  expect_true(all(vapply(out$panels, function(p) nrow(p$values) > 0L, logical(1L))))
 })
 
 test_that("plot contract: npplreg supports coef=TRUE plot-data payload", {
@@ -603,9 +589,12 @@ test_that("plot contract: npplreg supports coef=TRUE plot-data payload", {
   )
 
   expect_type(out, "list")
-  expect_true(all(c("coefficients", "coefficient.stderr", "fit") %in% names(out)))
-  expect_true(is.numeric(out$coefficients))
-  expect_true(length(out$coefficients) >= 1L)
+  expect_s3_class(out, "np_plot_data")
+  d <- as.data.frame(out)
+  expect_true(is.numeric(d$estimate))
+  expect_equal(d$estimate, as.vector(coef(fit)))
+  expect_gte(nrow(d), 1L)
+  expect_false("fit" %in% names(out))
 })
 
 test_that("plot contract: scbandwidth perspective bootstrap uses z evaluation column", {
@@ -703,7 +692,7 @@ test_that("plot contract: npscoef fitted perspective path preserves semantic z e
     view = "fixed",
     renderer = "base",
     output = "data",
-    data.overlay = FALSE,
+    data_overlay = FALSE,
     errors = "none"
   ))
 

@@ -730,6 +730,24 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   and missing-value policy details.
 }
 
+
+\section{Experimental status of bias-corrected inference}{
+\strong{All bias-corrected confidence intervals and bands are experimental
+(pre-beta research), incomplete, and not recommended for general-purpose
+inference.} This status remains in effect unless the documentation explicitly
+states otherwise for a particular method and scope. It applies wherever
+bias-corrected bounds are available: asymptotic and bootstrap constructions,
+including legacy methods, pointwise intervals, Bonferroni intervals and
+simultaneous bands, for levels and supported derivatives.
+
+These methods form an ongoing research project. Implementation support,
+numerical checks and favorable simulation results in selected settings do not
+establish generally valid coverage. Coverage can fail outside the studied
+settings, and available options do not constitute a general solution to
+bias-corrected inference. Method-specific assumptions, restrictions and known
+failures must be considered when experimenting with these bounds.
+}
+
 \seealso{
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}}
   \code{\link{loess}}
@@ -827,7 +845,7 @@ if (interactive()) Sys.sleep(5)
 
 # Next, plot the derivative...
 
-if (interactive()) plot(bw, errors="asymptotic", gradient=TRUE)
+if (interactive()) plot(bw, errors="asymptotic", gradients=TRUE)
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -852,7 +870,7 @@ if (interactive()) Sys.sleep(5)
 
 # Next, plot the derivative...
 
-if (interactive()) plot(bw, errors="asymptotic", gradient=TRUE)
+if (interactive()) plot(bw, errors="asymptotic", gradients=TRUE)
 
 # Sleep for 5 seconds so that we can examine the output...
 

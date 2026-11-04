@@ -76,11 +76,23 @@
         (!is.numeric(gradient.order) || !length(gradient.order) ||
          anyNA(gradient.order) || any(!is.finite(gradient.order)) ||
          any(gradient.order != 1)))
-      stop("conditional-quantile plots support only first derivatives ('gradient.order = 1')",
+      stop("conditional-quantile plots support only first derivatives ('gradient_order = 1')",
            call. = FALSE)
 
     if (.np_data_formal_supplied(sys.call(), sys.function()))
       .np_plot_data_error()
+
+    saved.plot.style <- list(xlab = xlab, ylab = ylab,
+        main = main, sub = sub, xlim = xlim, ylim = ylim, col = col,
+        lty = lty, lwd = lwd, type = type,
+        theta = theta, phi = phi, zlab = zlab, zlim = zlim)
+    publish.plot <- function(value) .np_plot_data_publish_display(value,
+      coordinates = cbind(xdat, ydat), roles = c(rep("X", ncol(xdat)), rep("Y", ncol(ydat))), response = ydat,
+      overlay = isTRUE(quantreg) && isTRUE(plot.data.overlay) && !gradients, rug = plot.rug,
+      style = utils::modifyList(plot.user.args, saved.plot.style),
+      points_args = .np_plot_user_args(dots, "points"), boxplot = plot.bxp,
+      interval_style = list(style = plot.errors.style, bar = plot.errors.bar,
+        bar_num = plot.errors.bar.num, boxplot_outliers = plot.bxp.out))
 
     sub.supplied <- !missing(sub)
 
@@ -220,7 +232,7 @@
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all")
     if (!missing(gaussian.draws) && !joint.request && !new.conditional)
-      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
+      stop("gaussian_draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- joint.request && !quantreg && !isTRUE(proper) && !new.conditional
     quantile.joint <- joint.request && isTRUE(quantreg)
     if (joint.request)
@@ -556,6 +568,10 @@
         cd1 <- do.call(ret.fun, ret.args)
         if (joint.eligible || quantile.joint)
           cd1 <- .np_plot_density_band_fields(cd1, terr.obj)
+        if (plot.errors && identical(plot.errors.type, "all"))
+          cd1[[".plot_band_widths"]] <- terr.all
+        cd1[[".plot_rows"]] <- list(estimate = tcomp,
+          corrected = terr[, 3L], widths = terr[, 1:2, drop = FALSE])
         cd1$bias = NA
         cd1$bias.corrected = NA
 
@@ -565,7 +581,7 @@
         if(new.conditional)
           cd1 <- .np_conditional_plot_fields(cd1,conditional.interval,plot.errors.type)
         if (plot.behavior == "data")
-          return ( list(cd1 = cd1) )
+          return(publish.plot(list(cd1 = cd1)))
       }
 
 
@@ -642,7 +658,7 @@
         return(.np_plot_rgl_finalize(
           rgl.out = rgl.out,
           plot.behavior = plot.behavior,
-          plot.data = list(cd1 = cd1)
+          plot.data = publish.plot(list(cd1 = cd1))
         ))
       }
 
@@ -757,7 +773,7 @@
       }
 
       if (plot.behavior == "plot-data")
-        return ( list(cd1 = cd1) )
+        return(publish.plot(list(cd1 = cd1)))
     } else {
 
       quantreg.gradient.diagonal <- isTRUE(quantreg) && isTRUE(gradients)
@@ -1195,6 +1211,13 @@
               temp.dens.mat[seq_len(xi.neval), , drop = FALSE] -
               multi.err[, 3L, , drop = TRUE]
             plot.out[[plot.index]]$bxp <- temp.boot
+            plot.out[[plot.index]] <- .np_plot_data_publish_target(
+              plot.out[[plot.index]], if (gradients) paste0("gradient", grad.j) else "value",
+              corrected = if (is.null(multi.err)) NULL else
+                matrix(multi.err[, 3L, , drop = FALSE], nrow = xi.neval),
+              std_error = if (identical(plot.errors.method, "asymptotic")) err.extract(tobj, grad.j) else NULL,
+              bands = if (identical(plot.errors.type, "all")) temp.all.err else NULL,
+              boxplot = temp.boot)
           } else if (plot.behavior != "data") {
             plot.layout <- .np_plot_layout_activate(plot.layout)
             .np_plot_variability_panel_begin(engine.ctx$annotation)
@@ -1219,6 +1242,13 @@
                   temp.dens.mat[seq_len(xi.neval), , drop = FALSE] -
                   multi.err[, 3L, , drop = TRUE]
                 plot.out[[plot.index]]$bxp <- temp.boot
+                plot.out[[plot.index]] <- .np_plot_data_publish_target(
+                  plot.out[[plot.index]], if (gradients) paste0("gradient", grad.j) else "value",
+                  corrected = if (is.null(multi.err)) NULL else
+                matrix(multi.err[, 3L, , drop = FALSE], nrow = xi.neval),
+                  std_error = if (identical(plot.errors.method, "asymptotic")) err.extract(tobj, grad.j) else NULL,
+                  bands = if (identical(plot.errors.type, "all")) temp.all.err else NULL,
+                  boxplot = temp.boot)
               }
               next
             }
@@ -1396,6 +1426,12 @@
               bias.name = bias.name,
               corrected.name = corrected.name)
             plot.out[[plot.index]]$bxp <- temp.boot
+            plot.out[[plot.index]] <- .np_plot_data_publish_target(
+              plot.out[[plot.index]], if (gradients) paste0("gradient", grad.j) else "value",
+              corrected = temp.err[seq_len(xi.neval), 3L],
+              std_error = if (identical(plot.errors.method, "asymptotic")) err.extract(tobj, grad.j) else NULL,
+              bands = if (identical(plot.errors.type, "all")) temp.all.err else NULL,
+              boxplot = temp.boot)
           }
         }
       }
@@ -1718,6 +1754,12 @@
                 bias.name = bias.name,
                 corrected.name = corrected.name)
               plot.out[[plot.index]]$bxp <- temp.boot
+              plot.out[[plot.index]] <- .np_plot_data_publish_target(
+                plot.out[[plot.index]], if (gradients) paste0("gradient", j) else "value",
+                corrected = temp.err[seq_len(xi.neval), 3L],
+                std_error = if (identical(plot.errors.method, "asymptotic")) err.extract(tobj, j) else NULL,
+                bands = if (identical(plot.errors.type, "all")) temp.all.err else NULL,
+                boxplot = temp.boot)
             }
           }
         }
@@ -1900,7 +1942,7 @@
 
       if (plot.behavior != "plot"){
         names(plot.out) = paste("cd", seq_len(tot.dim), sep="")
-        return (plot.out)
+        return(publish.plot(plot.out))
       }
     }
   }

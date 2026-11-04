@@ -26,7 +26,8 @@ test_that("partially linear plot grids do not fabricate goodness-of-fit scores",
   b<-npplregbw(xdat=x,zdat=z,ydat=y,bws=matrix(.3,2,1),bandwidth.compute=FALSE)
   f<-npplreg(bws=b,se=TRUE)
   for(common in c(TRUE,FALSE)) {
-    p<-plot(f,plot.behavior="data",neval=8,errors="none",common.scale=common)
-    for(one in p) expect_true(all(is.na(unlist(one[c("R2","MSE","MAE","MAPE","CORR")]))))
+    p<-plot(f,output="data",neval=8,errors="none",common_scale=common)
+    expect_s3_class(p, "np_plot_data")
+    for(one in p$panels) expect_false(any(c("R2","MSE","MAE","MAPE","CORR") %in% names(one)))
   }
 })

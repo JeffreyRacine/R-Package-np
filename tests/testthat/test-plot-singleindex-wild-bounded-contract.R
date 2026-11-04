@@ -67,8 +67,8 @@ test_that("single-index fixed wild bootstrap block path matches dense path", {
     neval = 23L,
     output = "data",
     perspective = FALSE,
-    data.overlay = FALSE
-  ))[[1L]]
+    data_overlay = FALSE
+  ))
 
   options(np.plot.wild.apply.operator.threshold.bytes = 0)
   set.seed(20260704)
@@ -80,11 +80,11 @@ test_that("single-index fixed wild bootstrap block path matches dense path", {
     neval = 23L,
     output = "data",
     perspective = FALSE,
-    data.overlay = FALSE
-  ))[[1L]]
+    data_overlay = FALSE
+  ))
 
-  expect_equal(block$mean, dense$mean, tolerance = 1e-12)
-  expect_equal(block$merr, dense$merr, tolerance = 1e-12)
+  expect_equal(plot_target(block)$estimate, plot_target(dense)$estimate, tolerance = 1e-12)
+  expect_equal(plot_band(block, "pmzsd"), plot_band(dense, "pmzsd"), tolerance = 1e-12)
 })
 
 test_that("single-index range-bounded wild bootstrap uses scalar-index bounds", {
@@ -118,7 +118,7 @@ test_that("single-index range-bounded wild bootstrap uses scalar-index bounds", 
 
     expect_type(out, "list")
     expect_true(length(out) >= 1L)
-    expect_true(all(is.finite(out[[1L]]$mean)))
-    expect_true(all(is.finite(out[[1L]]$merr)))
+    expect_true(all(is.finite(plot_target(out)$estimate)))
+    expect_true(all(is.finite(plot_band(out, "pointwise"))))
   }
 })

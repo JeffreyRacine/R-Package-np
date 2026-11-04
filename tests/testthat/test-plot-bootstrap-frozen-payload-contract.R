@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 library(np)
 
 collect_plot_payload_fields <- function(x, path = character()) {
@@ -49,12 +51,12 @@ run_exact_frozen_plot_pair <- function(fit, ..., seed = 9001L) {
 
   set.seed(seed)
   suppressWarnings(capture.output(
-    exact <- do.call(plot, c(list(fit), extra, list(boot.control = np_boot_control(nonfixed = "exact"))))
+    exact <- capture_plot_provider(do.call(plot, c(list(fit), extra, list(boot_control = np_boot_control(nonfixed = "exact")))))$provider
   ))
 
   set.seed(seed)
   suppressWarnings(capture.output(
-    frozen <- do.call(plot, c(list(fit), extra, list(boot.control = np_boot_control(nonfixed = "frozen"))))
+    frozen <- capture_plot_provider(do.call(plot, c(list(fit), extra, list(boot_control = np_boot_control(nonfixed = "frozen")))))$provider
   ))
 
   list(exact = exact, frozen = frozen)
@@ -310,21 +312,18 @@ test_that("density plot interval values equal quantiles of their own bootstrap d
     seen<-list();set.seed(9174)
     suppressWarnings(capture.output(out<-plot(fit,output='data',perspective=FALSE,view='fixed',
       errors='bootstrap',bootstrap='inid',B=41L,band='pointwise',center='estimate',neval=7L,
-      boot.control=np_boot_control(nonfixed=mode))))
-    fields<-collect_plot_payload_fields(out)
-    intervals<-grep('(^|[.])(derr|conderr)$',names(fields),value=TRUE)
-    expect_true(length(intervals)>0L);expect_equal(length(intervals),length(seen))
-    for(nm in intervals){
-      prefix<-sub('(derr|conderr)$','',nm)
-      point.names<-paste0(prefix,c('dens','dist','condens','condist'))
-      point<-fields[[intersect(point.names,names(fields))]]
-      index<-which(vapply(seen,function(s)length(s$point)==length(point)&&max(abs(s$point-point))<1e-10,logical(1)))
+      boot_control=np_boot_control(nonfixed=mode))))
+    expect_s3_class(out, "np_plot_data")
+    expect_equal(length(out$panels),length(seen))
+    for (panel in seq_along(out$panels)) {
+      d <- plot_target(out, panel=panel, band="pointwise")
+      index<-which(vapply(seen,function(s)length(s$point)==nrow(d)&&max(abs(s$point-d$estimate))<1e-10,logical(1)))
       expect_length(index,1L)
-      expected<-seen[[index]]$err;actual<-fields[[nm]]
-      expect_equal(unname(actual),unname(expected),tolerance=1e-12)
-      # Calibrate this fixture against the reported undetected mutations.
-      expect_false(isTRUE(all.equal(unname(actual*3),unname(expected),tolerance=1e-12)))
-      expect_false(isTRUE(all.equal(unname(actual[,2:1,drop=FALSE]),unname(expected),tolerance=1e-12)))
+      expected<-sweep(seen[[index]]$err,1,seen[[index]]$point,"+")
+      actual<-unname(as.matrix(d[c("lower","upper")]))
+      expect_equal(actual,unname(expected),tolerance=1e-12)
+      expect_false(isTRUE(all.equal(actual*3,unname(expected),tolerance=1e-12)))
+      expect_false(isTRUE(all.equal(actual[,2:1,drop=FALSE],unname(expected),tolerance=1e-12)))
     }
   }
 })

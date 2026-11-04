@@ -37,8 +37,8 @@ test_that("corrected plot families nest and singleton limits coincide", {
   fit <- npreg(bw, txdat=x, tydat=y)
   original <- fit
   rng <- .Random.seed
-  out <- plot(fit, errors="asymptotic", center="bias-corrected", band="all",
-              gaussian.draws=63L, neval=3L, output="data")[[1L]]
+  out <- capture_plot_provider(plot(fit, errors="asymptotic", center="bias-corrected", band="all",
+              gaussian_draws=63L, neval=3L, output="data"))$provider[[1L]]
   expect_identical(fit, original)
   expect_identical(.Random.seed, rng)
   expect_identical(out$inference$studentization$construction, "captured-pooled-positive-v1")
@@ -187,8 +187,8 @@ test_that("public adaptation controls preserve frozen and explicit constructions
   bw <- npregbw(xdat=x,ydat=y,bws=10000,bwscaling=TRUE,
     regtype="ll",bandwidth.compute=FALSE)
   saved <- bw
-  out <- plot(bw,errors="asymptotic",center="bias-corrected",band="all",
-    neval=3L,gaussian.draws=63L,output="data")[[1L]]$inference
+  out <- capture_plot_provider(plot(bw,errors="asymptotic",center="bias-corrected",band="all",
+    neval=3L,gaussian_draws=63L,output="data"))$provider[[1L]]$inference
   expect_true(out$settings$adaptation$active)
   expect_identical(bw,saved)
   expect_true(all(is.finite(out$center)))

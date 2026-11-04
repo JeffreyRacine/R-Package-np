@@ -1,7 +1,11 @@
 \name{np_conditional_bias_control}
 \alias{np_conditional_bias_control}
 \title{Experimental Bias-Corrected Conditional Density and Distribution Bands}
-\description{Selects explicitly the experimental local-constant conditional
+\description{
+\strong{Bias-corrected bounds are experimental (pre-beta research), incomplete,
+and not recommended for general-purpose inference.} See the experimental-status
+section below.
+Selects explicitly the experimental local-constant conditional
 inference constructions. Existing plots and methods are unchanged when this
 control is omitted.}
 \usage{
@@ -14,7 +18,7 @@ use \code{"jackknife"} for conditional density asymptotic inference.
 Use \code{"jackknife-mp1"} for the separate asymmetric studentized
 conditional density bootstrap described below.}
 }
-\value{A validated control object for the \code{bias.control} argument of
+\value{A validated control object for the \code{bias_control} argument of
 \code{plot} applied to \code{npcdist} or \code{npcdens} fits or bandwidths.}
 \details{
 These are experimental opt-ins for local constant, one continuous explanatory
@@ -79,18 +83,16 @@ and 25 distinct response targets. Choose, for example, \code{neval=9} for an
 scope. Inputs exceeding the numerical workspace budget of 256 MiB fail before
 resampling; the grid and draw count are never silently reduced. The budget is
 not a bound on total R-process memory. Bootstrap \code{B} and asymptotic
-\code{gaussian.draws} must be integers at least two; defaults are 9999.
+\code{gaussian_draws} must be integers at least two; defaults are 9999.
 Low finite-draw tail resolution is reported. Alpha is propagated throughout
 in \eqn{(0,0.5)}; population coverage evidence is currently for nominal 95\% only.
 
-The returned object's \code{inference} component records absolute endpoints for
-all three bands, correction, pilot law, calibration, physical bandwidths,
-requested grid, scales and covariance provenance. Jackknife-MP1 also records
-its construction, studentization, mixture weight and attained scale-ratio range. For these new routes,
-\code{bias.corrected + conderr[,1]} and
-\code{bias.corrected + conderr[,2]} recover the selected absolute endpoints.
-For \code{band="all"}, \code{conderr} represents the simultaneous band;
-all endpoints remain in \code{inference$bands}. Corrected centers may be signed.
+Data-returning plots use \code{\link{np_plot_data}}. The value tables contain
+original and corrected estimates and available SEs; interval tables contain
+absolute endpoints for every requested band. Compact inference records identify
+the construction, law, calibration and available studentization diagnostics.
+Corrected centers may be signed and need not be interval midpoints. Internal
+pilot samples, covariance workspaces and RNG states are not returned.
 
 Saved Gaussian-design studies support full-grid CDF coverage at n=100 and 400,
 and density coverage at n=400 and 800. CDF plot subfamilies and marginal intervals
@@ -110,22 +112,40 @@ x <- rnorm(100)
 y <- 0.5*x + rnorm(100)
 model <- npcdist(y ~ x, regtype="lc")
 p <- plot(model, errors="asymptotic", center="bias-corrected",
-          bias.control=np_conditional_bias_control("analytic"),
+          bias_control=np_conditional_bias_control("analytic"),
           band="all", neval=9, output="plot-data")
 p <- plot(model, errors="bootstrap", bootstrap="conditional-pilot",
           center="bias-corrected", band="all", neval=9,
-          bias.control=np_conditional_bias_control("analytic"),
-          boot.control=np_boot_control(calibration="asymmetric-sd"),
+          bias_control=np_conditional_bias_control("analytic"),
+          boot_control=np_boot_control(calibration="asymmetric-sd"),
           output="plot-data")
 
 model.d <- npcdens(y ~ x, regtype="lc")
 p.d <- plot(model.d, errors="bootstrap", bootstrap="conditional-pilot",
             center="bias-corrected", band="all", neval=9,
-            bias.control=np_conditional_bias_control("jackknife-mp1"),
-            boot.control=np_boot_control(calibration="asymmetric-sd"),
+            bias_control=np_conditional_bias_control("jackknife-mp1"),
+            boot_control=np_boot_control(calibration="asymmetric-sd"),
             output="plot-data")
 }
 }
+
+\section{Experimental status of bias-corrected inference}{
+\strong{All bias-corrected confidence intervals and bands are experimental
+(pre-beta research), incomplete, and not recommended for general-purpose
+inference.} This status remains in effect unless the documentation explicitly
+states otherwise for a particular method and scope. It applies wherever
+bias-corrected bounds are available: asymptotic and bootstrap constructions,
+including legacy methods, pointwise intervals, Bonferroni intervals and
+simultaneous bands, for levels and supported derivatives.
+
+These methods form an ongoing research project. Implementation support,
+numerical checks and favorable simulation results in selected settings do not
+establish generally valid coverage. Coverage can fail outside the studied
+settings, and available options do not constitute a general solution to
+bias-corrected inference. Method-specific assumptions, restrictions and known
+failures must be considered when experimenting with these bounds.
+}
+
 \seealso{\code{\link{plot.np}}, \code{\link{np_boot_control}},
 \code{\link{npcdist}}, \code{\link{npcdens}}}
 \keyword{nonparametric}

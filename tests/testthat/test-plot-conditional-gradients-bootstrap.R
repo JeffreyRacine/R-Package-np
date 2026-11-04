@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 test_that("conditional density/distribution gradient bootstrap inid works for bandwidth objects", {
   skip_if_not_installed("np")
 
@@ -17,7 +19,7 @@ test_that("conditional density/distribution gradient bootstrap inid works for ba
 
   for (obj in list(bw.cd, bw.cdist)) {
     out <- suppressWarnings(
-      plot(
+      capture_plot_provider(plot(
         obj,
         xdat = xdat,
         ydat = ydat,
@@ -27,7 +29,7 @@ test_that("conditional density/distribution gradient bootstrap inid works for ba
         errors = "bootstrap",
         bootstrap = "inid",
         B = 5L
-      )
+      ))$provider
     )
     expect_type(out, "list")
     expect_true(length(out[[1L]]$bxp) > 0L)
@@ -55,7 +57,7 @@ test_that("conditional density/distribution gradient bootstrap inid works for fi
 
   for (obj in list(fit.cd, fit.cdist)) {
     out <- suppressWarnings(
-      plot(
+      capture_plot_provider(plot(
         obj,
         output = "data",
         perspective = FALSE,
@@ -63,7 +65,7 @@ test_that("conditional density/distribution gradient bootstrap inid works for fi
         errors = "bootstrap",
         bootstrap = "inid",
         B = 5L
-      )
+      ))$provider
     )
     expect_type(out, "list")
     expect_true(length(out[[1L]]$bxp) > 0L)

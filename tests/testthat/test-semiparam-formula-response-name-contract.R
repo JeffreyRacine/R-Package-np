@@ -95,5 +95,8 @@ test_that("direct formula npindex fit plots from retained materialized data", {
     perspective = FALSE
   ))
 
+  expect_setequal(setdiff(explicit$request$supplied, auto$request$supplied), c("xdat", "ydat"))
+  expect_length(setdiff(auto$request$supplied, explicit$request$supplied), 0L)
+  auto$request$supplied <- explicit$request$supplied
   expect_equal(auto, explicit, tolerance = 1e-12, ignore_attr = TRUE)
 })

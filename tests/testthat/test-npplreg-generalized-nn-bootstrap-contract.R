@@ -49,7 +49,7 @@ test_that("npplreg generalized-nn cv.aic bootstrap plot contract holds across re
 
       expect_true(is.list(out), info = sprintf("regtype=%s boot=%s", regtype, boot_method))
       expect_true(length(out) > 0L, info = sprintf("regtype=%s boot=%s", regtype, boot_method))
-      expect_true(all(c("plr1", "plr2") %in% names(out)),
+      expect_true(inherits(out, "np_plot_data") && length(out$panels) == 2L,
                   info = sprintf("regtype=%s boot=%s", regtype, boot_method))
     }
   }

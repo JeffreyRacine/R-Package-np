@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 test_that("unreliable partially linear rows preserve curves and consistent band availability", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
@@ -8,8 +10,8 @@ test_that("unreliable partially linear rows preserve curves and consistent band 
   y <- x$x + sin(2 * pi * z$z) + rnorm(n, sd = .4)
   bw <- npplregbw(xdat = x, ydat = y, zdat = z,
     bws = matrix(c(.2, .25), 2L), bandwidth.compute = FALSE)
-  reference <- plot(bw, errors = "asymptotic", band = "all",
-                    perspective = FALSE, neval = 7L, output = "data")
+  reference <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all",
+                    perspective = FALSE, neval = 7L, output = "data"))$provider
   influence <- getFromNamespace(".np_plot_plreg_influence", "np")
   local_mocked_bindings(.np_plot_plreg_influence = function(bws, xdat, ydat,
       zdat, exdat, ezdat, ...) {
@@ -21,8 +23,8 @@ test_that("unreliable partially linear rows preserve curves and consistent band 
     out
   }, .package = "np")
   warnings <- character()
-  out <- withCallingHandlers(plot(bw, errors = "asymptotic", band = "all",
-      perspective = FALSE, neval = 7L, output = "data"), warning = function(w) {
+  out <- withCallingHandlers(capture_plot_provider(plot(bw, errors = "asymptotic", band = "all",
+      perspective = FALSE, neval = 7L, output = "data"))$provider, warning = function(w) {
     warnings <<- c(warnings, conditionMessage(w)); invokeRestart("muffleWarning")
   })
   expect_true(any(grepl("numerically unstable at 1 of 7", warnings, fixed = TRUE)))
@@ -35,8 +37,8 @@ test_that("unreliable partially linear rows preserve curves and consistent band 
     expect_identical(bands[[family]][-2L, ], reference[[2L]]$band.errors[[family]][-2L, ])
   }
   for (band in c("pointwise", "bonferroni", "simultaneous")) {
-    single <- suppressWarnings(plot(bw, errors = "asymptotic", band = band,
-                                    perspective = FALSE, neval = 7L, output = "data"))
+    single <- suppressWarnings(capture_plot_provider(plot(bw, errors = "asymptotic", band = band,
+                                    perspective = FALSE, neval = 7L, output = "data"))$provider)
     expect_equal(single[[2L]]$merr, bands[[band]], ignore_attr = TRUE)
     expect_identical(single[[2L]]$mean, reference[[2L]]$mean)
   }

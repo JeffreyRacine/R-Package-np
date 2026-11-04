@@ -47,6 +47,6 @@ test_that("npreg adaptive-nn wild gradient plot-data stays available in serial",
   )))
 
   expect_type(out, "list")
-  expect_s3_class(out[[1L]], "npregression")
-  expect_length(out[[1L]]$mean, 40L)
+  expect_s3_class(out, "np_plot_data")
+  expect_length(out$panels[[1L]]$values$estimate, 40L)
 })

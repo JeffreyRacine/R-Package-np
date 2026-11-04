@@ -27,24 +27,24 @@ test_that("quantile plots reject unsupported derivative orders without narrowing
     bandwidth.compute = FALSE, regtype = "lp", degree = 2L)
   q <- npqreg(b, txdat = x, tydat = y, tau = .5)
   p <- plot_audit_method(q)
-  first <- p(q, gradients = TRUE, gradient.order = 1L, errors = "none",
+  first <- p(q, gradients = TRUE, gradient_order = 1L, errors = "none",
     output = "data", neval = 3L)
-  expect_true(all(is.finite(first[[1L]]$quantgrad)))
-  expect_error(p(q, gradients = TRUE, gradient.order = 2L, errors = "none",
+  expect_true(all(is.finite(plot_target(first)$estimate)))
+  expect_error(p(q, gradients = TRUE, gradient_order = 2L, errors = "none",
     output = "data", neval = 3L), "conditional-quantile plots support only first derivatives",
     fixed = TRUE)
   expect_error(plot_audit_method(b)(b, xdat = x, ydat = y, quantreg = TRUE,
-    gradients = TRUE, gradient.order = 2L, errors = "none", output = "data",
+    gradients = TRUE, gradient_order = 2L, errors = "none", output = "data",
     neval = 3L), "conditional-quantile plots support only first derivatives", fixed = TRUE)
   l <- nplsqreg(bws = .5, txdat = x, tydat = y, tau = .5,
     bandwidth.compute = FALSE, regtype = "lp", degree = 2L)
   lp <- plot_audit_method(l)
-  first <- lp(l, gradients = TRUE, gradient.order = 1L, errors = "none",
+  first <- lp(l, gradients = TRUE, gradient_order = 1L, errors = "none",
     output = "data", neval = 3L)
-  second <- lp(l, gradients = TRUE, gradient.order = 2L, errors = "none",
+  second <- lp(l, gradients = TRUE, gradient_order = 2L, errors = "none",
     output = "data", neval = 3L)
-  expect_true(all(is.finite(second[[1L]]$quantgrad)))
-  expect_false(identical(first[[1L]]$quantgrad, second[[1L]]$quantgrad))
+  expect_true(all(is.finite(plot_target(second)$estimate)))
+  expect_false(identical(plot_target(first)$estimate, plot_target(second)$estimate))
 })
 
 test_that("data-only plots preserve graphics while renderer exits clean up", {
@@ -115,8 +115,8 @@ test_that("conmode pmzsd gradient intervals use the pointwise renderer", {
       errors = "asymptotic", band = "pointwise", output = "plot-data", layout = FALSE)
     pm <- p(fit, gradients = TRUE, level = "north", view = view, neval = 3L,
       errors = "asymptotic", band = "pmzsd", output = "plot-data", layout = FALSE)
-    expect_true(all(is.finite(pw[[1L]]$lower)))
-    expect_identical(pm, pw)
+    expect_true(all(is.finite(plot_target(pw)$lower)))
+    expect_identical(plot_band(pm, "pmzsd"), plot_band(pw, "pointwise"))
   }
 })
 
@@ -150,7 +150,7 @@ test_that("negative index coefficients exchange asymmetric all-band endpoints", 
   plot_audit_device()
   plot_audit_method(fit)(fit, gradients = TRUE, errors = "bootstrap",
     bootstrap = "inid", band = "all", B = 39L, neval = 4L,
-    output = "plot-data", data.overlay = FALSE)
+    output = "plot-data", data_overlay = FALSE)
   expect_length(panels, 2L)
   expect_length(draws, 6L)
   expect_identical(panels[[1L]]$ex, panels[[2L]]$ex)

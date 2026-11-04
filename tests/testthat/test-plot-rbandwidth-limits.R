@@ -16,13 +16,18 @@ test_that("continuous regression panels forward xlim without changing inference"
   fit <- npreg(bw,txdat=x,tydat=y)
   for (common in c(FALSE,TRUE)) for (grad in c(FALSE,TRUE)) {
     args <- list(x=fit,errors="asymptotic",band="all",center="bias-corrected",
-                 bias.control=np_bias_control(degree=2),gaussian.draws=31L,
-                 neval=3L,common.scale=common,gradients=grad)
+                 bias_control=np_bias_control(degree=2),gaussian_draws=31L,
+                 neval=3L,common_scale=common,gradients=grad)
     reference <- do.call(plot,c(args,list(output="data")))
     seed <- .Random.seed
     value <- do.call(plot,c(args,list(output="plot-data",xlim=c(.8,.2))))
     expect_identical(received,c(.8,.2))
-    expect_identical(value,reference)
+    expect_identical(value$inference, reference$inference)
+    expect_identical(value$targets, reference$targets)
+    for (i in seq_along(value$panels))
+      expect_identical(value$panels[[i]][c("grid","variables","values","intervals")],
+                       reference$panels[[i]][c("grid","variables","values","intervals")])
+    expect_identical(value$panels[[1L]]$display$style$xlim, c(.8,.2))
     expect_identical(.Random.seed,seed)
   }
 })

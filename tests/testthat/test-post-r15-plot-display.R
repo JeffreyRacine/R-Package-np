@@ -48,6 +48,6 @@ test_that("independent-scale partially linear overlays use panel-local data", {
   grDevices::pdf(file)
   on.exit({ grDevices::dev.off(); unlink(file) }, add = TRUE)
   for (object in list(b, f)) for (common in c(FALSE, TRUE))
-    expect_no_error(plot(object, errors = "none", common.scale = common,
-                         data.overlay = TRUE, neval = 4, perspective = FALSE))
+    expect_no_error(plot(object, errors = "none", common_scale = common,
+                         data_overlay = TRUE, neval = 4, perspective = FALSE))
 })

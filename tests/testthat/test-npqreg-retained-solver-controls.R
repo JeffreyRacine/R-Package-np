@@ -30,7 +30,7 @@ test_that("quantile plot fit construction records its actual default controls", 
   d$y <- d$x + .2*sin(seq_len(nrow(d)))
   b <- npcdistbw(y ~ x, data = d, bws = c(.4, .6), bandwidth.compute = FALSE)
   fit <- npqreg(b, tau = c(.3, .6))
-  out <- plot(fit, output = "data", perspective = FALSE, errors = "none", neval = 3L)
+  out <- capture_plot_provider(plot(fit, output = "data", perspective = FALSE, errors = "none", neval = 3L))$provider
   expect_true(length(out) > 0L)
   for (panel in out) {
     expect_identical(panel[["fit.controls", exact = TRUE]],

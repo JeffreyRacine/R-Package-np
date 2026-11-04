@@ -56,10 +56,10 @@ test_that("scaled hats and bootstrap reuse equal their physical estimator", {
     }
     run <- function(b) {
       set.seed(819)
-      p <- plot(b,xdat=x,ydat=y,plot.behavior="data",
-                plot.errors.method="bootstrap",plot.errors.boot.num=9L,
-                plot.errors.boot.method="wild",neval=7L)
-      list(values=lapply(p,function(z)c(z$mean,z$merr)),rng=.Random.seed)
+      p <- plot(b,xdat=x,ydat=y,output="data",
+                errors="bootstrap",B=9L,
+                bootstrap="wild",neval=7L)
+      list(values=lapply(p$panels,function(z)list(values=z$values,intervals=z$intervals)),rng=.Random.seed)
     }
     ss <- run(sc); pp <- run(ph)
     expect_equal(ss$values,pp$values,tolerance=2e-10)

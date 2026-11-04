@@ -34,19 +34,8 @@ expect_plot_modes_match_unconditional <- function(bw,
     do.call(plot, plot.args)
   )
 
-  expect_true(is.list(plot.out), info = method_label)
-  expect_named(plot.out, names(data.out), info = method_label)
-
-  for (nm in names(data.out)) {
-    expect_true(
-      inherits(plot.out[[nm]], class(data.out[[nm]])[1L]),
-      info = paste(method_label, nm, "class")
-    )
-    expect_equal(plot.out[[nm]]$eval, data.out[[nm]]$eval, info = paste(method_label, nm, "eval"))
-    expect_equal(plot.out[[nm]][[yfield]], data.out[[nm]][[yfield]], info = paste(method_label, nm, yfield))
-    expect_equal(plot.out[[nm]]$derr, data.out[[nm]]$derr, info = paste(method_label, nm, "derr"))
-    expect_equal(plot.out[[nm]]$bias, data.out[[nm]]$bias, info = paste(method_label, nm, "bias"))
-  }
+  expect_s3_class(plot.out, "np_plot_data")
+  expect_identical(plot.out, data.out, info = method_label)
 }
 
 test_that("plot engine startup helper respects plot.par.mfrow option override", {

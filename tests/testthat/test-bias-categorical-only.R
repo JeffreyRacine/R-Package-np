@@ -31,8 +31,8 @@ test_that("categorical-only public panels preserve declared levels and reference
   b <- npregbw(xdat=x,ydat=y,bws=.2,regtype="lc",bandwidth.compute=FALSE)
   fit <- npreg(b,txdat=x,tydat=y);saved <- fit;rng <- .Random.seed
   for (gradients in c(FALSE,TRUE)) {
-    z <- plot(fit,errors="asymptotic",center="bias-corrected",band="all",
-      gradients=gradients,output="data",gaussian.draws=31L)[[1L]]$inference
+    z <- capture_plot_provider(plot(fit,errors="asymptotic",center="bias-corrected",band="all",
+      gradients=gradients,output="data",gaussian_draws=31L))$provider[[1L]]$inference
     expect_identical(levels(z$grid$u),levels(x$u))
     expect_identical(as.character(z$grid$u),c("a","b","c"))
     expect_equal(z$center,if(gradients)as.numeric(tapply(y,x$u,mean)[1:3]-mean(y[x$u=="a"]))
@@ -43,6 +43,6 @@ test_that("categorical-only public panels preserve declared levels and reference
   expect_identical(rng,.Random.seed)
   missing <- x;missing$u <- factor(as.character(x$u),levels=c("absent","a","b","c"))
   b <- npregbw(xdat=missing,ydat=y,bws=.2,regtype="lc",bandwidth.compute=FALSE)
-  expect_error(plot(b,errors="asymptotic",center="bias-corrected",band="all",
-    gradients=TRUE,output="data",gaussian.draws=31L),"observed endpoint profiles")
+  expect_error(capture_plot_provider(plot(b,errors="asymptotic",center="bias-corrected",band="all",
+    gradients=TRUE,output="data",gaussian_draws=31L))$provider,"observed endpoint profiles")
 })

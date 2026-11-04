@@ -1,12 +1,16 @@
 \name{np_udens_bias_control}
 \alias{np_udens_bias_control}
 \title{Controls for Bias-Corrected Unconditional Density Bands}
-\description{Selects joint-scale bias-corrected density intervals, the earlier positive-covariance construction, or legacy bootstrap centering.}
+\description{
+\strong{Bias-corrected bounds are experimental (pre-beta research), incomplete,
+and not recommended for general-purpose inference.} See the experimental-status
+section below.
+Selects joint-scale bias-corrected density intervals, the earlier positive-covariance construction, or legacy bootstrap centering.}
 \usage{np_udens_bias_control(construction = c("joint-scale", "positive-covariance", "legacy"))}
 \arguments{\item{construction}{The joint-scale envelope, earlier positive-covariance construction, or existing smooth-bootstrap centering route.}}
 \details{
 With \code{center="bias-corrected"}, \code{errors="asymptotic"}, and
-omitted or \code{NULL} \code{bias.control}, fixed unbounded second-order
+omitted or \code{NULL} \code{bias_control}, fixed unbounded second-order
 Gaussian density plots with one to three continuous numeric variables use the
 D8 positive-pilot construction described below, for \eqn{10^{-4}<\alpha<0.5}.
 Other previously supported requests retain their existing construction and
@@ -32,12 +36,11 @@ Regression iterations and residual/pilot assumptions do not apply.
 
 Omitting \code{band}, or selecting \code{band="pmzsd"}, uses the existing
 normal-quantile convention: the corrected center plus or minus
-\eqn{z_{1-\alpha/2}} times \code{inference$se}. The family provider supplies
+\eqn{z_{1-\alpha/2}} times the returned \code{std_error}. The family provider supplies
 the corrected scale; its pointwise calibration work and RNG contract are
 retained. These normal intervals do not apply the joint-scale uncertainty
 envelope and do not inherit its empirical coverage results. Their endpoints
-are in \code{inference$bands$pmzsd}; \code{inference$normal.band} records the
-rule. Explicit \code{"pointwise"}, \code{"simultaneous"},
+are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"}, \code{"simultaneous"},
 \code{"bonferroni"} and \code{"all"} retain their calibrated constructions.
 
 
@@ -108,7 +111,7 @@ summed over participating processes, excluding baseline R/package memory.
 Defined version-2/3 bootstrap bands are returned at every positive draw count,
 including Bonferroni bands on the full surface. Coarse location or fixed-beta
 scale quantiles produce one aggregate warning and retained
-\code{inference$resolution} diagnostics. Small draw counts do not establish
+\code{inference[[1]]$resolution} diagnostics. Small draw counts do not establish
 statistical qualification. Invalid inputs and undefined arithmetic remain errors.
 No law or draw count is silently changed. Raw empirical tail quantiles do not
 establish a finite-sample Bonferroni guarantee; raw and nesting-adjusted
@@ -170,17 +173,35 @@ retained datasets, so substantial conservatism remains possible.
 Full bivariate calibration can take materially longer than a univariate plot.
 Earlier interior-grid evidence is not used to qualify sample-range plots.
 The fitted density is unchanged; the corrected center and confidence endpoints
-may be negative and are not clipped or renormalized. For version-2 and version-3 outputs,
-\code{bias.corrected + derr[,1]} and \code{bias.corrected + derr[,2]} recover
-lower and upper endpoints for curves and surfaces. Legacy/version-1 surfaces
-retain their historical positive lower-width convention.
+may be negative and are not clipped or renormalized. Absolute endpoints are returned consistently for all
+constructions, including legacy and version-1 surfaces; their internal width
+conventions do not appear in the public plot result.
 }
-\value{A family-specific control object. Corrected plot-data objects include an
-\code{inference} component with the center, marginal scales where applicable, bands,
-complete covariance or its factor-representation description, raw and adjusted
-criticals, effective calibration settings and random-stream provenance.
-Smoothed percentiles retain the selected pilot, outer calibration records,
-rank/content/support diagnostics and separate stream provenance; they do not retain the full draw matrix.}
+\value{A family-specific control object consumed by plot methods.
+Data-returning plots use \code{\link{np_plot_data}}: original and corrected
+values, available standard errors, absolute endpoints and compact method and
+resolution diagnostics. Select a panel, scalar target and band with
+\code{as.data.frame(result, panel=1, target=1, band="simultaneous")}.
+Full fitted state, covariance workspaces, bootstrap draws and RNG states are
+internal computation records, not public plot fields. The fitted object is unchanged.}
+
+\section{Experimental status of bias-corrected inference}{
+\strong{All bias-corrected confidence intervals and bands are experimental
+(pre-beta research), incomplete, and not recommended for general-purpose
+inference.} This status remains in effect unless the documentation explicitly
+states otherwise for a particular method and scope. It applies wherever
+bias-corrected bounds are available: asymptotic and bootstrap constructions,
+including legacy methods, pointwise intervals, Bonferroni intervals and
+simultaneous bands, for levels and supported derivatives.
+
+These methods form an ongoing research project. Implementation support,
+numerical checks and favorable simulation results in selected settings do not
+establish generally valid coverage. Coverage can fail outside the studied
+settings, and available options do not constitute a general solution to
+bias-corrected inference. Method-specific assumptions, restrictions and known
+failures must be considered when experimenting with these bounds.
+}
+
 \seealso{\code{\link{npudens}}, \code{\link[=plot.np]{npplot}}, \code{\link{np_bias_control}}}
 \examples{
 set.seed(123)
@@ -189,6 +210,6 @@ bw <- npudensbw(dat = x, bws = 0.45, bandwidth.compute = FALSE)
 z <- plot(bw, xdat = x, errors = "bootstrap", bootstrap = "inid",
           center = "bias-corrected", band = "all", B = 399,
           neval = 3, output = "data")
-z[[1]]$inference$settings$primary
+z$inference[[1]]$primary
 }
 \keyword{nonparametric}

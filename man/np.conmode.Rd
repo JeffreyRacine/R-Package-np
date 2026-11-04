@@ -368,9 +368,9 @@ prediction/evaluation route, or plot route as appropriate.
     \code{eydat} take precedence over \code{newdata}. In
     \code{plot.conmode}, additional arguments control the object-fed
     probability/effect display; common controls include
-    \code{gradients}, \code{level}, \code{output}, \code{data.rug},
+    \code{gradients}, \code{level}, \code{output}, \code{data_rug},
     \code{layout}, \code{legend}, \code{view}, \code{neval},
-    \code{grid.control}, \code{perspective}, \code{plot.vars},
+    \code{grid_control}, \code{perspective}, \code{plot_vars},
     \code{renderer}, and graphics arguments. The default
     \code{view="sample"} draws the stored fitted probabilities/effects at the
     fitted evaluation points. The \code{view="fixed"} route constructs
@@ -380,14 +380,12 @@ prediction/evaluation route, or plot route as appropriate.
     range and holdout quantiles. With \code{perspective=TRUE}, the same
     fixed-grid route draws a base-graphics probability surface for one selected
     response level over two continuous conditioning variables; use
-    \code{plot.vars} to name the displayed pair when more than two continuous
+    \code{plot_vars} to name the displayed pair when more than two continuous
     conditioning variables are present; \code{renderer="rgl"} requests the
     corresponding interactive surface when \pkg{rgl} is available. Both
     renderers use the package-wide viridis surface palette and neutral-gray
-    three-face reference grid. The public
-    \code{output="both"} spelling is
-    accepted as an alias for the historical \code{output="plot-data"}
-    behavior. For class-probability plots, \code{errors="asymptotic"}
+    three-face reference grid. Use \code{output="data"} to return an \code{\link{np_plot_data}}
+    object or \code{output="plot-data"} to draw and return the same object. For class-probability plots, \code{errors="asymptotic"}
     adds probability-level asymptotic standard errors and intervals for the
     selected response level. These intervals target the smooth probability
     \eqn{\Pr(Y=\ell\mid X=x)}, not the discrete modal class label. Rows whose
@@ -436,12 +434,12 @@ prediction/evaluation route, or plot route as appropriate.
     A growing or data-dependent sample grid additionally needs
     uniform linearization, non-dominating influences and a Gaussian-maximum
     approximation; arbitrary sample grids do not carry a uniform-coverage
-    guarantee. \code{gaussian.draws} (default 9999) and \code{random.seed}
+    guarantee. \code{gaussian_draws} (default 9999) and \code{random_seed}
     control reproducible joint calibration; pointwise and Bonferroni-only
     gradient requests need no Gaussian simulation.
     Surface asymptotic intervals are available as \code{output="data"}
     payload columns and are drawn with graphical surface output. The two
-    conditioning variables selected by \code{plot.vars} must be distinct.
+    conditioning variables selected by \code{plot_vars} must be distinct.
     Surface bootstrap intervals remain unsupported.
     See \code{\link{npcdensbw}} and \code{\link{plot.np}} for the complete
     bandwidth-selection and plotting argument surfaces.

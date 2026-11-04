@@ -176,32 +176,32 @@ test_that("conditional plot data honors higher-order gradient requests", {
       xdat = x,
       ydat = y,
       gradients = TRUE,
-      gradient.order = 2L,
+      gradient_order = 2L,
       xq = 0.5,
       yq = 0.5,
       neval = 8,
       perspective = FALSE,
       view = "fixed",
-      plot.behavior = "data",
-      plot.errors.method = "none"
+      output = "data",
+      errors = "none"
     )
 
-    slice <- plot.out[[1L]]
+    slice <- as.data.frame(plot.out, panel = 1L, target = 1L)
     eval.fun <- if (inherits(bw, "condbandwidth")) npcdist else npcdens
     fit <- eval.fun(se = TRUE,
       bws = bw,
       txdat = x,
       tydat = y,
-      exdat = slice$xeval,
-      eydat = slice$yeval,
+      exdat = plot_coordinates(plot.out, 1L, "X"),
+      eydat = plot_coordinates(plot.out, 1L, "Y"),
       gradients = TRUE,
       gradient.order = 2L
     )
 
-    expect_equal(slice$gradient.order, 2L)
-    expect_equal(as.vector(slice$congrad[, 1L]), as.vector(fit$congrad[, 1L]),
+    expect_equal(plot.out$targets$order[1L], 2L)
+    expect_equal(as.vector(slice$estimate), as.vector(fit$congrad[, 1L]),
                  tolerance = 1e-10)
-    expect_equal(as.vector(slice$congerr[, 1L]), as.vector(fit$congerr[, 1L]),
+    expect_equal(as.vector(slice$std_error), as.vector(fit$congerr[, 1L]),
                  tolerance = 1e-10)
   }
 })

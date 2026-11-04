@@ -6,9 +6,9 @@ test_that("bias-corrected panels omit unused levels without recoding the fit", {
   b <- npregbw(xdat=d,ydat=y,bws=c(.1,.3),regtype="ll",bandwidth.compute=FALSE)
   fit <- npreg(b,txdat=d,tydat=y);saved <- fit
   v <- plot(fit,errors="asymptotic",center="bias-corrected",band="all",
-    output="data",neval=2L,gaussian.draws=31L)
-  expect_identical(levels(v[[2]]$inference$grid$u),levels(u))
-  expect_setequal(as.character(v[[2]]$inference$grid$u),c("a","b","c"))
-  expect_true(all(is.finite(v[[2]]$inference$center)))
+    output="data",neval=2L,gaussian_draws=31L)
+  expect_identical(levels(plot_coordinates(v, 2, "X")$u),levels(u))
+  expect_setequal(as.character(plot_coordinates(v, 2, "X")$u),c("a","b","c"))
+  expect_true(all(is.finite(plot_target(v, 2, band = "pointwise")$bias_corrected)))
   expect_identical(fit,saved)
 })

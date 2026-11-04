@@ -45,13 +45,14 @@ test_that("plot contract: single-index asymptotic consumer payloads are supporte
           errors = "asymptotic",
           band = "pointwise",
           perspective = FALSE
-        ))[[1]]
+        ))
 
-        expect_s3_class(out, "singleindex")
-        expect_equal(length(out$mean), neval, info = paste(method, bwtype, cfg$regtype, "mean length"))
-        expect_equal(dim(out$merr), c(neval, 2L), info = paste(method, bwtype, cfg$regtype, "merr shape"))
-        expect_true(all(is.finite(out$mean)), info = paste(method, bwtype, cfg$regtype, "mean finite"))
-        expect_true(all(is.finite(out$merr)), info = paste(method, bwtype, cfg$regtype, "merr finite"))
+        expect_s3_class(out, "np_plot_data")
+        d <- plot_target(out)
+        expect_equal(length(d$estimate), neval, info = paste(method, bwtype, cfg$regtype, "mean length"))
+        expect_equal(dim(as.matrix(d[c("lower", "upper")])), c(neval, 2L), info = paste(method, bwtype, cfg$regtype, "merr shape"))
+        expect_true(all(is.finite(d$estimate)), info = paste(method, bwtype, cfg$regtype, "mean finite"))
+        expect_true(all(is.finite(as.matrix(d[c("lower", "upper")]))), info = paste(method, bwtype, cfg$regtype, "merr finite"))
       }
     }
   }
@@ -101,13 +102,14 @@ test_that("plot contract: partially linear asymptotic consumer payloads are supp
           errors = "asymptotic",
           band = "pointwise",
           perspective = FALSE
-        ))[[1]]
+        ))
 
-        expect_s3_class(out, "plregression")
-        expect_true(length(out$mean) > 0L, info = paste(bwmethod, bwtype, cfg$regtype, "mean length"))
-        expect_equal(dim(out$merr), c(length(out$mean), 2L), info = paste(bwmethod, bwtype, cfg$regtype, "merr shape"))
-        expect_true(all(is.finite(out$mean)), info = paste(bwmethod, bwtype, cfg$regtype, "mean finite"))
-        expect_true(all(is.finite(out$merr)), info = paste(bwmethod, bwtype, cfg$regtype, "merr finite"))
+        expect_s3_class(out, "np_plot_data")
+        d <- plot_target(out)
+        expect_true(length(d$estimate) > 0L, info = paste(bwmethod, bwtype, cfg$regtype, "mean length"))
+        expect_equal(dim(as.matrix(d[c("lower", "upper")])), c(length(d$estimate), 2L), info = paste(bwmethod, bwtype, cfg$regtype, "merr shape"))
+        expect_true(all(is.finite(d$estimate)), info = paste(bwmethod, bwtype, cfg$regtype, "mean finite"))
+        expect_true(all(is.finite(as.matrix(d[c("lower", "upper")]))), info = paste(bwmethod, bwtype, cfg$regtype, "merr finite"))
       }
     }
   }

@@ -48,7 +48,7 @@
   affected <- diagnostics[diagnostics$resolution_limited,,drop=FALSE]
   warning(structure(list(message=paste0("Empirical band quantiles have limited draw resolution (",
     paste(unique(affected$band),collapse=", "),
-    "); all requested bands were computed. See inference$resolution."),call=NULL,
+    "); all requested bands were computed. See the resolution diagnostics in the returned plot-data inference records."),call=NULL,
     diagnostics=affected),class=c("np_band_resolution_warning","warning","condition")))
   invisible(NULL)
 }

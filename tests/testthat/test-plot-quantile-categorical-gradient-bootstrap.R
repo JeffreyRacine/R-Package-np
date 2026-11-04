@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 test_that("quantile categorical gradient bootstrap helper matches explicit local refits", {
   skip_if_not_installed("np")
 
@@ -16,7 +18,7 @@ test_that("quantile categorical gradient bootstrap helper matches explicit local
   bw <- suppressWarnings(npcdistbw(xdat = xdat, ydat = ydat, nmulti = 1L))
   tau <- 0.5
 
-  slice <- suppressWarnings(plot(
+  slice <- suppressWarnings(capture_plot_provider(plot(
     bw,
     xdat = xdat,
     ydat = ydat,
@@ -24,7 +26,7 @@ test_that("quantile categorical gradient bootstrap helper matches explicit local
     gradients = TRUE,
     perspective = FALSE,
     output = "data"
-  ))[[1L]]
+  ))$provider)[[1L]]
 
   counts <- cbind(
     rep(1L, n),
@@ -100,7 +102,7 @@ test_that("quantile categorical bootstrap gradients work again", {
         ),
         case$args
       )
-      out <- suppressWarnings(do.call(plot, plot.args))
+      out <- suppressWarnings(capture_plot_provider(do.call(plot, plot.args))$provider)
       expect_true(is.list(out), info = paste(case$label, boot.method))
       expect_true(length(out) >= 1L, info = paste(case$label, boot.method))
       expect_true(length(out[[1L]]$bxp) > 0L, info = paste(case$label, boot.method))

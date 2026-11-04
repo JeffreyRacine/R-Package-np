@@ -1,4 +1,4 @@
-test_that("distribution correction uses the public center and signed surface offsets", {
+test_that("distribution correction uses the public center and absolute surface endpoints", {
   old <- options(np.messages = FALSE, np.plot.progress = FALSE)
   on.exit(options(old), add = TRUE)
   x <- data.frame(x1 = seq(-2, 2, length.out = 17), x2 = cos(seq_len(17)))
@@ -6,19 +6,22 @@ test_that("distribution correction uses the public center and signed surface off
   for (method in c("asymptotic", "bootstrap")) {
     args <- list(x = bw, xdat = x, errors = method, center = "bias-corrected",
       band = "all", neval = 7L, output = "data")
-    args[[if (method == "asymptotic") "gaussian.draws" else "B"]] <- 49L
-    z <- suppressWarnings(do.call(plot, args))$d1
+    args[[if (method == "asymptotic") "gaussian_draws" else "B"]] <- 49L
+    cap <- capture_plot_provider(suppressWarnings(do.call(plot, args)))
+    out <- cap$result
+    z <- cap$provider$d1
+    flat <- plot_target(out, band = "pointwise")
     expect_identical(z$inference$settings$construction, "cdf-absolute-process-v1")
     expect_identical(z$inference$settings$critical.units, "CDF")
     expect_equal(nrow(z$eval), 49L)
     expect_equal(range(z$eval[[1L]]), range(x$x1), tolerance = 0)
     expect_equal(range(z$eval[[2L]]), range(x$x2), tolerance = 0)
-    expect_equal(z$bias.corrected + z$derr[,1L], z$inference$bands$pointwise[,1L,1L], tolerance = 1e-12)
-    expect_equal(z$bias.corrected + z$derr[,2L], z$inference$bands$pointwise[,2L,1L], tolerance = 1e-12)
+    expect_equal(flat$lower, z$bias.corrected + z$derr[,1L], tolerance = 1e-12)
+    expect_equal(flat$upper, z$bias.corrected + z$derr[,2L], tolerance = 1e-12)
     args$neval <- 1L
-    one <- suppressWarnings(do.call(plot, args))$d1
-    expect_identical(one$inference$bands$pointwise, one$inference$bands$simultaneous)
-    expect_identical(one$inference$bands$pointwise, one$inference$bands$bonferroni)
+    one <- suppressWarnings(do.call(plot, args))
+    expect_identical(plot_band(one, "pointwise"), plot_band(one, "simultaneous"))
+    expect_identical(plot_band(one, "pointwise"), plot_band(one, "bonferroni"))
   }
 })
 

@@ -27,14 +27,16 @@ test_that("omitted corrected density and CDF bands retain pmzsd semantics", {
       if (method == "bootstrap") args$B <- 49L
       set.seed(628028)
       entry <- .Random.seed
-      a <- do.call(plot, args)$d1
+      cap <- capture_plot_provider(do.call(plot, args))
+      a <- cap$provider$d1
+      flat <- as.data.frame(cap$result)
       expect_identical(entry, .Random.seed)
       args$band <- "pmzsd"
-      b <- do.call(plot, args)$d1
+      b <- capture_plot_provider(do.call(plot, args))$provider$d1
       expect_identical(a$inference, b$inference)
-      expect_equal(a$bias.corrected + a$derr[,1L],
+      expect_equal(flat$lower,
         a$inference$bands$pmzsd[,1L,1L], tolerance=1e-14)
-      expect_equal(a$bias.corrected + a$derr[,2L],
+      expect_equal(flat$upper,
         a$inference$bands$pmzsd[,2L,1L], tolerance=1e-14)
     }
   }

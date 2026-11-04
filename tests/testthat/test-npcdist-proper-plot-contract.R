@@ -29,16 +29,16 @@ test_that("plot condistribution 2D data payload applies proper repair on support
   ))
 
   expect_type(out, "list")
-  expect_true("cd1" %in% names(out))
-  expect_s3_class(out$cd1, "condistribution")
-  expect_true(isTRUE(out$cd1$proper.requested))
-  expect_true(isTRUE(out$cd1$proper.applied))
-  expect_true(all(out$cd1$condist >= -1e-8))
-  expect_true(all(out$cd1$condist <= 1 + 1e-8))
+  expect_true("panel_1" %in% names(out$panels))
+  expect_s3_class(out, "np_plot_data")
+  expect_true(isTRUE(out$inference[[1L]]$projection$requested))
+  expect_true(isTRUE(out$inference[[1L]]$projection$applied))
+  expect_true(all(out$panels[[1L]]$values$estimate >= -1e-8))
+  expect_true(all(out$panels[[1L]]$values$estimate <= 1 + 1e-8))
 
-  split.idx <- split(seq_along(out$cd1$condist), out$cd1$xeval)
+  split.idx <- split(seq_along(out$panels[[1L]]$values$estimate), plot_coordinates(out, 1L, "X"))
   for (idx in split.idx)
-    expect_true(all(diff(out$cd1$condist[idx]) >= -1e-8))
+    expect_true(all(diff(out$panels[[1L]]$values$estimate[idx]) >= -1e-8))
 })
 
 test_that("plot condistribution 1D data payload repairs only y-varying panels", {
@@ -68,16 +68,16 @@ test_that("plot condistribution 1D data payload repairs only y-varying panels", 
     perspective = FALSE
   ))
 
-  expect_length(out, 2L)
-  expect_s3_class(out[[1]], "condistribution")
-  expect_s3_class(out[[2]], "condistribution")
-  expect_true(isTRUE(out[[1]]$proper.requested))
-  expect_false(isTRUE(out[[1]]$proper.applied))
-  expect_true(isTRUE(out[[2]]$proper.requested))
-  expect_true(isTRUE(out[[2]]$proper.applied))
-  expect_true(all(out[[2]]$condist >= -1e-8))
-  expect_true(all(out[[2]]$condist <= 1 + 1e-8))
-  expect_true(all(diff(out[[2]]$condist) >= -1e-8))
+  expect_length(out$panels, 2L)
+  expect_s3_class(out, "np_plot_data")
+  expect_s3_class(out, "np_plot_data")
+  expect_true(isTRUE(out$inference[[1L]]$projection$requested))
+  expect_false(isTRUE(out$inference[[1L]]$projection$applied))
+  expect_true(isTRUE(out$inference[[2L]]$projection$requested))
+  expect_true(isTRUE(out$inference[[2L]]$projection$applied))
+  expect_true(all(out$panels[[2L]]$values$estimate >= -1e-8))
+  expect_true(all(out$panels[[2L]]$values$estimate <= 1 + 1e-8))
+  expect_true(all(diff(out$panels[[2L]]$values$estimate) >= -1e-8))
 })
 
 test_that("plot condistribution supports asymptotic and bootstrap errors on proper grids", {
@@ -118,20 +118,20 @@ test_that("plot condistribution supports asymptotic and bootstrap errors on prop
     band = "pointwise"
   ))
 
-  expect_true(isTRUE(asym$cd1$proper.applied))
-  expect_true(all(asym$cd1$condist >= -1e-8))
-  expect_true(all(asym$cd1$condist <= 1 + 1e-8))
-  expect_true(all(is.finite(asym$cd1$conderr)))
+  expect_true(isTRUE(asym$inference[[1L]]$projection$applied))
+  expect_true(all(asym$panels[[1L]]$values$estimate >= -1e-8))
+  expect_true(all(asym$panels[[1L]]$values$estimate <= 1 + 1e-8))
+  expect_true(all(is.finite(as.matrix(asym$panels[[1L]]$intervals[c("lower", "upper")]))))
 
-  expect_true(isTRUE(boot$cd1$proper.applied))
-  expect_true(all(boot$cd1$condist >= -1e-8))
-  expect_true(all(boot$cd1$condist <= 1 + 1e-8))
-  expect_true(all(is.finite(boot$cd1$conderr)))
+  expect_true(isTRUE(boot$inference[[1L]]$projection$applied))
+  expect_true(all(boot$panels[[1L]]$values$estimate >= -1e-8))
+  expect_true(all(boot$panels[[1L]]$values$estimate <= 1 + 1e-8))
+  expect_true(all(is.finite(as.matrix(boot$panels[[1L]]$intervals[c("lower", "upper")]))))
 
-  xeval <- if (is.data.frame(boot$cd1$xeval)) boot$cd1$xeval[[1L]] else as.vector(boot$cd1$xeval)
-  split.idx <- split(seq_along(boot$cd1$condist), xeval)
+  xeval <- if (is.data.frame(plot_coordinates(boot, 1L, "X"))) plot_coordinates(boot, 1L, "X")[[1L]] else as.vector(plot_coordinates(boot, 1L, "X"))
+  split.idx <- split(seq_along(boot$panels[[1L]]$values$estimate), xeval)
   for (idx in split.idx)
-    expect_true(all(diff(boot$cd1$condist[idx]) >= -1e-8))
+    expect_true(all(diff(boot$panels[[1L]]$values$estimate[idx]) >= -1e-8))
 })
 
 test_that("plot condistribution bootstrap supports mixed-bound fixed helper path", {
@@ -145,14 +145,14 @@ test_that("plot condistribution bootstrap supports mixed-bound fixed helper path
     fit,
     output = "data",
     view = "fixed",
-    data.overlay = FALSE,
+    data_overlay = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
     B = 5L,
     band = "pointwise"
   ))
 
-  expect_s3_class(out$cd1, "condistribution")
-  expect_true(all(is.finite(out$cd1$condist)))
-  expect_true(all(is.finite(out$cd1$conderr)))
+  expect_s3_class(out, "np_plot_data")
+  expect_true(all(is.finite(out$panels[[1L]]$values$estimate)))
+  expect_true(all(is.finite(as.matrix(out$panels[[1L]]$intervals[c("lower", "upper")]))))
 })

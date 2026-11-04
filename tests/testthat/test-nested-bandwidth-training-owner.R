@@ -78,9 +78,13 @@ test_that("local-smoothing quantile children retain distinct pilot responses", {
         expect_equal(as.numeric(npreghat(restored)),
                      as.numeric(npreghat(restored, txdat = values$xdat)),
                      tolerance = 1e-14)
-        expect_equal(plot(restored, errors = "none", output = "data", neval = 3L),
-          plot(restored, xdat = values$xdat, ydat = values$ydat,
-               errors = "none", output = "data", neval = 3L))
+        actual.plot <- plot(restored, errors = "none", output = "data", neval = 3L)
+        explicit.plot <- plot(restored, xdat = values$xdat, ydat = values$ydat,
+               errors = "none", output = "data", neval = 3L)
+        expect_setequal(setdiff(explicit.plot$request$supplied, actual.plot$request$supplied), c("xdat", "ydat"))
+        expect_length(setdiff(actual.plot$request$supplied, explicit.plot$request$supplied), 0L)
+        actual.plot$request$supplied <- explicit.plot$request$supplied
+        expect_equal(actual.plot, explicit.plot)
         set.seed(7301)
         actual <- npsigtest(restored, B = 9L)
         set.seed(7301)

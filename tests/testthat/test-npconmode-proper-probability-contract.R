@@ -244,39 +244,42 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   expect_error(gradients(fit, level = "1"), "stored class-probability gradients")
 
   pdata <- plot(fit, output = "data")
-  expect_named(pdata, "x")
-  expect_equal(nrow(pdata$x), n)
-  expect_equal(plot(fit, output = "both"), pdata)
+  expect_s3_class(pdata, "np_plot_data")
+  expect_length(pdata$panels, 1L)
+  expect_equal(nrow(plot_target(pdata)), n)
+  expect_equal(plot(fit, output = "plot-data"), pdata)
 
   perr <- plot(fit, output = "data", errors = "asymptotic",
                band = "all", level = "0")
-  expect_true(all(c("stderr", "lower", "upper",
-                    "pointwise.lower", "bonferroni.upper") %in%
-                    names(perr$x)))
-  expect_equal(perr$x$stderr, fit$probability.errors[, "0"],
+  expect_true(all(c("std_error", "lower", "upper",
+                    "target_id", "band") %in%
+                    names(plot_target(perr, band = "pointwise"))))
+  expect_equal(plot_target(perr, band = "pointwise")$std_error, fit$probability.errors[, "0"],
                tolerance = 1e-12, ignore_attr = TRUE)
 
   grdata <- plot(fit, gradients = TRUE, output = "data")
-  expect_named(grdata, "x")
-  expect_true("effect" %in% names(grdata$x))
+  expect_s3_class(grdata, "np_plot_data")
+  expect_length(grdata$panels, 1L)
+  expect_true("estimate" %in% names(plot_target(grdata)))
   expect_error(plot(fit, gradients = TRUE, level = "1", output = "data"),
                "stored class-probability gradients")
 
   grid.data <- plot(fit, view = "fixed", neval = 9L, output = "data")
-  expect_named(grid.data, "x")
-  expect_equal(nrow(grid.data$x), 9L)
-  expect_equal(unique(grid.data$x$view), "fixed")
+  expect_s3_class(grid.data, "np_plot_data")
+  expect_length(grid.data$panels, 1L)
+  expect_equal(nrow(plot_target(grid.data)), 9L)
+  expect_equal(grid.data$request$view, "fixed")
   grid.prob <- predict(fit,
-                       newdata = data.frame(x = grid.data$x$x),
+                       newdata = data.frame(x = plot_target(grid.data)$eval_1),
                        type = "prob")[, "0"]
-  expect_equal(grid.data$x$probability, grid.prob, tolerance = 1e-5)
+  expect_equal(plot_target(grid.data)$estimate, grid.prob, tolerance = 1e-5)
 
   grid.err <- plot(fit, view = "fixed", neval = 9L, output = "data",
                    errors = "asymptotic", band = "pointwise", level = "0")
-  expect_true(all(c("stderr", "lower", "upper") %in% names(grid.err$x)))
-  expect_true(any(is.finite(grid.err$x$stderr)))
+  expect_true(all(c("std_error", "lower", "upper") %in% names(plot_target(grid.err))))
+  expect_true(any(is.finite(plot_target(grid.err)$std_error)))
   pred.se <- predict(fit,
-                     newdata = data.frame(x = grid.data$x$x),
+                     newdata = data.frame(x = plot_target(grid.data)$eval_1),
                      type = "prob",
                      se.fit = TRUE)
   expect_named(pred.se, c("fit", "se.fit"))
@@ -289,19 +292,19 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   grid.boot <- plot(fit, view = "fixed", neval = 7L, output = "data",
                     errors = "bootstrap", bootstrap = "inid", B = 39L,
                     band = "pointwise", level = "0")
-  expect_true(all(c("stderr", "center", "lower", "upper") %in%
-                    names(grid.boot$x)))
-  expect_true(any(is.finite(grid.boot$x$stderr)))
-  expect_true(all(is.finite(grid.boot$x$lower)))
-  expect_true(all(is.finite(grid.boot$x$upper)))
+  expect_true(all(c("std_error", "estimate", "lower", "upper") %in%
+                    names(plot_target(grid.boot))))
+  expect_true(any(is.finite(plot_target(grid.boot)$std_error)))
+  expect_true(all(is.finite(plot_target(grid.boot)$lower)))
+  expect_true(all(is.finite(plot_target(grid.boot)$upper)))
   expect_error(plot(fit, view = "fixed", neval = 7L, output = "data",
                     errors = "bootstrap", bootstrap = "wild"),
                "wild bootstrap is not available")
 
   grid.grad <- plot(fit, view = "fixed", neval = 9L,
                     gradients = TRUE, output = "data")
-  expect_equal(nrow(grid.grad$x), 9L)
-  expect_true("effect" %in% names(grid.grad$x))
+  expect_equal(nrow(plot_target(grid.grad)), 9L)
+  expect_true("estimate" %in% names(plot_target(grid.grad)))
 
   pdf(tempfile(fileext = ".pdf"))
   expect_silent(plot(fit))
@@ -317,24 +320,25 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
   grad.alpha <- 0.1
   grad.intervals <- plot(fit, gradients = TRUE, errors = "asymptotic",
                          band = "pointwise", alpha = grad.alpha, output = "data")
-  expect_named(grad.intervals, "x")
-  expect_true(all(c("effect", "center", "stderr", "lower", "upper") %in%
-                    names(grad.intervals$x)))
-  expect_identical(grad.intervals$x$x, grdata$x$x)
-  expect_equal(grad.intervals$x$effect, as.vector(direct$congrad),
+  expect_s3_class(grad.intervals, "np_plot_data")
+  expect_length(grad.intervals$panels, 1L)
+  expect_true(all(c("estimate", "estimate", "std_error", "lower", "upper") %in%
+                    names(plot_target(grad.intervals))))
+  expect_identical(plot_target(grad.intervals)$eval_1, plot_target(grdata)$eval_1)
+  expect_equal(plot_target(grad.intervals)$estimate, as.vector(direct$congrad),
                tolerance = 1e-10)
-  expect_identical(grad.intervals$x$effect, grdata$x$effect)
-  expect_identical(grad.intervals$x$center, grad.intervals$x$effect)
-  expect_true(all(is.finite(grad.intervals$x$stderr)))
-  expect_true(all(grad.intervals$x$stderr >= 0))
-  expect_true(any(grad.intervals$x$stderr > 0))
-  normal.width <- qnorm(1 - grad.alpha / 2) * grad.intervals$x$stderr
-  expect_equal(grad.intervals$x$lower,
-               grad.intervals$x$effect - normal.width, tolerance = 1e-12)
-  expect_equal(grad.intervals$x$upper,
-               grad.intervals$x$effect + normal.width, tolerance = 1e-12)
+  expect_identical(plot_target(grad.intervals)$estimate, plot_target(grdata)$estimate)
+  expect_identical(plot_target(grad.intervals)$estimate, plot_target(grad.intervals)$estimate)
+  expect_true(all(is.finite(plot_target(grad.intervals)$std_error)))
+  expect_true(all(plot_target(grad.intervals)$std_error >= 0))
+  expect_true(any(plot_target(grad.intervals)$std_error > 0))
+  normal.width <- qnorm(1 - grad.alpha / 2) * plot_target(grad.intervals)$std_error
+  expect_equal(plot_target(grad.intervals)$lower,
+               plot_target(grad.intervals)$estimate - normal.width, tolerance = 1e-12)
+  expect_equal(plot_target(grad.intervals)$upper,
+               plot_target(grad.intervals)$estimate + normal.width, tolerance = 1e-12)
   expect_equal(plot(fit, gradients = TRUE, errors = "asymptotic",
-                    band = "pointwise", alpha = grad.alpha, output = "both"),
+                    band = "pointwise", alpha = grad.alpha, output = "plot-data"),
                grad.intervals)
   # The new asymptotic route does not admit bootstrap gradient intervals.
   expect_error(plot(fit, gradients = TRUE, errors = "bootstrap", output = "data"),
@@ -369,27 +373,27 @@ test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
 
   surf <- plot(fit, view = "fixed", perspective = TRUE,
                neval = 7L, output = "data")
-  expect_s3_class(surf, "np_conmode_surface_data")
-  expect_named(surf, c("surface", "grid", "held", "level", "levels", "proper"))
-  expect_equal(surf$grid$variables, c("x1", "x2"))
-  expect_equal(surf$grid$dims, c(7L, 7L))
-  expect_equal(nrow(surf$surface), 49L)
-  expect_true("z" %in% names(surf$held))
-  expect_equal(unique(surf$surface$view), "fixed")
-  expect_true(all(is.finite(surf$surface$probability)))
-  expect_true(all(surf$surface$probability >= -1e-10))
-  expect_true(all(surf$surface$probability <= 1 + 1e-10))
+  expect_s3_class(surf, "np_plot_data")
+  expect_length(surf$panels, 1L)
+  expect_equal(surf$panels[[1]]$variables$name[1:2], c("x1", "x2"))
+  expect_equal(surf$panels[[1]]$display$dimensions, c(7L, 7L))
+  expect_equal(nrow(surf$panels[[1]]$grid), 49L)
+  expect_true("z" %in% surf$panels[[1]]$variables$name)
+  expect_equal(surf$request$view, "fixed")
+  expect_true(all(is.finite(plot_target(surf)$estimate)))
+  expect_true(all(plot_target(surf)$estimate >= -1e-10))
+  expect_true(all(plot_target(surf)$estimate <= 1 + 1e-10))
 
   surf.err <- plot(fit, view = "fixed", perspective = TRUE,
                    neval = 5L, output = "data",
-                   errors = "asymptotic", level = surf$level)
-  expect_true(all(c("stderr", "lower", "upper") %in% names(surf.err$surface)))
-  expect_true(any(is.finite(surf.err$surface$stderr)))
+                   errors = "asymptotic", level = surf$targets$level[1])
+  expect_true(all(c("std_error", "lower", "upper") %in% names(plot_target(surf.err))))
+  expect_true(any(is.finite(plot_target(surf.err)$std_error)))
   surface.device <- tempfile(fileext = ".pdf")
   grDevices::pdf(surface.device)
   surf.drawn <- tryCatch(
     plot(fit, view = "fixed", perspective = TRUE, neval = 5L,
-         errors = "asymptotic", level = surf$level, output = "plot-data"),
+         errors = "asymptotic", level = surf$targets$level[1], output = "plot-data"),
     finally = { grDevices::dev.off(); unlink(surface.device) }
   )
   expect_identical(surf.drawn, surf.err)
@@ -398,19 +402,16 @@ test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
                     B = 39L),
                "surface bootstrap intervals")
 
-  nd <- data.frame(
-    x1 = surf$surface$x1,
-    x2 = surf$surface$x2,
-    z = surf$held$z[rep(1L, nrow(surf$surface))]
-  )
-  pred <- predict(fit, newdata = nd, type = "prob")[, surf$level]
-  expect_equal(surf$surface$probability, pred, tolerance = 1e-5)
+  nd <- plot_coordinates(surf, role = "X")
+  expect_identical(levels(nd$z), levels(d$z))
+  pred <- predict(fit, newdata = nd, type = "prob")[, surf$targets$level[1]]
+  expect_equal(plot_target(surf)$estimate, pred, tolerance = 1e-5)
 
-  surf.alias <- plot(fit, view = "fixed", persp = TRUE,
+  surf.alias <- plot(fit, view = "fixed", perspective = TRUE,
                      neval = 5L, output = "data",
-                     plot.vars = c("x2", "x1"))
-  expect_equal(surf.alias$grid$variables, c("x2", "x1"))
-  expect_equal(surf.alias$grid$dims, c(5L, 5L))
+                     plot_vars = c("x2", "x1"))
+  expect_equal(surf.alias$panels[[1]]$variables$name[1:2], c("x2", "x1"))
+  expect_equal(surf.alias$panels[[1]]$display$dimensions, c(5L, 5L))
 
   expect_silent({
     grDevices::pdf(tempfile(fileext = ".pdf"))
@@ -436,13 +437,13 @@ test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
     )
     expect_equal(rgl.rendered, data.only)
   }
-  expect_error(plot(fit, plot.vars = c("x1", "x2"), output = "data"),
+  expect_error(plot(fit, plot_vars = c("x1", "x2"), output = "data"),
                "'plot.vars' is only supported")
   expect_error(plot(fit, perspective = TRUE, persp = FALSE, output = "data"),
-               "conflicting plot.conmode arguments")
+               "retired plot argument: persp")
   expect_error(plot(fit, perspective = TRUE, gradients = TRUE, output = "data"),
                "not gradients")
-  expect_error(plot(fit, perspective = TRUE, plot.vars = c("x1", "z"),
+  expect_error(plot(fit, perspective = TRUE, plot_vars = c("x1", "z"),
                     output = "data"),
                "currently require continuous variables")
 
@@ -497,5 +498,5 @@ test_that("npconmode class-probability gradients are level-specific for multinom
   )
   expect_error(gradients(fit, level = "c"), "stored class-probability gradients")
   grdata <- plot(fit, gradients = TRUE, output = "data")
-  expect_equal(unique(grdata$x$level), "b")
+  expect_equal(grdata$targets$level, "b")
 })

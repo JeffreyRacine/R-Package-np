@@ -1,3 +1,5 @@
+# Numerical-provider proof: public plot schema is checked by the interception
+# helper and dedicated schema/geometry tests; no provider fields are public.
 np_partial_gradient_local <- function(expr) {
   expr <- substitute(expr)
   if ("npRmpi" %in% loadedNamespaces()) {
@@ -29,11 +31,11 @@ test_that("mixed-degree gradient plots retain empty and categorical panels", {
   ))
 
   expect_warning(
-    out <- np_partial_gradient_local(plot(
+    out <- np_partial_gradient_local(capture_plot_provider(plot(
       bw, xdat = x, ydat = y, gradients = TRUE,
-      gradient.order = c(2L, 1L), errors = "none", output = "data",
+      gradient_order = c(2L, 1L), errors = "none", output = "data",
       neval = 6L
-    )),
+    ))$provider),
     "x1.*requested order 2.*degree 1"
   )
   expect_length(out, 3L)
@@ -47,13 +49,13 @@ test_that("mixed-degree gradient plots retain empty and categorical panels", {
     on.exit(grDevices::dev.off(), add = TRUE)
     np_partial_gradient_local(suppressWarnings(plot(
       bw, xdat = x, ydat = y, gradients = TRUE,
-      gradient.order = c(2L, 1L), errors = "none", neval = 6L,
-      common.scale = FALSE
+      gradient_order = c(2L, 1L), errors = "none", neval = 6L,
+      common_scale = FALSE
     )))
     np_partial_gradient_local(suppressWarnings(plot(
       bw, xdat = x, ydat = y, gradients = TRUE,
-      gradient.order = c(2L, 1L), errors = "none", neval = 6L,
-      common.scale = TRUE
+      gradient_order = c(2L, 1L), errors = "none", neval = 6L,
+      common_scale = TRUE
     )))
   })
 })
@@ -77,10 +79,10 @@ test_that("an all-unavailable gradient plot fails before RNG or device mutation"
   device.before <- grDevices::dev.cur()
 
   expect_error(
-    np_partial_gradient_local(plot(
+    np_partial_gradient_local(capture_plot_provider(plot(
       bw, xdat = x, ydat = y, gradients = TRUE,
-      gradient.order = c(2L, 2L), errors = "none", output = "data"
-    )),
+      gradient_order = c(2L, 2L), errors = "none", output = "data"
+    ))$provider),
     paste0(
       "no requested component is available.*",
       "x1.*requested order 2.*degree 1.*",
@@ -111,11 +113,11 @@ test_that("derived local-polynomial families preserve partial availability", {
   lsq <- np_partial_gradient_local(suppressWarnings(nplsqreg(
     bw.lsq, gradients = TRUE, gradient.order = c(2L, 2L)
   )))
-  lsq.plot <- np_partial_gradient_local(suppressWarnings(plot(
-    lsq, gradients = TRUE, gradient.order = c(2L, 2L),
+  lsq.plot <- np_partial_gradient_local(suppressWarnings(capture_plot_provider(plot(
+    lsq, gradients = TRUE, gradient_order = c(2L, 2L),
     errors = "none", output = "data", neval = 5L,
     perspective = FALSE
-  )))
+  ))$provider))
   expect_true(any(is.finite(lsq.plot[[1L]]$quantgrad[, 1L, ])))
   expect_true(all(is.na(lsq.plot[[2L]]$quantgrad[, 2L, ])))
 
@@ -127,10 +129,10 @@ test_that("derived local-polynomial families preserve partial availability", {
   qfit <- np_partial_gradient_local(suppressWarnings(npqreg(
     bw.q, txdat = x, tydat = y, tau = c(0.25, 0.75), gradients = TRUE
   )))
-  qplot <- np_partial_gradient_local(suppressWarnings(plot(
+  qplot <- np_partial_gradient_local(suppressWarnings(capture_plot_provider(plot(
     qfit, gradients = TRUE, errors = "asymptotic", output = "data",
     neval = 5L, perspective = FALSE
-  )))
+  ))$provider))
   expect_true(all(is.na(qplot[[1L]]$quantgrad[, 1L, ])))
   expect_true(all(is.na(qplot[[1L]]$quantgerr[, 1L, ])))
   expect_true(any(is.finite(qplot[[2L]]$quantgrad[, 2L, ])))
@@ -153,11 +155,11 @@ test_that("conditional and conmode plots retain categorical effects beside NA de
   y.df <- data.frame(y = y)
 
   check.conditional <- function(bw) {
-    out <- np_partial_gradient_local(suppressWarnings(plot(
+    out <- np_partial_gradient_local(suppressWarnings(capture_plot_provider(plot(
       bw, xdat = x, ydat = y.df, gradients = TRUE,
-      gradient.order = c(2L, 1L), errors = "none", output = "data",
+      gradient_order = c(2L, 1L), errors = "none", output = "data",
       neval = 5L, perspective = FALSE
-    )))
+    ))$provider))
     for (slice in out) {
       expect_true(all(is.na(slice$congrad[, 1L])))
       expect_true(any(is.finite(slice$congrad[, 2L])))
@@ -189,9 +191,9 @@ test_that("conditional and conmode plots retain categorical effects beside NA de
   cm.plot <- np_partial_gradient_local(suppressWarnings(plot(
     cm, gradients = TRUE, view = "fixed", neval = 5L, output = "data"
   )))
-  expect_true(all(is.na(cm.plot[[1L]]$effect)))
-  expect_true(any(abs(cm.plot[[2L]]$effect) > 1e-10))
-  expect_true(any(is.finite(cm.plot[[3L]]$effect)))
+  expect_true(all(is.na(plot_target(cm.plot, panel=1L)$estimate)))
+  expect_true(any(abs(plot_target(cm.plot, panel=2L)$estimate) > 1e-10))
+  expect_true(any(is.finite(plot_target(cm.plot, panel=3L)$estimate)))
 })
 
 test_that("partial availability spans Bernstein, NN, and interleaved factors", {
@@ -210,11 +212,11 @@ test_that("partial availability spans Bernstein, NN, and interleaved factors", {
     basis = "tensor", bernstein.basis = TRUE, bwtype = "fixed",
     bws = c(0.42, 0.42), bandwidth.compute = FALSE
   ))
-  bern <- np_partial_gradient_local(suppressWarnings(plot(
+  bern <- np_partial_gradient_local(suppressWarnings(capture_plot_provider(plot(
     bw.bern, xdat = x, ydat = y, gradients = TRUE,
-    gradient.order = c(2L, 1L), errors = "none", output = "data",
+    gradient_order = c(2L, 1L), errors = "none", output = "data",
     neval = 6L, perspective = FALSE
-  )))
+  ))$provider))
   expect_true(all(is.na(bern[[1L]]$grad)))
   expect_true(any(is.finite(bern[[2L]]$grad)))
 
@@ -224,11 +226,11 @@ test_that("partial availability spans Bernstein, NN, and interleaved factors", {
       basis = "glp", bwtype = bwtype, bws = c(9, 9),
       bandwidth.compute = FALSE
     ))
-    out.nn <- np_partial_gradient_local(suppressWarnings(plot(
+    out.nn <- np_partial_gradient_local(suppressWarnings(capture_plot_provider(plot(
       bw.nn, xdat = x, ydat = y, gradients = TRUE,
-      gradient.order = c(2L, 1L), errors = "none", output = "data",
+      gradient_order = c(2L, 1L), errors = "none", output = "data",
       neval = 6L, perspective = FALSE
-    )))
+    ))$provider))
     expect_true(all(is.na(out.nn[[1L]]$grad)), info = bwtype)
     expect_true(any(is.finite(out.nn[[2L]]$grad)), info = bwtype)
   }
@@ -248,11 +250,11 @@ test_that("partial availability spans Bernstein, NN, and interleaved factors", {
     degree = c(1L, 2L), basis = "glp", bwtype = "fixed",
     bws = c(0.45, 0.5, 0.5, 0.45), bandwidth.compute = FALSE
   ))
-  mixed.out <- np_partial_gradient_local(suppressWarnings(plot(
+  mixed.out <- np_partial_gradient_local(suppressWarnings(capture_plot_provider(plot(
     bw.mixed, xdat = mixed, ydat = y.mixed, gradients = TRUE,
-    gradient.order = c(2L, 1L), errors = "none", output = "data",
+    gradient_order = c(2L, 1L), errors = "none", output = "data",
     neval = 6L, perspective = FALSE
-  )))
+  ))$provider))
   expect_named(mixed.out, c("rg1", "rg2", "rg3", "rg4"))
   expect_true(all(is.na(mixed.out[[1L]]$grad)))
   expect_true(any(is.finite(mixed.out[[2L]]$grad)))
@@ -261,12 +263,12 @@ test_that("partial availability spans Bernstein, NN, and interleaved factors", {
 
   grDevices::pdf(tempfile(fileext = ".pdf"))
   on.exit(grDevices::dev.off(), add = TRUE)
-  plot.data <- np_partial_gradient_local(suppressWarnings(plot(
+  plot.data <- np_partial_gradient_local(suppressWarnings(capture_plot_provider(plot(
     bw.mixed, xdat = mixed, ydat = y.mixed, gradients = TRUE,
-    gradient.order = c(2L, 1L), errors = "none", output = "plot-data",
-    neval = 6L, perspective = FALSE, common.scale = FALSE,
+    gradient_order = c(2L, 1L), errors = "none", output = "plot-data",
+    neval = 6L, perspective = FALSE, common_scale = FALSE,
     xlab = "custom x", ylab = "custom y", ylim = c(-3, 3)
-  )))
+  ))$provider))
   expect_named(plot.data, names(mixed.out))
   expect_true(all(is.na(plot.data[[1L]]$grad)))
 })
@@ -327,8 +329,8 @@ test_that("common-scale all-band rendering retains unavailable terminal panels",
   if (!"npRmpi" %in% loadedNamespaces()) {
     reg.boot <- capture_warnings(np_partial_gradient_local(plot(
       bw.reg, xdat = x, ydat = y, gradients = TRUE,
-      gradient.order = 2L, errors = "bootstrap", band = "all",
-      common.scale = TRUE, B = 79L, neval = 2L
+      gradient_order = 2L, errors = "bootstrap", band = "all",
+      common_scale = TRUE, B = 79L, neval = 2L
     )))
     expect_availability_only(reg.boot, "regression bootstrap common scale")
   }
@@ -340,16 +342,16 @@ test_that("common-scale all-band rendering retains unavailable terminal panels",
   ))
   reg.asym <- capture_warnings(np_partial_gradient_local(plot(
     bw.reg.asym, xdat = xc, ydat = y, gradients = TRUE,
-    gradient.order = 2L, errors = "asymptotic", band = "all",
-    common.scale = TRUE, neval = 2L
+    gradient_order = 2L, errors = "asymptotic", band = "all",
+    common_scale = TRUE, neval = 2L
   )))
   expect_availability_only(reg.asym, "regression asymptotic common scale",
                            allow.simultaneous = TRUE)
 
   reg.panel <- capture_warnings(np_partial_gradient_local(plot(
     bw.reg.asym, xdat = xc, ydat = y, gradients = TRUE,
-    gradient.order = 2L, errors = "asymptotic", band = "all",
-    common.scale = FALSE, neval = 2L, ylim = c(-3, 3)
+    gradient_order = 2L, errors = "asymptotic", band = "all",
+    common_scale = FALSE, neval = 2L, ylim = c(-3, 3)
   )))
   expect_availability_only(reg.panel, "regression panel scale",
                            allow.simultaneous = TRUE)
@@ -361,8 +363,8 @@ test_that("common-scale all-band rendering retains unavailable terminal panels",
   ))
   cd <- capture_warnings(np_partial_gradient_local(plot(
     bw.cd, xdat = xc, ydat = y.df, gradients = TRUE,
-    gradient.order = 2L, errors = "asymptotic", band = "all",
-    common.scale = TRUE, neval = 2L, perspective = FALSE
+    gradient_order = 2L, errors = "asymptotic", band = "all",
+    common_scale = TRUE, neval = 2L, perspective = FALSE
   )))
   expect_availability_only(cd, "conditional density",
                            allow.simultaneous = TRUE)
@@ -374,8 +376,8 @@ test_that("common-scale all-band rendering retains unavailable terminal panels",
   ))
   dst <- capture_warnings(np_partial_gradient_local(plot(
     bw.dst, xdat = xc, ydat = y.df, gradients = TRUE,
-    gradient.order = 2L, errors = "asymptotic", band = "all",
-    common.scale = TRUE, neval = 2L, perspective = FALSE
+    gradient_order = 2L, errors = "asymptotic", band = "all",
+    common_scale = TRUE, neval = 2L, perspective = FALSE
   )))
   expect_availability_only(dst, "conditional distribution",
                            allow.simultaneous = TRUE)
