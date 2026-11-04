@@ -112,7 +112,12 @@ test_that("distributed inference capture retains the public fitted owner", {
   for(derivative in c(FALSE,TRUE)) {
     V <- if(derivative)cbind(0,1,2*e$x)else cbind(1,e$x,e$x^2)
     C <- tcrossprod(sweep(V%*%A,2L,z,"*"))
-    got <- .np_plot_regression_joint_covariance(bw,x,y,e,fit=fit,
+    # Replay the exact captured fit request. The public bandwidth object can
+    # additionally carry timing metadata restored after distributed fitting.
+    expect_identical(fit$fit.request$xdat, x)
+    expect_identical(fit$fit.request$ydat, y)
+    expect_identical(fit$fit.request$exdat, e)
+    got <- .np_plot_regression_joint_covariance(fit$fit.request$bws,x,y,e,fit=fit,
       deriv=if(derivative)1L else NULL)
     expect_equal(got$covariance,C,tolerance=1e-12)
   }
