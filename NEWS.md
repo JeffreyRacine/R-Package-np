@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Copula displays tolerate bounded floating-point rounding in computed values
+  at exactly duplicate coordinates. Conflicting values and distinct coordinates
+  still fail; fitted values and interval calculations are unchanged.
+
 * Document all bias-corrected intervals and bands as experimental (pre-beta
   research), incomplete and not recommended for general-purpose inference.
   This includes asymptotic, bootstrap and legacy constructions; favorable
