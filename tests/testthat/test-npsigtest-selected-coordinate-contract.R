@@ -29,8 +29,9 @@ test_that("selected-coordinate attribute is protected across allocating native c
   expect_length(protected, 1L)
   expect_lt(protected, min(grep("coerceVector(", wrapper, fixed = TRUE)))
   # Count actual PROTECT tokens, including inline assignments but excluding
-  # UNPROTECT. There are 27 unconditional protections and five guarded protections.
-  expect_length(grep("\\bPROTECT\\(", wrapper, perl = TRUE), 32L)
+  # UNPROTECT. The 27 baseline protections plus 14 extra-protection sites
+  # include the promoted compact-inference and precision-metadata branches.
+  expect_length(grep("\\bPROTECT\\(", wrapper, perl = TRUE), 41L)
   empty.start <- grep("PROTECT(empty_flags = allocVector(INTSXP, en));",
                       wrapper, fixed = TRUE)
   certificate.start <- grep("SEXP certificate = PROTECT(allocVector(LGLSXP, gsize));",
@@ -48,14 +49,32 @@ test_that("selected-coordinate attribute is protected across allocating native c
   expect_lt(certificate.start,
     grep('setAttrib(out, install(".np.gradient.structural.zero"), certificate);',
          wrapper, fixed = TRUE))
-  expect_length(grep("++extra_protect;", wrapper, fixed = TRUE), 3L)
+  expect_length(grep("++extra_protect;", wrapper, fixed = TRUE), 6L)
   # Plot projection protects its two matrices and returned container separately.
   projection.start <- grep("PROTECT(projection_basis = allocMatrix(REALSXP, num_train, width));",
                             wrapper, fixed = TRUE)
-  expect_length(projection.start, 1L)
-  expect_identical(trimws(wrapper[projection.start + 1L]),
+  expect_length(projection.start, 2L)
+  # Compact inference additionally retains four uncertainty buffers.
+  expect_identical(trimws(wrapper[projection.start[1L] + 0:6]), c(
+    "PROTECT(projection_basis = allocMatrix(REALSXP, num_train, width));",
+    "PROTECT(projection_rows = allocMatrix(REALSXP, en, width));",
+    "PROTECT(inference_gradient = allocMatrix(REALSXP, en, width * ncon));",
+    "PROTECT(inference_residual = allocVector(REALSXP, num_train));",
+    "PROTECT(inference_ridge = allocVector(REALSXP, en));",
+    "PROTECT(inference_gate = allocMatrix(REALSXP, 3, ncon + nunordered + nordered));",
+    "extra_protect += 6;"))
+  expect_identical(trimws(wrapper[projection.start[2L] + 1L]),
                    "PROTECT(projection_rows = allocMatrix(REALSXP, en, width));")
-  expect_identical(trimws(wrapper[projection.start + 2L]), "extra_protect += 2;")
+  expect_identical(trimws(wrapper[projection.start[2L] + 2L]), "extra_protect += 2;")
+  inference.start <- grep('SEXP inference_request = PROTECT(getAttrib(output_request, install(".np.inference.width")));',
+                         wrapper, fixed = TRUE)
+  expect_length(inference.start, 1L)
+  expect_lt(inference.start, min(grep("coerceVector(", wrapper, fixed = TRUE)))
+  expect_identical(trimws(wrapper[inference.start + 1L]), "++extra_protect;")
+  expect_length(grep("PROTECT(precision_policy=allocMatrix(REALSXP,en,2));++extra_protect;",
+                     wrapper, fixed = TRUE), 1L)
+  expect_length(grep("SEXP state=PROTECT(allocVector(VECSXP,4)); ++extra_protect;",
+                     wrapper, fixed = TRUE), 1L)
   result.start <- grep("SEXP projection_result = PROTECT(allocVector(VECSXP, 3));",
                        wrapper, fixed = TRUE)
   expect_length(result.start, 1L)

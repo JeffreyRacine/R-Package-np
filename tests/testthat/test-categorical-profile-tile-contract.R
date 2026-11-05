@@ -500,9 +500,30 @@ test_that("categorical profile implementation and native sink are bounded", {
   owner_uses <- gregexpr(".np_categorical_profile_kernel_tile", owner_text,
                         fixed = TRUE)[[1L]]
   expect_identical(sum(owner_uses > 0L), 2L)
+  # Promoted mixed-density certificates also query this same native owner.
+  # Admit only those two function bodies; retain the ban everywhere else.
+  categorical_file <- file.path(source_root, "R", "np.udens.bias.categorical.R")
+  categorical_code <- parse(categorical_file, keep.source = FALSE)
+  certificate_names <- c(".np_udens_bc_effective_aa_constant",
+                         ".np_udens_bc_literal_lr_certificate")
+  categorical_owner <- rep(FALSE, length(categorical_code))
+  for (name in certificate_names) {
+    owner <- vapply(categorical_code, function(expr) {
+      is.call(expr) && length(expr) == 3L && identical(expr[[1L]], as.name("<-")) &&
+        identical(expr[[2L]], as.name(name)) && is.call(expr[[3L]]) &&
+        identical(expr[[3L]][[1L]], as.name("function"))
+    }, logical(1))
+    expect_identical(sum(owner), 1L)
+    uses <- gregexpr(".np_categorical_profile_kernel_tile",
+                    paste(deparse(categorical_code[owner]), collapse = "\n"),
+                    fixed = TRUE)[[1L]]
+    expect_identical(sum(uses > 0L), 1L)
+    categorical_owner <- categorical_owner | owner
+  }
   production_text <- paste(
-    c(unlist(lapply(production_r[production_r != plot_file], readLines,
-                    warn = FALSE)), deparse(plot_code[!plot_owner])),
+    c(unlist(lapply(production_r[!production_r %in% c(plot_file, categorical_file)],
+                    readLines, warn = FALSE)), deparse(plot_code[!plot_owner]),
+      deparse(categorical_code[!categorical_owner])),
     collapse = "\n"
   )
 
