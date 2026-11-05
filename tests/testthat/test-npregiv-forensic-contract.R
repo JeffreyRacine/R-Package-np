@@ -9,7 +9,7 @@ iv_forensic_fixture <- function(n = 26L, seed = 20260721L) {
 
 iv_forensic_skip_mpi_numerics <- function() {
   if ("npRmpi" %in% loadedNamespaces())
-    skip("installed one- and multi-worker sentinels own npRmpi numerical coverage")
+    skip("tests/validation/run_delegated_numerical_contract.R blocks 03-06 own installed MPI coverage")
 }
 
 test_that("IV scalar controls fail early and deterministically", {

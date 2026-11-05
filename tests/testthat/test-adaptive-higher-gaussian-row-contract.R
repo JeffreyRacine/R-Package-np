@@ -123,7 +123,7 @@ test_that("adaptive higher-order conditional objectives retain scalar oracle", {
     identical(environmentName(environment(npksum)), "npRmpi"),
     paste(
       "npRmpi order-4/6/8 conditional objective oracles are covered by",
-      "active one- and multi-slave sentinels"
+      "tests/validation/run_delegated_numerical_contract.R block 01"
     )
   )
 

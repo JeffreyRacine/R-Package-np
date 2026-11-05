@@ -118,7 +118,7 @@ test_that("LP representation labels remain tied to their engines", {
 
 test_that("public IV summaries replace only the smoothing block", {
   if (identical(iv_summary_namespace(), "npRmpi"))
-    skip("installed MPI summary sentinels own public-fit coverage")
+    skip("tests/validation/run_delegated_numerical_contract.R block 09 owns installed MPI coverage")
 
   set.seed(2718)
   n <- 22L

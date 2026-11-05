@@ -62,7 +62,7 @@ test_that("accelerated Gaussian CVCDF remains numerically tied to scalar CVCDF",
   owner <- environmentName(environment(npudistbw))
   skip_if(
     identical(owner, "npRmpi"),
-    "active-pool numerical parity is covered by the MPI qualification sentinel"
+    "tests/validation/run_delegated_numerical_contract.R block 02 owns installed MPI coverage"
   )
 
   set.seed(20260727L)

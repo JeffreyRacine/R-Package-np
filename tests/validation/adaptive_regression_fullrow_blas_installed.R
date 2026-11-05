@@ -104,10 +104,11 @@ stopifnot(identical(
 ))
 
 signed <- objective_pair(make_case(2048L, "gaussian", 6L))
-stopifnot(identical(
-  unname(signed[["scalar"]]),
-  unname(signed[["blas"]])
-))
+# Fixture-specific maintainer-approved absolute budget: see the serial
+# sentinel and the independent Nov 5 P1 primitive/high-precision adjudication.
+# No package-wide or positive-kernel tolerance is changed.
+signed_abs <- abs(signed[["scalar"]] - signed[["blas"]])
+stopifnot(all(is.finite(signed)), signed_abs <= 1e-7)
 
 ks_pair <- function(case) {
   expr <- substitute(
@@ -170,7 +171,8 @@ cat(
   format(abs(ks[["scalar"]] - ks[["blas"]]), digits = 17L),
   " check_abs=",
   format(abs(check[["scalar"]] - check[["blas"]]), digits = 17L),
-  " threshold_exact=TRUE signed_exact=TRUE\n",
+  " signed_abs=", format(signed_abs, digits = 17L),
+  " threshold_exact=TRUE signed_abs_budget=1e-7\n",
   sep = ""
 )
 npRmpi.quit(force = TRUE)

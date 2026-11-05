@@ -67,7 +67,7 @@ test_that("IV formula grammar is explicit and transformation safe", {
 
 test_that("npregiv formula, modern degree spelling, and accessors preserve state", {
   if (identical(iv_interface_package(), "npRmpi"))
-    skip("installed MPI route sentinel owns npRmpi numerical coverage")
+    skip("tests/validation/run_delegated_numerical_contract.R blocks 07-08 own installed MPI coverage")
   dat <- iv_interface_fixture()
 
   native <- suppressWarnings(npregiv(
@@ -120,7 +120,7 @@ test_that("npregiv formula, modern degree spelling, and accessors preserve state
 
 test_that("npregivderiv formula and regression-consistent accessors preserve state", {
   if (identical(iv_interface_package(), "npRmpi"))
-    skip("installed MPI route sentinel owns npRmpi numerical coverage")
+    skip("tests/validation/run_delegated_numerical_contract.R blocks 07-08 own installed MPI coverage")
   dat <- iv_interface_fixture()
 
   native <- suppressWarnings(npregivderiv(
