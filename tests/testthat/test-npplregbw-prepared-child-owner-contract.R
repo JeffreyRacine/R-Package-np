@@ -8,7 +8,19 @@ test_that("npplreg child searches use the canonical prepared regression owner", 
 
   expect_match(child.search.text, ".npplregbw_child_nomad_call_args",
                fixed = TRUE)
-  expect_match(child.search.text, "do.call(npregbw, child.args)", fixed = TRUE)
+  expect_match(child.search.text, "do.call(.npregbw_auxiliary, child.args)",
+               fixed = TRUE)
+  # Numeric-response validation is public; response-on-Z children use the
+  # private auxiliary entry while retaining the canonical numerical owners.
+  auxiliary <- get(".npregbw_auxiliary", ns, inherits = FALSE)
+  auxiliary.text <- paste(deparse(body(auxiliary)), collapse = "\n")
+  for (owner in c(".np_bw_dispatch_target", ".npregbw_null_impl",
+                  ".npregbw_bandwidth_impl", ".npregbw_default_impl"))
+    expect_match(auxiliary.text, owner, fixed = TRUE)
+  forward <- tail(as.list(body(auxiliary)), 1L)[[1L]]
+  expect_identical(forward[[1L]], as.name(".np_regression_forward"))
+  expect_identical(forward[[2L]], as.name("implementation"))
+  expect_identical(tail(as.list(forward), 1L)[[1L]], FALSE)
   expect_match(child.args.text, "nomad = TRUE", fixed = TRUE)
   expect_match(child.args.text, "search.engine = degree.search$engine",
                fixed = TRUE)

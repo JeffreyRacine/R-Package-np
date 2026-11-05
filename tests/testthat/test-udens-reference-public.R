@@ -14,7 +14,7 @@ test_that("explicit joint-scale density surfaces expose absolute endpoints match
     args[[if (method == "asymptotic") "gaussian_draws" else "B"]] <- 199L
     if (method == "asymptotic")
       expect_warning(expect_warning(cap <- capture_plot_provider(do.call(plot, args)),
-        "gaussian.draws=199", fixed = TRUE), "gaussian.draws=199", fixed = TRUE)
+        "gaussian_draws=199", fixed = TRUE), "gaussian_draws=199", fixed = TRUE)
     else cap <- capture_plot_provider(do.call(plot, args))
     out <- cap$result
     r <- cap$provider$d1

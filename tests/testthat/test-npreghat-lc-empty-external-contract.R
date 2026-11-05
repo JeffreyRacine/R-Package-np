@@ -67,7 +67,7 @@ test_that("wild derivative reuse propagates only certified empty rows", {
                         np.plot.wild.hat.block.bytes = 8*48)
     set.seed(852)
     a <- helper(xdat = x, exdat = ex, bws = bw, ydat = y, fit.mean.train = pilot,
-                B = 7, gradients = TRUE)
+                B = 7, wild = "rademacher", gradients = TRUE)
     expect_equal(a$t, expected, tolerance = 1e-10)
     expect_true(is.na(a$t0[2]))
     expect_identical(.Random.seed, seed)

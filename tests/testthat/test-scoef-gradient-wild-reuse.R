@@ -138,7 +138,7 @@ test_that("categorical coefficient projections retain their moment kernel units"
         numeric(length(e))))
       set.seed(414)
       got <- internal(".np_wild_boot_from_scoef_exact")(x,y,z,x[e,,drop=FALSE],
-        z[e,,drop=FALSE],bw,B=5L,target="grad",gradient.index=1L)
+        z[e,,drop=FALSE],bw,B=5L,wild="rademacher",target="grad",gradient.index=1L)
       expect_equal(got$t,expected,tolerance=1e-11)
       expect_identical(.Random.seed,rng)
     }
