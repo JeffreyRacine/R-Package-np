@@ -1,5 +1,7 @@
 # npRmpi 0.80-2 (development)
 
+* Correct the panel-specific bias-corrected curve drawn in common-scale CDF slice plots. Returned estimates and interval endpoints are unchanged.
+
 * Preserve the original partially linear preparation error on the MPI broadcast
   source, allowing the existing coordinated error path and session reuse.
 * Retain effective replacement training frames when restoring formula metadata
