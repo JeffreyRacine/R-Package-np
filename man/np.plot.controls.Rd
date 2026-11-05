@@ -35,7 +35,10 @@ np_render_control(style = c("band", "bar"),
     the fitted object.}
   \item{wild}{Wild-bootstrap multiplier distribution. Mammen is the default;
     Rademacher remains available explicitly.}
-  \item{blocklen}{Optional block length for block bootstrap methods.}
+  \item{blocklen}{Optional block length for block bootstrap methods.
+  Corrected density providers reject fixed blocks whose length equals the
+  training sample size: each resample then contains every observation exactly
+  once and has no resampling variation. Geometric blocks are unaffected.}
   \item{calibration}{For bias-corrected bootstrap empirical bands,
     \code{"symmetric-sd"} selects the existing absolute-root construction and
     \code{"asymmetric-sd"} selects separate empirical tails with the family's

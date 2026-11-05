@@ -1,5 +1,7 @@
 # np 0.80-2 (development)
 
+* Reject structurally degenerate full-sample fixed blocks in corrected density inference instead of returning zero-width uncertainty bands.
+
 * Preserve non-syntactic retained training-column names in corrected CDF plot recovery. Explicit mismatched frames remain rejected.
 
 * Label smooth-coefficient plot targets with the selected coefficient, including the intercept, without changing their values.

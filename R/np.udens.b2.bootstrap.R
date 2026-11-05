@@ -1,7 +1,12 @@
 # Signed density bootstrap-t. This entry is private and leaves v1 untouched.
 .np_udens_b2_boot_request <- function(law, blocklen, n) {
   law <- match.arg(law,c("inid","fixed","geom"))
-  if(law%in%c("fixed","geom"))return(list(law=law,blocklen=.np_udens_b2_block_length(blocklen,n)))
+  if (law %in% c("fixed", "geom")) {
+    blocklen <- .np_udens_b2_block_length(blocklen, n)
+    if (law == "fixed" && blocklen == n)
+      stop("fixed block length equal to sample size has no resampling variation", call. = FALSE)
+    return(list(law = law, blocklen = blocklen))
+  }
   if (!is.null(blocklen) && (!is.numeric(blocklen) || length(blocklen)!=1L ||
       !is.finite(blocklen) || blocklen!=1))
     stop("inid density bootstrap requires block length one",call.=FALSE)
