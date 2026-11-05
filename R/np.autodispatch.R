@@ -796,7 +796,11 @@
   }
 
   names(out.args) <- out.names
-  as.call(c(list(head), out.args))
+  out <- as.call(c(list(head), out.args))
+  # Expanding arguments does not change the already established call owner.
+  attr(out, ".npRmpi.bound.call.owner") <-
+    attr(mc, ".npRmpi.bound.call.owner", exact = TRUE)
+  out
 }
 
 .npRmpi_autodispatch_active <- function() {

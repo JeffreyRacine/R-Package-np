@@ -87,3 +87,55 @@ test_that("MPI package aliases evaluate function heads and data exactly once", {
   expect_error(fun(xdat=d["x"],ydat=d$y,model=model,bws=.4,
     bandwidth.compute=FALSE,distribution="bad"),"arg")
 })
+
+test_that("dots expansion retains only the existing call-owner marker", {
+ f<-get(".npRmpi_autodispatch_expand_dots_call",asNamespace("npRmpi"))
+ for(marker in list(NULL,FALSE,TRUE)) for(dots in list(pairlist(),pairlist(a=1,2),list(a=1,2),quote(list(a=1,2)),quote(pairlist(a=1,2)))) {
+   x<-as.call(c(list(as.name("selected")),list(x=quote(side_effect()),"..."=dots,z=3)))
+   attr(x,".npRmpi.bound.call.owner")<-marker
+   y<-f(x);expect_identical(attr(y,".npRmpi.bound.call.owner",exact=TRUE),marker)
+   attr(y,".npRmpi.bound.call.owner")<-NULL
+   expected<-if(length(dots)==0L)quote(selected(x=side_effect(),z=3)) else quote(selected(x=side_effect(),a=1,2,z=3))
+   expect_identical(y,expected)
+ }
+ for(x in list(quote(selected()),quote(selected(x=side_effect())),NULL)) {
+   if(!is.null(x))attr(x,".npRmpi.bound.call.owner")<-TRUE
+   expect_identical(f(x),x)
+ }
+})
+
+test_that("fresh namespace-only aliases preserve bandwidth call ownership", {
+  skip_on_cran()
+  lines <- c(
+    "ns<-loadNamespace(\"npRmpi\")",
+    "options(np.messages=FALSE)",
+    "stopifnot(!\"package:npRmpi\"%in%search())",
+    "ns$npRmpi.init(nslaves=as.integer(Sys.getenv(\"N5_SLAVES\",\"1\")),quiet=TRUE)",
+    "on.exit(ns$npRmpi.quit(force=TRUE),add=TRUE)",
+    "set.seed(811);d<-data.frame(y=rnorm(80),a=rnorm(80),b=runif(80))",
+    "cases<-list(sc=list(fun=\"npscoefbw\",expr=quote(f(y~a|b,data=d,nmulti=1))),",
+    " pl=list(fun=\"npplregbw\",expr=quote(f(y~a|b,data=d,nmulti=1))),",
+    " ix=list(fun=\"npindexbw\",expr=quote(f(y~a+b,data=d,nmulti=1))))",
+    "if(!identical(Sys.getenv(\"N5_FULL\"),\"true\"))cases<-cases[1]",
+    "values<-list()",
+    "for(n in names(cases)){",
+    " f<-get(cases[[n]]$fun,ns);cat(\"BEGIN\",n,\"\\n\");flush(stdout())",
+    " set.seed(811);v<-eval(cases[[n]]$expr)",
+    " values[[n]]<-v;stopifnot(is.list(v));cat(\"DONE\",n,\"\\n\");flush(stdout())",
+    "}",
+    "library(npRmpi)",
+    "for(n in names(cases)){",
+    " f<-get(cases[[n]]$fun,ns);set.seed(811);v<-eval(cases[[n]]$expr)",
+    " for(k in intersect(c(\"bw\",\"xbw\",\"ybw\",\"xnames\",\"ynames\",\"znames\"),names(v))) {",
+    "   a<-v[[k]];b<-values[[n]][[k]]",
+    "   if(k==\"bw\" && is.list(a)){a<-lapply(a,function(x)x$bw);b<-lapply(b,function(x)x$bw)}",
+    "   if(!identical(a,b)){cat(\"MISMATCH\",n,k,\"\\n\");print(all.equal(a,b));stop(\"public payload differs\")}",
+    " }",
+    "}",
+    "npRmpi.quit(force=TRUE)",
+    "cat(\"N5_OWNER_NAMESPACE_COMPLETE\\n\")"
+  )
+  out <- npRmpi_run_rscript_subprocess(lines, timeout=90L)
+  expect_identical(out$status,0L)
+  expect_true(any(out$output=="N5_OWNER_NAMESPACE_COMPLETE"))
+})
