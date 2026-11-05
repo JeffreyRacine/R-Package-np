@@ -95,7 +95,7 @@
       xdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
     } else {
       if(miss.x && !is.null(bws$call)){
-        xdat <- data.frame(.np_eval_bws_call_arg(bws, "dat"))
+        xdat <- .np_eval_bws_call_arg(bws, "dat")
       }
       xdat = toFrame(xdat)
       xdat = na.omit(xdat)
