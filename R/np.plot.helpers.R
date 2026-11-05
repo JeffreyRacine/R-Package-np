@@ -2106,7 +2106,7 @@
   .npRmpi_bootstrap_attach_rng_stream(tasks, function(task) {
     start <- as.integer(task$start)
     invisible(counts.drawer(start, start + as.integer(task$bsz) - 1L))
-  })
+  }, normal.draws = isTRUE(attr(counts.drawer, "np.normal.draws", exact = TRUE)))
 }
 
 .npRmpi_bootstrap_task_counts_drawer <- function(task, counts.drawer) {
@@ -2659,7 +2659,7 @@
 
   draw.one <- .np_block_replicate_drawer(n, n.sim, blocklen, sim, endcorr)
 
-  function(start, stopi) {
+  drawer <- function(start, stopi) {
     start <- as.integer(start)
     stopi <- as.integer(stopi)
     if (start < 1L || stopi < start || stopi > B)
@@ -2672,6 +2672,10 @@
 
     out
   }
+  # rgeom can consume normals indirectly via rpois. Reuse the existing
+  # task admission/initialization contract; block length one returned above.
+  attr(drawer, "np.normal.draws") <- identical(sim, "geom")
+  drawer
 }
 
 .np_block_indices_drawer <- function(n,

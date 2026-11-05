@@ -67,7 +67,8 @@
   .npRmpi_bootstrap_fanout_enabled(n=n,B=B,chunk.size=32L,what="studentized score process")
   tasks <- .npRmpi_bootstrap_chunk_tasks(B,32L,with.seeds=FALSE)
   tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks,function(task)
-    invisible(.np_bias_process_innovations(n,task$start,task$start+task$bsz-1L,B,law,blocklen)))
+    invisible(.np_bias_process_innovations(n,task$start,task$start+task$bsz-1L,B,law,blocklen)),
+    normal.draws=identical(law,"geom") && blocklen>1L)
   worker <- function(task,factors,active,observed,B,law,blocklen,studentize,signed) {
     .npRmpi_bootstrap_use_task_rng(task)
     t(.np_bias_score_student_chunk(factors,active,observed,task$start,

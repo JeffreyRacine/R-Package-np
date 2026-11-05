@@ -46,7 +46,8 @@
   tasks <- .npRmpi_bootstrap_chunk_tasks(B,32L,with.seeds=FALSE)
   tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks,function(task)
     invisible(.np_udens_b2_indices(state$n,task$start,task$start+task$bsz-1L,
-                                   B,law,blocklen)))
+                                   B,law,blocklen)),
+    normal.draws=identical(law,"geom") && blocklen>1L)
   worker <- function(task,state,grid,base,B,law,blocklen) {
     .npRmpi_bootstrap_use_task_rng(task)
     z <- .np_udens_b2_boot_chunk(state,grid,base,task$start,

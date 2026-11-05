@@ -36,7 +36,8 @@
   .npRmpi_bootstrap_fanout_enabled(n = state$n, B = B, chunk.size = 32L, what = "exact NN CDF process")
   tasks <- .npRmpi_bootstrap_chunk_tasks(B, 32L, with.seeds = FALSE)
   tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks, function(task)
-    invisible(.np_udist_bc_nn_indices(state$n, task$start, task$start+task$bsz-1L, B, law, blocklen)))
+    invisible(.np_udist_bc_nn_indices(state$n, task$start, task$start+task$bsz-1L, B, law, blocklen)),
+    normal.draws = identical(law, "geom") && blocklen > 1L)
   worker <- function(task, state, grid, base, B, law, blocklen, corrected) {
     .npRmpi_bootstrap_use_task_rng(task)
     z <- .np_udist_bc_nn_chunk(state, grid, base, task$start, task$start+task$bsz-1L, B, law, blocklen, corrected)

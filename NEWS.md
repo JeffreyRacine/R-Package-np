@@ -1,5 +1,7 @@
 # npRmpi 0.80-2 (development)
 
+* Initialize an available user-supplied normal generator for geometric-bootstrap worker tasks, which can draw normals indirectly. The existing preflight rejects a missing worker generator before draws; uniform-only tasks are unchanged.
+
 * Reject structurally degenerate full-sample fixed blocks in corrected density inference instead of returning zero-width uncertainty bands.
 
 * Preserve non-syntactic retained training-column names in corrected CDF plot recovery. Explicit mismatched frames remain rejected.

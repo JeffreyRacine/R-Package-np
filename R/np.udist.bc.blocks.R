@@ -50,7 +50,7 @@
       draw <- .np_block_replicate_drawer(n, n, blocklen, law, TRUE)
       for (b in seq_len(task$bsz)) draw()
     }
-  })
+  }, normal.draws = identical(law, "geom") && blocklen > 1L)
   worker <- function(task, F, raw, B, law, blocklen) {
     .npRmpi_bootstrap_use_task_rng(task)
     z <- .np_udist_bc_block_chunk(F, raw, task$start, task$start+task$bsz-1L, B, law, blocklen)
