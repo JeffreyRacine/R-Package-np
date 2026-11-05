@@ -13,7 +13,8 @@
   checks. Estimator calculations and lease/transport policies are unchanged.
 
 * Copula displays tolerate bounded floating-point rounding in computed values
-  at exactly duplicate coordinates. Conflicting values and distinct coordinates
+  at exactly duplicate coordinates, using the center and error-offset scale
+  when interval endpoints nearly cancel. Conflicting values and distinct coordinates
   still fail; fitted values and interval calculations are unchanged.
 
 * MPI bandwidth fingerprints now account for R's serialization of evaluated

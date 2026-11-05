@@ -282,7 +282,11 @@ npcopula <- function(bws, ...) {
   )
 }
 
-.npcopula_display_values <- function(values, grid, exact = FALSE) {
+.npcopula_display_values <- function(values, grid, exact = FALSE, roundoff.scale = NULL) {
+  if (!is.null(roundoff.scale) &&
+      (!is.numeric(roundoff.scale) || length(roundoff.scale) != length(values) ||
+       any(!is.finite(roundoff.scale)) || any(roundoff.scale < 0)))
+    stop("npcopula endpoint operand scale is invalid")
   if (length(values) != length(grid$row.order))
     stop("npcopula surface values are incompatible with the rendering grid")
   selected <- values[grid$display.rows]
@@ -299,7 +303,10 @@ npcopula <- function(bws, ...) {
       if (identical(v, reference)) return(TRUE)
       if (any(!is.finite(v)) || any(!is.finite(reference))) return(FALSE)
       limits <- range(v)
-      diff(limits) <= (32 * .Machine$double.eps) * max(abs(limits))
+      # Subtracted endpoints can cancel: use their own operand magnitude,
+      # while retaining the original budget and the same-cell comparison.
+      scale <- max(abs(limits), roundoff.scale[ii])
+      diff(limits) <= (32 * .Machine$double.eps) * scale
     }, logical(1L)))
   }
   if (!same)
@@ -308,13 +315,13 @@ npcopula <- function(bws, ...) {
   selected
 }
 
-.npcopula_grid_matrix <- function(values, grid) {
+.npcopula_grid_matrix <- function(values, grid, roundoff.scale = NULL) {
   if (is.null(grid$display.rows)) {
     if (length(values) != length(grid$row.order))
       stop("npcopula surface values are incompatible with the rendering grid")
     values <- values[grid$row.order]
   } else {
-    values <- .npcopula_display_values(values, grid)
+    values <- .npcopula_display_values(values, grid, roundoff.scale = roundoff.scale)
   }
   matrix(values, nrow = length(grid$u1), ncol = length(grid$u2))
 }
@@ -1254,13 +1261,17 @@ plot.npcopula <- function(x,
   if (!is.null(payload)) {
     if (!is.null(grid$display.rows))
       .npcopula_display_values(payload$center, grid)
-    lerr <- .npcopula_grid_matrix(payload$center - payload$err[, 1L], grid)
-    herr <- .npcopula_grid_matrix(payload$center + payload$err[, 2L], grid)
+    lerr <- .npcopula_grid_matrix(payload$center - payload$err[, 1L], grid,
+      abs(payload$center) + abs(payload$err[, 1L]))
+    herr <- .npcopula_grid_matrix(payload$center + payload$err[, 2L], grid,
+      abs(payload$center) + abs(payload$err[, 2L]))
     if (identical(band, "all") && !is.null(payload$all.err)) {
       lerr.all <- lapply(payload$all.err, function(te)
-        .npcopula_grid_matrix(payload$center - te[, 1L], grid))
+        .npcopula_grid_matrix(payload$center - te[, 1L], grid,
+          abs(payload$center) + abs(te[, 1L])))
       herr.all <- lapply(payload$all.err, function(te)
-        .npcopula_grid_matrix(payload$center + te[, 2L], grid))
+        .npcopula_grid_matrix(payload$center + te[, 2L], grid,
+          abs(payload$center) + abs(te[, 2L])))
     }
   }
   if (is.null(zlim)) {
