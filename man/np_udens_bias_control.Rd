@@ -66,6 +66,12 @@ Bounded resident panels and invocation-owned temporary factor files avoid an
 unrestricted resident grid-square matrix. A row-major draw workspace reduces
 repeated file seeks; peak temporary disk can be twice the completed factor
 size. The resident allocation forecast is distinct from total R heap/RSS.
+In \pkg{npRmpi}, this conservative inference-storage forecast is summed
+across the coordinator and workers. Increasing the worker count can therefore
+exceed the 256 MiB forecast even for a grid that a smaller pool admits.
+The error does not imply that the observed R resident memory reached that
+limit. An explicitly selected smaller pool can retain the same complete grid;
+the package does not reduce the grid or switch methods automatically.
 A residual covariance bound is included in maximum calibration. Requested
 Gaussian draw counts are retained, with the existing precision warning when
 small. Seeded calls preserve ordinary caller RNG continuation, including
