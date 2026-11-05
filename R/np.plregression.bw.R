@@ -331,9 +331,11 @@ npplregbw.plbandwidth =
     if (inherits(value, "npRmpi_local_failure")) rank else size,
     type = 1L, op = "min", comm = 1L
   )
-  if (failed.rank < size)
-    return(mpi.bcast.Robj(if (rank == failed.rank) value else NULL,
-                          rank = failed.rank, comm = 1L))
+  if (failed.rank < size) {
+    shared.failure <- mpi.bcast.Robj(if (rank == failed.rank) value else NULL,
+                                    rank = failed.rank, comm = 1L)
+    return(if (rank == failed.rank) value else shared.failure)
+  }
   value
 }
 
