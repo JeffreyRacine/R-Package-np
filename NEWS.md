@@ -1,5 +1,7 @@
 # npRmpi 0.80-2 (development)
 
+* Label smooth-coefficient plot targets with the selected coefficient, including the intercept, without changing their values.
+
 * Correct the panel-specific bias-corrected curve drawn in common-scale CDF slice plots. Returned estimates and interval endpoints are unchanged.
 
 * Preserve the original partially linear preparation error on the MPI broadcast
