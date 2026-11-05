@@ -861,7 +861,7 @@
               continuous = !xi.factor
             )
             if (!xi.factor && !plotOnEstimate)
-              lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
+              lines(na.omit(allei[,i]), na.omit(data.err[,3*i]), lty = .np_plot_lty("center"))
 
             if (plot.errors.type == "all") {
               .np_plot_draw_all_errors_with_gaps(
