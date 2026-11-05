@@ -184,8 +184,14 @@ left the command protocol. The profile installs its own \code{options(error=)}
 handler; replacing that handler removes the master's fail-fast protection.
 To recover from an anticipated command error, catch it inside the broadcast
 expression on every affected rank. Catching only the master-side error does
-not recover a failed worker. Session and attach mode keep their existing
-error handling, and one-rank profile use does not install this policy.
+not recover a failed worker. In session and attach mode, an error escaping a
+manual broadcast expression can also end a worker's command loop. Catching only
+the master-side error does not make that pool reusable: later commands or
+shutdown can block waiting for the failed worker. Anticipated errors must be
+handled inside the broadcast expression on every affected rank. This is a
+limitation of manual-command error recovery, not a promise of recovery from
+arbitrary collective failures. One-rank profile use does not install the
+multi-rank profile policy.
 
 Minimal comparison script (three patterns) follows:
 \preformatted{

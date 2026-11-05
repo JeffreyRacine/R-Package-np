@@ -1,5 +1,7 @@
 # npRmpi 0.80-2 (development)
 
+* Session help now states the existing worker-loop limitation for errors escaping manual broadcasts; master-only error handling does not restore a failed worker pool. Runtime handling is unchanged.
+
 * Regression prediction and residuals now retain the existing collective evaluation path on all ranks during manual broadcast.
 
 * MPI calls now retain their established package owner when expanding dots, including namespace-only bandwidth-constructor aliases.
