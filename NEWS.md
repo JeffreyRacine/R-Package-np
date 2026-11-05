@@ -1,5 +1,11 @@
 # npRmpi 0.80-2 (development)
 
+* Preserve the original partially linear preparation error on the MPI broadcast
+  source, allowing the existing coordinated error path and session reuse.
+* Retain effective replacement training frames when restoring formula metadata
+  after MPI regression fits, while preserving constructor and callback ownership
+  checks. Estimator calculations and lease/transport policies are unchanged.
+
 * Copula displays tolerate bounded floating-point rounding in computed values
   at exactly duplicate coordinates. Conflicting values and distinct coordinates
   still fail; fitted values and interval calculations are unchanged.

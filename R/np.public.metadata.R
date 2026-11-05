@@ -174,16 +174,36 @@
                              "plbandwidth", "lsqregressionbandwidth"))) next
     restore <- function(value, reference) {
       fields <- c("call", "formula", "terms", "xterms", ".np.formula.training")
-      # Fitting may legitimately update omission/diagnostic metadata. Verify
-      # the constructor-owned formula representation itself, and restore only
-      # that representation; never replace fitted state or numerical fields.
-      current <- value[intersect(names(value), fields)]
-      expected <- reference[intersect(names(reference), fields)]
-      if (!identical(.npRmpi_autodispatch_fingerprint(current),
-                     .npRmpi_autodispatch_fingerprint(expected)))
+      metadata <- function(x) {
+        out <- x[intersect(names(x), fields)]
+        training <- out[[".np.formula.training", exact = TRUE]]
+        # Native fitting may replace the effective sample. Keep its presence
+        # and all retained policies in the guard, but not the sample values.
+        if (is.list(training) && "frame" %in% names(training)) {
+          training["frame"] <- list(NULL)
+          out[".np.formula.training"] <- list(training)
+        }
+        out
+      }
+      if (!identical(.npRmpi_autodispatch_fingerprint(metadata(value)),
+                     .npRmpi_autodispatch_fingerprint(metadata(reference))))
         stop("retained formula metadata changed before public owner restoration",
              call. = FALSE)
-      for (name in names(expected)) value[name] <- expected[name]
+      restored <- reference[intersect(names(reference), fields)]
+      training <- restored[[".np.formula.training", exact = TRUE]]
+      if (is.list(training) && "frame" %in% names(training)) {
+        frame <- value[[".np.formula.training", exact = TRUE]][["frame", exact = TRUE]]
+        tt <- attr(frame, "terms", exact = TRUE)
+        if (inherits(tt, "terms") && identical(environment(tt), emptyenv())) {
+          owner <- environment(attr(training[["frame", exact = TRUE]], "terms", exact = TRUE))
+          if (is.null(owner)) owner <- environment(reference[["formula", exact = TRUE]])
+          environment(tt) <- owner
+          attr(frame, "terms") <- tt
+        }
+        training["frame"] <- list(frame)
+        restored[".np.formula.training"] <- list(training)
+      }
+      for (name in names(restored)) value[name] <- restored[name]
       if (!is.null(value[["tau.bws", exact = TRUE]]))
         for (i in seq_along(value$tau.bws))
           value$tau.bws[[i]] <- restore(value$tau.bws[[i]], reference$tau.bws[[i]])
