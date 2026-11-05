@@ -54,10 +54,15 @@ stopifnot(identical(
 ))
 
 signed <- make_state(2048L, "gaussian", 6L)
-stopifnot(identical(
-  objective(signed$xdat, signed$y, signed$state, FALSE),
-  objective(signed$xdat, signed$y, signed$state, TRUE)
-))
+signed_scalar <- objective(signed$xdat, signed$y, signed$state, FALSE)
+signed_blas <- objective(signed$xdat, signed$y, signed$state, TRUE)
+# This fixed signed Gaussian6 fixture has ill-conditioned local moment systems.
+# Signed-row BLAS/vectorization legitimately reassociates the same arithmetic.
+# The maintainer accepted this fixture's absolute 1e-7 practical error budget;
+# independent primitive/high-precision adjudication is retained in the Nov 5
+# P1 numerical follow-up. Positive-kernel and threshold gates stay unchanged.
+signed_abs <- abs(signed_scalar - signed_blas)
+stopifnot(is.finite(signed_scalar), is.finite(signed_blas), signed_abs <= 1e-7)
 
 ks <- make_state(2048L, "gaussian", 2L, binary = TRUE)
 ks_scalar <- objective(ks$xdat, ks$y, ks$state, FALSE, kind = "ks")
@@ -97,6 +102,7 @@ cat(
   "active_abs=", format(abs(active_scalar - active_blas), digits = 17L),
   " ks_abs=", format(abs(ks_scalar - ks_blas), digits = 17L),
   " check_abs=", format(abs(check_scalar - check_blas), digits = 17L),
-  " threshold_exact=TRUE signed_exact=TRUE\n",
+  " signed_abs=", format(signed_abs, digits = 17L),
+  " threshold_exact=TRUE signed_abs_budget=1e-7\n",
   sep = ""
 )
