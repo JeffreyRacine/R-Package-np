@@ -7,7 +7,8 @@
 * Correct the panel-specific bias-corrected curve drawn in common-scale CDF slice plots. Returned estimates and interval endpoints are unchanged.
 
 * Copula displays tolerate bounded floating-point rounding in computed values
-  at exactly duplicate coordinates. Conflicting values and distinct coordinates
+  at exactly duplicate coordinates, using the center and error-offset scale
+  when interval endpoints nearly cancel. Conflicting values and distinct coordinates
   still fail; fitted values and interval calculations are unchanged.
 
 * Document all bias-corrected intervals and bands as experimental (pre-beta
