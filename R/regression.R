@@ -101,7 +101,8 @@ residuals.npregression <- function(object, ...) {
  } else {
    call.residuals <- function() npreg(bws = object$bws, se = FALSE,
                                       residuals = TRUE)$resid
-   if (.npRmpi_has_active_slave_pool(comm = 1L)) {
+   if (.npRmpi_has_active_slave_pool(comm = 1L) ||
+       isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
      return(call.residuals())
    }
    return(.npRmpi_with_local_regression(call.residuals()))
@@ -305,7 +306,8 @@ predict.npregression <- function(object, se.fit = FALSE, ...) {
     npreg,
     c(list(bws = object$bws, se = se.fit), dots)
   )
-  tr <- if (.npRmpi_has_active_slave_pool(comm = 1L)) {
+  tr <- if (.npRmpi_has_active_slave_pool(comm = 1L) ||
+       isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
     call.predict()
   } else {
     .npRmpi_with_local_regression(call.predict())

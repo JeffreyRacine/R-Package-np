@@ -1,5 +1,7 @@
 # npRmpi 0.80-2 (development)
 
+* Regression prediction and residuals now retain the existing collective evaluation path on all ranks during manual broadcast.
+
 * MPI calls now retain their established package owner when expanding dots, including namespace-only bandwidth-constructor aliases.
 
 * D8 density plot fanout now preserves the caller's RNG state around transport-tag generation, without changing innovations or interval values.
