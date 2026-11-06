@@ -23,7 +23,8 @@
 
 # Box-Muller has a cached deviate outside .Random.seed. Retain actual values
 # for bounded Gaussian regression jobs; no seed reset can replay that cache.
-# Other callers/kinds and larger jobs retain their existing path.
+# Other laws/kinds retain their existing path. Refuse uncached Box-Muller
+# here using resolved dimensions, before internal draws or seed-only replay.
 .np_bias_gaussian_cache <- function(n, B, law, kind=RNGkind()) {
   builtin <- c("Wichmann-Hill","Marsaglia-Multicarry","Super-Duper",
     "Mersenne-Twister","Knuth-TAOCP","Knuth-TAOCP-2002","L'Ecuyer-CMRG")
@@ -34,7 +35,8 @@
       any(!is.finite(dims)) || any(dims<1 | dims!=floor(dims)) ||
       any(dims>.Machine$integer.max))
     stop("invalid Gaussian replay dimensions",call.=FALSE)
-  if (8*as.double(n)*B>16*1024^2) return(NULL)
+  if (8*as.double(n)*B>16*1024^2)
+    stop("unsafe RNG replay: resolved Gaussian regression exceeds the 16 MiB Box-Muller innovation cache; explicitly select a qualified normal generator such as RNGkind(normal.kind = 'Inversion') before plotting",call.=FALSE)
   values <- .np_bias_draws(n,B,"gaussian")
   list(values=values,end=get(".Random.seed",.GlobalEnv,inherits=FALSE))
 }
