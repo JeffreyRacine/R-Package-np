@@ -16,7 +16,8 @@ D8 positive-pilot construction described below, for \eqn{10^{-4}<\alpha<0.5}.
 Other previously supported requests retain their existing construction and
 admission rules. Supplying \code{np_udens_bias_control()} explicitly selects
 the joint-scale construction, including for asymptotic inference. Omitted
-controls for bootstrap inference continue to select joint-scale.
+controls for unbounded Gaussian bootstrap inference continue to select joint-scale.
+Known-bound beta plots use the separate construction described below.
 The default \code{center="estimate"} is unchanged.
 Use \code{errors="asymptotic"} for Gaussian calibration or
 \code{errors="bootstrap"}, \code{bootstrap="inid"} for literal independent
@@ -34,7 +35,8 @@ practical envelope with bounded empirical qualification, not a finite-sample
 coverage guarantee.
 Regression iterations and residual/pilot assumptions do not apply.
 
-Omitting \code{band}, or selecting \code{band="pmzsd"}, uses the existing
+For the joint-scale construction, omitting \code{band}, or selecting
+\code{band="pmzsd"}, uses the existing
 normal-quantile convention: the corrected center plus or minus
 \eqn{z_{1-\alpha/2}} times the returned \code{std_error}. The family provider supplies
 the corrected scale; its pointwise calibration work and RNG contract are
@@ -43,6 +45,67 @@ envelope and do not inherit its empirical coverage results. Their endpoints
 are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"}, \code{"simultaneous"},
 \code{"bonferroni"} and \code{"all"} retain their calibrated constructions.
 
+
+\subsection{Known-bound beta density inference}{
+With omitted or \code{NULL} \code{bias_control}, fixed second-order beta
+kernels support \code{errors="asymptotic"} and independent bootstrap
+\code{calibration="symmetric-sd"} or \code{"asymmetric-sd"}. Request
+\code{center="bias-corrected"} and explicitly select \code{band="pointwise"}
+or \code{"simultaneous"}. This plot-only construction supports one or two
+continuous variables, at least ten observations and known finite coordinatewise
+\code{ckerbound="fixed"} bounds. Observations and evaluation points must lie
+strictly inside those bounds. Estimated \code{ckerbound="range"} bounds and
+literal support endpoints are rejected; no jittering or target deletion occurs.
+Bandwidths, bounds and targets stay fixed during inference. Core fitted values,
+estimator standard errors, bandwidth selection and \code{se=FALSE} are unchanged.
+An object fitted with \code{se=FALSE} can receive explicitly requested plot bands.
+
+On normalized support, write \eqn{L_r=4K_r-6K_{2r}+4K_{3r}-K_{4r}} and
+\eqn{\Psi=L_h+L_b-L_hL_b}. Products across coordinates are formed within each
+scale term. The corrected plot center is
+\eqn{C=\widehat R+g_{\widehat\theta}}, where
+\eqn{\widehat R=P_n\Psi-E_{g_{\widehat\theta}}\Psi}. The fitted guide has two
+edge-shape parameters in one dimension, and four edge-shape parameters plus
+an interaction in two dimensions. Half the nominal error probability is
+assigned to a nonlinear guide confidence region and half to the residual
+process. The residual covariance includes the guide-estimation projection
+and cross terms. A positive ratio pilot supplies its transported scale.
+This scale is not a complete normal standard error for the composite interval.
+
+Asymptotic pointwise intervals use \eqn{z_{1-\alpha/4}}; simultaneous bands
+calibrate the absolute Gaussian maximum under the complete residual covariance
+on the finite requested grid. For both SD variants, every literal independent
+multinomial resample refits the guide in the residual; the original empirical
+residual scale is held fixed. This is not replicate studentization or a
+bootstrap of the complete corrected center followed by a second guide region.
+\code{"asymmetric-sd"} inverts the signed residual roots. \code{"symmetric-sd"}
+uses their absolute roots, then takes the smallest outward-rounded interval
+symmetric about the corrected center that contains the composite interval.
+The guide region is added once in each case. These beta-specific rules do not
+change the existing Gaussian density bootstrap constructions.
+
+All slices in one call share one calibration family. Returned endpoints are
+absolute limits; they and the corrected center remain signed, without clipping
+or renormalization. Stored plotting reuses those limits. The selected RNG kind
+and literal resampling law are retained, including Box--Muller continuation.
+Low tail-draw resolution warns and returns finite limits; failed numerical
+certificates and workspace limits are errors. The requested \code{B} or
+\code{gaussian_draws} is never reduced. The current implementation uses bounded
+resident workspaces and invocation-owned temporary files, with limits of
+256 MiB aggregate inference workspace and 512 MiB temporary storage. These
+limits are distinct from total R-process memory.
+
+The retained Beta-family, uniform, mixture and dependent two-dimensional
+experiments show generally conservative finite-grid coverage. They do not
+establish continuum coverage, honesty over unknown boundary smoothness,
+uncertainty in estimated bounds or bandwidth-selection uncertainty. Very wide
+near-edge intervals, especially for singular densities, remain possible.
+The experimental status of bias-corrected inference applies to this method too.
+Other bounded kernels, nearest-neighbour bandwidths, mixed data, dimensions
+above two, derivatives, other bootstrap laws and the \code{pmzsd},
+\code{bonferroni} and \code{all} bands are outside this new beta construction.
+Explicit saved density controls keep their original construction and scope.
+}
 
 \subsection{Default D8 asymptotic density inference}{
 Let \eqn{H=\mathrm{diag}(h_1^2,\ldots,h_q^2)} and

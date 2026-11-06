@@ -608,6 +608,15 @@ np_render_control <- function(style = c("band", "bar"),
            "conbandwidth", "condbandwidth") %in% class(bws)))
   progress.enabled <- (identical(dots$plot.errors.method, "bootstrap") || conditional.optin) &&
     !identical(dots$plot.errors.boot.nonfixed, "frozen")
+  if (!owns.empty.rows && .np_udens_beta_request(bws, dots$bias.control,
+      dots$plot.errors.center, dots$plot.errors.method)) {
+    # Beta owns its explicit child stream; never reset the caller's cached normal.
+    npValidateNonNegativeInteger(random.seed, "random.seed")
+    dots$random.seed <- random.seed
+    value <- .np_plot_progress_run(.np_udens_resolution_run(
+      do.call(method, c(list(bws = bws), dots))), enabled = TRUE)
+    return(.np_plot_data_finish(value, bws, dots, method, random.seed))
+  }
   if (!owns.empty.rows && .np_udens_d8_default(bws, dots$bias.control,
       dots$plot.errors.center, dots$plot.errors.method,
       if (is.null(dots$plot.errors.alpha)) .05 else dots$plot.errors.alpha)) {

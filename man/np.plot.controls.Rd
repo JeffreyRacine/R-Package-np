@@ -74,6 +74,15 @@ It requires corrected bootstrap inference, preserves that legacy route's
 supported bands, laws and returned-error conventions, and rejects an explicitly
 supplied nonlegacy bias control. Omitted calibration remains unchanged.
 
+For known-fixed-bound beta density plots with omitted \code{bias_control},
+\code{"symmetric-sd"} and \code{"asymmetric-sd"} select the separate refitted
+residual construction described in \code{\link{np_udens_bias_control}}.
+It requires independent resampling and explicit pointwise or simultaneous
+bands. The asymmetric rule inverts signed residual roots; the symmetric rule
+adds the guide region and takes a containing symmetric hull once. Gaussian
+density tail transport and all existing calibration aliases retain their
+meanings; omitted calibration does not silently select a beta SD variant.
+
 For density, \code{"smoothed-percentile"} uses complete unshifted corrected
 curves, a data-selected outer smoothing pilot and 39 outer calibration samples.
 The complete density and its correction vary jointly. The original fitted

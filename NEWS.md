@@ -25,6 +25,14 @@
   including a pending Box-Muller deviate. General tiled and callback replay
   remain separate contracts.
 
+* Add experimental plot-only corrected density intervals for fixed, known-bound
+  order-2 beta kernels in one or two continuous dimensions: asymptotic,
+  symmetric-sd and asymmetric-sd, with explicit pointwise/simultaneous bands.
+  Share the guide/residual preparation, portable native arithmetic and bounded
+  calibration storage. Range-derived bounds and literal endpoints are rejected.
+  Core estimators, bandwidth searches, estimator SEs, se=FALSE and incumbent
+  Gaussian/D8/MP1 constructions are unchanged.
+
 * Preserve native-vector column identity when unconditional density/distribution fits retain training data and plots reconstruct their grids; explicitly named frames and matrices keep their own names.
 
 * Reject structurally degenerate full-sample fixed blocks in corrected density inference instead of returning zero-width uncertainty bands.
