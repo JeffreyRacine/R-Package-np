@@ -1,10 +1,11 @@
 # Invocation-owned preparation is shared by target blocks and all required laws.
-.np_udens_beta_q2_moment_prepare <- function(x,h,grid,theta,inner,outer,state=NULL) {
+.np_udens_beta_q2_moment_prepare <- function(x,h,grid,theta,inner,outer,state=NULL,
+                                             axis.cache=.np_udens_beta_axis_cache) {
   n<-nrow(x);st<-if(is.null(state)).np_udens_beta_joint_rule(theta,32L) else state
   axes<-list(.np_udens_beta_marginal_rule(theta[1:2],outer),.np_udens_beta_marginal_rule(theta[3:4],outer))
   nodes<-vapply(axes,`[[`,integer(1),'nodes')
   if(max(nodes)>1600L||prod(nodes)>2560000L)stop("beta plot joint refinement node cap",call.=FALSE)
-  cache<-.np_udens_beta_axis_cache(grid,axes,h,n^(-13/54),inner)
+  cache<-axis.cache(grid,axes,h,n^(-13/54),inner)
   Td<-.np_udens_beta_basis(x);lg<-drop(Td%*%theta)-st$A;rho<-n^(-1/3)
   mats<-vector('list',2);shifts<-numeric(2)
   for(j in 1:2) {
@@ -16,7 +17,7 @@
   if(any(!is.finite(ratio))||any(ratio<=0))stop("beta plot joint ratio cache range",call.=FALSE)
   ratio<-log(ratio)+sum(shifts)
   list(x=x,h=h,grid=grid,theta=theta,inner=inner,outer=outer,state=st,axes=axes,
-       cache=cache,ratio=ratio,Td=Td,Iinv=solve(st$I),
+       cache=cache,ratio=ratio,Td=Td,Iinv=solve(st$I),axis.cache=axis.cache,
        logz=st$A-axes[[1]]$A-axes[[2]]$A)
 }
 
@@ -33,7 +34,7 @@
   mu<-guide$mean[ix];B<-guide$cross[ix,,drop=FALSE];K<-B%*%prep$Iinv
   x<-prep$x;grid<-prep$grid[rows,,drop=FALSE]
   da<-list(list(lv=log(x[,1]),l1v=log1p(-x[,1])),list(lv=log(x[,2]),l1v=log1p(-x[,2])))
-  obs<-.np_udens_beta_joint_block_native(.np_udens_beta_axis_cache(grid,da,prep$h,n^(-13/54),prep$inner),seq_len(n),seq_len(n))
+  obs<-.np_udens_beta_joint_block_native(prep$axis.cache(grid,da,prep$h,n^(-13/54),prep$inner),seq_len(n),seq_len(n))
   Td<-sweep(prep$Td,2,colMeans(prep$Td));residual<-obs-rowMeans(obs)-K%*%t(Td)
   ve<-rowSums(residual^2)/(n*(n-1));emp<-if(full)tcrossprod(residual)/(n*(n-1)) else NULL
   covs<-variances<-identities<-list();Tg<-.np_udens_beta_basis(grid)

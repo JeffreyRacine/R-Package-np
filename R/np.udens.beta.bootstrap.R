@@ -2,9 +2,10 @@
   .Call(C_np_plot_udens_beta_refits,as.double(x),matrix(as.double(counts),nrow(counts)))
 }
 
-.np_udens_beta_q1_common <- function(x,h,grid,thetas,inner,outer) {
+.np_udens_beta_q1_common <- function(x,h,grid,thetas,inner,outer,
+                                     score=.np_udens_beta_q1_score) {
   base<-apply(thetas,2,min);st<-.np_udens_beta_marginal_rule(base,outer)
-  P<-.np_udens_beta_q1_score(grid,st$lv,st$l1v,h*h,length(x)^(-7/17),inner)
+  P<-score(grid,st$lv,st$l1v,h*h,length(x)^(-7/17),inner)
   mu<-fitted<-matrix(0,nrow(thetas),length(grid));Tg<-cbind(log(grid),log1p(-grid))
   mass.error<-score.error<-0
   for(start in seq.int(1L,nrow(thetas),by=32L)) {
@@ -20,7 +21,7 @@
     mass.error<-max(mass.error,mass);score.error<-max(score.error,err)
     mu[ix,]<-t(P%*%p);fitted[ix,]<-exp(sweep(th%*%t(Tg),1,A))
   }
-  obs<-.np_udens_beta_q1_score(grid,log(x),log1p(-x),h*h,length(x)^(-7/17),inner)
+  obs<-score(grid,log(x),log1p(-x),h*h,length(x)^(-7/17),inner)
   list(mu=mu,fitted=fitted,observed=obs,diagnostics=c(mass=mass.error,score=score.error,nodes=st$nodes))
 }
 

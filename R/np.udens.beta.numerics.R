@@ -91,10 +91,11 @@
   ans
 }
 
-.np_udens_beta_q1_moments <- function(x,h,grid,theta,inner,outer,full=TRUE) {
+.np_udens_beta_q1_moments <- function(x,h,grid,theta,inner,outer,full=TRUE,
+                                      score=.np_udens_beta_q1_score) {
   n<-length(x);rb<-n^(-7/17);st<-.np_udens_beta_marginal_rule(theta,outer)
-  P<-.np_udens_beta_q1_score(grid,st$lv,st$l1v,h*h,rb,inner)
-  obs<-.np_udens_beta_q1_score(grid,log(x),log1p(-x),h*h,rb,inner)
+  P<-score(grid,st$lv,st$l1v,h*h,rb,inner)
+  obs<-score(grid,log(x),log1p(-x),h*h,rb,inner)
   mu<-drop(P%*%st$prob);S<-sweep(st$T,2,st$mean);B<-P%*%(S*st$prob)
   Td<-cbind(log(x),log1p(-x));U<-t(solve(st$I,t(sweep(Td,2,colMeans(Td)))))
   Rdata<-obs-rowMeans(obs)-B%*%t(U);Ueta<-sweep(U,2,theta+1,"/")

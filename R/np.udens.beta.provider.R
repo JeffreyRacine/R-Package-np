@@ -87,7 +87,10 @@
   .np_udens_beta_region_dispatch(theta,Veta,grid,alpha,progress)
 }
 
-.np_udens_beta_sd_roots <- function(x,h,grid,prepared,stream,store,progress) {
+.np_udens_beta_sd_roots <- function(x,h,grid,prepared,stream,store,progress,
+                                   score=.np_udens_beta_q1_score,
+                                   axis.cache=.np_udens_beta_axis_cache,
+                                   inner=c(64L,128L)) {
   n<-nrow(x);q<-ncol(x);m<-nrow(grid);B<-stream$request$B
   theta<-prepared$theta;p<-length(theta);thetas<-matrix(0,B,p);iterations<-numeric(B)
   draw.blocks<-.np_udens_beta_blocks(B,min(32L,max(1L,floor(8*1024^2/(n*8)))))
@@ -101,8 +104,8 @@
     scale<-sqrt(prepared$empirical_variance)
     for(j in seq_along(roots$rows)) {
       ix<-roots$rows[[j]]
-      main<-.np_udens_beta_q1_common(x[,1],h,grid[ix,1],all.theta,64L,128L)
-      refined<-.np_udens_beta_q1_common(x[,1],h,grid[ix,1],all.theta,128L,256L)
+      main<-.np_udens_beta_q1_common(x[,1],h,grid[ix,1],all.theta,inner[1L],128L,score)
+      refined<-.np_udens_beta_q1_common(x[,1],h,grid[ix,1],all.theta,inner[2L],256L,score)
       .np_udens_beta_check(main$mu,refined$mu,'bootstrap common guide means',1e-10)
       .np_udens_beta_check(main$fitted,refined$fitted,'bootstrap common guide density',1e-10)
       .np_udens_beta_check(main$mu[1,],prepared$mu[ix],'bootstrap original mean',1e-10)
@@ -120,8 +123,8 @@
     roots$next_draw<-B+1L
     return(list(roots=roots,theta=thetas,iterations=iterations))
   } else {
-    main<-.np_udens_beta_series_projection(.np_udens_beta_series_rule(theta,32L),h,n,grid,64L)
-    refined<-.np_udens_beta_series_projection(.np_udens_beta_series_rule(theta,64L),h,n,grid,128L)
+    main<-.np_udens_beta_series_projection(.np_udens_beta_series_rule(theta,32L),h,n,grid,inner[1L],axis.cache)
+    refined<-.np_udens_beta_series_projection(.np_udens_beta_series_rule(theta,64L),h,n,grid,inner[2L],axis.cache)
     original<-.np_udens_beta_series_means_native(main,matrix(theta,1L))
     original.ref<-.np_udens_beta_series_means_native(refined,matrix(theta,1L))
     .np_udens_beta_check(original$mu,original.ref$mu,'bootstrap original mean refinement',1e-10)
