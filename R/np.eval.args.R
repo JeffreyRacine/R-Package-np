@@ -1,3 +1,13 @@
+# A native vector has no column identity of its own. Preserve the fitted role
+# at the conversion boundary; named frames/matrices keep their explicit identity.
+.np_native_vector_frame_names <- function(frame, was.vector, bws) {
+  columns <- bws[["xnames", exact = TRUE]]
+  if (isTRUE(was.vector) && ncol(frame) == 1L &&
+      is.character(columns) && length(columns) == 1L)
+    names(frame) <- columns
+  frame
+}
+
 # Native bandwidth-object fits share the evaluation roles already supported by
 # fitted-object predict methods. Do not consult a call or an ambient frame.
 .np_args_with_defaults <- function(defaults, explicit) {

@@ -1,5 +1,7 @@
 # npRmpi 0.80-2 (development)
 
+* Preserve native-vector column identity when unconditional density/distribution fits retain training data and plots reconstruct their grids; explicitly named frames and matrices keep their own names.
+
 * Clarify the aggregate D8 inference-storage forecast and its pool-size limitation.
 
 * Session help now states the existing worker-loop limitation for errors escaping manual broadcasts; master-only error handling does not restore a failed worker pool. Runtime handling is unchanged.

@@ -136,7 +136,8 @@ npudens.bandwidth <-
     return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
   }
 
-  tdat = toFrame(tdat)
+  tdat.was.vector <- is.atomic(tdat) && is.null(dim(tdat))
+    tdat = .np_native_vector_frame_names(toFrame(tdat), tdat.was.vector, bws)
   bws <- .np_bws_retain_native_training(bws, dat = tdat)
 
   if (!no.e)
