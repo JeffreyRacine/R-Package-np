@@ -1,5 +1,8 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Bias-corrected regression plots now detect unsafe uncached Box-Muller replay
+  for retained formulas with quoted predictor names, before changing RNG state.
+
 * Refuse unsafe Box-Muller replay for explicit joint-scale and retained version-2
   density factor bands above 512 targets. Default D8, covariance and bootstrap
   providers retain their existing computation and RNG behavior.
