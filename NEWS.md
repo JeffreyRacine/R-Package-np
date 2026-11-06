@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+- MPI regression degree search rejects an already-decoded nonfinite initial
+  bandwidth before starting its prepared worker command, preserving the pool
+  on the constant-regressor case. Native solver and manual-command handling
+  are unchanged.
+
 - Native-vector MPI fits reconcile descriptive variable identities before
   publication, including retained training/index names and nested fit copies.
   Explicit data-frame names, executable calls and acknowledged input leases

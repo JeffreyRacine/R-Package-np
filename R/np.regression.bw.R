@@ -3046,6 +3046,10 @@ npRmpiNomadPreparedSearchRegression <- function(template,
     if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
       search.result <- eval(mc, envir = environment())
     } else {
+      # Reject the already-decoded invalid start while workers are still idle.
+      # The existing storage validator owns this condition; no search is run.
+      .np_nomad_bw_validate_storage(start.bw, length(template$bw),
+        where = "npreg NOMAD degree-search initial bandwidth")
       .npRmpi_sync_prepared_search_options(comm = 1L)
       search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
     }
