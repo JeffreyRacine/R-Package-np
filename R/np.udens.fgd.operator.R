@@ -30,7 +30,10 @@
 }
 
 .np_udens_fgd_score <- function(grid,lv,l1v,rh,rb,order) {
-  .np_udens_fgd_operator(grid,exp(lv),sqrt(rh))
+  a<-.np_udens_fgd_operator(grid,exp(lv),sqrt(rh))
+  # Retain the frozen reference's arithmetic ordering as well as its operator.
+  # Although algebraically A-1, this combination affects tiny factor eigenmodes.
+  ((4*a-6*a)+4*a)-a
 }
 
 .np_udens_fgd_axis_cache <- function(grid,axes,h,rb=NULL,inner=24L) {

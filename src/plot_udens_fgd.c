@@ -4,6 +4,7 @@
 #include <R_ext/Utils.h>
 #include <math.h>
 #include <limits.h>
+#pragma STDC FP_CONTRACT OFF
 
 SEXP C_np_plot_fgd_evaluate(SEXP target, SEXP donor, SEXP bandwidth,
                            SEXP coefficients, SEXP logmass)
@@ -37,7 +38,7 @@ SEXP C_np_plot_fgd_evaluate(SEXP target, SEXP donor, SEXP bandwidth,
             double d=REAL(donor)[j]-REAL(target)[i], z=d/scale;
             double p=REAL(coefficients)[i]+z*(REAL(coefficients)[i+m]+
                 z*(REAL(coefficients)[i+2*m]+z*REAL(coefficients)[i+3*m]));
-            double value=expm1(-(d/h)*(d/h)*0.5-REAL(logmass)[i])*p+(p-1.0);
+            double value=expm1(-(d*d)/((2.0*h)*h)-REAL(logmass)[i])*p+(p-1.0);
             if (!R_FINITE(value)) error("nonfinite Gaussian plot operator");
             REAL(ans)[i+m*j]=value;
         }
