@@ -1,6 +1,29 @@
 # Pre-seed refusal only. This is not a general RNG capability certificate.
 # Unknown data reconstruction and other producers retain their own validation.
-.np_plot_replay_training_n <- function(dots) {
+.np_plot_replay_training_n <- function(dots, bws = NULL) {
+  # Match the engine's suppliedness and retained-value precedence without
+  # evaluating calls, formulas, NA policies or historical row counts.
+  if (!any(c("xdat", "ydat") %in% names(dots)) && !is.null(bws)) {
+    if (!is.null(bws[["formula", exact = TRUE]])) {
+      training <- bws[[".np.formula.training", exact = TRUE]]
+      if (is.object(training) || !is.list(training) ||
+          !"na.action" %in% names(training)) return(NULL)
+      frame <- training[["frame", exact = TRUE]]
+      if (!identical(class(frame), "data.frame") || length(frame) < 2L)
+        return(NULL)
+      tt <- attr(frame, "terms", exact = TRUE)
+      if (!identical(class(tt), c("terms", "formula")) ||
+          !identical(attr(tt, "response", exact = TRUE), 1L) ||
+          !identical(attr(tt, "term.labels", exact = TRUE), names(frame)[-1L]))
+        return(NULL)
+      dots <- list(xdat = frame[-1L], ydat = frame[[1L]])
+    } else {
+      training <- bws[[".np.native.training", exact = TRUE]]
+      if (is.object(training) || !is.list(training) ||
+          !all(c("xdat", "ydat") %in% names(training))) return(NULL)
+      dots <- training
+    }
+  }
   x <- dots[["xdat", exact = TRUE]]
   y <- dots[["ydat", exact = TRUE]]
   plain <- function(z) {
@@ -83,7 +106,7 @@
   if (!kind[1L] %in% builtin || !identical(kind[2L], "Box-Muller")) return(invisible(NULL))
   unsafe <- FALSE
   if (regression) {
-    n <- .np_plot_replay_training_n(dots)
+    n <- .np_plot_replay_training_n(dots, bws)
     B <- dots[["gaussian.draws", exact = TRUE]]
     if (is.null(B)) B <- 9999L
     if (!is.null(n) && !is.object(B) && is.numeric(B) && length(B) == 1L &&

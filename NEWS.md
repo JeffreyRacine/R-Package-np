@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Recognize ordinary retained native and formula training values when checking
+  uncached corrected-regression Box-Muller replay. Explicit data overrides keep
+  precedence; no stored call, model frame or user NA policy is reevaluated.
+
 * Refuse selected corrected regression and multi-tile fixed numeric joint CDF
   plots when a custom uniform generator exposes only a seed header and no replay
   state. This pre-seed check preserves the selected RNG; a nonempty payload is

@@ -626,6 +626,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   users may explicitly select a qualified built-in generator. A nonempty seed
   payload does not certify arbitrary custom state or callback behavior.
 
+  Ordinary complete retained native training values and formula training frames
+  can establish the regression replay size even without retained residuals.
+  Explicit training arguments take precedence; calls and NA policies are not
+  reevaluated by the check. Legacy or non-plain reconstruction stays unclassified.
   Known unsafe Box--Muller replay is refused before seeding for corrected
   Gaussian regression above the 16 MiB retained-innovation limit when ordinary
   training data are already available, and for multi-tile fixed numeric joint
