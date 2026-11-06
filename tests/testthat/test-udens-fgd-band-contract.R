@@ -40,3 +40,13 @@ test_that('FG-D selection preserves explicit and legacy routes', {
   b$ckerbound<-'range';expect_true(request(b)) # admitted to the early fixed-bound refusal
   for(class in c('rbandwidth','dbandwidth','conbandwidth')){b<-bws;class(b)<-class;expect_false(request(b))}
 })
+
+test_that('FG-D batched targets retain the scalar frozen moment convention', {
+  x<-c(.0006832685321569443,.2,.5,.8,.999)
+  u<-.np_udens_beta_rule(c(1,1),64L)[,1]
+  for(h in c(.05,.999999,1,1.000001,5,22.3546)) {
+    batch<-.np_udens_fgd_operator(x,u,h)
+    scalar<-do.call(rbind,lapply(x,function(xx).np_udens_fgd_operator(xx,u,h)))
+    expect_identical(batch,scalar)
+  }
+})

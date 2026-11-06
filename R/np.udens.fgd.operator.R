@@ -10,7 +10,11 @@
   if(!is.numeric(x)||!length(x)||!is.numeric(u)||!length(u)||
      any(!is.finite(c(x,u,h)))||length(h)!=1L||h<=0||
      any(x<0|x>1)||any(u<0|u>1))stop('invalid Gaussian plot operator geometry',call.=FALSE)
-  coefficients<-matrix(0,length(x),4L);mass<-.np_udens_fgd_logmass(x,h)
+  coefficients<-matrix(0,length(x),4L)
+  # The frozen local-polynomial operator evaluates log mass per target.
+  # A matrix BLAS contraction can round differently near the uniform limit.
+  mass<-if(h<1).np_udens_fgd_logmass(x,h) else
+    vapply(x,function(xx).np_udens_fgd_logmass(xx,h),numeric(1))
   if(h>=1)gl<-.np_udens_beta_rule(c(1,1),32L)
   for(i in seq_along(x)) {
     if(h<1) {
