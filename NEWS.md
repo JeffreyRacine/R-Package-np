@@ -1,5 +1,8 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Plot calibration help now distinguishes visible seed restoration from hidden
+  generator state and subsequent caller draws. No RNG behavior is changed.
+
 * Multi-tile numeric joint-CDF geometric bootstrap plots with unsigned
   calibration now refuse custom uniform state absent from the visible seed;
   signed cached paths and full-state generators retain their existing behavior.

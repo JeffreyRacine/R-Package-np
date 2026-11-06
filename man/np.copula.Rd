@@ -316,8 +316,12 @@ surface plots.
 
   \item{gaussian_draws, random_seed}{
     Gaussian maximum simulation count and reproducible seed for asymptotic
-    \code{band="simultaneous"} or \code{band="all"}. The caller's RNG state is
-    restored. These controls do not change bootstrap replication counts.
+    \code{band="simultaneous"} or \code{band="all"}. The temporary seed scope
+    restores the visible \code{.Random.seed} binding (or its absence).
+    Hidden generator state, including a pending Box--Muller normal or custom
+    state not represented by \code{.Random.seed}, is not restored, so later
+    caller draws can differ. This is separate from replay within the current
+    band calculation. These controls do not change bootstrap replication counts.
   }
 
   \item{errors}{

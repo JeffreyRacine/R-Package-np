@@ -298,8 +298,12 @@ selection, prediction, or plotting route.
 
   Calibration is over the retained finite grid within one panel and one
   \code{tau}; it is not joint over taus or panels. \code{gaussian.draws}
-  controls the Gaussian maximum simulation, and \code{random.seed} preserves
-  reproducibility without changing the caller's RNG state. These are
+  controls the Gaussian maximum simulation, and \code{random.seed} controls
+  reproducibility. The temporary seed scope restores the visible
+  \code{.Random.seed} binding (or its absence), but not hidden generator state,
+  including a pending Box--Muller normal or custom state absent from that binding.
+  Subsequent caller draws can therefore differ. This is separate from replay
+  within the current band calculation. These are
   variability bands under the frozen transformation convention below; they
   do not add uncertainty from transformation selection or remove smoothing
   bias, and do not cover points between the declared grid. Coverage requires
