@@ -159,3 +159,21 @@ test_that("explicit density replay retains default and covariance providers", {
   d$bias.control$version <- 2L; expect_error(guard(method,b,d),"unsafe RNG replay")
   d$plot.errors.method <- "bootstrap"; expect_silent(guard(method,b,d))
 })
+
+
+test_that("retained quoted symbols classify without evaluating terms", {
+  ns <- asNamespace("np")
+  count <- get(".np_plot_replay_training_n", ns)
+  d <- data.frame(y = 1:5, check.names = FALSE)
+  d[["x value"]] <- 2:6
+  frame <- model.frame(y ~ `x value`, d)
+  b <- list(formula = y ~ `x value`,
+            .np.formula.training = list(frame = frame, na.action = NULL))
+  expect_identical(count(list(), b), 5L)
+  expect_null(count(list(xdat = NULL), b))
+  for (bad in list("`", "stop('do not evaluate')", NA_character_,
+                   structure("`x value`", class = "custom_labels"))) {
+    attr(attr(b$.np.formula.training$frame, "terms"), "term.labels") <- bad
+    expect_null(count(list(), b))
+  }
+})

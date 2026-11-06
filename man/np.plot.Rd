@@ -633,6 +633,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Its smaller covariance and deterministic marginal bands remain available.
   Ordinary complete retained native training values and formula training frames
   can establish the regression replay size even without retained residuals.
+  This includes retained simple-symbol formulas with quoted predictor names.
   Explicit training arguments take precedence; calls and NA policies are not
   reevaluated by the check. Legacy or non-plain reconstruction stays unclassified.
   Known unsafe Box--Muller replay is refused before seeding for corrected

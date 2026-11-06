@@ -13,9 +13,19 @@
         return(NULL)
       tt <- attr(frame, "terms", exact = TRUE)
       if (!identical(class(tt), c("terms", "formula")) ||
-          !identical(attr(tt, "response", exact = TRUE), 1L) ||
-          !identical(attr(tt, "term.labels", exact = TRUE), names(frame)[-1L]))
-        return(NULL)
+          !identical(attr(tt, "response", exact = TRUE), 1L)) return(NULL)
+      labels <- attr(tt, "term.labels", exact = TRUE)
+      columns <- names(frame)[-1L]
+      if (!identical(labels, columns)) {
+        if (is.object(labels) || !is.character(labels) || anyNA(labels))
+          return(NULL)
+        # terms quotes simple non-syntactic symbols; model.frame does not.
+        # Encode known names, without parsing or evaluating supplied terms.
+        symbols <- vapply(columns, function(name)
+          paste(deparse(as.name(name), backtick = TRUE), collapse = ""),
+          character(1L), USE.NAMES = FALSE)
+        if (!identical(labels, symbols)) return(NULL)
+      }
       dots <- list(xdat = frame[-1L], ydat = frame[[1L]])
     } else {
       training <- bws[[".np.native.training", exact = TRUE]]
