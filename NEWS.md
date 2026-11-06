@@ -1,5 +1,8 @@
 # np 0.80-2 (development)
 
+* Explicit tiled density/CDF factor plots now refuse a custom uniform generator
+  whose visible seed omits its replay state, before entering the plot seed scope.
+
 * Bias-corrected regression plots now detect unsafe uncached Box-Muller replay
   for retained formulas with quoted predictor names, before changing RNG state.
 
