@@ -147,9 +147,11 @@
     if (distribution) {
       m <- .np_plot_replay_cdf_targets(bws, dots)
       band <- dots[["plot.errors.type", exact = TRUE]]
+      unsigned.geom <- identical(law, "geom") &&
+        (is.null(calibration) || isTRUE(calibration %in% c("default", "absolute", "symmetric-sd")))
       unsafe <- !is.null(m) && m > 25L &&
         ((asymptotic && isTRUE(band %in% c("bonferroni", "simultaneous", "all"))) ||
-         (!asymptotic && identical(law, "inid")))
+         (!asymptotic && (identical(law, "inid") || unsigned.geom)))
     }
     if (unsafe)
       stop("unsafe RNG replay: this bias-corrected plot requires custom uniform state absent from .Random.seed; explicitly select a qualified built-in generator before plotting", call. = FALSE)
