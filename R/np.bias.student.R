@@ -122,15 +122,16 @@
     prepared$wild.residual else prepared$root.variance
 }
 
-.np_bias_student_errors <- function(root.variance, size, law) {
+.np_bias_student_errors <- function(root.variance, size, law, innovations=NULL) {
   lapply(.np_bias_student_slices(size),function(ii)
-    root.variance * .np_bias_draws(length(root.variance),length(ii),law))
+    root.variance * (if (is.null(innovations))
+      .np_bias_draws(length(root.variance),length(ii),law) else innovations[,ii,drop=FALSE]))
 }
 
-.np_bias_student_chunk <- function(prepared, W, target, size, law, signed=FALSE) {
+.np_bias_student_chunk <- function(prepared, W, target, size, law, signed=FALSE, innovations=NULL) {
   n <- ncol(W)
   slices <- .np_bias_student_slices(size)
-  errors <- .np_bias_student_errors(.np_bias_student_error_scale(prepared,law),size,law)
+  errors <- .np_bias_student_errors(.np_bias_student_error_scale(prepared,law),size,law,innovations)
   numerator <- lapply(errors,function(ep) W %*% ep)
   residual <- matrix(0,n,size)
   owner <- .np_bias_student_pilot_owner(prepared$pilot)
@@ -155,14 +156,16 @@
   out
 }
 
-.np_bias_student_draws <- function(prepared, W, se, B, law, signed=FALSE) {
+.np_bias_student_draws <- function(prepared, W, se, B, law, signed=FALSE, innovations=NULL) {
   target <- .np_bias_student_target(prepared,W,se)
   out <- matrix(0,nrow(W),B)
   for (first in seq.int(1L,B,by=1024L)) {
     ii <- seq.int(first,min(B,first+1023L))
-    out[,ii] <- .np_bias_student_chunk(prepared,W,target,length(ii),law,signed=signed)
+    out[,ii] <- .np_bias_student_chunk(prepared,W,target,length(ii),law,signed=signed,
+      innovations=if(is.null(innovations))NULL else innovations$values[,ii,drop=FALSE])
     .np_plot_progress_notify(stage="Calibrating studentized process",
       done=max(ii),total=B,unit="draws")
   }
+  if (!is.null(innovations)) assign(".Random.seed",innovations$end,.GlobalEnv)
   out
 }
