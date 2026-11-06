@@ -97,7 +97,8 @@
       if(miss.x && !is.null(bws$call)){
         xdat <- data.frame(.np_eval_bws_call_arg(bws, "dat"))
       }
-      xdat = toFrame(xdat)
+      xdat.was.vector <- is.atomic(xdat) && is.null(dim(xdat))
+      xdat = .np_native_vector_frame_names(toFrame(xdat), xdat.was.vector, bws)
       xdat = na.omit(xdat)
     }
 
