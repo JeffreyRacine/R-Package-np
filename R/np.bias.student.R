@@ -123,15 +123,16 @@
     prepared$wild.residual else prepared$root.variance
 }
 
-.np_bias_student_errors <- function(root.variance, size, law) {
+.np_bias_student_errors <- function(root.variance, size, law, innovations=NULL) {
   lapply(.np_bias_student_slices(size),function(ii)
-    root.variance * .np_bias_draws(length(root.variance),length(ii),law))
+    root.variance * (if (is.null(innovations))
+      .np_bias_draws(length(root.variance),length(ii),law) else innovations[,ii,drop=FALSE]))
 }
 
-.np_bias_student_chunk <- function(prepared, W, target, size, law, signed=FALSE) {
+.np_bias_student_chunk <- function(prepared, W, target, size, law, signed=FALSE, innovations=NULL) {
   n <- ncol(W)
   slices <- .np_bias_student_slices(size)
-  errors <- .np_bias_student_errors(.np_bias_student_error_scale(prepared,law),size,law)
+  errors <- .np_bias_student_errors(.np_bias_student_error_scale(prepared,law),size,law,innovations)
   numerator <- lapply(errors,function(ep) W %*% ep)
   residual <- matrix(0,n,size)
   owner <- .np_bias_student_pilot_owner(prepared$pilot)
@@ -156,17 +157,27 @@
   out
 }
 
-.np_bias_student_draws <- function(prepared, W, se, B, law, signed=FALSE) {
+.np_bias_student_draws <- function(prepared, W, se, B, law, signed=FALSE, innovations=NULL) {
   target <- .np_bias_student_target(prepared,W,se)
   .npRmpi_bootstrap_fanout_enabled(n=ncol(W),B=B,chunk.size=1024L,
     what="studentized corrected process")
   tasks <- .npRmpi_bootstrap_chunk_tasks(B,1024L,with.seeds=FALSE)
-  tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks,function(task)
-    invisible(.np_bias_student_errors(.np_bias_student_error_scale(prepared,law),task$bsz,law)),
-    normal.draws=identical(law,"gaussian"))
+  if (is.null(innovations)) {
+    tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks,function(task)
+      invisible(.np_bias_student_errors(.np_bias_student_error_scale(prepared,law),task$bsz,law)),
+      normal.draws=identical(law,"gaussian"))
+  } else {
+    tasks <- lapply(tasks,function(task) {
+      ii <- seq.int(task$start,length.out=task$bsz)
+      task$innovations <- innovations$values[,ii,drop=FALSE]
+      task
+    })
+    attr(tasks,"rng_final_state") <- innovations$end
+  }
   worker <- function(task,prepared,W,target,law,signed) {
-    .npRmpi_bootstrap_use_task_rng(task)
-    t(.np_bias_student_chunk(prepared,W,target,task$bsz,law,signed=signed))
+    if (is.null(task$innovations)) .npRmpi_bootstrap_use_task_rng(task)
+    t(.np_bias_student_chunk(prepared,W,target,task$bsz,law,signed=signed,
+      innovations=task$innovations))
   }
   t(.npRmpi_bootstrap_run_fanout(tasks,worker,ncol.out=nrow(W),
     what="studentized corrected process",profile.where="mpi.applyLB:bias-student",

@@ -1,5 +1,11 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Bounded Gaussian bias-corrected regression calibration now reuses actual
+  Box-Muller innovations across target tiles and worker tasks. This preserves
+  joint studentization for built-in uniform generators when the innovation
+  matrix is at most 16 MiB. Larger replay jobs, opaque custom-generator state
+  and caller hidden-state restoration remain unresolved separate limitations.
+
 * Small-grid Gaussian density scale envelopes now preserve a single normal
   sample, avoiding Box-Muller replay errors and incorrect signed maxima.
   Broader tiled replay and caller-RNG restoration remain separate limitations.

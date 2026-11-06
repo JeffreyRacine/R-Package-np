@@ -21,14 +21,42 @@
   F %*% .np_bias_process_innovations(ncol(F),first,last,B,law,blocklen)
 }
 
-.np_bias_process_draws <- function(F, B, law, blocklen) {
+# Box-Muller has a cached deviate outside .Random.seed. Retain actual values
+# for bounded Gaussian regression jobs; no seed reset can replay that cache.
+# Other callers/kinds and larger jobs retain their existing path.
+.np_bias_gaussian_cache <- function(n, B, law, kind=RNGkind()) {
+  builtin <- c("Wichmann-Hill","Marsaglia-Multicarry","Super-Duper",
+    "Mersenne-Twister","Knuth-TAOCP","Knuth-TAOCP-2002","L'Ecuyer-CMRG")
+  if (!identical(law,"gaussian") || !kind[1L] %in% builtin ||
+      !identical(kind[2L],"Box-Muller")) return(NULL)
+  dims <- c(n,B)
+  if (!is.numeric(dims) || length(dims)!=2L || anyNA(dims) ||
+      any(!is.finite(dims)) || any(dims<1 | dims!=floor(dims)) ||
+      any(dims>.Machine$integer.max))
+    stop("invalid Gaussian replay dimensions",call.=FALSE)
+  if (8*as.double(n)*B>16*1024^2) return(NULL)
+  values <- .np_bias_draws(n,B,"gaussian")
+  list(values=values,end=get(".Random.seed",.GlobalEnv,inherits=FALSE))
+}
+
+.np_bias_process_draws <- function(F, B, law, blocklen, innovations=NULL) {
   n <- ncol(F)
   .npRmpi_bootstrap_fanout_enabled(n=n,B=B,chunk.size=32L,what="corrected process")
   tasks <- .npRmpi_bootstrap_chunk_tasks(B,32L,with.seeds=FALSE)
-  tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks,function(task)
-    invisible(.np_bias_process_innovations(n,task$start,task$start+task$bsz-1L,B,law,blocklen)),
-    normal.draws=identical(law,"gaussian") || (identical(law,"geom") && blocklen>1L))
+  if (is.null(innovations)) {
+    tasks <- .npRmpi_bootstrap_attach_rng_stream(tasks,function(task)
+      invisible(.np_bias_process_innovations(n,task$start,task$start+task$bsz-1L,B,law,blocklen)),
+      normal.draws=identical(law,"gaussian") || (identical(law,"geom") && blocklen>1L))
+  } else {
+    tasks <- lapply(tasks,function(task) {
+      ii <- seq.int(task$start,length.out=task$bsz)
+      task$innovations <- innovations$values[,ii,drop=FALSE]
+      task
+    })
+    attr(tasks,"rng_final_state") <- innovations$end
+  }
   worker <- function(task,factors,B,law,blocklen) {
+    if (!is.null(task$innovations)) return(t(factors %*% task$innovations))
     .npRmpi_bootstrap_use_task_rng(task)
     t(.np_bias_process_chunk(factors,task$start,task$start+task$bsz-1L,B,law,blocklen))
   }
@@ -212,6 +240,7 @@
   selection <- if(law%in%c("fixed","geom")) .np_bias_block_selection(state$residual_raw,law,blocklen) else NULL
   if(!exists(".Random.seed",.GlobalEnv,inherits=FALSE))runif(1L)
   rng <- get(".Random.seed",.GlobalEnv,inherits=FALSE);rng.kind <- RNGkind();end <- rng
+  innovations <- .np_bias_gaussian_cache(nrow(state$x),B,law,rng.kind)
   rank.results <- if(rank.calibration)vector("list",length(targets)) else NULL
   families <- if(rank.calibration)split(seq_along(targets),ceiling(seq_along(targets)/8L)) else list(1L)
   for(family in families) {
@@ -252,8 +281,8 @@
     if (student) {
       if (is.null(prepared)) prepared <- .np_bias_student_prepare(state)
       part <- if(rank.calibration) .np_bias_stream(rng,
-        .np_bias_student_draws(prepared,value$W,value$se,B,law,signed=TRUE)) else
-        .np_bias_stream(rng,.np_bias_student_draws(prepared,value$W,value$se,B,law))
+        .np_bias_student_draws(prepared,value$W,value$se,B,law,signed=TRUE,innovations=innovations)) else
+        .np_bias_stream(rng,.np_bias_student_draws(prepared,value$W,value$se,B,law,innovations=innovations))
     } else if (score.calibration) {
       F <- sweep(value$W,2L,state$residual,"*")
       F <- F-rowMeans(F)
@@ -267,7 +296,7 @@
       F <- if(score)sweep(value$W,2L,state$residual,"*") else value$factor
       if(score)F <- F-rowMeans(F)
       part <- .np_bias_stream(rng,
-        .np_bias_process_draws(F,B,law,if(is.null(selection))NULL else selection$length))
+        .np_bias_process_draws(F,B,law,if(is.null(selection))NULL else selection$length,innovations=innovations))
     }
     .np_plot_progress_notify(stage="Constructing bias-corrected intervals",
       done=max(jj),total=nrow(grid),unit="grid")
