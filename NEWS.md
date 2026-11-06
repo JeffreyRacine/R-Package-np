@@ -1,5 +1,8 @@
 # np 0.80-2 (development)
 
+* Refuse unsafe Box-Muller replay before seeding for explicit CDF simultaneous
+  factor bands above 32 targets; covariance and deterministic bands are unchanged.
+
 * Recognize ordinary retained native and formula training values when checking
   uncached corrected-regression Box-Muller replay. Explicit data overrides keep
   precedence; no stored call, model frame or user NA policy is reevaluated.

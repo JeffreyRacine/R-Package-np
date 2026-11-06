@@ -117,3 +117,24 @@ test_that("retained training classification preserves explicit suppliedness", {
   b$.np.formula.training <- NULL
   expect_null(n(list(), b))
 })
+
+test_that("explicit CDF replay retains covariance and deterministic boundaries", {
+  ns <- asNamespace("np")
+  guard <- get(".np_plot_rng_replay_preflight", ns)
+  method <- get(".np_plot_dbandwidth_engine", ns)
+  b <- structure(list(type="fixed", ncon=1L, nuno=0L, nord=0L,
+    ckertype="gaussian", ckerorder=2L, ckerbound="none"), class="dbandwidth")
+  d <- list(plot.errors.center="bias-corrected", plot.errors.method="asymptotic",
+    plot.errors.type="simultaneous", bias.control=np_udist_bias_control("cdf"))
+  old <- RNGkind(); on.exit(do.call(RNGkind, as.list(old)), add=TRUE)
+  RNGkind(normal.kind="Box-Muller")
+  for (m in c(31L,32L,33L)) {
+    d$neval <- m
+    if(m>32L) expect_error(guard(method,b,d),"unsafe RNG replay") else expect_silent(guard(method,b,d))
+  }
+  for(band in c("pointwise","bonferroni","pmzsd")) {
+    d$plot.errors.type <- band; expect_silent(guard(method,b,d))
+  }
+  d$plot.errors.type <- "simultaneous"; d$bias.control$version <- 99L
+  expect_silent(guard(method,b,d))
+})
