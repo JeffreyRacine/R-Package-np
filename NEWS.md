@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Multi-tile numeric joint-CDF geometric bootstrap plots with unsigned
+  calibration now refuse custom uniform state absent from the visible seed;
+  signed cached paths and full-state generators retain their existing behavior.
+
 * Explicit tiled density/CDF factor plots now refuse a custom uniform generator
   whose visible seed omits its replay state, before entering the plot seed scope.
 

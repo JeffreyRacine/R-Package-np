@@ -643,7 +643,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   explicitly select a qualified normal generator, such as Inversion. Explicit
   tiled density/CDF factor providers also refuse a custom uniform
   generator whose visible seed contains only a header without replay state. These
-  checks are bounded: other reconstruction and RNG replay cases remain
+  checks also cover unsigned geometric joint-CDF calibration on the admitted
+  multi-tile fixed numeric geometry. Signed cached paths remain available.
+  These checks are bounded: other reconstruction and RNG replay cases remain
   unqualified; non-refusal is not a general RNG safety certificate.
 
   \code{random_seed} (default 42) controls calibration without changing the

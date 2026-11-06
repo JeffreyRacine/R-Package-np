@@ -214,3 +214,33 @@ test_that("explicit factor replay refuses absent uniform state only", {
   e$get <- function(...) stop("active seed must not be inspected")
   expect_false(predicate(c("user-supplied","Inversion","Rejection")))
 })
+
+
+test_that("unsigned geometric CDF refusal preserves signed and single-tile routes", {
+  ns <- asNamespace("np")
+  guard <- get(".np_plot_rng_replay_preflight", ns)
+  e <- new.env(parent=environment(guard))
+  e$RNGkind <- function()c("user-supplied","Inversion","Rejection")
+  environment(guard) <- e
+  present <- exists(".Random.seed",.GlobalEnv,inherits=FALSE)
+  prior <- if(present)get(".Random.seed",.GlobalEnv,inherits=FALSE)else NULL
+  on.exit(if(present)assign(".Random.seed",prior,.GlobalEnv)else
+    rm(list=".Random.seed",envir=.GlobalEnv),add=TRUE)
+  assign(".Random.seed",10405L,.GlobalEnv)
+  b <- structure(list(type="fixed",ncon=1L,nuno=0L,nord=0L),class="dbandwidth")
+  d <- list(plot.errors.center="bias-corrected",plot.errors.method="bootstrap",
+    plot.errors.boot.method="geom",plot.errors.type="simultaneous",neval=26L)
+  method <- get(".np_plot_dbandwidth_engine",ns)
+  for(calibration in list(NULL,"default","absolute","symmetric-sd")) {
+    d$plot.errors.boot.calibration <- calibration
+    expect_error(guard(method,b,d),"custom uniform state absent")
+  }
+  for(calibration in c("asymmetric-sd","separate-tails","tail-envelope","legacy","smoothed-percentile")) {
+    d$plot.errors.boot.calibration <- calibration
+    expect_silent(guard(method,b,d))
+  }
+  d$plot.errors.boot.calibration <- NULL;d$neval <- 25L
+  expect_silent(guard(method,b,d))
+  d$neval <- 26L;assign(".Random.seed",c(10405L,1L,2L),.GlobalEnv)
+  expect_silent(guard(method,b,d))
+})
