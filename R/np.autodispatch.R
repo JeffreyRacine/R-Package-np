@@ -2932,6 +2932,7 @@
   if (!.npRmpi_autodispatch_preflight(comm = comm))
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
+  .npRmpi_warning_scope_activate()
   rec.comm(.npRmpi_lease_drain_pending(comm = comm),
            note = "autodispatch.lease.drain")
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
@@ -3282,55 +3283,59 @@
       metadata$identity <- identity
     }
   }
-  result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env,
-    comm = comm, warn_nested = TRUE, public.metadata = metadata)
-  if (inherits(result, c("bandwidth", "dbandwidth", "npdensity", "npdistribution")))
-    return(.npRmpi_autodispatch_finalize_unleased_names(result, mc, definition,
-      owner = sys.frame(method),
-      caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv()))
-  # Transport symbols are implementation details, never public variable names.
-  # Change only leaked labels; supplied names and formula metadata stay intact.
-  if (is.list(result)) {
-    bandwidth <- if (is.list(result[["bws", exact = TRUE]])) result[["bws"]] else result
-    for (name in c("ynames", "xnames", "znames")) {
-      label <- bandwidth[[name, exact = TRUE]]
-      if (is.character(label) && length(label) == 1L &&
-          startsWith(label, ".__npRmpi_autod_")) {
-        roles <- switch(name, ynames = c("ydat", "tydat"),
-                        xnames = c("xdat", "txdat", "dat", "tdat"),
-                        znames = c("zdat", "tzdat"))
-        role <- intersect(roles, names(formals(definition)))
-        if (length(role) && role[[1L]] %in% names(mc) &&
-            is.atomic(mc[[role[[1L]]]]) && is.null(dim(mc[[role[[1L]]]]))) {
-          expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))),
-                       envir = sys.frame(method))
-          expr <- .np_formula_dot_expression(expr,
-            sys.frame(sys.parents()[[method]]))
-          label <- if (name == "ynames") deparse(expr) else
-            paste(deparse(expr), collapse = "")
-          bandwidth <- updateBwNameMetadata(setNames(list(label), name), bandwidth)
-          if (inherits(bandwidth, "plbandwidth")) {
-            if (name == "ynames")
-              bandwidth$bw$yzbw <- updateBwNameMetadata(list(ynames = label), bandwidth$bw$yzbw)
-            if (name == "xnames")
-              for (i in seq_along(label))
-                bandwidth$bw[[i + 1L]] <- updateBwNameMetadata(list(ynames = label[[i]]), bandwidth$bw[[i + 1L]])
-            if (name == "znames")
-              bandwidth$bw <- lapply(bandwidth$bw, function(bw)
-                updateBwNameMetadata(list(xnames = label), bw))
+  .npRmpi_with_deferred_package_warnings({
+    result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env,
+      comm = comm, warn_nested = TRUE, public.metadata = metadata)
+    if (inherits(result, c("bandwidth", "dbandwidth", "npdensity", "npdistribution"))) {
+      result <- .npRmpi_autodispatch_finalize_unleased_names(result, mc, definition,
+        owner = sys.frame(method),
+        caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
+    } else {
+      # Transport symbols are implementation details, never public variable names.
+      # Change only leaked labels; supplied names and formula metadata stay intact.
+      if (is.list(result)) {
+        bandwidth <- if (is.list(result[["bws", exact = TRUE]])) result[["bws"]] else result
+        for (name in c("ynames", "xnames", "znames")) {
+          label <- bandwidth[[name, exact = TRUE]]
+          if (is.character(label) && length(label) == 1L &&
+              startsWith(label, ".__npRmpi_autod_")) {
+            roles <- switch(name, ynames = c("ydat", "tydat"),
+                            xnames = c("xdat", "txdat", "dat", "tdat"),
+                            znames = c("zdat", "tzdat"))
+            role <- intersect(roles, names(formals(definition)))
+            if (length(role) && role[[1L]] %in% names(mc) &&
+                is.atomic(mc[[role[[1L]]]]) && is.null(dim(mc[[role[[1L]]]]))) {
+              expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))),
+                           envir = sys.frame(method))
+              expr <- .np_formula_dot_expression(expr,
+                sys.frame(sys.parents()[[method]]))
+              label <- if (name == "ynames") deparse(expr) else
+                paste(deparse(expr), collapse = "")
+              bandwidth <- updateBwNameMetadata(setNames(list(label), name), bandwidth)
+              if (inherits(bandwidth, "plbandwidth")) {
+                if (name == "ynames")
+                  bandwidth$bw$yzbw <- updateBwNameMetadata(list(ynames = label), bandwidth$bw$yzbw)
+                if (name == "xnames")
+                  for (i in seq_along(label))
+                    bandwidth$bw[[i + 1L]] <- updateBwNameMetadata(list(ynames = label[[i]]), bandwidth$bw[[i + 1L]])
+                if (name == "znames")
+                  bandwidth$bw <- lapply(bandwidth$bw, function(bw)
+                    updateBwNameMetadata(list(xnames = label), bw))
+              }
+              if (inherits(bandwidth, "lsqregressionbandwidth"))
+                bandwidth <- .nplsqreg_set_response_name(bandwidth, bandwidth$ynames,
+                  predictor.names = if (name == "xnames") label else NULL)
+              if (is.list(result[["bws", exact = TRUE]])) {
+                result[["bws"]] <- bandwidth
+                if (!is.null(result[[name, exact = TRUE]])) result[[name]] <- label
+              } else result <- bandwidth
+            }
           }
-          if (inherits(bandwidth, "lsqregressionbandwidth"))
-            bandwidth <- .nplsqreg_set_response_name(bandwidth, bandwidth$ynames,
-              predictor.names = if (name == "xnames") label else NULL)
-          if (is.list(result[["bws", exact = TRUE]])) {
-            result[["bws"]] <- bandwidth
-            if (!is.null(result[[name, exact = TRUE]])) result[[name]] <- label
-          } else result <- bandwidth
         }
       }
     }
-  }
-  result
+    result
+  })
 }
 
 .npRmpi_manual_distributed_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
@@ -3338,5 +3343,8 @@
   .npRmpi_warn_rmpi_conflict_once()
   if (missing(caller_env) || !is.environment(caller_env))
     caller_env <- parent.frame()
-  .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = FALSE)
+  .npRmpi_with_deferred_package_warnings(
+    .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env,
+                                 comm = comm, warn_nested = FALSE)
+  )
 }

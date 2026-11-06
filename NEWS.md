@@ -1,5 +1,13 @@
 # R4 documentation: explicit option synchronization precondition
 
+- MPI autodispatch now delivers named normal-reference, uniform-kernel-order,
+  and unavailable-variance warnings after the distributed result and its
+  cleanup finish. Exiting/reentrant warning handlers can safely use the pool.
+  If that invocation fails first, the original error remains primary and
+  retains those warnings in its `.npRmpi.deferred.warnings` attribute.
+  Immediate design warnings, arbitrary callbacks/manual broadcasts and
+  rank-asymmetric warning-to-error conversion are not covered by this repair.
+
 * Bounded covariance Gaussian calibration now generates one maximum sample for
   all requested confidence levels, preserving normal-stream continuation,
   including a pending Box-Muller deviate. General tiled and callback replay

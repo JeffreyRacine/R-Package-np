@@ -3,10 +3,10 @@
   if (isTRUE(attr(native.output, ".np.variance.unavailable", exact = TRUE))) {
     comm <- if (mpi.comm.size(1L) > 0L) 1L else 0L
     if (mpi.comm.rank(comm) == 0L)
-      .np_warning(paste0(
+      .npRmpi_defer_named_warning(.np_warning(paste0(
         "Some standard errors are unavailable because the fitted smoother ",
         "leaves no residual information for observations used by those estimates. ",
-        "Point estimates are unchanged."))
+        "Point estimates are unchanged.")))
   }
   invisible(NULL)
 }

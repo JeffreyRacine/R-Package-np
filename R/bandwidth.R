@@ -49,7 +49,7 @@ bandwidth <-
            call. = FALSE)
 
     if (bwmethod == "normal-reference" && (ckertype != "gaussian" || bwtype != "fixed")){    
-      .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
+      .npRmpi_defer_named_warning(.np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth"))
       bwtype = "fixed"
       ckertype = "gaussian"
     }

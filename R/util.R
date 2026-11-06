@@ -2706,7 +2706,7 @@ npWarnIgnoredUniformKernelOrder <- function(call.names,
   else
     paste("ignoring", order.arg, "specified with uniform",
           sub("order$", "type", order.arg))
-  .np_warning(warning.text)
+  .npRmpi_defer_named_warning(.np_warning(warning.text))
   invisible(TRUE)
 }
 

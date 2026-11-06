@@ -75,7 +75,7 @@ condbandwidth <-
     stop("beta conditional distribution does not support normal-reference bandwidth selection",
          call. = FALSE)
   if (bwmethod == "normal-reference" && (cxkertype != "gaussian" || bwtype != "fixed")){    
-    .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
+    .npRmpi_defer_named_warning(.np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth"))
     bwtype = "fixed"
     cxkertype = "gaussian"
   }
@@ -92,7 +92,7 @@ condbandwidth <-
     stop("beta conditional distribution does not support normal-reference bandwidth selection",
          call. = FALSE)
   if (bwmethod == "normal-reference" && (cykertype != "gaussian" || bwtype != "fixed")){    
-    .np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
+    .npRmpi_defer_named_warning(.np_warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth"))
     bwtype = "fixed"
     cykertype = "gaussian"
   }
