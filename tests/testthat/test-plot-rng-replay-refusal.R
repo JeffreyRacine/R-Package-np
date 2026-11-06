@@ -96,3 +96,24 @@ test_that("opaque uniform refusal leaves exposed-state and legacy policy alone",
   assign(".Random.seed", c(10405L, 1L, 2L), .GlobalEnv)
   expect_silent(guard(method, bws, dots))
 })
+
+# Retained values extend the same count contract, not the data resolver.
+test_that("retained training classification preserves explicit suppliedness", {
+  ns <- asNamespace("np")
+  n <- get(".np_plot_replay_training_n", ns)
+  b <- list(.np.native.training = list(xdat = data.frame(x = 1:5), ydat = 2:6))
+  expect_identical(n(list(), b), 5L)
+  expect_identical(n(list(xdat = 1:2, ydat = 2:3), b), 2L)
+  expect_null(n(list(xdat = NULL), b))
+  expect_null(n(list(ydat = NULL), b))
+  frame <- model.frame(y ~ x, data.frame(x = 1:5, y = 2:6))
+  b$formula <- y ~ x
+  b$.np.formula.training <- list(frame = frame, na.action = NULL)
+  expect_identical(n(list(), b), 5L)
+  b$.np.formula.training$frame$x[1] <- NA
+  expect_null(n(list(), b))
+  b$.np.formula.training$frame <- structure(frame, class = c("custom", "data.frame"))
+  expect_null(n(list(), b))
+  b$.np.formula.training <- NULL
+  expect_null(n(list(), b))
+})
