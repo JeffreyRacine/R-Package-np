@@ -1,5 +1,10 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Refuse known uncached Box-Muller replay before seeding corrected plot inference:
+  Gaussian regression above the 16 MiB innovation limit when plain training data
+  are available, and multi-tile fixed numeric joint CDF inference. Qualified
+  cached and deterministic paths are preserved; other replay limitations remain.
+
 * Bounded Gaussian bias-corrected regression calibration now reuses actual
   Box-Muller innovations across target tiles and worker tasks. This preserves
   joint studentization for built-in uniform generators when the innovation

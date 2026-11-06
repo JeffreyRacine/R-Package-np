@@ -1,0 +1,79 @@
+# Pre-seed refusal only. This is not a general RNG capability certificate.
+# Unknown data reconstruction and other producers retain their own validation.
+.np_plot_replay_training_n <- function(dots) {
+  x <- dots[["xdat", exact = TRUE]]
+  y <- dots[["ydat", exact = TRUE]]
+  plain <- function(z) {
+    if (is.object(z)) return((identical(class(z), "factor") ||
+      identical(class(z), c("ordered", "factor"))) && !anyNA(unclass(z)))
+    is.numeric(z) && is.null(dim(z)) && all(is.finite(z))
+  }
+  if (identical(class(x), "data.frame")) {
+    if (!length(x) || !all(vapply(x, plain, logical(1L)))) return(NULL)
+    n <- nrow(x)
+  } else if (!is.object(x) && is.matrix(x) && is.numeric(x) && all(is.finite(x))) {
+    n <- nrow(x)
+  } else if (!is.object(x) && is.numeric(x) && is.null(dim(x)) && all(is.finite(x))) {
+    n <- length(x)
+  } else return(NULL)
+  if (is.object(y) || !is.numeric(y) || !is.null(dim(y)) ||
+      !all(is.finite(y)) || length(y) != n || n < 1L) return(NULL)
+  n
+}
+
+.np_plot_replay_cdf_targets <- function(bws, dots) {
+  if (!identical(bws[["type", exact = TRUE]], "fixed") ||
+      !isTRUE(bws[["ncon", exact = TRUE]] %in% 1:2) ||
+      !isTRUE(bws[["nuno", exact = TRUE]] == 0) ||
+      !isTRUE(bws[["nord", exact = TRUE]] == 0)) return(NULL)
+  m <- dots[["neval", exact = TRUE]]
+  if (is.null(m)) m <- 50L
+  if (is.object(m) || !is.numeric(m) || length(m) != 1L ||
+      !is.finite(m) || m < 1 || m != floor(m) || m > .Machine$integer.max) return(NULL)
+  perspective <- dots[["perspective", exact = TRUE]]
+  if (is.null(perspective)) perspective <- TRUE
+  if (!identical(perspective, TRUE) && !identical(perspective, FALSE)) return(NULL)
+  if (bws[["ncon", exact = TRUE]] == 2L && perspective) m <- as.double(m)^2
+  m
+}
+
+.np_plot_rng_replay_preflight <- function(method, bws, dots) {
+  if (!identical(dots[["plot.errors.center", exact = TRUE]], "bias-corrected") ||
+      !identical(dots[["plot.errors.method", exact = TRUE]], "asymptotic"))
+    return(invisible(NULL))
+  regression <- inherits(bws, "rbandwidth") &&
+    (identical(method, .np_plot_rbandwidth_engine) || identical(method, .np_plot_compat_dispatch))
+  distribution <- inherits(bws, "dbandwidth") &&
+    (identical(method, .np_plot_dbandwidth_engine) || identical(method, .np_plot_compat_dispatch))
+  if (!regression && !distribution) return(invisible(NULL))
+  calibration <- dots[["plot.errors.boot.calibration", exact = TRUE]]
+  if (isTRUE(calibration %in% c("legacy", "smoothed-percentile"))) return(invisible(NULL))
+  control <- dots[["bias.control", exact = TRUE]]
+  if (!is.null(control) && (!is.list(control) ||
+      !inherits(control, if (regression) "np_bias_control" else "np_udist_bias_control") ||
+      !identical(control[["construction", exact = TRUE]],
+                 if (regression) "iterated" else "joint-process"))) return(invisible(NULL))
+  kind <- RNGkind()
+  builtin <- c("Wichmann-Hill", "Marsaglia-Multicarry", "Super-Duper",
+    "Mersenne-Twister", "Knuth-TAOCP", "Knuth-TAOCP-2002", "L'Ecuyer-CMRG")
+  if (!kind[1L] %in% builtin || !identical(kind[2L], "Box-Muller")) return(invisible(NULL))
+  unsafe <- FALSE
+  if (regression) {
+    n <- .np_plot_replay_training_n(dots)
+    B <- dots[["gaussian.draws", exact = TRUE]]
+    if (is.null(B)) B <- 9999L
+    if (!is.null(n) && !is.object(B) && is.numeric(B) && length(B) == 1L &&
+        is.finite(B) && B >= 1 && B == floor(B) && B <= .Machine$integer.max)
+      # Same bounded-value boundary as .np_bias_gaussian_cache; no allocation.
+      unsafe <- 8 * as.double(n) * B > 16 * 1024^2
+  } else {
+    band <- dots[["plot.errors.type", exact = TRUE]]
+    m <- .np_plot_replay_cdf_targets(bws, dots)
+    # Joint CDF factors use target tiles of 25; pointwise/pmzsd are deterministic.
+    unsafe <- !is.null(m) && m > 25L &&
+      isTRUE(band %in% c("bonferroni", "simultaneous", "all"))
+  }
+  if (unsafe)
+    stop("unsafe RNG replay: this bias-corrected plot requires Box-Muller state not retained by .Random.seed; explicitly select a qualified normal generator such as RNGkind(normal.kind = 'Inversion') before plotting", call. = FALSE)
+  invisible(NULL)
+}
