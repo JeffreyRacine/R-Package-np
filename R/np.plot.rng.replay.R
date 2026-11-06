@@ -39,7 +39,7 @@
 
 .np_plot_rng_replay_preflight <- function(method, bws, dots) {
   if (!identical(dots[["plot.errors.center", exact = TRUE]], "bias-corrected") ||
-      !identical(dots[["plot.errors.method", exact = TRUE]], "asymptotic"))
+      !isTRUE(dots[["plot.errors.method", exact = TRUE]] %in% c("asymptotic", "bootstrap")))
     return(invisible(NULL))
   regression <- inherits(bws, "rbandwidth") &&
     (identical(method, .np_plot_rbandwidth_engine) || identical(method, .np_plot_compat_dispatch))
@@ -54,6 +54,30 @@
       !identical(control[["construction", exact = TRUE]],
                  if (regression) "iterated" else "joint-process"))) return(invisible(NULL))
   kind <- RNGkind()
+  # A header without payload establishes missing replay state, not the converse.
+  # Do not inspect an active seed binding or try to discover arbitrary native state.
+  if (identical(kind[1L], "user-supplied") &&
+      exists(".Random.seed", .GlobalEnv, inherits = FALSE) &&
+      !bindingIsActive(".Random.seed", .GlobalEnv)) {
+    seed <- get(".Random.seed", .GlobalEnv, inherits = FALSE)
+    if (is.integer(seed) && length(seed) == 1L) {
+      asymptotic <- identical(dots[["plot.errors.method", exact = TRUE]], "asymptotic")
+      law <- dots[["plot.errors.boot.method", exact = TRUE]]
+      if (is.null(law)) law <- if (regression) "wild" else "inid"
+      unsafe <- regression && (asymptotic ||
+        isTRUE(law %in% c("wild", "inid", "fixed", "geom")))
+      if (distribution) {
+        m <- .np_plot_replay_cdf_targets(bws, dots)
+        band <- dots[["plot.errors.type", exact = TRUE]]
+        unsafe <- !is.null(m) && m > 25L &&
+          ((asymptotic && isTRUE(band %in% c("bonferroni", "simultaneous", "all"))) ||
+           (!asymptotic && identical(law, "inid")))
+      }
+      if (unsafe)
+        stop("unsafe RNG replay: this bias-corrected plot requires custom uniform state absent from .Random.seed; explicitly select a qualified built-in generator before plotting", call. = FALSE)
+    }
+  }
+  if (!identical(dots[["plot.errors.method", exact = TRUE]], "asymptotic")) return(invisible(NULL))
   builtin <- c("Wichmann-Hill", "Marsaglia-Multicarry", "Super-Duper",
     "Mersenne-Twister", "Knuth-TAOCP", "Knuth-TAOCP-2002", "L'Ecuyer-CMRG")
   if (!kind[1L] %in% builtin || !identical(kind[2L], "Box-Muller")) return(invisible(NULL))
