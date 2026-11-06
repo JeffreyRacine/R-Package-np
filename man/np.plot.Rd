@@ -648,8 +648,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   These checks are bounded: other reconstruction and RNG replay cases remain
   unqualified; non-refusal is not a general RNG safety certificate.
 
-  \code{random_seed} (default 42) controls calibration without changing the
-  caller's random-number state. A count below
+  \code{random_seed} (default 42) controls reproducible calibration. The
+  temporary seed scope restores the visible \code{.Random.seed} binding (or
+  its absence), but does not restore hidden generator state, such as a pending
+  Box--Muller normal or custom state not represented by \code{.Random.seed}.
+  Consequently, subsequent caller draws can differ. This continuation limitation
+  is distinct from replay correctness within the current band calculation;
+  visible seed restoration alone does not establish either guarantee.
+  A count below
   \code{ceiling(qnorm(.975)^2 * (1-alpha) / (.1^2 * alpha))} warns and is used
   unchanged. This is an approximate 95 percent Monte Carlo target for relative
   error within 10 percent in the simulated maximum's upper-tail probability.

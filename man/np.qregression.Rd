@@ -406,7 +406,11 @@ prediction/evaluation route, or plot route as appropriate.
   linearization and Gaussian-maximum approximation. Unsupported or
   nonregular grids receive a specific unavailable-band notice.
   \code{gaussian_draws} controls simulation precision and
-  \code{random_seed} restores the caller's RNG state.
+  \code{random_seed} controls reproducible calibration. Its temporary seed
+  scope restores the visible \code{.Random.seed} binding (or its absence),
+  but not hidden generator state, including a pending Box--Muller normal or
+  custom state absent from that binding. Subsequent caller draws can therefore
+  differ; this is separate from replay within the current band calculation.
 
   If \code{gradients=TRUE}, \code{npqreg} also computes gradients of
   the conditional quantile with respect to the conditioning variables
