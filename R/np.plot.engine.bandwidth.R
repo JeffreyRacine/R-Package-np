@@ -124,6 +124,13 @@
     joint.eligible <- joint.request
     if (joint.request)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+    beta.state <- NULL
+    if (.np_udens_beta_request(bws, bias.control, plot.errors.center,
+        error.request$method))
+      beta.state <- .np_udens_beta_public_prepare(bws, xdat,
+        error.request$method, as.character(plot.errors.boot.method)[1L],
+        error.request$type, plot.errors.boot.calibration, plot.errors.alpha,
+        if (missing(random.seed)) 42L else random.seed)
     density.block.automatic <- is.null(plot.errors.boot.blocklen)
     if (density.block.automatic && identical(plot.errors.center, "bias-corrected") &&
         identical(error.request$method, "bootstrap") &&
@@ -167,7 +174,7 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
-    bias.state <- .np_udens_plot_prepare(bias.control, bws, xdat,
+    bias.state <- if (!is.null(beta.state)) beta.state else .np_udens_plot_prepare(bias.control, bws, xdat,
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
       plot.errors.boot.calibration, blocklen = plot.errors.boot.blocklen,
       block.automatic = density.block.automatic, alpha = plot.errors.alpha,
@@ -254,7 +261,7 @@
         exdat = x.eval,
         bws = bws,
         cdf = FALSE,
-        need.asymptotic = identical(plot.errors.method, "asymptotic")
+        need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(beta.state)
       )
 
       tdens = matrix(data = tobj$dens,
@@ -345,7 +352,7 @@
 
       if (plot.behavior != "plot"){
         d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens,
-                        derr = if (new.bias && (.np_udens_d8_active(bias.state) || bias.state$plot.control.version %in% c(2L, 3L)))
+                        derr = if (new.bias && (.np_udens_beta_active(bias.state) || .np_udens_d8_active(bias.state) || bias.state$plot.control.version %in% c(2L, 3L)))
                           cbind(-terr[,1L], terr[,2L]) else terr[,1:2],
                         ntrain = nrow(xdat), se = plot.errors)
         if (joint.eligible)
@@ -562,6 +569,17 @@
       plot.bootstrap <- plot.errors.method == "bootstrap"
       plotOnEstimate <- (plot.errors.center == "estimate")
 
+      beta.slices <- NULL
+      if (new.bias && .np_udens_beta_active(bias.state)) {
+        grids <- lapply(seq_len(bws$ndim), function(j) {
+          limits <- trim.quantiles(xdat[,j], xtrim[j])
+          subcol(exdat, seq(limits[1L], limits[2L], length.out = neval), j)[
+            seq_len(neval), , drop = FALSE]
+        })
+        beta.slices <- .np_udens_plot_errors(bias.state, do.call(rbind, grids),
+          plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
+            gaussian.draws else plot.errors.boot.num, plot.errors.type)
+      }
       d8.slices <- NULL
       if (new.bias && .np_udens_d8_active(bias.state)) {
         grids <- lapply(seq_len(bws$ndim), function(j) {
@@ -602,13 +620,14 @@
           exdat = eval.slice,
           bws = bws,
           cdf = FALSE,
-          need.asymptotic = identical(plot.errors.method, "asymptotic")
+          need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(beta.state)
         )
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){
           if (new.bias) {
-            temp.boot.raw <- if (!is.null(d8.slices)) .np_udens_d8_plot_subset(d8.slices,
+            temp.boot.raw <- if (!is.null(beta.slices)) .np_udens_beta_plot_subset(beta.slices,
+              seq.int((i-1L)*neval+1L, i*neval)) else if (!is.null(d8.slices)) .np_udens_d8_plot_subset(d8.slices,
               seq.int((i-1L)*neval+1L, i*neval)) else .np_udens_plot_errors(bias.state, eval.slice,
               plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))
                 gaussian.draws else plot.errors.boot.num, plot.errors.type, design = list(vary = i, xtrim = xtrim, xq = xq))

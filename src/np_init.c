@@ -5,6 +5,18 @@
 /* Routine registration for the npRmpi shared library. */
 
 /* .Call calls */
+extern SEXP C_np_plot_udens_beta_rule(SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_axis(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_hull(SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_refits(SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_normalizer(SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_joint_refits(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_joint_block(SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_joint_moments(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_series_means(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_joint_covariance(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_beta_factor(SEXP);
+extern SEXP C_np_plot_udens_beta_region_objective(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_nomad_condition_raise(SEXP);
 extern SEXP C_np_ordered_rly_matrix(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_copula_density_se(SEXP);
@@ -191,6 +203,18 @@ extern SEXP C_np_plot_ann_rank_decode(SEXP, SEXP);
 extern SEXP C_np_plot_udens_d8_column(SEXP, SEXP, SEXP, SEXP, SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_plot_udens_beta_rule", (DL_FUNC) &C_np_plot_udens_beta_rule, 2},
+    {"C_np_plot_udens_beta_axis", (DL_FUNC) &C_np_plot_udens_beta_axis, 5},
+    {"C_np_plot_udens_beta_hull", (DL_FUNC) &C_np_plot_udens_beta_hull, 3},
+    {"C_np_plot_udens_beta_refits", (DL_FUNC) &C_np_plot_udens_beta_refits, 2},
+    {"C_np_plot_udens_beta_normalizer", (DL_FUNC) &C_np_plot_udens_beta_normalizer, 2},
+    {"C_np_plot_udens_beta_joint_refits", (DL_FUNC) &C_np_plot_udens_beta_joint_refits, 5},
+    {"C_np_plot_udens_beta_joint_block", (DL_FUNC) &C_np_plot_udens_beta_joint_block, 4},
+    {"C_np_plot_udens_beta_joint_moments", (DL_FUNC) &C_np_plot_udens_beta_joint_moments, 6},
+    {"C_np_plot_udens_beta_series_means", (DL_FUNC) &C_np_plot_udens_beta_series_means, 6},
+    {"C_np_plot_udens_beta_joint_covariance", (DL_FUNC) &C_np_plot_udens_beta_joint_covariance, 8},
+    {"C_np_plot_udens_beta_factor", (DL_FUNC) &C_np_plot_udens_beta_factor, 1},
+    {"C_np_plot_udens_beta_region_objective", (DL_FUNC) &C_np_plot_udens_beta_region_objective, 5},
     {"C_np_plot_udens_d8_column", (DL_FUNC) &C_np_plot_udens_d8_column, 5},
     {"C_np_plot_ann_rank_decode", (DL_FUNC) &C_np_plot_ann_rank_decode, 2},
     {"C_np_plot_regression_gradient_projection", (DL_FUNC) &C_np_plot_regression_gradient_projection, 1},

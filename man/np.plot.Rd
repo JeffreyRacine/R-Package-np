@@ -573,6 +573,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   construction; see \code{\link{npqreg}} for its supported level and
   gradient targets and conditioning assumptions.
 
+  Known-fixed-bound order-2 beta density plots support a separate corrected
+  guide-region plus residual construction in one or two continuous dimensions.
+  With omitted \code{bias_control}, request asymptotic errors or independent
+  bootstrap \code{calibration="symmetric-sd"}/\code{"asymmetric-sd"}, and
+  explicitly choose pointwise or simultaneous bands. Range-derived bounds and
+  literal endpoints are rejected. All slices share one finite calibration
+  family; core fits and estimator SEs are unchanged. See
+  \code{\link{np_udens_bias_control}} for the distinct beta endpoint rules,
+  restrictions and limitations.
+
   Default bias-corrected unconditional Gaussian density plots use the D8
   positive-pilot construction for eligible asymptotic requests; see
   \code{\link{np_udens_bias_control}}. It uses complete corrected covariance
