@@ -1,5 +1,13 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Add experimental plot-only FG-D corrected intervals for fixed, known-bound
+  order-2 Gaussian density kernels in one or two continuous dimensions:
+  asymptotic, symmetric-sd and asymmetric-sd, with explicit pointwise or
+  simultaneous bands. Combine complete pilot and empirical residual intervals,
+  preserving signed inversion, guide uncertainty and full-grid calibration.
+  Range-derived bounds and literal endpoints are rejected. Core estimators,
+  se=FALSE, explicit saved controls, unbounded D8 and beta inference are unchanged.
+
 * Refuse selected corrected regression and multi-tile fixed numeric joint CDF
   plots when a custom uniform generator exposes only a seed header and no replay
   state. This pre-seed check preserves the selected RNG; a nonempty payload is

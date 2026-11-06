@@ -24,3 +24,19 @@ test_that('FG-D rejects excessive owned workspace before allocation', {
   expect_error(.np_udens_fgd_disk(1000,1e6,2,9999,TRUE,TRUE),'budget')
   expect_error(.np_udens_fgd_hidden(matrix(.5,10,1),.1,matrix(0,1,1),.05,'asymptotic','pointwise'),'request')
 })
+
+test_that('FG-D selection preserves explicit and legacy routes', {
+  bws<-structure(list(ckertype='gaussian',ckerbound='fixed'),class='bandwidth')
+  request<-function(b=bws,control=NULL,center='bias-corrected',method='asymptotic',calibration=NULL)
+    .np_udens_fgd_request(b,control,center,method,calibration)
+  expect_true(request());expect_true(request(method='bootstrap',calibration='symmetric-sd'))
+  expect_true(request(method='bootstrap',calibration='asymmetric-sd'))
+  expect_false(request(method='bootstrap',calibration='legacy'))
+  expect_false(request(control=np_udens_bias_control('legacy')))
+  expect_false(request(control=np_udens_bias_control()))
+  expect_false(request(center='estimate'));expect_false(request(method='none'))
+  for(kernel in c('beta','epanechnikov','uniform')){b<-bws;b$ckertype<-kernel;expect_false(request(b))}
+  b<-bws;b$ckerbound<-'none';expect_false(request(b))
+  b$ckerbound<-'range';expect_true(request(b)) # admitted to the early fixed-bound refusal
+  for(class in c('rbandwidth','dbandwidth','conbandwidth')){b<-bws;class(b)<-class;expect_false(request(b))}
+})
