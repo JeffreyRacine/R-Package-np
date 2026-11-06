@@ -50,7 +50,10 @@ MPI startup, shutdown, worker-count, and worker-status controls.
     synchronized options across ranks on each dispatch sync event.}
   \item{autodispatch.option.sync}{Option synchronization policy for
     auto-dispatch: \code{"onchange"} (default), \code{"always"}, or
-    \code{"never"}.}
+    \code{"never"}. The synchronized options include \code{warn}, so
+    warning-to-error conversion follows the same policy on participating ranks.
+    Synchronized values remain worker options until a subsequent update; they
+    are not restored at the end of an individual call.}
   \item{np.messages}{Logical; if non-\code{NULL}, sets
     \code{options(np.messages=...)} inside \code{npRmpi.init()}.}
   \item{nonblock}{Logical passed to the worker-loop receive path in both spawn

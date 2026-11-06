@@ -1,5 +1,9 @@
 # npRmpi 0.80-2 (development)
 
+- MPI auto-dispatch now includes R's `warn` option in the existing synchronized
+  option policy, keeping warning conversion consistent at symmetric warning
+  sites. This does not alter exiting-handler or interrupted-collective recovery.
+
 * Preserve native-vector column identity when unconditional density/distribution fits retain training data and plots reconstruct their grids; explicitly named frames and matrices keep their own names.
 
 * Clarify the aggregate D8 inference-storage forecast and its pool-size limitation.
