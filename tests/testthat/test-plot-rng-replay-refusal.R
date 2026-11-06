@@ -177,3 +177,40 @@ test_that("retained quoted symbols classify without evaluating terms", {
     expect_null(count(list(), b))
   }
 })
+
+
+test_that("explicit factor replay refuses absent uniform state only", {
+  ns <- asNamespace("npRmpi")
+  guard <- get(".np_plot_replay_factor_preflight", ns)
+  env <- new.env(parent = environment(guard))
+  env$RNGkind <- function() c("user-supplied", "Inversion", "Rejection")
+  environment(guard) <- env
+  present <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
+  prior <- if (present) get(".Random.seed", .GlobalEnv, inherits = FALSE) else NULL
+  on.exit(if (present) assign(".Random.seed", prior, .GlobalEnv) else
+    rm(list = ".Random.seed", envir = .GlobalEnv), add = TRUE)
+  for (family in c("cdf", "density")) {
+    b <- structure(list(type="fixed", ncon=1L, nuno=0L, nord=0L,
+      ckertype="gaussian", ckerorder=2L, ckerbound="none"),
+      class=if(family=="cdf") "dbandwidth" else "bandwidth")
+    method <- get(if(family=="cdf") ".np_plot_dbandwidth_engine" else
+      ".np_plot_bandwidth_engine", ns)
+    d <- list(plot.errors.method="asymptotic", plot.errors.type="simultaneous",
+      bias.control=if(family=="cdf") np_udist_bias_control("cdf") else
+        np_udens_bias_control("joint-scale"))
+    boundary <- if(family=="cdf")32L else 512L
+    assign(".Random.seed", 10405L, .GlobalEnv)
+    for(m in c(boundary-1L,boundary,boundary+1L)) {
+      d$neval <- m
+      if(m>boundary) expect_error(guard(method,b,d), "custom uniform state absent")
+      else expect_silent(guard(method,b,d))
+    }
+    assign(".Random.seed", c(10405L,1L,2L), .GlobalEnv)
+    expect_silent(guard(method,b,d))
+  }
+  predicate <- get(".np_plot_replay_uniform_state_absent", environment(guard))
+  e <- new.env(parent=environment(predicate)); environment(predicate) <- e
+  e$exists <- function(...) TRUE; e$bindingIsActive <- function(...) TRUE
+  e$get <- function(...) stop("active seed must not be inspected")
+  expect_false(predicate(c("user-supplied","Inversion","Rejection")))
+})

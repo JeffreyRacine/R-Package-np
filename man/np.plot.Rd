@@ -642,7 +642,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Gaussian regression above the 16 MiB retained-innovation limit when ordinary
   training data are already available, and for multi-tile fixed numeric joint
   CDF calibration. The error does not change the selected generator. Users may
-  explicitly select a qualified normal generator, such as Inversion. These
+  explicitly select a qualified normal generator, such as Inversion. Explicit
+  tiled density/CDF factor providers also refuse a custom uniform
+  generator whose visible seed contains only a header without replay state. These
   checks are bounded: other reconstruction and RNG replay cases remain
   unqualified; non-refusal is not a general RNG safety certificate.
 
