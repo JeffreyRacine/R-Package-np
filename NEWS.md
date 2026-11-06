@@ -8,6 +8,17 @@
   Range-derived bounds and literal endpoints are rejected. Core estimators,
   se=FALSE, explicit saved controls, unbounded D8 and beta inference are unchanged.
 
+* Refuse unsafe Box-Muller replay for explicit joint-scale and retained version-2
+  density factor bands above 512 targets. Default D8, covariance and bootstrap
+  providers retain their existing computation and RNG behavior.
+
+* Refuse unsafe Box-Muller replay before seeding for explicit CDF simultaneous
+  factor bands above 32 targets; covariance and deterministic bands are unchanged.
+
+* Recognize ordinary retained native and formula training values when checking
+  uncached corrected-regression Box-Muller replay. Explicit data overrides keep
+  precedence; no stored call, model frame or user NA policy is reevaluated.
+
 * Refuse selected corrected regression and multi-tile fixed numeric joint CDF
   plots when a custom uniform generator exposes only a seed header and no replay
   state. This pre-seed check preserves the selected RNG; a nonempty payload is

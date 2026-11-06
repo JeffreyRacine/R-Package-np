@@ -96,3 +96,66 @@ test_that("opaque uniform refusal leaves exposed-state and legacy policy alone",
   assign(".Random.seed", c(10405L, 1L, 2L), .GlobalEnv)
   expect_silent(guard(method, bws, dots))
 })
+
+# Retained values extend the same count contract, not the data resolver.
+test_that("retained training classification preserves explicit suppliedness", {
+  ns <- asNamespace("npRmpi")
+  n <- get(".np_plot_replay_training_n", ns)
+  b <- list(.np.native.training = list(xdat = data.frame(x = 1:5), ydat = 2:6))
+  expect_identical(n(list(), b), 5L)
+  expect_identical(n(list(xdat = 1:2, ydat = 2:3), b), 2L)
+  expect_null(n(list(xdat = NULL), b))
+  expect_null(n(list(ydat = NULL), b))
+  frame <- model.frame(y ~ x, data.frame(x = 1:5, y = 2:6))
+  b$formula <- y ~ x
+  b$.np.formula.training <- list(frame = frame, na.action = NULL)
+  expect_identical(n(list(), b), 5L)
+  b$.np.formula.training$frame$x[1] <- NA
+  expect_null(n(list(), b))
+  b$.np.formula.training$frame <- structure(frame, class = c("custom", "data.frame"))
+  expect_null(n(list(), b))
+  b$.np.formula.training <- NULL
+  expect_null(n(list(), b))
+})
+
+test_that("explicit CDF replay retains covariance and deterministic boundaries", {
+  ns <- asNamespace("npRmpi")
+  guard <- get(".np_plot_rng_replay_preflight", ns)
+  method <- get(".np_plot_dbandwidth_engine", ns)
+  b <- structure(list(type="fixed", ncon=1L, nuno=0L, nord=0L,
+    ckertype="gaussian", ckerorder=2L, ckerbound="none"), class="dbandwidth")
+  d <- list(plot.errors.center="bias-corrected", plot.errors.method="asymptotic",
+    plot.errors.type="simultaneous", bias.control=np_udist_bias_control("cdf"))
+  old <- RNGkind(); on.exit(do.call(RNGkind, as.list(old)), add=TRUE)
+  RNGkind(normal.kind="Box-Muller")
+  for (m in c(31L,32L,33L)) {
+    d$neval <- m
+    if(m>32L) expect_error(guard(method,b,d),"unsafe RNG replay") else expect_silent(guard(method,b,d))
+  }
+  for(band in c("pointwise","bonferroni","pmzsd")) {
+    d$plot.errors.type <- band; expect_silent(guard(method,b,d))
+  }
+  d$plot.errors.type <- "simultaneous"; d$bias.control$version <- 99L
+  expect_silent(guard(method,b,d))
+})
+
+test_that("explicit density replay retains default and covariance providers", {
+  ns <- asNamespace("npRmpi")
+  guard <- get(".np_plot_rng_replay_preflight", ns)
+  method <- get(".np_plot_bandwidth_engine", ns)
+  b <- structure(list(type="fixed",ncon=1L,nuno=0L,nord=0L,
+    ckertype="gaussian",ckerorder=2L,ckerbound="none"),class="bandwidth")
+  d <- list(plot.errors.center="bias-corrected",plot.errors.method="asymptotic",
+    plot.errors.type="simultaneous",bias.control=np_udens_bias_control())
+  old <- RNGkind(); on.exit(do.call(RNGkind,as.list(old)),add=TRUE)
+  RNGkind(normal.kind="Box-Muller")
+  for(m in c(511L,512L,513L)) {
+    d$neval <- m
+    if(m>512L) expect_error(guard(method,b,d),"unsafe RNG replay") else expect_silent(guard(method,b,d))
+  }
+  d$bias.control <- NULL; expect_silent(guard(method,b,d))
+  d$bias.control <- np_udens_bias_control("positive-covariance")
+  expect_silent(guard(method,b,d))
+  d$bias.control$version <- 2L; expect_error(guard(method,b,d),"unsafe RNG replay")
+  d$plot.errors.method <- "bootstrap"; expect_silent(guard(method,b,d))
+})
