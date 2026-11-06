@@ -73,13 +73,23 @@
     (identical(method, .np_plot_dbandwidth_engine) || identical(method, .np_plot_compat_dispatch)) &&
     identical(control, structure(list(construction = "cdf", version = 1L),
                                  class = "np_udist_bias_control"))
-  if (!cdf || !isTRUE(dots[["plot.errors.type", exact = TRUE]] %in% c("simultaneous", "all")))
+  density <- inherits(bws, "bandwidth") &&
+    (identical(method, .np_plot_bandwidth_engine) || identical(method, .np_plot_compat_dispatch)) &&
+    (identical(control, structure(list(construction = "joint-scale", calibration = "absolute", version = 3L),
+                                  class = "np_udens_bias_control")) ||
+     identical(control, structure(list(construction = "positive-covariance", calibration = "absolute", version = 2L),
+                                  class = "np_udens_bias_control")))
+  band <- dots[["plot.errors.type", exact = TRUE]]
+  if ((!cdf || !isTRUE(band %in% c("simultaneous", "all"))) &&
+      (!density || !isTRUE(band %in% c("pointwise", "bonferroni", "pmzsd", "simultaneous", "all"))))
     return(invisible(NULL))
+  # Explicit density calibration is only valid for bootstrap inference.
+  if (density && !is.null(calibration)) return(invisible(NULL))
   if (!identical(bws[["ckertype", exact = TRUE]], "gaussian") ||
       !isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) ||
       !identical(bws[["ckerbound", exact = TRUE]], "none")) return(invisible(NULL))
   m <- .np_plot_replay_cdf_targets(bws, dots)
-  if (is.null(m) || m <= 32L) return(invisible(NULL))
+  if (is.null(m) || m <= if (density) 512L else 32L) return(invisible(NULL))
   kind <- RNGkind()
   builtin <- c("Wichmann-Hill", "Marsaglia-Multicarry", "Super-Duper",
     "Mersenne-Twister", "Knuth-TAOCP", "Knuth-TAOCP-2002", "L'Ecuyer-CMRG")
