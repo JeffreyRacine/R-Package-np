@@ -626,6 +626,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   users may explicitly select a qualified built-in generator. A nonempty seed
   payload does not certify arbitrary custom state or callback behavior.
 
+  The explicit CDF construction also refuses Box--Muller factor replay above
+  32 targets for simultaneous or all bands on fixed numeric Gaussian geometry.
+  Its smaller covariance and deterministic marginal bands remain available.
   Ordinary complete retained native training values and formula training frames
   can establish the regression replay size even without retained residuals.
   Explicit training arguments take precedence; calls and NA policies are not

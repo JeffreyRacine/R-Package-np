@@ -60,10 +60,39 @@
   m
 }
 
+# Explicit factor providers use a different covariance cutoff from joint CDF.
+# Only exact, already-qualified controls and geometry are classified here.
+.np_plot_replay_factor_preflight <- function(method, bws, dots) {
+  if (!identical(dots[["plot.errors.method", exact = TRUE]], "asymptotic"))
+    return(invisible(NULL))
+  control <- dots[["bias.control", exact = TRUE]]
+  calibration <- dots[["plot.errors.boot.calibration", exact = TRUE]]
+  if (!is.null(calibration) && !identical(calibration, "default"))
+    return(invisible(NULL))
+  cdf <- inherits(bws, "dbandwidth") &&
+    (identical(method, .np_plot_dbandwidth_engine) || identical(method, .np_plot_compat_dispatch)) &&
+    identical(control, structure(list(construction = "cdf", version = 1L),
+                                 class = "np_udist_bias_control"))
+  if (!cdf || !isTRUE(dots[["plot.errors.type", exact = TRUE]] %in% c("simultaneous", "all")))
+    return(invisible(NULL))
+  if (!identical(bws[["ckertype", exact = TRUE]], "gaussian") ||
+      !isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) ||
+      !identical(bws[["ckerbound", exact = TRUE]], "none")) return(invisible(NULL))
+  m <- .np_plot_replay_cdf_targets(bws, dots)
+  if (is.null(m) || m <= 32L) return(invisible(NULL))
+  kind <- RNGkind()
+  builtin <- c("Wichmann-Hill", "Marsaglia-Multicarry", "Super-Duper",
+    "Mersenne-Twister", "Knuth-TAOCP", "Knuth-TAOCP-2002", "L'Ecuyer-CMRG")
+  if (kind[1L] %in% builtin && identical(kind[2L], "Box-Muller"))
+    stop("unsafe RNG replay: this explicit factor plot requires Box-Muller state not retained by .Random.seed; explicitly select a qualified normal generator such as RNGkind(normal.kind = 'Inversion') before plotting", call. = FALSE)
+  invisible(NULL)
+}
+
 .np_plot_rng_replay_preflight <- function(method, bws, dots) {
   if (!identical(dots[["plot.errors.center", exact = TRUE]], "bias-corrected") ||
       !isTRUE(dots[["plot.errors.method", exact = TRUE]] %in% c("asymptotic", "bootstrap")))
     return(invisible(NULL))
+  .np_plot_replay_factor_preflight(method, bws, dots)
   regression <- inherits(bws, "rbandwidth") &&
     (identical(method, .np_plot_rbandwidth_engine) || identical(method, .np_plot_compat_dispatch))
   distribution <- inherits(bws, "dbandwidth") &&
