@@ -618,6 +618,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   of 9999 and accepts positive integer counts subject to representability and
   workspace limits, without a fixed one-million upper cap. It applies only to asymptotic
   simultaneous/all requests; \code{B} remains bootstrap-only. The usual
+  Known unsafe Box--Muller replay is refused before seeding for corrected
+  Gaussian regression above the 16 MiB retained-innovation limit when ordinary
+  training data are already available, and for multi-tile fixed numeric joint
+  CDF calibration. The error does not change the selected generator. Users may
+  explicitly select a qualified normal generator, such as Inversion. These
+  checks are bounded: other reconstruction and RNG replay cases remain
+  unqualified; non-refusal is not a general RNG safety certificate.
+
   \code{random_seed} (default 42) controls calibration without changing the
   caller's random-number state. A count below
   \code{ceiling(qnorm(.975)^2 * (1-alpha) / (.1^2 * alpha))} warns and is used

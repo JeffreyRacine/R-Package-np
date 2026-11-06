@@ -596,6 +596,8 @@ np_render_control <- function(style = c("band", "bar"),
       dots$view <- "fixed"
   }
 
+  .np_plot_rng_replay_preflight(method, bws, dots)
+
   owns.empty.rows <- identical(method, .np_plot_rbandwidth_engine) ||
     identical(method, .np_plot_conbandwidth_engine) ||
     identical(method, .np_plot_condbandwidth_engine) ||
