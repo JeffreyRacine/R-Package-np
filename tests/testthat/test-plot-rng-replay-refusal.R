@@ -138,3 +138,24 @@ test_that("explicit CDF replay retains covariance and deterministic boundaries",
   d$plot.errors.type <- "simultaneous"; d$bias.control$version <- 99L
   expect_silent(guard(method,b,d))
 })
+
+test_that("explicit density replay retains default and covariance providers", {
+  ns <- asNamespace("np")
+  guard <- get(".np_plot_rng_replay_preflight", ns)
+  method <- get(".np_plot_bandwidth_engine", ns)
+  b <- structure(list(type="fixed",ncon=1L,nuno=0L,nord=0L,
+    ckertype="gaussian",ckerorder=2L,ckerbound="none"),class="bandwidth")
+  d <- list(plot.errors.center="bias-corrected",plot.errors.method="asymptotic",
+    plot.errors.type="simultaneous",bias.control=np_udens_bias_control())
+  old <- RNGkind(); on.exit(do.call(RNGkind,as.list(old)),add=TRUE)
+  RNGkind(normal.kind="Box-Muller")
+  for(m in c(511L,512L,513L)) {
+    d$neval <- m
+    if(m>512L) expect_error(guard(method,b,d),"unsafe RNG replay") else expect_silent(guard(method,b,d))
+  }
+  d$bias.control <- NULL; expect_silent(guard(method,b,d))
+  d$bias.control <- np_udens_bias_control("positive-covariance")
+  expect_silent(guard(method,b,d))
+  d$bias.control$version <- 2L; expect_error(guard(method,b,d),"unsafe RNG replay")
+  d$plot.errors.method <- "bootstrap"; expect_silent(guard(method,b,d))
+})

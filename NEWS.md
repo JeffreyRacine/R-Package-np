@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Refuse unsafe Box-Muller replay for explicit joint-scale and retained version-2
+  density factor bands above 512 targets. Default D8, covariance and bootstrap
+  providers retain their existing computation and RNG behavior.
+
 * Refuse unsafe Box-Muller replay before seeding for explicit CDF simultaneous
   factor bands above 32 targets; covariance and deterministic bands are unchanged.
 

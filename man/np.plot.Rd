@@ -624,6 +624,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   users may explicitly select a qualified built-in generator. A nonempty seed
   payload does not certify arbitrary custom state or callback behavior.
 
+  Explicit joint-scale and saved version-2 positive-covariance density controls
+  refuse Box--Muller factor replay above 512 targets on fixed numeric Gaussian
+  geometry. This covers all band displays because these providers compute joint
+  calibration internally; the default density provider is unchanged.
   The explicit CDF construction also refuses Box--Muller factor replay above
   32 targets for simultaneous or all bands on fixed numeric Gaussian geometry.
   Its smaller covariance and deterministic marginal bands remain available.
