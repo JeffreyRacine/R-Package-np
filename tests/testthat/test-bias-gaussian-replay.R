@@ -22,7 +22,14 @@ test_that("bounded Box-Muller regression replay retains actual shared innovation
     expect_identical(rnorm(5L),following)
   }
   saved <- .Random.seed
-  expect_null(npRmpi:::.np_bias_gaussian_cache(2048L,1025L,"gaussian"))
+  expect_error(npRmpi:::.np_bias_gaussian_cache(2048L,1025L,"gaussian"),
+    "unsafe RNG replay: resolved Gaussian regression",fixed=TRUE)
+  expect_error(npRmpi:::.np_bias_gaussian_cache(0L,33L,"gaussian"),
+    "invalid Gaussian replay dimensions",fixed=TRUE)
   expect_null(npRmpi:::.np_bias_gaussian_cache(7L,33L,"mammen"))
+  expect_identical(.Random.seed,saved)
+  RNGkind(normal.kind="Inversion")
+  saved <- .Random.seed
+  expect_null(npRmpi:::.np_bias_gaussian_cache(2048L,1025L,"gaussian"))
   expect_identical(.Random.seed,saved)
 })

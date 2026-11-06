@@ -637,7 +637,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   can establish the regression replay size even without retained residuals.
   This includes retained simple-symbol formulas with quoted predictor names.
   Explicit training arguments take precedence; calls and NA policies are not
-  reevaluated by the check. Legacy or non-plain reconstruction stays unclassified.
+  reevaluated by the early check. If the early check cannot determine the
+  regression sample size, the existing resolved-data Gaussian cache owner also
+  refuses Box--Muller requests above its 16 MiB limit, before internal replay.
+  This backstop uses the training data after the original data/NA processing;
+  it does not evaluate those callbacks again. Unlike the early check, it runs
+  inside the existing plot seed scope, so the caller-continuation limitation
+  below still applies.
   Known unsafe Box--Muller replay is refused before seeding for corrected
   Gaussian regression above the 16 MiB retained-innovation limit when ordinary
   training data are already available, and for multi-tile fixed numeric joint

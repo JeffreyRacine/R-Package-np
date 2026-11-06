@@ -63,6 +63,11 @@
 
 # npRmpi 0.80-2 (development)
 
+* Corrected Gaussian regression now refuses unsafe uncached Box-Muller replay
+  at the resolved-data cache boundary, including legacy and NA-omission routes
+  that cannot be classified before plotting. Data/NA callbacks are not repeated;
+  cached and other-generator paths retain their existing behavior.
+
 - MPI regression degree search rejects an already-decoded nonfinite initial
   bandwidth before starting its prepared worker command, preserving the pool
   on the constant-regressor case. Native solver and manual-command handling
