@@ -608,9 +608,12 @@ np_render_control <- function(style = c("band", "bar"),
            "conbandwidth", "condbandwidth") %in% class(bws)))
   progress.enabled <- (identical(dots$plot.errors.method, "bootstrap") || conditional.optin) &&
     !identical(dots$plot.errors.boot.nonfixed, "frozen")
-  if (!owns.empty.rows && .np_udens_beta_request(bws, dots$bias.control,
-      dots$plot.errors.center, dots$plot.errors.method)) {
-    # Beta owns its explicit child stream; never reset the caller's cached normal.
+  if (!owns.empty.rows && (.np_udens_beta_request(bws, dots$bias.control,
+      dots$plot.errors.center, dots$plot.errors.method) ||
+      .np_udens_fgd_request(bws, dots$bias.control,
+      dots$plot.errors.center, dots$plot.errors.method,
+      dots$plot.errors.boot.calibration))) {
+    # Bounded density inference owns its child stream; preserve cached normals.
     npValidateNonNegativeInteger(random.seed, "random.seed")
     dots$random.seed <- random.seed
     value <- .np_plot_progress_run(.np_udens_resolution_run(

@@ -123,6 +123,13 @@
     joint.eligible <- joint.request
     if (joint.request)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+    fgd.state <- NULL
+    if (.np_udens_fgd_request(bws, bias.control, plot.errors.center,
+        error.request$method, plot.errors.boot.calibration))
+      fgd.state <- .np_udens_fgd_public_prepare(bws, xdat,
+        error.request$method, as.character(plot.errors.boot.method)[1L],
+        error.request$type, plot.errors.boot.calibration, plot.errors.alpha,
+        if (missing(random.seed)) 42L else random.seed)
     beta.state <- NULL
     if (.np_udens_beta_request(bws, bias.control, plot.errors.center,
         error.request$method))
@@ -173,7 +180,7 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
-    bias.state <- if (!is.null(beta.state)) beta.state else .np_udens_plot_prepare(bias.control, bws, xdat,
+    bias.state <- if (!is.null(fgd.state)) fgd.state else if (!is.null(beta.state)) beta.state else .np_udens_plot_prepare(bias.control, bws, xdat,
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
       plot.errors.boot.calibration, blocklen = plot.errors.boot.blocklen,
       block.automatic = density.block.automatic, alpha = plot.errors.alpha,
@@ -259,7 +266,7 @@
         exdat = x.eval,
         bws = bws,
         cdf = FALSE,
-        need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(beta.state)
+        need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(beta.state) && is.null(fgd.state)
       )
 
       tdens = matrix(data = tobj$dens,
@@ -339,7 +346,7 @@
 
       if (plot.behavior != "plot"){
         d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens,
-                        derr = if (new.bias && (.np_udens_beta_active(bias.state) || .np_udens_d8_active(bias.state) || bias.state$plot.control.version %in% c(2L, 3L)))
+                        derr = if (new.bias && (.np_udens_fgd_active(bias.state) || .np_udens_beta_active(bias.state) || .np_udens_d8_active(bias.state) || bias.state$plot.control.version %in% c(2L, 3L)))
                           cbind(-terr[,1L], terr[,2L]) else terr[,1:2],
                         ntrain = nrow(xdat), se = plot.errors)
         if (joint.eligible)
@@ -557,7 +564,7 @@
       plotOnEstimate <- (plot.errors.center == "estimate")
 
       beta.slices <- NULL
-      if (new.bias && .np_udens_beta_active(bias.state)) {
+      if (new.bias && (.np_udens_beta_active(bias.state) || .np_udens_fgd_active(bias.state))) {
         grids <- lapply(seq_len(bws$ndim), function(j) {
           limits <- trim.quantiles(xdat[,j], xtrim[j])
           subcol(exdat, seq(limits[1L], limits[2L], length.out = neval), j)[
@@ -607,7 +614,7 @@
           exdat = eval.slice,
           bws = bws,
           cdf = FALSE,
-          need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(beta.state)
+          need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(beta.state) && is.null(fgd.state)
         )
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 

@@ -581,7 +581,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \code{\link{np_udens_bias_control}} for the distinct beta endpoint rules,
   restrictions and limitations.
 
-  Default bias-corrected unconditional Gaussian density plots use the D8
+  Known-fixed-bound order-2 Gaussian density plots also support corrected
+  asymptotic and independent symmetric-sd/asymmetric-sd intervals for one or
+  two continuous coordinates, with omitted \code{bias_control} and explicit
+  pointwise/simultaneous bands. FG-D combines complete ratio-pilot and empirical
+  residual intervals with a nonlinear guide region; it is distinct from beta
+  correction and unbounded D8. Range-derived bounds and literal endpoints are
+  rejected. All slices form one finite calibration family. See
+  \code{\link{np_udens_bias_control}} for assumptions and endpoint rules.
+
+  Default bias-corrected unconditional unbounded Gaussian density plots use the D8
   positive-pilot construction for eligible asymptotic requests; see
   \code{\link{np_udens_bias_control}}. It uses complete corrected covariance
   and a standardized full-grid Gaussian maximum, combining all slices in one

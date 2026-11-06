@@ -17,7 +17,7 @@ Other previously supported requests retain their existing construction and
 admission rules. Supplying \code{np_udens_bias_control()} explicitly selects
 the joint-scale construction, including for asymptotic inference. Omitted
 controls for unbounded Gaussian bootstrap inference continue to select joint-scale.
-Known-bound beta plots use the separate construction described below.
+Known-bound beta and Gaussian plots use the separate constructions described below.
 The default \code{center="estimate"} is unchanged.
 Use \code{errors="asymptotic"} for Gaussian calibration or
 \code{errors="bootstrap"}, \code{bootstrap="inid"} for literal independent
@@ -105,6 +105,48 @@ Other bounded kernels, nearest-neighbour bandwidths, mixed data, dimensions
 above two, derivatives, other bootstrap laws and the \code{pmzsd},
 \code{bonferroni} and \code{all} bands are outside this new beta construction.
 Explicit saved density controls keep their original construction and scope.
+}
+
+\subsection{Known-bound Gaussian density inference}{
+With omitted or \code{NULL} \code{bias_control}, fixed second-order Gaussian
+kernels with known \code{ckerbound="fixed"} bounds use the FG-D plot
+construction for corrected asymptotic and independent symmetric-sd/asymmetric-sd
+intervals. Request explicit pointwise or simultaneous bands. As for the
+known-bound beta construction, one or two continuous coordinates and at least
+ten observations are required; data and evaluation points must be strictly
+interior. Range-derived bounds, support endpoints, nearest-neighbour bandwidths,
+higher kernel orders, derivatives, other bootstrap laws and pmzsd/Bonferroni/all
+bands are outside this construction. Explicit density controls, including the
+legacy calibration alias, retain their existing meanings.
+
+The query-normalized truncated Gaussian is corrected by a cubic donor-moment
+projection on each normalized support coordinate. Coordinate operators are
+multiplied in two dimensions. Write this operator as \eqn{A}; the corrected
+plot center is \eqn{g_{\widehat\theta}+P_n A-E_{g_{\widehat\theta}}A}.
+The guide and its nonlinear region have the same parameterization and
+half-guide/half-residual risk allocation described above. Residual uncertainty
+includes the guide-estimation projection, cross terms and mean products.
+
+FG-D constructs two complete intervals, using respectively the positive
+ratio-pilot residual covariance and the observation-based residual covariance,
+then takes their outward union. Asymptotic simultaneous inference uses each
+full covariance law on the entire finite target family, with common Gaussian
+innovations; pointwise inference uses \eqn{z_{1-\alpha/4}}. SD inference refits
+the guide in each actual multinomial sample and holds the original empirical
+residual denominator fixed. The same residual roots are transported under each
+scale. The asymmetric rule inverts their signed ranks; the symmetric rule forms
+a containing symmetric hull for each complete interval before the union.
+Taking the maximum of the two scales is not the asymmetric construction.
+The guide region is added once per constituent interval.
+
+Returned limits and the corrected center are signed, without clipping or
+renormalization. Bounds, evaluation grid and selected bandwidth are conditioned
+on, not re-estimated. The full finite target family, requested draw count and
+selected RNG are preserved; numerical or workspace failures are explicit.
+Near-edge intervals may be very wide. Retained coverage experiments are
+conservative over the investigated Beta-family and mixture cases, but do not
+establish continuum or universal coverage. Core estimators and \code{se=FALSE}
+are unchanged; an existing fitted object can request these plot intervals.
 }
 
 \subsection{Default D8 asymptotic density inference}{
