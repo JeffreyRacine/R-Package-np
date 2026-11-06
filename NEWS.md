@@ -1,5 +1,10 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Bounded covariance Gaussian calibration now generates one maximum sample for
+  all requested confidence levels, preserving normal-stream continuation,
+  including a pending Box-Muller deviate. General tiled and callback replay
+  remain separate contracts.
+
 - Document that `autodispatch.option.sync="never"` requires caller-maintained
   computational-option agreement across ranks. This is an existing limitation;
   runtime behavior and communication are unchanged.

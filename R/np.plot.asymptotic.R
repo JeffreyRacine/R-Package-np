@@ -136,6 +136,18 @@
   if (!is.numeric(alpha) || length(alpha) != 1L || !is.finite(alpha) ||
       alpha <= 0 || alpha >= 0.5)
     stop("alpha must lie in (0, 0.5)", call. = FALSE)
+  .np_plot_gaussian_calibrate_alphas(covariance, alpha, draws, block, max.bytes)[[1L]]
+}
+
+# One stochastic producer serves all alpha reductions. Reassigning a visible
+# seed cannot replay a pending Box-Muller deviate; leave the normal stream live.
+.np_plot_gaussian_calibrate_alphas <- function(covariance, alpha,
+                                               draws = 9999L, block = 4096L,
+                                               max.bytes = 64 * 1024^2) {
+  block <- .np_plot_gaussian_integer(block, "Gaussian draw block", 1000000L)
+  if (!is.numeric(alpha) || !length(alpha) || any(!is.finite(alpha)) ||
+      any(alpha <= 0 | alpha >= 0.5) || anyDuplicated(alpha))
+    stop("alpha values must be unique and lie in (0, 0.5)", call. = FALSE)
   if (!is.numeric(max.bytes) || length(max.bytes) != 1L ||
       !is.finite(max.bytes) || max.bytes <= 0)
     stop("Gaussian memory budget must be positive and finite", call. = FALSE)
@@ -144,7 +156,9 @@
     stop("Gaussian covariance must be a nonempty square numeric matrix",
          call. = FALSE)
   g <- nrow(covariance)
-  draws <- .np_plot_gaussian_draws(draws, alpha, g)
+  draws <- .np_plot_gaussian_draws(draws, alpha[[1L]], g)
+  if (length(alpha) > 1L)
+    for (a in alpha[-1L]) .np_plot_gaussian_draws(draws, a, g)
   if (g > 512L || 64 * as.double(g)^2 + 24 * draws + 64 * g > max.bytes)
     .np_plot_joint_unavailable("finite-grid Gaussian covariance exceeds the plot memory/grid budget",
          call. = FALSE)
@@ -165,7 +179,7 @@
   metadata <- list(method = "asymptotic Gaussian", scope = "finite grid within panel",
                    draws = draws, critical = 0, grid.size = g,
                    positive.variance = length(active), rank = 0L)
-  if (!length(active)) return(metadata)
+  if (!length(active)) return(lapply(alpha, function(a) metadata))
   s <- sqrt(variance[active])
   correlation <- covariance[active, active, drop = FALSE] / outer(s, s)
   correlation <- (correlation + t(correlation)) / 2
@@ -191,10 +205,13 @@
     maxima[start:last] <- apply(abs(simulated), 2L, max)
     progress <- .np_plot_progress_tick(progress, last)
   }
-  metadata$critical.raw <- unname(quantile(maxima, 1 - alpha, type = 1L))
-  metadata$critical <- .np_plot_gaussian_critical(metadata$critical.raw, alpha, g)
-  metadata$rank <- sum(values > tolerance)
-  metadata
+  lapply(alpha, function(a) {
+    result <- metadata
+    result$critical.raw <- unname(quantile(maxima, 1 - a, type = 1L))
+    result$critical <- .np_plot_gaussian_critical(result$critical.raw, a, g)
+    result$rank <- sum(values > tolerance)
+    result
+  })
 }
 
 # Captured adjoints belong to one complete request, including its native
