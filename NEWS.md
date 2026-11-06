@@ -1,5 +1,10 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Refuse selected corrected regression and multi-tile fixed numeric joint CDF
+  plots when a custom uniform generator exposes only a seed header and no replay
+  state. This pre-seed check preserves the selected RNG; a nonempty payload is
+  not a general certificate for arbitrary custom generators.
+
 * Refuse known uncached Box-Muller replay before seeding corrected plot inference:
   Gaussian regression above the 16 MiB innovation limit when plain training data
   are available, and multi-tile fixed numeric joint CDF inference. Qualified

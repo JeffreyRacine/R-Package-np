@@ -70,3 +70,29 @@ test_that("CDF refusal respects target geometry and deterministic bands", {
   RNGkind(normal.kind = "Inversion")
   expect_silent(guard(method, bws, dots))
 })
+
+# Policy-table test only; actual hidden/exposed native generator fixtures are
+# exercised in separate bounded subprocesses in the R13 forensic evidence.
+test_that("opaque uniform refusal leaves exposed-state and legacy policy alone", {
+  ns <- asNamespace("npRmpi")
+  guard <- get(".np_plot_rng_replay_preflight", ns)
+  env <- new.env(parent = environment(guard))
+  env$RNGkind <- function() c("user-supplied", "Inversion", "Rejection")
+  environment(guard) <- env
+  present <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
+  prior <- if (present) get(".Random.seed", .GlobalEnv, inherits = FALSE) else NULL
+  on.exit(if (present) assign(".Random.seed", prior, .GlobalEnv) else
+    rm(list = ".Random.seed", envir = .GlobalEnv), add = TRUE)
+  method <- get(".np_plot_rbandwidth_engine", ns)
+  bws <- structure(list(), class = "rbandwidth")
+  dots <- list(plot.errors.center = "bias-corrected",
+               plot.errors.method = "bootstrap")
+  assign(".Random.seed", 10405L, .GlobalEnv)
+  expect_error(guard(method, bws, dots), "custom uniform state absent")
+  expect_identical(get(".Random.seed", .GlobalEnv), 10405L)
+  dots$plot.errors.boot.calibration <- "legacy"
+  expect_silent(guard(method, bws, dots))
+  dots$plot.errors.boot.calibration <- NULL
+  assign(".Random.seed", c(10405L, 1L, 2L), .GlobalEnv)
+  expect_silent(guard(method, bws, dots))
+})

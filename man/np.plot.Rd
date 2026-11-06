@@ -620,6 +620,12 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   of 9999 and accepts positive integer counts subject to representability and
   workspace limits, without a fixed one-million upper cap. It applies only to asymptotic
   simultaneous/all requests; \code{B} remains bootstrap-only. The usual
+  Selected corrected regression and multi-tile fixed numeric joint CDF requests
+  are also refused before seeding when a custom uniform generator exposes only
+  a seed header without replay state. The generator is never changed silently;
+  users may explicitly select a qualified built-in generator. A nonempty seed
+  payload does not certify arbitrary custom state or callback behavior.
+
   Known unsafe Box--Muller replay is refused before seeding for corrected
   Gaussian regression above the 16 MiB retained-innovation limit when ordinary
   training data are already available, and for multi-tile fixed numeric joint
