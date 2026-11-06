@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Small-grid Gaussian density scale envelopes now preserve a single normal
+  sample, avoiding Box-Muller replay errors and incorrect signed maxima.
+  Broader tiled replay and caller-RNG restoration remain separate limitations.
+
 * Bounded covariance Gaussian calibration now generates one maximum sample for
   all requested confidence levels, preserving normal-stream continuation,
   including a pending Box-Muller deviate. General tiled and callback replay
