@@ -76,20 +76,17 @@
     model <- .np_udens_bc_covariance(state, grid, tile)
     center <- model$center; original <- model$original.center; empirical <- model$se
     covariance <- model$covariance * tcrossprod(scale / empirical)
-    calibrated <- lapply(alpha, function(a) .np_bias_stream(start,
-      .np_plot_gaussian_calibrate(covariance, alpha = a, draws = B,
-                                 max.bytes = state$max.bytes)))
-    end <- calibrated[[1L]]$end
-    if (!all(vapply(calibrated, function(z) identical(z$end, end), logical(1L))))
-      stop("density Gaussian alpha replays consumed inconsistent streams", call. = FALSE)
+    calibrated <- .np_plot_gaussian_calibrate_alphas(covariance,
+      alpha = alpha, draws = B, max.bytes = state$max.bytes)
+    end <- get(".Random.seed", .GlobalEnv, inherits = FALSE)
     critical <- list(
       pointwise = matrix(rep(qnorm(alpha/2, lower.tail = FALSE), each = m), m),
-      simultaneous = matrix(rep(vapply(calibrated, function(z) z$value$critical,
+      simultaneous = matrix(rep(vapply(calibrated, function(z) z$critical,
                                       numeric(1L)), each = m), m),
       bonferroni = matrix(rep(qnorm(alpha/(2*m), lower.tail = FALSE), each = m), m))
     raw.critical <- critical
     raw.critical$simultaneous <- matrix(rep(vapply(calibrated,
-      function(z) z$value$critical.raw, numeric(1L)), each = m), m)
+      function(z) z$critical.raw, numeric(1L)), each = m), m)
   } else {
     limits <- .np_bias_limits_prepare(rep("density", m), alpha, law == "gaussian", B)
     center <- original <- empirical <- numeric(m)

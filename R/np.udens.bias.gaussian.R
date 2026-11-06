@@ -2,21 +2,18 @@
 .np_udens_bc_gaussian <- function(state, grid, alpha, B, tile, corrected, start) {
   moments <- .np_udens_bc_covariance(state, grid, tile, corrected)
   m <- nrow(grid)
-  output <- lapply(alpha, function(a) .np_bias_stream(start,
-    .np_plot_gaussian_calibrate(moments$covariance, alpha = a, draws = B,
-                               max.bytes = state$max.bytes)))
-  end <- output[[1L]]$end
-  if (!all(vapply(output, function(z) identical(z$end, end), logical(1L))))
-    stop("Gaussian alpha replay consumed inconsistent streams", call. = FALSE)
+  output <- .np_plot_gaussian_calibrate_alphas(moments$covariance,
+    alpha = alpha, draws = B, max.bytes = state$max.bytes)
+  end <- get(".Random.seed", .GlobalEnv, inherits = FALSE)
   point <- matrix(rep(qnorm(alpha/2, lower.tail = FALSE), each = m), m)
   bonf <- matrix(rep(qnorm(alpha/(2*m), lower.tail = FALSE), each = m), m)
-  joint <- matrix(rep(vapply(output, function(z) z$value$critical, numeric(1L)), each = m), m)
+  joint <- matrix(rep(vapply(output, function(z) z$critical, numeric(1L)), each = m), m)
   list(center = moments$center, original.center = moments$original.center,
        se = moments$se, covariance = moments$covariance,
        critical = list(pointwise = point, simultaneous = joint, bonferroni = bonf),
-       raw.max = vapply(output, function(z) z$value$critical.raw, numeric(1L)),
+       raw.max = vapply(output, function(z) z$critical.raw, numeric(1L)),
        raw.bonf = bonf, degeneracy = integer(m), cancellation = integer(m),
-       gaussian = lapply(output, `[[`, "value"), end = end)
+       gaussian = output, end = end)
 }
 
 .np_udens_bc_factor <- function(state, grid, alpha, B, tile, corrected, start) {

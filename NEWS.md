@@ -1,5 +1,10 @@
 # np 0.80-2 (development)
 
+* Bounded covariance Gaussian calibration now generates one maximum sample for
+  all requested confidence levels, preserving normal-stream continuation,
+  including a pending Box-Muller deviate. General tiled and callback replay
+  remain separate contracts.
+
 * Preserve native-vector column identity when unconditional density/distribution fits retain training data and plots reconstruct their grids; explicitly named frames and matrices keep their own names.
 
 * Reject structurally degenerate full-sample fixed blocks in corrected density inference instead of returning zero-width uncertainty bands.

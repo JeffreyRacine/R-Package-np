@@ -37,13 +37,11 @@
     bonf <- matrix(rep(qnorm(alpha/(2*m), lower.tail = FALSE), each = m), m)
     joint <- point
     if (stochastic) {
-      draws <- lapply(alpha, function(a) .np_bias_stream(start,
-        .np_plot_gaussian_calibrate(covariance, alpha = a, draws = B, max.bytes = state$max.bytes)))
-      end <- draws[[1L]]$end
-      if (!all(vapply(draws, function(d) identical(d$end, end), logical(1L))))
-        stop("CDF Gaussian alpha replay mismatch", call. = FALSE)
-      joint <- matrix(rep(vapply(draws, function(d) d$value$critical, numeric(1L)), each = m), m)
-      raw.max <- vapply(draws, function(d) d$value$critical.raw, numeric(1L))
+      draws <- .np_plot_gaussian_calibrate_alphas(covariance,
+        alpha = alpha, draws = B, max.bytes = state$max.bytes)
+      end <- get(".Random.seed", .GlobalEnv, inherits = FALSE)
+      joint <- matrix(rep(vapply(draws, function(d) d$critical, numeric(1L)), each = m), m)
+      raw.max <- vapply(draws, function(d) d$critical.raw, numeric(1L))
     }
     critical <- list(pointwise = point, simultaneous = joint, bonferroni = bonf)
     raw.bonf <- bonf
