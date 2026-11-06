@@ -83,14 +83,15 @@
   NULL
 }
 
-.npRmpi_native_name_plan <- function(definition, owner, caller) {
+.npRmpi_native_name_plan <- function(definition, owner, caller, values) {
   if (!is.function(definition)) return(list())
   out <- list()
   for (name in c("ynames", "xnames", "znames")) {
     roles <- switch(name, ynames = c("ydat", "tydat"),
       xnames = c("xdat", "txdat", "dat", "tdat"), znames = c("zdat", "tzdat"))
     role <- intersect(roles, names(formals(definition)))
-    if (length(role)) {
+    if (length(role) && role[[1L]] %in% names(values) &&
+        is.atomic(values[[role[[1L]]]]) && is.null(dim(values[[role[[1L]]]]))) {
       expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))), owner)
       out[name] <- list(.np_formula_dot_expression(expr, caller))
     }
@@ -212,4 +213,86 @@
     result[["bws"]] <- restore(bws, original)
   }
   result
+}
+
+# Observe a native vector only after the existing argument owner has forced it.
+# Formula owners and caller-supplied bandwidth objects retain their own identity.
+.npRmpi_native_identity_plan <- function(definition, mc, owner, caller) {
+  if (!is.function(definition) || !is.call(mc) ||
+      is.list(mc[["bws"]]) || is.list(mc[["bw"]])) return(list())
+  out <- list()
+  for (role in intersect(c("xdat", "txdat", "ydat", "tydat", "zdat", "tzdat"),
+                         intersect(names(formals(definition)), names(mc)))) {
+    value <- mc[[role]]
+    if (!is.atomic(value) || !is.null(dim(value))) next
+    expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role))), owner)
+    expr <- .np_formula_dot_expression(expr, caller)
+    out[[role]] <- paste(deparse(expr), collapse = "")
+  }
+  out
+}
+
+.npRmpi_native_identity_bind <- function(plan, call, temporaries) {
+  out <- character()
+  for (role in names(plan)) {
+    token <- call[[role]]
+    if (is.symbol(token) && as.character(token) %in% temporaries)
+      out[as.character(token)] <- plan[[role]]
+  }
+  out
+}
+
+# Only descriptive fields in these producer schemas are rewritten, before the
+# existing publication. Calls, formulas, values and acknowledged leases are not.
+.npRmpi_native_identity_apply <- function(value, identity) {
+  if (!is.list(value) || !length(identity)) return(value)
+  if (!is.null(.npRmpi_lease_handle_fields(value))) return(value)
+  rename <- function(x) {
+    if (!is.character(x)) return(x)
+    at <- match(x, names(identity))
+    ok <- !is.na(at)
+    x[ok] <- unname(identity[at[ok]])
+    x
+  }
+  named <- function(x) {
+    if (!is.null(names(x))) names(x) <- rename(names(x))
+    if (!is.data.frame(x) && !is.null(dimnames(x)))
+      dimnames(x) <- lapply(dimnames(x), rename)
+    x
+  }
+  descriptors <- function(x) {
+    if (!is.list(x)) return(named(x))
+    lapply(x, function(a) if (is.list(a)) descriptors(a) else named(a))
+  }
+  for (name in c("xnames", "ynames", "znames", "data.xnames", "data.znames"))
+    if (!is.null(value[[name, exact = TRUE]])) value[[name]] <- rename(value[[name]])
+  if (is.list(value[["varnames", exact = TRUE]]))
+    value$varnames <- lapply(value$varnames, rename)
+  for (name in c("xcoef", "xcoeferr", "xcoefvcov", "evalx", "evalz", "xeval", "yeval",
+                 "icon", "iuno", "iord", "ixcon", "ixuno", "ixord", "iycon", "iyuno", "iyord", "sdev"))
+    if (!is.null(value[[name, exact = TRUE]])) value[[name]] <- named(value[[name]])
+  for (name in c("xdati", "ydati", "zdati", "dati"))
+    if (is.list(value[[name, exact = TRUE]])) value[[name]] <- descriptors(value[[name]])
+  if (is.list(value[["eval", exact = TRUE]]))
+    for (name in c("exdat", "ezdat"))
+      if (!is.null(value$eval[[name, exact = TRUE]])) value$eval[[name]] <- named(value$eval[[name]])
+  training <- value[[".np.native.training", exact = TRUE]]
+  if (is.list(training)) {
+    for (name in c("xdat", "ydat", "zdat"))
+      if (!is.null(training[[name, exact = TRUE]])) training[[name]] <- named(training[[name]])
+    value[[".np.native.training"]] <- training
+  }
+  for (name in c("bws", "reg.bws", "fit", "mean.fit", "scale.fit"))
+    if (is.list(value[[name, exact = TRUE]]))
+      value[[name]] <- .npRmpi_native_identity_apply(value[[name]], identity)
+  for (name in c("tau.bws", "tau.fits"))
+    if (is.list(value[[name, exact = TRUE]]))
+      value[[name]] <- lapply(value[[name]], .npRmpi_native_identity_apply, identity = identity)
+  bw <- value[["bw", exact = TRUE]]
+  if (is.list(bw)) {
+    if (inherits(bw, "plbandwidth") || !is.null(bw[["xnames", exact = TRUE]]))
+      value$bw <- .npRmpi_native_identity_apply(bw, identity)
+    else value$bw <- lapply(bw, .npRmpi_native_identity_apply, identity = identity)
+  }
+  value
 }

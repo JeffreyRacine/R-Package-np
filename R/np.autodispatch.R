@@ -1179,6 +1179,7 @@
     res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpreplace)
   metadata <- payload[["public.metadata", exact = TRUE]]
   if (!is.null(metadata)) {
+    res <- .npRmpi_native_identity_apply(res, metadata$identity)
     res <- .npRmpi_native_names_apply(res, metadata$names)
     res <- .npRmpi_bw_formula_apply(res, metadata$formula)
   }
@@ -3010,6 +3011,9 @@
     args_ref = prepared$tmpnames,
     timeout_class = timeout.class
   )
+  if (!is.null(public.metadata))
+    public.metadata$identity <- .npRmpi_native_identity_bind(
+      public.metadata$identity, prepared$call, prepared$tmpnames)
   payload <- list(
     invocation = invocation,
     call = prepared$call,
@@ -3135,6 +3139,7 @@
     result <- .npRmpi_autodispatch_sanitize_object(result, tmpvals = tmpreplace)
     result <- .npRmpi_bw_restore_public_owner(result, prepared$lease.replacements)
     if (!is.null(public.metadata)) {
+      result <- .npRmpi_native_identity_apply(result, public.metadata$identity)
       result <- .npRmpi_native_names_apply(result, public.metadata$names)
       result <- .npRmpi_bw_formula_apply(result, public.metadata$formula)
     }
@@ -3264,8 +3269,19 @@
   producer <- .npRmpi_lease_producer(mc)
   metadata <- if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw"))
     list(names = .npRmpi_native_name_plan(definition, sys.frame(method),
-      if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv()),
+      if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv(), values = mc),
       formula = .npRmpi_bw_formula_owner_plan(producer)) else NULL
+  identity.families <- c("npplreg", "npscoef", "npcdens", "npcdist", "npqreg", "nplsqreg",
+                         "npplregbw", "npscoefbw", "npcdensbw", "npcdistbw", "nplsqregbw")
+  if (sub("\\..*$", "", owner.name) %in% identity.families &&
+      is.null(metadata$formula)) {
+    identity <- .npRmpi_native_identity_plan(definition, mc, sys.frame(method),
+      if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
+    if (length(identity)) {
+      if (is.null(metadata)) metadata <- list(names = list(), formula = NULL)
+      metadata$identity <- identity
+    }
+  }
   result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env,
     comm = comm, warn_nested = TRUE, public.metadata = metadata)
   if (inherits(result, c("bandwidth", "dbandwidth", "npdensity", "npdistribution")))
@@ -3284,7 +3300,8 @@
                         xnames = c("xdat", "txdat", "dat", "tdat"),
                         znames = c("zdat", "tzdat"))
         role <- intersect(roles, names(formals(definition)))
-        if (length(role)) {
+        if (length(role) && role[[1L]] %in% names(mc) &&
+            is.atomic(mc[[role[[1L]]]]) && is.null(dim(mc[[role[[1L]]]]))) {
           expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))),
                        envir = sys.frame(method))
           expr <- .np_formula_dot_expression(expr,

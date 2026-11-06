@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+- Native-vector MPI fits reconcile descriptive variable identities before
+  publication, including retained training/index names and nested fit copies.
+  Explicit data-frame names, executable calls and acknowledged input leases
+  retain their existing ownership.
+
 - MPI auto-dispatch now includes R's `warn` option in the existing synchronized
   option policy, keeping warning conversion consistent at symmetric warning
   sites. This does not alter exiting-handler or interrupted-collective recovery.
