@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Small-grid Gaussian density scale envelopes now preserve a single normal
+  sample, avoiding Box-Muller replay errors and incorrect signed maxima.
+  Broader tiled replay and caller-RNG restoration remain separate limitations.
+
 - MPI autodispatch now delivers named normal-reference, uniform-kernel-order,
   and unavailable-variance warnings after the distributed result and its
   cleanup finish. Exiting/reentrant warning handlers can safely use the pool.

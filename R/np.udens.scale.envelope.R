@@ -27,35 +27,17 @@
 }
 
 # One-sided reduction of the canonical bounded Gaussian symmetric-root
-# construction. The shared two-sided calibrator is intentionally unchanged.
+# construction, generated once from the currently active normal stream.
 .np_udens_scale_gaussian <- function(G, B, max.bytes) {
   C <- tcrossprod(G)
-  # Validate the complete covariance using the existing bounded calibrator,
-  # replaying its stream for the signed reduction below.
-  start <- get(".Random.seed", .GlobalEnv)
-  canonical <- .np_bias_stream(start,
-    .np_plot_gaussian_calibrate(C, alpha = .05, draws = B, max.bytes = max.bytes))
-  active <- which(diag(C) > 0)
-  if (!length(active)) return(list(maxima = rep(0, B), end = canonical$end))
-  sdv <- sqrt(diag(C)[active])
-  R <- C[active, active, drop = FALSE] / outer(sdv, sdv)
-  R <- (R + t(R))/2
-  eig <- eigen(R, symmetric = TRUE)
-  root <- tcrossprod(sweep(eig$vectors, 2L, sqrt(pmax(eig$values, 0)), "*"), eig$vectors)
-  m <- nrow(C)
-  block <- min(4096L, B, floor((max.bytes - 64*as.double(m)^2 - 24*B)/(64*m)))
-  if (block < 1L) stop("density scale covariance exceeds memory budget", call. = FALSE)
-  maximum <- numeric(B)
-  for (first in seq.int(1L, B, by = block)) {
-    last <- min(B, first + block - 1L)
-    Z <- root %*% matrix(rnorm(length(active)*(last-first+1L)), length(active))
-    maximum[first:last] <- apply(-Z, 2L, max)
-    if (length(active) < m) maximum[first:last] <- pmax(0, maximum[first:last])
-  }
+  # Preserve the initialized-stream precondition, including for a zero family.
+  get(".Random.seed", .GlobalEnv)
+  process <- .np_plot_gaussian_maxima(C, alpha = .05, draws = B,
+    max.bytes = max.bytes, reduction = "negative")
   end <- get(".Random.seed", .GlobalEnv)
-  if (!identical(end, canonical$end))
-    stop("density signed Gaussian replay consumed inconsistent stream", call. = FALSE)
-  list(maxima = maximum, end = end, rank = canonical$value$rank)
+  if (!process$metadata$positive.variance)
+    return(list(maxima = rep(0, B), end = end))
+  list(maxima = process$maxima, end = end, rank = process$rank)
 }
 
 .np_udens_scale_inference <- function(state, grid, law = c("gaussian", "inid", "fixed", "geom"),
@@ -109,8 +91,9 @@
       stop("density scale envelope changed the F4 scale", call. = FALSE)
     tau[ii] <- z$t
     if (small) {
-      draw <- .np_bias_stream(start, .np_udens_scale_gaussian(z$factor, B, state$max.bytes))
-      maximum <- draw$value$maxima; end <- draw$end
+      # The reference producer left this stream live at base$rng$end.
+      draw <- .np_udens_scale_gaussian(z$factor, B, state$max.bytes)
+      maximum <- draw$maxima; end <- draw$end
       point[ii] <- ifelse(z$t > 0, qnorm(.95), 0)
     } else {
       draw <- .np_bias_stream(start,

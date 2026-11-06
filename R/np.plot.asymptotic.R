@@ -144,6 +144,26 @@
 .np_plot_gaussian_calibrate_alphas <- function(covariance, alpha,
                                                draws = 9999L, block = 4096L,
                                                max.bytes = 64 * 1024^2) {
+  process <- .np_plot_gaussian_maxima(covariance, alpha, draws, block, max.bytes)
+  metadata <- process$metadata
+  if (!metadata$positive.variance) return(lapply(alpha, function(a) metadata))
+  lapply(alpha, function(a) {
+    result <- metadata
+    result$critical.raw <- unname(quantile(process$maxima, 1 - a, type = 1L))
+    result$critical <- .np_plot_gaussian_critical(result$critical.raw, a,
+                                                 metadata$grid.size)
+    result$rank <- process$rank
+    result
+  })
+}
+
+# Shared bounded producer: validation, symmetric root and normal draw order
+# have one owner. Signed scale uncertainty uses the same draws without replay.
+.np_plot_gaussian_maxima <- function(covariance, alpha,
+                                      draws = 9999L, block = 4096L,
+                                      max.bytes = 64 * 1024^2,
+                                      reduction = c("absolute", "negative")) {
+  reduction <- match.arg(reduction)
   block <- .np_plot_gaussian_integer(block, "Gaussian draw block", 1000000L)
   if (!is.numeric(alpha) || !length(alpha) || any(!is.finite(alpha)) ||
       any(alpha <= 0 | alpha >= 0.5) || anyDuplicated(alpha))
@@ -179,7 +199,7 @@
   metadata <- list(method = "asymptotic Gaussian", scope = "finite grid within panel",
                    draws = draws, critical = 0, grid.size = g,
                    positive.variance = length(active), rank = 0L)
-  if (!length(active)) return(lapply(alpha, function(a) metadata))
+  if (!length(active)) return(list(metadata = metadata, maxima = NULL, rank = 0L))
   s <- sqrt(variance[active])
   correlation <- covariance[active, active, drop = FALSE] / outer(s, s)
   correlation <- (correlation + t(correlation)) / 2
@@ -202,16 +222,15 @@
     normal <- matrix(rnorm(length(active) * (last - start + 1L)),
                      nrow = length(active))
     simulated <- root %*% normal
-    maxima[start:last] <- apply(abs(simulated), 2L, max)
+    maxima[start:last] <- if (reduction == "absolute") {
+      apply(abs(simulated), 2L, max)
+    } else {
+      negative <- apply(-simulated, 2L, max)
+      if (length(zero)) pmax(0, negative) else negative
+    }
     progress <- .np_plot_progress_tick(progress, last)
   }
-  lapply(alpha, function(a) {
-    result <- metadata
-    result$critical.raw <- unname(quantile(maxima, 1 - a, type = 1L))
-    result$critical <- .np_plot_gaussian_critical(result$critical.raw, a, g)
-    result$rank <- sum(values > tolerance)
-    result
-  })
+  list(metadata = metadata, maxima = maxima, rank = sum(values > tolerance))
 }
 
 # Captured adjoints belong to one complete request, including its native
