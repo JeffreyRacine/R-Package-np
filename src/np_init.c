@@ -5,6 +5,7 @@
 /* Routine registration for the npRmpi shared library. */
 
 /* .Call calls */
+extern SEXP C_np_plot_fgd_evaluate(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_udens_beta_rule(SEXP, SEXP);
 extern SEXP C_np_plot_udens_beta_axis(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_udens_beta_hull(SEXP, SEXP, SEXP);
@@ -203,6 +204,7 @@ extern SEXP C_np_plot_ann_rank_decode(SEXP, SEXP);
 extern SEXP C_np_plot_udens_d8_column(SEXP, SEXP, SEXP, SEXP, SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_plot_fgd_evaluate", (DL_FUNC) &C_np_plot_fgd_evaluate, 5},
     {"C_np_plot_udens_beta_rule", (DL_FUNC) &C_np_plot_udens_beta_rule, 2},
     {"C_np_plot_udens_beta_axis", (DL_FUNC) &C_np_plot_udens_beta_axis, 5},
     {"C_np_plot_udens_beta_hull", (DL_FUNC) &C_np_plot_udens_beta_hull, 3},

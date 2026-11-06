@@ -7,8 +7,9 @@
   list(theta=result[,1:5,drop=FALSE],iterations=result[,6],rule=q)
 }
 
-.np_udens_beta_series_projection <- function(q,h,n,grid,inner) {
-  cache<-.np_udens_beta_axis_cache(grid,q$axes,h,n^(-13/54),inner)
+.np_udens_beta_series_projection <- function(q,h,n,grid,inner,
+                                             axis.cache=.np_udens_beta_axis_cache) {
+  cache<-axis.cache(grid,q$axes,h,n^(-13/54),inner)
   list(cache=cache,rule=q,grid=grid)
 }
 
