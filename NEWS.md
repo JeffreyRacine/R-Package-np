@@ -1,3 +1,9 @@
+# R4 documentation: explicit option synchronization precondition
+
+- Document that `autodispatch.option.sync="never"` requires caller-maintained
+  computational-option agreement across ranks. This is an existing limitation;
+  runtime behavior and communication are unchanged.
+
 # npRmpi 0.80-2 (development)
 
 - MPI regression degree search rejects an already-decoded nonfinite initial

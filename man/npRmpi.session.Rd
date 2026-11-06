@@ -53,7 +53,13 @@ MPI startup, shutdown, worker-count, and worker-status controls.
     \code{"never"}. The synchronized options include \code{warn}, so
     warning-to-error conversion follows the same policy on participating ranks.
     Synchronized values remain worker options until a subsequent update; they
-    are not restored at the end of an individual call.}
+    are not restored at the end of an individual call. With \code{"never"},
+    the caller must maintain agreement of computational options on every rank,
+    including after worker-side changes. Incompatible rank settings can return
+    incorrect results. No synchronization or fresh rank-agreement check is
+    performed in this mode; \code{autodispatch.verify.options} verifies only
+    an actual synchronization event. Use \code{"onchange"} or \code{"always"}
+    for package-managed synchronization.}
   \item{np.messages}{Logical; if non-\code{NULL}, sets
     \code{options(np.messages=...)} inside \code{npRmpi.init()}.}
   \item{nonblock}{Logical passed to the worker-loop receive path in both spawn
