@@ -377,12 +377,14 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 				    scmd.arg$arg,
 				    quote = FALSE,
 				    envir = .GlobalEnv
-				  ))
+				  )),
+          rng.refusal.as.value = TRUE
 				))
 			} else
         as.call(list(
           .npRmpi_bcast_cmd_funref(".npRmpi_with_manual_bcast_context"),
-          scmd.arg$scmd
+          scmd.arg$scmd,
+          rng.refusal.as.value = TRUE
         ))
 		}
 }

@@ -858,7 +858,7 @@
   isTRUE(getOption("npRmpi.manual.bcast.context", FALSE))
 }
 
-.npRmpi_with_manual_bcast_context <- function(expr) {
+.npRmpi_with_manual_bcast_context <- function(expr, rng.refusal.as.value = FALSE) {
   old <- getOption("npRmpi.manual.bcast.context", FALSE)
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   options(npRmpi.manual.bcast.context = TRUE)
@@ -867,7 +867,12 @@
     options(npRmpi.autodispatch.disable = old.disable)
     options(npRmpi.manual.bcast.context = old)
   }, add = TRUE)
-  force(expr)
+  # Only received commands convert an already agreed RNG refusal into a value.
+  # Unwind the command first; the sender still signals the original condition.
+  if (isTRUE(rng.refusal.as.value))
+    tryCatch(force(expr), np_rng_scope_refusal = function(e) e)
+  else
+    force(expr)
 }
 
 .npRmpi_eval_without_dispatch <- function(mc, caller_env) {
