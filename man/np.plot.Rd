@@ -410,6 +410,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
 }
 \details{
+  Ordinary bias-corrected distribution calibration with unsigned fixed blocks
+  refuses multi-tile replay when a custom uniform generator exposes no state
+  beyond the header of \code{.Random.seed}. Select a qualified built-in
+  generator explicitly before plotting. Single-tile and complete-state paths
+  retain their existing behavior; numeric nearest-neighbor replay has a separate
+  construction and is not qualified by this restriction.
+
   Seed-only MPI bootstrap replay refuses \code{"Box-Muller"} when the
   selected producer requires normal draws, including indirect draws from
   nonunit geometric blocks. Its cached normal state is not carried by

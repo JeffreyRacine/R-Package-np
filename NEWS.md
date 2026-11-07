@@ -1,5 +1,8 @@
 # R4 documentation: explicit option synchronization precondition
 
+- Refuse resolved unsigned fixed-block CDF replay across target tiles when a
+  custom uniform generator supplies no replayable seed state.
+
 * MPI bootstrap tasks that require normal draws now refuse seed-only Box-Muller
   replay explicitly; precomputed innovations and normal-free tasks are unchanged.
 
