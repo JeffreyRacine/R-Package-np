@@ -17,8 +17,8 @@
      !isTRUE(bws[['ndim',exact=TRUE]]%in%1:2) ||
      !isTRUE(bws[['ncon',exact=TRUE]]==bws[['ndim',exact=TRUE]]))
     stop('beta corrected bands require fixed order-2 bandwidths and one or two continuous coordinates',call.=FALSE)
-  if(!band%in%c('pointwise','simultaneous'))
-    stop("beta corrected bands require explicit band='pointwise' or band='simultaneous'",call.=FALSE)
+  if(!band%in%if(identical(method,'asymptotic'))c('pointwise','simultaneous','bonferroni','all') else c('pointwise','simultaneous'))
+    stop("beta corrected bands require explicit band='pointwise' or band='simultaneous'; asymptotic bands also support 'bonferroni' and 'all'",call.=FALSE)
   variant<-if(identical(method,'asymptotic'))'asymptotic' else calibration
   if(identical(method,'asymptotic') && !is.null(calibration))
     stop('beta asymptotic bands do not accept bootstrap calibration',call.=FALSE)
@@ -80,12 +80,15 @@
       calibration.status='fixed-bound beta guide-region plus refitted residual inference'),
     numerical.checks=result$checks)
   # These are signed endpoint offsets, not a complete standard error.
-  list(boot.err=cbind(result$center-result$lower,result$upper-result$center,result$center),
+  out<-list(boot.err=cbind(result$center-result$lower,result$upper-result$center,result$center),
        boot.all.err=NULL,inference=inference,bxp=list())
+  if(band%in%c('bonferroni','all'))out<-.np_udens_bounded_public_companions(out,result,band,state$jacobian,alpha)
+  out
 }
 
 .np_udens_beta_plot_subset <- function(raw,rows) {
   raw$boot.err<-raw$boot.err[rows,,drop=FALSE]
+  if(!is.null(raw$boot.all.err))raw$boot.all.err<-lapply(raw$boot.all.err,function(x)x[rows,,drop=FALSE])
   for(key in c('center','pilot.residual.scale','empirical.residual.scale'))
     raw$inference[[key]]<-raw$inference[[key]][rows]
   for(key in c('bands','intervals','absolute.intervals'))

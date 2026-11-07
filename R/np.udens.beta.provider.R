@@ -152,14 +152,14 @@
      any(!is.finite(c(x,grid,h)))||any(x<=0|x>=1)||any(grid<=0|grid>=1)||
      length(h)!=ncol(x)||any(h<=0)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1||
      length(variant)!=1L||!variant%in%c('asymptotic','symmetric-sd','asymmetric-sd')||
-     length(band)!=1L||!band%in%c('pointwise','simultaneous'))stop('invalid beta plot hidden provider request',call.=FALSE)
+     length(band)!=1L||!band%in%if(variant=='asymptotic')c('pointwise','simultaneous','bonferroni','all') else c('pointwise','simultaneous'))stop('invalid beta plot hidden provider request',call.=FALSE)
   # Canonical unique targets make a seeded family independent of caller ordering.
   original<-grid
   unique.grid<-unique(grid);ordering<-do.call(order,as.data.frame(unique.grid))
   grid<-unique.grid[ordering,,drop=FALSE]
   keys<-function(x)apply(x,1,function(z)paste(format(z,digits=17,scientific=TRUE),collapse=':'))
   restore<-match(keys(original),keys(grid))
-  sd<-variant!='asymptotic';draws<-sd||band=='simultaneous'
+  sd<-variant!='asymptotic';draws<-sd||band%in%c('simultaneous','all')
   if(draws).np_udens_beta_random_request(if(sd)'multinomial' else 'normal',if(sd)nrow(x) else nrow(grid),B,seed,RNGkind())
   # Preflight the whole owned-disk requirement before starting mathematical work.
   disk<-if(sd)4*as.double(nrow(x))*B+8*as.double(nrow(grid))*B+8*as.double(nrow(grid))*nrow(x)+262144 else
@@ -167,7 +167,7 @@
   if(disk>512*1024^2)stop('beta plot inference exceeds owned-disk budget',call.=FALSE)
   store<-if(draws).np_udens_beta_store() else NULL
   if(draws)on.exit(.np_udens_beta_store_close(store),add=TRUE)
-  prepared<-.np_udens_beta_prepare(x,h,grid,!sd&&band=='simultaneous',store,progress,B,0L)
+  prepared<-.np_udens_beta_prepare(x,h,grid,!sd&&band%in%c('simultaneous','all'),store,progress,B,0L)
   region<-.np_udens_beta_regions(prepared$theta,prepared$Veta,grid,alpha,progress)
   scale<-sqrt(prepared$pilot_variance);rhat<-prepared$center-prepared$fitted
   if(draws)stream<-.np_udens_beta_random_stream(store,if(sd)'multinomial' else 'normal',
@@ -176,13 +176,24 @@
     bootstrap<-.np_udens_beta_sd_roots(x,h,grid,prepared,stream,store,progress)
     result<-.np_udens_beta_stored_reduce(bootstrap$roots,rhat,scale,region,prepared$center,alpha,band,variant)
   } else {
-    critical<-if(band=='pointwise')qnorm(1-alpha/4) else
+    critical<-if(band=='pointwise')qnorm(1-alpha/4) else if(band=='bonferroni')
+      if(nrow(grid)==1L)qnorm(1-alpha/4) else qnorm(alpha/(4*nrow(grid)),lower.tail=FALSE) else
       .np_udens_beta_gaussian_critical(prepared$covariance,B,alpha,stream,progress)
     result<-list(lower=rhat+region$lower-critical*scale,upper=rhat+region$upper+critical*scale,
       critical=critical,B=if(draws)B else 0L)
   }
+  if(band=='all') {
+    companions<-.np_udens_bounded_analytic(rhat,region,list(scale),alpha,nrow(grid))
+    result$bands<-list(pointwise=companions$pointwise,
+      simultaneous=list(lower=result$lower,upper=result$upper,critical=result$critical),
+      bonferroni=companions$bonferroni)
+  }
   result$center<-prepared$center;result$pilot_se<-scale;result$empirical_se<-sqrt(prepared$empirical_variance)
   for(name in c('lower','upper','center','pilot_se','empirical_se'))result[[name]]<-result[[name]][restore]
+  if(band%in%c('bonferroni','all'))result$family_size<-nrow(grid)
+  if(band=='all')result$bands<-lapply(result$bands,function(x) {
+    x$lower<-x$lower[restore];x$upper<-x$upper[restore];x
+  })
   result$theta<-prepared$theta;result$variant<-variant;result$band<-band;result$alpha<-alpha
   result$construction<-switch(variant,asymptotic='residual-Gaussian-plus-guide-region',
     'symmetric-sd'='residual-absolute-containing-hull','asymmetric-sd'='signed-residual-inversion')
