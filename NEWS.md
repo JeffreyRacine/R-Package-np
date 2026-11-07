@@ -12,6 +12,13 @@
 
 * Bias-corrected regression plots now detect unsafe uncached Box-Muller replay
   for retained formulas with quoted predictor names, before changing RNG state.
+* Add experimental plot-only FG-D corrected intervals for fixed, known-bound
+  order-2 Gaussian density kernels in one or two continuous dimensions:
+  asymptotic, symmetric-sd and asymmetric-sd, with explicit pointwise or
+  simultaneous bands. Combine complete pilot and empirical residual intervals,
+  preserving signed inversion, guide uncertainty and full-grid calibration.
+  Range-derived bounds and literal endpoints are rejected. Core estimators,
+  se=FALSE, explicit saved controls, unbounded D8 and beta inference are unchanged.
 
 * Refuse unsafe Box-Muller replay for explicit joint-scale and retained version-2
   density factor bands above 512 targets. Default D8, covariance and bootstrap
@@ -56,6 +63,14 @@
   all requested confidence levels, preserving normal-stream continuation,
   including a pending Box-Muller deviate. General tiled and callback replay
   remain separate contracts.
+
+* Add experimental plot-only corrected density intervals for fixed, known-bound
+  order-2 beta kernels in one or two continuous dimensions: asymptotic,
+  symmetric-sd and asymmetric-sd, with explicit pointwise/simultaneous bands.
+  Share the guide/residual preparation, portable native arithmetic and bounded
+  calibration storage. Range-derived bounds and literal endpoints are rejected.
+  Core estimators, bandwidth searches, estimator SEs, se=FALSE and incumbent
+  Gaussian/D8/MP1 constructions are unchanged.
 
 - Document that `autodispatch.option.sync="never"` requires caller-maintained
   computational-option agreement across ranks. This is an existing limitation;

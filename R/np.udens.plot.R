@@ -9,6 +9,12 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
 .np_udens_plot_prepare <- function(control, bws, x, center, method, bootstrap, band,
     calibration = NULL, blocklen = NULL, block.automatic = FALSE,
     alpha = .05, random.seed = 42L) {
+  if (.np_udens_fgd_request(bws, control, center, method, calibration))
+    return(.np_udens_fgd_public_prepare(bws, x, method, bootstrap, band,
+      calibration, alpha, random.seed))
+  if (.np_udens_beta_request(bws, control, center, method))
+    return(.np_udens_beta_public_prepare(bws, x, method, bootstrap, band,
+      calibration, alpha, random.seed))
   requested <- calibration
   control <- .np_plot_legacy_bias_control(calibration, control, "density", center, method)
   if (identical(calibration, "legacy")) calibration <- NULL
@@ -82,6 +88,10 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
 
 .np_udens_plot_errors <- function(state, grid, alpha, B, band, design = NULL) {
   names(grid) <- names(state$x)
+  if (.np_udens_fgd_active(state))
+    return(.np_udens_fgd_public_errors(state, grid, alpha, B, band))
+  if (.np_udens_beta_active(state))
+    return(.np_udens_beta_public_errors(state, grid, alpha, B, band))
   provider.band <- if (band == "pmzsd") "pointwise" else band
   inference <- .np_plot_corrected_activity_run("Constructing bias-corrected density intervals",
     if (.np_udens_d8_active(state))
