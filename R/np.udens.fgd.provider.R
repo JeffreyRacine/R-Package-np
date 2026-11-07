@@ -16,17 +16,17 @@
      any(!is.finite(c(x,grid,h)))||any(x<=0|x>=1)||any(grid<=0|grid>=1)||
      length(h)!=ncol(x)||any(h<=0)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1||
      length(variant)!=1L||!variant%in%c('asymptotic','symmetric-sd','asymmetric-sd')||
-     length(band)!=1L||!band%in%c('pointwise','simultaneous'))stop('invalid Gaussian plot hidden provider request',call.=FALSE)
+     length(band)!=1L||!band%in%if(variant=='asymptotic')c('pointwise','simultaneous','bonferroni','all') else c('pointwise','simultaneous'))stop('invalid Gaussian plot hidden provider request',call.=FALSE)
   original<-grid;unique.grid<-unique(grid);ordering<-do.call(order,as.data.frame(unique.grid))
   grid<-unique.grid[ordering,,drop=FALSE]
   keys<-function(x)apply(x,1,function(z)paste(format(z,digits=17,scientific=TRUE),collapse=':'))
   restore<-match(keys(original),keys(grid))
-  sd<-variant!='asymptotic';draws<-sd||band=='simultaneous';m<-nrow(grid)
+  sd<-variant!='asymptotic';draws<-sd||band%in%c('simultaneous','all');m<-nrow(grid)
   if(draws).np_udens_beta_random_request(if(sd)'multinomial' else 'normal',if(sd)nrow(x) else m,B,seed,RNGkind())
   .np_udens_fgd_disk(nrow(x),m,ncol(x),B,sd,draws)
   store<-if(draws).np_udens_beta_store() else NULL
   if(draws)on.exit(.np_udens_beta_store_close(store),add=TRUE)
-  prepared<-.np_udens_fgd_prepare(x,h,grid,!sd&&band=='simultaneous',store,progress,B,.npRmpi_bootstrap_worker_count())
+  prepared<-.np_udens_fgd_prepare(x,h,grid,!sd&&band%in%c('simultaneous','all'),store,progress,B,.npRmpi_bootstrap_worker_count())
   region<-.np_udens_beta_regions(prepared$theta,prepared$Veta,grid,alpha,progress)
   scales<-list(sqrt(prepared$pilot_variance),sqrt(prepared$empirical_variance))
   rhat<-prepared$center-prepared$fitted
@@ -39,7 +39,8 @@
       .np_udens_fgd_score,.np_udens_fgd_axis_cache,c(24L,48L))
     for(j in 1:2)constituents[[j]]<-.np_udens_beta_stored_reduce(bootstrap$roots,rhat,scales[[j]],region,prepared$center,alpha,band,variant)
   } else for(j in 1:2) {
-    if(band=='pointwise')critical<-qnorm(1-alpha/4) else {
+    if(band=='pointwise')critical<-qnorm(1-alpha/4) else if(band=='bonferroni')
+      critical<-if(m==1L)qnorm(1-alpha/4) else qnorm(alpha/(4*m),lower.tail=FALSE) else {
       path<-prepared$covariance_files[[c('covariance','empirical')[j]]]
       covariance<-.np_udens_fgd_read(path,m,m)
       critical<-.np_udens_beta_gaussian_critical(covariance,B,alpha,stream,progress)
@@ -53,8 +54,19 @@
     result$k_signed<-constituents[[1]]$k_signed
     result$k_absolute<-constituents[[1]]$k_absolute
   }
+  if(band=='all') {
+    companions<-.np_udens_bounded_analytic(rhat,region,scales,alpha,m)
+    result$bands<-list(pointwise=companions$pointwise,
+      simultaneous=list(lower=result$lower,upper=result$upper,
+        critical=list(pilot=result$pilot_critical,empirical=result$empirical_critical)),
+      bonferroni=companions$bonferroni)
+  }
   result$center<-prepared$center;result$pilot_se<-scales[[1]];result$empirical_se<-scales[[2]]
   for(name in c('lower','upper','center','pilot_se','empirical_se'))result[[name]]<-result[[name]][restore]
+  if(band%in%c('bonferroni','all'))result$family_size<-nrow(grid)
+  if(band=='all')result$bands<-lapply(result$bands,function(x) {
+    x$lower<-x$lower[restore];x$upper<-x$upper[restore];x
+  })
   result$theta<-prepared$theta;result$variant<-variant;result$band<-band;result$alpha<-alpha
   result$B<-if(draws)B else 0L
   result$construction<-'complete pilot/empirical residual interval envelope with guide region'

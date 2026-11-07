@@ -16,8 +16,8 @@
   if(!identical(bws[['type',exact=TRUE]],'fixed') || !isTRUE(bws[['ckerorder',exact=TRUE]]==2L) ||
      !isTRUE(bws[['ndim',exact=TRUE]]%in%1:2) || !isTRUE(bws[['ncon',exact=TRUE]]==bws[['ndim',exact=TRUE]]))
     stop('Gaussian corrected bands require fixed order-2 bandwidths and one or two continuous coordinates',call.=FALSE)
-  if(!band%in%c('pointwise','simultaneous'))
-    stop("Gaussian corrected bands require explicit band='pointwise' or band='simultaneous'",call.=FALSE)
+  if(!band%in%if(identical(method,'asymptotic'))c('pointwise','simultaneous','bonferroni','all') else c('pointwise','simultaneous'))
+    stop("Gaussian corrected bands require explicit band='pointwise' or band='simultaneous'; asymptotic bands also support 'bonferroni' and 'all'",call.=FALSE)
   variant<-if(identical(method,'asymptotic'))'asymptotic' else calibration
   if(identical(method,'asymptotic')&&!is.null(calibration))
     stop('Gaussian asymptotic bands do not accept bootstrap calibration',call.=FALSE)
@@ -75,6 +75,8 @@
       guide.risk=alpha/2,residual.risk=alpha/2,
       calibration.status='fixed-bound Gaussian complete pilot/empirical residual envelope plus guide region'),
     numerical.checks=result$checks)
-  list(boot.err=cbind(result$center-result$lower,result$upper-result$center,result$center),
+  out<-list(boot.err=cbind(result$center-result$lower,result$upper-result$center,result$center),
     boot.all.err=NULL,inference=inference,bxp=list())
+  if(band%in%c('bonferroni','all'))out<-.np_udens_bounded_public_companions(out,result,band,state$jacobian,alpha)
+  out
 }
