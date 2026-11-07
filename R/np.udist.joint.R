@@ -81,6 +81,10 @@
       budget$per.process <- budget$per.process + cache.plan$extra.bytes
       budget$bytes <- cache.plan$bytes
       budget$innovation.cache <- cache.plan
+    } else if (m > tile && .np_plot_replay_uniform_state_absent(kind)) {
+      # Multiple target tiles must share the same observation-count draws.
+      # A header-only custom seed cannot replay uncached dependent draws.
+      stop("unsafe RNG replay: resolved signed CDF calibration requires custom uniform state absent from .Random.seed when its innovation cache is unavailable; explicitly select a qualified built-in generator before plotting", call. = FALSE)
     }
   }
   center <- original <- se <- numeric(m)

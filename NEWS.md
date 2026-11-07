@@ -1,5 +1,10 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Refuse uncached multi-tile signed fixed/geometric CDF bootstrap replay when a
+  custom uniform generator exposes no replay state, instead of combining
+  different observation-count draws across targets. Existing cached, single-tile
+  and complete-state paths are unchanged.
+
 * Plot calibration help now distinguishes visible seed restoration from hidden
   generator state and subsequent caller draws. No RNG behavior is changed.
 
