@@ -1,10 +1,18 @@
 # Joint variability for density-family plots only. The incumbent fit and marginal SEs
 # are unchanged; these empirical influence rows supply cross-grid dependence.  Kernels,
 # basis preparation and accepted solves retain their canonical owners.
-.np_plot_density_joint_supported <- function(bws, conditional) {
+.np_plot_density_joint_supported <- function(bws, conditional, cdf = FALSE) {
   second <- function(kernel, order) kernel %in% c("gaussian", "epanechnikov") && identical(as.integer(order),
     2L)
   if (!conditional) {
+    # Density-only admission: beta CDF and conditional policies are unchanged.
+    if (!cdf && identical(bws[["ckertype", exact = TRUE]], "beta") &&
+        identical(bws[["type", exact = TRUE]], "fixed") &&
+        identical(bws[["ckerbound", exact = TRUE]], "fixed") &&
+        isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) &&
+        isTRUE(bws[["ndim", exact = TRUE]] %in% 1:2) &&
+        isTRUE(bws[["ncon", exact = TRUE]] == bws[["ndim", exact = TRUE]]))
+      return(TRUE)
     return(bws[["ncon", exact = TRUE]] == 0L || second(bws[["ckertype", exact = TRUE]],
       bws[["ckerorder", exact = TRUE]]) || (identical(bws[["type", exact = TRUE]],
       "adaptive_nn") && identical(bws[["ckertype", exact = TRUE]], "uniform")))
@@ -404,7 +412,7 @@
   n <- nrow(x)
   m <- nrow(ex)
   incumbent <- estimate
-  if (!.np_plot_density_joint_supported(bws, !is.null(y)))
+  if (!.np_plot_density_joint_supported(bws, !is.null(y), cdf))
     .np_plot_joint_unavailable("this density kernel specification is not supported")
   if (length(se) != m || any(!is.finite(se)) || any(se < 0))
     .np_plot_joint_unavailable("marginal uncertainty is unavailable on this grid")
