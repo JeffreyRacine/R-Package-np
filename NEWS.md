@@ -1,5 +1,8 @@
 # np 0.80-2 (development)
 
+- Refuse resolved unsigned fixed-block CDF replay across target tiles when a
+  custom uniform generator supplies no replayable seed state.
+
 * Refuse uncached multi-tile signed fixed/geometric CDF bootstrap replay when a
   custom uniform generator exposes no replay state, instead of combining
   different observation-count draws across targets. Existing cached, single-tile

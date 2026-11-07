@@ -90,6 +90,9 @@
   center <- original <- se <- numeric(m)
   limits <- .np_bias_limits_prepare(rep("cdf", m), alpha, law == "gaussian", B)
   gnn.bootstrap <- nearest && state$q > 0L && law != "gaussian"
+  if (!gnn.bootstrap && !signed.calibration && identical(law, "fixed") &&
+      m > tile && .np_plot_replay_uniform_state_absent(kind))
+    stop("unsafe RNG replay: resolved unsigned fixed-block CDF calibration requires custom uniform state absent from .Random.seed; explicitly select a qualified built-in generator before plotting", call. = FALSE)
   if (gnn.bootstrap) {
     exact <- .np_udist_gnn_stream(state, grid, law, alpha, B, corrected, blocklen, start)
     center <- exact$center; original <- exact$original; se <- exact$se
