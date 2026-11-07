@@ -134,9 +134,10 @@ different RNG implementation.
 Loading a generator library is distinct from initializing it for R, and a seed
 vector need not contain all of a custom generator's state. The separate
 \code{\link{npsigtest}} bootstrap planner is not qualified for distributed
-user-supplied uniform replay and does not consistently refuse it. Use a built-in
-uniform generator for that distributed bootstrap; absence of an error does not
-establish reproducibility. The shared bootstrap task-state transport also
+user-supplied uniform replay and refuses such saved bootstrap plans inside
+its existing task failure boundary. Use a built-in uniform generator for that
+distributed bootstrap. This refusal does not certify hidden caller-state
+restoration by temporary seed scopes. The shared bootstrap task-state transport also
 refuses user-supplied normal generators when its tasks draw normal variates,
 before advancing or publishing those tasks. Loading the implementation on
 every rank does not certify its hidden state. An unused custom normal generator

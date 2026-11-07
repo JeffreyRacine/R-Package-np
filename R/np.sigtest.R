@@ -115,6 +115,19 @@ if (getRversion() >= "2.15.1")
   seeds
 }
 
+# Check inside the existing rank-local failure envelope, not in the planner:
+# a rank-specific RNG refusal before a collective can strand its peers.
+# These bootstrap laws draw uniforms only; an unused custom normal is harmless.
+.npRmpi_npsig_replay_check <- function(task.idx, seed.plan) {
+  for (i in task.idx) {
+    seed <- seed.plan[[i]]
+    .np_bias_custom_replay_check(
+      custom.uniform = as.integer(seed[[1L]]) %% 100L == 5L,
+      custom.normal = FALSE, normal = FALSE)
+  }
+  invisible(NULL)
+}
+
 .npRmpi_npsig_gather_rank_chunks <- function(gathered, size) {
   size <- as.integer(size)[1L]
   if (is.na(size) || size < 1L)
@@ -1184,6 +1197,7 @@ npsigtest.rbandwidth <- function(bws,
       post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
 
       joint.eval <- function(task.idx, seed.plan) {
+        .npRmpi_npsig_replay_check(task.idx, seed.plan)
         out <- numeric(length(task.idx))
         if (streamed.iid) {
           tile.width <- 8L
@@ -1279,6 +1293,7 @@ npsigtest.rbandwidth <- function(bws,
       }
 
       joint.bindings <- list(
+        .npRmpi_npsig_replay_check = .npRmpi_npsig_replay_check,
         boot.method = boot.method,
         xdat = xdat,
         ydat = ydat,
@@ -1550,6 +1565,7 @@ npsigtest.rbandwidth <- function(bws,
         post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
 
         indiv.eval <- function(task.idx, seed.plan) {
+          .npRmpi_npsig_replay_check(task.idx, seed.plan)
           out <- numeric(length(task.idx))
           if (streamed.iid) {
             tile.width <- 8L
@@ -1670,6 +1686,7 @@ npsigtest.rbandwidth <- function(bws,
         }
 
         indiv.bindings <- list(
+          .npRmpi_npsig_replay_check = .npRmpi_npsig_replay_check,
           boot.method = boot.method,
           xdat = xdat,
           ydat = ydat,

@@ -377,8 +377,9 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 \section{Usage Issues}{
 
   In \pkg{npRmpi}, the distributed bootstrap planner is not qualified for
-  user-supplied uniform RNG replay. Some unsupported cases are not refused,
-  so obtaining a result does not establish reproducibility. Explicitly select
+  user-supplied uniform RNG replay and refuses such saved bootstrap plans
+  before replaying a task. This does not certify restoration of opaque caller
+  state by a temporary seed scope. Explicitly select
   a built-in uniform generator, for example
   \code{RNGkind(kind="Mersenne-Twister")}, and set the desired seed before
   distributed bootstrap use. See \code{\link{npRmpi.init}} for the current
