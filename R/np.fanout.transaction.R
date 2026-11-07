@@ -700,7 +700,7 @@
     while (any(tx$rank != "closed")) {
       message <- .npRmpi_fanout_receive(tx, poll = poll, sleep = sleep)
       if (identical(message$kind, "result"))
-        out[[message$tasks]] <- message$value[[1L]]
+        out[message$tasks] <- list(message$value[[1L]])
       if (identical(message$kind, "ready")) {
         next.task <- tx$next.task[[message$source]]
         if (next.task <= n)

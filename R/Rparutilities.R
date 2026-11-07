@@ -278,7 +278,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
             for (i in seq_len(size - 1L)){
         tmp<- mpi.recv.Robj(mpi.any.source(),tag,comm)
         src <- mpi.get.sourcetag()[1] 
-        out[[src]]<- tmp 
+        out[src] <- list(tmp)
         }
         }
         .npRmpi_transport_trace(
