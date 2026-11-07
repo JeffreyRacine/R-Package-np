@@ -47,10 +47,11 @@ test_that("both preflight owners give absent and header seeds the same decision"
         plot.errors.type="simultaneous",neval=if(family=="density")513L else 33L)
       if(family!="regression")d$bias.control <- if(family=="cdf")
         np_udist_bias_control("cdf") else np_udens_bias_control("joint-scale")
-      if(mode=="full")expect_silent(ordinary(method,b,d)) else
+      if(mode=="full" && family=="regression")expect_silent(ordinary(method,b,d)) else
+        if(mode=="full")expect_error(ordinary(method,b,d),"user-supplied generator state cannot be certified",fixed=TRUE) else
         expect_error(ordinary(method,b,d),"custom uniform state absent",fixed=TRUE)
       if(family!="regression") {
-        if(mode=="full")expect_silent(factor(method,b,d)) else
+        if(mode=="full")expect_error(factor(method,b,d),"user-supplied generator state cannot be certified",fixed=TRUE) else
           expect_error(factor(method,b,d),"custom uniform state absent",fixed=TRUE)
         d$neval <- if(family=="density")512L else 32L
         expect_silent(factor(method,b,d))

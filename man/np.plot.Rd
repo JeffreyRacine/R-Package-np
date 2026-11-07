@@ -695,6 +695,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   unavailable. Cached and single-tile paths retain their existing behavior.
   The resolved check does not reevaluate data or NA callbacks, and runs inside
   the existing seed scope; the caller-continuation limitation below still applies.
+  At the shared resolved seed-only replay owner, a nonempty custom seed
+  payload is also insufficient: user-supplied uniform generators, and
+  user-supplied normal generators when the requested draws consume normal
+  variates, are refused unless the existing route retains the innovations.
+  The same rule applies to the explicit tiled factor providers and MPI
+  bootstrap task-state transport. It does not change the selected generator
+  or resampling law. Normal-free paths do not refuse an unused custom normal
+  generator. This admission rule does not certify temporary seed restoration.
   These checks are bounded: other reconstruction and RNG replay cases remain
   unqualified; non-refusal is not a general RNG safety certificate.
 

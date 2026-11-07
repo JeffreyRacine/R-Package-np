@@ -136,10 +136,13 @@ vector need not contain all of a custom generator's state. The separate
 \code{\link{npsigtest}} bootstrap planner is not qualified for distributed
 user-supplied uniform replay and does not consistently refuse it. Use a built-in
 uniform generator for that distributed bootstrap; absence of an error does not
-establish reproducibility. Custom normal generators have a separate availability
-requirement when a route draws normal variates: the implementation must be
-available on each participating rank. Availability alone does not establish
-replay of hidden custom-normal state.
+establish reproducibility. The shared bootstrap task-state transport also
+refuses user-supplied normal generators when its tasks draw normal variates,
+before advancing or publishing those tasks. Loading the implementation on
+every rank does not certify its hidden state. An unused custom normal generator
+is not refused for normal-free tasks. These guards also cover local seed-only
+task replay; deterministic tasks and retained innovations do not enter this
+transport owner.
 
 These limitations do not redefine unrelated local computations or RNGs that
 do not enter the affected replay routes. In particular,

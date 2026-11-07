@@ -2058,15 +2058,25 @@
   invisible(NULL)
 }
 
+.npRmpi_replay_context_preflight <- function() {
+  # These uncached replay owners already require master-context fanout.
+  # Preserve that common refusal before rank-specific RNG admission.
+  if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+    .npRmpi_bootstrap_fanout_enabled(what = "corrected process")
+  invisible(NULL)
+}
+
 .npRmpi_bootstrap_attach_rng_stream <- function(tasks, advance, normal.draws = FALSE) {
   if (!is.list(tasks) || !length(tasks))
     return(tasks)
   if (!is.function(advance))
     stop("advance must be a function")
+  .npRmpi_replay_context_preflight()
   # Raw seed vectors do not transport a caller's custom uniform generator.
   # Inspect the effective stream here, after any family-owned substream setup;
   # deterministic/precomputed fanout never enters this replay owner.
-  if (identical(RNGkind()[1L], "user-supplied") &&
+  kind <- RNGkind()
+  if (identical(kind[1L], "user-supplied") &&
       (isTRUE(.npRmpi_has_active_slave_pool()) ||
        !isTRUE(.npRmpi_master_only_mode())))
     stop("distributed bootstrap cannot reproduce a user-supplied uniform RNG on workers; use a built-in RNG or an explicitly selected supported local execution route",
@@ -2075,6 +2085,8 @@
   # Precomputed innovations bypass this seed-only transport owner.
   if (isTRUE(normal.draws) && identical(RNGkind()[2L], "Box-Muller"))
     stop("unsafe RNG replay: seed-only bootstrap tasks cannot reproduce Box-Muller normal state; explicitly select a qualified normal generator such as RNGkind(normal.kind = 'Inversion') before plotting", call. = FALSE)
+  .np_bias_custom_replay_check(identical(kind[1L], "user-supplied"),
+    identical(kind[2L], "user-supplied"), normal = isTRUE(normal.draws))
   if (isTRUE(normal.draws))
     .npRmpi_bootstrap_require_normal_rng()
   if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))

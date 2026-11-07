@@ -150,6 +150,13 @@
 # Repeated target/family draws require all normal state, not only .Random.seed.
 # R encodes the normal generator in the seed header's hundreds field (2 is
 # Box-Muller). Inspect the saved stream: it may differ from the caller's kind.
+# User callbacks may keep hidden state even when their seed payload is nonempty.
+.np_bias_custom_replay_check <- function(custom.uniform, custom.normal, normal) {
+  if (isTRUE(custom.uniform) || (isTRUE(normal) && isTRUE(custom.normal)))
+    stop("unsafe RNG replay: user-supplied generator state cannot be certified by a seed vector; explicitly select a qualified built-in generator before this replay", call. = FALSE)
+  invisible(NULL)
+}
+
 .np_bias_normal_replay_check <- function(law, blocklen, replay, retained = FALSE,
                                           seed = NULL) {
   if (!isTRUE(replay) || isTRUE(retained)) return(invisible(NULL))
@@ -163,25 +170,30 @@
   invisible(NULL)
 }
 
-# Refuse only a proved missing component of a repeated seed-only stream.
-# A nonempty custom payload is not a general certificate of RNG replayability.
+# Known missing state and uncertifiable custom state have distinct refusals.
+# A nonempty custom payload is not a certificate of RNG replayability.
 .np_bias_replay_check <- function(law, blocklen, replay, retained = FALSE,
                                 seed = NULL) {
   if (!isTRUE(replay) || isTRUE(retained)) return(invisible(NULL))
+  .npRmpi_replay_context_preflight()
   if (is.null(seed)) {
     kind <- RNGkind()
     absent <- .np_plot_replay_uniform_state_absent(kind)
     custom.normal <- identical(kind[2L], "user-supplied")
+    custom.uniform <- identical(kind[1L], "user-supplied")
   } else {
     absent <- is.integer(seed) && length(seed) == 1L &&
       isTRUE(seed[1L] %% 100L == 5L)
     custom.normal <- isTRUE((seed[1L] %/% 100L) %% 100L == 3L)
+    custom.uniform <- isTRUE(seed[1L] %% 100L == 5L)
   }
   # User normal callbacks need not consume the selected uniform generator.
   # Their hidden-state contract is separate from this known-missing-state test.
   if (absent && !(identical(law, "gaussian") && custom.normal))
     stop("unsafe RNG replay: repeated draws require custom uniform state absent from .Random.seed; explicitly select a qualified built-in generator before plotting", call. = FALSE)
   .np_bias_normal_replay_check(law, blocklen, replay, retained, seed)
+  .np_bias_custom_replay_check(custom.uniform, custom.normal,
+    identical(law, "gaussian") || (identical(law, "geom") && isTRUE(blocklen > 1)))
 }
 
 .np_bias_stream <- function(state, code) {
