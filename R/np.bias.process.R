@@ -147,6 +147,22 @@
 
 # Replaying a draw stream for bounded target batches does not consume a new
 # independent stream. Advance the caller once, by one complete draw sequence.
+# Repeated target/family draws require all normal state, not only .Random.seed.
+# R encodes the normal generator in the seed header's hundreds field (2 is
+# Box-Muller). Inspect the saved stream: it may differ from the caller's kind.
+.np_bias_normal_replay_check <- function(law, blocklen, replay, retained = FALSE,
+                                          seed = NULL) {
+  if (!isTRUE(replay) || isTRUE(retained)) return(invisible(NULL))
+  normal <- identical(law, "gaussian") ||
+    (identical(law, "geom") && isTRUE(blocklen > 1))
+  if (!normal) return(invisible(NULL))
+  box.muller <- if (is.null(seed)) identical(RNGkind()[2L], "Box-Muller") else
+    isTRUE((seed[1L] %/% 100L) %% 100L == 2L)
+  if (box.muller)
+    stop("unsafe RNG replay: seed-only replay cannot reproduce Box-Muller normal state; explicitly select a qualified normal generator such as RNGkind(normal.kind = 'Inversion') before plotting", call. = FALSE)
+  invisible(NULL)
+}
+
 .np_bias_stream <- function(state, code) {
   previous <- get(".Random.seed",.GlobalEnv,inherits=FALSE)
   on.exit(assign(".Random.seed",previous,.GlobalEnv))
@@ -264,6 +280,10 @@
       anchors=min(25L,tile.rows %/% length(family)),rows=min(500L,tile.rows))
     family.blocks <- lapply(family.blocks,function(b) {b$rows<-family.rows[b$rows];b})
    } else {family.blocks <- blocks;retain.tile <- FALSE}
+   .np_bias_normal_replay_check(law, if (is.null(selection)) NULL else selection$length,
+     length(family.blocks) > 1L || length(families) > 1L ||
+       (rank.calibration && !tail.calibration && !retain.tile),
+     retained = !is.null(innovations), seed = rng)
    for(pass in seq_len(if(rank.calibration && !tail.calibration && !retain.tile)2L else 1L)) {
     if(rank.calibration && pass==2L)rank.states <- lapply(rank.states,.np_band_rank_cutoff)
     for(batch in family.blocks) {
