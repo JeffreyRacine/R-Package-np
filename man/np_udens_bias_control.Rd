@@ -60,17 +60,53 @@ Bandwidths, bounds and targets stay fixed during inference. Core fitted values,
 estimator standard errors, bandwidth selection and \code{se=FALSE} are unchanged.
 An object fitted with \code{se=FALSE} can receive explicitly requested plot bands.
 
-On normalized support, write \eqn{L_r=4K_r-6K_{2r}+4K_{3r}-K_{4r}} and
-\eqn{\Psi=L_h+L_b-L_hL_b}. Products across coordinates are formed within each
-scale term. The corrected plot center is
+On normalized support, write \eqn{L_r=4K_r-6K_{2r}+4K_{3r}-K_{4r}}.
+Here \eqn{r} is the dimensionless Chen kernel scale, not a distance
+bandwidth. On \eqn{[0,1]},
+\deqn{K_r(x,v)=\mathrm{Beta}(v;1+x/r,1+(1-x)/r).}
+If the fitted physical bandwidth in coordinate \eqn{j} is \eqn{h_j^{phys}}
+and the known support width is \eqn{w_j}, the operator uses
+\eqn{\rho_{h,j}=(h_j^{phys}/w_j)^2}. Its auxiliary scale is
+\eqn{b=n^{-7/17}} for one coordinate and \eqn{b=n^{-13/54}}
+for two coordinates. In the two-coordinate formula, \eqn{K_{sr}}
+is the product of the coordinate kernels at the same multiplier \eqn{s};
+the four-term linear combination is taken after this product.
+
+The product \eqn{L_{\rho_h}L_b} denotes operator composition:
+\deqn{(L_{\rho_h}L_b)(x,v)=\int L_{\rho_h}(x,u)L_b(u,v)\,du.}
+The fitted-bandwidth operator is outer and the auxiliary operator is inner.
+It is neither a pointwise product nor the reversed composition. Thus the
+residual kernel is \eqn{\Psi=L_{\rho_h}+L_b-L_{\rho_h}L_b}.
+
+The corrected plot center is
 \eqn{C=\widehat R+g_{\widehat\theta}}, where
 \eqn{\widehat R=P_n\Psi-E_{g_{\widehat\theta}}\Psi}. The fitted guide has two
 edge-shape parameters in one dimension, and four edge-shape parameters plus
-an interaction in two dimensions. Half the nominal error probability is
+an interaction in two dimensions. More explicitly,
+\deqn{g_\theta(u)\propto\prod_j u_j^{\theta_{2j-1}}(1-u_j)^{\theta_{2j}}}
+in one dimension, with the additional factor
+\eqn{\exp\{\theta_5(2u_1-1)(2u_2-1)\}} in two dimensions.
+Each edge parameter exceeds \eqn{-1}; the interaction is unconstrained.
+The guide region uses \eqn{\eta_j=\log(1+\theta_j)} for edge parameters
+and \eqn{\eta_5=\theta_5} for the interaction. With the empirical sandwich
+covariance \eqn{\widehat V_\eta}, it takes the minimum and maximum guide
+density over the Wald ellipsoid
+\deqn{(\eta-\widehat\eta)'\widehat V_\eta^{-1}(\eta-\widehat\eta)
+       \leq \chi^2_{p,1-\alpha/2},\qquad p=2\ \mathrm{or}\ 5.}
+Half the nominal error probability is
 assigned to a nonlinear guide confidence region and half to the residual
 process. The residual covariance includes the guide-estimation projection
 and cross terms. A positive ratio pilot supplies its transported scale.
 This scale is not a complete normal standard error for the composite interval.
+
+The positive ratio pilot is proportional to
+\deqn{g_{\widehat\theta}(u)\frac{1}{n}\sum_i
+       \frac{K_{\rho_p}(u,X_i)}{g_{\widehat\theta}(X_i)},}
+normalized by numerical integration. Its Chen scale is
+\eqn{\rho_p=n^{-2/5}} in one dimension and \eqn{\rho_p=n^{-1/3}}
+in each coordinate in two dimensions. This is distinct from the auxiliary
+operator scale \eqn{b}. Density values and interval limits are transformed
+back to physical units by dividing by the product of support widths.
 
 Asymptotic pointwise intervals use \eqn{z_{1-\alpha/4}}; simultaneous bands
 calibrate the absolute Gaussian maximum under the complete residual covariance
@@ -81,6 +117,13 @@ bootstrap of the complete corrected center followed by a second guide region.
 \code{"asymmetric-sd"} inverts the signed residual roots. \code{"symmetric-sd"}
 uses their absolute roots, then takes the smallest outward-rounded interval
 symmetric about the corrected center that contains the composite interval.
+For \eqn{B} residual draws, the signed lower rank is
+\eqn{k=\lfloor B\alpha/4\rfloor+1} and the upper rank is \eqn{B+1-k}.
+Inversion subtracts the upper root at the lower endpoint and the lower root
+at the upper endpoint. The absolute rank is
+\eqn{k_a=\lceil B(1-\alpha/2)\rceil}. Pointwise ranks use each target's
+roots; simultaneous signed ranks use the minimum and maximum across the
+supplied finite family, and absolute ranks use its maximum absolute root.
 The guide region is added once in each case. These beta-specific rules do not
 change the existing Gaussian density bootstrap constructions.
 
