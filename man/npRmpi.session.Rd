@@ -56,9 +56,11 @@ MPI startup, shutdown, worker-count, and worker-status controls.
     are not restored at the end of an individual call. With \code{"never"},
     the caller must maintain agreement of computational options on every rank,
     including after worker-side changes. Incompatible rank settings can return
-    incorrect results. No synchronization or fresh rank-agreement check is
-    performed in this mode; \code{autodispatch.verify.options} verifies only
-    an actual synchronization event. Use \code{"onchange"} or \code{"always"}
+    incorrect results. General auto-dispatch does not synchronize options or
+    perform a fresh rank-agreement check in this mode. Prepared-search commands
+    still broadcast their required search-option snapshot; this exception does
+    not establish agreement for other calls. \code{autodispatch.verify.options}
+    verifies only an actual synchronization event. Use \code{"onchange"} or \code{"always"}
     for package-managed synchronization.}
   \item{np.messages}{Logical; if non-\code{NULL}, sets
     \code{options(np.messages=...)} inside \code{npRmpi.init()}.}
