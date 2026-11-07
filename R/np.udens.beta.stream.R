@@ -36,8 +36,10 @@
      !is.numeric(n)||length(n)!=1L||!is.finite(n)||n<1||n!=floor(n)||n>.Machine$integer.max||
      !is.numeric(B)||length(B)!=1L||!is.finite(B)||B<1||B!=floor(B)||B>.Machine$integer.max||
      !is.numeric(seed)||length(seed)!=1L||!is.finite(seed)||seed<0||seed!=floor(seed)||seed>.Machine$integer.max||
-     !is.character(kind)||length(kind)!=3L||anyNA(kind)||!kind[1]%in%uniform||!kind[2]%in%normal||
+     !is.character(kind)||length(kind)!=3L||anyNA(kind)||
      !kind[3]%in%c('Rounding','Rejection'))stop('invalid beta plot random stream request',call.=FALSE)
+  if(!kind[1]%in%uniform||!kind[2]%in%normal)
+    stop('fixed-bound beta/Gaussian density streams require supported built-in RNG kinds; explicitly select a supported built-in generator',call.=FALSE)
   bytes<-as.double(n)*as.double(B)*if(mode=='normal')8 else 4
   if(!is.finite(bytes)||bytes>512*1024^2)stop('beta plot random stream exceeds owned-disk budget',call.=FALSE)
   list(mode=mode,n=as.integer(n),B=as.integer(B),seed=as.integer(seed),kind=kind,

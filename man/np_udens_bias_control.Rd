@@ -138,6 +138,24 @@ resident workspaces and invocation-owned temporary files, with limits of
 256 MiB aggregate inference workspace and 512 MiB temporary storage. These
 limits are distinct from total R-process memory.
 
+Both the beta construction and the fixed-bound Gaussian FG-D construction
+require supported built-in uniform and normal RNG kinds when they simulate
+calibration draws. User-supplied uniform or normal generators are refused
+before stream work; they are not silently replaced. To use these draw-based
+routes, explicitly select a supported built-in combination, for example
+\code{RNGkind("Mersenne-Twister", "Inversion", "Rejection")}, and set the
+intended seed. Deterministic asymptotic pointwise inference does not create a
+calibration stream. This statement does not certify arbitrary custom state
+for other plotting constructions.
+
+For a workspace or owned-file budget refusal, reduce the requested grid size
+and/or the explicit \code{B} or \code{gaussian_draws}, as applicable to the
+reported allocation. Reducing draws changes simulation resolution, not the
+requested nominal level. No draw count, grid or method is reduced automatically.
+Temporary-file creation also requires a writable temporary directory with
+sufficient free space; the per-invocation storage budget is not a promise
+about total R-process memory or other concurrent jobs.
+
 The retained Beta-family, uniform, mixture and dependent two-dimensional
 experiments show generally conservative finite-grid coverage. They do not
 establish continuum coverage, honesty over unknown boundary smoothness,
