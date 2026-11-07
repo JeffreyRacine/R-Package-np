@@ -1,5 +1,8 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Copula plots now retain matching missing interval endpoints on repeated
+  coordinates. Finite endpoint rounding tolerances and returned data are unchanged.
+
 * RNG replay: resolved regression, density and CDF producers now refuse
   repeated draws when custom uniform state is provably absent from the saved
   seed. Retained innovation caches and explicit replayable streams are preserved.
