@@ -179,7 +179,7 @@ test_that("retained quoted symbols classify without evaluating terms", {
 })
 
 
-test_that("explicit factor replay refuses absent uniform state only", {
+test_that("explicit factor replay refuses uncertifiable custom state", {
   ns <- asNamespace("np")
   guard <- get(".np_plot_replay_factor_preflight", ns)
   env <- new.env(parent = environment(guard))
@@ -206,7 +206,14 @@ test_that("explicit factor replay refuses absent uniform state only", {
       else expect_silent(guard(method,b,d))
     }
     assign(".Random.seed", c(10405L,1L,2L), .GlobalEnv)
-    expect_silent(guard(method,b,d))
+    expect_error(guard(method,b,d), "user-supplied generator state cannot be certified", fixed=TRUE)
+    env$RNGkind <- function() c("Mersenne-Twister", "user-supplied", "Rejection")
+    for(m in c(boundary-1L,boundary,boundary+1L)) {
+      d$neval <- m
+      if(m>boundary) expect_error(guard(method,b,d), "user-supplied generator state cannot be certified", fixed=TRUE)
+      else expect_silent(guard(method,b,d))
+    }
+    env$RNGkind <- function() c("user-supplied", "Inversion", "Rejection")
   }
   predicate <- get(".np_plot_replay_uniform_state_absent", environment(guard))
   e <- new.env(parent=environment(predicate)); environment(predicate) <- e

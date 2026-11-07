@@ -113,6 +113,8 @@
   kind <- RNGkind()
   if (.np_plot_replay_uniform_state_absent(kind))
     stop("unsafe RNG replay: this explicit factor plot requires custom uniform state absent from .Random.seed; explicitly select a qualified built-in generator before plotting", call. = FALSE)
+  .np_bias_custom_replay_check(identical(kind[1L], "user-supplied"),
+    identical(kind[2L], "user-supplied"), normal = TRUE)
   builtin <- c("Wichmann-Hill", "Marsaglia-Multicarry", "Super-Duper",
     "Mersenne-Twister", "Knuth-TAOCP", "Knuth-TAOCP-2002", "L'Ecuyer-CMRG")
   if (kind[1L] %in% builtin && identical(kind[2L], "Box-Muller"))
