@@ -43,6 +43,15 @@
 .np_retained_training_args <- function(bws, roles, explicit, definition,
                                        training = names(roles)) {
   explicit <- .np_match_native_args(explicit, definition)
+  # NULL required training values must not re-enter the retained call dispatcher.
+  # Optional defaults (and non-training arguments) keep their existing semantics.
+  for (arg in intersect(training, names(explicit))) {
+    if (is.null(explicit[[arg]])) {
+      default <- formals(definition)[[arg]]
+      if (is.call(default) && identical(default[[1L]], quote(stop)))
+        stop(sprintf("training data '%s' missing", arg), call. = FALSE)
+    }
+  }
   # Response-only replacement retains the design (e.g. a wild bootstrap).
   # A replaced design must still supply every required training role.
   if (!any(setdiff(training, "tydat") %in% names(explicit))) {
