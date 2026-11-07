@@ -1,5 +1,8 @@
 # R4 documentation: explicit option synchronization precondition
 
+* MPI bootstrap tasks that require normal draws now refuse seed-only Box-Muller
+  replay explicitly; precomputed innovations and normal-free tasks are unchanged.
+
 * Refuse uncached multi-tile signed fixed/geometric CDF bootstrap replay when a
   custom uniform generator exposes no replay state, instead of combining
   different observation-count draws across targets. Existing cached, single-tile

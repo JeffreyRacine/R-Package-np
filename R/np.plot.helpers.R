@@ -2062,6 +2062,10 @@
        !isTRUE(.npRmpi_master_only_mode())))
     stop("distributed bootstrap cannot reproduce a user-supplied uniform RNG on workers; use a built-in RNG or an explicitly selected supported local execution route",
          call. = FALSE)
+  # Task seed vectors cannot carry Box-Muller's cached normal deviate.
+  # Precomputed innovations bypass this seed-only transport owner.
+  if (isTRUE(normal.draws) && identical(RNGkind()[2L], "Box-Muller"))
+    stop("unsafe RNG replay: seed-only bootstrap tasks cannot reproduce Box-Muller normal state; explicitly select a qualified normal generator such as RNGkind(normal.kind = 'Inversion') before plotting", call. = FALSE)
   if (isTRUE(normal.draws))
     .npRmpi_bootstrap_require_normal_rng()
   if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))

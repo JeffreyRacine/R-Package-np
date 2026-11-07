@@ -410,6 +410,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
 }
 \details{
+  Seed-only MPI bootstrap replay refuses \code{"Box-Muller"} when the
+  selected producer requires normal draws, including indirect draws from
+  nonunit geometric blocks. Its cached normal state is not carried by
+  \code{.Random.seed}. Explicitly select a qualified normal generator, such
+  as \code{RNGkind(normal.kind = "Inversion")}, before plotting. Paths
+  transporting actual innovations and normal-free task streams are unchanged.
+
   Experimental local-constant conditional CDF and density corrected bands are
   available through \code{\link{np_conditional_bias_control}}. They require
   explicit selection and preserve existing methods. Their bootstrap response law
