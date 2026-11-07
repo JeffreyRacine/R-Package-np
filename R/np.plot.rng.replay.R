@@ -73,9 +73,9 @@
 .np_plot_replay_uniform_state_absent <- function(kind) {
   # A header without payload establishes missing replay state, not the converse.
   # Do not inspect active bindings or try to discover arbitrary native state.
-  if (!identical(kind[1L], "user-supplied") ||
-      !exists(".Random.seed", .GlobalEnv, inherits = FALSE) ||
-      bindingIsActive(".Random.seed", .GlobalEnv)) return(FALSE)
+  if (!identical(kind[1L], "user-supplied")) return(FALSE)
+  if (!exists(".Random.seed", .GlobalEnv, inherits = FALSE)) return(TRUE)
+  if (bindingIsActive(".Random.seed", .GlobalEnv)) return(FALSE)
   seed <- get(".Random.seed", .GlobalEnv, inherits = FALSE)
   is.integer(seed) && length(seed) == 1L
 }
