@@ -153,7 +153,7 @@
     eta.label <- "eta"
     if (!context$finished && !is.null(context$phase)) {
       phase <- context$phase
-      eta.label <- "outer eta"
+      eta.label <- if (is.null(phase$eta.label)) "outer eta" else phase$eta.label
       eta <- if (phase$done <= 0) "estimating" else if (phase$done >= phase$total)
         "finishing" else paste0(.np_progress_fmt_num(
           max(0, now - phase$started) * (phase$total - phase$done) / phase$done), "s")
@@ -478,14 +478,36 @@
   if (is.na(total_frames) || total_frames < 2L)
     return(NULL)
 
-  .np_plot_progress_begin(total = total_frames, label = label)
+  state <- .np_plot_progress_begin(total = total_frames, label = label)
+  if (is.null(state)) return(NULL)
+  context <- state$plot_context
+  if (!is.null(context)) {
+    # Frame work has its own rate. Completed inference targets cannot provide
+    # an ETA for a renderer that has only just started.
+    state$rotation.previous <- list(phase = context$phase, stage = context$stage,
+      rep = context$rep, fraction = context$fraction)
+    state$rotation.label <- label
+    state$plot_unit <- "frames"
+    context$phase <- list(started = state$started, done = 0L,
+      total = total_frames, unit = "frames", eta.label = "frame eta")
+    .np_plot_progress_notify(stage = label, done = 0L, total = total_frames,
+                             unit = "frames", force = TRUE)
+  }
+  state
 }
 
 .np_plot_rotation_progress_tick <- function(state, done) {
+  if (!is.null(state$rotation.label))
+    .np_plot_progress_record(stage = state$rotation.label)
   .np_plot_progress_tick(state = state, done = done)
 }
 
 .np_plot_rotation_progress_end <- function(state) {
+  if (!is.null(state$rotation.previous)) {
+    context <- state$plot_context
+    for (name in names(state$rotation.previous))
+      context[[name]] <- state$rotation.previous[[name]]
+  }
   .np_plot_progress_end(state)
 }
 
