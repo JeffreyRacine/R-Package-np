@@ -1,8 +1,11 @@
-.np_plot_match_coef_index <- function(value) {
+.np_plot_match_coef_index <- function(value, maximum = NULL) {
   if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
       !is.finite(value) || value < 1L || value > .Machine$integer.max)
     stop("coef_index must be a positive finite numeric scalar", call. = FALSE)
-  as.integer(value)
+  index <- as.integer(value)
+  if (!is.null(maximum) && index > maximum)
+    stop(sprintf("coef_index exceeds the %d available coefficients", maximum), call. = FALSE)
+  index
 }
 
 .np_plot_scalar_match <- function(value, choices, argname) {

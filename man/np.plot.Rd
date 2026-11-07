@@ -103,7 +103,10 @@ Named options passed via \code{\dots} include:
     \describe{
       \item{\code{coef}, \code{coef_index}}{
         coefficient-function plotting controls for semiparametric
-        families where supported.
+        families where supported. For smooth-coefficient plots with
+        \code{coef = TRUE}, \code{coef_index} selects the intercept as 1
+        and then the fitted regressors in order. An index beyond the available
+        coefficients is an error; it is not replaced by the last coefficient.
       }
       \item{\code{common_scale}}{
         a logical value specifying whether multiple panels should share a
