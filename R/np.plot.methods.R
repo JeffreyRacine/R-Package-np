@@ -634,6 +634,8 @@ np_render_control <- function(style = c("band", "bar"),
            "conbandwidth", "condbandwidth") %in% class(bws)))
   progress.enabled <- (identical(dots$plot.errors.method, "bootstrap") || conditional.optin) &&
     !identical(dots$plot.errors.boot.nonfixed, "frozen")
+  progress.label <- if (identical(dots$plot.errors.method, "asymptotic"))
+    "Plot inference" else "Plot bootstrap"
   if (!owns.empty.rows && (.np_udens_beta_request(bws, dots$bias.control,
       dots$plot.errors.center, dots$plot.errors.method) ||
       .np_udens_fgd_request(bws, dots$bias.control,
@@ -643,7 +645,7 @@ np_render_control <- function(style = c("band", "bar"),
     npValidateNonNegativeInteger(random.seed, "random.seed")
     dots$random.seed <- random.seed
     value <- .np_plot_progress_run(.np_udens_resolution_run(
-      do.call(method, c(list(bws = bws), dots))), enabled = TRUE)
+      do.call(method, c(list(bws = bws), dots))), enabled = TRUE, label = progress.label)
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   if (!owns.empty.rows && .np_udens_d8_default(bws, dots$bias.control,
@@ -654,27 +656,27 @@ np_render_control <- function(style = c("band", "bar"),
     npValidateNonNegativeInteger(random.seed, "random.seed")
     dots$random.seed <- random.seed
     value <- .np_plot_progress_run(.np_udens_resolution_run(
-      do.call(method, c(list(bws = bws), dots))), enabled = TRUE)
+      do.call(method, c(list(bws = bws), dots))), enabled = TRUE, label = progress.label)
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   if (!owns.empty.rows && inherits(bws, c("bandwidth", "dbandwidth"))) {
     value <- .np_plot_progress_run(
       .np_with_seed(random.seed, .np_udens_resolution_run(
         do.call(method, c(list(bws = bws), dots)))),
-      enabled = progress.enabled)
+      enabled = progress.enabled, label = progress.label)
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   if(!owns.empty.rows) {
     value <- .np_plot_progress_run(
       .np_with_seed(random.seed, do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))),
-      enabled = progress.enabled)
+      enabled = progress.enabled, label = progress.label)
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   publisher <- .npreg_plot_empty_publisher(.plot_context)
   dots$.np.empty.report <- publisher$record
   value <- .np_plot_progress_run(.npreg_finish_plot_call(
     .np_with_seed(random.seed, do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))), publisher),
-    enabled = progress.enabled)
+    enabled = progress.enabled, label = progress.label)
   .np_plot_data_finish(value, bws, dots, method, random.seed)
 }
 

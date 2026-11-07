@@ -177,7 +177,7 @@
     .np_progress_runtime$fit_forward <- old.forward
     .np_plot_progress_runtime$context <- previous
     if (complete) .np_progress_end(context$state) else
-      .np_progress_abort(context$state)
+      .np_progress_abort(context$state, detail = paste(label, "interrupted"))
   }, add = TRUE)
   .np_plot_progress_runtime$context <- context
   .np_progress_runtime$fit_forward <- function() .np_plot_progress_notify()
