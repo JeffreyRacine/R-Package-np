@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Treat an absent visible seed as missing custom-uniform replay state, consistently
+  with a header-only seed. Existing safe paths and active-binding non-evaluation
+  are preserved.
+
 * Refuse repeated uncached Box-Muller normal replay in corrected regression,
   density and distribution calibration, including geometric resampling.
   Actual-value caches, normal-free laws and one-pass calculations are retained;
