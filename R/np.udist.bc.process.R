@@ -27,7 +27,7 @@
   stochastic <- law != "gaussian" || "simultaneous" %in% bands
   if (stochastic && !existed) runif(1L)
   start <- if (stochastic) get(".Random.seed", .GlobalEnv, inherits = FALSE) else entry
-  .np_bias_normal_replay_check(law,
+  .np_bias_replay_check(law,
     if (is.null(block.request)) NULL else block.request$length,
     stochastic && m > tile && !(law == "gaussian" && m <= 32L), seed = start)
   end <- start; covariance <- NULL; raw.max <- NULL

@@ -71,7 +71,7 @@
     stop("fixed-reference density requires positive finite observed scales", call. = FALSE)
   if (!existed) runif(1L)
   start <- get(".Random.seed", .GlobalEnv, inherits = FALSE)
-  .np_bias_normal_replay_check(law, blocklen, !covariance.mode && m > tile,
+  .np_bias_replay_check(law, blocklen, !covariance.mode && m > tile,
     retained = !is.null(process.cache), seed = start)
   covariance <- NULL; end <- NULL
   if (covariance.mode) {

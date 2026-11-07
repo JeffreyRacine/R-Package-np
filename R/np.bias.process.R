@@ -149,6 +149,27 @@
   invisible(NULL)
 }
 
+# Refuse only a proved missing component of a repeated seed-only stream.
+# A nonempty custom payload is not a general certificate of RNG replayability.
+.np_bias_replay_check <- function(law, blocklen, replay, retained = FALSE,
+                                seed = NULL) {
+  if (!isTRUE(replay) || isTRUE(retained)) return(invisible(NULL))
+  if (is.null(seed)) {
+    kind <- RNGkind()
+    absent <- .np_plot_replay_uniform_state_absent(kind)
+    custom.normal <- identical(kind[2L], "user-supplied")
+  } else {
+    absent <- is.integer(seed) && length(seed) == 1L &&
+      isTRUE(seed[1L] %% 100L == 5L)
+    custom.normal <- isTRUE((seed[1L] %/% 100L) %% 100L == 3L)
+  }
+  # User normal callbacks need not consume the selected uniform generator.
+  # Their hidden-state contract is separate from this known-missing-state test.
+  if (absent && !(identical(law, "gaussian") && custom.normal))
+    stop("unsafe RNG replay: repeated draws require custom uniform state absent from .Random.seed; explicitly select a qualified built-in generator before plotting", call. = FALSE)
+  .np_bias_normal_replay_check(law, blocklen, replay, retained, seed)
+}
+
 .np_bias_stream <- function(state, code) {
   previous <- get(".Random.seed",.GlobalEnv,inherits=FALSE)
   on.exit(assign(".Random.seed",previous,.GlobalEnv))
@@ -266,7 +287,7 @@
       anchors=min(25L,tile.rows %/% length(family)),rows=min(500L,tile.rows))
     family.blocks <- lapply(family.blocks,function(b) {b$rows<-family.rows[b$rows];b})
    } else {family.blocks <- blocks;retain.tile <- FALSE}
-   .np_bias_normal_replay_check(law, if (is.null(selection)) NULL else selection$length,
+   .np_bias_replay_check(law, if (is.null(selection)) NULL else selection$length,
      length(family.blocks) > 1L || length(families) > 1L ||
        (rank.calibration && !tail.calibration && !retain.tile),
      retained = !is.null(innovations), seed = rng)
