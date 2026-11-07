@@ -4,10 +4,11 @@
 }
 
 
-.np_udens_beta_sphere_accept <- function(value,trial,predicted,newnorm,oldnorm) {
+.np_udens_beta_sphere_accept <- function(value,trial,predicted,newnorm,oldnorm,gtol=0) {
   if(trial<=value+1e-4*predicted)return(TRUE)
   roundoff<-32*.Machine$double.eps*(1+abs(value))
-  abs(predicted)<=roundoff && abs(trial-value)<=roundoff && newnorm<=.5*oldnorm
+  abs(predicted)<=roundoff && abs(trial-value)<=roundoff &&
+    (newnorm<=.5*oldnorm || (oldnorm>gtol && newnorm<=gtol))
 }
 
 .np_udens_beta_sphere <- function(objective,start,maxiter=150L,gtol=1e-7) {
@@ -26,7 +27,7 @@
       step<-direction*.5^line;length<-norm(step);candidate<-cos(length)*z+sin(length)*step/length
       candidate<-candidate/norm(candidate);trial<-objective(candidate)
       newtangent<-trial$gradient-sum(trial$gradient*candidate)*candidate
-      if(.np_udens_beta_sphere_accept(value,trial$value,.5^line*descent,norm(newtangent),gn)) {accepted<-TRUE;break}
+      if(.np_udens_beta_sphere_accept(value,trial$value,.5^line*descent,norm(newtangent),gn,gtol)) {accepted<-TRUE;break}
     }
     if(!accepted)stop("beta plot sphere BFGS line-search",call.=FALSE)
     K<-tcrossprod(candidate,z)-tcrossprod(z,candidate)
@@ -57,7 +58,7 @@
       s<-step*.5^line;length<-norm(s);candidate<-cos(length)*z+sin(length)*drop(B%*%s)/length
       candidate<-candidate/norm(candidate);trial<-objective(candidate)
       newtangent<-trial$gradient-sum(trial$gradient*candidate)*candidate
-      if(.np_udens_beta_sphere_accept(value,trial$value,.5^line*descent,norm(newtangent),gn)) {accepted<-TRUE;break}
+      if(.np_udens_beta_sphere_accept(value,trial$value,.5^line*descent,norm(newtangent),gn,gtol)) {accepted<-TRUE;break}
     }
     if(!accepted)stop("beta plot sphere Newton line-search",call.=FALSE)
     z<-candidate
