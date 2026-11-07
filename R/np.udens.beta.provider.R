@@ -152,7 +152,7 @@
      any(!is.finite(c(x,grid,h)))||any(x<=0|x>=1)||any(grid<=0|grid>=1)||
      length(h)!=ncol(x)||any(h<=0)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1||
      length(variant)!=1L||!variant%in%c('asymptotic','symmetric-sd','asymmetric-sd')||
-     length(band)!=1L||!band%in%if(variant=='asymptotic')c('pointwise','simultaneous','bonferroni','all') else c('pointwise','simultaneous'))stop('invalid beta plot hidden provider request',call.=FALSE)
+     length(band)!=1L||!band%in%c('pointwise','simultaneous','bonferroni','all'))stop('invalid beta plot hidden provider request',call.=FALSE)
   .npRmpi_bootstrap_fanout_enabled(n=nrow(x),B=nrow(grid),chunk.size=8L,what='beta density bands')
   # Canonical unique targets make a seeded family independent of caller ordering.
   original<-grid
@@ -175,7 +175,9 @@
     if(sd)nrow(x) else nrow(grid),B,seed)
   if(sd) {
     bootstrap<-.np_udens_beta_sd_roots(x,h,grid,prepared,stream,store,progress)
-    result<-.np_udens_beta_stored_reduce(bootstrap$roots,rhat,scale,region,prepared$center,alpha,band,variant)
+    result<-if(band%in%c('bonferroni','all'))
+      .np_udens_bounded_sd(bootstrap$roots,rhat,list(scale),region,prepared$center,alpha,band,variant,progress) else
+      .np_udens_beta_stored_reduce(bootstrap$roots,rhat,scale,region,prepared$center,alpha,band,variant)
   } else {
     critical<-if(band=='pointwise')qnorm(1-alpha/4) else if(band=='bonferroni')
       if(nrow(grid)==1L)qnorm(1-alpha/4) else qnorm(alpha/(4*nrow(grid)),lower.tail=FALSE) else
@@ -183,7 +185,7 @@
     result<-list(lower=rhat+region$lower-critical*scale,upper=rhat+region$upper+critical*scale,
       critical=critical,B=if(draws)B else 0L)
   }
-  if(band=='all') {
+  if(band=='all'&&!sd) {
     companions<-.np_udens_bounded_analytic(rhat,region,list(scale),alpha,nrow(grid))
     result$bands<-list(pointwise=companions$pointwise,
       simultaneous=list(lower=result$lower,upper=result$upper,critical=result$critical),
@@ -199,7 +201,10 @@
   result$construction<-switch(variant,asymptotic='residual-Gaussian-plus-guide-region',
     'symmetric-sd'='residual-absolute-containing-hull','asymmetric-sd'='signed-residual-inversion')
   result$checks<-prepared$checks
-  if(draws&&(if(sd&&variant=='asymmetric-sd')floor(B*alpha/4) else floor(B*alpha/2))<20)
+  if(sd&&band%in%c('bonferroni','all')) {
+    if(result$sd_companion$resolution.limited)
+      warning('beta plot Bonferroni calibration has low finite-draw tail resolution; returning finite empirical limits with the simultaneous hull',call.=FALSE)
+  } else if(draws&&(if(sd&&variant=='asymmetric-sd')floor(B*alpha/4) else floor(B*alpha/2))<20)
     warning('beta plot calibration has low finite-draw tail resolution; returning the finite band',call.=FALSE)
   result
 }

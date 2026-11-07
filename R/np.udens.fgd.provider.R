@@ -16,7 +16,7 @@
      any(!is.finite(c(x,grid,h)))||any(x<=0|x>=1)||any(grid<=0|grid>=1)||
      length(h)!=ncol(x)||any(h<=0)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1||
      length(variant)!=1L||!variant%in%c('asymptotic','symmetric-sd','asymmetric-sd')||
-     length(band)!=1L||!band%in%if(variant=='asymptotic')c('pointwise','simultaneous','bonferroni','all') else c('pointwise','simultaneous'))stop('invalid Gaussian plot hidden provider request',call.=FALSE)
+     length(band)!=1L||!band%in%c('pointwise','simultaneous','bonferroni','all'))stop('invalid Gaussian plot hidden provider request',call.=FALSE)
   original<-grid;unique.grid<-unique(grid);ordering<-do.call(order,as.data.frame(unique.grid))
   grid<-unique.grid[ordering,,drop=FALSE]
   keys<-function(x)apply(x,1,function(z)paste(format(z,digits=17,scientific=TRUE),collapse=':'))
@@ -37,7 +37,9 @@
   if(sd) {
     bootstrap<-.np_udens_beta_sd_roots(x,h,grid,prepared,stream,store,progress,
       .np_udens_fgd_score,.np_udens_fgd_axis_cache,c(24L,48L))
-    for(j in 1:2)constituents[[j]]<-.np_udens_beta_stored_reduce(bootstrap$roots,rhat,scales[[j]],region,prepared$center,alpha,band,variant)
+    if(band%in%c('bonferroni','all'))
+      companion<-.np_udens_bounded_sd(bootstrap$roots,rhat,scales,region,prepared$center,alpha,band,variant,progress) else
+      for(j in 1:2)constituents[[j]]<-.np_udens_beta_stored_reduce(bootstrap$roots,rhat,scales[[j]],region,prepared$center,alpha,band,variant)
   } else for(j in 1:2) {
     if(band=='pointwise')critical<-qnorm(1-alpha/4) else if(band=='bonferroni')
       critical<-if(m==1L)qnorm(1-alpha/4) else qnorm(alpha/(4*m),lower.tail=FALSE) else {
@@ -49,12 +51,12 @@
     constituents[[j]]<-list(lower=rhat+region$lower-critical*scales[[j]],
       upper=rhat+region$upper+critical*scales[[j]],critical=critical)
   }
-  result<-.np_udens_fgd_envelope(constituents[[1]],constituents[[2]])
-  if(sd) {
+  result<-if(sd&&band%in%c('bonferroni','all'))companion else .np_udens_fgd_envelope(constituents[[1]],constituents[[2]])
+  if(sd&&!band%in%c('bonferroni','all')) {
     result$k_signed<-constituents[[1]]$k_signed
     result$k_absolute<-constituents[[1]]$k_absolute
   }
-  if(band=='all') {
+  if(band=='all'&&!sd) {
     companions<-.np_udens_bounded_analytic(rhat,region,scales,alpha,m)
     result$bands<-list(pointwise=companions$pointwise,
       simultaneous=list(lower=result$lower,upper=result$upper,
@@ -71,7 +73,10 @@
   result$B<-if(draws)B else 0L
   result$construction<-'complete pilot/empirical residual interval envelope with guide region'
   result$checks<-prepared$checks
-  if(draws&&(if(sd&&variant=='asymmetric-sd')floor(B*alpha/4) else floor(B*alpha/2))<20)
+  if(sd&&band%in%c('bonferroni','all')) {
+    if(result$sd_companion$resolution.limited)
+      warning('Gaussian plot Bonferroni calibration has low finite-draw tail resolution; returning finite empirical limits with the simultaneous hull',call.=FALSE)
+  } else if(draws&&(if(sd&&variant=='asymmetric-sd')floor(B*alpha/4) else floor(B*alpha/2))<20)
     warning('Gaussian plot calibration has low finite-draw tail resolution; returning the finite band',call.=FALSE)
   result
 }

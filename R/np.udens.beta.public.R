@@ -17,8 +17,8 @@
      !isTRUE(bws[['ndim',exact=TRUE]]%in%1:2) ||
      !isTRUE(bws[['ncon',exact=TRUE]]==bws[['ndim',exact=TRUE]]))
     stop('beta corrected bands require fixed order-2 bandwidths and one or two continuous coordinates',call.=FALSE)
-  if(!band%in%if(identical(method,'asymptotic'))c('pointwise','simultaneous','bonferroni','all') else c('pointwise','simultaneous'))
-    stop("beta corrected bands require explicit band='pointwise' or band='simultaneous'; asymptotic bands also support 'bonferroni' and 'all'",call.=FALSE)
+  if(!band%in%c('pointwise','simultaneous','bonferroni','all'))
+    stop("beta corrected bands require explicit band='pointwise', 'simultaneous', 'bonferroni' or 'all'",call.=FALSE)
   variant<-if(identical(method,'asymptotic'))'asymptotic' else calibration
   if(identical(method,'asymptotic') && !is.null(calibration))
     stop('beta asymptotic bands do not accept bootstrap calibration',call.=FALSE)
@@ -69,7 +69,8 @@
     resolution=list(draws=result$B,signed.lower.index=result$k_signed,
       signed.upper.index=if(!is.null(result$k_signed))result$B+1L-result$k_signed else NULL,
       absolute.index=result$k_absolute,guide.risk=alpha/2,residual.risk=alpha/2,
-      signed.tail.probability=alpha/4,absolute.tail.probability=alpha/2,
+      signed.tail.probability=alpha/(4*if(band=='bonferroni'&&state$variant!='asymptotic')result$family_size else 1),
+      absolute.tail.probability=alpha/(2*if(band=='bonferroni'&&state$variant!='asymptotic')result$family_size else 1),
       gaussian.quantile.type=if(state$variant=='asymptotic'&&band=='simultaneous')7L else NULL),
     settings=list(construction=state$construction,calibration=state$variant,endpoint.construction=result$construction,law=state$plot.law,
       family='one supplied finite interior grid',grid.size=nrow(grid),q=state$q,n=state$n,

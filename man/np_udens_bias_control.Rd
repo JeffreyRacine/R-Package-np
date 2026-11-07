@@ -51,8 +51,7 @@ With omitted or \code{NULL} \code{bias_control}, fixed second-order beta
 kernels support \code{errors="asymptotic"} and independent bootstrap
 \code{calibration="symmetric-sd"} or \code{"asymmetric-sd"}. Request
 \code{center="bias-corrected"} and explicitly select \code{band="pointwise"}
-or \code{"simultaneous"}; asymptotic requests also accept \code{"bonferroni"}
-and \code{"all"}. This plot-only construction supports one or two
+or \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}. This plot-only construction supports one or two
 continuous variables, at least ten observations and known finite coordinatewise
 \code{ckerbound="fixed"} bounds. Observations and evaluation points must lie
 strictly inside those bounds. Estimated \code{ckerbound="range"} bounds and
@@ -134,6 +133,29 @@ supplied finite family, and absolute ranks use its maximum absolute root.
 The guide region is added once in each case. These beta-specific rules do not
 change the existing Gaussian density bootstrap constructions.
 
+For SD Bonferroni bands, let \eqn{m} be the number of distinct targets in the
+whole supplied family, and \eqn{B} the unchanged number of bootstrap draws.
+The symmetric absolute-root order statistic has rank
+\eqn{\lceil B(1-\alpha/(2m))\rceil}. The asymmetric signed lower rank is
+\eqn{k=\lfloor B\alpha/(4m)\rfloor+1}, with upper rank \eqn{B+1-k};
+the signed interval is inverted before multiplying by the residual scale.
+The guide region retains risk \eqn{\alpha/2}. Each complete marginal
+Bonferroni interval is then united with its same-draw simultaneous interval.
+This unconditional simultaneous hull cannot reduce coverage relative to the
+existing simultaneous band, but can widen the result. It is not an estimate
+of unseen bootstrap tails or a finite-sample population coverage guarantee.
+The returned construction and resolution diagnostics identify this hull.
+
+With \code{band="all"}, the existing pointwise and simultaneous endpoints are
+retained exactly, together with this safeguarded Bonferroni companion. The
+same preparation, guide region, resamples and guide refits are reused; no
+additional bootstrap samples are generated. Very small Bonferroni tail
+probabilities may select the observed extremes. Expected tail counts below
+the existing resolution threshold produce one warning, while retaining
+finite endpoints and the simultaneous hull. Requested draw counts, the
+resampling law and existing standalone methods are unchanged.
+
+
 All slices in one call share one calibration family. Returned endpoints are
 absolute limits; they and the corrected center remain signed, without clipping
 or renormalization. Stored plotting reuses those limits. The selected RNG kind
@@ -171,8 +193,7 @@ near-edge intervals, especially for singular densities, remain possible.
 The experimental status of bias-corrected inference applies to this method too.
 Other bounded kernels, nearest-neighbour bandwidths, mixed data, dimensions
 above two, derivatives, other bootstrap laws and \code{pmzsd} are outside
-this beta construction. Bootstrap SD Bonferroni and all-band requests remain
-unsupported; the analytic companions do not substitute for bootstrap tails.
+this beta construction.
 Explicit saved density controls keep their original construction and scope.
 }
 
@@ -180,13 +201,13 @@ Explicit saved density controls keep their original construction and scope.
 With omitted or \code{NULL} \code{bias_control}, fixed second-order Gaussian
 kernels with known \code{ckerbound="fixed"} bounds use the FG-D plot
 construction for corrected asymptotic and independent symmetric-sd/asymmetric-sd
-intervals. Request explicit pointwise or simultaneous bands; asymptotic
-requests also support Bonferroni and \code{band="all"}. As for the
+intervals. Request explicit pointwise, simultaneous, Bonferroni or
+\code{band="all"}. As for the
 known-bound beta construction, one or two continuous coordinates and at least
 ten observations are required; data and evaluation points must be strictly
 interior. Range-derived bounds, support endpoints, nearest-neighbour bandwidths,
 higher kernel orders, derivatives, other bootstrap laws and pmzsd
-are outside this construction. Bootstrap SD Bonferroni/all remain unsupported. Explicit density controls, including the
+are outside this construction. Explicit density controls, including the
 legacy calibration alias, retain their existing meanings.
 
 The query-normalized truncated Gaussian is corrected by a cubic donor-moment
@@ -210,7 +231,10 @@ residual denominator fixed. The same residual roots are transported under each
 scale. The asymmetric rule inverts their signed ranks; the symmetric rule forms
 a containing symmetric hull for each complete interval before the union.
 Taking the maximum of the two scales is not the asymmetric construction.
-The guide region is added once per constituent interval.
+The guide region is added once per constituent interval. SD Bonferroni uses
+the same marginal ranks and unconditional simultaneous hull described for
+beta, separately for each complete constituent before their union; SD
+\code{band="all"} preserves its existing pointwise and simultaneous components.
 
 Returned limits and the corrected center are signed, without clipping or
 renormalization. Bounds, evaluation grid and selected bandwidth are conditioned
