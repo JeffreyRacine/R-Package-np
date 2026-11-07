@@ -327,8 +327,8 @@
       term <- NA_character_
       if (family == "npscoef" && request$coef) {
         coefficient.names <- c("Intercept", bws[["xnames", exact = TRUE]])
-        term <- coefficient.names[min(.np_plot_data_field(options, "coef.index", 1L),
-                                      length(coefficient.names))]
+        term <- coefficient.names[.np_plot_match_coef_index(
+          .np_plot_data_field(options, "coef.index", 1L), length(coefficient.names))]
       }
       targets <- rbind(targets, .np_plot_data_target(id, quantity, label, term = term,
         variable = variable, inference_id = owner, tau = tau,

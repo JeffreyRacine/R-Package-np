@@ -108,13 +108,15 @@
     coef <- isTRUE(coef)
     if (coef && gradients)
       stop("coef=TRUE and gradients=TRUE cannot be combined for smooth coefficient plots.", call. = FALSE)
+    if (coef)
+      coef.index <- .np_plot_match_coef_index(coef.index, length(bws$xnames) + 1L)
     gradient.index <- coef.index
     response.axis.label <- .np_plot_resolve_axis_label(
       bws$ynames,
       "Conditional Mean"
     )
     default.value.ylab <- if (coef) {
-      paste("Coefficient", min(coef.index, bws$xndim))
+      paste("Coefficient", coef.index)
     } else if (gradients) {
       .np_plot_gradient_axis_label(
         target = response.axis.label,
@@ -137,7 +139,7 @@
       if (is.null(beta.plot))
         stop("coef=TRUE requires npscoef(..., betas=TRUE) output.")
       if (is.matrix(beta.plot))
-        return(as.double(beta.plot[, min(coef.index, ncol(beta.plot))]))
+        return(as.double(beta.plot[, coef.index]))
       as.double(beta.plot)
     }
     extract_scoef_se <- function(obj) {
