@@ -652,7 +652,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   The separately named plot argument \code{gaussian_draws} has a fixed default
   of 9999 and accepts positive integer counts subject to representability and
   workspace limits, without a fixed one-million upper cap. It applies only to asymptotic
-  simultaneous/all requests; \code{B} remains bootstrap-only. The usual
+  simultaneous/all requests; \code{B} remains bootstrap-only.
+
   Selected corrected regression and multi-tile fixed numeric joint CDF requests
   are also refused before seeding when a custom uniform generator exposes only
   a seed header without replay state. The generator is never changed silently;
@@ -701,7 +702,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Consequently, subsequent caller draws can differ. This continuation limitation
   is distinct from replay correctness within the current band calculation;
   visible seed restoration alone does not establish either guarantee.
-  A count below
+  For the asymptotic Gaussian simulation described above, a \code{gaussian_draws}
+  count below
   \code{ceiling(qnorm(.975)^2 * (1-alpha) / (.1^2 * alpha))} warns and is used
   unchanged. This is an approximate 95 percent Monte Carlo target for relative
   error within 10 percent in the simulated maximum's upper-tail probability.
