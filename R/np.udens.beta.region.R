@@ -65,6 +65,30 @@
   stop("beta plot sphere iteration cap",call.=FALSE)
 }
 
+.np_udens_beta_region_certificate <- function(runs,index,target,transform,sign) {
+  chosen<-runs[[index]]
+  # Certify the returned 32-node quantity, independently of the lower-order
+  # objective used to locate the retained sphere candidate.
+  eta<-do.call(rbind,lapply(runs,`[[`,'eta'))
+  normal<-.np_udens_beta_joint_normalizer(eta,32L)
+  ref<-.np_udens_beta_joint_rule(chosen$theta,32L,moments=TRUE)
+  actual<-sum(chosen$theta*target)-ref$A
+  err<-abs(normal[index]-ref$A)
+  if(!is.finite(err)||err>1e-10)
+    stop("beta plot joint projection independent-normalizer gate",call.=FALSE)
+  gradient<-drop(crossprod(transform,c(chosen$theta[1:4]+1,1)*(target-ref$mean)))
+  z<-chosen$direction
+  kkt<-sqrt(sum((gradient-sum(gradient*z)*z)^2))
+  if(!is.finite(kkt)||kkt>1e-4)
+    stop("beta plot joint projection stationarity",call.=FALSE)
+  values<-vapply(runs,function(run)sum(run$theta*target),numeric(1))-normal
+  ranking<-sign*actual-min(sign*values)
+  if(!is.finite(ranking)||ranking>1e-10)
+    stop("beta plot joint projection refined-ranking gate",call.=FALSE)
+  list(value=actual,refinement=err,kkt=kkt,
+       optimization_refinement=abs(actual-chosen$value),ranking_gap=ranking)
+}
+
 .np_udens_beta_region_q2 <- function(theta,Veta,grid,alpha) {
   eta<-c(log(theta[1:4]+1),theta[5]);L<-t(chol(Veta));radius<-sqrt(qchisq(1-alpha/2,5))
   transform<-radius*L;T<-.np_udens_beta_basis(grid);starts<-rbind(diag(5),-diag(5))
@@ -80,15 +104,14 @@
       if(abs(sum(r$x^2)-1)>1e-12)stop("beta plot sphere norm certificate",call.=FALSE)
       kkt<-sqrt(sum((out$gradient-sum(out$gradient*r$x)*r$x)^2))
       if(kkt>1e-4)stop("beta plot joint projection stationarity",call.=FALSE)
-      runs[[j]]<-list(value=sign*out$value,theta=out$theta,eta=out$eta,kkt=kkt,iterations=r$iterations)
+      runs[[j]]<-list(value=sign*out$value,theta=out$theta,eta=out$eta,direction=r$x,kkt=kkt,iterations=r$iterations)
     }
-    values<-vapply(runs,`[[`,numeric(1),'value');chosen<-runs[[which.min(sign*values)]]
-    ref<-.np_udens_beta_joint_rule(chosen$theta,32L,moments=FALSE);actual<-sum(chosen$theta*T[k,])-ref$A
-    err<-max(abs(actual-chosen$value),abs(.np_udens_beta_joint_normalizer(chosen$eta,32L)-ref$A))
-    if(err>1e-10)stop("beta plot joint projection independent-normalizer gate",call.=FALSE)
-    value<-exp(actual);if(!is.finite(value))stop("beta plot nonfinite joint region",call.=FALSE)
+    values<-vapply(runs,`[[`,numeric(1),'value');index<-which.min(sign*values)
+    certificate<-.np_udens_beta_region_certificate(runs,index,as.double(T[k,]),transform,sign)
+    value<-exp(certificate$value);if(!is.finite(value))stop("beta plot nonfinite joint region",call.=FALSE)
     if(sign==1)lower[k]<-value else upper[k]<-value
-    proof[[length(proof)+1L]]<-list(target=k,sign=sign,refinement=err,kkt=chosen$kkt,
+    proof[[length(proof)+1L]]<-list(target=k,sign=sign,refinement=certificate$refinement,kkt=certificate$kkt,
+      optimization_refinement=certificate$optimization_refinement,ranking_gap=certificate$ranking_gap,
       multistart_log_range=diff(range(values)),iterations=sum(vapply(runs,`[[`,numeric(1),'iterations')))
     # Release completed target temporaries before the next bounded region unit.
     gc(FALSE)
