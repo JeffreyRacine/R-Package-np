@@ -1,5 +1,10 @@
 # np 0.80-2 (development)
 
+* Refuse uncached multi-tile signed fixed/geometric CDF bootstrap replay when a
+  custom uniform generator exposes no replay state, instead of combining
+  different observation-count draws across targets. Existing cached, single-tile
+  and complete-state paths are unchanged.
+
 * Corrected Gaussian regression now refuses unsafe uncached Box-Muller replay
   at the resolved-data cache boundary, including legacy and NA-omission routes
   that cannot be classified before plotting. Data/NA callbacks are not repeated;

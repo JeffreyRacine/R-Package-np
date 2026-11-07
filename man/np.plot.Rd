@@ -669,7 +669,12 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   tiled density/CDF factor providers also refuse a custom uniform
   generator whose visible seed contains only a header without replay state. These
   checks also cover unsigned geometric joint-CDF calibration on the admitted
-  multi-tile fixed numeric geometry. Signed cached paths remain available.
+  multi-tile fixed numeric geometry. Signed fixed/geometric joint-CDF requests
+  also refuse a header-only custom uniform generator at the resolved inference
+  owner when multiple target tiles require replay and the innovation cache is
+  unavailable. Cached and single-tile paths retain their existing behavior.
+  The resolved check does not reevaluate data or NA callbacks, and runs inside
+  the existing seed scope; the caller-continuation limitation below still applies.
   These checks are bounded: other reconstruction and RNG replay cases remain
   unqualified; non-refusal is not a general RNG safety certificate.
 
