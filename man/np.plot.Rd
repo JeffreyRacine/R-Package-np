@@ -595,18 +595,20 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   guide-region plus residual construction in one or two continuous dimensions.
   With omitted \code{bias_control}, request asymptotic errors or independent
   bootstrap \code{calibration="symmetric-sd"}/\code{"asymmetric-sd"}, and
-  explicitly choose pointwise or simultaneous bands. Asymptotic requests also
-  support Bonferroni and all three bands together with \code{band="all"}. Range-derived bounds and
+  explicitly choose pointwise, simultaneous, Bonferroni or all three bands
+  together with \code{band="all"}. Range-derived bounds and
   literal endpoints are rejected. All slices share one finite calibration
   family; core fits and estimator SEs are unchanged. See
   \code{\link{np_udens_bias_control}} for the distinct beta endpoint rules,
-  restrictions and limitations.
+  restrictions and limitations. SD Bonferroni intervals use marginal empirical
+  ranks with an unconditional hull containing the same-draw simultaneous band.
+  Low tail resolution warns; no draws or Gaussian tail substitutions are added.
+  All-band requests reuse one preparation and preserve existing components.
 
   Known-fixed-bound order-2 Gaussian density plots also support corrected
   asymptotic and independent symmetric-sd/asymmetric-sd intervals for one or
   two continuous coordinates, with omitted \code{bias_control} and explicit
-  pointwise/simultaneous bands (asymptotic requests also accept Bonferroni and
-  \code{band="all"}). FG-D combines complete ratio-pilot and empirical
+  pointwise/simultaneous/Bonferroni bands or \code{band="all"}. FG-D combines complete ratio-pilot and empirical
   residual intervals with a nonlinear guide region; it is distinct from beta
   correction and unbounded D8. Range-derived bounds and literal endpoints are
   rejected. All slices form one finite calibration family. See
