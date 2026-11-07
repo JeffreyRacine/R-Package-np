@@ -189,7 +189,8 @@
     new.bias <- !is.null(bias.state)
     # Presentation only: percentile endpoints are not a maximum-root band.
     annotation.construction <- if (new.bias) {
-      if (identical(bias.state[["plot.calibration", exact = TRUE]],
+      if (.np_udens_beta_active(bias.state) || .np_udens_fgd_active(bias.state)) "guide-region"
+      else if (identical(bias.state[["plot.calibration", exact = TRUE]],
                     "smoothed-percentile")) "smoothed-percentile" else "positive-covariance"
     } else NULL
     joint.eligible <- joint.eligible && !new.bias

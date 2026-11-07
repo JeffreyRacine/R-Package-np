@@ -725,6 +725,15 @@
     candidates <- paste0(candidates, suffix)
   }
 
+  if (identical(construction, "guide-region")) {
+    # These providers combine a guide region and a residual envelope. Their
+    # simultaneous family includes every supplied slice, not one panel at a time.
+    scope <- if (identical(band, "simultaneous")) "; supplied finite family" else ""
+    candidates <- c(
+      sprintf("%s %s guide-region + residual envelope%s", level, band, scope),
+      sprintf("%s %s guide + residual envelope%s", level, band, scope))
+  }
+
   if (identical(construction,"conditional-pilot")) {
     candidates <- c(sprintf("%s %s conditional-pilot band; corrected center with score safeguard%s", level, band,
       if(band %in% c("simultaneous","all")) "; finite grid within panel" else ""),
