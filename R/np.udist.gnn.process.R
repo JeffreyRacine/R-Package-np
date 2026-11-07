@@ -32,7 +32,9 @@
   }
   limits <- .np_bias_limits_prepare(rep("cdf", m), alpha, FALSE, B)
   end <- NULL; done <- 0L
-  for (block in .np_udist_gnn_blocks(state, grid, budget$marginal.tile)) {
+  blocks <- .np_udist_gnn_blocks(state, grid, budget$marginal.tile)
+  .np_bias_normal_replay_check(law, blocklen, length(blocks) > 1L, seed = start)
+  for (block in blocks) {
     prepared <- .np_udist_gnn_block(state, block, corrected)
     # Coupled evaluation of identical sums preserves exactly zero displacement
     # for an unchanged sample, while the displayed observed center stays intact.

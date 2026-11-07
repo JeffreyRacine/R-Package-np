@@ -55,6 +55,12 @@
 }
 
 .np_udens_smoothed_plan <- function(x, h, B, law, blocklen, streams, chunk, cache, layout = NULL) {
+  .np_bias_normal_replay_check(law, blocklen, !cache, seed = streams$count)
+  normal.jitter <- if (is.null(layout)) ncol(x) > 0L else
+    any(layout$numeric) || any(vapply(layout$category,
+      function(z) isTRUE(z$ordered) && isTRUE(z$lambda > 0), logical(1L)))
+  .np_bias_normal_replay_check("gaussian", NULL, !cache && normal.jitter,
+    seed = streams$jitter)
   starts <- seq.int(1L, B, by = chunk)
   tasks <- vector("list", length(starts)); current <- streams
   for (i in seq_along(starts)) {

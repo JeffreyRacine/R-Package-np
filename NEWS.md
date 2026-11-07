@@ -1,5 +1,10 @@
 # np 0.80-2 (development)
 
+* Refuse repeated uncached Box-Muller normal replay in corrected regression,
+  density and distribution calibration, including geometric resampling.
+  Actual-value caches, normal-free laws and one-pass calculations are retained;
+  saved Inversion streams remain usable regardless of the caller's normal kind.
+
 - Refuse resolved unsigned fixed-block CDF replay across target tiles when a
   custom uniform generator supplies no replayable seed state.
 

@@ -79,6 +79,9 @@
       budget$innovation.cache <- cache$plan
     }
   }
+  # The location and scale passes replay even for a single target tile.
+  .np_bias_normal_replay_check(law, blocklen, !small,
+    retained = !is.null(cache))
   base <- .np_udens_reference_inference(state, grid, law, alpha, B, tile, bands, calibration,
                                         blocklen = blocklen, process.cache = cache)
   if (dependent) base$rng$entry <- previous
