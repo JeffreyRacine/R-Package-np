@@ -585,6 +585,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   first differences are supported in slice plots; higher generalized-NN
   derivatives retain their existing restrictions. Unconditional adaptive-NN
   uniform kernels are supported on regular spacing and support-face domains.
+  Estimate-centered unconditional density plots also support fixed second-order
+  beta kernels with known finite \code{ckerbound="fixed"} bounds in one or two
+  continuous coordinates. These bands retain the fitted curve and its incumbent
+  marginal standard errors, using centered beta-kernel contributions for
+  cross-grid dependence. They describe variability around the smoothed target;
+  they do not correct smoothing bias. Range-derived bounds, nearest-neighbor,
+  mixed and higher-dimensional beta specifications keep their existing joint-band
+  restrictions. Beta CDF admission is unchanged.
   Fixed continuous conditional LC specifications also support beta kernels.
   Proper-projected density/CDF plots and other continuous kernel
   specifications retain their documented simultaneous-band restrictions.
