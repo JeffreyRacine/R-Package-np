@@ -17,7 +17,9 @@
       Default is \code{TRUE}.
 
       \item \code{np.plot.progress} (logical): controls bounded
-      plot/bootstrap progress heartbeats. Default is \code{TRUE}.
+      plot/bootstrap and corrected-inference progress heartbeats. Default is
+      \code{TRUE}. During rotation, remaining-frame time is reported
+      separately from completed inference work.
 
       \item \code{np.progress.interval.sec} (numeric): package-wide minimum
       elapsed time between visible progress heartbeats. The default is
