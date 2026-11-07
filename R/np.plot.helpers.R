@@ -2283,6 +2283,11 @@
                                          progress.context = NULL,
                                          metadata.reducer = NULL,
                                          progress.unit = "rep") {
+  if (.npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast() &&
+      .npRmpi_has_active_slave_pool(comm = comm))
+    .npRmpi_autodispatch_require_option_sync()
   if (!is.null(metadata.reducer) && !is.function(metadata.reducer))
     stop("invalid internal fan-out metadata reducer", call. = FALSE)
   rng.final.state <- attr(tasks, "rng_final_state", exact = TRUE)

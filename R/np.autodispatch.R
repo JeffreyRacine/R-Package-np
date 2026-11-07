@@ -32,12 +32,22 @@
   invisible(TRUE)
 }
 
-.npRmpi_autodispatch_should_sync_options <- function(snapshot) {
-  .npRmpi_autodispatch_validate_option_snapshot(snapshot)
+.npRmpi_autodispatch_option_mode <- function() {
   mode <- getOption("npRmpi.autodispatch.option.sync", "onchange")
   if (!is.character(mode) || length(mode) != 1L || is.na(mode))
     mode <- "onchange"
-  mode <- match.arg(mode, choices = c("onchange", "always", "never"))
+  match.arg(mode, choices = c("onchange", "always", "never"))
+}
+
+.npRmpi_autodispatch_require_option_sync <- function() {
+  if (identical(.npRmpi_autodispatch_option_mode(), "never"))
+    stop("automatic numerical calls require verified option agreement: set npRmpi.autodispatch.option.sync to 'onchange' or 'always', or use the explicit manual MPI workflow", call. = FALSE)
+  invisible(NULL)
+}
+
+.npRmpi_autodispatch_should_sync_options <- function(snapshot) {
+  .npRmpi_autodispatch_validate_option_snapshot(snapshot)
+  mode <- .npRmpi_autodispatch_option_mode()
 
   if (identical(mode, "never"))
     return(FALSE)
@@ -2839,7 +2849,8 @@
                                           caller_env = parent.frame(),
                                           comm = 1L,
                                           warn_nested = FALSE,
-                                          public.metadata = NULL) {
+                                          public.metadata = NULL,
+                                          automatic = FALSE) {
   .npRmpi_fanout_assert_idle(comm)
   mc <- .npRmpi_autodispatch_expand_dots_call(mc)
   t.start <- proc.time()
@@ -2932,6 +2943,7 @@
   if (!.npRmpi_autodispatch_preflight(comm = comm))
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
+  if (isTRUE(automatic)) .npRmpi_autodispatch_require_option_sync()
   .npRmpi_warning_scope_activate()
   rec.comm(.npRmpi_lease_drain_pending(comm = comm),
            note = "autodispatch.lease.drain")
@@ -3285,7 +3297,8 @@
   }
   .npRmpi_with_deferred_package_warnings({
     result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env,
-      comm = comm, warn_nested = TRUE, public.metadata = metadata)
+      comm = comm, warn_nested = TRUE, public.metadata = metadata,
+      automatic = TRUE)
     if (inherits(result, c("bandwidth", "dbandwidth", "npdensity", "npdistribution"))) {
       result <- .npRmpi_autodispatch_finalize_unleased_names(result, mc, definition,
         owner = sys.frame(method),

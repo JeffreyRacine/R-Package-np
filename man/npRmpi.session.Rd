@@ -54,12 +54,13 @@ MPI startup, shutdown, worker-count, and worker-status controls.
     warning-to-error conversion follows the same policy on participating ranks.
     Synchronized values remain worker options until a subsequent update; they
     are not restored at the end of an individual call. With \code{"never"},
-    the caller must maintain agreement of computational options on every rank,
-    including after worker-side changes. Incompatible rank settings can return
-    incorrect results. General auto-dispatch does not synchronize options or
-    perform a fresh rank-agreement check in this mode. Prepared-search commands
-    still broadcast their required search-option snapshot; this exception does
-    not establish agreement for other calls. \code{autodispatch.verify.options}
+    automatic numerical calls are refused before dispatch because the existing
+    boundary cannot certify agreement of computational options across ranks.
+    This also refuses manually synchronized automatic calls. Explicit manual
+    MPI workflows remain available; their caller must maintain agreement of
+    computational options on every rank, including after worker-side changes.
+    Prepared-search commands still broadcast their required search-option
+    snapshot, but this does not certify the enclosing automatic call. \code{autodispatch.verify.options}
     verifies only an actual synchronization event. Use \code{"onchange"} or \code{"always"}
     for package-managed synchronization.}
   \item{np.messages}{Logical; if non-\code{NULL}, sets
