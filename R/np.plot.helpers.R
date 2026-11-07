@@ -117,7 +117,8 @@
 .np_plot_progress_runtime <- new.env(parent = emptyenv())
 .np_plot_progress_runtime$context <- NULL
 
-.np_plot_progress_run <- function(expr, enabled = FALSE) {
+.np_plot_progress_run <- function(expr, enabled = FALSE,
+                                  label = "Plot bootstrap") {
   if (!isTRUE(enabled) || !.np_plot_progress_enabled())
     return(force(expr))
   previous <- .np_plot_progress_runtime$context
@@ -137,7 +138,7 @@
   context$stage <- "preparing"
   context$finished <- FALSE
   context$phase <- NULL
-  context$state <- .np_progress_begin("Plot bootstrap", domain = "plot",
+  context$state <- .np_progress_begin(label, domain = "plot",
                                        surface = "plot_bounded")
   if (!isTRUE(context$state$visible))
     return(force(expr))
@@ -425,12 +426,20 @@
   invisible(NULL)
 }
 
-# Corrected adapters bypass the ordinary bootstrap target scope. Keep their
-# lifecycle at this shared boundary; standalone/asymptotic calls have no owner.
+# Corrected adapters bypass the ordinary bootstrap target scope. Supply a
+# display owner for standalone calls without changing their local work clocks.
 .np_plot_corrected_activity_run <- function(label, expr) {
-  target <- .np_plot_progress_target_begin()
-  on.exit(.np_plot_progress_target_end(target), add = TRUE)
-  .np_plot_activity_run(label, expr)
+  run <- function() {
+    target <- .np_plot_progress_target_begin()
+    on.exit(.np_plot_progress_target_end(target), add = TRUE)
+    .np_plot_activity_run(label, expr)
+  }
+  if (is.null(.np_plot_progress_runtime$context))
+    return(.np_plot_progress_run({
+      .np_plot_progress_plan(1L)
+      run()
+    }, enabled = TRUE, label = "Plot inference"))
+  run()
 }
 
 .np_plot_activity_run <- function(label, expr) {
