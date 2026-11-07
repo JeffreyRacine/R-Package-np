@@ -820,7 +820,8 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   plot.args <- c(list(object = object, slot = "bws"), dots)
-  use.local.plot <- !.npRmpi_has_active_slave_pool(comm = 1L) &&
+  use.local.plot <- !.npRmpi_autodispatch_called_from_bcast() &&
+    !.npRmpi_has_active_slave_pool(comm = 1L) &&
     identical(as.character(dots$plot.behavior)[1L], "data")
 
   if (use.local.plot)

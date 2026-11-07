@@ -1,5 +1,7 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Regression data plots inside manual MPI broadcasts preserve the existing collective owner on every rank; plotting after closing a pool retains its local fallback.
+
 * Copula plots now retain matching missing interval endpoints on repeated
   coordinates. Finite endpoint rounding tolerances and returned data are unchanged.
 
