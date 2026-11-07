@@ -208,7 +208,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
         )
         if (eqlen && simplify){
             out <- mpi.gather(integer(len[1]),1,integer(size*len[1]),0,comm)
-            out <- out[(len[1]+1):(size*len[1])]
+            out <- out[seq.int(from = len[1] + 1L, length.out = (size - 1L) * len[1])]
         dim(out) <- c(len[1], size-1)
         out <- data.frame(out)
         }
@@ -219,7 +219,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
                 out <- as.list(integer(size-1))
                 names(out) <- paste("slave", seq_len(size - 1L), sep="")
                 for (i in seq_len(size - 1L))
-            out[[i]]<- out1[lowlen[i]:uplen[i]]
+            out[[i]]<- out1[seq.int(from = lowlen[i], length.out = len[i])]
         }
     }
     else if (all(type==2)){
@@ -230,7 +230,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
         )
         if (eqlen && simplify){
                 out <- mpi.gather(double(len[1]),2,double(size*len[1]),0,comm)
-                out <- out[(len[1]+1):(size*len[1])]
+                out <- out[seq.int(from = len[1] + 1L, length.out = (size - 1L) * len[1])]
                 dim(out) <- c(len[1], size-1)
                 out <- data.frame(out)
             }
@@ -241,7 +241,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
                 out <- as.list(integer(size-1))
                 names(out) <- paste("slave", seq_len(size - 1L), sep="")
                 for (i in seq_len(size - 1L))
-            out[[i]]<- out1[lowlen[i]:uplen[i]]
+            out[[i]]<- out1[seq.int(from = lowlen[i], length.out = len[i])]
         }
     }
  else if (all(type==4)){
@@ -252,7 +252,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
         )
         if (eqlen && simplify){
                 out <- mpi.gather(raw(len[1]),4,raw(size*len[1]),0,comm)
-                out <- out[(len[1]+1):(size*len[1])]
+                out <- out[seq.int(from = len[1] + 1L, length.out = (size - 1L) * len[1])]
                 dim(out) <- c(len[1], size-1)
                 out <- data.frame(out)
             }
@@ -263,7 +263,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
                 out <- as.list(integer(size-1))
                 names(out) <- paste("slave", seq_len(size - 1L), sep="")
                 for (i in seq_len(size - 1L))
-                    out[[i]]<- out1[lowlen[i]:uplen[i]]
+                    out[[i]]<- out1[seq.int(from = lowlen[i], length.out = len[i])]
         }
     }
 
