@@ -198,8 +198,12 @@ expression on every affected rank. Catching only the master-side error does
 not recover a failed worker. In session and attach mode, an error escaping a
 manual broadcast expression can also end a worker's command loop. Catching only
 the master-side error does not make that pool reusable: later commands or
-shutdown can block waiting for the failed worker. Anticipated errors must be
-handled inside the broadcast expression on every affected rank. This is a
+shutdown can block waiting for the failed worker. This can include
+\code{npRmpi.quit()}, \code{npRmpi.quit(force=TRUE)} and ordinary \code{q()}:
+force does not repair a lost worker. If the affected R/MPI job is already stuck
+in this state, it must be ended externally using the operating system's process
+manager or job launcher. Anticipated errors must be handled inside the broadcast
+expression on every affected rank. This is a
 limitation of manual-command error recovery, not a promise of recovery from
 arbitrary collective failures. One-rank profile use does not install the
 multi-rank profile policy.
