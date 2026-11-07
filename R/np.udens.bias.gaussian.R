@@ -18,7 +18,7 @@
 
 .np_udens_bc_factor <- function(state, grid, alpha, B, tile, corrected, start) {
   m <- nrow(grid)
-  .np_bias_normal_replay_check("gaussian", NULL, m > tile, seed = start)
+  .np_bias_replay_check("gaussian", NULL, m > tile, seed = start)
   limits <- .np_bias_limits_prepare(rep("density", m), alpha, TRUE, B)
   center <- original <- se <- numeric(m); end <- NULL
   for (block in .np_bias_target_blocks(m, 1L, anchors = tile)) {

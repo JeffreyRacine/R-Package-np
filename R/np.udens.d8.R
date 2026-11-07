@@ -82,7 +82,7 @@
   if (m > 1L) for (level in alpha) .np_plot_gaussian_draws(B, level, m)
   if (!existed) sample.int(1L, 0L)
   start <- get(".Random.seed", .GlobalEnv, inherits = FALSE)
-  .np_bias_normal_replay_check("gaussian", NULL, m > tile, seed = start)
+  .np_bias_replay_check("gaussian", NULL, m > tile, seed = start)
   end <- NULL; maximum <- numeric(B)
   center <- original <- scale <- numeric(m)
   for (first in seq.int(1L, m, by = tile)) {

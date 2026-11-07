@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* RNG replay: resolved regression, density and CDF producers now refuse
+  repeated draws when custom uniform state is provably absent from the saved
+  seed. Retained innovation caches and explicit replayable streams are preserved.
+
 * Treat an absent visible seed as missing custom-uniform replay state, consistently
   with a header-only seed. Existing safe paths and active-binding non-evaluation
   are preserved.

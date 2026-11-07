@@ -104,7 +104,7 @@
   budget <- .np_udens_b2_budget(state,m,B,tile,FALSE)
   if(!existed)runif(1L)
   start <- get(".Random.seed",.GlobalEnv,inherits=FALSE);end <- NULL
-  .np_bias_normal_replay_check(law, blocklen, m > tile, seed = start)
+  .np_bias_replay_check(law, blocklen, m > tile, seed = start)
   fresh <- function()list(maximum=rep(-Inf,B),point=matrix(0,m,length(alpha)),bonf=matrix(0,m,length(alpha)))
   plus <- minus <- fresh();absolute <- .np_bias_limits_prepare(rep("density",m),alpha,FALSE,B)
   center <- original <- se <- numeric(m);degenerate <- cancellation <- integer(m)
