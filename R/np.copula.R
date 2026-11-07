@@ -283,10 +283,17 @@ npcopula <- function(bws, ...) {
 .npcopula_display_values <- function(values, grid, exact = FALSE, roundoff.scale = NULL) {
   if (length(values) != length(grid$row.order))
     stop("npcopula surface values are incompatible with the rendering grid")
-  if (!is.null(roundoff.scale) &&
-      (!is.numeric(roundoff.scale) || length(roundoff.scale) != length(values) ||
-       any(!is.finite(roundoff.scale)) || any(roundoff.scale < 0)))
-    stop("npcopula endpoint operand scale is invalid")
+  if (!is.null(roundoff.scale)) {
+    if (!is.numeric(roundoff.scale) || length(roundoff.scale) != length(values))
+      stop("npcopula endpoint operand scale is invalid")
+    nonfinite.scale <- !is.finite(roundoff.scale)
+    # Missing/nonfinite endpoints need exact pattern agreement, not a rounding
+    # certificate. Finite endpoints still require finite nonnegative operands.
+    if (any(roundoff.scale < 0, na.rm = TRUE) ||
+        (any(nonfinite.scale) && (!is.numeric(values) ||
+          any(is.finite(values[nonfinite.scale])))))
+      stop("npcopula endpoint operand scale is invalid")
+  }
   selected <- values[grid$display.rows]
   expanded <- selected[grid$display.cell]
   same <- identical(unname(values), unname(expanded))
