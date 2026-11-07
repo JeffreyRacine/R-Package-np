@@ -57,6 +57,7 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
   if (identical(control[["construction", exact = TRUE]], "legacy")) {
     if (!identical(method, "bootstrap"))
       stop("legacy density bias correction requires errors='bootstrap'", call. = FALSE)
+    .np_udens_fixed_block_check(bootstrap, blocklen, nrow(x))
     return(NULL)
   }
   if (version == 1L && !identical(method, "bootstrap"))
