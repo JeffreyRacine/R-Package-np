@@ -693,8 +693,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Consequently, subsequent caller draws can differ. This continuation limitation
   is distinct from replay correctness within the current band calculation;
   visible seed restoration alone does not establish either guarantee.
-  For the asymptotic Gaussian simulation described above, a \code{gaussian_draws}
-  count below
+  For the standard asymptotic Gaussian calibration described above (excluding
+  the fixed-bound beta and FG-D guide-region constructions), a
+  \code{gaussian_draws} count below
   \code{ceiling(qnorm(.975)^2 * (1-alpha) / (.1^2 * alpha))} warns and is used
   unchanged. This is an approximate 95 percent Monte Carlo target for relative
   error within 10 percent in the simulated maximum's upper-tail probability.
@@ -705,6 +706,18 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   This recommendation does not guarantee critical-value accuracy or statistical
   coverage and is not a draw-count prescription in Chernozhukov, Chetverikov and
   Kato (2013). Explicit counts are never increased silently.
+
+  Fixed-bound beta and FG-D density constructions instead warn about finite
+  tail-rank resolution when \eqn{\lfloor B\alpha/2\rfloor<20} for symmetric-SD
+  bootstrap or asymptotic simultaneous calibration, or when
+  \eqn{\lfloor B\alpha/4\rfloor<20} for asymmetric-SD bootstrap. Here \eqn{B}
+  denotes the requested \code{gaussian_draws} for asymptotic simulation and
+  the requested bootstrap \code{B} otherwise. At \eqn{\alpha=0.05}, these
+  warnings occur below 800 and 1600 draws, respectively. Their asymptotic
+  pointwise calculation uses a normal quantile without simulated draws.
+  These are resolution diagnostics, not guarantees of coverage or critical-value
+  accuracy. A finite result is returned at the requested count if the other
+  numerical checks pass.
   Simulation uses bounded blocks and the bootstrap progress mechanism to
   report completed draws, elapsed time and estimated time remaining during
   interactive computation. It uses a conservative 64 MiB workspace budget;
