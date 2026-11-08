@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+- `npsigtest(bws = y ~ x, ...)` now accepts an explicitly named formula,
+  matching the positional formula and existing npRmpi interface. Numeric
+  bandwidth inputs retain their existing selection behavior.
+
 * Formula selectors and conditional/grid model frames consume original data
   and NA-policy promises once, preserving saved calls, subset evaluation,
   RNG state ownership and MPI behavior.

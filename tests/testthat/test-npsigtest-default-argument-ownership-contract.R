@@ -196,3 +196,29 @@ test_that("default route preserves strict diagnostics", {
     fixed = TRUE
   )
 })
+
+test_that("named formulas retain selector semantics and their resolved owner", {
+  pkg <- environmentName(environment(npsigtest))
+  method <- getS3method("npsigtest", "default")
+  captured <- new.env(parent = emptyenv())
+  captured$count <- 0L
+  f <- y ~ x
+  local_mocked_bindings(
+    .np_eval_bw_call = function(call, caller_env, formula.value = NULL,
+                                native.map = NULL, native.frame = NULL) {
+      captured$call <- call
+      captured$formula <- formula.value$value
+      structure(list(marker = "bw"), class = "rbandwidth")
+    },
+    npsigtest = function(bws, ...) list(bws = bws),
+    .package = pkg
+  )
+  method(bws = { captured$count <- captured$count + 1L; f }, B = 9L)
+  expect_identical(captured$count, 1L)
+  expect_null(captured$call$bws)
+  expect_identical(captured$call$formula, f)
+  expect_identical(captured$formula, f)
+  expect_false("bandwidth.compute" %in% names(captured$call))
+  method(bws = f, bandwidth.compute = FALSE, B = 9L)
+  expect_identical(captured$call$bandwidth.compute, FALSE)
+})

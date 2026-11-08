@@ -1310,8 +1310,14 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
     xdat <- toFrame(xdat)
   }
 
+  # A named formula is a selector input, not a fixed numeric bandwidth.
+  # Match the established npRmpi handoff using the already-resolved value.
   sc.bw <- sc
-  
+  if (bws.named && no.xdat && no.ydat && inherits(bws, "formula")) {
+    sc.bw$bws <- NULL
+    sc.bw$formula <- bws
+    bws.named <- FALSE
+  }
   sc.bw[[1]] <- quote(npregbw)
   sc.bw[.np_npsig_default_test_args] <- NULL
 
