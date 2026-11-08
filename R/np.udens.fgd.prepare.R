@@ -21,7 +21,11 @@
   progress('guide',0L,1L)
   fit<-if(q==1L).np_udens_beta_q1_fit(x[,1]) else .np_udens_beta_q2_fit(x)
   theta<-fit$theta;progress('guide',1L,1L)
-  workspace<-.np_udens_fgd_workspace(n,grid,theta,full,B,workers)
+  # Reject oversized families before materializing the family quadrature plan.
+  if(q==1L).np_udens_fgd_workspace(n,grid,theta,full,B,workers)
+  variance.plan<-if(q==1L).np_udens_q1_variance_plan(theta,h,grid[,1L]) else NULL
+  workspace<-.np_udens_fgd_workspace(n,grid,theta,full,B,workers,
+    variance.nodes=if(q==1L)variance.plan$nodes else 0L)
   out<-list(theta=theta,history=fit$history,center=numeric(m),fitted=numeric(m),mu=numeric(m),
     pilot_variance=numeric(m),empirical_variance=numeric(m),guide_variance=numeric(m),
     B=matrix(0,m,length(theta)),B_refined=matrix(0,m,length(theta)),
@@ -36,7 +40,7 @@
   for(j in seq_along(blocks)) {
     ix<-blocks[[j]];progress('moments/refinement',min(ix)-1L,m)
     if(q==1L) {
-      a<-.np_udens_beta_q1_moments(x[,1],h,grid[ix,1],theta,24L,128L,full,.np_udens_fgd_score)
+      a<-.np_udens_beta_q1_moments(x[,1],h,grid[ix,1],theta,24L,128L,full,.np_udens_fgd_score,variance.plan)
       b<-.np_udens_beta_q1_moments(x[,1],h,grid[ix,1],theta,48L,256L,full,.np_udens_fgd_score)
     } else {
       a<-.np_udens_beta_q2_moment_block(main,ix,FALSE)

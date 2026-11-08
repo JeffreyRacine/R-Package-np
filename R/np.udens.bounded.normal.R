@@ -111,11 +111,22 @@
   score <- if (kernel=='beta') .np_udens_beta_q1_score else .np_udens_fgd_score
   inner <- if (kernel=='beta') c(64L,128L) else c(24L,48L)
   outer <- c(128L,256L); result <- vector('list',2L)
+  variance.plan <- .np_udens_q1_variance_plan(theta,h,grid)
   for (level in 1:2) {
     progress(paste('reference pilot',level),0L,1L)
     p <- .np_udens_bounded_normal_pilot(x,theta,outer[level],length(grid))
     st <- p$st; sq <- p$sq; tq <- p$fit$theta
     progress(paste('reference pilot',level),1L,1L)
+    vr <- if(level==1L).np_udens_q1_variance_rule(theta,variance.plan) else st
+    extra.workspace <- .np_udens_q1_variance_workspace(n,min(32L,length(grid)),
+      st$nodes+sq$nodes,if(level==1L)vr$nodes else 0L)
+    if(extra.workspace>192*1024^2)stop('bounded normal plot workspace exceeds 192 MiB',call.=FALSE)
+    p$workspace <- max(p$workspace,extra.workspace)
+    for(key in c('A','mean','I')) .np_udens_beta_check(vr[[key]],st[[key]],
+      paste('normal variance guide',key),if(key=='mean')1e-10 else 1e-9)
+    vw <- if(level==1L) .np_udens_q1_ratio_weights(x,theta,st$A,vr) else
+      list(prob=p$prob,normal=p$normal)
+    .np_udens_beta_check(vw$normal,p$normal,'normal cross-rule normalization')
     fitted <- exp(drop(Tg%*%theta)-st$A)
     fittedQ <- exp(drop(Tg%*%tq)-sq$A)
     Gq <- sweep(sweep(Tg,2,sq$mean),1,fittedQ,'*')
@@ -128,16 +139,21 @@
     for (first in seq.int(1L,length(grid),by=32L)) {
       ix <- seq.int(first,min(length(grid),first+31L)); g <- grid[ix]
       progress(paste('complete moments',level),first-1L,length(grid))
-      A <- score(g,st$lv,st$l1v,h*h,n^(-7/17),inner[level])
-      Aq <- score(g,sq$lv,sq$l1v,h*h,n^(-7/17),inner[level])
-      obs <- score(g,log(x),log1p(-x),h*h,n^(-7/17),inner[level])
+      coordinates <- list(st,sq,list(lv=log(x),l1v=log1p(-x)))
+      if(level==1L)coordinates[[4L]] <- vr
+      columns <- .np_udens_q1_score_columns(g,coordinates,h,n^(-7/17),inner[level],score)
+      A <- columns[[1L]]; Aq <- columns[[2L]]; obs <- columns[[3L]]
+      Av <- if(level==1L)columns[[4L]] else A
+      rm(columns,coordinates)
       mu <- drop(A%*%st$prob)
       Bq <- Aq%*%(sweep(sq$T,2,sq$mean)*sq$prob)
       Dq <- Gq[ix,,drop=FALSE]-Bq
-      vq <- .np_udens_bounded_normal_variance(A,st$T,p$prob,Dq,sq$I,n)
+      original.mean <- drop(A%*%p$prob)
+      vq <- .np_udens_bounded_normal_variance(Av,vr$T,vw$prob,Dq,sq$I,n)
+      .np_udens_beta_check(vq$meanA,original.mean,'normal cross-rule mean')
       z$center[ix] <- rowMeans(obs)-mu+fitted[ix]
       z$se[ix] <- sqrt(vq$value); z$mu[ix] <- mu
-      z$fitted[ix] <- fitted[ix]; z$meanQ[ix] <- vq$meanA
+      z$fitted[ix] <- fitted[ix]; z$meanQ[ix] <- original.mean
       z$variance.checks[[length(z$variance.checks)+1L]] <- vq$check
       progress(paste('complete moments',level),max(ix),length(grid))
     }

@@ -92,29 +92,38 @@
 }
 
 .np_udens_beta_q1_moments <- function(x,h,grid,theta,inner,outer,full=TRUE,
-                                      score=.np_udens_beta_q1_score) {
+                                      score=.np_udens_beta_q1_score,variance.plan=NULL) {
   n<-length(x);rb<-n^(-7/17);st<-.np_udens_beta_marginal_rule(theta,outer)
-  P<-score(grid,st$lv,st$l1v,h*h,rb,inner)
-  obs<-score(grid,log(x),log1p(-x),h*h,rb,inner)
+  second<-outer==128L
+  if(second && is.null(variance.plan))variance.plan<-.np_udens_q1_variance_plan(theta,h,grid)
+  vr<-if(second).np_udens_q1_variance_rule(theta,variance.plan) else st
+  for(key in c('A','mean','I')) .np_udens_beta_check(vr[[key]],st[[key]],
+    paste('q1 variance guide',key),if(key=='mean')1e-10 else 1e-9)
+  coordinates<-list(st)
+  if(second)coordinates[[2L]]<-vr
+  coordinates[[length(coordinates)+1L]]<-list(lv=log(x),l1v=log1p(-x))
+  columns<-.np_udens_q1_score_columns(grid,coordinates,h,rb,inner,score)
+  P<-columns[[1L]];Pvar<-if(second)columns[[2L]] else P
+  obs<-columns[[length(columns)]];rm(columns,coordinates)
   mu<-drop(P%*%st$prob);S<-sweep(st$T,2,st$mean);B<-P%*%(S*st$prob)
   Td<-cbind(log(x),log1p(-x));U<-t(solve(st$I,t(sweep(Td,2,colMeans(Td)))))
   Rdata<-obs-rowMeans(obs)-B%*%t(U);Ueta<-sweep(U,2,theta+1,"/")
-  Veta<-crossprod(Ueta)/(n*(n-1));Ugrid<-solve(st$I,t(S))
-  R<-P-mu-B%*%Ugrid;lgx<-drop(Td%*%theta)-st$A
-  rho<-n^(-2/5);lp<-numeric(st$nodes)
-  for(start in seq.int(1L,st$nodes,by=32L)) {
-    ix<-seq.int(start,min(st$nodes,start+31L));v<-exp(st$lv[ix]);a<-v/rho;b<-(1-v)/rho
+  Veta<-crossprod(Ueta)/(n*(n-1));Ugrid<-solve(st$I,t(sweep(vr$T,2,st$mean)))
+  R<-Pvar-mu-B%*%Ugrid;lgx<-drop(Td%*%theta)-st$A
+  rho<-n^(-2/5);lp<-numeric(vr$nodes)
+  for(start in seq.int(1L,vr$nodes,by=32L)) {
+    ix<-seq.int(start,min(vr$nodes,start+31L));v<-exp(vr$lv[ix]);a<-v/rho;b<-(1-v)/rho
     logs<-outer(a,log(x))+outer(b,log1p(-x))-lbeta(a+1,b+1)
     logs<-sweep(logs,2,lgx)
     lp[ix]<-apply(logs,1,.np_udens_beta_logsum)-log(n)
   }
-  lw<-log(st$prob)+lp;normal<-.np_udens_beta_logsum(lw);pp<-exp(lw-normal);pp<-pp/sum(pp)
+  lw<-log(vr$prob)+lp;normal<-.np_udens_beta_logsum(lw);pp<-exp(lw-normal);pp<-pp/sum(pp)
   Rc<-R-drop(R%*%pp);weighted<-sweep(Rc,2,sqrt(pp),"*")
   covariance<-if(full)tcrossprod(weighted)/n else NULL
   empirical<-if(full)tcrossprod(Rdata)/(n*(n-1)) else NULL
-  guide.mean<-drop(R%*%st$prob)
+  guide.mean<-drop(R%*%vr$prob)
   if(max(abs(guide.mean))>1e-9)stop('beta plot guide residual is not centered',call.=FALSE)
-  guide.rows<-sweep(R-guide.mean,2,sqrt(st$prob),'*')
+  guide.rows<-sweep(R-guide.mean,2,sqrt(vr$prob),'*')
   guide.covariance<-if(full)tcrossprod(guide.rows)/n else NULL
   guide.variance<-rowSums(guide.rows^2)/n
   pilot.variance<-rowSums(weighted^2)/n;empirical.variance<-rowSums(Rdata^2)/(n*(n-1))
@@ -126,7 +135,7 @@
   for(first in seq.int(1L,length(grid),by=32L)) {
     ix<-seq.int(first,min(length(grid),first+31L))
     corrected<-R[ix,,drop=FALSE]+G[ix,,drop=FALSE]%*%Ugrid
-    direct<-P[ix,,drop=FALSE]-mu[ix]+(G[ix,,drop=FALSE]-B[ix,,drop=FALSE])%*%Ugrid
+    direct<-Pvar[ix,,drop=FALSE]-mu[ix]+(G[ix,,drop=FALSE]-B[ix,,drop=FALSE])%*%Ugrid
     identity.error<-max(identity.error,.np_udens_beta_check(corrected,direct,'complete q1 influence')[1L])
   }
   if(full)for(cv in list(covariance,empirical,guide.covariance))
