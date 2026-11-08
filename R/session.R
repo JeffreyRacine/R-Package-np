@@ -491,6 +491,31 @@ npRmpi.init <- function(...,
     mode <- if (world.size > 1L) "attach" else "spawn"
   }
 
+  # A running attach pool is already in its command loop. Reinitialization
+  # must reuse that loop, not repeat the collective startup or lose its ACK
+  # session identity. A fresh, manually duplicated communicator is not itself
+  # evidence of a running worker loop.
+  if (identical(mode, "attach")) {
+    if (world.size < 2L)
+      stop("attach mode requires a pre-launched MPI world (e.g. mpiexec -n <master+slaves>)")
+    if (comm != 1L) {
+      comm <- 1L
+      .npRmpi_fanout_assert_idle(comm)
+    }
+    if (isTRUE(getOption("npRmpi.profile.active", FALSE)))
+      stop(paste(
+        "npRmpi.init(mode='attach') cannot convert a profile-managed pool.",
+        "Keep the profile/manual workflow, or use mode='spawn' to reuse",
+        "its existing workers without changing their shutdown protocol."
+      ), call. = FALSE)
+  }
+  reuse <- .npRmpi_session_has_active_pool(comm = comm) &&
+    (identical(mode, "spawn") ||
+     (isTRUE(getOption("npRmpi.pool.active", FALSE)) &&
+      identical(getOption("npRmpi.attach.close.state"), "open")))
+  if (reuse)
+    .npRmpi_worker_identity_admit(comm)
+
   effective.autodispatch <- autodispatch
 
   .npRmpi_session_apply_options(
@@ -500,8 +525,10 @@ npRmpi.init <- function(...,
     autodispatch.option.sync = autodispatch.option.sync
   )
   options(npRmpi.autodispatch.option.snapshot = NULL)
-  .npRmpi_session_reset_spmd_state()
-  .npRmpi_attach_state_reset()
+  if (!reuse) {
+    .npRmpi_session_reset_spmd_state()
+    .npRmpi_attach_state_reset()
+  }
 
   {
     clear.fun <- tryCatch(
@@ -512,29 +539,26 @@ npRmpi.init <- function(...,
       tryCatch(clear.fun(), error = function(e) NULL)
   }
 
+  if (reuse) {
+    .npRmpi_session_reset_spmd_state_allranks(
+      comm = comm,
+      strict = TRUE,
+      where = "npRmpi.init() reused-slave SPMD reset"
+    )
+    options(npRmpi.master.only = FALSE)
+    options(npRmpi.pool.active = TRUE)
+    if (!quiet)
+      mpi.hostinfo(comm)
+    return(invisible(TRUE))
+  }
+
   if (identical(mode, "spawn")) {
-    if (.npRmpi_session_has_active_pool(comm = comm)) {
-      .npRmpi_worker_identity_admit(comm)
-      .npRmpi_session_reset_spmd_state_allranks(
-        comm = comm,
-        strict = TRUE,
-        where = "npRmpi.init() reused-slave SPMD reset"
-      )
-      options(npRmpi.master.only = FALSE)
-      options(npRmpi.pool.active = TRUE)
-      if (!quiet)
-        mpi.hostinfo(comm)
-      return(invisible(TRUE))
-    }
     mpi.spawn.Rslaves(..., nslaves = nslaves, comm = comm, quiet = quiet, nonblock = nonblock, sleep = sleep)
     mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE, comm = comm)
     options(npRmpi.master.only = FALSE)
     options(npRmpi.pool.active = TRUE)
     return(invisible(TRUE))
   }
-
-  if (world.size < 2L)
-    stop("attach mode requires a pre-launched MPI world (e.g. mpiexec -n <master+slaves>)")
 
   # Attach mode standardizes on communicator 1 used by the C core.
   # Ensure it exists under mpiexec-launched sessions without requiring

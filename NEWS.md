@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* MPI session reinitialization preserves open attach-pool ownership and reuses
+  its workers without repeating startup collectives. Invalid profile-to-attach
+  conversion fails before altering the pool.
+
 * Automatic-degree regression and conditional density/distribution searches use
   the existing all-rank command context to select one collective search owner.
   Explicit manual broadcasts remain coherent after pool adoption; rank-local

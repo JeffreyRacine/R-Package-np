@@ -103,6 +103,22 @@ points for two workflows:
   MPI world and runs worker-loop coordination internally.
 }
 
+Calling \code{npRmpi.init()} again on the coordinator reuses an open
+package-managed pool. Reuse reapplies the requested automatic-dispatch
+options and resets rank sequencing together, but does not change worker
+count or shutdown ownership. In particular, an attached pool retains its
+session identity even when reused with \code{mode="spawn"}; close it using
+its original attach workflow. Repeated \code{mode="attach"} or
+\code{mode="auto"} does not repeat attach startup collectives.
+An explicit attach request in an ordinary single-process world is rejected
+before changing the existing pool or its options.
+
+A profile-managed pool can be explicitly reused with \code{mode="spawn"},
+but it retains its profile/manual shutdown workflow. Trying to convert it
+with \code{mode="attach"} (including \code{"auto"} in that MPI world)
+is rejected before changing state. Ordinary profile scripts should continue
+to use the separate workflow below.
+
 \strong{Profile/manual-broadcast mode is a separate advanced route.} For
 pure explicit collective use, it does not call \code{npRmpi.init()}.
 Instead, ranks are started under
