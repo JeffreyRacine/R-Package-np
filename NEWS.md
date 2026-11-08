@@ -144,6 +144,8 @@
 
 # npRmpi 0.80-2 (development)
 
+- Extend estimate-centered density asymptotic joint variability bands to fixed Gaussian and Epanechnikov orders 4, 6 and 8 in one/two continuous dimensions with unbounded or finite known fixed support. Signed kernel contributions, existing marginal intervals and estimators are preserved.
+
 * Corrected Gaussian regression now refuses unsafe uncached Box-Muller replay
   at the resolved-data cache boundary, including legacy and NA-omission routes
   that cannot be classified before plotting. Data/NA callbacks are not repeated;
