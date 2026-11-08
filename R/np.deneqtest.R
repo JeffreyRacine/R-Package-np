@@ -377,8 +377,9 @@ npdeneqtest <- function(x = NULL,
 
   ## Save seed prior to setting
 
-  seed.state <- .np_seed_enter(random.seed)
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture(collective = .npRmpi_rng_scope_collective())
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+  .np_rng_scope_seed(seed.state, random.seed)
 
 
   ## First, define test statistic function. This will return the
@@ -624,7 +625,7 @@ npdeneqtest <- function(x = NULL,
   
   ## Restore seed
 
-  .np_seed_exit(seed.state, remove_if_absent = TRUE)
+  .np_rng_scope_restore(seed.state)
   
   deneqtest(Tn=output$Tn,
             In=output$In,

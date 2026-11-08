@@ -59,6 +59,8 @@ These arguments control bootstrap replication and reproducibility settings.
 
 
   \item{random.seed}{
+    Temporary caller-state restoration requires a certifiable initialized
+    state; see \link{np_rng_scope}.
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }

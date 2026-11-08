@@ -640,8 +640,9 @@ npindexbw.NULL <-
   start_matrix.raw[, degree.col] <- as.integer(degree.starts[, 1L])
 
   if (nmulti > 1L) {
-    seed.state <- .np_seed_enter(random.seed)
-    on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+    seed.state <- .np_rng_scope_capture(collective = .npRmpi_rng_scope_collective())
+    on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+    .np_rng_scope_seed(seed.state, random.seed)
 
     for (j in 2:nmulti) {
       if (length(beta.free)) {
@@ -3199,8 +3200,9 @@ npindexbw.sibandwidth <-
 
     ## Save seed prior to setting
 
-    seed.state <- .np_seed_enter(random.seed)
-    on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+    seed.state <- .np_rng_scope_capture(collective = .npRmpi_rng_scope_collective())
+    on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+    .np_rng_scope_seed(seed.state, random.seed)
 
 
     xdat = toFrame(xdat)
@@ -3852,7 +3854,7 @@ npindexbw.sibandwidth <-
 
     ## Restore seed
 
-    .np_seed_exit(seed.state, remove_if_absent = TRUE)
+    .np_rng_scope_restore(seed.state)
     nn.cache <- bws$nn.cache
 
     bws <- sibandwidth(beta = bws$beta,

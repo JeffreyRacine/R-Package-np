@@ -2,11 +2,7 @@
 # Original fitted geometry is immutable. Empirical standardized innovations
 # are resampled at fixed design; no kernel jitter is added to residuals.
 .np_reg_percentile_with_seed <- function(seed, code) {
- had <- exists('.Random.seed',.GlobalEnv,inherits=FALSE)
- old <- if(had)get('.Random.seed',.GlobalEnv) else NULL
- kind <- RNGkind()
- on.exit({do.call(RNGkind,as.list(kind));if(had)assign('.Random.seed',old,.GlobalEnv) else if(exists('.Random.seed',.GlobalEnv,inherits=FALSE))rm('.Random.seed',envir=.GlobalEnv)})
- set.seed(seed);force(code)
+  .np_with_seed(seed, code)
 }
 # Capture opaque runtime state without selecting a different generator.
 .np_reg_percentile_rng_mode <- function() {
@@ -18,13 +14,7 @@
   'legacy-local-custom'
 }
 .np_reg_percentile_rng_state <- function(seed) {
-  had <- exists('.Random.seed', .GlobalEnv, inherits = FALSE)
-  old <- if (had) get('.Random.seed', .GlobalEnv, inherits = FALSE) else NULL
-  on.exit(if (had) assign('.Random.seed', old, .GlobalEnv) else
-    if (exists('.Random.seed', .GlobalEnv, inherits = FALSE))
-      rm('.Random.seed', envir = .GlobalEnv))
-  set.seed(seed)
-  get('.Random.seed', .GlobalEnv, inherits = FALSE)
+  .np_with_seed(seed, get(".Random.seed", .GlobalEnv, inherits = FALSE))
 }
 .np_reg_percentile_rng_validate <- function(state, contract) {
   invalid <- function() stop('invalid regression percentile task RNG state', call. = FALSE)
@@ -51,29 +41,10 @@
 }
 .np_reg_percentile_with_state <- function(state, contract, code) {
   .np_reg_percentile_rng_validate(state, contract)
-  had <- exists('.Random.seed', .GlobalEnv, inherits = FALSE)
-  old <- if (had) get('.Random.seed', .GlobalEnv, inherits = FALSE) else NULL
-  kind <- RNGkind(); complete <- FALSE
-  on.exit({
-    warnings <- list()
-    # Restore before notifying caller handlers, which may themselves throw.
-    cleanup <- tryCatch(withCallingHandlers(do.call(RNGkind, as.list(kind)),
-      warning = function(w) {
-        warnings[[length(warnings) + 1L]] <<- w
-        invokeRestart('muffleWarning')
-      }), error = identity, interrupt = identity)
-    if (had) assign('.Random.seed', old, .GlobalEnv) else
-      if (exists('.Random.seed', .GlobalEnv, inherits = FALSE))
-        rm('.Random.seed', envir = .GlobalEnv)
-    # Never replace a condition already unwinding through the draw body.
-    if (complete) {
-      if (inherits(cleanup, 'condition')) stop(cleanup)
-      for (w in warnings) warning(w)
-    }
-  })
-  assign('.Random.seed', state, .GlobalEnv)
+  scope <- .np_rng_scope_capture()
+  on.exit(.np_rng_scope_restore(scope), add = TRUE)
+  .np_rng_scope_state(scope, state)
   value <- force(code)
-  complete <- TRUE
   value
 }
 .np_reg_percentile_rank_bands <- function(curves,map,alpha=.05) {

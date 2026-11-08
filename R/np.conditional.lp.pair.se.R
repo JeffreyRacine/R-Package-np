@@ -56,10 +56,8 @@
       bws, txdat, tydat, upper[rows, , drop = FALSE], lower[rows, , drop = FALSE],
       upper.y[rows, , drop = FALSE], lower.y[rows, , drop = FALSE], cdf, quantile))
   }
-  seed.state <- list(
-    exists.seed = exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE),
-    save.seed = get0(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture(uniform.only = TRUE)
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
   .npRmpi_bootstrap_run_fanout(tasks = tasks, worker = worker, ncol.out = 6L,
     progress.unit = "row",
     what = "conditional-lp-pair-se", progress.label = "Categorical contrast standard errors",

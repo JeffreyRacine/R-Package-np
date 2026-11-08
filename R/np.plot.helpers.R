@@ -2,32 +2,10 @@
 ## you just need to supply training data and the bandwidth
 ## this tool will help you visualize the result
 
-.np_seed_enter <- function(random.seed = 42L) {
-  save.seed <- NULL
-  if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
-    save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-    exists.seed <- TRUE
-  } else {
-    exists.seed <- FALSE
-  }
-
-  set.seed(random.seed)
-  list(exists.seed = exists.seed, save.seed = save.seed)
-}
-
-.np_seed_exit <- function(state, remove_if_absent = FALSE) {
-  if (isTRUE(state$exists.seed)) {
-    assign(".Random.seed", state$save.seed, envir = .GlobalEnv)
-  } else if (isTRUE(remove_if_absent) &&
-             exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
-    rm(".Random.seed", envir = .GlobalEnv)
-  }
-  invisible(NULL)
-}
-
 .np_with_seed <- function(random.seed = 42L, code) {
-  seed.state <- .np_seed_enter(random.seed)
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture()
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+  .np_rng_scope_seed(seed.state, random.seed)
   force(code)
 }
 

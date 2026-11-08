@@ -22,10 +22,8 @@
 .np_udens_d8_pilot_dispatch <- function(factor, innovations) {
   # Deterministic innovations need no caller RNG. The one-task mpi.apply
   # transport still draws a uniform tag; preserve it like copula SE fanout.
-  seed.state <- list(
-    exists.seed = exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE),
-    save.seed = get0(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture(uniform.only = TRUE)
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
   B <- ncol(innovations)
   .npRmpi_bootstrap_fanout_enabled(n = ncol(factor), B = B,
     chunk.size = 32L, what = "D8 positive-pilot process")

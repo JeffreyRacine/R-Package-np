@@ -1,5 +1,14 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Temporary RNG scopes validate caller state before resetting or replacing it,
+  register cleanup before activation, and restore supported built-in state
+  without resetting the generator kind. Seed-only restoration refuses absent,
+  active or locked seed bindings and uncertifiable Box-Muller/custom state.
+  Deterministic uniform-only transport retains its qualified normal-state paths;
+  unaffected direct draws and existing statistical calculations are unchanged.
+  Enumerated collective numerical entries agree on refusal before computation;
+  the manual receiver handles this specific completed refusal and remains reusable.
+
 * Regression data plots inside manual MPI broadcasts preserve the existing collective owner on every rank; plotting after closing a pool retains its local fallback.
 
 * Copula plots now retain matching missing interval endpoints on repeated

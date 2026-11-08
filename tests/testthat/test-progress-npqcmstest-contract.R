@@ -36,6 +36,7 @@ test_that("npqcmstest single-line bootstrap progress matches legacy semantics", 
   skip_if_not_installed("quantreg")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  npRmpi::mpi.bcast.cmd(set.seed(42L), caller.execute = TRUE)
 
   set.seed(42)
   n <- 40
@@ -73,6 +74,7 @@ test_that("npqcmstest progress respects np.messages FALSE", {
   skip_if_not_installed("quantreg")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  npRmpi::mpi.bcast.cmd(set.seed(42L), caller.execute = TRUE)
 
   set.seed(42)
   n <- 40
@@ -97,6 +99,7 @@ test_that("npqcmstest progress respects suppressMessages", {
   skip_if_not_installed("quantreg")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  npRmpi::mpi.bcast.cmd(set.seed(42L), caller.execute = TRUE)
 
   set.seed(42)
   n <- 40

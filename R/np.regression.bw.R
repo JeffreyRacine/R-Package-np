@@ -2374,8 +2374,12 @@ npRmpiNomadPreparedSearchRegression <- function(template,
   on.exit(options(np.messages = old.messages), add = TRUE)
   on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
 
-  seed.state <- .np_seed_enter(random.seed)
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture(
+    collective = .npRmpi_rng_scope_collective(), deferred = TRUE)
+  if (inherits(seed.state, "np_rng_scope_refusal")) return(seed.state)
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+  seed.status <- .np_rng_scope_seed(seed.state, random.seed)
+  if (inherits(seed.status, "np_rng_scope_refusal")) return(seed.status)
   if (isTRUE(rank == 0L))
     .np_nomad_baseline_note(degree.search$start.degree)
 
@@ -3053,6 +3057,8 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       .npRmpi_sync_prepared_search_options(comm = 1L)
       search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
     }
+    # A known pre-native refusal is signalled after command completion.
+    if (inherits(search.result, "np_rng_scope_refusal")) stop(search.result)
     if (!is.null(search.result$num.feval.total))
       nomad.num.feval.total <- as.numeric(search.result$num.feval.total[1L])
     if (!is.null(search.result$num.feval.fast.total))

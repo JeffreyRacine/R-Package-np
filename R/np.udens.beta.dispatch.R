@@ -19,13 +19,12 @@
 }
 
 # Transport siblings: the leaves above and every numerical certificate are shared.
-.np_udens_beta_mpi_seed_state <- function() list(
-  exists.seed=exists('.Random.seed',envir=.GlobalEnv,inherits=FALSE),
-  save.seed=get0('.Random.seed',envir=.GlobalEnv,inherits=FALSE))
+.np_udens_beta_mpi_seed_state <- function()
+  .np_rng_scope_capture(uniform.only = TRUE)
 
 .np_udens_beta_region_dispatch <- function(theta,Veta,grid,alpha,progress) {
   seed.state<-.np_udens_beta_mpi_seed_state()
-  on.exit(.np_seed_exit(seed.state,remove_if_absent=TRUE),add=TRUE)
+  on.exit(.np_rng_scope_restore(seed.state),add=TRUE)
   .npRmpi_bootstrap_fanout_enabled(B=nrow(grid),chunk.size=8L,what='beta nonlinear guide region')
   tasks<-lapply(.np_udens_beta_blocks(nrow(grid),8L),function(ix)
     list(start=min(ix),bsz=length(ix),grid=grid[ix,,drop=FALSE]))
@@ -43,7 +42,7 @@
 
 .np_udens_beta_refit_dispatch <- function(x,theta,stream,progress) {
   seed.state<-.np_udens_beta_mpi_seed_state()
-  on.exit(.np_seed_exit(seed.state,remove_if_absent=TRUE),add=TRUE)
+  on.exit(.np_rng_scope_restore(seed.state),add=TRUE)
   B<-stream$request$B;n<-nrow(x)
   .npRmpi_bootstrap_fanout_enabled(n=n,B=B,chunk.size=32L,what='beta bootstrap guide refits')
   workers<-.npRmpi_bootstrap_worker_count();width<-max(1L,workers+1L)

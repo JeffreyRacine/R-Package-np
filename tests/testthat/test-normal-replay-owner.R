@@ -27,10 +27,17 @@ test_that("smoothed reconstruction follows its stream header, not caller kind", 
     fn(".np_udens_smoothed_plan")(x,.3,3L,law,blocklen,
       list(count=stream,jitter=stream),2L,cache,layout)
   expect_error(plan(bm),"unsafe RNG replay",fixed=TRUE)
-  expect_type(plan(bm,cache=TRUE),"list")
-  streams <- fn(".np_udens_calibrated_streams")(bm)
+  expect_error(plan(bm,cache=TRUE),"cannot safely restore temporary RNG state",fixed=TRUE)
+  expect_error(fn(".np_udens_calibrated_streams")(bm),
+    "cannot safely restore temporary RNG state", fixed=TRUE)
+  RNGkind("Mersenne-Twister","Inversion");set.seed(42)
+  streams <- fn(".np_udens_calibrated_streams")(.Random.seed)
   RNGkind("Mersenne-Twister","Box-Muller");set.seed(42)
   before <- .Random.seed
+  expect_error(fn(".np_udens_smoothed_plan")(x,.3,3L,"inid",NULL,
+    streams$original,2L,FALSE),"cannot safely restore temporary RNG state",fixed=TRUE)
+  expect_identical(.Random.seed,before)
+  RNGkind("Mersenne-Twister","Inversion");set.seed(42);before <- .Random.seed
   expect_type(fn(".np_udens_smoothed_plan")(x,.3,3L,"inid",NULL,
     streams$original,2L,FALSE),"list")
   expect_identical(.Random.seed,before)

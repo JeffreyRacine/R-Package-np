@@ -205,10 +205,8 @@
       .npcopula_density_se_nn_local(bws, data, xgrid[rows, , drop = FALSE]))
     matrix(values, ncol = 1L)
   }
-  seed.state <- list(
-    exists.seed = exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE),
-    save.seed = get0(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture(uniform.only = TRUE)
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
   result <- .npRmpi_bootstrap_run_fanout(
     progress.unit = "row", tasks = tasks, worker = worker, ncol.out = 1L,
     what = "npcopula-density-nn-se", progress.label = "Copula density standard errors",
