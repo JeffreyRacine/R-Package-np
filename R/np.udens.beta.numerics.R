@@ -94,18 +94,14 @@
 .np_udens_beta_q1_moments <- function(x,h,grid,theta,inner,outer,full=TRUE,
                                       score=.np_udens_beta_q1_score,variance.plan=NULL) {
   n<-length(x);rb<-n^(-7/17);st<-.np_udens_beta_marginal_rule(theta,outer)
-  second<-outer==128L
-  if(second && is.null(variance.plan))variance.plan<-.np_udens_q1_variance_plan(theta,h,grid)
-  vr<-if(second).np_udens_q1_variance_rule(theta,variance.plan) else st
+  if(is.null(variance.plan))variance.plan<-.np_udens_q1_operator_plan(theta,h,grid)
+  vr<-.np_udens_q1_operator_rule(theta,variance.plan,outer)
   for(key in c('A','mean','I')) .np_udens_beta_check(vr[[key]],st[[key]],
-    paste('q1 variance guide',key),if(key=='mean')1e-10 else 1e-9)
-  coordinates<-list(st)
-  if(second)coordinates[[2L]]<-vr
-  coordinates[[length(coordinates)+1L]]<-list(lv=log(x),l1v=log1p(-x))
+    paste('q1 operator guide',key),if(key=='mean')1e-10 else 1e-9)
+  coordinates<-list(vr,list(lv=log(x),l1v=log1p(-x)))
   columns<-.np_udens_q1_score_columns(grid,coordinates,h,rb,inner,score)
-  P<-columns[[1L]];Pvar<-if(second)columns[[2L]] else P
-  obs<-columns[[length(columns)]];rm(columns,coordinates)
-  mu<-drop(P%*%st$prob);S<-sweep(st$T,2,st$mean);B<-P%*%(S*st$prob)
+  P<-Pvar<-columns[[1L]];obs<-columns[[2L]];rm(columns,coordinates)
+  mu<-drop(P%*%vr$prob);S<-sweep(vr$T,2,st$mean);B<-P%*%(S*vr$prob)
   Td<-cbind(log(x),log1p(-x));U<-t(solve(st$I,t(sweep(Td,2,colMeans(Td)))))
   Rdata<-obs-rowMeans(obs)-B%*%t(U);Ueta<-sweep(U,2,theta+1,"/")
   Veta<-crossprod(Ueta)/(n*(n-1));Ugrid<-solve(st$I,t(sweep(vr$T,2,st$mean)))

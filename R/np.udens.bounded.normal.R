@@ -111,22 +111,31 @@
   score <- if (kernel=='beta') .np_udens_beta_q1_score else .np_udens_fgd_score
   inner <- if (kernel=='beta') c(64L,128L) else c(24L,48L)
   outer <- c(128L,256L); result <- vector('list',2L)
-  variance.plan <- .np_udens_q1_variance_plan(theta,h,grid)
+  variance.plan <- .np_udens_q1_operator_plan(theta,h,grid)
   for (level in 1:2) {
     progress(paste('reference pilot',level),0L,1L)
     p <- .np_udens_bounded_normal_pilot(x,theta,outer[level],length(grid))
     st <- p$st; sq <- p$sq; tq <- p$fit$theta
     progress(paste('reference pilot',level),1L,1L)
-    vr <- if(level==1L).np_udens_q1_variance_rule(theta,variance.plan) else st
+    vr <- .np_udens_q1_operator_rule(theta,variance.plan,outer[level])
+    qp <- .np_udens_q1_operator_plan(tq,h,grid)
+    qr <- .np_udens_q1_operator_rule(tq,qp,outer[level])
+    for(key in c("A","mean","I")) .np_udens_beta_check(qr[[key]],sq[[key]],
+      paste("normal operator variance guide",key),if(key=="mean")1e-10 else 1e-9)
     extra.workspace <- .np_udens_q1_variance_workspace(n,min(32L,length(grid)),
-      st$nodes+sq$nodes,if(level==1L)vr$nodes else 0L)
+      qr$nodes,vr$nodes)
     if(extra.workspace>192*1024^2)stop('bounded normal plot workspace exceeds 192 MiB',call.=FALSE)
     p$workspace <- max(p$workspace,extra.workspace)
     for(key in c('A','mean','I')) .np_udens_beta_check(vr[[key]],st[[key]],
       paste('normal variance guide',key),if(key=='mean')1e-10 else 1e-9)
-    vw <- if(level==1L) .np_udens_q1_ratio_weights(x,theta,st$A,vr) else
-      list(prob=p$prob,normal=p$normal)
+    vw <- .np_udens_q1_ratio_weights(x,theta,st$A,vr)
     .np_udens_beta_check(vw$normal,p$normal,'normal cross-rule normalization')
+    # The variance-guide nodes provide a second evaluation of the SAME Q law.
+    qst<-qr
+    qst$prob<-qr$prob*exp(drop(qr$T%*%(theta-tq))+qr$A-st$A)
+    .np_udens_beta_check(sum(qst$prob),1,'normal cross-guide mass',1e-10)
+    qw<-.np_udens_q1_ratio_weights(x,theta,st$A,qst)
+    .np_udens_beta_check(qw$normal,p$normal,'normal cross-guide normalization')
     fitted <- exp(drop(Tg%*%theta)-st$A)
     fittedQ <- exp(drop(Tg%*%tq)-sq$A)
     Gq <- sweep(sweep(Tg,2,sq$mean),1,fittedQ,'*')
@@ -139,16 +148,15 @@
     for (first in seq.int(1L,length(grid),by=32L)) {
       ix <- seq.int(first,min(length(grid),first+31L)); g <- grid[ix]
       progress(paste('complete moments',level),first-1L,length(grid))
-      coordinates <- list(st,sq,list(lv=log(x),l1v=log1p(-x)))
-      if(level==1L)coordinates[[4L]] <- vr
+      coordinates <- list(vr,qr,list(lv=log(x),l1v=log1p(-x)))
       columns <- .np_udens_q1_score_columns(g,coordinates,h,n^(-7/17),inner[level],score)
       A <- columns[[1L]]; Aq <- columns[[2L]]; obs <- columns[[3L]]
-      Av <- if(level==1L)columns[[4L]] else A
+      Av <- A
       rm(columns,coordinates)
-      mu <- drop(A%*%st$prob)
-      Bq <- Aq%*%(sweep(sq$T,2,sq$mean)*sq$prob)
+      mu <- drop(A%*%vr$prob)
+      Bq <- Aq%*%(sweep(qr$T,2,sq$mean)*qr$prob)
       Dq <- Gq[ix,,drop=FALSE]-Bq
-      original.mean <- drop(A%*%p$prob)
+      original.mean <- drop(Aq%*%qw$prob)
       vq <- .np_udens_bounded_normal_variance(Av,vr$T,vw$prob,Dq,sq$I,n)
       .np_udens_beta_check(vq$meanA,original.mean,'normal cross-rule mean')
       z$center[ix] <- rowMeans(obs)-mu+fitted[ix]

@@ -9,6 +9,10 @@
   Explicit manual broadcasts remain coherent after pool adoption; rank-local
   services, ordinary automatic dispatch and both RNG safety guards are preserved.
 
+* Fixed-bound univariate density plot bands now resolve narrow corrected-score
+  means and guide projections on the same positive quadrature measure as their
+  covariance. Statistical formulas, tolerances and core estimates are unchanged.
+
 * Formula/IV argument forwarding reads bandwidth fields by exact name, so
   `bwsolver` cannot be mistaken for `bws` or suppress the requested IV seed.
   Existing bandwidth objects, solver choices and numerical algorithms are unchanged.
