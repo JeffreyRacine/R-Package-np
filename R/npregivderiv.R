@@ -133,7 +133,7 @@ npregivderiv.default <- function(y,
   random.seed <- .np_iv_validate_integer(random.seed, "random.seed", 0)
   iv.npreg <- function(...) {
     args <- list(...)
-    if(is.null(args$bws)) args$random.seed <- random.seed
+    if(is.null(args[["bws", exact = TRUE]])) args$random.seed <- random.seed
     do.call(.npreg_complete, c(args, .np_iv_deriv_stage_args(smoothing.spec, args$txdat)))
   }
 

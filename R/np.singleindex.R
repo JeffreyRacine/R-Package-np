@@ -161,9 +161,9 @@ npindex.formula <-
             out <- dots$.np_index_explicit_bws
             dots$.np_index_explicit_bws <- NULL
             out
-        } else if (!is.null(dots$bws)) {
-            out <- dots$bws
-            dots$bws <- NULL
+        } else if (!is.null(dots[["bws", exact = TRUE]])) {
+            out <- dots[["bws", exact = TRUE]]
+            dots[["bws"]] <- NULL
             out
         } else {
             bws

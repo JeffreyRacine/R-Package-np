@@ -312,9 +312,9 @@ npreg.formula <-
       exdat <- emf[, .np_formula_term_names(attr(attr(emf, "terms"),"term.labels")), drop = FALSE]
     }
 
-    reg.bws <- if (!is.null(dots$bws)) {
-      out <- dots$bws
-      dots$bws <- NULL
+    reg.bws <- if (!is.null(dots[["bws", exact = TRUE]])) {
+      out <- dots[["bws", exact = TRUE]]
+      dots[["bws"]] <- NULL
       out
     } else {
       bws

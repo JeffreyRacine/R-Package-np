@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Formula/IV argument forwarding reads bandwidth fields by exact name, so
+  `bwsolver` cannot be mistaken for `bws` or suppress the requested IV seed.
+  Existing bandwidth objects, solver choices and numerical algorithms are unchanged.
+
 * Single-index NOMAD searches agree on temporary RNG admission and activation
   before workers enter the objective service. Coordinator-owned starts, payload
   assembly, Powell refinement and verification retain local RNG restoration
