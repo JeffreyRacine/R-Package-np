@@ -626,6 +626,22 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   endpoints are not admitted by this additional construction. See
   \code{\link{np_udens_bias_control}} for its assumptions and limitations.
 
+  Known-fixed-bound order-2 uniform and Epanechnikov density plots support
+  corrected asymptotic pointwise, Bonferroni, simultaneous and all bands for
+  one continuous coordinate and a fixed bandwidth. The plot-only local-cubic
+  correction retains the fitted physical bandwidth and combines a nonlinear
+  guide region with the envelope of complete pilot and empirical residual
+  covariance bands. This does not alter the original second-order estimate.
+  Supply an explicit band and omit density bias controls; explicit existing
+  controls retain their own constructions. Observations and evaluation points
+  must be strictly inside the supplied finite bounds, with at least ten
+  observations. Range-estimated bounds, literal endpoints, nearest-neighbor
+  bandwidths, higher orders, multivariate compact correction, bootstrap
+  correction and normal-scale pmzsd are not admitted by this construction.
+  The simultaneous claim concerns the supplied finite family, not a continuum.
+  Saved-sample coverage screening was conservative; it does not guarantee
+  nominal coverage for arbitrary densities or very small samples.
+
   Default bias-corrected unconditional unbounded Gaussian density plots use the D8
   positive-pilot construction for eligible asymptotic requests; see
   \code{\link{np_udens_bias_control}}. It uses complete corrected covariance
