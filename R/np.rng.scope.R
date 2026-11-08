@@ -15,8 +15,18 @@
   invisible(NULL)
 }
 .np_rng_scope_capture <- function(uniform.only = FALSE) {
-  if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-    stop("cannot safely restore temporary RNG state: caller seed is absent; explicitly select a supported built-in RNG and call set.seed() first", call. = FALSE)
+  if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+    # RNGkind() would initialize an absent seed and can discard hidden state.
+    # Inspect the current representation without a draw or generator reset.
+    on.exit(if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+      rm(".Random.seed", envir = .GlobalEnv), add = TRUE)
+    .Call(C_np_rng_scope_materialize)
+    previous <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    # Even uniform-only draws initialize an absent binding and may reset an
+    # otherwise unused hidden normal cache. Preserve the absent-state refusal.
+    .np_rng_scope_check(previous, uniform.only = FALSE)
+    return(list(seed = previous, uniform.only = uniform.only, absent = TRUE))
+  }
   if (bindingIsActive(".Random.seed", .GlobalEnv) || bindingIsLocked(".Random.seed", .GlobalEnv))
     stop("cannot safely restore temporary RNG state: caller seed binding is active or locked", call. = FALSE)
   previous <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
@@ -24,7 +34,14 @@
   list(seed = previous, uniform.only = uniform.only)
 }
 .np_rng_scope_restore <- function(scope) {
-  assign(".Random.seed", scope$seed, envir = .GlobalEnv)
+  if (isTRUE(scope$absent)) {
+    on.exit(if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+      rm(".Random.seed", envir = .GlobalEnv), add = TRUE)
+    assign(".Random.seed", scope$seed, envir = .GlobalEnv)
+    # A state swap can change the internal kind. Load the saved built-in
+    # representation before removing its binding, without drawing a variate.
+    .Call(C_np_rng_scope_restore_absent)
+  } else assign(".Random.seed", scope$seed, envir = .GlobalEnv)
   invisible(NULL)
 }
 # A uniform-only transport record never certifies a seed reset or state swap.

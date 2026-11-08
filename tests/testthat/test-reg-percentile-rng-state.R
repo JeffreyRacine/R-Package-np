@@ -39,15 +39,17 @@ test_that("task RNG cleanup survives throwing warning handlers", {
   for (absent in c(FALSE, TRUE)) {
     suppressWarnings(RNGkind("L'Ecuyer-CMRG", 'Inversion', 'Rounding'))
     set.seed(42)
+    expected.header <- .Random.seed[1L]
     if (absent) rm('.Random.seed', envir = .GlobalEnv)
     entry <- if (!absent) .Random.seed else NULL
     expected.kind <- c("L'Ecuyer-CMRG", 'Inversion', 'Rounding')
     err <- tryCatch(withCallingHandlers(
       .np_reg_percentile_with_state(state, contract, {runif(3); warning('body')}),
       warning = function(w) stop('handler primary')), error = identity)
-    expect_match(conditionMessage(err), if (absent) 'caller seed is absent' else 'handler primary')
+    expect_match(conditionMessage(err), 'handler primary')
     expect_identical(if (exists('.Random.seed', .GlobalEnv, inherits = FALSE)) .Random.seed else NULL, entry)
     if (!absent) expect_identical(RNGkind(), expected.kind)
+    else expect_identical(.np_rng_scope_capture()$seed[1L], expected.header)
   }
 })
 

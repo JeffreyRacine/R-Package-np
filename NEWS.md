@@ -2,8 +2,10 @@
 
 * Temporary RNG scopes validate caller state before resetting or replacing it,
   register cleanup before activation, and restore supported built-in state
-  without resetting the generator kind. Seed-only restoration refuses absent,
-  active or locked seed bindings and uncertifiable Box-Muller/custom state.
+  without resetting the generator kind. Fresh sessions and workers without a seed binding are supported for
+  certifiable built-in generators, with original absence and kind restored.
+  Active or locked bindings and uncertifiable Box-Muller/custom state remain
+  refused.
   Deterministic uniform-only transport retains its qualified normal-state paths;
   unaffected direct draws and existing statistical calculations are unchanged.
 
