@@ -29,6 +29,8 @@
   Actual-value caches, normal-free laws and one-pass calculations are retained;
   saved Inversion streams remain usable regardless of the caller's normal kind.
 
+- Extend estimate-centered density asymptotic joint variability bands to fixed Gaussian and Epanechnikov orders 4, 6 and 8 in one/two continuous dimensions with unbounded or finite known fixed support. Signed kernel contributions, existing marginal intervals and estimators are preserved.
+
 - Estimate-centered density plots now provide finite-grid asymptotic joint variability bands for fixed uniform kernels in one/two continuous dimensions, with unbounded or finite known support. Existing marginal bands and estimators are unchanged; unidentified correlation remains explicitly unavailable.
 
 * Add plot-only asymptotic normal pmzsd intervals for univariate fixed-bound

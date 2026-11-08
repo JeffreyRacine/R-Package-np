@@ -1061,6 +1061,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   while the marginal intervals are retained. Range bounds and other new uniform
   bandwidth/dimension classes are not admitted by this extension.
 
+  The same estimate-centered joint variability construction supports fixed
+  Gaussian and Epanechnikov kernels of orders 4, 6 and 8, with one or two
+  continuous coordinates and unbounded or finite known fixed support.
+  Signed kernel contributions are retained in the empirical correlations.
+  The fitted curve and ordinary marginal standard errors are not replaced.
+  If marginal uncertainty is unavailable on the requested grid, the joint
+  limits remain explicitly unavailable under the existing policy.
+  This higher-order addition does not admit CDFs, conditional estimators,
+  nearest-neighbour bandwidths, range bounds or bias-corrected requests.
+
   For ordinary estimate-centered plots, asymptotic standard errors are taken from fitted-object components such as
   \code{merr}, \code{gerr}, \code{derr}, \code{conderr}, and
   \code{congerr} where implemented. Ordinary regression, single-index
