@@ -203,7 +203,12 @@ extern SEXP C_np_plot_ann_rank_decode(SEXP, SEXP);
 
 extern SEXP C_np_plot_udens_d8_column(SEXP, SEXP, SEXP, SEXP, SEXP);
 
+extern SEXP C_np_rng_scope_materialize(void);
+extern SEXP C_np_rng_scope_restore_absent(void);
+
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_rng_scope_materialize", (DL_FUNC) &C_np_rng_scope_materialize, 0},
+    {"C_np_rng_scope_restore_absent", (DL_FUNC) &C_np_rng_scope_restore_absent, 0},
     {"C_np_plot_fgd_evaluate", (DL_FUNC) &C_np_plot_fgd_evaluate, 5},
     {"C_np_plot_udens_beta_rule", (DL_FUNC) &C_np_plot_udens_beta_rule, 2},
     {"C_np_plot_udens_beta_axis", (DL_FUNC) &C_np_plot_udens_beta_axis, 5},
