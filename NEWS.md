@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Formula selectors and conditional/grid model frames consume original data
+  and NA-policy promises once, preserving saved calls, subset evaluation,
+  RNG state ownership and MPI behavior.
+
 * MPI session reinitialization preserves open attach-pool ownership and reuses
   its workers without repeating startup collectives. Invalid profile-to-attach
   conversion fails before altering the pool.
