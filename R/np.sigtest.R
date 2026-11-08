@@ -618,8 +618,9 @@ npsigtest.rbandwidth <- function(bws,
   ## Save seed prior to setting.  The computational owner is selected before
   ## this boundary so unsupported calls enter the incumbent without RNG work.
 
-  seed.state <- .np_seed_enter(random.seed)
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture()
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+  .np_rng_scope_seed(seed.state, random.seed)
 
   if(boot.type=="II") {
     ## Store a copy of the bandwidths passed in
@@ -1253,7 +1254,7 @@ npsigtest.rbandwidth <- function(bws,
 
   ## Restore seed
 
-  .np_seed_exit(seed.state, remove_if_absent = TRUE)
+  .np_rng_scope_restore(seed.state)
 
   sigtest(In = In,
           In.bootstrap = In.mat,

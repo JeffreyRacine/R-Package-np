@@ -1,5 +1,12 @@
 # np 0.80-2 (development)
 
+* Temporary RNG scopes validate caller state before resetting or replacing it,
+  register cleanup before activation, and restore supported built-in state
+  without resetting the generator kind. Seed-only restoration refuses absent,
+  active or locked seed bindings and uncertifiable Box-Muller/custom state.
+  Deterministic uniform-only transport retains its qualified normal-state paths;
+  unaffected direct draws and existing statistical calculations are unchanged.
+
 * Copula plots now retain matching missing interval endpoints on repeated
   coordinates. Finite endpoint rounding tolerances and returned data are unchanged.
 

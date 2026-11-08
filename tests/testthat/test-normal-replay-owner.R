@@ -17,7 +17,7 @@ test_that("normal replay checks the saved kind and preserves safe decisions", {
   expect_identical(.Random.seed, before)
 })
 
-test_that("CDF owners refuse uncached normal replay and retain caches", {
+test_that("CDF owners distinguish replay, caller restoration and direct caches", {
   ns <- asNamespace("np"); fn <- function(name) get(name, ns)
   old <- RNGkind(); on.exit(do.call(RNGkind,as.list(old)),add=TRUE)
   x <- data.frame(x=sin(seq_len(41)))
@@ -32,10 +32,10 @@ test_that("CDF owners refuse uncached normal replay and retain caches", {
   }
   expect_error(call(),"unsafe RNG replay",fixed=TRUE)
   expect_error(call(law="gaussian",blocklen=NULL),"unsafe RNG replay",fixed=TRUE)
-  expect_type(call(m=25),"list")
-  expect_type(call(blocklen=1L),"list")
+  expect_error(call(m=25),"cannot safely restore temporary RNG state",fixed=TRUE)
+  expect_error(call(blocklen=1L),"cannot safely restore temporary RNG state",fixed=TRUE)
   expect_type(call(law="gaussian",blocklen=NULL,bands="pointwise"),"list")
-  expect_type(call(calibration="separate-tails"),"list")
+  expect_error(call(calibration="separate-tails"),"cannot safely restore temporary RNG state",fixed=TRUE)
   reset()
   expect_error(fn(".np_udist_bc_inference")(state,grid,law="geom",blocklen=3L,B=49L),
     "unsafe RNG replay",fixed=TRUE)
@@ -52,7 +52,7 @@ test_that("CDF owners refuse uncached normal replay and retain caches", {
   expect_error(fn(".np_udist_gnn_stream")(state,grid,"geom",.05,49L,TRUE,3L,.Random.seed),
     "unsafe RNG replay",fixed=TRUE)
   reset()
-  expect_type(fn(".np_udist_gnn_stream")(state,grid[1:2,,drop=FALSE],"geom",.05,49L,TRUE,3L,.Random.seed),"list")
+  expect_error(fn(".np_udist_gnn_stream")(state,grid[1:2,,drop=FALSE],"geom",.05,49L,TRUE,3L,.Random.seed),"cannot safely restore temporary RNG state",fixed=TRUE)
 })
 
 test_that("density owners use factor, family and retained-draw boundaries", {
@@ -67,28 +67,28 @@ test_that("density owners use factor, family and retained-draw boundaries", {
   expect_error(fn(".np_udens_bc_factor")(state,grid,.05,49L,25L,TRUE,.Random.seed),
     "unsafe RNG replay",fixed=TRUE)
   reset()
-  expect_type(fn(".np_udens_bc_factor")(state,grid[1:25,,drop=FALSE],.05,49L,25L,TRUE,.Random.seed),"list")
+  expect_error(fn(".np_udens_bc_factor")(state,grid[1:25,,drop=FALSE],.05,49L,25L,TRUE,.Random.seed),"cannot safely restore temporary RNG state",fixed=TRUE)
   reset()
   expect_error(fn(".np_udens_b2_bootstrap")(state,grid,law="geom",blocklen=3L,B=49L),
     "unsafe RNG replay",fixed=TRUE)
   reset()
-  expect_type(fn(".np_udens_b2_bootstrap")(state,grid[1:2,,drop=FALSE],law="geom",blocklen=3L,B=49L),"list")
+  expect_error(fn(".np_udens_b2_bootstrap")(state,grid[1:2,,drop=FALSE],law="geom",blocklen=3L,B=49L),"cannot safely restore temporary RNG state",fixed=TRUE)
   reset()
   expect_error(fn(".np_udens_reference_inference")(state,grid,law="geom",blocklen=3L,B=49L),
     "unsafe RNG replay",fixed=TRUE)
   reset()
-  expect_type(fn(".np_udens_reference_inference")(state,grid[1:2,,drop=FALSE],law="geom",blocklen=3L,B=49L),"list")
+  expect_error(fn(".np_udens_reference_inference")(state,grid[1:2,,drop=FALSE],law="geom",blocklen=3L,B=49L),"cannot safely restore temporary RNG state",fixed=TRUE)
   # A second scale pass replays even when the whole grid fits in one tile.
   reset()
   expect_error(fn(".np_udens_scale_inference")(state,grid[1:2,,drop=FALSE],law="geom",blocklen=3L,B=49L),
     "unsafe RNG replay",fixed=TRUE)
   reset()
-  expect_type(fn(".np_udens_scale_inference")(state,grid,law="geom",blocklen=3L,B=49L),"list")
+  expect_error(fn(".np_udens_scale_inference")(state,grid,law="geom",blocklen=3L,B=49L),"cannot safely restore temporary RNG state",fixed=TRUE)
   d8 <- fn(".np_udens_d8_prepare")(bw,x)
   reset()
   expect_error(fn(".np_udens_d8_inference")(d8,grid,B=49L),"unsafe RNG replay",fixed=TRUE)
   reset()
-  expect_type(fn(".np_udens_d8_inference")(d8,grid[1:2,,drop=FALSE],B=49L),"list")
+  expect_error(fn(".np_udens_d8_inference")(d8,grid[1:2,,drop=FALSE],B=49L),"cannot safely restore temporary RNG state",fixed=TRUE)
 })
 
 test_that("smoothed reconstruction follows its stream header, not caller kind", {
@@ -101,10 +101,17 @@ test_that("smoothed reconstruction follows its stream header, not caller kind", 
     fn(".np_udens_smoothed_plan")(x,.3,3L,law,blocklen,
       list(count=stream,jitter=stream),2L,cache,layout)
   expect_error(plan(bm),"unsafe RNG replay",fixed=TRUE)
-  expect_type(plan(bm,cache=TRUE),"list")
-  streams <- fn(".np_udens_calibrated_streams")(bm)
+  expect_error(plan(bm,cache=TRUE),"cannot safely restore temporary RNG state",fixed=TRUE)
+  expect_error(fn(".np_udens_calibrated_streams")(bm),
+    "cannot safely restore temporary RNG state", fixed=TRUE)
+  RNGkind("Mersenne-Twister","Inversion");set.seed(42)
+  streams <- fn(".np_udens_calibrated_streams")(.Random.seed)
   RNGkind("Mersenne-Twister","Box-Muller");set.seed(42)
   before <- .Random.seed
+  expect_error(fn(".np_udens_smoothed_plan")(x,.3,3L,"inid",NULL,
+    streams$original,2L,FALSE),"cannot safely restore temporary RNG state",fixed=TRUE)
+  expect_identical(.Random.seed,before)
+  RNGkind("Mersenne-Twister","Inversion");set.seed(42);before <- .Random.seed
   expect_type(fn(".np_udens_smoothed_plan")(x,.3,3L,"inid",NULL,
     streams$original,2L,FALSE),"list")
   expect_identical(.Random.seed,before)

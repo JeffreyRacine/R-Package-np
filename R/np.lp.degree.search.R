@@ -1531,8 +1531,9 @@
 
   initial <- as.integer(pmax(lower, pmin(upper, initial)))
 
-  seed.state <- .np_seed_enter(random.seed)
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture()
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+  .np_rng_scope_seed(seed.state, random.seed)
 
   if (isTRUE(user_supplied)) {
     starts[1L, ] <- initial
@@ -1600,8 +1601,9 @@
   start.lower <- normalize.start.bound(start.lower, lb, "start.lower")
   start.upper <- normalize.start.bound(start.upper, ub, "start.upper")
 
-  seed.state <- .np_seed_enter(random.seed)
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture()
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+  .np_rng_scope_seed(seed.state, random.seed)
 
   for (j in seq_len(nstart)) {
     for (i in seq_len(n)) {

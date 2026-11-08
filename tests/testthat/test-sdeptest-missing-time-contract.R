@@ -6,7 +6,7 @@ test_that("serial-dependence input never compresses missing time points", {
   # selection would fail this focused test instead of masking the contract.
   env$.npRmpi_require_active_slave_pool <- function(...) invisible(TRUE)
   env$.npRmpi_autodispatch_active <- function(...) FALSE
-  env$.np_seed_enter <- function(...) stop("seed entry reached")
+  env$.np_rng_scope_capture <- function(...) stop("seed entry reached")
   env$npudensbw <- function(...) stop("bandwidth search reached")
   environment(fun) <- env
   set.seed(54)

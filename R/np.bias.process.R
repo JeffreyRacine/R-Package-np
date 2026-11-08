@@ -182,9 +182,9 @@
 }
 
 .np_bias_stream <- function(state, code) {
-  previous <- get(".Random.seed",.GlobalEnv,inherits=FALSE)
-  on.exit(assign(".Random.seed",previous,.GlobalEnv))
-  assign(".Random.seed",state,.GlobalEnv)
+  scope <- .np_rng_scope_capture()
+  on.exit(.np_rng_scope_restore(scope), add = TRUE)
+  .np_rng_scope_state(scope, state)
   value <- force(code)
   list(value=value,end=get(".Random.seed",.GlobalEnv,inherits=FALSE))
 }

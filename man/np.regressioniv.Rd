@@ -329,6 +329,8 @@ These arguments control returned kernel weights, starting values, residual smoot
 
 
   \item{random.seed}{
+    Temporary caller-state restoration requires a certifiable initialized
+    state; see \link{np_rng_scope}.
     an integer used to seed R's random number generator. This ensures
     replicability of the numerical search. Defaults to 42.
   }

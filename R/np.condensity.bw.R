@@ -1821,8 +1821,9 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
                                                       source = "explicit",
                                                       reason = NULL,
                                                       progress_label = NULL) {
-  seed.state <- .np_seed_enter(random.seed)
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture()
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+  .np_rng_scope_seed(seed.state, random.seed)
   .np_nomad_baseline_note(degree.search$start.degree)
 
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)

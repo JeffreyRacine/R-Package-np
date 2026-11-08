@@ -11,12 +11,12 @@ test_that("resolved replay refuses known missing uniform payload without draws",
     expect_error(check(law,3L,TRUE,seed=10405L),"custom uniform state absent",fixed=TRUE)
     expect_null(check(law,3L,FALSE,seed=10405L))
     expect_null(check(law,3L,TRUE,retained=TRUE,seed=10405L))
-    expect_null(check(law,3L,TRUE,seed=c(10405L,17L)))
+    expect_error(check(law,3L,TRUE,seed=c(10405L,17L)),"user-supplied generator state cannot be certified",fixed=TRUE)
     expect_null(check(law,3L,TRUE,seed=seed))
   }
   # Normal callbacks do not necessarily use uniform state; that opaque class
   # stays separate, while count draws still require it.
-  expect_null(check("gaussian",NULL,TRUE,seed=10305L))
+  expect_error(check("gaussian",NULL,TRUE,seed=10305L),"user-supplied generator state cannot be certified",fixed=TRUE)
   expect_error(check("inid",NULL,TRUE,seed=10305L),"custom uniform state absent",fixed=TRUE)
   expect_error(check("gaussian",NULL,TRUE,seed=10203L),"Box-Muller",fixed=TRUE)
   expect_identical(.Random.seed,seed)

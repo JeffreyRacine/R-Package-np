@@ -749,6 +749,8 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+  Seeded temporary operations follow \link{np_rng_scope}.
+
 Formula bandwidth objects retain the prepared training sample (after alignment,
 subsetting and missing-value handling) and the resolved missing-value policy.
 Later refits use that sample even if constructor variables are rebound.

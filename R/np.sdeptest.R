@@ -25,8 +25,9 @@ npsdeptest <- function(data = NULL,
 
   ## Save seed prior to setting
 
-  seed.state <- .np_seed_enter(random.seed)
-  on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
+  seed.state <- .np_rng_scope_capture()
+  on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
+  .np_rng_scope_seed(seed.state, random.seed)
 
 
   ## If the variable is a time series convert to type numeric
@@ -178,7 +179,7 @@ npsdeptest <- function(data = NULL,
 
   ## Restore seed
   
-  .np_seed_exit(seed.state, remove_if_absent = TRUE)
+  .np_rng_scope_restore(seed.state)
   
   if(bootstrap) {
     

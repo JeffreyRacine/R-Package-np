@@ -48,7 +48,7 @@ test_that("an exactly zero observed contrast skips bootstrap but preserves later
   y <- x$x + rnorm(n, sd = .3)
   bw <- npregbw(xdat = x, ydat = y, bws = c(.5, .6),
                 regtype = "ll", bandwidth.compute = FALSE)
-  seed.enter <- getFromNamespace(".np_seed_enter", "np")
+  seed.enter <- getFromNamespace(".np_rng_scope_seed", "np")
   for (method in c("iid", "wild", "wild-rademacher", "pairwise")) {
     set.seed(91)
     outer <- .Random.seed
@@ -63,8 +63,8 @@ test_that("an exactly zero observed contrast skips bootstrap but preserves later
     # initializes a new state, so it must not be used as this oracle.
     later <- testthat::with_mocked_bindings(
       npsigtest(bw, index = 2L, B = 9L, boot.method = method, random.seed = 81),
-      .np_seed_enter = function(random.seed) {
-        state <- seed.enter(random.seed)
+      .np_rng_scope_seed = function(state, random.seed) {
+        seed.enter(state, random.seed)
         for (k in seq_len(9L)) {
           if (method %in% c("iid", "pairwise")) sample.int(n, replace = TRUE)
           else runif(n)
@@ -123,7 +123,7 @@ test_that("Type II zero effects preserve later draws and reselection hot starts"
   y <- x$x + as.integer(x$u) / 2 + sin(seq_len(n)) / 5
   bw <- npregbw(xdat = x, ydat = y, bws = c(1, .6),
     bandwidth.compute = FALSE, regtype = "lc", ukertype = "liracine")
-  seed.enter <- getFromNamespace(".np_seed_enter", "np")
+  seed.enter <- getFromNamespace(".np_rng_scope_seed", "np")
   run <- function(index, advance = FALSE) {
     calls <- results <- list()
     set.seed(91)
@@ -146,8 +146,8 @@ test_that("Type II zero effects preserve later draws and reselection hot starts"
         results[[k]] <<- selected
         selected
       },
-      .np_seed_enter = function(random.seed) {
-        state <- seed.enter(random.seed)
+      .np_rng_scope_seed = function(state, random.seed) {
+        seed.enter(state, random.seed)
         if (advance) for (k in seq_len(9L)) sample.int(n, replace = TRUE)
         state
       }, .package = "np")
