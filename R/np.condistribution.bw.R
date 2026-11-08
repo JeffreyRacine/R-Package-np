@@ -49,7 +49,7 @@ npcdistbw.formula <-
     gmf[["formula"]] <- mf[["formula"]]
 
     mf[["formula"]] <- terms(mf[["formula"]])
-    mf.args <- as.list(mf[-1L])
+    mf.args <- .np_formula_frame_promises(as.list(mf[-1L]), environment())
     capture <- new.env(parent = emptyenv())
     mf.args$.np.capture <- capture
     mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
@@ -60,6 +60,7 @@ npcdistbw.formula <-
     if (has.gval) {
       gmf.args <- as.list(gmf[-1L])
       names(gmf.args)[names(gmf.args) == "gdata"] <- "data"
+      gmf.args <- .np_formula_frame_promises(gmf.args, environment(), c(data = "gdata"))
       gmf.args$formula <- attr(mf, "terms")
       gmf <- do.call(.np_formula_model_frame, gmf.args, envir = parent.frame())
       gydat <- gmf[, variableNames[[1]], drop = FALSE]

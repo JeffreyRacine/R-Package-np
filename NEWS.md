@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Formula selectors and conditional/grid model frames consume original data
+  and NA-policy promises once, preserving saved calls, subset evaluation,
+  RNG state ownership and MPI behavior.
+
 * Formula/IV argument forwarding reads bandwidth fields by exact name, so
   `bwsolver` cannot be mistaken for `bws` or suppress the requested IV seed.
   Existing bandwidth objects, solver choices and numerical algorithms are unchanged.

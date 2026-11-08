@@ -16,7 +16,7 @@ npksum.formula <-
                names(mf), nomatch = 0)
     mf <- mf[c(1,m)]
     mf[[1]] <- as.name("model.frame")
-    mf.args <- as.list(mf[-1L])
+    mf.args <- .np_formula_frame_promises(as.list(mf[-1L]), environment())
     mf.args$formula <- .np_formula_aligned_terms(
       if (missing(data)) terms(formula) else terms(formula, data = data))
     if (!missing(subset))

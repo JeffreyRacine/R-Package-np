@@ -168,6 +168,52 @@
   list(call = call_obj, expressions = expressions, values = values)
 }
 
+.np_bw_formula_promises <- function(call_obj, formula.index, map, frame, caller_env) {
+  if (is.null(map) || is.null(formula.index))
+    return(list(call = call_obj, expressions = list()))
+  tagged <- call_obj
+  for (i in seq_along(tagged)[-1L]) tagged[[i]] <- i
+  native.matcher <- function(...) NULL
+  formals(native.matcher) <- as.pairlist(c(
+    stats::setNames(rep(alist(value = ), length(map)), names(map)), alist(... = )))
+  native <- match.call(native.matcher, tagged, expand.dots = FALSE)
+  # Determine selector formula roles without evaluating any argument. The
+  # original default's formal map still owns positional native/data slots.
+  names(tagged)[formula.index] <- "formula"
+  roles <- match.call(function(formula, data, subset, na.action, call,
+                              gdata = NULL, ...) NULL, tagged, expand.dots = FALSE)
+  dots <- eval(quote(substitute(list(...))), envir = frame)[-1L]
+  dot.names <- names(dots)
+  if (is.null(dot.names)) dot.names <- rep("", length(dots))
+  native.dots <- native[["..."]]
+  native.names <- names(native.dots)
+  if (is.null(native.names)) native.names <- rep("", length(native.dots))
+  expressions <- list()
+  for (name in intersect(c("data", "na.action", "gdata"), names(roles))) {
+    index <- roles[[name]]
+    formal <- names(map)[vapply(names(map), function(n)
+      identical(native[[n]], index), logical(1L))]
+    if (length(formal)) {
+      source <- as.name(map[[formal]])
+    } else {
+      position <- which(vapply(as.list(native.dots), identical, logical(1L), index))
+      argument <- native.names[position]
+      if (length(argument) && nzchar(argument)) {
+        dot <- match(argument, dot.names)
+      } else {
+        ordinal <- match(position, which(!nzchar(native.names)))
+        dot <- which(!nzchar(dot.names))[ordinal]
+      }
+      if (length(dot) != 1L || is.na(dot))
+        stop("cannot identify original formula data promise", call. = FALSE)
+      source <- substitute(...elt(I), list(I = dot))
+    }
+    expressions[name] <- list(.np_formula_dot_expression(call_obj[[index]], caller_env))
+    call_obj[[index]] <- .np_formula_promise_expression(source, frame)
+  }
+  list(call = call_obj, expressions = expressions)
+}
+
 .np_eval_bw_call <- function(call_obj, caller_env = parent.frame(),
                              formula.value = NULL, native.map = NULL,
                              native.frame = NULL) {
@@ -185,6 +231,7 @@
     call_obj[[1L]] <- call("::", as.name("np"), selector)
 
   formula.expression <- NULL
+  formula.index <- NULL
   if (!is.null(formula.value)) {
     if (!inherits(formula.value$value, "formula"))
       stop("invalid resolved formula handoff", call. = FALSE)
@@ -201,6 +248,7 @@
     if (source == "bws" && "formula" %in% names(matched)) source <- "formula"
     index <- matched[[source]]
     if (!is.null(index)) {
+      formula.index <- index
       formula.expression <- .np_formula_dot_expression(call_obj[[index]], caller_env)
       call_obj[[index]] <- substitute(quote(VALUE), list(VALUE = formula.value$value))
     }
@@ -211,7 +259,7 @@
     .np_native_data_error()
   native <- if (is.null(formula.value))
     .np_bw_native_values(call_obj, native.map, native.frame, caller_env) else
-    list(call = call_obj, expressions = list())
+    .np_bw_formula_promises(call_obj, formula.index, native.map, native.frame, caller_env)
   # Bound values avoid deparsing an entire response vector as a variable
   # name. The child environment exists only during this selector invocation;
   # restore the public call and its owner before returning the object.

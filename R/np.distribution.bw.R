@@ -99,7 +99,7 @@ npudistbw.formula <-
       gmf[[1]] <- as.name("model.frame")
       names(gmf)[3] <- "data"
       gmf[["formula"]] <- attr(mf, "terms")
-      gmf.args <- as.list(gmf[-1L])
+      gmf.args <- .np_formula_frame_promises(as.list(gmf[-1L]), environment(), c(data = "gdata"))
       gmf <- do.call(.np_formula_model_frame, gmf.args, envir = parent.frame())
 
       gdat <- gmf[, .np_formula_term_names(attr(attr(gmf, "terms"),"term.labels")), drop = FALSE]

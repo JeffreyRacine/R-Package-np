@@ -1,3 +1,17 @@
+# Reconstructed calls must consume the original promise, not replay its
+# expression. Keep this reference transient: public calls retain their original
+# syntax and the model-frame owner still controls subset/NA evaluation order.
+.np_formula_promise_expression <- function(expression, frame) {
+  substitute(base::evalq(EXPRESSION, FRAME), list(EXPRESSION = expression, FRAME = frame))
+}
+
+.np_formula_frame_promises <- function(args, frame,
+                                        map = c(data = "data", na.action = "na.action")) {
+  for (name in intersect(names(map), names(args)))
+    args[[name]] <- .np_formula_promise_expression(as.name(map[[name]]), frame)
+  args
+}
+
 # terms() quotes non-syntactic symbols; model.frame() uses their actual names.
 # Resolve only a simple symbol. Never evaluate a term or rewrite a transform,
 # interaction, formula, predvars expression, or the user's data-frame names.

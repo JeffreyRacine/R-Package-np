@@ -38,7 +38,7 @@ npcdensbw.formula <-
                                         varsPlus[[2]]),
                                   env = environment(formula))
     mf[["formula"]] <- terms(mf[["formula"]])
-    mf.args <- as.list(mf[-1L])
+    mf.args <- .np_formula_frame_promises(as.list(mf[-1L]), environment())
     capture <- new.env(parent = emptyenv())
     mf.args$.np.capture <- capture
     mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
