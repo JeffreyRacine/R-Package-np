@@ -85,7 +85,8 @@ test_that("npindexbw retains Powell evaluation counts when Powell does not impro
       .npindexbw_run_fixed_degree = function(xdat, ydat, bws, template,
                                              reg.args, opt.args,
                                              .certify.selected = TRUE,
-                                             .fixed.h.lower = NULL) {
+                                             .fixed.h.lower = NULL,
+                                             .rng.collective = FALSE) {
         hot.certify <<- .certify.selected
         list(
           beta = c(1, 0.5),

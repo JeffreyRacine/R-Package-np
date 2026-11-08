@@ -1485,7 +1485,8 @@
                                              nmulti = 1L,
                                              random.seed = 42L,
                                              max.tries = 256L,
-                                             user_supplied = FALSE) {
+                                             user_supplied = FALSE,
+                                             .rng.collective = .npRmpi_rng_scope_collective()) {
   basis <- match.arg(basis)
   lower <- as.integer(lower)
   upper <- as.integer(upper)
@@ -1550,7 +1551,7 @@
 
   initial <- as.integer(pmax(lower, pmin(upper, initial)))
 
-  seed.state <- .np_rng_scope_capture(collective = .npRmpi_rng_scope_collective())
+  seed.state <- .np_rng_scope_capture(collective = .rng.collective)
   on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
   .np_rng_scope_seed(seed.state, random.seed)
 
@@ -1599,7 +1600,8 @@
                                    random.seed = 42L,
                                    degree_spec = NULL,
                                    start.lower = NULL,
-                                   start.upper = NULL) {
+                                   start.upper = NULL,
+                                   .rng.collective = .npRmpi_rng_scope_collective()) {
   n <- length(lb)
   if (length(ub) != n || length(bbin) != n)
     stop("NOMAD start construction requires matching lengths for x0/bbin/lb/ub")
@@ -1620,7 +1622,7 @@
   start.lower <- normalize.start.bound(start.lower, lb, "start.lower")
   start.upper <- normalize.start.bound(start.upper, ub, "start.upper")
 
-  seed.state <- .np_rng_scope_capture(collective = .npRmpi_rng_scope_collective())
+  seed.state <- .np_rng_scope_capture(collective = .rng.collective)
   on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
   .np_rng_scope_seed(seed.state, random.seed)
 
@@ -1654,7 +1656,8 @@
         nobs = degree_spec$nobs,
         nmulti = nstart,
         random.seed = random.seed,
-        user_supplied = isTRUE(degree_spec$user_supplied)
+        user_supplied = isTRUE(degree_spec$user_supplied),
+        .rng.collective = .rng.collective
       )
       starts[, degree.idx] <- degree.starts
     }
@@ -1682,7 +1685,8 @@
           nobs = degree_spec$nobs,
           nmulti = 1L,
           random.seed = random.seed,
-          user_supplied = isTRUE(degree_spec$user_supplied)
+          user_supplied = isTRUE(degree_spec$user_supplied),
+          .rng.collective = .rng.collective
         )[1L, ]
       }
     }
@@ -2652,7 +2656,8 @@
                              recover_start = NULL,
                              prepare_starts = NULL,
                              preserve.eval.error = FALSE,
-                             .native.callback.transaction = NULL) {
+                             .native.callback.transaction = NULL,
+                             .rng.collective = .npRmpi_rng_scope_collective()) {
   engine <- match.arg(engine)
   direction <- match.arg(direction)
   if (!is.null(recover_start) && !is.function(recover_start))
@@ -2725,7 +2730,8 @@
     random.seed = random.seed,
     degree_spec = degree_spec,
     start.lower = start.lower,
-    start.upper = start.upper
+    start.upper = start.upper,
+    .rng.collective = .rng.collective
   )
   if (!is.null(prepare_starts)) {
     prepared <- prepare_starts(start_matrix)

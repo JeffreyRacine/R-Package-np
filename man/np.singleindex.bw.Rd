@@ -83,7 +83,8 @@ npindexbw(\dots)
           scale.factor.search.lower = NULL,
           .restore.first.start = TRUE,
           \dots,
-          .fixed.h.lower = NULL)
+          .fixed.h.lower = NULL,
+          .rng.collective = .npRmpi_rng_scope_collective())
 
 }
 
@@ -109,6 +110,13 @@ These arguments identify the data, formula interface, method label, and whether 
     internal logical control enabling bounded restoration of eligible
     automatically generated raw-invalid first optimizer evaluations.
     It is used by package search owners and is not intended for direct user control.
+  }
+
+  \item{.rng.collective}{
+    internal temporary-RNG agreement ownership. Package search owners use
+    local scopes only after collective admission and activation have succeeded
+    before entering a worker service. This argument is not intended for
+    direct user control; leave its context-dependent default unchanged.
   }
 
   \item{.fixed.h.lower}{

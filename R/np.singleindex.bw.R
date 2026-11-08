@@ -1859,7 +1859,8 @@ npindexbw.NULL <-
 
 .npindexbw_run_fixed_degree <- function(xdat, ydat, bws, template, reg.args,
                                         opt.args, .certify.selected = TRUE,
-                                        .fixed.h.lower = NULL) {
+                                        .fixed.h.lower = NULL,
+                                        .rng.collective = .npRmpi_rng_scope_collective()) {
   tbw <- .npindexbw_build_sibandwidth(
     xdat = xdat,
     ydat = ydat,
@@ -1877,7 +1878,8 @@ npindexbw.NULL <-
         ydat = ydat,
         bws = tbw,
         .certify.selected = .certify.selected,
-        .fixed.h.lower = .fixed.h.lower
+        .fixed.h.lower = .fixed.h.lower,
+        .rng.collective = .rng.collective
       ),
       opt.args
     )
@@ -2252,6 +2254,17 @@ npindexbw.NULL <-
       character(0L)
     }
   )
+  # All ranks certify and activate temporary RNG ownership before workers
+  # enter the objective service. Subsequent coordinator-only scopes remain
+  # locally guarded; they must not initiate an unmatched collective.
+  service.rng.collective <- .npRmpi_rng_scope_collective()
+  if (isTRUE(service.ctx$active)) {
+    service.seed.state <- .np_rng_scope_capture(collective = TRUE)
+    on.exit(.np_rng_scope_restore(service.seed.state), add = TRUE)
+    .np_rng_scope_seed(service.seed.state,
+      if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L)
+    service.rng.collective <- FALSE
+  }
   service.ctx$leaf.descriptor <- leaf.descriptor
   service.ctx$invalid.penalty <- ichimura.invalid.penalty
   if (isTRUE(service.ctx$active) && !isTRUE(service.ctx$root))
@@ -2407,7 +2420,8 @@ npindexbw.NULL <-
         xdat = xdat,
         ydat = ydat,
         bws = tbw,
-        bandwidth.compute = FALSE
+        bandwidth.compute = FALSE,
+        .rng.collective = service.rng.collective
       )
       if (!is.null(payload$method) && length(payload$method))
         payload$pmethod <- bwmToPrint(as.character(payload$method[1L]))
@@ -2445,7 +2459,8 @@ npindexbw.NULL <-
           .certify.selected = FALSE,
           .fixed.h.lower = if (fixed.nomad)
             h.start.controls$scale.factor.search.lower * fixed.setup$h.scale
-          else NULL
+          else NULL,
+          .rng.collective = service.rng.collective
         )
       )
       powell.elapsed <- proc.time()[3L] - powell.start
@@ -2522,6 +2537,7 @@ npindexbw.NULL <-
     nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     native.r.bridge = TRUE,
     preserve.eval.error = TRUE,
+    .rng.collective = service.rng.collective,
     start.lower = start.lb,
     start.upper = start.ub,
     coordinate.roles = coordinate.roles,
@@ -2560,7 +2576,8 @@ npindexbw.NULL <-
           bws = bws,
           template = template,
           reg.args = verify.reg.args,
-          opt.args = opt.args
+          opt.args = opt.args,
+          .rng.collective = service.rng.collective
         ),
         error = function(e) e
       )
@@ -3191,7 +3208,8 @@ npindexbw.sibandwidth <-
            scale.factor.search.lower = NULL,
            .restore.first.start = TRUE,
            ...,
-           .fixed.h.lower = NULL){
+           .fixed.h.lower = NULL,
+           .rng.collective = .npRmpi_rng_scope_collective()){
   .np_reject_native_data(substitute(list(...))[-1L])
 
 
@@ -3200,7 +3218,7 @@ npindexbw.sibandwidth <-
 
     ## Save seed prior to setting
 
-    seed.state <- .np_rng_scope_capture(collective = .npRmpi_rng_scope_collective())
+    seed.state <- .np_rng_scope_capture(collective = .rng.collective)
     on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
     .np_rng_scope_seed(seed.state, random.seed)
 

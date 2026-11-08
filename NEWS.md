@@ -1,5 +1,10 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Single-index NOMAD searches agree on temporary RNG admission and activation
+  before workers enter the objective service. Coordinator-owned starts, payload
+  assembly, Powell refinement and verification retain local RNG restoration
+  without unmatched collectives; existing guards and worker computation remain.
+
 * Package-owned MPI startup and reuse check loaded R/native source identities
   before accepting a worker pool. Missing or mismatched identities give a
   restart/reinstall error; same-source builds at different paths/platforms are
