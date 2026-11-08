@@ -1,5 +1,10 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Automatic-degree regression and conditional density/distribution searches use
+  the existing all-rank command context to select one collective search owner.
+  Explicit manual broadcasts remain coherent after pool adoption; rank-local
+  services, ordinary automatic dispatch and both RNG safety guards are preserved.
+
 * Formula/IV argument forwarding reads bandwidth fields by exact name, so
   `bwsolver` cannot be mistaken for `bws` or suppress the requested IV seed.
   Existing bandwidth objects, solver choices and numerical algorithms are unchanged.

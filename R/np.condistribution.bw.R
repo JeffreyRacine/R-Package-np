@@ -2765,8 +2765,7 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
-  if (.npRmpi_has_active_slave_pool(comm = 1L) &&
-      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+  if (.npRmpi_degree_search_collective(comm = 1L)) {
     search.template <- template
     search.setup <- list(
       type = setup$type,

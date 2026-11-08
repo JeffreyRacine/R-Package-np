@@ -935,6 +935,19 @@
   size >= 2L
 }
 
+.npRmpi_degree_search_collective <- function(comm = 1L) {
+  if (isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
+    return(FALSE)
+
+  # A received command already has an all-rank owner. Worker pool flags
+  # describe coordinator-managed services and need not agree across ranks.
+  if (isTRUE(.npRmpi_autodispatch_in_context()) ||
+      isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+    return(isTRUE(mpi.comm.size(comm) >= 2L))
+
+  .npRmpi_has_active_slave_pool(comm = comm)
+}
+
 .npRmpi_rank_local_regression_context <- function(comm = 1L) {
   isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) ||
     isTRUE(.npRmpi_autodispatch_in_context()) ||

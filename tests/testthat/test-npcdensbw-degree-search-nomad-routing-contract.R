@@ -33,8 +33,7 @@ test_that("npcdensbw prepared-objective search keeps collective routing in manua
     collapse = "\n"
   )
 
-  expect_true(grepl(".npRmpi_has_active_slave_pool(comm = 1L)", body_text, fixed = TRUE))
-  expect_match(body_text, "getOption\\(\"npRmpi\\.local\\.regression\\.mode\",\\s*FALSE\\)")
+  expect_true(grepl(".npRmpi_degree_search_collective(comm = 1L)", body_text, fixed = TRUE))
   expect_true(grepl("if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))", body_text, fixed = TRUE))
   expect_true(grepl("search.result <- eval(mc, envir = environment())", body_text, fixed = TRUE))
   expect_true(grepl("search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L,", body_text, fixed = TRUE))
