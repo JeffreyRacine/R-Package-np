@@ -1,7 +1,26 @@
 # Joint variability for density-family plots only. The incumbent fit and marginal SEs
 # are unchanged; these empirical influence rows supply cross-grid dependence.  Kernels,
 # basis preparation and accepted solves retain their canonical owners.
+.np_plot_density_uniform_fixed <- function(bws, conditional, cdf = FALSE) {
+  if (conditional || cdf ||
+      !identical(bws[["ckertype", exact = TRUE]], "uniform") ||
+      !identical(bws[["type", exact = TRUE]], "fixed") ||
+      !isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) ||
+      !isTRUE(bws[["ndim", exact = TRUE]] %in% 1:2) ||
+      !isTRUE(bws[["ncon", exact = TRUE]] == bws[["ndim", exact = TRUE]]))
+    return(FALSE)
+  bounds <- bws[["ckerbound", exact = TRUE]]
+  if (identical(bounds, "none")) return(TRUE)
+  lower <- bws[["ckerlb", exact = TRUE]]
+  upper <- bws[["ckerub", exact = TRUE]]
+  identical(bounds, "fixed") && is.numeric(lower) && is.numeric(upper) &&
+    length(lower) == bws[["ndim", exact = TRUE]] &&
+    length(upper) == length(lower) && all(is.finite(c(lower, upper))) &&
+    all(upper > lower)
+}
+
 .np_plot_density_joint_supported <- function(bws, conditional, cdf = FALSE) {
+  if (.np_plot_density_uniform_fixed(bws, conditional, cdf)) return(TRUE)
   second <- function(kernel, order) kernel %in% c("gaussian", "epanechnikov") && identical(as.integer(order),
     2L)
   if (!conditional) {
@@ -475,6 +494,12 @@
       stop("density influence does not reproduce the plotted target within 1% of its SE",
         call. = FALSE)
   }
+  # A constant uniform window contains no empirical correlation information.
+  # Preserve marginal intervals, using the existing explicit-unavailability
+  # contract only for this newly admitted class. Other arithmetic still fails.
+  if (.np_plot_density_uniform_fixed(bws, !is.null(y), cdf) &&
+      any(se > 0 & apply(A, 1L, function(row) all(row == row[1L]))))
+    .np_plot_joint_unavailable("uniform empirical correlation is unidentified with positive marginal uncertainty")
   P <- .np_plot_density_rescale(A, se)
   if (m <= 512L)
     cal <- .np_plot_gaussian_calibrate(tcrossprod(P$factor), alpha = alpha, draws = gaussian.draws) else cal <- .np_plot_gaussian_factor_calibrate(P$factor, alpha = alpha, draws = gaussian.draws)

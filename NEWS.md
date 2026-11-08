@@ -43,6 +43,8 @@
   Actual-value caches, normal-free laws and one-pass calculations are retained;
   saved Inversion streams remain usable regardless of the caller's normal kind.
 
+- Estimate-centered density plots now provide finite-grid asymptotic joint variability bands for fixed uniform kernels in one/two continuous dimensions, with unbounded or finite known support. Existing marginal bands and estimators are unchanged; unidentified correlation remains explicitly unavailable.
+
 * Clarify explicit adoption of an existing profile-started MPI pool before
   master plotting, and add an opt-in lifecycle/plot sentinel. Implementation,
   estimator and uncertainty calculations are unchanged.

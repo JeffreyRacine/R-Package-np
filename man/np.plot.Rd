@@ -1068,6 +1068,19 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bias correction can increase variance and may have larger mean squared
   error than the uncorrected estimator.
 
+  Estimate-centered unconditional density plots also support finite-grid
+  asymptotic simultaneous variability bands for fixed-bandwidth uniform kernels
+  with one or two continuous coordinates, either unbounded or with finite
+  known \code{ckerbound="fixed"} bounds. Empirical kernel-contribution
+  correlations are rescaled to the existing marginal standard errors; the
+  Gaussian maximum is calibrated over the declared grid, not a continuum.
+  These bands do not correct smoothing bias or account for bandwidth selection.
+  \code{band="all"} retains the pointwise and Bonferroni intervals unchanged.
+  A constant kernel window with positive marginal uncertainty has unidentified
+  empirical correlation: simultaneous limits remain unavailable with a warning,
+  while the marginal intervals are retained. Range bounds and other new uniform
+  bandwidth/dimension classes are not admitted by this extension.
+
   For ordinary estimate-centered plots, asymptotic standard errors are taken from fitted-object components such as
   \code{merr}, \code{gerr}, \code{derr}, \code{conderr}, and
   \code{congerr} where implemented. Ordinary regression, single-index
