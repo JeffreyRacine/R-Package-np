@@ -1,7 +1,7 @@
-.np_udens_fgd_workspace <- function(n,grid,theta,full,B=9999L,workers=0L) {
+.np_udens_fgd_workspace <- function(n,grid,theta,full,B=9999L,workers=0L,variance.nodes=0L) {
   # The Gaussian adapter uses the same 24-component joint accumulator. The
   # original common forecast bounds its retained quadrature and SD projections.
-  base<-.np_udens_beta_workspace(n,grid,theta,full,B,workers)
+  base<-.np_udens_beta_workspace(n,grid,theta,full,B,workers,variance.nodes)
   m<-as.double(nrow(grid));n<-as.double(n);B<-as.double(B)
   stages<-base$stages
   if(full) {

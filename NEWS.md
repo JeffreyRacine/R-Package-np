@@ -29,6 +29,12 @@
   Actual-value caches, normal-free laws and one-pass calculations are retained;
   saved Inversion streams remain usable regardless of the caller's normal kind.
 
+- Improve plot-only univariate fixed-bound beta/Gaussian corrected-band
+  second-moment quadrature, including asymptotic normal pmzsd intervals.
+  Resolve narrow variance features using a common positive quadrature rule,
+  retaining the original independent refinement check, corrected centers,
+  guide fits and numerical tolerances. Estimators and skip-SE paths are unchanged.
+
 - Extend estimate-centered asymptotic joint variability bands to fixed higher-order beta kernels (orders 4, 6 and 8), with finite known bounds and one/two continuous dimensions. Preserve signed contributions, native marginal scales and all existing corrected beta methods.
 
 - Extend estimate-centered density asymptotic joint variability bands to fixed Gaussian and Epanechnikov orders 4, 6 and 8 in one/two continuous dimensions with unbounded or finite known fixed support. Signed kernel contributions, existing marginal intervals and estimators are preserved.

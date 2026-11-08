@@ -1,6 +1,6 @@
 # Additional inference arrays, not whole-process RSS. Counts are doubles for
 # arithmetic; both retained numerical rules and serialization copies are charged.
-.np_udens_beta_workspace <- function(n,grid,theta,full,B=9999L,workers=0L) {
+.np_udens_beta_workspace <- function(n,grid,theta,full,B=9999L,workers=0L,variance.nodes=0L) {
   m<-nrow(grid);q<-ncol(grid);tile<-min(m,64L);cap<-256*1024^2
   if(!is.numeric(n)||length(n)!=1L||!is.finite(n)||n<10||!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<1||
      !is.numeric(workers)||length(workers)!=1L||!is.finite(workers)||workers<0)
@@ -12,7 +12,9 @@
     # Common-guide rules use bounded draw tiles, but retain B-by-target means.
     bootstrap<-8*(10*tile*8192+10*8192*32+8*B*tile+6*n*tile+20*B+12*n)
     factor<-8*(4*m^2+6*m*64+4*B+20*m)
-    stages<-c(moments=moments,calibration=if(full)factor else bootstrap)
+    extra<-if(variance.nodes>0L).np_udens_q1_variance_workspace(n,rows,
+      .np_udens_beta_marginal_rule(theta,128L)$nodes,variance.nodes) else 0
+    stages<-c(moments=max(moments,extra),calibration=if(full)factor else bootstrap)
   } else {
     nodes<-vapply(c(32L,64L),function(order)vapply(1:2,function(j)
       .np_udens_beta_marginal_rule(theta[(2*j-1):(2*j)],order)$nodes,integer(1)),integer(2))
