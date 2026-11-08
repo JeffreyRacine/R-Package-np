@@ -43,6 +43,8 @@
   Actual-value caches, normal-free laws and one-pass calculations are retained;
   saved Inversion streams remain usable regardless of the caller's normal kind.
 
+- Extend estimate-centered asymptotic joint variability bands to fixed higher-order beta kernels (orders 4, 6 and 8), with finite known bounds and one/two continuous dimensions. Preserve signed contributions, native marginal scales and all existing corrected beta methods.
+
 - Estimate-centered density plots now provide finite-grid asymptotic joint variability bands for fixed uniform kernels in one/two continuous dimensions, with unbounded or finite known support. Existing marginal bands and estimators are unchanged; unidentified correlation remains explicitly unavailable.
 
 * Clarify explicit adoption of an existing profile-started MPI pool before

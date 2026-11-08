@@ -21,14 +21,15 @@
 
 .np_plot_density_higher_order_fixed <- function(bws, conditional, cdf = FALSE) {
   if (conditional || cdf ||
-      !isTRUE(bws[["ckertype", exact = TRUE]] %in% c("gaussian", "epanechnikov")) ||
+      !isTRUE(bws[["ckertype", exact = TRUE]] %in% c("gaussian", "epanechnikov", "beta")) ||
       !identical(bws[["type", exact = TRUE]], "fixed") ||
       !isTRUE(bws[["ckerorder", exact = TRUE]] %in% c(4L, 6L, 8L)) ||
       !isTRUE(bws[["ndim", exact = TRUE]] %in% 1:2) ||
       !isTRUE(bws[["ncon", exact = TRUE]] == bws[["ndim", exact = TRUE]]))
     return(FALSE)
   bounds <- bws[["ckerbound", exact = TRUE]]
-  if (identical(bounds, "none")) return(TRUE)
+  if (identical(bounds, "none"))
+    return(!identical(bws[["ckertype", exact = TRUE]], "beta"))
   lower <- bws[["ckerlb", exact = TRUE]]
   upper <- bws[["ckerub", exact = TRUE]]
   identical(bounds, "fixed") && is.numeric(lower) && is.numeric(upper) &&

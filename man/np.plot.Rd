@@ -1088,6 +1088,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   The fitted curve and ordinary marginal standard errors are not replaced.
   If marginal uncertainty is unavailable on the requested grid, the joint
   limits remain explicitly unavailable under the existing policy.
+  Fixed-bandwidth beta kernels of orders 4, 6 and 8 also support these
+  estimate-centered joint variability bands in one or two continuous
+  dimensions with finite known fixed bounds. Their signed observation
+  contributions are retained; this does not extend beta bias-corrected
+  methods or change the native marginal standard errors.
   This higher-order addition does not admit CDFs, conditional estimators,
   nearest-neighbour bandwidths, range bounds or bias-corrected requests.
 
