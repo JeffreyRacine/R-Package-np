@@ -29,6 +29,12 @@
   Actual-value caches, normal-free laws and one-pass calculations are retained;
   saved Inversion streams remain usable regardless of the caller's normal kind.
 
+* Add plot-only asymptotic normal pmzsd intervals for univariate fixed-bound
+  order-2 beta and Gaussian densities, using complete ratio-pilot variance
+  around the unchanged corrected center. Existing calibrated bands, core
+  estimators and skip-SE paths are preserved; q2/bootstrap pmzsd remains outside
+  this addition.
+
 - Refuse resolved unsigned fixed-block CDF replay across target tiles when a
   custom uniform generator supplies no replayable seed state.
 

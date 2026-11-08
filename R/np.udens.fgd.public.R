@@ -16,7 +16,8 @@
   if(!identical(bws[['type',exact=TRUE]],'fixed') || !isTRUE(bws[['ckerorder',exact=TRUE]]==2L) ||
      !isTRUE(bws[['ndim',exact=TRUE]]%in%1:2) || !isTRUE(bws[['ncon',exact=TRUE]]==bws[['ndim',exact=TRUE]]))
     stop('Gaussian corrected bands require fixed order-2 bandwidths and one or two continuous coordinates',call.=FALSE)
-  if(!band%in%c('pointwise','simultaneous','bonferroni','all'))
+  normal <- .np_udens_bounded_normal_request(bws,method,band,calibration,alpha)
+  if(!normal && !band%in%c('pointwise','simultaneous','bonferroni','all'))
     stop("Gaussian corrected bands require explicit band='pointwise', 'simultaneous', 'bonferroni' or 'all'",call.=FALSE)
   variant<-if(identical(method,'asymptotic'))'asymptotic' else calibration
   if(identical(method,'asymptotic')&&!is.null(calibration))
@@ -40,12 +41,16 @@
   if(!is.numeric(alpha)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1)
     stop('Gaussian corrected bands require alpha in (0,1)',call.=FALSE)
   npValidateNonNegativeInteger(seed,'random.seed')
-  list(x=x,normalized=normalized,h=h,lower=lower,width=width,jacobian=jacobian,
+  state<-list(x=x,normalized=normalized,h=h,lower=lower,width=width,jacobian=jacobian,
     q=ncol(x),n=nrow(x),variant=variant,plot.law=if(method=='asymptotic')'gaussian' else 'inid',
     plot.random.seed=seed,construction='density-fixed-gaussian-fgd-v1')
+  if(normal)state$normal.pmzsd<-TRUE
+  state
 }
 
 .np_udens_fgd_public_errors <- function(state,grid,alpha,B,band) {
+  if(identical(state[['normal.pmzsd',exact=TRUE]],TRUE))
+    return(.np_udens_bounded_normal_public(state,grid,alpha,band,'gaussian'))
   if(!is.data.frame(grid)||nrow(grid)<1L||!identical(names(grid),names(state$x))||
      !all(vapply(grid,is.numeric,logical(1L)))||any(!is.finite(as.matrix(grid))))
     stop('invalid Gaussian corrected-band evaluation frame',call.=FALSE)
