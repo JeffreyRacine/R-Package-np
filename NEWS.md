@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Formula/IV argument forwarding reads bandwidth fields by exact name, so
+  `bwsolver` cannot be mistaken for `bws` or suppress the requested IV seed.
+  Existing bandwidth objects, solver choices and numerical algorithms are unchanged.
+
 * Temporary RNG scopes validate caller state before resetting or replacing it,
   register cleanup before activation, and restore supported built-in state
   without resetting the generator kind. Fresh sessions and workers without a seed binding are supported for
