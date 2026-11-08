@@ -197,6 +197,38 @@ this beta construction.
 Explicit saved density controls keep their original construction and scope.
 }
 
+\subsection{Known-bound univariate normal intervals}{
+With omitted or \code{NULL} \code{bias_control}, known-fixed-bound order-2 beta
+and Gaussian density plots support \code{errors="asymptotic"},
+\code{center="bias-corrected"} and omitted \code{band} or \code{band="pmzsd"}
+for one continuous variable. Fixed bandwidths, at least ten observations,
+strictly interior data and targets, and \code{0 < alpha < 0.5} are required.
+The original corrected center, observation operator and fitted bandwidth are
+unchanged. The normal standard error includes the full guide-estimation and
+cross-covariance terms, integrated under the normalized positive ratio pilot.
+The guide fitted to that reference law is used only for the variance, not to
+replace the original curve. Intervals are the corrected center plus or minus
+\eqn{z_{1-\alpha/2}} times this complete scale; no guide-region risk split,
+maximum calibration, variance floor, envelope or bootstrap resampling is used.
+
+These are marginal normal intervals. They do not inherit the simultaneous
+coverage claims of the separate calibrated constructions. Saved-sample
+experiments give useful average coverage, but local sparse-tail deficits and
+residual mixture bias remain. The calculation conditions on the selected
+bandwidth, fixed bounds and targets; it does not add bandwidth-selection or
+estimated-bound uncertainty. Negative centers and endpoints are retained.
+The complete scale and its distinct normal/reference-law provenance are
+available in the plot inference record. Core fitted values, estimator standard
+errors and \code{se=FALSE} are unchanged.
+
+Existing pointwise, simultaneous, Bonferroni, all-band, estimate-centered,
+unbounded and explicit-control methods retain their constructions.
+This addition does not support bootstrap pmzsd, two-dimensional pmzsd,
+nearest-neighbour bandwidths, mixed data, range-derived bounds or literal
+support endpoints. In particular, the reference-law scale is not the standard
+deviation of iid bootstrap refits.
+}
+
 \subsection{Known-bound Gaussian density inference}{
 With omitted or \code{NULL} \code{bias_control}, fixed second-order Gaussian
 kernels with known \code{ckerbound="fixed"} bounds use the FG-D plot

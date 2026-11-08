@@ -623,6 +623,18 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   rejected. All slices form one finite calibration family. See
   \code{\link{np_udens_bias_control}} for assumptions and endpoint rules.
 
+  For one continuous variable, these known-fixed-bound order-2 beta and Gaussian
+  density plots additionally support asymptotic normal intervals with omitted
+  \code{band} or \code{band="pmzsd"} and omitted \code{bias_control}.
+  The corrected center is unchanged. The complete influence variance is
+  integrated under the normalized positive ratio pilot, including guide and
+  cross-covariance terms, and uses ordinary normal critical values.
+  These are marginal intervals, distinct from the calibrated guide-region bands;
+  \code{band="all"} retains its three existing calibrated components.
+  Bootstrap pmzsd, two-dimensional pmzsd, estimated bounds and literal support
+  endpoints are not admitted by this additional construction. See
+  \code{\link{np_udens_bias_control}} for its assumptions and limitations.
+
   Default bias-corrected unconditional unbounded Gaussian density plots use the D8
   positive-pilot construction for eligible asymptotic requests; see
   \code{\link{np_udens_bias_control}}. It uses complete corrected covariance
