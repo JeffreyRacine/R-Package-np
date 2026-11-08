@@ -438,6 +438,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   limits, signed returned offsets and known coverage limitations.
 
   For MPI startup/performance guidance (including message-passing tradeoffs and the manual-broadcast template), see \code{\link{npRmpi.init}} details and \code{inst/Rprofile}.
+  Profile startup alone does not register the active coordinator pool required
+  by master plotting. For a fresh profile-started job, the
+  \code{\link{npRmpi.init}} help describes explicit adoption of its existing
+  workers using \code{mode="spawn"} before constructing models. Plot on the
+  master after adoption, not inside \code{mpi.bcast.cmd(...)}. Adoption does
+  not broaden any method's supported bands, kernels or RNGs, or enable raw
+  SPMD plotting.
   Documentation guide: see \code{\link{np.kernels}} for kernels and
   \code{\link{np.options}} for global options.
 

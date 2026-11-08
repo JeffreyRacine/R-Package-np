@@ -43,6 +43,10 @@
   Actual-value caches, normal-free laws and one-pass calculations are retained;
   saved Inversion streams remain usable regardless of the caller's normal kind.
 
+* Clarify explicit adoption of an existing profile-started MPI pool before
+  master plotting, and add an opt-in lifecycle/plot sentinel. Implementation,
+  estimator and uncertainty calculations are unchanged.
+
 * Add plot-only asymptotic normal pmzsd intervals for univariate fixed-bound
   order-2 beta and Gaussian densities, using complete ratio-pilot variance
   around the unchanged corrected center. Existing calibrated bands, core

@@ -103,13 +103,39 @@ points for two workflows:
   MPI world and runs worker-loop coordination internally.
 }
 
-\strong{Profile/manual-broadcast mode is a separate advanced route.} It
-does not call \code{npRmpi.init()}. Instead, ranks are started under
+\strong{Profile/manual-broadcast mode is a separate advanced route.} For
+pure explicit collective use, it does not call \code{npRmpi.init()}.
+Instead, ranks are started under
 \code{mpiexec} with \code{inst/Rprofile} (or an explicit
 \code{R_PROFILE_USER} path), and the script then uses
 \code{mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)} plus
 explicit \code{mpi.bcast.*} calls. See \code{\link{np.mpi.initialize}},
 \code{inst/Rprofile}, and the demo run guide for that route.
+
+\strong{Master plotting from a profile-started job.} Profile startup alone
+does not register an active coordinator pool. To use a master-coordinated
+plot, explicitly adopt the existing workers at the start of a fresh job,
+before constructing models. On rank zero, after the initialization broadcast:
+\preformatted{
+stopifnot(mpi.comm.rank(1L) == 0L, mpi.comm.size(1L) >= 2L)
+npRmpi.init(mode = "spawn", nslaves = mpi.comm.size(1L) - 1L,
+           quiet = TRUE)
+}
+With this existing communicator, the \code{"spawn"} mode reuses its workers;
+it does not create additional ranks. Use that explicit mode: the default
+\code{"auto"} selects attach startup in a multi-rank world, whereas these
+profile workers are already in their command loops. Do not set internal pool
+options manually or use this recipe to migrate an in-progress leased session.
+
+Then call \code{plot(model, ...)} on the master. A direct
+\code{mpi.bcast.cmd(plot(...))} is rejected; wrapping or hiding the plot call
+inside another expression is not a supported substitute. This adopted-pool
+workflow remains distinct from raw SPMD plotting. Each method's ordinary
+kernel, band and RNG restrictions still apply. For this standalone
+profile-started job, terminate with the explicit broadcast
+\code{mpi.bcast.cmd(mpi.quit(), caller.execute = TRUE)} after the work has
+completed. Ordinary session/attach workflows retain their existing shutdown
+rules.
 
 Workflow quick-start guidance:
 \enumerate{

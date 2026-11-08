@@ -66,7 +66,7 @@ The `tools/makefile` is the source of truth for launch semantics:
   `*_npRmpi_session.R` script, so broad legacy demo sets remain runnable while
   session coverage is expanded family by family.
 - attach demo scripts execute estimator bodies on master rank only (`mpi.comm.rank(0L) == 0L`) and finalize with `npRmpi.quit(mode="attach", ...)`.
-- profile demo scripts do not call `npRmpi.init()`; startup comes from `inst/Rprofile`, then scripts use `np.mpi.initialize()` plus explicit `mpi.bcast.*` calls.
+- pure manual-broadcast profile demos do not call `npRmpi.init()`; startup comes from `inst/Rprofile`, then scripts use `np.mpi.initialize()` plus explicit `mpi.bcast.*` calls. Master-coordinated plotting uses the separate adopted-pool workflow below.
 
 Profile startup contract (required):
 - provide exactly one profile source per profile run:
@@ -83,6 +83,39 @@ Profile startup contract (required):
   `cpu_monitor_summary.csv` under the run directory. Stages with rank median
   CPU below roughly `80-90%` should be treated as suspicious enough to inspect
   when the corresponding timing row is long enough to be meaningful.
+
+## Master plotting after profile startup
+
+Use this setup on rank zero at the start of a fresh profile job, before
+constructing models. Keep the single-profile-source launch contract above.
+
+```r
+mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)
+stopifnot(mpi.comm.rank(1L) == 0L, mpi.comm.size(1L) >= 2L)
+npRmpi.init(mode = "spawn", nslaves = mpi.comm.size(1L) - 1L,
+           quiet = TRUE)
+# Construct the model using the intended established workflow.
+# Call plot(model, ...) on the master.
+# After all work in this standalone profile-started process:
+mpi.bcast.cmd(mpi.quit(), caller.execute = TRUE)
+```
+
+The existing communicator selects the public reuse branch: no additional
+workers are spawned. Explicit `mode="spawn"` matters because `mode="auto"`
+would select attach startup while the profile workers are already receiving
+commands. Do not set internal pool flags or adopt an in-progress leased session.
+Pure profile startup alone does not qualify a master plot. Directly broadcasting
+`plot(...)` is rejected; hiding it in a wrapper is not a supported workaround.
+The adopted-pool route preserves each method's kernel, band and RNG restrictions.
+
+The focused, opt-in `tests/validation/profile_plot_adoption.R` sentinel checks
+the expected refusals, same-rank adoption, master plotting, RNG/model preservation
+and subsequent pool reuse. Its header gives the installed-package launch shape.
+It runs outside the default `testthat`/CRAN lane. A saved `RESULT.rds` and the
+completion line are necessary but not sufficient: the supervising run must also
+return raw status zero without timeout/cleanup and verify that its actual
+controller/worker processes have exited. Never infer plot success solely from
+`mpi.quit()` returning a zero launcher status.
 
 ## Tiny Fast Smoke
 
