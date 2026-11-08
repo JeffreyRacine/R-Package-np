@@ -5346,3 +5346,6 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 printf "%s\n" "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
+
+# Bind the lazy-load data and every native object to these source inputs.
+"${R_HOME}/bin/Rscript" --vanilla tools/worker-identity.R || exit 1

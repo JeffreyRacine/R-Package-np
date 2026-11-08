@@ -5,6 +5,7 @@
 /* Routine registration for the npRmpi shared library. */
 
 /* .Call calls */
+extern SEXP C_np_worker_native_identity(void);
 extern SEXP C_np_plot_fgd_evaluate(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_udens_beta_rule(SEXP, SEXP);
 extern SEXP C_np_plot_udens_beta_axis(SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -207,6 +208,7 @@ extern SEXP C_np_rng_scope_materialize(void);
 extern SEXP C_np_rng_scope_restore_absent(void);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"C_np_worker_native_identity", (DL_FUNC) &C_np_worker_native_identity, 0},
     {"C_np_rng_scope_materialize", (DL_FUNC) &C_np_rng_scope_materialize, 0},
     {"C_np_rng_scope_restore_absent", (DL_FUNC) &C_np_rng_scope_restore_absent, 0},
     {"C_np_plot_fgd_evaluate", (DL_FUNC) &C_np_plot_fgd_evaluate, 5},

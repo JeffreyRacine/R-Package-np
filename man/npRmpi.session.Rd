@@ -80,6 +80,18 @@ MPI startup, shutdown, worker-count, and worker-status controls.
   \item{\dots}{Additional arguments passed to \code{mpi.spawn.Rslaves()}.}
 }
 \details{
+The package-owned startup routes compare the loaded R and native source
+identities on participating ranks. A mismatch or a worker from an older build
+without an identity record refuses admission. Close the pool and restart all
+ranks with matching package sources; changing files underneath a running R
+session does not update its loaded code. Different library paths and supported
+platform builds of the same sources are allowed. Identity checking runs at
+startup/reuse, not for every numerical call. It is an accidental source-mismatch
+check, not authentication of modified binaries or subsequent namespace changes.
+Low-level MPI worlds that bypass these startup helpers and the shipped profile
+remain caller-managed and are not certified by this check.
+
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
 \code{npRmpi.init()} and \code{npRmpi.quit()} are the ordinary entry

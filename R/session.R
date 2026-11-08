@@ -514,6 +514,7 @@ npRmpi.init <- function(...,
 
   if (identical(mode, "spawn")) {
     if (.npRmpi_session_has_active_pool(comm = comm)) {
+      .npRmpi_worker_identity_admit(comm)
       .npRmpi_session_reset_spmd_state_allranks(
         comm = comm,
         strict = TRUE,
@@ -559,6 +560,7 @@ npRmpi.init <- function(...,
 
   if (rank == 0L) {
     .npRmpi_attach_register_exit_finalizer()
+    .npRmpi_worker_identity_admit(comm)
     if (!quiet) slave.hostinfo(comm)
     return(invisible(TRUE))
   }

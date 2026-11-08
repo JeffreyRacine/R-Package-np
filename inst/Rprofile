@@ -130,6 +130,8 @@ if (mpi.comm.rank(0) > 0) {
 
 if (mpi.comm.rank(0) == 0) {
   mpi.barrier(0)
+  if (mpi.comm.size(0) > 1)
+    get(".npRmpi_worker_identity_admit", envir = .npRmpi_ns, inherits = FALSE)(1L)
   if (mpi.comm.size(0) > 1 && !quiet)
     slave.hostinfo(1)
 }

@@ -7,3 +7,5 @@
 /bin/rm -rf -- src-* *~ *.pdf *.bak */*~ */*/*~ */*bak
 /bin/rm -rf -- demo/serial demo/n_*
 /bin/rm -rf -- tests/testthat/_snaps
+
+/bin/rm -f R/zzz-np-worker-identity.R src/np_worker_identity.h src/np_worker_identity_deps.mk

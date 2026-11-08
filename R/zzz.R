@@ -230,6 +230,8 @@
   if (!is.loaded("mpi_initialize"))
     stop("Probably npRmpi has been detached. Please quit R.")
 
+  .npRmpi_worker_identity_load(asNamespace(pkg))
+
   .np_conditional_literal_initialize(pkg)
 
   # On macOS with MPICH, repeated spawn/close cycles have been observed to

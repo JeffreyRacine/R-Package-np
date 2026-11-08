@@ -5,3 +5,7 @@
 config.log
 config.status
 src/Makevars
+
+/R/zzz-np-worker-identity.R
+/src/np_worker_identity.h
+/src/np_worker_identity_deps.mk

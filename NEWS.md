@@ -1,5 +1,10 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Package-owned MPI startup and reuse check loaded R/native source identities
+  before accepting a worker pool. Missing or mismatched identities give a
+  restart/reinstall error; same-source builds at different paths/platforms are
+  allowed. This startup check does not change RNG guards or numerical methods.
+
 * Temporary RNG scopes validate caller state before resetting or replacing it,
   register cleanup before activation, and restore supported built-in state
   without resetting the generator kind. Fresh sessions and workers without a seed binding are supported for

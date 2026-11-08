@@ -71,3 +71,6 @@ jksum.o categorical_profile_tile.o: conditional_literal.h $(NP_CONDITIONAL_JKSUM
 # Shared accepted-policy precision workspace and replay consumers.
 regression_precision.o: regression_precision.h regression_contrast.h jksum_lp_solve.h
 jksum.o reghat_fast.o np_plot_projection.o: regression_precision.h
+
+# Configure generates source identity and complete object dependencies.
+include np_worker_identity_deps.mk

@@ -361,3 +361,6 @@ AC_SUBST(NP_ACCELERATE_CPPFLAGS)
 
 AC_CONFIG_FILES([src/Makevars])
 AC_OUTPUT
+
+# Bind the lazy-load data and every native object to these source inputs.
+"${R_HOME}/bin/Rscript" --vanilla tools/worker-identity.R || exit 1
