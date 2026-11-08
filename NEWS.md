@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Align generalized nearest-neighbor regression all-large CV shortcuts with
+  serial np, including local polynomial fits. Existing literal-kernel paths,
+  conditional bandwidth policies and RNG safeguards are unchanged.
+
 * Formula selectors and conditional/grid model frames consume original data
   and NA-policy promises once, preserving saved calls, subset evaluation,
   RNG state ownership and MPI behavior.
