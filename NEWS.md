@@ -29,6 +29,8 @@
   Actual-value caches, normal-free laws and one-pass calculations are retained;
   saved Inversion streams remain usable regardless of the caller's normal kind.
 
+- Estimate-centered density plots now provide finite-grid asymptotic joint variability bands for fixed uniform kernels in one/two continuous dimensions, with unbounded or finite known support. Existing marginal bands and estimators are unchanged; unidentified correlation remains explicitly unavailable.
+
 * Add plot-only asymptotic normal pmzsd intervals for univariate fixed-bound
   order-2 beta and Gaussian densities, using complete ratio-pilot variance
   around the unchanged corrected center. Existing calibrated bands, core
