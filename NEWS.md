@@ -1,5 +1,12 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Known-fixed-bound univariate uniform and Epanechnikov density plots now
+  support explicit corrected asymptotic pointwise, Bonferroni, simultaneous
+  and all bands through a plot-only local-cubic guide/residual construction.
+  Existing methods, core estimates and se=FALSE are unchanged. Bootstrap,
+  range bounds, literal endpoints and multivariate compact correction remain
+  outside this new construction.
+
 * MPI session reinitialization preserves open attach-pool ownership and reuses
   its workers without repeating startup collectives. Invalid profile-to-attach
   conversion fails before altering the pool.
