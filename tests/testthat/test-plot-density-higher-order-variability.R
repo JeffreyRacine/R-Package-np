@@ -21,3 +21,18 @@ test_that("signed fixed density kernels have a density-only joint admission", {
                      list(ckertype="beta"),list(ckertype="uniform")))
     expect_false(.np_plot_density_joint_supported(modifyList(b,change),FALSE))
 })
+
+
+test_that("higher-order beta joint admission requires finite known fixed support", {
+  for (q in 1:2) for (order in c(4L,6L,8L)) {
+    b <- list(ckertype="beta", ckerorder=order, type="fixed", ndim=q,
+              ncon=q, ckerbound="fixed", ckerlb=rep(-2,q), ckerub=rep(3,q))
+    expect_true(.np_plot_density_joint_supported(b,FALSE))
+    expect_false(.np_plot_density_higher_order_fixed(b,TRUE))
+    expect_false(.np_plot_density_joint_supported(b,FALSE,TRUE))
+    for (change in list(list(ckerbound="none"),list(ckerbound="range"),
+                       list(ckerub=rep(Inf,q)),list(ckerub=rep(-2,q)),
+                       list(type="generalized_nn"),list(type="adaptive_nn")))
+      expect_false(.np_plot_density_joint_supported(modifyList(b,change),FALSE))
+  }
+})
