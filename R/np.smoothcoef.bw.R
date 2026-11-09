@@ -223,6 +223,11 @@ npscoefbw.NULL <-
 }
 
 .npscoefbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, zdat, bws, reg.args, opt.args) {
+  # Admit every participating rank before entering the local numerical owner.
+  admission <- .np_rng_scope_capture(
+    collective = .npRmpi_rng_scope_collective(), deferred = TRUE)
+  if (inherits(admission, "np_rng_scope_refusal")) return(admission)
+
   old.messages <- getOption("np.messages")
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
 
@@ -272,7 +277,9 @@ npscoefbw.NULL <-
         OPTARGS = worker.opt.args
       )
     )
-    return(.npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE))
+    result <- .npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = TRUE)
+    if (inherits(result, "np_rng_scope_refusal")) stop(result)
+    return(result)
   }
 
   .npscoefbw_run_fixed_degree(

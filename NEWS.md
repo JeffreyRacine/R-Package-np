@@ -28,6 +28,11 @@
   and finite-draw tail-resolution warnings remain. Defaults, range bounds,
   literal endpoints, pmzsd and multivariate compact correction are unchanged.
 
+* Smooth-coefficient automatic degree searches admit temporary RNG state on
+  every participating rank before entering local work. A worker-only unsafe
+  state now produces the existing coordinated refusal instead of stranding
+  peers; supported streams and caller-state restoration are unchanged.
+
 * MPI session reinitialization preserves open attach-pool ownership and reuses
   its workers without repeating startup collectives. Invalid profile-to-attach
   conversion fails before altering the pool.
