@@ -12985,6 +12985,10 @@ plotFactor <- function(f, y, ...){
 .np_plot_all_band_legend_labels <- function(plot.errors.method, construction = NULL) {
   method <- match.arg(as.character(plot.errors.method)[1L],
                       c("bootstrap", "asymptotic"))
+  if (identical(construction, "guide-region"))
+    return(c(pointwise = "Pointwise (guide + residual envelope)",
+      simultaneous = "Simultaneous (guide + residual envelope, finite family)",
+      bonferroni = "Bonferroni (guide + residual envelope)"))
   if (identical(construction,"conditional-pilot"))
     return(c(pointwise="Pointwise (score safeguard)",
       simultaneous="Simultaneous (finite grid, score safeguard)",
