@@ -123,9 +123,12 @@
     joint.eligible <- joint.request
     if (joint.request)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
+    compact.sd.explicit <- !missing(plot.errors.boot.method) && !missing(plot.errors.type) &&
+      identical(as.character(plot.errors.boot.method)[1L], "inid") &&
+      error.request$type %in% c("pointwise", "simultaneous", "bonferroni", "all")
     compact.state <- NULL
     if (.np_udens_compact_request(bws, bias.control, plot.errors.center,
-        error.request$method, plot.errors.boot.calibration))
+        error.request$method, plot.errors.boot.calibration, compact.sd.explicit))
       compact.state <- .np_udens_compact_public_prepare(bws, xdat,
         error.request$method, as.character(plot.errors.boot.method)[1L],
         error.request$type, plot.errors.boot.calibration, plot.errors.alpha,
@@ -191,7 +194,8 @@
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
       plot.errors.boot.calibration, blocklen = plot.errors.boot.blocklen,
       block.automatic = density.block.automatic, alpha = plot.errors.alpha,
-      random.seed = if (missing(random.seed)) 42L else random.seed)
+      random.seed = if (missing(random.seed)) 42L else random.seed,
+      compact.sd.explicit = compact.sd.explicit)
     new.bias <- !is.null(bias.state)
     # Presentation only: percentile endpoints are not a maximum-root band.
     annotation.construction <- if (new.bias) {

@@ -1,7 +1,8 @@
 # Common quadrature for the original guide and every literal bootstrap refit.
 # All target tiles retain the full support-knot union and one all-fit base.
 .np_udens_compact_common <- function(plan,thetas,order,rows=seq_along(plan$target),
-                                    held.bytes=0,fit.block=NULL,target.block=NULL) {
+                                    held.bytes=0,fit.block=NULL,target.block=NULL,
+                                    progress=function(...)NULL) {
   if(!is.matrix(thetas)||ncol(thetas)!=2L||!nrow(thetas)||
      any(!is.finite(thetas))||any(thetas<= -1)||!length(rows)||
      any(!rows%in%seq_along(plan$target)))
@@ -28,6 +29,8 @@
   mu<-matrix(0,nb,nr);mass.error<-score.error<-tail.max<-0
   TL<-max(40,(70+abs(lbeta(base[1]+1,base[2]+1)))/(base[1]+1))
   TR<-max(40,(70+abs(lbeta(base[1]+1,base[2]+1)))/(base[2]+1))
+  done<-0L;total<-as.double(nb)*ceiling(nr/nt)
+  progress(paste('compact common guide means',order),done,total)
   for(jj in .np_udens_beta_blocks(nr,as.integer(nt))) {
     ix<-rows[jj];pl<-plan;pl$target<-plan$target[ix]
     pl$coefficients<-plan$coefficients[ix,,drop=FALSE]
@@ -48,6 +51,8 @@
         stop('compact bootstrap per-fit tail certificate',call.=FALSE)
       mu[ii,jj]<-t(P%*%prob)
       mass.error<-max(mass.error,mass);score.error<-max(score.error,err);tail.max<-max(tail.max,tail)
+      done<-done+length(ii)
+      progress(paste('compact common guide means',order),done,total)
     }
     rm(P)
   }
@@ -66,8 +71,8 @@
   batch<-min(B,max(1L,floor(8*1024^2/(8*as.double(n)))))
   rhat<-prepared$center-prepared$fitted;scale<-sqrt(prepared$empirical_variance)
   # Compute the all-fit measures once; store-row boundaries are not quadrature boundaries.
-  main<-.np_udens_compact_common(plan,all.theta,128L,held.bytes=held)
-  refined<-.np_udens_compact_common(plan,all.theta,256L,held.bytes=held)
+  main<-.np_udens_compact_common(plan,all.theta,128L,held.bytes=held,progress=progress)
+  refined<-.np_udens_compact_common(plan,all.theta,256L,held.bytes=held,progress=progress)
   checks<-list(refinement=.np_udens_beta_check(main$mu,refined$mu,'compact bootstrap common guide means',1e-10),
     original=.np_udens_beta_check(main$mu[1L,],prepared$mu,'compact bootstrap original mean',1e-10),
     main=main$diagnostics,refined=refined$diagnostics)
