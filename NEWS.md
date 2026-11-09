@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* The plot-only normal reference guide now satisfies both existing score
+  certificates before stopping. A rare premature numerical stop is corrected
+  without changing the method, tolerances, fitted center or se=FALSE.
+
 * Positive-Gram covariances in corrected bounded-density simultaneous plots
   that fail the raw absolute eigenvalue check are now tested by the existing
   normalized-correlation factor and reconstruction checks. Successful paths,

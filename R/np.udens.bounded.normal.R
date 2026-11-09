@@ -28,7 +28,10 @@
     if (any(!is.finite(ev)) || min(ev) <= 0 || max(ev)/min(ev) > 1e13)
       stop("bounded normal reference information conditioning", call.=FALSE)
     d <- solve(st$I,grad); dec <- sum(grad*d); obj <- st$A-sum(theta*target)
-    if (dec < 1e-14 && max(abs(grad)) < 2e-8) break
+    # Also satisfy the caller's existing relative score certificate. An
+    # absolute residual below 2e-8 alone can stop too soon for small targets.
+    if (dec < 1e-14 && max(abs(grad)) < 2e-8 &&
+        max(abs(grad)) <= 1e-12 + 2e-8 * max(abs(target))) break
     step <- 1
     for (j in 1:2) if (d[j] > 0) step <- min(step,.99*(theta[j]+1)/d[j])
     accepted <- FALSE
