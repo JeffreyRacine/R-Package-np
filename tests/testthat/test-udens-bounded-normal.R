@@ -24,6 +24,27 @@ test_that("normal reference fitting uses the beta score equation", {
   expect_error(.np_udens_bounded_normal_analytic(c(-1,0)),"reference guide")
 })
 
+test_that("normal reference stopping satisfies both score certificates", {
+  target <- c(-0.9517478719711074, -0.8496103883630108)
+  start <- c(0.22875755046493026, 0.43028131723618307)
+  premature <- c(0.36439115274809775, 0.4653588189532693)
+  score <- function(theta) digamma(theta + 1) - digamma(sum(theta + 1))
+  limit <- 1e-12 + 2e-8 * max(abs(target))
+  expect_lt(max(abs(score(premature) - target)), 2e-8)
+  expect_gt(max(abs(score(premature) - target)), limit)
+  z <- .np_udens_bounded_normal_fit(target, start)
+  expect_lte(max(abs(score(z$theta) - target)), limit)
+  expect_lt(z$score_error, 1e-12)
+  for (shape in list(c(.8, 1.2), c(1, 1), c(4, 9), c(50, 50))) {
+    goal <- digamma(shape) - digamma(sum(shape))
+    z <- .np_udens_bounded_normal_fit(goal, shape * 1.05 - 1)
+    residual <- max(abs(score(z$theta) - goal))
+    expect_lt(residual, 2e-8)
+    expect_lte(residual, 1e-12 + 2e-8 * max(abs(goal)))
+    expect_true(all(z$theta > -1))
+  }
+})
+
 test_that("complete normal variance keeps guide and cross contributions", {
   A <- rbind(c(1,3,2,5),c(2,-1,4,1))
   T <- cbind(c(-2,-1,0,1),c(1,-1,2,0)); p <- c(.1,.2,.3,.4)
