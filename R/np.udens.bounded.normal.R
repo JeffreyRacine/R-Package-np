@@ -1,8 +1,9 @@
-# Complete normal-scale inference for fixed-bound q1 density plots only.
+# Complete normal-scale inference for fixed-bound density plots.
 # The original guide owns the center; the ratio-pilot guide owns the variance.
 .np_udens_bounded_normal_request <- function(bws, method, band, calibration, alpha) {
   if (!identical(band, "pmzsd")) return(FALSE)
-  if (!identical(method, "asymptotic") || !isTRUE(bws[["ndim", exact=TRUE]] == 1L))
+  if (!identical(method, "asymptotic") ||
+      (!isTRUE(bws[["ndim", exact=TRUE]] == 1L) && !.np_udens_beta_normal_q2_request(bws)))
     stop("bounded density pmzsd requires q=1 and errors='asymptotic'", call.=FALSE)
   if (!is.null(calibration))
     stop("bounded density asymptotic pmzsd does not accept bootstrap calibration", call.=FALSE)
@@ -180,6 +181,8 @@
 }
 
 .np_udens_bounded_normal_public <- function(state,grid,alpha,band,kernel) {
+  if (identical(kernel,"beta") && identical(state$q,2L))
+    return(.np_udens_beta_normal_q2_public(state,grid,alpha,band))
   if (!identical(band,'pmzsd') || !identical(state$q,1L) ||
       !identical(state$variant,'asymptotic'))
     stop("invalid bounded normal plot state",call.=FALSE)

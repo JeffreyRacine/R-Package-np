@@ -624,8 +624,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   cross-covariance terms, and uses ordinary normal critical values.
   These are marginal intervals, distinct from the calibrated guide-region bands;
   \code{band="all"} retains its three existing calibrated components.
-  Bootstrap pmzsd, two-dimensional pmzsd, estimated bounds and literal support
-  endpoints are not admitted by this additional construction. See
+  Fixed-bound order-2 beta plots also support these normal intervals for two
+  continuous coordinates. Their complete variance retains the joint guide-score
+  dependence and all guide/kernel cross terms under the ratio pilot; the
+  original corrected center is unchanged. This normal approximation can be
+  less accurate at sparse boundary targets in small samples. Two-dimensional
+  Gaussian normal intervals, bootstrap pmzsd, estimated bounds and literal
+  support endpoints are not admitted by this additional construction. See
   \code{\link{np_udens_bias_control}} for its assumptions and limitations.
 
   Known-fixed-bound order-2 uniform and Epanechnikov density plots support

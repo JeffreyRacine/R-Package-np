@@ -1,0 +1,40 @@
+test_that("beta q2 normal admission does not widen neighboring owners", {
+  b <- list(ckertype="beta",type="fixed",ckerbound="fixed",ckerorder=2L,ndim=2L,ncon=2L)
+  expect_true(.np_udens_beta_normal_q2_request(b))
+  expect_true(.np_udens_bounded_normal_request(b,"asymptotic","pmzsd",NULL,.05))
+  for (change in list(list(ckertype="gaussian"),list(ckertype="uniform"),
+    list(ckerorder=4L),list(type="adaptive_nn"),list(type="generalized_nn"),
+    list(ckerbound="range"),list(ckerbound="none"),list(ncon=1L),list(ndim=3L))) {
+    z <- modifyList(b,change)
+    expect_false(.np_udens_beta_normal_q2_request(z))
+    expect_error(.np_udens_bounded_normal_request(z,"asymptotic","pmzsd",NULL,.05),"q=1")
+  }
+  expect_error(.np_udens_bounded_normal_request(b,"bootstrap","pmzsd",NULL,.05),"asymptotic")
+  for (band in c("pointwise","simultaneous","bonferroni","all"))
+    expect_false(.np_udens_bounded_normal_request(b,"asymptotic",band,NULL,.05))
+  expect_error(.np_udens_bounded_normal_request(b,"asymptotic","pmzsd","symmetric-sd",.05),"calibration")
+  expect_error(.np_udens_beta_normal_q2_budget(1e8,16,c(0,0,0,0,0),64L),"workspace")
+})
+
+test_that("beta q2 normal moments retain the center and support units", {
+  x <- cbind(seq(.06,.94,length.out=40),seq(.94,.06,length.out=40)[c(seq(1,40,2),seq(2,40,2))])
+  grid <- rbind(c(.3,.4),c(.7,.6),c(.3,.4));h <- c(.14,.16)
+  z <- .np_udens_beta_normal_q2_moments(x,h,grid)
+  fit <- .np_udens_beta_q2_fit(x)
+  prep <- .np_udens_beta_q2_moment_prepare(x,h,grid,fit$theta,64L,32L,fit$state)
+  old <- .np_udens_beta_q2_moment_block(prep,seq_len(nrow(grid)),FALSE)
+  expect_equal(z$center,old$center,tolerance=1e-12)
+  expect_identical(z$center[1],z$center[3]);expect_identical(z$se[1],z$se[3])
+  expect_true(all(is.finite(z$se)&z$se>0));expect_lte(z$workspace,192*1024^2)
+  sx <- as.data.frame(sweep(sweep(x,2,c(4,5),"*"),2,c(3,-2),"+"));names(sx)<-c("x","y")
+  sg <- as.data.frame(sweep(sweep(grid,2,c(4,5),"*"),2,c(3,-2),"+"));names(sg)<-names(sx)
+  state <- list(q=2L,n=nrow(x),variant="asymptotic",x=sx,normalized=x,h=h,lower=c(3,-2),width=c(4,5),jacobian=20)
+  out <- .np_udens_bounded_normal_public(state,sg,.05,"pmzsd","beta")
+  expect_equal(out$inference$center,z$center/20,tolerance=1e-12)
+  expect_equal(out$inference$se,z$se/20,tolerance=1e-12)
+  expect_equal(out$inference$bands$pmzsd[,1,1],(z$center-qnorm(.975)*z$se)/20,tolerance=1e-12)
+  expect_identical(out$inference$settings$B,0L)
+  expect_false(out$inference$normal.band$calibrated.envelope)
+  expect_error(.np_udens_beta_normal_q2_public(state,transform(sg,x=3),.05,"pmzsd"),"interior")
+  expect_error(.np_udens_beta_normal_q2_moments(x,h,cbind(0,.5)),"invalid")
+})

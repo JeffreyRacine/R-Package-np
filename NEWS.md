@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Fixed-bound beta density plots now support two-dimensional asymptotic pmzsd
+  intervals with complete joint ratio-pilot variance and the existing corrected
+  center. Calibrated bands, core estimators and se=FALSE are unchanged.
+
 * Estimate-centered uniform density joint plot bands now admit known one-sided and partially bounded supports in one or two continuous dimensions, preserving the fitted curve and marginal standard errors.
 
 * Plot grid controls now use both requested quantile endpoints on each
