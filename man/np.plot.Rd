@@ -92,7 +92,9 @@ Named options passed via \code{\dots} include:
       }
       \item{\code{xq}, \code{yq}, \code{zq}}{
         quantiles used to hold non-plotted variables fixed when
-        constructing slices.
+        constructing slices. Single-index plots have one index axis and reject
+        \code{grid_control$xq}. Their \code{grid_control$xtrim} selects the
+        lower and upper quantiles of the fitted index.
       }
       \item{\code{xtrim}, \code{ytrim}, \code{ztrim}}{
         trimming/expansion controls for the evaluation support.

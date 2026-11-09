@@ -21,6 +21,8 @@
            lwd = NULL,
            plot.behavior = c("plot","plot-data","data"),
            neval = 50,
+           xtrim = NULL,
+           xq = NULL,
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.num = 9999,
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
@@ -41,6 +43,11 @@
 
     if (.np_data_formal_supplied(sys.call(), sys.function()))
       .np_plot_data_error()
+
+    if (!is.null(xq))
+      stop("grid_control$xq is not applicable to a single-index plot", call. = FALSE)
+    if (!is.null(xtrim))
+      xtrim <- .np_plot_conmode_resolve_xtrim(xtrim)
 
     saved.plot.style <- list(xlab = xlab, ylab = ylab,
         main = main, sub = sub, xlim = xlim, ylim = ylim, col = col,
@@ -207,7 +214,8 @@
       xdat = xdat,
       neval = neval,
       trim = 0.0,
-      where = "plot.sibandwidth"
+      where = "plot.sibandwidth",
+      probs = xtrim
     )
     maxneval <- nrow(eval.info$idx.eval)
 
