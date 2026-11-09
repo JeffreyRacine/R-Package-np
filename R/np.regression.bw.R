@@ -1,3 +1,17 @@
+.npregbw_owned_dispatch_call <- function(context, owner, call = context$expanded) {
+  call <- .npRmpi_autodispatch_as_generic_call("npregbw", call)
+  if (identical(context$public, FALSE)) {
+    if (!owner %in% c("npregbw.NULL", "npregbw.default", "npregbw.rbandwidth") ||
+        !identical(context$expanded[[1L]], as.name(owner)))
+      stop("invalid private regression bandwidth dispatch owner", call. = FALSE)
+    # The auxiliary entry already selected this package leaf. Its public
+    # wrapper is absent from the dynamic stack; retain the declared owner.
+    call[[1L]] <- as.name(owner)
+    attr(call, ".npRmpi.bound.call.owner") <- TRUE
+  }
+  call
+}
+
 npregbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
@@ -113,7 +127,7 @@ npregbw.NULL <-
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search) &&
         !isTRUE(legacy.remin))
       return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_as_generic_call("npregbw", mc),
+        .npregbw_owned_dispatch_call(.np.context, "npregbw.NULL", mc),
         .np.context$caller, owner.name = "npregbw.NULL"))
 
     xdat <- toFrame(xdat)
@@ -247,8 +261,7 @@ npregbw.rbandwidth <-
       # bandwidth template. Preserve that template's factor metadata while
       # sending its established numeric scores through the public RPC owner.
       # The same conversion otherwise occurs below on every participating rank.
-      dispatch.call <- .npRmpi_autodispatch_as_generic_call(
-        "npregbw", .np.context$expanded)
+      dispatch.call <- .npregbw_owned_dispatch_call(.np.context, "npregbw.rbandwidth")
       if (!.np.context$public && is.factor(ydat)) {
         scores <- dlev(ydat)[as.integer(ydat)]
         names(scores) <- names(ydat)
@@ -3593,7 +3606,7 @@ npregbw.default <-
 
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
       return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_as_generic_call("npregbw", .np.context$expanded),
+        .npregbw_owned_dispatch_call(.np.context, "npregbw.default"),
         .np.context$caller, owner.name = "npregbw.default"))
 
     npWarnIgnoredUniformKernelOrder(
