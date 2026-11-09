@@ -1166,14 +1166,15 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   wild            : fast np*hat linear-operator bootstrap path
   inid/fixed/geom : fast direct helper path (no internal bandwidth search)
   }
-  For non-fixed density/distribution bootstrap, an explicit experimental
-  approximation is available via
   Raw asymmetric iterated regression bands are available with
   \code{boot_control=np_boot_control(calibration="separate-tails")};
   \code{calibration="tail-envelope"} adds empirical absolute-root protection.
   These options require bootstrap bias-corrected empirical bands and retain
   the selected wild/inid/fixed/geom law. See \code{\link{np_boot_control}}
   for scope and finite-sample limitations.
+
+  For non-fixed density/distribution bootstrap, an explicit experimental
+  approximation is available via
   \code{boot_control = np_boot_control(nonfixed = "exact")} or
   \code{boot_control = np_boot_control(nonfixed = "frozen")}. The default
   \code{"exact"} route recomputes the non-fixed geometry for each resample.
