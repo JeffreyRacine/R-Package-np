@@ -38,11 +38,20 @@ npreghat <-
     }
   }
 
-# Reuse fitted response coding at hat ingress; numeric payloads are untouched.
+# Reuse retained categorical coding only when the bandwidth owns that scale.
+# Numeric operators accept numeric RHS storage, never implicit response codes.
 .np_hat_response <- function(y, ydati) {
+  if (is.null(y)) return(y)
   if (is.factor(y) && any(ydati[["iord", exact = TRUE]] |
                           ydati[["iuno", exact = TRUE]]))
     return(.np_plreg_numeric_response(y, ydati))
+  numeric.storage <- is.numeric(y) && (is.integer(y) || is.double(y))
+  if (is.data.frame(y))
+    numeric.storage <- all(vapply(y, function(column)
+      is.numeric(column) && (is.integer(column) || is.double(column)), logical(1L)))
+  if (!numeric.storage)
+    stop("hat response 'y' must have numeric (integer or double) storage; supply a numeric vector, matrix or data frame",
+         call. = FALSE)
   y
 }
 
