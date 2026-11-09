@@ -12,6 +12,16 @@
 * Formula selectors and conditional/grid model frames consume original data
   and NA-policy promises once, preserving saved calls, subset evaluation,
   RNG state ownership and MPI behavior.
+* Known-fixed-bound univariate uniform and Epanechnikov density plots now
+  support explicit corrected asymptotic pointwise, Bonferroni, simultaneous
+  and all bands through a plot-only local-cubic guide/residual construction.
+  Existing methods, core estimates and se=FALSE are unchanged. Bootstrap,
+  range bounds, literal endpoints and multivariate compact correction remain
+  outside this new construction.
+
+* Fixed-bound univariate density plot bands now resolve narrow corrected-score
+  means and guide projections on the same positive quadrature measure as their
+  covariance. Statistical formulas, tolerances and core estimates are unchanged.
 
 * Formula/IV argument forwarding reads bandwidth fields by exact name, so
   `bwsolver` cannot be mistaken for `bws` or suppress the requested IV seed.

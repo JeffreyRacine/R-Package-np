@@ -6,9 +6,9 @@
   theta<-fit$theta;progress('guide',1L,1L)
   # Reject oversized families before materializing the family quadrature plan.
   if(q==1L).np_udens_beta_workspace(n,grid,theta,full,B,workers)
-  variance.plan<-if(q==1L).np_udens_q1_variance_plan(theta,h,grid[,1L]) else NULL
+  variance.plan<-if(q==1L).np_udens_q1_operator_plan(theta,h,grid[,1L]) else NULL
   workspace<-.np_udens_beta_workspace(n,grid,theta,full,B,workers,
-    variance.nodes=if(q==1L)variance.plan$nodes else 0L)
+    variance.nodes=if(q==1L)variance.plan$refined.nodes else 0L)
   out<-list(theta=theta,history=fit$history,center=numeric(m),fitted=numeric(m),mu=numeric(m),
     pilot_variance=numeric(m),empirical_variance=numeric(m),guide_variance=numeric(m),
     B=matrix(0,m,length(theta)),B_refined=matrix(0,m,length(theta)),
@@ -16,7 +16,7 @@
   dense.block<-full&&q==1L
   blocks<-.np_udens_beta_blocks(m,if(dense.block)m else 64L)
   if(dense.block) {
-    nodes<-max(.np_udens_beta_marginal_rule(theta,256L)$nodes,variance.plan$nodes)
+    nodes<-max(.np_udens_beta_marginal_rule(theta,256L)$nodes,variance.plan$refined.nodes)
     if(8*(10*as.double(m)*nodes+5*as.double(m)^2+3*as.double(m)*n+10*nodes)>192*1024^2)
       stop('beta plot univariate dense workspace budget',call.=FALSE)
   }
@@ -29,7 +29,7 @@
     progress('moments/refinement',min(ix)-1L,m)
     if(q==1L) {
       a<-.np_udens_beta_q1_moments(x[,1],h,grid[ix,1],theta,64L,128L,full,variance.plan=variance.plan)
-      b<-.np_udens_beta_q1_moments(x[,1],h,grid[ix,1],theta,128L,256L,full)
+      b<-.np_udens_beta_q1_moments(x[,1],h,grid[ix,1],theta,128L,256L,full,variance.plan=variance.plan)
     } else {
       a<-.np_udens_beta_q2_moment_block(main,ix,FALSE)
       b<-.np_udens_beta_q2_moment_block(refined,ix,FALSE)
@@ -102,12 +102,13 @@
   if(q==1L) {
     # The common rule uses the same componentwise minimum over ALL accepted fits.
     all.theta<-rbind(theta,thetas)
+    moment.plan<-.np_udens_q1_operator_plan(apply(all.theta,2,min),h,grid[,1L])
     rhat<-prepared$center-prepared$fitted
     scale<-sqrt(prepared$empirical_variance)
     for(j in seq_along(roots$rows)) {
       ix<-roots$rows[[j]]
-      main<-.np_udens_beta_q1_common(x[,1],h,grid[ix,1],all.theta,inner[1L],128L,score)
-      refined<-.np_udens_beta_q1_common(x[,1],h,grid[ix,1],all.theta,inner[2L],256L,score)
+      main<-.np_udens_beta_q1_common(x[,1],h,grid[ix,1],all.theta,inner[1L],128L,score,moment.plan)
+      refined<-.np_udens_beta_q1_common(x[,1],h,grid[ix,1],all.theta,inner[2L],256L,score,moment.plan)
       .np_udens_beta_check(main$mu,refined$mu,'bootstrap common guide means',1e-10)
       .np_udens_beta_check(main$fitted,refined$fitted,'bootstrap common guide density',1e-10)
       .np_udens_beta_check(main$mu[1,],prepared$mu[ix],'bootstrap original mean',1e-10)
