@@ -1,3 +1,13 @@
+# Only positive-Gram producers may use this admission check. Keep the old
+# successful path; on its scale-sensitive refusal, require the unchanged
+# downstream correlation factor and reconstruction checks. No covariance is
+# modified and no factor is retained. Expanded moment subtraction is excluded.
+.np_udens_positive_gram_check <- function(covariance) {
+  if(min(eigen(covariance,symmetric=TRUE,only.values=TRUE)$values)< -1e-10)
+    .np_udens_beta_factor(covariance)
+  invisible(NULL)
+}
+
 .np_udens_beta_covariance_native <- function(prep,B,law,progress=NULL) {
   axes<-lapply(prep$axes,function(a)cbind(a$lv,a$l1v,log(a$prob)))
   .Call(C_np_plot_udens_beta_joint_covariance,prep$cache$parts,prep$cache$index,axes,

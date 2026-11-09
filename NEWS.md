@@ -1,5 +1,10 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Positive-Gram covariances in corrected bounded-density simultaneous plots
+  that fail the raw absolute eigenvalue check are now tested by the existing
+  normalized-correlation factor and reconstruction checks. Successful paths,
+  covariance values, random streams and calibration are unchanged.
+
 * Align generalized nearest-neighbor regression all-large CV shortcuts with
   serial np, including local polynomial fits. Existing literal-kernel paths,
   conditional bandwidth policies and RNG safeguards are unchanged.
