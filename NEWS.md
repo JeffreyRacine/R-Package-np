@@ -1,5 +1,7 @@
 # np 0.80-2 (development)
 
+* Formula estimator calls now reuse a supplied numeric bandwidth expression once, including side effects and random expressions.
+
 * The plot-only normal reference guide now satisfies both existing score
   certificates before stopping. A rare premature numerical stop is corrected
   without changing the method, tolerances, fitted center or se=FALSE.
