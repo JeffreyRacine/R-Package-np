@@ -13,7 +13,7 @@ test_that("deterministic D8 dispatch restores tags on local success and unwind",
     invisible(rnorm(1));expected<-list(normal=rnorm(4),uniform=runif(4))
     set.seed(5);invisible(rnorm(1));seed<-.Random.seed
     if(!present)rm(".Random.seed",envir=.GlobalEnv)
-    if(!present)expect_error(f(diag(2),matrix(1,2,1)),"caller seed is absent",fixed=TRUE) else
+    if(!present)expect_error(f(diag(2),matrix(1,2,1)),"Box-Muller state is not fully represented",fixed=TRUE) else
     if(fail)expect_error(f(diag(2),matrix(1,2,1)),"ordinary local failure") else
       expect_identical(f(diag(2),matrix(1,2,1)),matrix(0,2,1))
     expect_identical(exists(".Random.seed",.GlobalEnv,inherits=FALSE),present)
@@ -53,7 +53,7 @@ test_that("D8 transport preserves caller uniform and cached-normal continuation"
   }
   RNGkind(normal.kind="Box-Muller");set.seed(5);rm(".Random.seed",envir=.GlobalEnv)
   expect_error(suppressWarnings(plot(f,errors="asymptotic",center="bias-corrected",band="all",neval=11L,
-    gaussian_draws=257L,output="data")),"caller seed is absent",fixed=TRUE)
+    gaussian_draws=257L,output="data")),"Box-Muller state is not fully represented",fixed=TRUE)
   expect_false(exists(".Random.seed",.GlobalEnv,inherits=FALSE))
   if(nzchar(Sys.getenv("N5_SNAPSHOT")))saveRDS(payloads,Sys.getenv("N5_SNAPSHOT"))
 })
