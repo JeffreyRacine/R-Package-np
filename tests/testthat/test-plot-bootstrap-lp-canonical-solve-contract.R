@@ -1,3 +1,17 @@
+# Only the explicit qualification lane makes MPI availability mandatory.
+require_lp_batch_pool <- function() {
+  required<-identical(Sys.getenv("NP_RMPI_REQUIRE_LP_BATCH",""),"1")
+  workers<-if(required)as.integer(Sys.getenv("NP_RMPI_LP_BATCH_WORKERS","1")) else 1L
+  if(required && (length(workers)!=1L || is.na(workers) || !workers%in%c(1L,3L)))
+    stop("required LP batch lane needs one or three workers")
+  ready<-spawn_mpi_slaves(workers)
+  if(required){
+    if(!isTRUE(ready))stop("required LP batch MPI pool unavailable")
+    if(mpi.comm.size()!=workers+1L)stop("required LP batch worker count mismatch")
+  }else skip_if_not(ready,"MPI pool unavailable")
+  invisible(TRUE)
+}
+
 test_that("fixed-LP bootstrap batch projection uses one canonical response solve", {
   project <- getFromNamespace(".np_inid_lp_batch_project", "npRmpi")
   set.seed(81701)
@@ -138,7 +152,7 @@ test_that("fixed-LP bootstrap batch projection has typed transactional failures"
 })
 
 test_that("migrated fixed-LP index and smooth-coefficient consumers match refits", {
-  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  require_lp_batch_pool()
   on.exit(close_mpi_slaves(), add = TRUE)
   # Batch helpers use their MPI owner; only explicit refits are local below.
   local_eval <- getFromNamespace(".np_plot_with_local_compiled_eval", "npRmpi")
@@ -223,7 +237,7 @@ test_that("migrated fixed-LP index and smooth-coefficient consumers match refits
 })
 
 test_that("migrated fixed-LP partial and conditional consumers match refits", {
-  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  require_lp_batch_pool()
   on.exit(close_mpi_slaves(), add = TRUE)
   # Do not set only the R local flag around a distributed bootstrap batch.
   local_eval <- getFromNamespace(".np_plot_with_local_compiled_eval", "npRmpi")
