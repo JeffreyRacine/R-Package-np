@@ -39,6 +39,8 @@ npconmode <-
 
 npconmode.formula <-
   function(bws, data = NULL, newdata = NULL, ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
     se <- npValidateScalarLogical(se, "se")
     dots <- list(...)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
@@ -110,6 +112,8 @@ npconmode.formula <-
 
 npconmode.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npconmode, .np_retained_training_args(
@@ -513,6 +517,8 @@ npconmode.conbandwidth <-
             gradients = FALSE,
             level = NULL,
             ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

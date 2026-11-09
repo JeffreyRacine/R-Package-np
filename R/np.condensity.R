@@ -27,6 +27,8 @@ npcdens <-
 
 npcdens.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
 
     dots <- list(...)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
@@ -103,6 +105,8 @@ npcdens.formula <-
 
 npcdens.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npcdens, .np_retained_training_args(
@@ -119,6 +123,8 @@ npcdens.conbandwidth <- function(bws,
                                  proper.method = c("project"),
                                  proper.control = list(),
                                  ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

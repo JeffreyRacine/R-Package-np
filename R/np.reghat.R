@@ -12,7 +12,7 @@ npreghat <-
     args <- .np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment(),
       data.roles = c("txdat", "y"), call = sys.call(), caller = parent.frame(),
-      omit.subset = FALSE)
+      omit.subset = TRUE)
 
     if (!missing(bws)){
       # A fitted model owns a registered method; its call is not a bandwidth
@@ -2046,6 +2046,8 @@ npreghat <-
 
 npreghat.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
 
     dots <- list(...)
     tt <- terms(bws)
@@ -2090,6 +2092,8 @@ npreghat.formula <-
 
 npreghat.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     dots <- list(...)
@@ -2103,6 +2107,8 @@ npreghat.call <-
 
 npreghat.npregression <-
   function(bws, txdat, y, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     model <- bws
@@ -2132,6 +2138,8 @@ npreghat.rbandwidth <-
            ridge = 0.0,
            s = NULL,
            ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

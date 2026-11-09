@@ -1336,6 +1336,8 @@ npqreg <-
 
 npqreg.formula <-
   function(bws, data = NULL, newdata = NULL, ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
     se <- npValidateScalarLogical(se, "se")
     dots <- list(...)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
@@ -1412,6 +1414,8 @@ npqreg.formula <-
 
 npqreg.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npqreg, .np_retained_training_args(
@@ -1448,6 +1452,8 @@ npqreg.condbandwidth <-
            tol = 1.490116e-04,
            small = 1.490116e-05, itmax = 10000,
            ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

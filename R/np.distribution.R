@@ -28,6 +28,8 @@ npudist <-
 
 npudist.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
 
     dots <- list(...)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
@@ -80,6 +82,8 @@ npudist.formula <-
 
 npudist.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npudist, .np_retained_training_args(
@@ -90,6 +94,8 @@ npudist.dbandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
            edat, ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

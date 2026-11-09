@@ -2118,6 +2118,8 @@ nplsqreg.default <-
         logical(1L))]
       if (length(controls))
         .nplsqreg_stored_training_error(controls)
+      # This owner has consumed the accepted NULL/TRUE no-op subset.
+      dots$subset <- NULL
     }
     native.newdata <- dots$newdata
     dots$newdata <- NULL

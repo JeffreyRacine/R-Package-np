@@ -27,6 +27,8 @@ npplreg <-
 
 npplreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
     se <- npValidateScalarLogical(se, "se")
     dots <- list(...)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
@@ -89,6 +91,8 @@ npplreg.formula <-
 
 npplreg.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npplreg, .np_retained_training_args(
@@ -496,6 +500,8 @@ npplreg.plbandwidth <-
            tydat = stop("training data tydat missing"),
            tzdat = stop("training data tzdat missing"),
            exdat, eydat, ezdat, residuals = FALSE, ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

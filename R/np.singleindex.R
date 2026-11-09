@@ -69,6 +69,9 @@ npindex <-
 npindex.formula <-
     function(bws, data = NULL, newdata = NULL, y.eval = NULL,
              se = TRUE, ..., se.type = c("asymptotic", "bootstrap")){
+    if (!inherits(bws, "formula"))
+      .np_reject_fit_subset(substitute(list(...))[-1L])
+
 
         if (!is.null(y.eval)) y.eval <- npValidateScalarLogical(y.eval, "y.eval")
         raw.formula <- inherits(bws, "formula")
@@ -231,6 +234,8 @@ npindex.formula <-
 
 npindex.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npindex, .np_retained_training_args(
@@ -687,6 +692,8 @@ npindex.sibandwidth <-
            gradients = FALSE,
            residuals = FALSE, ..., se.type = c("asymptotic", "bootstrap"),
            y.eval = NULL) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

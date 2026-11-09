@@ -29,6 +29,8 @@ npscoef <-
 npscoef.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
            se = FALSE, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
 
     dots <- list(...)
     npRejectLegacyBooleanErrors(dots, "npscoef")
@@ -129,6 +131,8 @@ npscoef.formula <-
 
 npscoef.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     roles <- c(txdat = "xdat", tydat = "ydat")
@@ -1434,6 +1438,8 @@ npscoef.scbandwidth <-
            residuals = FALSE,
            tol = .Machine$double.eps,
            ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     npRejectLegacyBooleanErrors(list(...), "npscoef")
