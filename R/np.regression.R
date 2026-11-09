@@ -242,6 +242,8 @@ npreg <-
 npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
            se = FALSE, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
 
     dots <- list(...)
     npRejectLegacyBooleanErrors(dots, "npreg")
@@ -379,6 +381,8 @@ npreg.formula <-
 
 npreg.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     ev <- do.call(npreg, .np_retained_training_args(
@@ -407,6 +411,8 @@ npreg.rbandwidth <-
            exdat, eydat, gradient.order = 1L, gradients = FALSE,
            residuals = FALSE, se = FALSE,
            ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_regression_forward(.npreg_fit_impl, environment(),
     match.call(expand.dots = FALSE), match.call(), parent.frame(),
     substitute(tydat), substitute(list(...))[-1L], TRUE)

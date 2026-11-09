@@ -27,6 +27,8 @@ npcdist <-
 
 npcdist.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
     dots <- list(...)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
     dots$.np.formula.state <- NULL
@@ -102,6 +104,8 @@ npcdist.formula <-
 
 npcdist.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npcdist, .np_retained_training_args(
@@ -119,6 +123,8 @@ npcdist.condbandwidth <-
            proper.method = c("isotonic"),
            proper.control = list(),
            ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

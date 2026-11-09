@@ -27,6 +27,8 @@ npudens <-
 
 npudens.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
 
     dots <- list(...)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
@@ -90,6 +92,8 @@ npudens.formula <-
 
 npudens.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npudens, .np_retained_training_args(
@@ -100,6 +104,8 @@ npudens.bandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
            edat, ..., se = FALSE){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

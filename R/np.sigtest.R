@@ -37,6 +37,8 @@ npsigtest <-
 
 npsigtest.formula <-
   function(bws, data = NULL, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
 
     state.index <- match(".np.formula.state",
                          names(substitute(list(...))[-1L]), nomatch = 0L)
@@ -76,6 +78,8 @@ npsigtest.formula <-
 
 npsigtest.call <-
   function(bws, ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     ev <- npsigtest(xdat = .np_eval_bws_call_arg(bws, "xdat"),
@@ -88,6 +92,8 @@ npsigtest.call <-
 
 npsigtest.npregression <-
   function(bws, ...){
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
     ev <- npsigtest(bws$bws, ...)
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
@@ -536,6 +542,8 @@ npsigtest.rbandwidth <- function(bws,
                                  index = seq_len(ncol(xdat)),
                                  random.seed = 42,
                                  ...) {
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
 

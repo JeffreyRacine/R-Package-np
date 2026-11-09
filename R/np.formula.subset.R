@@ -1,3 +1,12 @@
+# A stored fit owns its training sample. Inspect supplied syntax only: unused
+# replacement subsets must never be forced outside the original data mask.
+.np_reject_fit_subset <- function(expressions) {
+  if ("subset" %in% names(expressions))
+    stop("replacement subset is not supported with this stored bandwidth or fit; subset the input data explicitly or select new bandwidths with a formula subset",
+         call. = FALSE)
+  invisible(NULL)
+}
+
 # Reconstructed calls must consume the original promise, not replay its
 # expression. Keep this reference transient: public calls retain their original
 # syntax and the model-frame owner still controls subset/NA evaluation order.

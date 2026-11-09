@@ -1419,6 +1419,9 @@ npcopula.default <- function(bws,
                              n.quasi.inv = 1000,
                              er.quasi.inv = 1,
                              ..., se = FALSE) {
+  if (!missing(bws) && inherits(bws, c("bandwidth", "dbandwidth")))
+    .np_reject_fit_subset(substitute(list(...))[-1L])
+
   se <- npValidateScalarLogical(se, "se")
   dots <- .np_formula_dispatch_args(
     NULL, substitute(list(...))[-1L], environment())
