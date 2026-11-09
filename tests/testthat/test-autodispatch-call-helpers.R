@@ -59,7 +59,7 @@ test_that(".npRmpi_autodispatch_call delegates with public metadata", {
   expect_length(calls, 1L)
   expect_identical(calls[[1L]], quote(.npRmpi_distributed_call_impl(
     mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE,
-    public.metadata = metadata)))
+    public.metadata = metadata, automatic = TRUE)))
 })
 
 test_that(".npRmpi_manual_distributed_call delegates to shared distributed-call helper", {
