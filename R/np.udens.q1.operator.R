@@ -7,7 +7,7 @@
   plan
 }
 
-.np_udens_q1_operator_rule <- function(theta,plan,outer) {
+.np_udens_q1_operator_rule <- function(theta,plan,outer,keep.log=FALSE) {
   if(length(outer)!=1L || !outer%in%c(128L,256L))
     stop('invalid q1 plot operator refinement',call.=FALSE)
   order<-if(outer==128L)64L else 96L
@@ -22,6 +22,8 @@
   softplus<-function(t)pmax(t,0)+log1p(exp(-abs(t)))
   lv<--softplus(-t);l1v<--softplus(t);T<-cbind(lv,l1v)
   lw<-drop(T%*%theta)+lv+l1v+log(qw);A<-.np_udens_beta_logsum(lw)
-  p<-exp(lw-A);p<-p/sum(p);mean<-drop(crossprod(p,T));D<-sweep(T,2,mean)
-  list(A=A,mean=mean,I=crossprod(D,D*p),lv=lv,l1v=l1v,T=T,prob=p,nodes=length(t))
+  p<-exp(lw-A);total<-sum(p);p<-p/total;mean<-drop(crossprod(p,T));D<-sweep(T,2,mean)
+  out<-list(A=A,mean=mean,I=crossprod(D,D*p),lv=lv,l1v=l1v,T=T,prob=p,nodes=length(t))
+  if(keep.log)out$log.prob<-lw-A-log(total)
+  out
 }
