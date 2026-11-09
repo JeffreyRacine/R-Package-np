@@ -81,6 +81,26 @@ test_that("unconditional NN Gaussian plots and unavailable grids keep their shap
   bw <- npudensbw(dat = x, bws = .7, ckerorder = 4,
                   bandwidth.compute = FALSE)
   fit <- npudens(bws = bw, tdat = x)
+  # Fixed signed Gaussian kernels gained joint variability support. Keep the
+  # public finite-grid check and independently verify the order-four kernel.
+  out <- capture_plot_provider(plot(fit, errors = "asymptotic", band = "simultaneous",
+                                    output = "data", neval = 7))$provider
+  expect_equal(nrow(out[[1L]]$derr), 7L)
+  expect_true(all(is.finite(out[[1L]]$derr)))
+  ex <- out[[1L]]$eval
+  K <- outer(ex[[1L]], x$x, function(a, b) {
+    u <- (a - b) / .7
+    (3 - u^2) * dnorm(u) / (2 * .7 * nrow(x))
+  })
+  owner <- .np_plot_density_unconditional(bw, x, ex)
+  A <- K - rowMeans(K)
+  expect_equal(owner$estimate, rowSums(K), tolerance = 1e-12)
+  expect_equal(tcrossprod(owner$A), tcrossprod(A), tolerance = 1e-12)
+
+  # Higher-order nearest-neighbour joint variability is still excluded.
+  bw <- npudensbw(dat = x, bws = 25, bwtype = "adaptive_nn", ckerorder = 4,
+                  bandwidth.compute = FALSE)
+  fit <- npudens(bws = bw, tdat = x)
   expect_warning(out <- capture_plot_provider(plot(fit, errors = "asymptotic", band = "simultaneous",
                               output = "data", neval = 7))$provider, "kernel specification")
   expect_equal(nrow(out[[1L]]$derr), 7L)
