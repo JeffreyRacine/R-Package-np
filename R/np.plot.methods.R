@@ -637,6 +637,15 @@ np_render_control <- function(style = c("band", "bar"),
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   if (!owns.empty.rows && inherits(bws, c("bandwidth", "dbandwidth"))) {
+    # Compact inference owns a child seed in addition to this outer scope.
+    # Forward the request without bypassing either existing RNG admission guard.
+    if (.np_udens_compact_request(bws, dots$bias.control,
+        dots$plot.errors.center, dots$plot.errors.method,
+        dots$plot.errors.boot.calibration,
+        identical(dots$plot.errors.boot.method, "inid") &&
+          isTRUE(dots$plot.errors.type %in%
+            c("pointwise", "simultaneous", "bonferroni", "all"))))
+      dots$random.seed <- random.seed
     value <- .np_plot_progress_run(
       .np_with_seed(random.seed, .np_udens_resolution_run(
         do.call(method, c(list(bws = bws), dots)))),
