@@ -1,0 +1,21 @@
+test_that("signed Gaussian public endpoints use the simultaneous critical value", {
+  old<-options(np.messages=FALSE);on.exit(options(old),add=TRUE)
+  set.seed(835);x<-data.frame(x=rnorm(80));h<-.7;n<-nrow(x)
+  bw<-npudensbw(dat=x,bws=h,ckerorder=4L,bandwidth.compute=FALSE)
+  fit<-npudens(bws=bw,tdat=x)
+  out<-plot(fit,errors="asymptotic",band="simultaneous",output="data",neval=7L)
+  d<-as.data.frame(out,panel=1L,band="simultaneous")
+  K<-outer(d$eval_1,x$x,function(a,b){u<-(a-b)/h;(3-u^2)*dnorm(u)/(2*h*n)})
+  A<-K-rowMeans(K);V<-tcrossprod(A);R<-V/sqrt(outer(diag(V),diag(V)))
+  expect_equal(d$estimate,rowSums(K),tolerance=1e-12)
+  expected.se<-sqrt(pmax(rowSums(K),0)*27/(32*sqrt(pi))/(n*h))
+  expect_equal(d$std_error,expected.se,tolerance=1e-12)
+  set.seed(904);z<-t(chol(R))%*%matrix(rnorm(7L*99999L),7L)
+  reference<-unname(quantile(apply(abs(z),2L,max),.95,type=1L))
+  upper<-(d$upper-d$estimate)/d$std_error
+  lower<-(d$estimate-d$lower)/d$std_error
+  expect_lt(max(abs(upper-reference)),.06)
+  expect_equal(lower,upper,tolerance=1e-12)
+  expect_gt(min(upper),qnorm(.975)+.1)
+  expect_lt(max(upper),qnorm(1-.05/14)-.02)
+})
