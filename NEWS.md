@@ -1,5 +1,7 @@
 # np 0.80-2 (development)
 
+* Estimate-centered uniform density joint plot bands now admit known one-sided and partially bounded supports in one or two continuous dimensions, preserving the fitted curve and marginal standard errors.
+
 * Plot grid controls now use both requested quantile endpoints on each
   numeric X margin, rather than recycling them as symmetric trim amounts.
   Default grids, categorical levels and legacy internal trim inputs are unchanged.

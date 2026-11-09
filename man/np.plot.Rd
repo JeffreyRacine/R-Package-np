@@ -1088,8 +1088,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   Estimate-centered unconditional density plots also support finite-grid
   asymptotic simultaneous variability bands for fixed-bandwidth uniform kernels
-  with one or two continuous coordinates, either unbounded or with finite
-  known \code{ckerbound="fixed"} bounds. Empirical kernel-contribution
+  with one or two continuous coordinates, either unbounded or with known
+  \code{ckerbound="fixed"} bounds, including one-sided and partially
+  bounded supports. Empirical kernel-contribution
   correlations are rescaled to the existing marginal standard errors; the
   Gaussian maximum is calibrated over the declared grid, not a continuum.
   These bands do not correct smoothing bias or account for bandwidth selection.
