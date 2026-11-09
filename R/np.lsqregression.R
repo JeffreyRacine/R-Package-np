@@ -1180,7 +1180,7 @@ nplsqregbw.formula <-
     tmf[["formula"]] <- tt
     if (!missing(data) && !is.null(data))
       tmf[["data"]] <- data
-    mf.args <- as.list(tmf)[-1L]
+    mf.args <- .np_formula_frame_promises(as.list(tmf)[-1L], environment())
     if (!is.null(dots$scale)) mf.args$.np.auxiliary <- list(scale = dots$scale)
     mf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
     if (!is.null(dots$scale)) dots$scale <- mf[["(scale)"]]
@@ -1759,6 +1759,7 @@ nplsqreg.formula <-
         dots$scale <- mf[["(scale)"]]
       dots$bws <- bws
     } else {
+      mf.args <- .np_formula_frame_promises(mf.args, environment())
       mf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
       if (!is.null(dots$scale)) dots$scale <- mf[["(scale)"]]
     }
