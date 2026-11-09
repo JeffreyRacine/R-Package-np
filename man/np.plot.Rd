@@ -743,8 +743,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   refuses Box--Muller requests above its 16 MiB limit, before internal replay.
   This backstop uses the training data after the original data/NA processing;
   it does not evaluate those callbacks again. Unlike the early check, it runs
-  inside the existing plot seed scope, so the caller-continuation limitation
-  below still applies.
+  inside the existing plot seed scope, whose caller-state admission and
+  restoration contract is described below.
   Known unsafe Box--Muller replay is refused before seeding for corrected
   Gaussian regression above the 16 MiB retained-innovation limit when ordinary
   training data are already available, and for multi-tile fixed numeric joint
@@ -758,7 +758,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   owner when multiple target tiles require replay and the innovation cache is
   unavailable. Cached and single-tile paths retain their existing behavior.
   The resolved check does not reevaluate data or NA callbacks, and runs inside
-  the existing seed scope; the caller-continuation limitation below still applies.
+  the existing seed scope, which separately admits and restores caller state.
   At the shared resolved seed-only replay owner, a nonempty custom seed
   payload is also insufficient: user-supplied uniform generators, and
   user-supplied normal generators when the requested draws consume normal
@@ -770,13 +770,18 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   These checks are bounded: other reconstruction and RNG replay cases remain
   unqualified; non-refusal is not a general RNG safety certificate.
 
-  \code{random_seed} (default 42) controls reproducible calibration. The
-  temporary seed scope restores the visible \code{.Random.seed} binding (or
-  its absence), but does not restore hidden generator state, such as a pending
-  Box--Muller normal or custom state not represented by \code{.Random.seed}.
-  Consequently, subsequent caller draws can differ. This continuation limitation
-  is distinct from replay correctness within the current band calculation;
-  visible seed restoration alone does not establish either guarantee.
+  \code{random_seed} (default 42) controls reproducible calibration. Before
+  changing the seed, a temporary seed scope checks that caller state can be
+  restored. It refuses Box--Muller and uncertifiable user-supplied generator
+  state, including hidden state absent from \code{.Random.seed}; it never
+  silently substitutes a generator. For admitted built-in states, it restores
+  caller continuation and the original seed binding (including its absence).
+  Users may explicitly select a supported built-in generator and set a seed.
+  Deterministic fixed-bound beta and FG-D requests that do not enter a temporary
+  seed scope retain their existing behavior, including under Box--Muller.
+  Scope restoration is separate from replay admission within a calculation:
+  retained innovations can qualify replay without certifying a seed reset.
+  These guarantees do not certify arbitrary RNG changes made by user callbacks.
   For the standard asymptotic Gaussian calibration described above (excluding
   the fixed-bound beta and FG-D guide-region constructions), a
   \code{gaussian_draws} count below

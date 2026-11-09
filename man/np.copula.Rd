@@ -316,12 +316,14 @@ surface plots.
 
   \item{gaussian_draws, random_seed}{
     Gaussian maximum simulation count and reproducible seed for asymptotic
-    \code{band="simultaneous"} or \code{band="all"}. The temporary seed scope
-    restores the visible \code{.Random.seed} binding (or its absence).
-    Hidden generator state, including a pending Box--Muller normal or custom
-    state not represented by \code{.Random.seed}, is not restored, so later
-    caller draws can differ. This is separate from replay within the current
-    band calculation. These controls do not change bootstrap replication counts.
+    \code{band="simultaneous"} or \code{band="all"}. Before changing the
+    seed, the temporary seed scope refuses Box--Muller and uncertifiable
+    user-supplied generator state that cannot be restored from the seed
+    representation. Admitted built-in states retain caller continuation and
+    the original \code{.Random.seed} binding (including its absence).
+    The package does not silently change generators. This admission is
+    separate from replay within the current band calculation. These controls
+    do not change bootstrap replication counts.
   }
 
   \item{errors}{

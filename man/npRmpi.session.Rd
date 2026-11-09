@@ -182,7 +182,7 @@ requested resampling law. The package does not automatically choose another
 generator. To use a guarded route, explicitly select a built-in uniform
 generator before the call, for example
 \code{RNGkind(kind="Mersenne-Twister")}, and then set the desired seed.
-The plotting argument \code{random.seed} sets a seed; it does not select a
+The plotting argument \code{random_seed} sets a seed; it does not select a
 different RNG implementation.
 
 Loading a generator library is distinct from initializing it for R, and a seed
@@ -190,8 +190,11 @@ vector need not contain all of a custom generator's state. The separate
 \code{\link{npsigtest}} bootstrap planner is not qualified for distributed
 user-supplied uniform replay and refuses such saved bootstrap plans inside
 its existing task failure boundary. Use a built-in uniform generator for that
-distributed bootstrap. This refusal does not certify hidden caller-state
-restoration by temporary seed scopes. The shared bootstrap task-state transport also
+distributed bootstrap. Temporary seed scopes separately refuse Box--Muller
+and uncertifiable custom caller states before a seed reset or state swap;
+admitted built-in states preserve caller continuation and seed-binding absence.
+Uniform-only task transport does not by itself certify a seed reset. The shared
+bootstrap task-state transport also
 refuses user-supplied normal generators when its tasks draw normal variates,
 before advancing or publishing those tasks. Loading the implementation on
 every rank does not certify its hidden state. An unused custom normal generator
