@@ -1,0 +1,10 @@
+test_that("public pool reinitialization refuses a real worker identity mismatch", {
+ skip_on_cran()
+ if(.mpi_suite_pool_owned())skip("identity quarantine runs in its required standalone subprocess lane")
+ code<-readLines(testthat::test_path("fixtures","worker-identity-admission.R"),warn=FALSE)
+ env<-npRmpi_subprocess_env(c("_R_CHECK_PACKAGE_NAME_=","NP_RMPI_TEST_SUITE_POOL=","R55_IDENTITY_MODE=reuse","R55_IDENTITY_MUTANT="))
+ if(is.null(env))stop("required identity contract has no installed package path")
+ result<-npRmpi_run_rscript_subprocess(code,timeout=60L,env=env,cleanup=FALSE)
+ expect_identical(result$status,0L)
+ expect_true(any(grepl("IDENTITY_ADMISSION_PASS",result$output,fixed=TRUE)))
+})
