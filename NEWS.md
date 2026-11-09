@@ -1,5 +1,8 @@
 # np 0.80-2 (development)
 
+* Single-index plot grids now honor the requested quantile range of the fitted
+  index. Slice-holding `xq` controls are rejected for this single-axis plot.
+
 * Formula estimator calls now reuse a supplied numeric bandwidth expression once, including side effects and random expressions.
 
 * The plot-only normal reference guide now satisfies both existing score

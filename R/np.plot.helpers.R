@@ -8959,11 +8959,13 @@ plotFactor <- function(f, y, ...){
                                            xdat,
                                            neval,
                                            trim = 0.0,
-                                           where = "plot.singleindex") {
+                                           where = "plot.singleindex",
+                                           probs = NULL) {
   xdat <- adjustLevels(toFrame(xdat), bws$xdati)
   neval <- .np_plot_validate_neval(neval, where = where)
   index.train <- as.vector(toMatrix(xdat) %*% bws$beta)
-  bounds <- trim.quantiles(index.train, trim = trim)
+  bounds <- if (is.null(probs)) trim.quantiles(index.train, trim = trim) else
+    stats::quantile(index.train, probs = probs, names = FALSE)
   index.eval <- seq(bounds[1L], bounds[2L], length.out = neval)
 
   list(
