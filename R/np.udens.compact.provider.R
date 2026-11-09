@@ -1,6 +1,8 @@
 # A single finite target family, with common innovations for both covariance laws.
 .np_udens_compact_hidden <- function(x,h,grid,kernel,alpha,band,B=9999L,seed=42L,
-                                    progress=function(...)NULL) {
+                                    progress=function(...)NULL,variant='asymptotic') {
+  if(!identical(variant,'asymptotic'))
+    return(.np_udens_compact_sd_hidden(x,h,grid,kernel,alpha,variant,band,B,seed,progress))
   if(!is.numeric(x)||length(x)<10L||!is.numeric(grid)||!length(grid)||
      any(!is.finite(c(x,grid,h)))||any(x<=0|x>=1)||any(grid<=0|grid>=1)||
      length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1||
