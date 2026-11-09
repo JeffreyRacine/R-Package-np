@@ -122,7 +122,7 @@
     progress(paste('reference pilot',level),1L,1L)
     vr <- .np_udens_q1_operator_rule(theta,variance.plan,outer[level])
     qp <- .np_udens_q1_operator_plan(tq,h,grid)
-    qr <- .np_udens_q1_operator_rule(tq,qp,outer[level])
+    qr <- .np_udens_q1_operator_rule(tq,qp,outer[level],keep.log=TRUE)
     for(key in c("A","mean","I")) .np_udens_beta_check(qr[[key]],sq[[key]],
       paste("normal operator variance guide",key),if(key=="mean")1e-10 else 1e-9)
     extra.workspace <- .np_udens_q1_variance_workspace(n,min(32L,length(grid)),
@@ -135,7 +135,7 @@
     .np_udens_beta_check(vw$normal,p$normal,'normal cross-rule normalization')
     # The variance-guide nodes provide a second evaluation of the SAME Q law.
     qst<-qr
-    qst$prob<-qr$prob*exp(drop(qr$T%*%(theta-tq))+qr$A-st$A)
+    qst$prob<-exp(qr$log.prob+drop(qr$T%*%(theta-tq))+qr$A-st$A)
     .np_udens_beta_check(sum(qst$prob),1,'normal cross-guide mass',1e-10)
     qw<-.np_udens_q1_ratio_weights(x,theta,st$A,qst)
     .np_udens_beta_check(qw$normal,p$normal,'normal cross-guide normalization')
