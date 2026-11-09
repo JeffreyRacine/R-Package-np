@@ -58,11 +58,13 @@ test_that("smooth coefficient plot terms identify the selected coefficient", {
       expect_true(all(is.na(out$targets$term)))
       snapshots[[paste0("gradient-", gradient)]] <- out
     }
-    out <- plot(fit, neval = 5L, perspective = FALSE, coef = TRUE,
-                coef_index = 4L, output = "data")
-    expect_true(all(out$targets$term == "b"))
-    for (k in seq_along(out$panels))
-      expect_identical(out$panels[[k]]$values, snapshots[["3"]]$panels[[k]]$values)
+    before.invalid <- serialize(fit, NULL)
+    rng.before.invalid <- .Random.seed
+    expect_error(plot(fit, neval = 5L, perspective = FALSE, coef = TRUE,
+                      coef_index = 4L, output = "data"),
+                 "coef_index exceeds the 3 available coefficients", fixed = TRUE)
+    expect_identical(serialize(fit, NULL), before.invalid)
+    expect_identical(.Random.seed, rng.before.invalid)
   }
   if (nzchar(Sys.getenv("N5_SNAPSHOT"))) saveRDS(snapshots, Sys.getenv("N5_SNAPSHOT"))
 })
