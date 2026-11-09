@@ -228,8 +228,7 @@ nplsqregbw <-
     stop("'ydat' must be a vector")
   if (nrow(xdat) != length(ydat))
     stop("number of explanatory data and response data do not match")
-  if (is.factor(ydat))
-    stop("nplsqreg requires a numeric dependent variable", call. = FALSE)
+  .np_require_numeric_response(ydat, "nplsqreg", "ydat")
   ydat <- as.numeric(ydat)
 
   rows.omit <- attr(na.omit(data.frame(xdat, .nplsqreg_y = ydat)),
