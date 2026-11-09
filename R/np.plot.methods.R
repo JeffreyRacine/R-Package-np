@@ -448,7 +448,8 @@ np_render_control <- function(style = c("band", "bar"),
     dots$grid.control <- NULL
     if (!is.null(ctrl$xtrim))
       dots <- .np_plot_set_normalized_arg(dots, "grid_control$xtrim",
-                                          "xtrim", ctrl$xtrim)
+                                          "xtrim", structure(list(probs = ctrl$xtrim),
+                                            class = "np_plot_trim_range"))
     if (!is.null(ctrl$xq))
       dots <- .np_plot_set_normalized_arg(dots, "grid_control$xq",
                                           "xq", ctrl$xq)
@@ -1200,6 +1201,7 @@ np_render_control <- function(style = c("band", "bar"),
 }
 
 .np_plot_conmode_resolve_xtrim <- function(xtrim) {
+  if (inherits(xtrim, "np_plot_trim_range")) xtrim <- xtrim$probs
   if (!is.numeric(xtrim) || length(xtrim) != 2L ||
       any(is.na(xtrim)) || any(xtrim < 0) || any(xtrim > 1) ||
       xtrim[1L] >= xtrim[2L])

@@ -472,21 +472,21 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   median.
 
   The slice itself is evaluated on a uniformly spaced sequence of
-  \eqn{neval} points. The interval of evaluation is determined by the
-  training data. The default behavior is to evaluate from
-  \code{min(txdat[,i])} to \code{max(txdat[,i])}. The \code{xtrim}
-  variable allows for control over this behavior. When \code{xtrim} is
-  set, data is evaluated from the \code{xtrim[i]}th quantile of
-  \code{txdat[,i]} to the \code{1.0-xtrim[i]}th quantile of
-  \code{txdat[,i]}.
+  \eqn{neval} points. By default its limits are the training-data minimum
+  and maximum. Use \code{grid_control = np_grid_control(xtrim = c(a, b))}
+  to select the \code{a} and \code{b} quantiles for each numeric variable
+  in the X block, with \code{0 <= a < b <= 1}. This pair is a range,
+  not a separate trim amount for each variable. Single-index plots apply
+  it to the fitted index. Categorical grids continue to use their levels.
+  In conditional and semiparametric plots it does not alter the separate
+  response or auxiliary-variable grid controls.
 
-  Furthermore, \code{xtrim} can be set to a negative
-  value in which case it will expand the limits of the evaluation
-  interval beyond the support of the training data, by measuring the
-  distance between \code{min(txdat[,i])} and the \code{xtrim[i]}th
-  quantile of \code{txdat[,i]}, and extending the support by that
-  distance on the lower limit of the interval. \code{plot} uses an
-  analogous procedure to extend the upper limit of the interval.
+  Direct \code{xtrim} arguments to the legacy density, distribution,
+  regression, conditional and semiparametric engines retain their original
+  meaning: one symmetric tail proportion per X variable (a scalar is recycled).
+  Negative proportions expand the grid limits by the corresponding tail
+  distances. This legacy direct-argument convention is distinct from the
+  ordered range in \code{np_grid_control()}.
 
   Numeric estimator output follows R's extended-real conventions:
   mathematically defined one-sided limits are retained as \code{-Inf} or

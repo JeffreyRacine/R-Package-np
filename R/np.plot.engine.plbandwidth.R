@@ -154,7 +154,7 @@
     xq = double(bws$xndim)+xq
     zq = double(bws$zndim)+zq
     
-    xtrim = double(bws$xndim)+xtrim
+    xtrim = .np_plot_recycle_xtrim(xtrim, bws$xndim)
     ztrim = double(bws$zndim)+ztrim
 
 
