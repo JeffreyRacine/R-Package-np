@@ -181,7 +181,7 @@
   # original default's formal map still owns positional native/data slots.
   names(tagged)[formula.index] <- "formula"
   roles <- match.call(function(formula, data, subset, na.action, call,
-                              gdata = NULL, ...) NULL, tagged, expand.dots = FALSE)
+                              gdata = NULL, ..., bws = NULL) NULL, tagged, expand.dots = FALSE)
   dots <- eval(quote(substitute(list(...))), envir = frame)[-1L]
   dot.names <- names(dots)
   if (is.null(dot.names)) dot.names <- rep("", length(dots))
@@ -189,7 +189,9 @@
   native.names <- names(native.dots)
   if (is.null(native.names)) native.names <- rep("", length(native.dots))
   expressions <- list()
-  for (name in intersect(c("data", "na.action", "gdata"), names(roles))) {
+  # Numeric bandwidths may already have been forced by generic dispatch.
+  # Reuse that same promise, just as for the formula's data/NA arguments.
+  for (name in intersect(c("data", "na.action", "gdata", "bws"), names(roles))) {
     index <- roles[[name]]
     formal <- names(map)[vapply(names(map), function(n)
       identical(native[[n]], index), logical(1L))]
@@ -267,8 +269,12 @@
     list2env(native$values, parent = caller_env) else caller_env
   result <- eval(native$call, envir = value.env)
   if (is.list(result) && is.call(result[["call"]])) {
-    for (name in intersect(names(native$expressions), names(result[["call"]])))
-      result[["call"]][[name]] <- native$expressions[[name]]
+    for (name in names(native$expressions)) {
+      if (name %in% names(result[["call"]]))
+        result[["call"]][[name]] <- native$expressions[[name]]
+      else if (name %in% names(result[["call"]][["..."]]))
+        result[["call"]][["..."]][[name]] <- native$expressions[[name]]
+    }
     if (identical(environment(result[["call"]]), value.env))
       environment(result[["call"]]) <- caller_env
   }
