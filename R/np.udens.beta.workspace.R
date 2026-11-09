@@ -6,14 +6,14 @@
      !is.numeric(workers)||length(workers)!=1L||!is.finite(workers)||workers<0)
     stop('invalid beta plot workspace geometry',call.=FALSE)
   if(q==1L) {
-    nodes<-.np_udens_beta_marginal_rule(theta,256L)$nodes
+    nodes<-max(.np_udens_beta_marginal_rule(theta,256L)$nodes,variance.nodes)
     rows<-if(full)m else tile
     moments<-8*(10*rows*nodes+5*rows^2+6*rows*n+32*nodes+12*n+32*m)
     # Common-guide rules use bounded draw tiles, but retain B-by-target means.
     bootstrap<-8*(10*tile*8192+10*8192*32+8*B*tile+6*n*tile+20*B+12*n)
     factor<-8*(4*m^2+6*m*64+4*B+20*m)
     extra<-if(variance.nodes>0L).np_udens_q1_variance_workspace(n,rows,
-      .np_udens_beta_marginal_rule(theta,128L)$nodes,variance.nodes) else 0
+      0L,variance.nodes) else 0
     stages<-c(moments=max(moments,extra),calibration=if(full)factor else bootstrap)
   } else {
     nodes<-vapply(c(32L,64L),function(order)vapply(1:2,function(j)

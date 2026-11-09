@@ -12,6 +12,12 @@
 * Formula selectors and conditional/grid model frames consume original data
   and NA-policy promises once, preserving saved calls, subset evaluation,
   RNG state ownership and MPI behavior.
+* Known-fixed-bound univariate uniform and Epanechnikov density plots now
+  support explicit corrected asymptotic pointwise, Bonferroni, simultaneous
+  and all bands through a plot-only local-cubic guide/residual construction.
+  Existing methods, core estimates and se=FALSE are unchanged. Bootstrap,
+  range bounds, literal endpoints and multivariate compact correction remain
+  outside this new construction.
 
 * MPI session reinitialization preserves open attach-pool ownership and reuses
   its workers without repeating startup collectives. Invalid profile-to-attach
@@ -21,6 +27,10 @@
   the existing all-rank command context to select one collective search owner.
   Explicit manual broadcasts remain coherent after pool adoption; rank-local
   services, ordinary automatic dispatch and both RNG safety guards are preserved.
+
+* Fixed-bound univariate density plot bands now resolve narrow corrected-score
+  means and guide projections on the same positive quadrature measure as their
+  covariance. Statistical formulas, tolerances and core estimates are unchanged.
 
 * Formula/IV argument forwarding reads bandwidth fields by exact name, so
   `bwsolver` cannot be mistaken for `bws` or suppress the requested IV seed.
