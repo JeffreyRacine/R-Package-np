@@ -13948,7 +13948,17 @@ uocquantile <- function(x, prob) {
 }
 
 
+# Public grid controls carry an ordered probability range; keep the legacy
+# engine's numeric symmetric-trim contract separate and unchanged.
+.np_plot_recycle_xtrim <- function(trim, n) {
+  if (inherits(trim, "np_plot_trim_range"))
+    return(rep(list(.np_plot_conmode_resolve_xtrim(trim)), n))
+  double(n) + trim
+}
+
 trim.quantiles <- function(dat, trim){
+  if (is.list(trim))
+    return(stats::quantile(dat, probs = trim[[1L]]))
   if (sign(trim) == sign(-1)){
     trim <- abs(trim)
     tq <- quantile(dat, probs = c(0.0, 0.0+trim, 1.0-trim,1.0))

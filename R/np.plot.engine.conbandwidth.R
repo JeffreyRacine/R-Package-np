@@ -181,7 +181,7 @@
     xq = double(bws$xndim)+xq
     yq = double(bws$yndim)+yq
     
-    xtrim = double(bws$xndim)+xtrim
+    xtrim = .np_plot_recycle_xtrim(xtrim, bws$xndim)
     ytrim = double(bws$yndim)+ytrim
 
     if (missing(plot.errors.method) &

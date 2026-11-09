@@ -209,7 +209,7 @@
     ## ydat = as.double(ydat)
 
     xq = double(ncol(xdat))+xq
-    xtrim = double(ncol(xdat))+xtrim
+    xtrim = .np_plot_recycle_xtrim(xtrim, ncol(xdat))
 
     if (!miss.z){
       zq = double(ncol(zdat))+zq

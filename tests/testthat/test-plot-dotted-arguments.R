@@ -50,7 +50,7 @@ test_that("control constructors retain their contract while plot inputs use snak
   expect_identical(out$proper.control,list(mode='slice'))
   expect_identical(out$plot.errors.bar.num,3L)
   expect_identical(out$plot.errors.boot.blocklen,3L)
-  expect_identical(out$xtrim,c(.1,.9))
+  expect_identical(out$xtrim,structure(list(probs=c(.1,.9)),class="np_plot_trim_range"))
   # The canonical dotted key already admits NULL at its existing family owner.
   expect_identical(.np_plot_normalize_public_dots(list(proper_control=NULL)),list(proper.control=NULL))
   expect_error(.np_plot_normalize_public_dots(list(data_overlay=NA)), 'data_overlay',fixed=TRUE)

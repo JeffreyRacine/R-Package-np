@@ -28,7 +28,11 @@
     stop("invalid percentile plot family", call. = FALSE)
   points <- vapply(which(nm), function(j) length(unique(grid[[j]])), integer(1L))
   # Exact original owner for full sample-range Cartesian numeric families.
-  if (all(which(nm) %in% vary) && all(design$xtrim[which(nm)] == 0))
+  full.range <- if (is.list(design$xtrim))
+    all(vapply(design$xtrim[which(nm)], function(x)
+      identical(as.numeric(x), c(0, 1)), logical(1L))) else
+    all(design$xtrim[which(nm)] == 0)
+  if (all(which(nm) %in% vary) && full.range)
     return(list(points = points, builder = NULL))
   prototype <- grid
   indices <- lapply(seq_len(ncol(grid)), function(j) match(grid[[j]], unique(grid[[j]])))

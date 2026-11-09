@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Plot grid controls now use both requested quantile endpoints on each
+  numeric X margin, rather than recycling them as symmetric trim amounts.
+  Default grids, categorical levels and legacy internal trim inputs are unchanged.
+
 * Single-index plot grids now honor the requested quantile range of the fitted
   index. Slice-holding `xq` controls are rejected for this single-axis plot.
 
