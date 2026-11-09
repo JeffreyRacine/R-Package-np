@@ -82,7 +82,8 @@
   stop(refusal)
 }
 
-.np_rng_scope_capture <- function(uniform.only = FALSE, collective = FALSE, deferred = FALSE) {
+.np_rng_scope_capture <- function(uniform.only = FALSE, collective = FALSE, deferred = FALSE,
+                                  same.kind = FALSE) {
   if (!isTRUE(collective)) return(.np_rng_scope_capture_local(uniform.only))
   failure <- NULL
   scope <- tryCatch(.np_rng_scope_capture_local(uniform.only),
@@ -90,6 +91,18 @@
     interrupt = function(e) { failure <<- e; NULL })
   refusal <- .npRmpi_rng_scope_agree(failure, "admission", deferred = deferred)
   if (inherits(refusal, "np_rng_scope_refusal")) return(refusal)
+  # Rank-owned resampling plans require the same generator tuple. Inspect the
+  # certified representation without resetting any rank or drawing a variate.
+  if (isTRUE(same.kind)) {
+    kind <- scope$seed[1L]
+    bounds <- mpi.allreduce(c(kind, -kind), type = 1L, op = "max")
+    if (bounds[1L] != -bounds[2L]) {
+      refusal <- .npRmpi_rng_scope_agree(simpleError(
+        "participating ranks use different RNG kinds; select the same uniform, normal and sample kinds before this test"),
+        "kind agreement", deferred = deferred)
+      if (inherits(refusal, "np_rng_scope_refusal")) return(refusal)
+    }
+  }
   scope$collective <- TRUE
   scope$deferred <- deferred
   scope

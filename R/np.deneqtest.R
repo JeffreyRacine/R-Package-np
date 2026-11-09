@@ -377,7 +377,8 @@ npdeneqtest <- function(x = NULL,
 
   ## Save seed prior to setting
 
-  seed.state <- .np_rng_scope_capture(collective = .npRmpi_rng_scope_collective())
+  seed.state <- .np_rng_scope_capture(collective = .npRmpi_rng_scope_collective(),
+                                      same.kind = TRUE)
   on.exit(.np_rng_scope_restore(seed.state), add = TRUE)
   .np_rng_scope_seed(seed.state, random.seed)
 
