@@ -15,7 +15,7 @@
   upper <- bws[["ckerub", exact = TRUE]]
   identical(bounds, "fixed") && is.numeric(lower) && is.numeric(upper) &&
     length(lower) == bws[["ndim", exact = TRUE]] &&
-    length(upper) == length(lower) && all(is.finite(c(lower, upper))) &&
+    length(upper) == length(lower) && !anyNA(c(lower, upper)) &&
     all(upper > lower)
 }
 

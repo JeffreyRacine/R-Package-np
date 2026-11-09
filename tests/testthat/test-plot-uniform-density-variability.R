@@ -10,7 +10,7 @@ test_that("fixed uniform density admission is narrow and preserves ANN", {
     z$ckerbound <- "fixed"; z$ckerlb <- rep(0,q); z$ckerub <- rep(1,q)
     expect_true(.np_plot_density_uniform_fixed(z,FALSE))
     z$ckerub[1L] <- Inf
-    expect_false(.np_plot_density_uniform_fixed(z,FALSE))
+    expect_true(.np_plot_density_uniform_fixed(z,FALSE))
   }
   for (change in list(list(type="generalized_nn"),list(ckerbound="range"),
                      list(ndim=3L,ncon=3L),list(ndim=2L,ncon=1L),
