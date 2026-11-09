@@ -138,7 +138,9 @@ test_that("fixed-LP bootstrap batch projection has typed transactional failures"
 })
 
 test_that("migrated fixed-LP index and smooth-coefficient consumers match refits", {
-  withr::local_options(npRmpi.local.regression.mode = TRUE)
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+  # Batch helpers use their MPI owner; only explicit refits are local below.
   local_eval <- getFromNamespace(".np_plot_with_local_compiled_eval", "npRmpi")
   set.seed(81702)
   n <- 24L
@@ -221,7 +223,9 @@ test_that("migrated fixed-LP index and smooth-coefficient consumers match refits
 })
 
 test_that("migrated fixed-LP partial and conditional consumers match refits", {
-  withr::local_options(npRmpi.local.regression.mode = TRUE)
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+  # Do not set only the R local flag around a distributed bootstrap batch.
   local_eval <- getFromNamespace(".np_plot_with_local_compiled_eval", "npRmpi")
   set.seed(81703)
   n <- 24L
