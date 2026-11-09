@@ -413,8 +413,18 @@ test_that("registered autodispatch call formals have an explicit transport owner
   # `subset` must remain language for model-frame evaluation.  The internal
   # formula-method `call` formal is deliberately reconstructed by its owner.
   language.or.derived <- c("subset", "call")
+  # R37 derives this internal scope from the executing rank/service owner.
+  # Materializing a caller value would not describe coordinator-only phases.
+  # Keep the exception head-specific so new unowned formals still fail.
+  rank.derived <- formal.pairs$head == "npindexbw.sibandwidth" &
+    formal.pairs$arg == ".rng.collective"
+  expect_identical(
+    formals(get("npindexbw.sibandwidth", envir = ns))[[".rng.collective"]],
+    quote(.npRmpi_rng_scope_collective())
+  )
   unowned <- formal.pairs[
-    !formal.pairs$arg %in% c(targets, language.or.derived), , drop = FALSE
+    !formal.pairs$arg %in% c(targets, language.or.derived) & !rank.derived,
+    , drop = FALSE
   ]
 
   expect_equal(unowned, formal.pairs[FALSE, , drop = FALSE],
