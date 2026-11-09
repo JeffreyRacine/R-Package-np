@@ -1,11 +1,13 @@
-.np_udens_compact_request <- function(bws,control,center,method,calibration=NULL) {
+.np_udens_compact_request <- function(bws,control,center,method,calibration=NULL,sd.explicit=FALSE) {
   inherits(bws,'bandwidth') && is.null(control) &&
     !identical(calibration,'legacy') &&
     isTRUE(bws[['ckertype',exact=TRUE]]%in%c('uniform','epanechnikov')) &&
     isTRUE(bws[['ndim',exact=TRUE]]==1L) && isTRUE(bws[['ncon',exact=TRUE]]==1L) &&
     identical(bws[['type',exact=TRUE]],'fixed') && isTRUE(bws[['ckerorder',exact=TRUE]]==2L) &&
     isTRUE(bws[['ckerbound',exact=TRUE]]%in%c('fixed','range')) &&
-    identical(center,'bias-corrected') && identical(method,'asymptotic')
+    identical(center,'bias-corrected') && (identical(method,'asymptotic') ||
+      (identical(method,'bootstrap') && isTRUE(sd.explicit) &&
+       isTRUE(calibration%in%c('symmetric-sd','asymmetric-sd'))))
 }
 
 .np_udens_compact_active <- function(state) {
@@ -21,7 +23,11 @@
   if( !band%in%c('pointwise','simultaneous','bonferroni','all'))
     stop("Compact corrected bands require explicit band='pointwise', 'simultaneous', 'bonferroni' or 'all'",call.=FALSE)
   variant<-'asymptotic'
-  if(!identical(method,'asymptotic')||!is.null(calibration))
+  if(identical(method,'bootstrap')) {
+    if(!identical(bootstrap,'inid')||!isTRUE(calibration%in%c('symmetric-sd','asymmetric-sd')))
+      stop("Compact corrected SD bands require explicit bootstrap='inid' and symmetric-sd or asymmetric-sd calibration",call.=FALSE)
+    variant<-calibration
+  } else if(!identical(method,'asymptotic')||!is.null(calibration))
     stop('Compact corrected bands require asymptotic errors without bootstrap calibration',call.=FALSE)
   if(!is.data.frame(x)||nrow(x)<10L||ncol(x)!=bws[['ndim',exact=TRUE]]||
      anyDuplicated(names(x))||any(!nzchar(names(x)))||!all(vapply(x,is.numeric,logical(1L)))||any(!is.finite(as.matrix(x))))
@@ -55,7 +61,7 @@
     stop('Compact corrected bands require strictly interior evaluation points; literal support endpoints are excluded',call.=FALSE)
   progress<-function(stage,done,total).np_plot_progress_notify(stage=paste('Compact density:',stage),done=done,total=total,unit='work')
   result<-.np_plot_corrected_activity_run('Constructing fixed-bound Compact density intervals',
-    .np_udens_compact_hidden(state$normalized[,1L],state$h,normalized[,1L],state$kernel,alpha,band,B,state$plot.random.seed,progress))
+    .np_udens_compact_hidden(state$normalized[,1L],state$h,normalized[,1L],state$kernel,alpha,band,B,state$plot.random.seed,progress,variant=state$variant))
   for(key in c('center','lower','upper','pilot_se','empirical_se'))result[[key]]<-result[[key]]/state$jacobian
   if(any(!is.finite(unlist(result[c('center','lower','upper','pilot_se','empirical_se')]))))
     stop('Compact corrected-band output units are not representable',call.=FALSE)
@@ -75,7 +81,8 @@
       critical=result$critical,available.bands=band,
       bounds=cbind(state$lower,state$lower+state$width),bandwidth=state$h*state$width,
       guide.risk=alpha/2,residual.risk=alpha/2,
-      calibration.status='fixed-bound compact cubic complete pilot/empirical residual envelope plus guide region'),
+      calibration.status=if(state$variant=='asymptotic')'fixed-bound compact cubic complete pilot/empirical residual envelope plus guide region'else
+        'fixed-bound compact refitted residual bootstrap at original empirical scale; complete pilot/empirical interval envelope plus guide region'),
     numerical.checks=result$checks)
   out<-list(boot.err=cbind(result$center-result$lower,result$upper-result$center,result$center),
     boot.all.err=NULL,inference=inference,bxp=list())

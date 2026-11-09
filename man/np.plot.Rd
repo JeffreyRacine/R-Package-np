@@ -652,11 +652,26 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   controls retain their own constructions. Observations and evaluation points
   must be strictly inside the supplied finite bounds, with at least ten
   observations. Range-estimated bounds, literal endpoints, nearest-neighbor
-  bandwidths, higher orders, multivariate compact correction, bootstrap
-  correction and normal-scale pmzsd are not admitted by this construction.
+  bandwidths, higher orders, multivariate compact correction and normal-scale
+  pmzsd are not admitted by this construction.
+  For corrected bootstrap bands, supply \code{errors="bootstrap"}, explicit
+  \code{bootstrap="inid"}, an explicit band, and
+  \code{boot_control=np_boot_control(calibration="symmetric-sd")} or
+  \code{boot_control=np_boot_control(calibration="asymmetric-sd")}.
+  Each literal resample refits the guide; the residual functional, rather than
+  the complete corrected curve, is bootstrapped at the original empirical
+  residual scale. The original nonlinear guide region is included once.
+  Complete intervals under the pilot and empirical transport scales are
+  enveloped. Symmetric calibration uses an outward-rounded containing hull;
+  asymmetric calibration inverts signed roots. All three components of
+  \code{band="all"} share one preparation, refit set and stream. Omitted
+  controls retain their existing behavior; this does not select a new default.
   The simultaneous claim concerns the supplied finite family, not a continuum.
-  Saved-sample coverage screening was conservative; it does not guarantee
-  nominal coverage for arbitrary densities or very small samples.
+  Saved-sample screening for these experimental SD bands was substantially
+  conservative, with very wide intervals possible near singular edges. It does
+  not guarantee nominal coverage for arbitrary densities or very small samples.
+  Low finite-draw tail resolution, particularly for Bonferroni bands, is reported
+  without changing \code{B}; defined finite limits are retained.
 
   Default bias-corrected unconditional unbounded Gaussian density plots use the D8
   positive-pilot construction for eligible asymptotic requests; see
