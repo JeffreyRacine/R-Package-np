@@ -4,14 +4,15 @@
 }
 
 
-.np_udens_beta_sphere_accept <- function(value,trial,predicted,newnorm,oldnorm,gtol=0) {
+.np_udens_beta_sphere_accept <- function(value,trial,predicted,newnorm,oldnorm,gtol=0,scale=1+abs(value)) {
   if(trial<=value+1e-4*predicted)return(TRUE)
-  roundoff<-32*.Machine$double.eps*(1+abs(value))
+  roundoff<-32*.Machine$double.eps*max(1+abs(value),scale)
   abs(predicted)<=roundoff && abs(trial-value)<=roundoff &&
     (newnorm<=.5*oldnorm || (oldnorm>gtol && newnorm<=gtol))
 }
 
 .np_udens_beta_sphere <- function(objective,start,maxiter=150L,gtol=1e-7) {
+  value.scale<-function(out)if(is.null(out$roundoff.scale))1+abs(out$value) else out$roundoff.scale
   norm<-function(z)sqrt(sum(z*z));z<-start/norm(start);H<-diag(length(z));history<-list()
   out<-objective(z);value<-out$value;g<-out$gradient;tangent<-g-sum(g*z)*z
   # Frozen five-step BFGS phase, followed by the same bounded Newton polishing.
@@ -27,7 +28,7 @@
       step<-direction*.5^line;length<-norm(step);candidate<-cos(length)*z+sin(length)*step/length
       candidate<-candidate/norm(candidate);trial<-objective(candidate)
       newtangent<-trial$gradient-sum(trial$gradient*candidate)*candidate
-      if(.np_udens_beta_sphere_accept(value,trial$value,.5^line*descent,norm(newtangent),gn,gtol)) {accepted<-TRUE;break}
+      if(.np_udens_beta_sphere_accept(value,trial$value,.5^line*descent,norm(newtangent),gn,gtol,max(value.scale(out),value.scale(trial)))) {accepted<-TRUE;break}
     }
     if(!accepted)stop("beta plot sphere BFGS line-search",call.=FALSE)
     K<-tcrossprod(candidate,z)-tcrossprod(z,candidate)
@@ -37,7 +38,7 @@
     if(sy>1e-10*norm(ss)*norm(yy)) {
       A<-diag(5)-tcrossprod(ss,yy)/sy;H<-A%*%H%*%t(A)+tcrossprod(ss)/sy;H<-(H+t(H))/2
     }
-    z<-candidate;value<-trial$value;tangent<-newtangent
+    z<-candidate;out<-trial;value<-trial$value;tangent<-newtangent
   }
   for(it in seq_len(maxiter-5L)) {
     out<-objective(z);value<-out$value;g<-out$gradient;tangent<-g-sum(g*z)*z;gn<-norm(tangent)
@@ -58,7 +59,7 @@
       s<-step*.5^line;length<-norm(s);candidate<-cos(length)*z+sin(length)*drop(B%*%s)/length
       candidate<-candidate/norm(candidate);trial<-objective(candidate)
       newtangent<-trial$gradient-sum(trial$gradient*candidate)*candidate
-      if(.np_udens_beta_sphere_accept(value,trial$value,.5^line*descent,norm(newtangent),gn,gtol)) {accepted<-TRUE;break}
+      if(.np_udens_beta_sphere_accept(value,trial$value,.5^line*descent,norm(newtangent),gn,gtol,max(value.scale(out),value.scale(trial)))) {accepted<-TRUE;break}
     }
     if(!accepted)stop("beta plot sphere Newton line-search",call.=FALSE)
     z<-candidate
@@ -97,7 +98,9 @@
   for(k in seq_len(nrow(grid)))for(sign in c(1,-1)) {
     objective<-function(z) {
       out<-.Call(C_np_plot_udens_beta_region_objective,eta,transform,as.double(T[k,]),as.double(z),as.double(sign))
-      names(out)<-c('value','gradient','eta','theta');out
+      names(out)<-c('value','gradient','eta','theta')
+      terms<-out$theta*T[k,];normal<-sum(terms)-sign*out$value
+      out$roundoff.scale<-abs(normal)+sum(abs(terms));out
     }
     runs<-vector('list',10L)
     for(j in seq_len(nrow(starts))) {
