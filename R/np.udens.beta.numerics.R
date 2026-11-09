@@ -139,8 +139,7 @@
     identity.error<-max(identity.error,.np_udens_beta_check(corrected,direct,'complete q1 influence')[1L])
   }
   if(full)for(cv in list(covariance,empirical,guide.covariance))
-    if(min(eigen(cv,symmetric=TRUE,only.values=TRUE)$values)< -1e-10)
-      stop('beta plot q1 residual covariance PSD',call.=FALSE)
+    .np_udens_positive_gram_check(cv)
   list(center=rowMeans(obs)-mu+fitted,fitted=fitted,mu=mu,B=B,observed=obs,
     covariance=covariance,empirical=empirical,Veta=Veta,ratio_normalization=exp(normal),
     pilot_variance=pilot.variance,empirical_variance=empirical.variance,

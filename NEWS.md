@@ -1,5 +1,10 @@
 # np 0.80-2 (development)
 
+* Positive-Gram covariances in corrected bounded-density simultaneous plots
+  that fail the raw absolute eigenvalue check are now tested by the existing
+  normalized-correlation factor and reconstruction checks. Successful paths,
+  covariance values, random streams and calibration are unchanged.
+
 - `npsigtest(bws = y ~ x, ...)` now accepts an explicitly named formula,
   matching the positional formula and existing npRmpi interface. Numeric
   bandwidth inputs retain their existing selection behavior.
