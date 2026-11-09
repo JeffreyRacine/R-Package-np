@@ -28,3 +28,34 @@ test_that("GNN polynomial CV uses the certified global shortcut", {
     })
   }
 })
+
+
+test_that("an aborted polynomial shortcut leaves no partial CV score", {
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.extendednn = TRUE, np.macMseries.accelerate = FALSE)
+  on.exit(options(old), add = TRUE)
+  x <- c(rep(0, 25L), rep(1, 24L), 3)
+  y <- x + sin(seq_along(x))
+  .npRmpi_with_local_regression({
+    for (position in c(1L, 25L, 50L)) {
+      order <- append(seq_len(49L), 50L, after = position - 1L)
+      data <- data.frame(x = x[order])
+      response <- y[order]
+      for (type in c("fixed", "generalized_nn")) {
+        bw <- npregbw(xdat = data, ydat = response,
+                      bws = if (type == "fixed") 100 else 5000,
+                      bandwidth.compute = FALSE, bwtype = type,
+                      regtype = "lp", degree = 2L,
+                      bernstein.basis = FALSE)
+        options(np.largeh = FALSE)
+        literal <- .npregbw_eval_only(data, response, bw,
+                                      invalid.penalty = "dbmax")
+        options(np.largeh = TRUE)
+        attempted <- .npregbw_eval_only(data, response, bw,
+                                        invalid.penalty = "dbmax")
+        expect_identical(as.integer(attempted$num.feval.fast), 0L)
+        expect_equal(attempted$objective, literal$objective, tolerance = 1e-10)
+      }
+    }
+  })
+})

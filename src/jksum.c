@@ -17386,6 +17386,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       }
 
       const double epsilon = 1.0/(double)MAX(1, num_obs);
+      /* An aborted all-large shortcut may have accumulated a partial score.
+       * The literal owner starts a new criterion, as in the serial path. */
+      cv = 0.0;
+      traceH = 0.0;
       if(adaptive_tree && np_regression_cv_ann_tree_moments(
            bwm, num_obs, num_reg_unordered, num_reg_ordered,
            num_reg_continuous, nrc2, matrix_X_unordered, matrix_X_ordered,
