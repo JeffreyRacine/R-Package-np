@@ -222,6 +222,8 @@
 
 # npRmpi 0.80-2 (development)
 
+* Density and distribution hat operators require numeric RHS storage, without coercing factor codes or numeric-looking strings.
+
 * Native bandwidth and kernel-sum calls now reject formula-only subset and NA-action arguments instead of ignoring them.
 
 * Preserve the declared regression-fit owner in private partially linear MPI calls, including namespace-only and masked-package use.

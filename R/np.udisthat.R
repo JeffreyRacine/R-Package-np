@@ -129,6 +129,7 @@ npudisthat <- function(bws,
   }
 
   if (!is.null(y)) {
+    y <- .np_hat_response(y, NULL)
     if (is.factor(y) || is.vector(y)) {
       y <- matrix(as.double(y), ncol = 1L)
     } else {
