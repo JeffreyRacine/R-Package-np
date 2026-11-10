@@ -9,6 +9,10 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
 .np_udens_plot_prepare <- function(control, bws, x, center, method, bootstrap, band,
     calibration = NULL, blocklen = NULL, block.automatic = FALSE,
     alpha = .05, random.seed = 42L, compact.sd.explicit = FALSE) {
+  if (.np_udens_compact_normal_q2_request(bws, control, center, method, band, calibration))
+    return(.np_udens_compact_normal_q2_public_prepare(bws, x, alpha, random.seed))
+  if (.np_udens_compact_q2_request(bws, control, center, method, band, calibration, compact.sd.explicit))
+    return(.np_udens_compact_q2_public_prepare(bws, x, method, bootstrap, band, calibration, alpha, random.seed))
   if (.np_udens_compact_request(bws, control, center, method, calibration, compact.sd.explicit))
     return(.np_udens_compact_public_prepare(bws, x, method, bootstrap, band,
       calibration, alpha, random.seed))

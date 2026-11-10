@@ -29,7 +29,7 @@
   out
 }
 
-.np_udens_compact_rule <- function(theta,order,plan) {
+.np_udens_compact_rule <- function(theta,order,plan,keep.log=FALSE) {
   a<-theta[1L]+1;b<-theta[2L]+1;budget<-70+abs(lbeta(a,b))
   TL<-max(40,budget/a);TR<-max(40,budget/b)
   if(!is.finite(TL+TR)||max(TL,TR)>1e7)stop('compact plot guide tail domain',call.=FALSE)
@@ -38,7 +38,7 @@
   cuts<-qlogis(knots[knots>0&knots<1])
   edges<-sort(unique(c(-TL,-fixed[fixed<TL],fixed[fixed<TR],TR,cuts)))
   nodes<-as.double(length(edges)-1L)*order
-  if(!is.finite(nodes)||8*40*nodes>64*1024^2)stop('compact plot quadrature workspace budget',call.=FALSE)
+  if(!is.finite(nodes)||8*(40+as.integer(isTRUE(keep.log)))*nodes>64*1024^2)stop('compact plot quadrature workspace budget',call.=FALSE)
   gl<-.np_udens_beta_rule(c(1,1),order);u<-gl[,1L];w<-gl[,2L]
   z<-as.vector(outer(u,diff(edges),'*')+rep(head(edges,-1L),each=order))
   weight<-as.vector(outer(w,diff(edges),'*'))
@@ -49,7 +49,11 @@
   tail<-sum(vapply(list(c(a,TL),c(b,TR)),function(v)
     exp(-A-v[1]*v[2])*((v[2]+1)^2/v[1]+2*(v[2]+1)/v[1]^2+2/v[1]^3),numeric(1L)))
   if(!is.finite(tail)||tail>1e-12)stop('compact plot guide tail certificate',call.=FALSE)
-  list(A=A,mean=mean,I=I,lv=lv,l1v=l1v,T=T,prob=prob,tail=tail,nodes=length(z))
+  result<-list(A=A,mean=mean,I=I,lv=lv,l1v=l1v,T=T,prob=prob,tail=tail,nodes=length(z))
+  # Preserve the discrete normalizer before probabilities can underflow.
+  # Existing callers retain their exact probability arithmetic and fields.
+  if(isTRUE(keep.log))result$log.prob<-lw-A-log(sum(exp(lw-A)))
+  result
 }
 
 .np_udens_compact_moments <- function(x,plan,theta,order,full,progress=function(...)NULL) {

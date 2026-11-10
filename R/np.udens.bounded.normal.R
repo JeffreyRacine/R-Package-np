@@ -194,8 +194,10 @@
     stop("bounded normal bands require strictly interior evaluation points; literal support endpoints are excluded",call.=FALSE)
   progress <- function(stage,done,total) .np_plot_progress_notify(
     stage=paste('Bounded density normal:',stage),done=done,total=total,unit='work')
+  moments <- if(kernel %in% c('uniform','epanechnikov'))
+    .np_udens_compact_normal_moments else .np_udens_bounded_normal_moments
   z <- .np_plot_corrected_activity_run('Constructing fixed-bound density normal intervals',
-    .np_udens_bounded_normal_moments(state$normalized[,1L],state$h,normalized,kernel,progress))
+    moments(state$normalized[,1L],state$h,normalized,kernel,progress))
   inference <- list(center=z$center/state$jacobian,se=z$se/state$jacobian,bands=list(),
     settings=list(construction='density-fixed-q1-ratio-pilot-normal-v1',
       calibration='normal-quantile',law='asymptotic',kernel=kernel,q=1L,n=state$n,
