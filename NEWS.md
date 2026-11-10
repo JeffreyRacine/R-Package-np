@@ -222,6 +222,8 @@
 
 # npRmpi 0.80-2 (development)
 
+* Asymptotic density plots mark empty-window uncertainty unavailable while retaining estimates and the full evaluation grid.
+
 * MPI option-agreement bookkeeping now remains valid when user code restores an earlier options() snapshot.
 
 * Density and distribution hat operators require numeric RHS storage, without coercing factor codes or numeric-looking strings.

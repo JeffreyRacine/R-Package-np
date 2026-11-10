@@ -1,3 +1,35 @@
+# A nonnegative second-order kernel sum can be zero only when no positive
+# empirical contribution reaches the target. That does not identify zero
+# uncertainty inside support. This admission is plot-only; raw fits are intact.
+.np_plot_density_marginal_se <- function(bws, ex, estimate, se) {
+  positive <- isTRUE(bws[["ncon", exact = TRUE]] == 0L) ||
+    (isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) &&
+     isTRUE(bws[["ckertype", exact = TRUE]] %in%
+       c("gaussian", "epanechnikov", "uniform", "beta")))
+  if (!positive) return(se)
+  empty <- is.finite(estimate) & estimate == 0 & is.finite(se) & se == 0
+  if (!any(empty)) return(se)
+  # Only genuinely fixed support certifies zero density outside its bounds.
+  # An endpoint itself, or an empirical-range boundary, is not such a zero.
+  if (identical(bws[["ckerbound", exact = TRUE]], "fixed")) {
+    continuous <- which(bws[["icon", exact = TRUE]])
+    lower <- bws[["ckerlb", exact = TRUE]]
+    upper <- bws[["ckerub", exact = TRUE]]
+    for (j in continuous) {
+      if (is.finite(lower[j])) empty[ex[[j]] < lower[j]] <- FALSE
+      if (is.finite(upper[j])) empty[ex[[j]] > upper[j]] <- FALSE
+    }
+  }
+  if (any(empty)) {
+    se[empty] <- NA_real_
+    .np_warning(sprintf(paste0("asymptotic density uncertainty is unavailable at %d ",
+      "grid target(s) with no positive empirical kernel contribution; returning NA ",
+      "limits at those targets and retaining the estimates and full grid"), sum(empty)),
+      call. = FALSE)
+  }
+  se
+}
+
 # Joint variability for density-family plots only. The incumbent fit and marginal SEs
 # are unchanged; these empirical influence rows supply cross-grid dependence.  Kernels,
 # basis preparation and accepted solves retain their canonical owners.
