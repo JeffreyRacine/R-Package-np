@@ -83,6 +83,27 @@
       !.npRmpi_has_active_slave_pool(comm = comm))
     return(invisible(FALSE))
   .npRmpi_autodispatch_require_option_sync()
+  snapshot <- .npRmpi_autodispatch_option_snapshot()
+  if (.npRmpi_autodispatch_should_sync_options(snapshot)) {
+    complete <- FALSE
+    on.exit(if (!complete)
+      options(npRmpi.autodispatch.option.snapshot = NULL), add = TRUE)
+    .npRmpi_bcast_cmd_expr(substitute(base::local({
+      opts <- OPTS
+      do.call("options", opts)
+      if (VERIFY) {
+        for (key in names(opts))
+          if (!identical(getOption(key), opts[[key]]))
+            stop(sprintf("failed to synchronize option '%s' across MPI ranks", key),
+                 call. = FALSE)
+      }
+      invisible(NULL)
+    }, envir = base::new.env(parent = base::baseenv())),
+    list(OPTS = snapshot,
+         VERIFY = isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE)))),
+      comm = comm, caller.execute = FALSE)
+    complete <- TRUE
+  }
   invisible(TRUE)
 }
 
