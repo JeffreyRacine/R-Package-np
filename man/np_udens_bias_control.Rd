@@ -225,7 +225,7 @@ Existing pointwise, simultaneous, Bonferroni, all-band, estimate-centered,
 unbounded and explicit-control methods retain their constructions.
 This univariate construction does not support bootstrap pmzsd or Gaussian
 two-dimensional pmzsd. For the separate two-dimensional beta and compact normal constructions,
-see also \code{\link[plot.np]{plot}}. It does not support nearest-neighbour bandwidths, mixed data, range-derived bounds or literal
+see also \code{\link{plot.np}}. It does not support nearest-neighbour bandwidths, mixed data, range-derived bounds or literal
 support endpoints. In particular, the reference-law scale is not the standard
 deviation of iid bootstrap refits.
 }
