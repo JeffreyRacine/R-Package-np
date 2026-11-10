@@ -179,7 +179,8 @@ SEXP C_np_plot_udens_beta_refits(SEXP data, SEXP counts)
             double dec=g0*d0+g1*d1;
             if(dec<1e-14 && fmax(fabs(g0),fabs(g1))<2e-8) {done=1;break;}
             double obj=lbeta(a,c)-(a-1)*t0-(c-1)*t1,step=1;int accepted=0;
-            if(d0>0)step=fmin(step,.99*a/d0);if(d1>0)step=fmin(step,.99*c/d1);
+            if(d0>0)step=fmin(step,.99*a/d0);
+            if(d1>0)step=fmin(step,.99*c/d1);
             for(int ls=0;ls<40;++ls) {
                 double ta=a-step*d0,tb=c-step*d1,val=lbeta(ta,tb)-(ta-1)*t0-(tb-1)*t1;
                 if(R_FINITE(val)&&val<=obj-1e-4*step*dec+1e-14) {a=ta;c=tb;accepted=1;break;}
@@ -211,7 +212,8 @@ static double beta_joint_rule_sum(const double *eta,int n,const double *u,const 
     for(int i=0;i<n;++i)for(int j=0;j<n;++j)
         mass+=exp(lp[i]+lw[j]+gamma*zu[i]*zv[j]-peak);
     double result=lbeta(ab[0],ab[1])+lbeta(ab[2],ab[3])+peak+log((double)mass);
-    if(!R_FINITE(result))error("nonfinite beta plot joint normalizer");return result;
+    if(!R_FINITE(result))error("nonfinite beta plot joint normalizer");
+    return result;
 }
 
 static double beta_joint_normalizer(const double *eta,int n,double *u,double *p,
@@ -414,7 +416,8 @@ SEXP C_np_plot_udens_beta_joint_refits(SEXP axes,SEXP base,SEXP normal,
             for(int k=0;k<5;++k) {di[k]=mean[k]-target[k];gradient=fmax(gradient,fabs(di[k]));}
             F77_CALL(dgesv)(&dim,&nrhs,I,&dim,piv,di,&dim,&info);
             if(info)error("beta plot joint information solve (draw %d)",b+1);
-            for(int k=0;k<5;++k)dec+=(mean[k]-target[k])*di[k];iterations=it+1;
+            for(int k=0;k<5;++k)dec+=(mean[k]-target[k])*di[k];
+            iterations=it+1;
             if(dec<1e-14&&gradient<2e-8) {done=1;break;}
             double step=1;for(int k=0;k<4;++k)if(di[k]>0)step=fmin(step,.99*(theta[k]+1)/di[k]);int accepted=0;
             for(int ls=0;ls<35;++ls) {
@@ -426,7 +429,8 @@ SEXP C_np_plot_udens_beta_joint_refits(SEXP axes,SEXP base,SEXP normal,
             if(!accepted)error("beta plot joint likelihood line-search (draw %d)",b+1);
         }
         if(!done)error("beta plot joint likelihood stationarity (draw %d)",b+1);
-        for(int k=0;k<5;++k)REAL(ans)[b+B*k]=theta[k];REAL(ans)[b+5*B]=iterations;
+        for(int k=0;k<5;++k)REAL(ans)[b+B*k]=theta[k];
+        REAL(ans)[b+5*B]=iterations;
     }
     UNPROTECT(1);return ans;
 }
@@ -460,7 +464,8 @@ SEXP C_np_plot_udens_beta_joint_block(SEXP parts,SEXP index,SEXP i1,SEXP i2)
         for(R_xlen_t row=0;row<m;++row) {
             double value=0;
             for(int k=0;k<24;++k)value+=coefficient[k]*a[0][ix[0][row]-1+p0+(size_t)nx[0]*nv[0]*k]*a[1][ix[1][row]-1+p1+(size_t)nx[1]*nv[1]*k];
-            if(!R_FINITE(value))error("nonfinite beta plot joint composition");out[row+m*col]=value;
+            if(!R_FINITE(value))error("nonfinite beta plot joint composition");
+            out[row+m*col]=value;
         }
     }
     UNPROTECT(1);return ans;
@@ -528,7 +533,8 @@ SEXP C_np_plot_udens_beta_series_means(SEXP parts,SEXP index,SEXP axes,
                     G[1][ix[1][row]-1+(size_t)nx[1]*(t+terms*k)];
                 result+=coefficient[k]*(double)sum;
             }
-            if(!R_FINITE(result))error("nonfinite beta plot series projection");REAL(VECTOR_ELT(out,0))[b+(size_t)B*row]=result;
+            if(!R_FINITE(result))error("nonfinite beta plot series projection");
+            REAL(VECTOR_ELT(out,0))[b+(size_t)B*row]=result;
         }
         REAL(VECTOR_ELT(out,1))[b]=A;REAL(VECTOR_ELT(out,2))[b]=terms;REAL(VECTOR_ELT(out,3))[b]=w->tail_bound;
     }
@@ -593,7 +599,8 @@ SEXP C_np_plot_udens_beta_joint_moments(SEXP parts,SEXP index,SEXP axes,
                 double z=0;
                 for(int k=0;k<24;++k)z+=coefficient[k]*a[0][ix[0][row]-1+(size_t)nx[0]*(i+nv[0]*k)]*
                     a[1][ix[1][row]-1+(size_t)nx[1]*(j+nv[1]*k)];
-                if(!R_FINITE(z))error("nonfinite beta plot joint feature");Z[row+(size_t)d*col]=z;
+                if(!R_FINITE(z))error("nonfinite beta plot joint feature");
+                Z[row+(size_t)d*col]=z;
             }
             Z[m+(size_t)d*col]=ax[0][i];Z[m+1+(size_t)d*col]=ax[0][nv[0]+i];
             Z[m+2+(size_t)d*col]=ax[1][j];Z[m+3+(size_t)d*col]=ax[1][nv[1]+j];Z[m+4+(size_t)d*col]=interaction;
@@ -695,7 +702,8 @@ SEXP C_np_plot_udens_beta_joint_covariance(SEXP parts,SEXP index,SEXP axes,
                 for(int k=0;k<24;++k)value+=coefficient[k]*a[0][ix[0][row]-1+(size_t)nx[0]*(i+nv[0]*k)]*
                     a[1][ix[1][row]-1+(size_t)nx[1]*(j+nv[1]*k)];
                 for(int k=0;k<5;++k)value-=REAL(projection)[row+(size_t)m*k]*T[k];
-                if(!R_FINITE(value))error("nonfinite beta plot residual covariance feature");Z[row+(size_t)m*col]=value;
+                if(!R_FINITE(value))error("nonfinite beta plot residual covariance feature");
+                Z[row+(size_t)m*col]=value;
             }
             lw[col]=ax[0][2*nv[0]+i]+ax[1][2*nv[1]+j]+REAL(parameters)[0]*T[4]-REAL(parameters)[1]+(selected?REAL(ratio)[flat]:0);
         }
@@ -708,7 +716,8 @@ SEXP C_np_plot_udens_beta_joint_covariance(SEXP parts,SEXP index,SEXP axes,
         for(int col=0;col<count;++col)for(int row=0;row<m;++row)D[row+(size_t)m*col]=(Z[row+(size_t)m*col]-bm[row])*sqrt(prob[col]);
         for(int col=0;col<m;++col)for(int row=col;row<m;++row)cov[row+(size_t)m*col]=v*cov[row+(size_t)m*col]+v*w*delta[row]*delta[col];
         F77_CALL(dsyrk)(&lower,&no,&m,&count,&w,D,&m,&one,cov,&m FCONE FCONE);
-        for(int row=0;row<m;++row)mean[row]=v*mean[row]+w*bm[row];logmass=lm;
+        for(int row=0;row<m;++row)mean[row]=v*mean[row]+w*bm[row];
+        logmass=lm;
         if(!isNull(progress)&&(start%16384==0||start+count==total)) {
             SEXP call=PROTECT(lang4(progress,R_NilValue,R_NilValue,R_NilValue));
             SETCADR(call,mkString("exact covariance"));SETCADDR(call,ScalarInteger(start+count));
