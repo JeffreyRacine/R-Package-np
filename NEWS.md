@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Isolated plot samplers now preserve and validate R-devel's fourth RNG kind
+  (binomial selection). Existing generators, stream receipts and RNG safety
+  guards are unchanged.
+
 * Asymptotic density plots mark empty-window uncertainty unavailable while retaining estimates and the full evaluation grid.
 
 * Density and distribution hat operators require numeric RHS storage, without coercing factor codes or numeric-looking strings.

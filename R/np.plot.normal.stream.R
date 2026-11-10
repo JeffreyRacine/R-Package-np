@@ -6,9 +6,8 @@
     stop("invalid plot normal seed", call. = FALSE)
   uniform <- c("Wichmann-Hill", "Marsaglia-Multicarry", "Super-Duper",
     "Mersenne-Twister", "Knuth-TAOCP", "Knuth-TAOCP-2002", "L'Ecuyer-CMRG")
-  if (!is.character(kind) || !length(kind) %in% 2:3 || anyNA(kind) ||
-      !kind[1L] %in% uniform || kind[2L] != "Box-Muller" ||
-      (length(kind) == 3L && !kind[3L] %in% c("Rounding", "Rejection")))
+  if (!.np_plot_rng_kind_shape(kind, 2L) ||
+      !kind[1L] %in% uniform || kind[2L] != "Box-Muller")
     stop("seeded plot Box-Muller draws require a built-in uniform generator and supported RNG kinds",
          call. = FALSE)
   if (!is.numeric(count) || length(count) != 1L || !is.finite(count) ||
