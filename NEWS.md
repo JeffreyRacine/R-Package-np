@@ -1,5 +1,11 @@
 # np 0.80-2 (development)
 
+* Fixed-bound q1 uniform and Epanechnikov density plots support asymptotic
+  pmzsd intervals, including an omitted band, with the existing corrected center
+  and complete ratio-pilot normal variance. Cross-guide weights retain their
+  pre-underflow log probabilities. Calibrated bands, core estimators and
+  se=FALSE retain their existing behavior.
+
 * Fixed-bound beta density plots now support two-dimensional asymptotic pmzsd
   intervals with complete joint ratio-pilot variance and the existing corrected
   center. Calibrated bands, core estimators and se=FALSE are unchanged.

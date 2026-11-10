@@ -643,8 +643,15 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   controls retain their own constructions. Observations and evaluation points
   must be strictly inside the supplied finite bounds, with at least ten
   observations. Range-estimated bounds, literal endpoints, nearest-neighbor
-  bandwidths, higher orders, multivariate compact correction and normal-scale
-  pmzsd are not admitted by this construction.
+  bandwidths, higher orders and multivariate compact correction are not
+  admitted by this construction.
+  With \code{errors="asymptotic"}, omitted \code{band} or
+  \code{band="pmzsd"} instead uses the same corrected center and complete
+  normalized ratio-pilot influence variance with normal critical values.
+  Guide and cross-covariance contributions are included. These marginal
+  intervals require no simulated draws; they are distinct from the calibrated
+  pointwise and simultaneous bands. Finite-sample accuracy can be weaker at
+  individual sparse or tail targets. Bootstrap pmzsd is not admitted.
   For corrected bootstrap bands, supply \code{errors="bootstrap"}, explicit
   \code{bootstrap="inid"}, an explicit band, and
   \code{boot_control=np_boot_control(calibration="symmetric-sd")} or
