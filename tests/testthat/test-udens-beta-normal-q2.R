@@ -38,3 +38,28 @@ test_that("beta q2 normal moments retain the center and support units", {
   expect_error(.np_udens_beta_normal_q2_public(state,transform(sg,x=3),.05,"pmzsd"),"interior")
   expect_error(.np_udens_beta_normal_q2_moments(x,h,cbind(0,.5)),"invalid")
 })
+
+
+test_that("beta q2 expanded capacity charges full results with bounded tiles", {
+  budget <- .np_udens_beta_normal_q2_capacity
+  for(n in c(80,200,800,1000))for(m in c(754,755,2500,4096)) {
+    value <- budget(n,m,c(0,0,0,0,0),64L)
+    expect_true(is.finite(value));expect_lte(value,192*1024^2)
+  }
+  expect_gt(budget(800,2500,c(0,0,0,0,0),64L),budget(800,755,c(0,0,0,0,0),64L))
+  expect_error(budget(1e8,2500),"workspace")
+  expect_error(budget(800,1e8),"workspace")
+  for(m in c(0,NA,Inf,-1,1.5))expect_error(budget(800,m),"geometry")
+  expect_error(budget(1,2500),"geometry")
+})
+
+
+test_that("beta q2 expanded capacity refuses immediately above its cheap bound", {
+  budget <- .np_udens_beta_normal_q2_capacity
+  for(n in c(80,200,800,1000)) {
+    last <- floor((192*1024^2/8-28*600000-60*n-65536)/200)
+    expect_lte(budget(n,last-1),192*1024^2)
+    expect_lte(budget(n,last),192*1024^2)
+    expect_error(budget(n,last+1),"workspace")
+  }
+})

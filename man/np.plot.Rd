@@ -627,7 +627,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Fixed-bound order-2 beta plots also support these normal intervals for two
   continuous coordinates. Their complete variance retains the joint guide-score
   dependence and all guide/kernel cross terms under the ratio pilot; the
-  original corrected center is unchanged. This normal approximation can be
+  original corrected center is unchanged. Normal interval calculations process
+  targets in blocks while retaining the complete requested grid. Admission
+  accounts for the target results and both guide preparations within the
+  existing 192 MiB plot-workspace limit; requests whose actual geometry exceeds
+  that limit still stop. This is distinct from full-covariance calibrated bands
+  and does not bound the memory used by the entire R process.
+  This normal approximation can be
   less accurate at sparse boundary targets in small samples. Two-dimensional
   Gaussian normal intervals, bootstrap pmzsd, estimated bounds and literal
   support endpoints are not admitted by this additional construction. See

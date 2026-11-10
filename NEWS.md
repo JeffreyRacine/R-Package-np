@@ -6,6 +6,11 @@
   pre-underflow log probabilities. Calibrated bands, core estimators and
   se=FALSE retain their existing behavior.
 
+* Two-dimensional fixed-bound beta normal plot intervals now admit larger
+  target grids using the existing blocked calculation and a complete workspace
+  bound. The 192 MiB limit, statistical method, tolerances and existing
+  successful paths are unchanged.
+
 * Fixed-bound beta density plots now support two-dimensional asymptotic pmzsd
   intervals with complete joint ratio-pilot variance and the existing corrected
   center. Calibrated bands, core estimators and se=FALSE are unchanged.
