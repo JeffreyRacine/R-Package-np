@@ -1,5 +1,11 @@
 # np 0.80-2 (development)
 
+* Fixed-bound q2 uniform and Epanechnikov density plots now support asymptotic
+  normal (pmzsd or omitted-band) intervals using the unchanged corrected center
+  and complete joint ratio-pilot variance. Target-specific blocked quadrature
+  supports full default grids within a bounded plot workspace. Existing
+  calibrated/SD methods, core estimators and se=FALSE remain unchanged.
+
 * Fixed-bound q1 uniform and Epanechnikov density plots support asymptotic
   pmzsd intervals, including an omitted band, with the existing corrected center
   and complete ratio-pilot normal variance. Cross-guide weights retain their

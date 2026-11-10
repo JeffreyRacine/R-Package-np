@@ -224,10 +224,40 @@ errors and \code{se=FALSE} are unchanged.
 
 Existing pointwise, simultaneous, Bonferroni, all-band, estimate-centered,
 unbounded and explicit-control methods retain their constructions.
-This addition does not support bootstrap pmzsd, two-dimensional pmzsd,
-nearest-neighbour bandwidths, mixed data, range-derived bounds or literal
+This univariate construction does not support bootstrap pmzsd or Gaussian
+two-dimensional pmzsd. The separate two-dimensional beta and compact normal
+constructions are described below. It does not support nearest-neighbour bandwidths, mixed data, range-derived bounds or literal
 support endpoints. In particular, the reference-law scale is not the standard
 deviation of iid bootstrap refits.
+}
+
+\subsection{Known-bound compact normal intervals in two dimensions}{
+With omitted or \code{NULL} \code{bias_control}, fixed second-order uniform and
+Epanechnikov kernels support corrected asymptotic normal intervals for exactly
+two continuous coordinates. Request omitted \code{band} or \code{band="pmzsd"}.
+The fixed bandwidth, finite coordinatewise bounds, strictly interior data and
+evaluation targets, at least ten observations and \code{0 < alpha < 0.5} are
+required. The product local-cubic observation operator and corrected center are
+unchanged. The variance integrates the complete influence function under the
+normalized positive joint ratio pilot, including guide-score dependence and
+all guide/kernel cross terms. A guide fitted to this reference law affects
+only the variance, not the original corrected center.
+
+Intervals use ordinary normal critical values without simulated draws, a
+nonlinear guide region, a variance floor or a maximum calibration. They are
+marginal intervals conditional on the bandwidth, fixed bounds and supplied
+targets. Saved-sample coverage is useful on average; sparse-target uncertainty
+and residual bias can still impair local coverage. There is no simultaneous
+coverage claim. Negative centers and endpoints are retained.
+
+The calculation processes targets in bounded blocks, recomputing target-specific
+compact-support quadrature. It retains the whole requested grid and checks the
+192 MiB plot-workspace limit before allocation; this is not a bound on total R
+process memory. Existing calibrated and SD compact methods remain univariate.
+Explicit controls, range-derived bounds, literal support endpoints, mixed data,
+nearest-neighbour bandwidths, higher kernel orders and bootstrap pmzsd are not
+admitted by this two-dimensional normal addition. Core estimates, estimator
+standard errors and \code{se=FALSE} are unchanged.
 }
 
 \subsection{Known-bound Gaussian density inference}{

@@ -11,7 +11,8 @@
 }
 
 .np_udens_compact_active <- function(state) {
-  identical(state[['construction',exact=TRUE]],'density-fixed-compact-cubic-v1')
+  identical(state[['construction',exact=TRUE]],'density-fixed-compact-cubic-v1') ||
+    .np_udens_compact_normal_q2_active(state)
 }
 
 .np_udens_compact_public_prepare <- function(bws,x,method,bootstrap,band,calibration,alpha,seed) {
@@ -55,6 +56,8 @@
 }
 
 .np_udens_compact_public_errors <- function(state,grid,alpha,B,band) {
+  if(.np_udens_compact_normal_q2_active(state))
+    return(.np_udens_compact_normal_q2_public(state,grid,alpha,band))
   if(identical(state[['normal.pmzsd',exact=TRUE]],TRUE))
     return(.np_udens_bounded_normal_public(state,grid,alpha,band,state$kernel))
   if(!is.data.frame(grid)||nrow(grid)<1L||!identical(names(grid),names(state$x))||

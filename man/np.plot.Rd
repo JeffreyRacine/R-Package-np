@@ -649,15 +649,24 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   controls retain their own constructions. Observations and evaluation points
   must be strictly inside the supplied finite bounds, with at least ten
   observations. Range-estimated bounds, literal endpoints, nearest-neighbor
-  bandwidths, higher orders and multivariate compact correction are not
-  admitted by this construction.
+  bandwidths, higher orders and multivariate calibrated compact correction
+  are not admitted by this construction.
   With \code{errors="asymptotic"}, omitted \code{band} or
   \code{band="pmzsd"} instead uses the same corrected center and complete
   normalized ratio-pilot influence variance with normal critical values.
   Guide and cross-covariance contributions are included. These marginal
   intervals require no simulated draws; they are distinct from the calibrated
   pointwise and simultaneous bands. Finite-sample accuracy can be weaker at
-  individual sparse or tail targets. Bootstrap pmzsd is not admitted.
+  individual sparse or tail targets. These asymptotic normal intervals also
+  support two continuous coordinates under the same fixed-bound, fixed-bandwidth
+  and interior-target restrictions, with omitted density bias controls and
+  \code{0 < alpha < 0.5}. The two-dimensional variance includes joint
+  guide-score dependence and every guide/kernel cross term. Target blocks
+  recompute their own compact-support quadrature; the complete requested grid
+  is retained within the 192 MiB plot-workspace bound. Normal intervals remain
+  marginal: this does not extend calibrated pointwise, simultaneous,
+  Bonferroni, all-band or SD methods to two dimensions. Bootstrap pmzsd is not
+  admitted.
   For corrected bootstrap bands, supply \code{errors="bootstrap"}, explicit
   \code{bootstrap="inid"}, an explicit band, and
   \code{boot_control=np_boot_control(calibration="symmetric-sd")} or
