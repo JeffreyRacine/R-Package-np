@@ -66,10 +66,10 @@
     first<-blocks[[1L]]
     p<-.np_udens_compact_normal_q2_prepare(x,h,grid[first,,drop=FALSE],theta,outer,fit$state,kernel,held.bytes)
     initial<-raw(p)[[2L]];target<-initial$mean[length(first)+seq_len(5L)]
-    .np_udens_compact_normal_q2_capacity(n,length(first),held.bytes=held.bytes+as.double(object.size(p)))
+    .np_udens_compact_normal_q2_capacity(n,length(first),held.bytes=held.bytes+as.double(utils::object.size(p)))
     fq<-.np_udens_beta_normal_q2_fit(target,theta)
     workspace<-max(workspace,.np_udens_beta_normal_q2_budget(n,width,fq$theta,outer))
-    pq<-.np_udens_compact_normal_q2_prepare(x,h,grid[first,,drop=FALSE],fq$theta,outer,fq$state,kernel,held.bytes+as.double(object.size(p)))
+    pq<-.np_udens_compact_normal_q2_prepare(x,h,grid[first,,drop=FALSE],fq$theta,outer,fq$state,kernel,held.bytes+as.double(utils::object.size(p)))
     workspace<-max(workspace,p$workspace,pq$workspace)
     z<-list(center=numeric(m),se=numeric(m),theta=theta,thetaQ=fq$theta,
       meanQ=numeric(m),D=matrix(0,m,5L),variance.checks=list())
