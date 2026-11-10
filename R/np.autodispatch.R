@@ -45,6 +45,11 @@
   invisible(NULL)
 }
 
+# A worker-agreement certificate is not a user option: options(op) must not
+# roll it back while the same workers retain newer synchronized settings.
+.npRmpi_option_agreement <- new.env(parent = emptyenv())
+.npRmpi_option_agreement$snapshot <- NULL
+
 .npRmpi_autodispatch_should_sync_options <- function(snapshot) {
   .npRmpi_autodispatch_validate_option_snapshot(snapshot)
   mode <- .npRmpi_autodispatch_option_mode()
@@ -53,13 +58,13 @@
     return(FALSE)
 
   if (identical(mode, "always")) {
-    options(npRmpi.autodispatch.option.snapshot = snapshot)
+    .npRmpi_option_agreement$snapshot <- snapshot
     return(TRUE)
   }
 
-  cached <- getOption("npRmpi.autodispatch.option.snapshot", NULL)
+  cached <- .npRmpi_option_agreement$snapshot
   if (!identical(cached, snapshot)) {
-    options(npRmpi.autodispatch.option.snapshot = snapshot)
+    .npRmpi_option_agreement$snapshot <- snapshot
     return(TRUE)
   }
 
@@ -87,7 +92,7 @@
   if (.npRmpi_autodispatch_should_sync_options(snapshot)) {
     complete <- FALSE
     on.exit(if (!complete)
-      options(npRmpi.autodispatch.option.snapshot = NULL), add = TRUE)
+      .npRmpi_option_agreement$snapshot <- NULL, add = TRUE)
     .npRmpi_bcast_cmd_expr(substitute(base::local({
       opts <- OPTS
       do.call("options", opts)

@@ -3,6 +3,8 @@
 reinit_fixture <- function(world = 1L, pool = TRUE, owner = "spawn",
                            blocked = NULL, rank = 0L) {
   e <- new.env(parent = environment(npRmpi.init))
+  e$.npRmpi_option_agreement <- new.env(parent=emptyenv())
+  e$.npRmpi_option_agreement$snapshot <- NULL
   e$events <- character()
   e$asNamespace <- function(package) e
   e$.npRmpi_profile_clear <- function() invisible(NULL)
@@ -43,8 +45,7 @@ reinit_options <- function(owner = "spawn") {
   keys <- c("npRmpi.mpi.initialized", "npRmpi.pool.active", "npRmpi.profile.active",
             "npRmpi.attach.close.state", "npRmpi.attach.session.id",
             "npRmpi.autodispatch", "np.messages", "npRmpi.master.only",
-            "npRmpi.autodispatch.verify.options", "npRmpi.autodispatch.option.sync",
-            "npRmpi.autodispatch.option.snapshot")
+            "npRmpi.autodispatch.verify.options", "npRmpi.autodispatch.option.sync")
   old <- setNames(lapply(keys, getOption), keys)
   options(npRmpi.mpi.initialized = TRUE, npRmpi.pool.active = owner != "fresh",
           npRmpi.profile.active = identical(owner, "profile"),

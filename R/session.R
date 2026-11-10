@@ -74,7 +74,7 @@
   if (!is.list(snap))
     return(invisible(FALSE))
 
-  options(npRmpi.autodispatch.option.snapshot = snap)
+  .npRmpi_option_agreement$snapshot <- snap
 
   invisible(TRUE)
 }
@@ -524,7 +524,7 @@ npRmpi.init <- function(...,
     autodispatch.verify.options = autodispatch.verify.options,
     autodispatch.option.sync = autodispatch.option.sync
   )
-  options(npRmpi.autodispatch.option.snapshot = NULL)
+  .npRmpi_option_agreement$snapshot <- NULL
   if (!reuse) {
     .npRmpi_session_reset_spmd_state()
     .npRmpi_attach_state_reset()
@@ -658,7 +658,7 @@ npRmpi.quit <- function(force = FALSE,
   clear.fun <- tryCatch(get(".npRmpi_profile_clear", envir = asNamespace("npRmpi"),
                             inherits = FALSE), error = function(e) NULL)
   if (is.function(clear.fun)) tryCatch(clear.fun(), error = function(e) NULL)
-  options(npRmpi.autodispatch.option.snapshot = NULL)
+  .npRmpi_option_agreement$snapshot <- NULL
   primary <- NULL
   attempt <- function(expr) tryCatch(force(expr), error = function(e) {
     if (is.null(primary)) primary <<- e

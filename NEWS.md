@@ -222,6 +222,8 @@
 
 # npRmpi 0.80-2 (development)
 
+* MPI option-agreement bookkeeping now remains valid when user code restores an earlier options() snapshot.
+
 * Density and distribution hat operators require numeric RHS storage, without coercing factor codes or numeric-looking strings.
 
 * Native bandwidth and kernel-sum calls now reject formula-only subset and NA-action arguments instead of ignoring them.

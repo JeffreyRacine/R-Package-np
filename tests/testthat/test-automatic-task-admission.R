@@ -1,11 +1,13 @@
 admission_fixture <- function() {
   e <- new.env(parent = asNamespace("npRmpi"))
   for (name in c(".npRmpi_automatic_task_owner", ".npRmpi_admit_automatic_task",
-                 ".npRmpi_with_local_bootstrap")) {
+                 ".npRmpi_with_local_bootstrap", ".npRmpi_autodispatch_should_sync_options")) {
     f <- get(name, asNamespace("npRmpi"))
     environment(f) <- e
     assign(name, f, e)
   }
+  e$.npRmpi_option_agreement <- new.env(parent=emptyenv())
+  e$.npRmpi_option_agreement$snapshot <- NULL
   e$.npRmpi_task_origin <- new.env(parent = emptyenv())
   e$.npRmpi_task_origin$automatic <- FALSE
   e$manual <- FALSE; e$pool <- TRUE; e$calls <- 0L; e$fail <- FALSE
@@ -54,7 +56,7 @@ test_that("automatic task options reuse the incumbent cache without draws", {
   withr::local_options(npRmpi.autodispatch = TRUE,
     npRmpi.autodispatch.disable = FALSE, npRmpi.autodispatch.context = FALSE,
     npRmpi.autodispatch.option.sync = "onchange",
-    npRmpi.autodispatch.option.snapshot = NULL, np.tree = FALSE)
+    np.tree = FALSE)
   e <- admission_fixture(); run <- e$.npRmpi_admit_automatic_task
   set.seed(6001); seed <- .Random.seed
   expect_true(run()); expect_identical(e$calls, 1L)
@@ -62,13 +64,13 @@ test_that("automatic task options reuse the incumbent cache without draws", {
   options(np.tree = TRUE)
   expect_true(e$.npRmpi_with_local_bootstrap(run()))
   expect_identical(e$calls, 2L)
-  expect_true(getOption("npRmpi.autodispatch.option.snapshot")[["np.tree"]])
+  expect_true(e$.npRmpi_option_agreement$snapshot[["np.tree"]])
   options(npRmpi.autodispatch.option.sync = "always")
   expect_true(run()); expect_true(run()); expect_identical(e$calls, 4L)
   expect_identical(.Random.seed, seed)
   e$fail <- TRUE
   expect_error(e$.npRmpi_with_local_bootstrap(run()), "transport sentinel", fixed = TRUE)
-  expect_null(getOption("npRmpi.autodispatch.option.snapshot"))
+  expect_null(e$.npRmpi_option_agreement$snapshot)
   expect_false(e$.npRmpi_task_origin$automatic)
   expect_false(getOption("npRmpi.autodispatch.context"))
   e$fail <- FALSE; options(npRmpi.autodispatch.option.sync = "onchange")
@@ -81,7 +83,7 @@ test_that("transported option command cannot resolve worker-global masks", {
     npRmpi.autodispatch.disable = FALSE, npRmpi.autodispatch.context = FALSE,
     npRmpi.autodispatch.option.sync = "always",
     npRmpi.autodispatch.verify.options = TRUE,
-    npRmpi.autodispatch.option.snapshot = NULL, np.tree = FALSE)
+    np.tree = FALSE)
   e <- admission_fixture()
   expect_true(e$.npRmpi_admit_automatic_task())
   shadow <- new.env(parent = baseenv())

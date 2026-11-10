@@ -7,10 +7,10 @@ test_that("option agreement refusal preserves existing mode normalization", {
   }
   for(value in c('never','ne')) {
     options(npRmpi.autodispatch.option.sync=value);seed<-if(exists('.Random.seed',.GlobalEnv))get('.Random.seed',.GlobalEnv)else NULL
-    snapshot<-getOption('npRmpi.autodispatch.option.snapshot');expect_identical(mode(),'never')
+    snapshot<-get('.npRmpi_option_agreement',ns)$snapshot;expect_identical(mode(),'never')
     expect_error(check(),'automatic numerical calls require verified option agreement',fixed=TRUE)
     expect_identical(getOption('npRmpi.autodispatch.option.sync'),value)
-    expect_identical(getOption('npRmpi.autodispatch.option.snapshot'),snapshot)
+    expect_identical(get('.npRmpi_option_agreement',ns)$snapshot,snapshot)
     expect_identical(if(exists('.Random.seed',.GlobalEnv))get('.Random.seed',.GlobalEnv)else NULL,seed)
   }
   options(npRmpi.autodispatch.option.sync='invalid');expect_error(check(),"'arg' should be one of",fixed=TRUE)
