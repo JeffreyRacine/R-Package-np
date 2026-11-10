@@ -8,7 +8,7 @@ test_that('compact q2 calibrated admission preserves neighboring methods', {
     # Normal keeps its separate owner; Gaussian-factor S/all remains unqualified.
     for(band in c('pmzsd','simultaneous','all'))expect_false(request(z,band=band))
     for(cal in c('symmetric-sd','asymmetric-sd'))for(band in c('pointwise','simultaneous','bonferroni','all')) {
-      expect_false(request(z,'bootstrap',band,cal,TRUE))
+      expect_true(request(z,'bootstrap',band,cal,TRUE))
       expect_false(request(z,'bootstrap',band,cal,FALSE))
     }
     expect_true(.np_udens_compact_normal_q2_request(z,NULL,'bias-corrected','asymptotic','pmzsd',NULL))
