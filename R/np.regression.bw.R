@@ -67,6 +67,7 @@ npregbw.NULL <-
            ydat = stop("invoked without data 'ydat'"),
            bws, ..., .np.context){
   .np_reject_native_data(.np.context$dots)
+  .np_reject_native_frame_args(.np.context$dots)
 
     mc <- .np.context$call
     dots <- list(...)
@@ -220,6 +221,7 @@ npregbw.rbandwidth <-
            ...,
            nomad.opts = list(), .np.context){
   .np_reject_native_data(.np.context$dots)
+  .np_reject_native_frame_args(.np.context$dots)
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     .np_nomad_native_reject_unsupported_options_for_route(
@@ -3498,6 +3500,7 @@ npregbw.default <-
            ...,
            nomad.opts = list(), .np.context){
   .np_reject_native_data(.np.context$dots)
+  .np_reject_native_frame_args(.np.context$dots)
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
     .np_nomad_native_reject_unsupported_options_for_route(

@@ -60,6 +60,7 @@ npindexbw.NULL <-
            ydat = stop("training data ydat missing"),
            bws, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
     if (.npRmpi_master_local_entry_needed()) {
@@ -2803,6 +2804,7 @@ npindexbw.default <-
            ...,
            nomad.opts = list()){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     only.beta <- !missing(only.optimize.beta) &&
       npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
@@ -3211,6 +3213,7 @@ npindexbw.sibandwidth <-
            .fixed.h.lower = NULL,
            .rng.collective = .npRmpi_rng_scope_collective()){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     dots <- list(...)

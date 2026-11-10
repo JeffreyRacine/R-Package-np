@@ -50,6 +50,7 @@ npplregbw.NULL =
            zdat = stop("invoked without data `zdat'"),
            bws, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
     if (.npRmpi_master_local_entry_needed()) {
@@ -126,6 +127,7 @@ npplregbw.plbandwidth =
            zdat = stop("invoked without data `zdat'"),
            bws, nmulti, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     ## n observations
     ## rows are observations, columns are variables
@@ -865,6 +867,7 @@ npplregbw.default =
            ftol, itmax, nmulti, nomad.remin, powell.remin, small, tol,
            ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     .npRmpi_require_active_slave_pool(where = "npplregbw()")

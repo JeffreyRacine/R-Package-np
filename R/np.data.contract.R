@@ -1,3 +1,14 @@
+# Formula frame arguments have no semantics in native bandwidth/kernel calls.
+# Inspect syntax only; rejected subset/NA promises must never be evaluated.
+.np_reject_native_frame_args <- function(dots) {
+  unsupported <- intersect(c("subset", "na.action"), names(dots))
+  if (length(unsupported))
+    stop(sprintf("%s supported only with the formula interface; for native calls, subset and handle missing values in the input data explicitly.",
+                 paste0("`", unsupported, "=`", collapse = ", ")),
+         call. = FALSE)
+  invisible(NULL)
+}
+
 # The native interface consumes explicit vectors/matrices/data frames. Inspect
 # only argument names: an unsupported data promise (including NULL) is not input.
 .np_native_data_error <- function() {

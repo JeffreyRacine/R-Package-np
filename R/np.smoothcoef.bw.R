@@ -99,6 +99,7 @@ npscoefbw.NULL <-
            zdat = NULL,
            bws, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")
     if (.npRmpi_master_local_entry_needed()) {
@@ -2442,6 +2443,7 @@ npscoefbw.scbandwidth <-
            scale.factor.search.lower = NULL,
            ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     dots <- list(...)
@@ -3872,6 +3874,7 @@ npscoefbw.default <-
            ...,
            nomad.opts = list()){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")

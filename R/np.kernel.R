@@ -76,6 +76,7 @@ npksum.formula <-
 npksum.integer <-
   function(...) {
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
  npksum.numeric(...) }
 
 # Transport already-owned dots instead of replaying expressions on workers.
@@ -99,6 +100,7 @@ npksum.numeric <-
            leave.one.out, operator, permutation.operator, return.kernel.weights,
            ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     dots <- list(...)
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
@@ -198,6 +200,7 @@ npksum.default <-
            return.kernel.weights = FALSE,
            ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     dots <- list(...)
     internal.power12 <- isTRUE(dots$.np.internal.power12)
