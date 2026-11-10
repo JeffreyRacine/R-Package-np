@@ -282,6 +282,10 @@
         need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state)
       )
 
+      plot.se <- tobj$derr
+      if (!new.bias && identical(plot.errors.method, "asymptotic"))
+        plot.se <- .np_plot_density_marginal_se(bws, x.eval, tobj$dens, plot.se)
+
       tdens = matrix(data = tobj$dens,
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
@@ -290,7 +294,7 @@
           gaussian.draws else plot.errors.boot.num, plot.errors.type, design = list(vary = seq_len(ncol(xdat)), xtrim = xtrim, xq = xq)) else NULL
       terr.payload <- if (new.bias) .np_udens_plot_payload(bias.raw) else .np_plot_interval_payload(
         estimate = tobj$dens,
-        se = tobj$derr,
+        se = plot.se,
         plot.errors.method = plot.errors.method,
         plot.errors.alpha = plot.errors.alpha,
         plot.errors.type = plot.errors.type,
@@ -317,7 +321,7 @@
 
       if (joint.eligible)
         terr.payload <- .np_plot_density_interval(terr.payload,
-          bws, xdat, x.eval, tobj$derr, tobj$dens, cdf = FALSE,
+          bws, xdat, x.eval, plot.se, tobj$dens, cdf = FALSE,
           alpha = plot.errors.alpha, band.type = plot.errors.type,
           gaussian.draws = gaussian.draws)
 
@@ -351,6 +355,9 @@
                                              lerr.all, herr.all)
                   else if (joint.eligible && identical(plot.errors.type, "simultaneous"))
                       .np_plot_joint_panel_range(tobj$dens, terr)
+                  else if (identical(plot.errors.method, "asymptotic"))
+                      .np_plot_panel_error_range(tobj$dens, terr,
+                        plot.errors.type = plot.errors.type)
                   else
                       c(min(lerr), max(herr))
               } else
@@ -366,7 +373,7 @@
           d1 <- .np_plot_density_band_fields(d1, terr.payload)
         if (new.bias) d1$inference <- bias.raw$inference
         if (identical(plot.errors.method, "asymptotic"))
-          d1[[".plot_std_error"]] <- tobj$derr
+          d1[[".plot_std_error"]] <- plot.se
         if (plot.errors && identical(plot.errors.type, "all"))
           d1[[".plot_band_widths"]] <- terr.all
         d1[[".plot_rows"]] <- list(estimate = tobj$dens,
@@ -629,6 +636,9 @@
           cdf = FALSE,
           need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state)
         )
+        plot.se <- tobj$derr
+        if (!new.bias && identical(plot.errors.method, "asymptotic"))
+          plot.se <- .np_plot_density_marginal_se(bws, eval.slice, tobj$dens, plot.se)
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){
@@ -639,7 +649,7 @@
           gaussian.draws else plot.errors.boot.num, plot.errors.type, design = list(vary = i, xtrim = xtrim, xq = xq)) else NULL
           temp.payload <- if (new.bias) .np_udens_plot_payload(bias.raw) else .np_plot_interval_payload(
             estimate = temp.dens[seq_len(xi.neval)],
-            se = tobj$derr,
+            se = plot.se,
             plot.errors.method = plot.errors.method,
             plot.errors.alpha = plot.errors.alpha,
             plot.errors.type = plot.errors.type,
@@ -665,7 +675,7 @@
           )
           if (joint.eligible)
             temp.payload <- .np_plot_density_interval(temp.payload,
-              bws, xdat, eval.slice, tobj$derr, tobj$dens, cdf = FALSE,
+              bws, xdat, eval.slice, plot.se, tobj$dens, cdf = FALSE,
               alpha = plot.errors.alpha, band.type = plot.errors.type,
               gaussian.draws = gaussian.draws)
           temp.err[seq_len(xi.neval),] <- temp.payload$err
@@ -809,9 +819,11 @@
             bws = bws,
             eval = eval.slice,
             dens = na.omit(temp.dens),
-            derr = .np_plot_joint_interval_rows(
-              cbind(-temp.err[,1], temp.err[,2]), temp.dens,
-              joint.eligible, plot.errors.type),
+            derr = if (identical(plot.errors.method, "asymptotic"))
+              cbind(-temp.err[,1], temp.err[,2])[!is.na(temp.dens), , drop = FALSE]
+              else .np_plot_joint_interval_rows(
+                cbind(-temp.err[,1], temp.err[,2]), temp.dens,
+                joint.eligible, plot.errors.type),
             ntrain = bws$nobs, se = plot.errors
           )
           if (new.bias) plot.out[[i]]$inference <- bias.raw$inference
@@ -828,7 +840,7 @@
             corrected = temp.err[seq_len(xi.neval), 3L],
             widths = temp.err[seq_len(xi.neval), 1:2, drop = FALSE])
           if (identical(plot.errors.method, "asymptotic"))
-            plot.out[[i]][[".plot_std_error"]] <- tobj$derr
+            plot.out[[i]][[".plot_std_error"]] <- plot.se
           if (identical(plot.errors.type, "all"))
             plot.out[[i]][[".plot_band_widths"]] <- temp.all.err
           if (joint.eligible)

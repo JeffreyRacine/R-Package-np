@@ -1,5 +1,7 @@
 # np 0.80-2 (development)
 
+* Asymptotic density plots mark empty-window uncertainty unavailable while retaining estimates and the full evaluation grid.
+
 * Density and distribution hat operators require numeric RHS storage, without coercing factor codes or numeric-looking strings.
 
 * Native bandwidth and kernel-sum calls now reject formula-only subset and NA-action arguments instead of ignoring them.
