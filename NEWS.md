@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Temporary RNG scopes and regression percentile task validation accept the
+  documented binomial RNG kind on newer R runtimes. Existing hidden-state
+  refusals, selected generators and caller-state restoration are preserved.
+
 * MPI plot-data and density-bias examples follow the existing non-running
   ordinary-check policy and remain in the executable documentation gate.
 

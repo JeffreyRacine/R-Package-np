@@ -1,3 +1,6 @@
+# Inspect the public API without initializing or changing RNG state.
+.np_rng_kind_count <- function() length(formals(base::RNGkind))
+
 # Invocation-local ownership of temporary R RNG state. No generator is replaced.
 .np_rng_scope_check <- function(state, where = "caller", uniform.only = FALSE) {
   bad <- function(reason) stop(paste0("cannot safely restore temporary RNG state (", where, "): ", reason,
@@ -6,11 +9,13 @@
       is.na(state[1L]) || state[1L] < 0L) bad("uncertifiable seed")
   u <- state[1L] %% 100L
   n <- (state[1L] %/% 100L) %% 100L
-  s <- state[1L] %/% 10000L
+  s <- (state[1L] %/% 10000L) %% 10L
+  b <- state[1L] %/% 100000L
   if (u == 5L || (!uniform.only && n == 3L)) bad("user-supplied generator state is not fully represented")
   if (!uniform.only && n == 2L) bad("Box-Muller state is not fully represented")
   if (!u %in% c(0L, 1L, 2L, 3L, 4L, 6L, 7L) ||
       !n %in% c(0L, 1L, 2L, 3L, 4L, 5L) || !s %in% c(0L, 1L) ||
+      (b != 0L && !(b == 1L && .np_rng_kind_count() == 4L)) ||
       length(state) != c(4L, 3L, 3L, 626L, 102L, 0L, 102L, 7L)[u + 1L]) bad("unrecognized seed representation")
   invisible(NULL)
 }
