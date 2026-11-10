@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Isolated plot samplers now preserve and validate R-devel's fourth RNG kind
+  (binomial selection). Existing generators, stream receipts and RNG safety
+  guards are unchanged.
+
 * Temporary RNG scopes and regression percentile task validation accept the
   documented binomial RNG kind on newer R runtimes. Existing hidden-state
   refusals, selected generators and caller-state restoration are preserved.
