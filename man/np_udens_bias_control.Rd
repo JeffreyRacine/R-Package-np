@@ -223,10 +223,86 @@ errors and \code{se=FALSE} are unchanged.
 
 Existing pointwise, simultaneous, Bonferroni, all-band, estimate-centered,
 unbounded and explicit-control methods retain their constructions.
-This addition does not support bootstrap pmzsd, two-dimensional pmzsd,
-nearest-neighbour bandwidths, mixed data, range-derived bounds or literal
+This univariate construction does not support bootstrap pmzsd or Gaussian
+two-dimensional pmzsd. For the separate two-dimensional beta and compact normal constructions,
+see also \code{\link{plot.np}}. It does not support nearest-neighbour bandwidths, mixed data, range-derived bounds or literal
 support endpoints. In particular, the reference-law scale is not the standard
 deviation of iid bootstrap refits.
+}
+
+\subsection{Known-bound compact normal intervals in two dimensions}{
+With omitted or \code{NULL} \code{bias_control}, fixed second-order uniform and
+Epanechnikov kernels support corrected asymptotic normal intervals for exactly
+two continuous coordinates. Request omitted \code{band} or \code{band="pmzsd"}.
+The fixed bandwidth, finite coordinatewise bounds, strictly interior data and
+evaluation targets, at least ten observations and \code{0 < alpha < 0.5} are
+required. The product local-cubic observation operator and corrected center are
+unchanged. The variance integrates the complete influence function under the
+normalized positive joint ratio pilot, including guide-score dependence and
+all guide/kernel cross terms. A guide fitted to this reference law affects
+only the variance, not the original corrected center.
+
+Intervals use ordinary normal critical values without simulated draws, a
+nonlinear guide region, a variance floor or a maximum calibration. They are
+marginal intervals conditional on the bandwidth, fixed bounds and supplied
+targets. Saved-sample coverage is useful on average; sparse-target uncertainty
+and residual bias can still impair local coverage. There is no simultaneous
+coverage claim. Negative centers and endpoints are retained.
+
+The calculation processes targets in bounded blocks, recomputing target-specific
+compact-support quadrature. It retains the whole requested grid and checks the
+192 MiB plot-workspace limit before allocation; this is not a bound on total R
+process memory. The separate calibrated and SD q2 addition is described below.
+Explicit controls, range-derived bounds, literal support endpoints, mixed data,
+nearest-neighbour bandwidths, higher kernel orders and bootstrap pmzsd are not
+admitted by this two-dimensional normal addition. Core estimates, estimator
+standard errors and \code{se=FALSE} are unchanged.
+}
+
+\subsection{Two-dimensional compact calibrated and SD bands}{
+With omitted density bias controls, fixed second-order uniform and Epanechnikov
+kernels support corrected asymptotic \code{band="pointwise"} and
+\code{"bonferroni"}, and independent \code{"symmetric-sd"} or
+\code{"asymmetric-sd"} calibration with explicit \code{"pointwise"},
+\code{"simultaneous"}, \code{"bonferroni"} or \code{"all"} bands.
+The SD route requires explicit \code{bootstrap="inid"} and calibration in
+\code{np_boot_control()}; an omitted or different bootstrap law is not remapped.
+Use two continuous variables, known finite coordinatewise fixed bounds,
+fixed bandwidths, at least ten strictly interior observations and interior
+evaluation points, and \code{0 < alpha < 1}. Range bounds, literal support
+endpoints, mixed variables, nearest-neighbour bandwidths, higher kernel orders,
+explicit density controls and additional bootstrap laws are outside this addition.
+
+The product compact correction and fitted center are unchanged. A joint
+five-score guide retains cross-coordinate dependence. Residual uncertainty uses
+both the complete ratio-pilot and empirical influence variances; endpoints take
+their containing envelope and include a separate nonlinear guide region. The
+risk allocation remains alpha/2 for the guide and alpha/2 for the residual.
+Analytic pointwise and Bonferroni bands do not require Gaussian draws or a full
+covariance matrix. Asymptotic simultaneous/all calibration is not admitted here.
+
+SD bands use literal shared multinomial counts and one actual joint-guide refit
+per draw. Roots are standardized by the original empirical residual scale;
+both original scales enter the endpoint envelope. Symmetric-sd retains the
+absolute containing hull; asymmetric-sd inverts signed residual tails.
+Bonferroni companions use empirical tails with a simultaneous containing hull.
+Small finite-draw tail resolution is reported explicitly, without extrapolating,
+deleting draws or increasing the requested B. All-band output shares the same
+preparation, draws and finite family as its individual components.
+
+A complete common quadrature includes every supplied target's compact-support
+cuts. Storage blocks do not define independent inference families or refit guides.
+The 192 MiB additional inference-array and 512 MiB invocation-storage bounds are
+checked; neither is a bound on the complete R process. Fitted values, estimator
+standard errors, core \code{se=FALSE}, normal pmzsd and other existing methods
+are unchanged. Negative returned centers and interval endpoints remain available.
+
+Retained evidence is conservative rather than proof of universal nominal
+coverage. In the retained six law/sample-size cells, calibrated simultaneous and
+Bonferroni intervals covered all 128 originals per cell; SD evidence used only
+16 originals per cell. Sampling uncertainty is correspondingly larger for SD.
+Claims concern the supplied finite grid and do not establish continuum-wide
+coverage or protect arbitrary sparse-tail distributions.
 }
 
 \subsection{Known-bound Gaussian density inference}{

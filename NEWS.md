@@ -6,8 +6,32 @@
 
 * MPI plot-data and density-bias examples follow the existing non-running
   ordinary-check policy and remain in the executable documentation gate.
+* Fixed-bound two-dimensional uniform and Epanechnikov density plots add
+  asymptotic calibrated pointwise/Bonferroni bands and independent symmetric-sd
+  and asymmetric-sd bands across all four explicit band types. Joint guide
+  dependence, literal bootstrap refits and a complete common quadrature are
+  retained within bounded plot workspaces. Existing normal and univariate
+  methods, core estimators and se=FALSE are unchanged. Asymptotic q2
+  simultaneous/all calibration remains unavailable in this addition.
+
+* Fixed-bound q2 uniform and Epanechnikov density plots now support asymptotic
+  normal (pmzsd or omitted-band) intervals using the unchanged corrected center
+  and complete joint ratio-pilot variance. Target-specific blocked quadrature
+  supports full default grids within a bounded plot workspace. Existing
+  calibrated/SD methods, core estimators and se=FALSE remain unchanged.
 
 * Automatic plot task and regression-hat dispatch now apply the existing option-agreement policy even after temporary plot localization. Manual MPI and genuinely local calculations retain their existing ownership.
+
+* Fixed-bound q1 uniform and Epanechnikov density plots support asymptotic
+  pmzsd intervals, including an omitted band, with the existing corrected center
+  and complete ratio-pilot normal variance. Cross-guide weights retain their
+  pre-underflow log probabilities. Calibrated bands, core estimators and
+  se=FALSE retain their existing behavior.
+
+* Two-dimensional fixed-bound beta normal plot intervals now admit larger
+  target grids using the existing blocked calculation and a complete workspace
+  bound. The 192 MiB limit, statistical method, tolerances and existing
+  successful paths are unchanged.
 
 * Fixed-bound beta density plots now support two-dimensional asymptotic pmzsd
   intervals with complete joint ratio-pilot variance and the existing corrected

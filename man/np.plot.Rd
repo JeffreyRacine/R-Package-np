@@ -643,7 +643,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Fixed-bound order-2 beta plots also support these normal intervals for two
   continuous coordinates. Their complete variance retains the joint guide-score
   dependence and all guide/kernel cross terms under the ratio pilot; the
-  original corrected center is unchanged. This normal approximation can be
+  original corrected center is unchanged. Normal interval calculations process
+  targets in blocks while retaining the complete requested grid. Admission
+  accounts for the target results and both guide preparations within the
+  existing 192 MiB plot-workspace limit; requests whose actual geometry exceeds
+  that limit still stop. This is distinct from full-covariance calibrated bands
+  and does not bound the memory used by the entire R process.
+  This normal approximation can be
   less accurate at sparse boundary targets in small samples. Two-dimensional
   Gaussian normal intervals, bootstrap pmzsd, estimated bounds and literal
   support endpoints are not admitted by this additional construction. See
@@ -659,8 +665,30 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   controls retain their own constructions. Observations and evaluation points
   must be strictly inside the supplied finite bounds, with at least ten
   observations. Range-estimated bounds, literal endpoints, nearest-neighbor
-  bandwidths, higher orders, multivariate compact correction and normal-scale
-  pmzsd are not admitted by this construction.
+  bandwidths, higher orders and multivariate calibrated compact correction
+  are not admitted by this construction.
+  With \code{errors="asymptotic"}, omitted \code{band} or
+  \code{band="pmzsd"} instead uses the same corrected center and complete
+  normalized ratio-pilot influence variance with normal critical values.
+  Guide and cross-covariance contributions are included. These marginal
+  intervals require no simulated draws; they are distinct from the calibrated
+  pointwise and simultaneous bands. Finite-sample accuracy can be weaker at
+  individual sparse or tail targets. These asymptotic normal intervals also
+  support two continuous coordinates under the same fixed-bound, fixed-bandwidth
+  and interior-target restrictions, with omitted density bias controls and
+  \code{0 < alpha < 0.5}. The two-dimensional variance includes joint
+  guide-score dependence and every guide/kernel cross term. Target blocks
+  recompute their own compact-support quadrature; the complete requested grid
+  is retained within the 192 MiB plot-workspace bound. Normal intervals remain
+  marginal and keep their separate construction. A separate fixed-bound q2
+  addition supports asymptotic pointwise and Bonferroni calibrated intervals,
+  and independent symmetric-sd/asymmetric-sd intervals with all four explicit
+  band types. These require omitted density bias controls and the same interior
+  data/target restrictions. For SD bands explicitly select \code{bootstrap="inid"}
+  and the calibration in \code{boot_control}. Asymptotic simultaneous/all and
+  bootstrap pmzsd are not admitted by this addition. See
+  \code{\link{np_udens_bias_control}} for the distinct uncertainty constructions
+  and their conservative, finite-grid evidence.
   For corrected bootstrap bands, supply \code{errors="bootstrap"}, explicit
   \code{bootstrap="inid"}, an explicit band, and
   \code{boot_control=np_boot_control(calibration="symmetric-sd")} or
