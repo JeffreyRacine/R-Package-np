@@ -6,7 +6,8 @@
     identical(bws[['type',exact=TRUE]],'fixed') && isTRUE(bws[['ckerorder',exact=TRUE]]==2L) &&
     isTRUE(bws[['ckerbound',exact=TRUE]]%in%c('fixed','range')) &&
     identical(center,'bias-corrected') && isTRUE(band%in%c('pointwise','simultaneous','bonferroni','all')) &&
-    (identical(method,'asymptotic')&&is.null(calibration)&&isTRUE(band%in%c('pointwise','bonferroni')))
+    ((identical(method,'asymptotic')&&is.null(calibration)&&isTRUE(band%in%c('pointwise','bonferroni'))) ||
+     (identical(method,'bootstrap')&&isTRUE(sd.explicit)&&isTRUE(calibration%in%c('symmetric-sd','asymmetric-sd'))))
 }
 .np_udens_compact_q2_active <- function(state)
   identical(state[['construction',exact=TRUE]],'density-fixed-compact-q2-calibrated-v1')
@@ -42,7 +43,7 @@
                                        progress=function(...)NULL,variant='asymptotic') {
   .np_udens_compact_q2_validate(x,h,grid,kernel)
   if(!is.numeric(alpha)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1||
-     !identical(variant,'asymptotic')||
+     length(variant)!=1L||!variant%in%c('asymptotic','symmetric-sd','asymmetric-sd')||
      length(band)!=1L||!band%in%c('pointwise','simultaneous','bonferroni','all'))
     stop('invalid compact q2 band request',call.=FALSE)
   original<-grid;grid<-unique(grid);grid<-grid[do.call(order,as.data.frame(grid)),,drop=FALSE]
@@ -59,7 +60,15 @@
   region<-.np_udens_beta_regions(prepared$theta,prepared$Veta,grid,alpha,progress)
   rhat<-prepared$center-prepared$fitted;scales<-list(sqrt(prepared$pilot_variance),sqrt(prepared$empirical_variance))
   if(draws)stream<-.np_udens_beta_random_stream(store,if(sd)'multinomial' else 'normal',if(sd)n else m,B,seed)
-  {
+  if(sd) {
+    bootstrap<-.np_udens_compact_q2_sd_roots(prepared,stream,store,progress)
+    if(band%in%c('bonferroni','all'))result<-.np_udens_bounded_sd(bootstrap$roots,rhat,scales,region,prepared$center,alpha,band,variant,progress)
+    else {
+      parts<-lapply(scales,function(s).np_udens_beta_stored_reduce(bootstrap$roots,rhat,s,region,prepared$center,alpha,band,variant))
+      result<-parts[[1L]];result$lower<-pmin(parts[[1L]]$lower,parts[[2L]]$lower);result$upper<-pmax(parts[[1L]]$upper,parts[[2L]]$upper)
+    }
+    prepared$checks$bootstrap<-bootstrap$checks
+  } else {
     companions<-.np_udens_bounded_analytic(rhat,region,scales,alpha,m)
     if(draws) {
       covariance<-.np_udens_compact_q2_covariance_read(prepared)
