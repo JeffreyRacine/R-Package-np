@@ -33,6 +33,33 @@
   list(theta=theta,state=s,iterations=it,score_error=max(abs(s$mean-target)))
 }
 
+# Additional admission for full grids refused by the incumbent cheap bound.
+# This bounds live plot workspace, not R's entire heap or process RSS.
+.np_udens_beta_normal_q2_capacity <- function(n,m,theta=NULL,outer=NULL,thetaQ=theta) {
+  if(!is.numeric(n)||length(n)!=1L||!is.finite(n)||n<10||n!=floor(n)||
+     !is.numeric(m)||length(m)!=1L||!is.finite(m)||m<1||m!=floor(m))
+    stop('invalid beta normal q2 workspace geometry',call.=FALSE)
+  n<-as.double(n);m<-as.double(m);block<-min(m,16)
+  retained<-200*m+60*n+65536
+  stages<-c(input=160*block*n,guide=28*600000)
+  if(!is.null(theta)) {
+    nodes<-vapply(list(theta,thetaQ),function(th)vapply(list(th[1:2],th[3:4]),
+      function(a).np_udens_beta_marginal_rule(a,outer)$nodes,integer(1L)),integer(2L))
+    products<-apply(nodes,2L,prod)
+    if(any(nodes>1600L)||any(products>2560000L))
+      stop('beta normal q2 plot workspace exceeds 192 MiB',call.=FALSE)
+    largest<-max(nodes);axis.sum<-sum(apply(nodes,1L,max));product<-max(products)
+    # Both retained guides, replacement caches, pilot construction temporaries,
+    # diagonal native buffers and all full-grid result/diagnostic arrays.
+    stages<-c(stages,preparation=12*n*largest+4*product+96*block*axis.sum+40*block^2,
+      reference.fit=28*600000+product+24*block*axis.sum)
+  }
+  bytes<-8*(max(stages)+retained)
+  if(!is.finite(bytes)||bytes>192*1024^2)
+    stop('beta normal q2 plot workspace exceeds 192 MiB',call.=FALSE)
+  bytes
+}
+
 .np_udens_beta_normal_q2_budget <- function(n,m,theta,outer) {
   nodes<-vapply(list(theta[1:2],theta[3:4]),function(a)
     .np_udens_beta_marginal_rule(a,outer)$nodes,integer(1L))
@@ -52,9 +79,9 @@
      any(h<=0)||any(x<=0|x>=1)||any(grid<=0|grid>=1))
     stop('invalid beta normal q2 moment request',call.=FALSE)
   n<-nrow(x);m<-nrow(grid)
-  # Cheap input-size refusal precedes guide or kernel preparation.
-  if(8*(4*as.double(m)*n+40*as.double(m)^2)>192*1024^2)
-    stop('beta normal q2 plot workspace exceeds 192 MiB',call.=FALSE)
+  # Retain every incumbent admission; expand only formerly refused grids.
+  expanded.capacity<-8*(4*as.double(m)*n+40*as.double(m)^2)>192*1024^2
+  if(expanded.capacity).np_udens_beta_normal_q2_capacity(n,m)
   progress('original joint guide',0L,1L)
   fit<-.np_udens_beta_q2_fit(x);theta<-fit$theta
   progress('original joint guide',1L,1L);levels<-vector('list',2L);workspace<-0
@@ -64,12 +91,14 @@
     inner<-c(64L,128L)[level];outer<-c(32L,64L)[level]
     width<-min(16L,m)
     workspace<-max(workspace,.np_udens_beta_normal_q2_budget(n,width,theta,outer))
+    if(expanded.capacity)workspace<-max(workspace,.np_udens_beta_normal_q2_capacity(n,m,theta,outer))
     progress(paste('joint reference pilot',level),0L,1L)
     first<-blocks[[1L]]
     p<-.np_udens_beta_q2_moment_prepare(x,h,grid[first,,drop=FALSE],theta,inner,outer,fit$state)
     initial<-raw(p)[[2L]];target<-initial$mean[length(first)+seq_len(5L)]
     fq<-.np_udens_beta_normal_q2_fit(target,theta)
     workspace<-max(workspace,.np_udens_beta_normal_q2_budget(n,width,fq$theta,outer))
+    if(expanded.capacity)workspace<-max(workspace,.np_udens_beta_normal_q2_capacity(n,m,theta,outer,fq$theta))
     pq<-.np_udens_beta_q2_moment_prepare(x,h,grid[first,,drop=FALSE],fq$theta,inner,outer,fq$state)
     z<-list(center=numeric(m),se=numeric(m),theta=theta,thetaQ=fq$theta,
       meanQ=numeric(m),D=matrix(0,m,5L),variance.checks=list())
