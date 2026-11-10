@@ -47,3 +47,24 @@ test_that('compact providers retain explicit bands and interior support', {
     expect_lt(max(abs(p$guide_residual_mean)),1e-9)
   }
 })
+
+
+test_that("compact cross-guide weights retain normalized pre-underflow logs", {
+  plan <- .np_udens_compact_operator_plan(c(.2,.5,.8),.1,"uniform")
+  target <- c(4,2.5); proposal <- c(3,38)
+  for (order in c(128L,256L)) {
+    plain <- .np_udens_compact_rule(proposal,order,plan)
+    rule <- .np_udens_compact_rule(proposal,order,plan,keep.log=TRUE)
+    expect_identical(rule[names(plain)],plain)
+    expect_equal(exp(rule$log.prob),rule$prob,tolerance=1e-15)
+    term <- drop(rule$T %*% (target-proposal))+rule$A-lbeta(target[1]+1,target[2]+1)
+    expect_true(any(is.nan(rule$prob*exp(term))))
+    weights <- exp(rule$log.prob+term)
+    expect_true(all(is.finite(weights)))
+    expect_equal(sum(weights),1,tolerance=1e-10)
+    expect_equal(unname(colSums(rule$T*weights)),unname(digamma(target+1)-digamma(sum(target+1))),tolerance=1e-10)
+    S <- sweep(rule$T,2,digamma(target+1)-digamma(sum(target+1)))
+    oracle <- diag(trigamma(target+1))-trigamma(sum(target+1))
+    expect_equal(unname(crossprod(S,S*weights)),unname(oracle),tolerance=1e-10)
+  }
+})
