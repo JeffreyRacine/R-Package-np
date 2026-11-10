@@ -56,6 +56,8 @@ MPI startup, shutdown, worker-count, and worker-status controls.
     are not restored at the end of an individual call. With \code{"never"},
     automatic numerical calls are refused before dispatch because the existing
     boundary cannot certify agreement of computational options across ranks.
+    This includes automatic plot tasks and regression-hat broadcasts;
+    genuinely local calculations do not acquire a new MPI admission requirement.
     This also refuses manually synchronized automatic calls. Explicit manual
     MPI workflows remain available; their caller must maintain agreement of
     computational options on every rank, including after worker-side changes.

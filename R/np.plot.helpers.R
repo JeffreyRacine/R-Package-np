@@ -2304,11 +2304,7 @@
                                          progress.context = NULL,
                                          metadata.reducer = NULL,
                                          progress.unit = "rep") {
-  if (.npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast() &&
-      .npRmpi_has_active_slave_pool(comm = comm))
-    .npRmpi_autodispatch_require_option_sync()
+  .npRmpi_admit_automatic_task(comm = comm)
   if (!is.null(metadata.reducer) && !is.function(metadata.reducer))
     stop("invalid internal fan-out metadata reducer", call. = FALSE)
   rng.final.state <- attr(tasks, "rng_final_state", exact = TRUE)
@@ -15195,6 +15191,9 @@ plotFactor <- function(f, y, ...){
 }
 
 .npRmpi_with_local_bootstrap <- function(expr) {
+  old.owner <- .npRmpi_task_origin$automatic
+  .npRmpi_task_origin$automatic <- .npRmpi_automatic_task_owner()
+  on.exit(.npRmpi_task_origin$automatic <- old.owner, add = TRUE)
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
   options(npRmpi.autodispatch.disable = TRUE)

@@ -66,6 +66,26 @@
   FALSE
 }
 
+# Retain only the originating owner while a plot temporarily localizes helpers.
+# This state is not a task payload or an option-agreement certificate.
+.npRmpi_task_origin <- new.env(parent = emptyenv())
+.npRmpi_task_origin$automatic <- FALSE
+
+.npRmpi_automatic_task_owner <- function() {
+  if (!isTRUE(.npRmpi_task_origin$automatic) &&
+      (!.npRmpi_autodispatch_active() || .npRmpi_autodispatch_in_context()))
+    return(FALSE)
+  !.npRmpi_autodispatch_called_from_bcast()
+}
+
+.npRmpi_admit_automatic_task <- function(comm = 1L) {
+  if (!.npRmpi_automatic_task_owner() ||
+      !.npRmpi_has_active_slave_pool(comm = comm))
+    return(invisible(FALSE))
+  .npRmpi_autodispatch_require_option_sync()
+  invisible(TRUE)
+}
+
 .npRmpi_warn_pkg_conflict_once <- function() {
   if (!isTRUE(getOption("npRmpi.conflicts.warn", TRUE)))
     return(invisible(FALSE))

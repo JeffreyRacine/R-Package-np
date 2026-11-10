@@ -1,5 +1,7 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Automatic plot task and regression-hat dispatch now enforce the existing never-mode refusal even after temporary plot localization. Manual MPI and genuinely local calculations retain their existing ownership.
+
 * Fixed-bound beta density plots now support two-dimensional asymptotic pmzsd
   intervals with complete joint ratio-pilot variance and the existing corrected
   center. Calibrated bands, core estimators and se=FALSE are unchanged.

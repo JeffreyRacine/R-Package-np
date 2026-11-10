@@ -2208,6 +2208,7 @@ npreghat.rbandwidth <-
     if (.npRmpi_has_active_slave_pool(comm = 1L) &&
         !.npRmpi_autodispatch_in_context() &&
         !.npRmpi_autodispatch_called_from_bcast()) {
+      .npRmpi_admit_automatic_task(comm = 1L)
       invisible(.npreghat_operator_spec(
         bws = bws,
         degree = degree,
