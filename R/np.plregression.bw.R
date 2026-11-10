@@ -58,6 +58,7 @@ npplregbw.NULL =
            zdat = stop("invoked without data `zdat'"),
            bws, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     ## maintain x names and 'toFrame'
@@ -91,6 +92,7 @@ npplregbw.plbandwidth =
            zdat = stop("invoked without data `zdat'"),
            bws, nmulti, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     ## n observations
@@ -730,6 +732,7 @@ npplregbw.default =
            ftol, itmax, nmulti, nomad.remin, powell.remin, small, tol,
            ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
 

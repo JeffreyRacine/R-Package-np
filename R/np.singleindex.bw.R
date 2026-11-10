@@ -72,6 +72,7 @@ npindexbw.NULL <-
            ydat = stop("training data ydat missing"),
            bws, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     xdat <- toFrame(xdat)
@@ -1858,6 +1859,7 @@ npindexbw.default <-
            ...,
            nomad.opts = list()){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     only.beta <- !missing(only.optimize.beta) &&
@@ -2212,6 +2214,7 @@ npindexbw.sibandwidth <-
            ...,
            .fixed.h.lower = NULL){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     dots <- list(...)

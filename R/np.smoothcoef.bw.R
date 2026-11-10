@@ -112,6 +112,7 @@ npscoefbw.NULL <-
            zdat = NULL,
            bws, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     miss.z <- missing(zdat)
@@ -570,6 +571,7 @@ npscoefbw.scbandwidth <-
            ...,
            nomad.opts = list()){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")
@@ -2979,6 +2981,7 @@ npscoefbw.default <-
            ...,
            nomad.opts = list()){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")

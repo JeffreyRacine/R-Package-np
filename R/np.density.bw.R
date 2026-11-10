@@ -67,6 +67,7 @@ npudensbw.NULL <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     dots <- list(...)
@@ -790,6 +791,7 @@ npudensbw.bandwidth <-
            ...,
            nomad.opts = list()){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     .np_density_bw_progress(bandwidth.compute, bwsolver, eval.only, {
 
@@ -1163,6 +1165,7 @@ npudensbw.default <-
            ...,
            nomad.opts = list()){
   .np_reject_native_data(substitute(list(...))[-1L])
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudensbw")

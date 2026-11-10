@@ -1,5 +1,7 @@
 # np 0.80-2 (development)
 
+* Native bandwidth and kernel-sum calls now reject formula-only subset and NA-action arguments instead of ignoring them.
+
 * Temporary RNG scopes and regression percentile task validation accept the
   documented binomial RNG kind on newer R runtimes. Existing hidden-state
   refusals, selected generators and caller-state restoration are preserved.
