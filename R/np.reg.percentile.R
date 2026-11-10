@@ -13,8 +13,8 @@
 }
 .np_reg_percentile_rng_validate <- function(state, contract) {
   invalid <- function() stop('invalid regression percentile task RNG state', call. = FALSE)
-  kind.length <- if (getRversion() < '3.6.0') 2L else 3L
-  if (!is.integer(state) || length(state) < 2L || is.na(state[1L]) ||
+  kind.length <- .np_rng_kind_count()
+  if (!kind.length %in% 2:4 || !is.integer(state) || length(state) < 2L || is.na(state[1L]) ||
       !is.list(contract) ||
       !identical(contract$runtime, paste(R.version$major, R.version$minor, sep = '.')) ||
       !identical(contract$header, state[1L]) ||
@@ -29,8 +29,10 @@
     'Box-Muller', 'user-supplied', 'Inversion', 'Kinderman-Ramage')) - 1L
   sample <- if (kind.length == 2L) 0L else
     match(contract$kind[3L], c('Rounding', 'Rejection')) - 1L
-  if (anyNA(c(uniform, normal, sample)) || uniform == 5L ||
-      !identical(state[1L], uniform + 100L * normal + 10000L * sample) ||
+  binomial <- if (kind.length < 4L) 0L else
+    match(contract$kind[4L], c('Buggy BTPE', 'BTPE')) - 1L
+  if (anyNA(c(uniform, normal, sample, binomial)) || uniform == 5L ||
+      !identical(state[1L], uniform + 100L * normal + 10000L * sample + 100000L * binomial) ||
       length(state) != c(4L, 3L, 3L, 626L, 102L, 0L, 102L, 7L)[uniform + 1L]) invalid()
   invisible(TRUE)
 }

@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Temporary RNG scopes and regression percentile task validation accept the
+  documented binomial RNG kind on newer R runtimes. Existing hidden-state
+  refusals, selected generators and caller-state restoration are preserved.
+
 * Fixed-bound beta density plots now support two-dimensional asymptotic pmzsd
   intervals with complete joint ratio-pilot variance and the existing corrected
   center. Calibrated bands, core estimators and se=FALSE are unchanged.
