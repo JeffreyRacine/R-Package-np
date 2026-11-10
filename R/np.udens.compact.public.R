@@ -12,7 +12,7 @@
 
 .np_udens_compact_active <- function(state) {
   identical(state[['construction',exact=TRUE]],'density-fixed-compact-cubic-v1') ||
-    .np_udens_compact_normal_q2_active(state)
+    .np_udens_compact_normal_q2_active(state) || .np_udens_compact_q2_active(state)
 }
 
 .np_udens_compact_public_prepare <- function(bws,x,method,bootstrap,band,calibration,alpha,seed) {
@@ -68,7 +68,9 @@
     stop('Compact corrected bands require strictly interior evaluation points; literal support endpoints are excluded',call.=FALSE)
   progress<-function(stage,done,total).np_plot_progress_notify(stage=paste('Compact density:',stage),done=done,total=total,unit='work')
   result<-.np_plot_corrected_activity_run('Constructing fixed-bound Compact density intervals',
-    .np_udens_compact_hidden(state$normalized[,1L],state$h,normalized[,1L],state$kernel,alpha,band,B,state$plot.random.seed,progress,variant=state$variant))
+    if(.np_udens_compact_q2_active(state))
+      .np_udens_compact_q2_hidden(state$normalized,state$h,normalized,state$kernel,alpha,band,B,state$plot.random.seed,progress,variant=state$variant)
+    else .np_udens_compact_hidden(state$normalized[,1L],state$h,normalized[,1L],state$kernel,alpha,band,B,state$plot.random.seed,progress,variant=state$variant))
   for(key in c('center','lower','upper','pilot_se','empirical_se'))result[[key]]<-result[[key]]/state$jacobian
   if(any(!is.finite(unlist(result[c('center','lower','upper','pilot_se','empirical_se')]))))
     stop('Compact corrected-band output units are not representable',call.=FALSE)

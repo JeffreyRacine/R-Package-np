@@ -138,6 +138,12 @@
         error.request$method, as.character(plot.errors.boot.method)[1L],
         error.request$type, plot.errors.boot.calibration, plot.errors.alpha,
         if (missing(random.seed)) 42L else random.seed)
+    if (.np_udens_compact_q2_request(bws, bias.control, plot.errors.center,
+        error.request$method, error.request$type, plot.errors.boot.calibration, compact.sd.explicit))
+      compact.state <- .np_udens_compact_q2_public_prepare(bws, xdat,
+        error.request$method, as.character(plot.errors.boot.method)[1L],
+        error.request$type, plot.errors.boot.calibration, plot.errors.alpha,
+        if (missing(random.seed)) 42L else random.seed)
     fgd.state <- NULL
     if (.np_udens_fgd_request(bws, bias.control, plot.errors.center,
         error.request$method, plot.errors.boot.calibration))
