@@ -22,8 +22,8 @@ test_that("npsigtest locked opcode rejects mismatched call heads", {
   set.seq <- getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")
 
   with_mpi_pool({
-    old.seq <- getOption("npRmpi.spmd.seq_id", 0L)
-    on.exit(options(npRmpi.spmd.seq_id = old.seq), add = TRUE)
+    old.seq <- getFromNamespace(".npRmpi_spmd_seq_get", "npRmpi")()
+    on.exit(getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")(old.seq), add = TRUE)
     set.seq(0L)
 
     env <- make.env(opcode = "autodispatch.npsigtest.core", timeout_class = "default")

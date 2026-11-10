@@ -1049,8 +1049,12 @@
   stop(sprintf("%s requires an active MPI slave pool; call npRmpi.init(...) first", where))
 }
 
+# Sequence ownership follows the live session, not a user options snapshot.
+.npRmpi_spmd_state <- new.env(parent = emptyenv())
+.npRmpi_spmd_state$seq_id <- 0L
+
 .npRmpi_spmd_seq_get <- function() {
-  seq.id <- getOption("npRmpi.spmd.seq_id", 0L)
+  seq.id <- .npRmpi_spmd_state$seq_id
   if (!is.numeric(seq.id) || length(seq.id) != 1L || is.na(seq.id) || seq.id < 0)
     return(0L)
   as.integer(seq.id)
@@ -1060,7 +1064,7 @@
   if (!is.numeric(seq.id) || length(seq.id) != 1L || is.na(seq.id) ||
       !is.finite(seq.id) || seq.id < 0 || seq.id != floor(seq.id))
     stop("'seq.id' must be a non-negative integer", call. = FALSE)
-  options(npRmpi.spmd.seq_id = as.integer(seq.id))
+  .npRmpi_spmd_state$seq_id <- as.integer(seq.id)
   invisible(as.integer(seq.id))
 }
 

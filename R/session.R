@@ -15,7 +15,7 @@
 
 .npRmpi_session_reset_spmd_state <- function() {
   # SPMD sequencing must restart for each fresh session world.
-  options(npRmpi.spmd.seq_id = 0L)
+  .npRmpi_spmd_state$seq_id <- 0L
   options(npRmpi.autodispatch.remote.counter = 0L)
   .npRmpi_lease_reset_local()
   invisible(TRUE)

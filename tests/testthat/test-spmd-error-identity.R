@@ -1,8 +1,8 @@
 test_that("SPMD local execution retains complete arbitrary application errors", {
   registry <- getFromNamespace(".npRmpi_spmd_registry", "npRmpi")
   opcode <- "unit.original.condition"
-  old.seq <- getOption("npRmpi.spmd.seq_id", 0L)
-  on.exit({options(npRmpi.spmd.seq_id = old.seq)
+  old.seq <- getFromNamespace(".npRmpi_spmd_seq_get", "npRmpi")()
+  on.exit({getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")(old.seq)
     if (exists(opcode, envir = registry, inherits = FALSE))
       rm(list = opcode, envir = registry)
   }, add = TRUE)

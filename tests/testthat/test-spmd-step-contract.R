@@ -101,8 +101,8 @@ test_that("SPMD envelope sequence contract fails fast on mismatch", {
   try.exec <- getFromNamespace(".npRmpi_spmd_try_execute_local", "npRmpi")
   set.seq <- getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")
 
-  old.seq <- getOption("npRmpi.spmd.seq_id", 0L)
-  on.exit(options(npRmpi.spmd.seq_id = old.seq), add = TRUE)
+  old.seq <- getFromNamespace(".npRmpi_spmd_seq_get", "npRmpi")()
+  on.exit(getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")(old.seq), add = TRUE)
 
   set.seq(0L)
   env1 <- make.env(opcode = "spmd.ping", timeout_class = "smoke")
@@ -178,7 +178,7 @@ test_that("SPMD step diverged sequence fails fast with ACK mismatch diagnostics"
       "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "mk <- getFromNamespace('.npRmpi_spmd_make_envelope', 'npRmpi')",
       "bcast <- getFromNamespace('.npRmpi_bcast_cmd_expr', 'npRmpi')",
-      "mpi.bcast.cmd(if (mpi.comm.rank(1L) == 1L) options(npRmpi.spmd.seq_id = 5L), caller.execute=TRUE)",
+      "mpi.bcast.cmd(if (mpi.comm.rank(1L) == 1L) getFromNamespace('.npRmpi_spmd_seq_set', 'npRmpi')(5L), caller.execute=TRUE)",
       "env <- mk(opcode='spmd.ping', timeout_class='smoke')",
       "cmd <- substitute({",
       "  run <- get('.npRmpi_spmd_execute_step', envir=asNamespace('npRmpi'), inherits=FALSE)",
@@ -433,8 +433,8 @@ test_that("SPMD locked core opcodes reject mismatched call heads", {
   try.exec <- getFromNamespace(".npRmpi_spmd_try_execute_local", "npRmpi")
   set.seq <- getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")
 
-  old.seq <- getOption("npRmpi.spmd.seq_id", 0L)
-  on.exit(options(npRmpi.spmd.seq_id = old.seq), add = TRUE)
+  old.seq <- getFromNamespace(".npRmpi_spmd_seq_get", "npRmpi")()
+  on.exit(getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")(old.seq), add = TRUE)
   set.seq(0L)
 
   env.reg <- make.env(opcode = "autodispatch.npregbw.cv_lllp", timeout_class = "cv-regression")
@@ -490,8 +490,8 @@ test_that("SPMD dynamic autodispatch opcode executes payload with ACK", {
   try.exec <- getFromNamespace(".npRmpi_spmd_try_execute_local", "npRmpi")
   set.seq <- getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")
 
-  old.seq <- getOption("npRmpi.spmd.seq_id", 0L)
-  on.exit(options(npRmpi.spmd.seq_id = old.seq), add = TRUE)
+  old.seq <- getFromNamespace(".npRmpi_spmd_seq_get", "npRmpi")()
+  on.exit(getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")(old.seq), add = TRUE)
   set.seq(0L)
 
   env <- make.env(opcode = "autodispatch.unit_test", timeout_class = "unit")
