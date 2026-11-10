@@ -55,6 +55,9 @@
   progress('original joint guide',1L,1L);levels<-vector('list',2L);workspace<-0
   raw<-function(p).np_udens_beta_joint_raw_native(p$cache,p$axes,p$theta[5L],p$logz,p$ratio,FALSE)
   blocks<-.np_udens_beta_blocks(m,16L)
+  # This reference owner receives at most nine targets. Each public block
+  # prepares fresh target-specific axes; no later-block axis reuse is allowed.
+  stopifnot(length(blocks)==1L)
   for(level in 1:2) {
     outer<-c(16L,32L)[level]
     width<-min(16L,m)
@@ -159,4 +162,80 @@
     progress('completed target blocks',max(rows),m)
   }
   out
+}
+
+# Exact admission; neighboring kernels, controls and bands retain their owners.
+.np_udens_compact_normal_q2_request <- function(bws,control,center,method,band,calibration=NULL) {
+  inherits(bws,'bandwidth') && is.null(control) && is.null(calibration) &&
+    identical(center,'bias-corrected') && identical(method,'asymptotic') &&
+    identical(band,'pmzsd') &&
+    isTRUE(bws[['ckertype',exact=TRUE]]%in%c('uniform','epanechnikov')) &&
+    identical(bws[['type',exact=TRUE]],'fixed') &&
+    identical(bws[['ckerbound',exact=TRUE]],'fixed') &&
+    isTRUE(bws[['ckerorder',exact=TRUE]]==2L) &&
+    isTRUE(bws[['ndim',exact=TRUE]]==2L) && isTRUE(bws[['ncon',exact=TRUE]]==2L)
+}
+
+.np_udens_compact_normal_q2_active <- function(state) {
+  identical(state[['construction',exact=TRUE]],'density-fixed-q2-compact-normal-v1')
+}
+
+.np_udens_compact_normal_q2_public_prepare <- function(bws,x,alpha,seed) {
+  if(!.np_udens_compact_normal_q2_request(bws,NULL,'bias-corrected','asymptotic','pmzsd'))
+    stop('invalid compact q2 normal plot request',call.=FALSE)
+  if(!is.data.frame(x)||nrow(x)<10L||ncol(x)!=2L||anyDuplicated(names(x))||
+     any(!nzchar(names(x)))||!all(vapply(x,is.numeric,logical(1L)))||any(!is.finite(as.matrix(x))))
+    stop('Compact q2 normal bands require at least ten finite numeric observations',call.=FALSE)
+  lower<-bws[['ckerlb',exact=TRUE]];upper<-bws[['ckerub',exact=TRUE]]
+  if(!is.numeric(lower)||!is.numeric(upper)||length(lower)!=2L||length(upper)!=2L||
+     any(!is.finite(c(lower,upper)))||any(upper<=lower))
+    stop('Compact q2 normal bands require finite ordered coordinatewise bounds',call.=FALSE)
+  width<-upper-lower;jacobian<-prod(width)
+  if(any(!is.finite(width))||!is.finite(jacobian)||jacobian<=0||!is.finite(1/jacobian))
+    stop('Compact q2 normal support units are not representable',call.=FALSE)
+  normalized<-sweep(sweep(as.matrix(x),2L,lower),2L,width,'/')
+  h<-as.double(.np_physical_bandwidth(bws))/width
+  if(length(h)!=2L||any(!is.finite(h))||any(h<=0)||any(normalized<=0|normalized>=1))
+    stop('Compact q2 normal bands require positive bandwidths and strictly interior observations',call.=FALSE)
+  if(!is.numeric(alpha)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=.5)
+    stop('Compact q2 normal bands require alpha in (0,0.5)',call.=FALSE)
+  npValidateNonNegativeInteger(seed,'random.seed')
+  list(x=x,normalized=normalized,h=h,lower=lower,width=width,jacobian=jacobian,
+    kernel=bws[['ckertype',exact=TRUE]],q=2L,n=nrow(x),variant='asymptotic',
+    plot.law='gaussian',plot.random.seed=seed,normal.pmzsd=TRUE,
+    construction='density-fixed-q2-compact-normal-v1')
+}
+
+.np_udens_compact_normal_q2_public <- function(state,grid,alpha,band) {
+  if(!.np_udens_compact_normal_q2_active(state)||!identical(band,'pmzsd'))
+    stop('invalid compact q2 normal plot state',call.=FALSE)
+  if(!is.data.frame(grid)||!nrow(grid)||!identical(names(grid),names(state$x))||
+     !all(vapply(grid,is.numeric,logical(1L)))||any(!is.finite(as.matrix(grid))))
+    stop('invalid compact q2 normal evaluation frame',call.=FALSE)
+  normalized<-sweep(sweep(as.matrix(grid),2L,state$lower),2L,state$width,'/')
+  if(any(normalized<=0|normalized>=1))
+    stop('Compact q2 normal bands require strictly interior evaluation points',call.=FALSE)
+  progress<-function(stage,done,total).np_plot_progress_notify(
+    stage=paste('Compact density normal:',stage),done=done,total=total,unit='work')
+  z<-.np_plot_corrected_activity_run('Constructing fixed-bound compact q2 normal intervals',
+    .np_udens_compact_normal_q2_moments(state$normalized,state$h,normalized,state$kernel,progress))
+  inference<-list(center=z$center/state$jacobian,se=z$se/state$jacobian,bands=list(),
+    settings=list(construction=state$construction,calibration='normal-quantile',law='asymptotic',
+      kernel=state$kernel,q=2L,n=state$n,alpha=alpha,B=0L,available.bands='pmzsd',grid.size=nrow(grid),
+      family='marginal intervals at supplied interior targets',bounds=cbind(state$lower,state$lower+state$width),
+      bandwidth=state$h*state$width,
+      calibration.status='complete joint ratio-pilot variance; unchanged corrected center'),
+    reference=list(original.guide=z$theta,blocks=lapply(z$blocks,function(b)
+      list(rows=b$rows,variance.guide=b$thetaQ,normalization=b$reference$normal,
+        score.error=b$reference$score_error,score.iterations=b$reference$iterations,
+        score.covariance=b$reference$V,guide.information=b$reference$I))),
+    numerical.checks=list(blocks=lapply(z$blocks,function(b)
+      list(rows=b$rows,refinement=b$checks,variance=b$variance)),workspace=z$workspace))
+  if(any(!is.finite(c(inference$center,inference$se))))
+    stop('Compact q2 normal output units are not representable',call.=FALSE)
+  inference<-.np_plot_bias_normal(inference,alpha)
+  inference$intervals<-inference$absolute.intervals<-inference$bands
+  endpoints<-inference$bands$pmzsd
+  list(boot.err=cbind(inference$center-endpoints[,1L,1L],endpoints[,2L,1L]-inference$center,inference$center),
+    boot.all.err=NULL,inference=inference,bxp=list())
 }

@@ -663,7 +663,10 @@ np_render_control <- function(style = c("band", "bar"),
   if (!owns.empty.rows && inherits(bws, c("bandwidth", "dbandwidth"))) {
     # Compact inference owns a child seed in addition to this outer scope.
     # Forward the request without bypassing either existing RNG admission guard.
-    if (.np_udens_compact_request(bws, dots$bias.control,
+    if (.np_udens_compact_normal_q2_request(bws, dots$bias.control,
+        dots$plot.errors.center, dots$plot.errors.method,
+        dots$plot.errors.type, dots$plot.errors.boot.calibration) ||
+        .np_udens_compact_request(bws, dots$bias.control,
         dots$plot.errors.center, dots$plot.errors.method,
         dots$plot.errors.boot.calibration,
         identical(dots$plot.errors.boot.method, "inid") &&

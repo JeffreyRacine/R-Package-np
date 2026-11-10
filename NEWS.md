@@ -1,5 +1,11 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Fixed-bound q2 uniform and Epanechnikov density plots now support asymptotic
+  normal (pmzsd or omitted-band) intervals using the unchanged corrected center
+  and complete joint ratio-pilot variance. Target-specific blocked quadrature
+  supports full default grids within a bounded plot workspace. Existing
+  calibrated/SD methods, core estimators and se=FALSE remain unchanged.
+
 * Automatic plot task and regression-hat dispatch now apply the existing option-agreement policy even after temporary plot localization. Manual MPI and genuinely local calculations retain their existing ownership.
 
 * Fixed-bound q1 uniform and Epanechnikov density plots support asymptotic
