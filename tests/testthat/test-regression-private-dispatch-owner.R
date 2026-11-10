@@ -42,7 +42,7 @@ test_that("private regression fit dispatch retains its declared leaf", {
 test_that("private fit call site preserves ownership before transport", {
   skip_on_cran()
   if (!spawn_mpi_slaves(1L)) skip("MPI slaves unavailable")
-  on.exit(close_mpi_slaves(), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   ns <- asNamespace("npRmpi")
   scope <- new.env(parent = ns)
   for (name in c(".npreg_auxiliary", ".npreg_fit_impl", ".np_regression_forward")) {
