@@ -4,7 +4,10 @@
 #include <R_ext/Utils.h>
 #include <math.h>
 #include <limits.h>
+/* GCC ignores this pragma; retain the existing contraction policy per compiler. */
+#if !defined(__GNUC__) || defined(__clang__)
 #pragma STDC FP_CONTRACT OFF
+#endif
 
 SEXP C_np_plot_fgd_evaluate(SEXP target, SEXP donor, SEXP bandwidth,
                            SEXP coefficients, SEXP logmass)
