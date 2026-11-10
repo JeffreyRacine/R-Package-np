@@ -1,5 +1,13 @@
 # np 0.80-2 (development)
 
+* Fixed-bound two-dimensional uniform and Epanechnikov density plots add
+  asymptotic calibrated pointwise/Bonferroni bands and independent symmetric-sd
+  and asymmetric-sd bands across all four explicit band types. Joint guide
+  dependence, literal bootstrap refits and a complete common quadrature are
+  retained within bounded plot workspaces. Existing normal and univariate
+  methods, core estimators and se=FALSE are unchanged. Asymptotic q2
+  simultaneous/all calibration remains unavailable in this addition.
+
 * Fixed-bound q2 uniform and Epanechnikov density plots now support asymptotic
   normal (pmzsd or omitted-band) intervals using the unchanged corrected center
   and complete joint ratio-pilot variance. Target-specific blocked quadrature
