@@ -1,5 +1,7 @@
 # np 0.80-2 (development)
 
+* Density and distribution hat operators require numeric RHS storage, without coercing factor codes or numeric-looking strings.
+
 * Native bandwidth and kernel-sum calls now reject formula-only subset and NA-action arguments instead of ignoring them.
 
 * Temporary RNG scopes and regression percentile task validation accept the
