@@ -1,3 +1,15 @@
+.npreg_owned_dispatch_call <- function(context) {
+  call <- context$expanded
+  if (identical(context$public, FALSE)) {
+    if (!identical(call[[1L]], quote(npreg.rbandwidth)))
+      stop("invalid private regression fit dispatch owner", call. = FALSE)
+    # The auxiliary entry already selected this package leaf. Its public
+    # wrapper is absent from the dynamic stack; retain the declared owner.
+    attr(call, ".npRmpi.bound.call.owner") <- TRUE
+  }
+  call
+}
+
 # Required inference/refit consumers must not publish partial external fits.
 .npreg_report_variance_unavailable <- function(native.output) {
   if (isTRUE(attr(native.output, ".np.variance.unavailable", exact = TRUE))) {
@@ -596,7 +608,7 @@ npreg.rbandwidth <-
       return(.npRmpi_autodispatch_tag_result(result, mode = "auto"))
     }
     if (.npRmpi_autodispatch_active()) {
-      dispatch.call <- .np.context$expanded
+      dispatch.call <- .npreg_owned_dispatch_call(.np.context)
       dispatch.call$.np.defer.empty.rows <- TRUE
       result <- .npRmpi_autodispatch_call(dispatch.call, .np.context$caller, owner.name = "npreg.rbandwidth")
       if (is.list(result) && is.list(bws)) {
