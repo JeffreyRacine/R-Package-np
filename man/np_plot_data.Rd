@@ -123,6 +123,7 @@ failures must be considered when experimenting with these bounds.
 
 \seealso{\code{\link{plot.np}}, \code{\link{np_boot_control}}}
 \examples{
+\dontrun{
 npRmpi.init(nslaves = 1)
 x <- seq(-2, 2, length.out = 30)
 bw <- npudensbw(dat = data.frame(x = x), bws = .6,
@@ -135,4 +136,5 @@ p$targets
 p$panels[[1]]$variables
 plot(p)
 npRmpi.quit()
+} % enddontrun
 }

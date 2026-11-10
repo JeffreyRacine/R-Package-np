@@ -444,6 +444,7 @@ failures must be considered when experimenting with these bounds.
 
 \seealso{\code{\link{npudens}}, \code{\link[=plot.np]{npplot}}, \code{\link{np_bias_control}}}
 \examples{
+\dontrun{
 npRmpi.init(nslaves = 1)
 set.seed(123)
 x <- data.frame(x = rnorm(80))
@@ -453,5 +454,6 @@ z <- plot(bw, xdat = x, errors = "bootstrap", bootstrap = "inid",
           neval = 3, output = "data")
 z$inference[[1]]$primary
 npRmpi.quit()
+} % enddontrun
 }
 \keyword{nonparametric}

@@ -1,5 +1,8 @@
 # R4 documentation: explicit option synchronization precondition
 
+* MPI plot-data and density-bias examples follow the existing non-running
+  ordinary-check policy and remain in the executable documentation gate.
+
 * Automatic plot task and regression-hat dispatch now apply the existing option-agreement policy even after temporary plot localization. Manual MPI and genuinely local calculations retain their existing ownership.
 
 * Fixed-bound beta density plots now support two-dimensional asymptotic pmzsd

@@ -49,4 +49,6 @@ sed -i bak -f sed_dontrun.scr uocquantile.Rd
 sed -i bak -f sed_dontrun.scr npuniden.boundary.Rd
 sed -i bak -f sed_dontrun.scr npuniden.reflect.Rd
 sed -i bak -f sed_dontrun.scr npuniden.sc.Rd
+sed -i bak -f sed_dontrun.scr np_plot_data.Rd
+sed -i bak -f sed_dontrun.scr np_udens_bias_control.Rd
 rm *.Rdbak
