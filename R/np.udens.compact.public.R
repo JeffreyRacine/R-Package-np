@@ -20,7 +20,8 @@
   if(!identical(bws[['type',exact=TRUE]],'fixed') || !isTRUE(bws[['ckerorder',exact=TRUE]]==2L) ||
      !isTRUE(bws[['ndim',exact=TRUE]]==1L) || !isTRUE(bws[['ncon',exact=TRUE]]==bws[['ndim',exact=TRUE]]))
     stop('Compact corrected bands require fixed order-2 bandwidths and one continuous coordinate',call.=FALSE)
-  if( !band%in%c('pointwise','simultaneous','bonferroni','all'))
+  normal <- .np_udens_bounded_normal_request(bws,method,band,calibration,alpha)
+  if(!normal && !band%in%c('pointwise','simultaneous','bonferroni','all'))
     stop("Compact corrected bands require explicit band='pointwise', 'simultaneous', 'bonferroni' or 'all'",call.=FALSE)
   variant<-'asymptotic'
   if(identical(method,'bootstrap')) {
@@ -49,10 +50,13 @@
   state<-list(x=x,normalized=normalized,h=h,lower=lower,width=width,jacobian=jacobian,
     kernel=bws[['ckertype',exact=TRUE]],q=ncol(x),n=nrow(x),variant=variant,plot.law=if(method=='asymptotic')'gaussian' else 'inid',
     plot.random.seed=seed,construction='density-fixed-compact-cubic-v1')
+  if(normal)state$normal.pmzsd<-TRUE
   state
 }
 
 .np_udens_compact_public_errors <- function(state,grid,alpha,B,band) {
+  if(identical(state[['normal.pmzsd',exact=TRUE]],TRUE))
+    return(.np_udens_bounded_normal_public(state,grid,alpha,band,state$kernel))
   if(!is.data.frame(grid)||nrow(grid)<1L||!identical(names(grid),names(state$x))||
      !all(vapply(grid,is.numeric,logical(1L)))||any(!is.finite(as.matrix(grid))))
     stop('invalid Compact corrected-band evaluation frame',call.=FALSE)
