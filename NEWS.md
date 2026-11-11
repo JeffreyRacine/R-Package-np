@@ -1,5 +1,10 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Document known experimental coverage limitations of pilot-based normal-scale
+  bias-corrected density intervals, including potentially substantial
+  uncertainty understatement. All bias-corrected bounds remain pre-beta;
+  calculations, returned objects and defaults are unchanged.
+
 * Isolated plot samplers now preserve and validate R-devel's fourth RNG kind
   (binomial selection). Existing generators, stream receipts and RNG safety
   guards are unchanged.
