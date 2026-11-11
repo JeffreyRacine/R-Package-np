@@ -1639,6 +1639,20 @@ establish generally valid coverage. Coverage can fail outside the studied
 settings, and available options do not constitute a general solution to
 bias-corrected inference. Method-specific assumptions, restrictions and known
 failures must be considered when experimenting with these bounds.
+
+A known limitation concerns pilot-based normal-scale, bias-corrected density
+intervals, including the fixed-support beta and Gaussian constructions and the
+related two-dimensional construction. These use normal critical values for
+\code{band="pmzsd"} (also selected when \code{band} is omitted on these
+routes). The fitted pilot reference law can substantially understate
+uncertainty even when all joint bias-correction covariance terms are included.
+Residual smoothing bias and sparse information can also cause poor coverage
+of the true density. These limitations are not confined to numerical failures
+or extreme stress tests. Data-driven bandwidth selection, including
+cross-validation, does not by itself establish valid bias-corrected coverage.
+Results for a particular calibrated construction do not establish coverage for
+other constructions. These bounds should be used for methodological
+experimentation, with independent coverage assessment for the intended setting.
 }
 
 \seealso{
