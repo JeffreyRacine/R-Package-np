@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Stored conditional bandwidth constructors and native consistent-model tests
+  reject unused formula-only frame controls without evaluating them. Formula
+  subset and NA handling retain their existing owner.
+
 * Package-generated bandwidth-selector calls retain their package owner under
   caller masking and either np/npRmpi attachment order. Argument and formula
   environments remain with their original callers.

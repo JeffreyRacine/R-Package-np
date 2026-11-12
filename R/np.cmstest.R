@@ -121,6 +121,12 @@ npcmstest <- function(formula,
                       density.weighted = TRUE,
                       random.seed = 42,
                       ...) {
+  if (missing(formula) && !missing(xdat) && !missing(ydat)) {
+    frame.args <- substitute(list(...))[-1L]
+    if (!missing(subset)) frame.args <- c(list(subset = quote(subset)), frame.args)
+    .np_reject_native_frame_args(frame.args)
+  }
+
   if (missing(formula) && !missing(xdat) && !missing(ydat) &&
       .np_data_formal_supplied(sys.call(), sys.function()))
     .np_native_data_error()
