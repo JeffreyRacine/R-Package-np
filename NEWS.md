@@ -1,5 +1,10 @@
 # npRmpi 0.80-2 (development)
 
+* Class-probability plots reconstruct uncertainty on complete training and
+  evaluation rows, then restore omitted display positions. Bootstrap, simultaneous
+  and derivative intervals now support fitted objects with missing rows without
+  changing complete-input results or re-evaluating data and NA callbacks.
+
 * Conditional density and distribution perspective plots retain undefined targets
   and range automatic display limits over finite estimates and interval endpoints.
   Explicit limits and returned numerical results are unchanged.

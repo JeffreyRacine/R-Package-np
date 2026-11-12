@@ -419,6 +419,22 @@
  .np_plot_conmode_joint_columns_local <- function(dat, object, x, y, ex, level,
                                             levels, se, alpha, band,
                                             gaussian.draws) {
+  # Retain padded plot positions while calibrating only defined targets.
+  if (anyNA(ex)) {
+    keep <- complete.cases(ex)
+    omit <- which(!keep)
+    if (length(omit)) {
+      out <- .np_plot_conmode_joint_columns_local(dat[keep, , drop = FALSE], object, x, y,
+        ex[keep, , drop = FALSE], level, levels, se[keep], alpha, band,
+        gaussian.draws)
+      for (nm in names(out)) {
+        if (!(nm %in% names(dat)) || !identical(out[[nm]], dat[[nm]][keep]))
+          dat[[nm]] <- .npConmodeNapredictRows(omit, out[[nm]])
+      }
+      attr(dat, "band.calibration") <- attr(out, "band.calibration", exact = TRUE)
+      return(dat)
+    }
+  }
   gradient <- if(isTRUE(dat$gradients[1L]))match(dat$variable[1L],names(x)) else NULL
   target <- if(is.null(gradient))dat$probability else dat$effect
   view <- if(identical(dat$view[1L],"fixed"))"fixed" else "sample"

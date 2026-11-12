@@ -1164,7 +1164,16 @@ np_render_control <- function(style = c("band", "bar"),
   if (is.null(xtrain) || is.null(ytrain))
     stop("fixed-grid plot.conmode displays require an object fitted with probabilities=TRUE or gradients=TRUE",
          call. = FALSE)
-  list(xtrain = as.data.frame(xtrain), ytrain = as.data.frame(ytrain))
+  xtrain <- as.data.frame(xtrain)
+  ytrain <- as.data.frame(ytrain)
+  # Training outputs may have been padded to their original NA positions.
+  # Numerical plot owners use the compact paired sample, retaining its order.
+  if (anyNA(xtrain) || anyNA(ytrain)) {
+    keep <- complete.cases(xtrain, ytrain)
+    xtrain <- xtrain[keep, , drop = FALSE]
+    ytrain <- ytrain[keep, , drop = FALSE]
+  }
+  list(xtrain = xtrain, ytrain = ytrain)
 }
 
 .np_plot_conmode_levels <- function(object, ytrain) {
@@ -1463,6 +1472,23 @@ np_render_control <- function(style = c("band", "bar"),
                                            method,
                                            B,
                                            blocklen) {
+  # Padded display rows are not bootstrap targets. Compute on defined
+  # conditioning rows, then restore the original display positions.
+  if (anyNA(exdat)) {
+    keep <- complete.cases(exdat)
+    omit <- which(!keep)
+    if (length(omit)) {
+      out <- .np_plot_conmode_bootstrap_raw(object, xtrain, ytrain,
+        exdat[keep, , drop = FALSE], level, levels, t0[keep], alpha, band,
+        center, method, B, blocklen)
+      out$boot.err <- .npConmodeNapredictRows(omit, out$boot.err)
+      if (!is.null(out$boot.all.err))
+        out$boot.all.err <- lapply(out$boot.all.err, function(z)
+          .npConmodeNapredictRows(omit, z))
+      out$boot.t <- t(.npConmodeNapredictRows(omit, t(out$boot.t)))
+      return(out)
+    }
+  }
   boot.out <- .np_plot_conmode_bootstrap_values(
     object = object,
     xtrain = xtrain,
