@@ -274,7 +274,7 @@ The SD route requires explicit \code{bootstrap="inid"} and calibration in
 \code{np_boot_control()}; an omitted or different bootstrap law is not remapped.
 Use two continuous variables, known finite coordinatewise fixed bounds,
 fixed bandwidths, at least ten strictly interior observations and interior
-evaluation points, and \code{0 < alpha < 1}. Range bounds, literal support
+evaluation points, and \code{0 < alpha < 0.5}. Range bounds, literal support
 endpoints, mixed variables, nearest-neighbour bandwidths, higher kernel orders,
 explicit density controls and additional bootstrap laws are outside this addition.
 
