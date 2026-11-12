@@ -375,6 +375,8 @@ npcdensbw.conbandwidth <-
            transform.bounds = FALSE,
            ...,
            nomad.opts = list()){
+  .np_reject_native_frame_args(substitute(list(...))[-1L])
+
   .np_reject_native_data(substitute(list(...))[-1L])
 
     .np_density_bw_progress(bandwidth.compute, bwsolver, FALSE, {

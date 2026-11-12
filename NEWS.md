@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Stored conditional bandwidth constructors and native consistent-model tests
+  reject unused formula-only frame controls without evaluating them. Formula
+  subset and NA handling retain their existing owner.
+
 * Restoring user options no longer rolls back the worker acceleration
   agreement certificate; failed delivery leaves that certificate invalid.
 
