@@ -656,7 +656,12 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   normalized ratio-pilot influence variance with normal critical values.
   Guide and cross-covariance contributions are included. These marginal
   intervals require no simulated draws; they are distinct from the calibrated
-  pointwise and simultaneous bands. Finite-sample accuracy can be weaker at
+  pointwise and simultaneous bands. The one-coordinate normal route retains
+  a 192 MiB plot-workspace limit. Its quadrature uses the full target grid,
+  so some moderate grids (for example, around 100 targets) exceed this limit
+  depending on bandwidth, support and data geometry. The check can refuse a
+  request after the first numerical refinement has completed; no smaller
+  grid is substituted automatically. Finite-sample accuracy can be weaker at
   individual sparse or tail targets. These asymptotic normal intervals also
   support two continuous coordinates under the same fixed-bound, fixed-bandwidth
   and interior-target restrictions, with omitted density bias controls and
