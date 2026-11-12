@@ -39,31 +39,6 @@ test_that("private regression fit dispatch retains its declared leaf", {
                "invalid private regression fit dispatch owner", fixed = TRUE)
 })
 
-test_that("private fit call site preserves ownership before transport", {
-  skip_on_cran()
-  if (!spawn_mpi_slaves(1L)) skip("MPI slaves unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-  ns <- asNamespace("npRmpi")
-  scope <- new.env(parent = ns)
-  for (name in c(".npreg_auxiliary", ".npreg_fit_impl", ".np_regression_forward")) {
-    fn <- get(name, ns); environment(fn) <- scope; scope[[name]] <- fn
-  }
-  scope$.npRmpi_autodispatch_call <- function(mc, caller_env, comm = 1L, owner.name = NULL)
-    stop(structure(list(message = "captured fit dispatch", call = NULL,
-                        invocation = mc, owner = owner.name),
-                   class = c("fit_dispatch_capture", "error", "condition")))
-  x <- data.frame(x = seq(.05, .95, length.out = 24))
-  y <- sin(x$x)
-  b <- npregbw(xdat = x, ydat = y, bws = .3, bandwidth.compute = FALSE)
-  got <- tryCatch(scope$.npreg_auxiliary(b, txdat = x, tydat = y),
-                  fit_dispatch_capture = identity)
-  expect_s3_class(got, "fit_dispatch_capture")
-  expect_identical(got$owner, "npreg.rbandwidth")
-  expect_identical(got$invocation[[1L]], quote(npreg.rbandwidth))
-  expect_true(attr(got$invocation, ".npRmpi.bound.call.owner", exact = TRUE))
-  expect_true(got$invocation$.np.defer.empty.rows)
-})
-
 test_that("namespace-only public partially linear fitting retains its child owner", {
   skip_on_cran()
   # Isolate package masking and coordinator progress from the suite's pool.
@@ -71,6 +46,25 @@ test_that("namespace-only public partially linear fitting retains its child owne
     "loadNamespace('npRmpi')",
     "npRmpi::npRmpi.init(nslaves=1L, quiet=TRUE)",
     "on.exit(npRmpi::npRmpi.quit(force=TRUE), add=TRUE)",
+    "ns <- asNamespace(\"npRmpi\")",
+    "  scope <- new.env(parent = ns)",
+    "  for (name in c(\".npreg_auxiliary\", \".npreg_fit_impl\", \".np_regression_forward\")) {",
+    "    fn <- get(name, ns); environment(fn) <- scope; scope[[name]] <- fn",
+    "  }",
+    "  scope$.npRmpi_autodispatch_call <- function(mc, caller_env, comm = 1L, owner.name = NULL)",
+    "    stop(structure(list(message = \"captured fit dispatch\", call = NULL,",
+    "                        invocation = mc, owner = owner.name),",
+    "                   class = c(\"fit_dispatch_capture\", \"error\", \"condition\")))",
+    "  x <- data.frame(x = seq(.05, .95, length.out = 24))",
+    "  y <- sin(x$x)",
+    "  b <- npRmpi::npregbw(xdat = x, ydat = y, bws = .3, bandwidth.compute = FALSE)",
+    "  got <- tryCatch(scope$.npreg_auxiliary(b, txdat = x, tydat = y),",
+    "                  fit_dispatch_capture = identity)",
+    "  testthat::expect_s3_class(got, \"fit_dispatch_capture\")",
+    "  testthat::expect_identical(got$owner, \"npreg.rbandwidth\")",
+    "  testthat::expect_identical(got$invocation[[1L]], quote(npreg.rbandwidth))",
+    "  testthat::expect_true(attr(got$invocation, \".npRmpi.bound.call.owner\", exact = TRUE))",
+    "  testthat::expect_true(got$invocation$.np.defer.empty.rows)",
     "d <- data.frame(x=seq(.03,.97,length.out=31), z=sin(seq_len(31)))",
     "d$y <- sin(3*d$x)+.5*d$z+cos(seq_len(31))*.1",
     "options(np.messages=FALSE)",
