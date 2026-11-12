@@ -1,5 +1,11 @@
 # npRmpi 0.80-2
 
+* Univariate whole-line Epanechnikov density plots add explicit asymptotic
+  bias-corrected simultaneous bands using the complete M4 guide-influence
+  covariance. The addition is plot-only; other bands and existing methods,
+  selected bandwidths, fitted estimators and se=FALSE are unchanged.
+
+
 * Known-fixed-bound two-dimensional uniform and Epanechnikov corrected density
   plots add asymptotic simultaneous and all-band requests using the complete
   covariance and existing Gaussian factor. Existing pointwise, Bonferroni,

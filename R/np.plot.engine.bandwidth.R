@@ -291,7 +291,7 @@
         exdat = x.eval,
         bws = bws,
         cdf = FALSE,
-        need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state)
+        need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state) && !.np_udens_m4_active(bias.state)
       )
 
       plot.se <- tobj$derr
@@ -658,7 +658,7 @@
           exdat = eval.slice,
           bws = bws,
           cdf = FALSE,
-          need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state)
+          need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state) && !.np_udens_m4_active(bias.state)
         )
         plot.se <- tobj$derr
         if (!new.bias && identical(plot.errors.method, "asymptotic"))
