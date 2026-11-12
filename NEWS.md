@@ -1,5 +1,7 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Density surface ranges include the selected bias-corrected center and its intervals; explicit ranges and returned plot data are unchanged.
+
 * Clarify the experimental pilot-scale limitations of compact density normal
   intervals and whole-panel unavailability of simultaneous variability bands.
 

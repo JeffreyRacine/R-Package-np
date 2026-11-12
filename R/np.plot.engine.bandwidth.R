@@ -380,7 +380,8 @@
                       .np_plot_joint_panel_range(tobj$dens, terr)
                   else if (identical(plot.errors.method, "asymptotic"))
                       .np_plot_panel_error_range(tobj$dens, terr,
-                        plot.errors.type = plot.errors.type)
+                        plot.errors.type = plot.errors.type,
+                        plotOnEstimate = !.np_plot_center_is_bias_corrected(plot.errors.center))
                   else
                       c(min(lerr), max(herr))
               } else
