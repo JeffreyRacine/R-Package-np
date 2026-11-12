@@ -1,5 +1,8 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Single-index formula fits retain their training and evaluation NA policies
+  without forwarding already-consumed formula controls to native constructors.
+
 * Prepared bandwidth searches and automatic calls now publish worker-option
   agreement only after successful delivery. Restoring earlier options cannot
   reuse a stale agreement record; synchronization policies and RNG guards are unchanged.
