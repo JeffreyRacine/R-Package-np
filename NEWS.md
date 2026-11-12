@@ -1,5 +1,8 @@
 # np 0.80-2 (development)
 
+* Single-index formula fits retain their training and evaluation NA policies
+  without forwarding already-consumed formula controls to native constructors.
+
 * Document known experimental coverage limitations of pilot-based normal-scale
   bias-corrected density intervals, including potentially substantial
   uncertainty understatement. All bias-corrected bounds remain pre-beta;

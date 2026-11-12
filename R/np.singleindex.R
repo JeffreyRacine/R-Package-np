@@ -188,6 +188,11 @@ npindex.formula <-
         # formula again through the explicit-native formula reentry interface.
         if (!inherits(si.bws, "formula"))
           si.args$bws <- si.bws
+        # The raw formula owner has already applied the training NA policy
+        # and retained the evaluation policy above. Native constructors must
+        # not receive this consumed formula-only argument a second time.
+        if (raw.formula)
+          dots$na.action <- NULL
         ev <- do.call(npindex, c(si.args, list(se = se, se.type = se.type), dots))
         ev$call <- mc
         environment(ev$call) <- .np_call_owner_environment(
