@@ -1,5 +1,10 @@
 # np 0.80-2
 
+* Known-fixed-bound two-dimensional uniform and Epanechnikov corrected density
+  plots add asymptotic simultaneous and all-band requests using the complete
+  covariance and existing Gaussian factor. Existing pointwise, Bonferroni,
+  normal and SD constructions, fitted estimators and RNG behavior are retained.
+
 * Class-probability plots reconstruct uncertainty on complete training and
   evaluation rows, then restore omitted display positions. Bootstrap, simultaneous
   and derivative intervals now support fitted objects with missing rows without

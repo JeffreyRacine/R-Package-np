@@ -670,12 +670,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   recompute their own compact-support quadrature; the complete requested grid
   is retained within the 192 MiB plot-workspace bound. Normal intervals remain
   marginal and keep their separate construction. A separate fixed-bound q2
-  addition supports asymptotic pointwise and Bonferroni calibrated intervals,
+  addition supports asymptotic pointwise, simultaneous, Bonferroni and all-band calibrated intervals,
   and independent symmetric-sd/asymmetric-sd intervals with all four explicit
   band types. These require omitted density bias controls and the same interior
   data/target restrictions. For SD bands explicitly select \code{bootstrap="inid"}
-  and the calibration in \code{boot_control}. Asymptotic simultaneous/all and
-  bootstrap pmzsd are not admitted by this addition. See
+  and the calibration in \code{boot_control}. Bootstrap pmzsd is not admitted
+  by this addition. Asymptotic simultaneous bands use the complete pilot and
+  empirical Gaussian covariances, including all cross-coordinate guide terms. See
   \code{\link{np_udens_bias_control}} for the distinct uncertainty constructions
   and their conservative, finite-grid evidence.
   For corrected bootstrap bands, supply \code{errors="bootstrap"}, explicit

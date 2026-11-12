@@ -266,8 +266,8 @@ standard errors and \code{se=FALSE} are unchanged.
 
 \subsection{Two-dimensional compact calibrated and SD bands}{
 With omitted density bias controls, fixed second-order uniform and Epanechnikov
-kernels support corrected asymptotic \code{band="pointwise"} and
-\code{"bonferroni"}, and independent \code{"symmetric-sd"} or
+kernels support corrected asymptotic \code{band="pointwise"},
+\code{"simultaneous"}, \code{"bonferroni"} and \code{"all"}, and independent \code{"symmetric-sd"} or
 \code{"asymmetric-sd"} calibration with explicit \code{"pointwise"},
 \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"} bands.
 The SD route requires explicit \code{bootstrap="inid"} and calibration in
@@ -284,7 +284,14 @@ both the complete ratio-pilot and empirical influence variances; endpoints take
 their containing envelope and include a separate nonlinear guide region. The
 risk allocation remains alpha/2 for the guide and alpha/2 for the residual.
 Analytic pointwise and Bonferroni bands do not require Gaussian draws or a full
-covariance matrix. Asymptotic simultaneous/all calibration is not admitted here.
+covariance matrix. Simultaneous calibration uses the complete covariance under
+each reference measure, the maintained full Gaussian correlation factor and
+one shared normal stream. It uses the type-7 empirical quantile of the absolute
+finite-grid maximum at probability \eqn{1-\alpha/2}. All-band output includes
+the unchanged pointwise and Bonferroni companions. Near-null covariance
+directions are retained without a positive-eigenvalue cutoff or added jitter.
+Different floating-point covariance factorizations need not give identical
+finite-stream endpoints even when they represent the same Gaussian law.
 
 SD bands use literal shared multinomial counts and one actual joint-guide refit
 per draw. Roots are standardized by the original empirical residual scale;

@@ -6,7 +6,7 @@
     identical(bws[['type',exact=TRUE]],'fixed') && isTRUE(bws[['ckerorder',exact=TRUE]]==2L) &&
     isTRUE(bws[['ckerbound',exact=TRUE]]%in%c('fixed','range')) &&
     identical(center,'bias-corrected') && isTRUE(band%in%c('pointwise','simultaneous','bonferroni','all')) &&
-    ((identical(method,'asymptotic')&&is.null(calibration)&&isTRUE(band%in%c('pointwise','bonferroni'))) ||
+    ((identical(method,'asymptotic')&&is.null(calibration)) ||
      (identical(method,'bootstrap')&&isTRUE(sd.explicit)&&isTRUE(calibration%in%c('symmetric-sd','asymmetric-sd'))))
 }
 .np_udens_compact_q2_active <- function(state)
