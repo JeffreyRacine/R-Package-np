@@ -1,5 +1,8 @@
 # np 0.80-2 (development)
 
+* Clarify the experimental pilot-scale limitations of compact density normal
+  intervals and whole-panel unavailability of simultaneous variability bands.
+
 * Single-index formula fits retain their training and evaluation NA policies
   without forwarding already-consumed formula controls to native constructors.
 
@@ -16,7 +19,9 @@
 
 * Density and distribution hat operators require numeric RHS storage, without coercing factor codes or numeric-looking strings.
 
-* Native bandwidth and kernel-sum calls now reject formula-only subset and NA-action arguments instead of ignoring them.
+* Native default bandwidth-constructor and kernel-sum calls reject formula-only
+  subset and NA-action arguments instead of ignoring them. This guard does not
+  certify the argument policy of every stored-bandwidth or testing route.
 
 * Temporary RNG scopes and regression percentile task validation accept the
   documented binomial RNG kind on newer R runtimes. Existing hidden-state

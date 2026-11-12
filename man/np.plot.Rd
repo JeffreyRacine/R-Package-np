@@ -1138,8 +1138,12 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   continuous coordinates and unbounded or finite known fixed support.
   Signed kernel contributions are retained in the empirical correlations.
   The fitted curve and ordinary marginal standard errors are not replaced.
-  If marginal uncertainty is unavailable on the requested grid, the joint
-  limits remain explicitly unavailable under the existing policy.
+  If marginal uncertainty is unavailable at any target of the requested panel,
+  simultaneous limits for that whole panel remain unavailable with a warning;
+  calibration does not silently use a reduced grid. Pointwise and Bonferroni
+  intervals remain available at the other targets. Skipping an unavailable
+  panel can change later panels' simulated critical values at Monte Carlo
+  precision because panels share the plot call's calibration stream.
   Fixed-bandwidth beta kernels of orders 4, 6 and 8 also support these
   estimate-centered joint variability bands in one or two continuous
   dimensions with finite known fixed bounds. Their signed observation
@@ -1641,8 +1645,8 @@ bias-corrected inference. Method-specific assumptions, restrictions and known
 failures must be considered when experimenting with these bounds.
 
 A known limitation concerns pilot-based normal-scale, bias-corrected density
-intervals, including the fixed-support beta and Gaussian constructions and the
-related two-dimensional construction. These use normal critical values for
+intervals, including the fixed-support beta and Gaussian constructions and
+the one- and two-dimensional uniform and Epanechnikov normal constructions. These use normal critical values for
 \code{band="pmzsd"} (also selected when \code{band} is omitted on these
 routes). The fitted pilot reference law can substantially understate
 uncertainty even when all joint bias-correction covariance terms are included.
