@@ -57,6 +57,7 @@ npRmpi_shard_local_only_files <- function() {
   c(
     "test-adaptive-conditional-plot-session-contract.R",
     "test-attach-gennn-exdat-contract.R",
+    "test-bw-package-selector-replay.R",
     "test-mpi-finalization-lifecycle-contract.R",
     "test-regression-private-dispatch-owner.R",
     "test-private-search-callsite-owners.R",
