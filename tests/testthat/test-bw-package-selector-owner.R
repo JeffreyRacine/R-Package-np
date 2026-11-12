@@ -26,7 +26,7 @@ test_that("package selector heads ignore caller masking without moving arguments
     expect_identical(.np_bw_package_selector_call(call), call)
 })
 
-test_that("all generated selector consumers preserve values under masking", {
+test_that("public consumers preserve values under caller masking", {
   old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
   ns <- environment(npudens)
   e <- new.env(parent = ns)
