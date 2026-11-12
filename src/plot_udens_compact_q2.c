@@ -1,4 +1,4 @@
-/* Plot-only compact q2 computational leaves. Full covariance, no rank policy. */
+/* Plot-only full covariance: eval invokes the owning R progress callback; no native renderer exists here. */
 #include <R.h>
 #include <Rinternals.h>
 #include <R_ext/Lapack.h>
