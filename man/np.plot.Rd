@@ -698,6 +698,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Low finite-draw tail resolution, particularly for Bonferroni bands, is reported
   without changing \code{B}; defined finite limits are retained.
 
+  Fixed unbounded second-order Epanechnikov density plots with one continuous
+  variable also support corrected asymptotic explicit \code{band="simultaneous"}
+  requests through the M4 complete-covariance construction. This experimental
+  addition does not select M4 for pointwise, Bonferroni, \code{all}, normal or
+  bootstrap bands; see \code{\link{np_udens_bias_control}}. Core estimators and
+  existing plotting constructions are unchanged.
+
   Default bias-corrected unconditional unbounded Gaussian density plots use the D8
   positive-pilot construction for eligible asymptotic requests; see
   \code{\link{np_udens_bias_control}}. It uses complete corrected covariance

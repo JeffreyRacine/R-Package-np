@@ -46,6 +46,34 @@ are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"}, 
 \code{"bonferroni"} and \code{"all"} retain their calibrated constructions.
 
 
+
+\subsection{Whole-line Epanechnikov simultaneous bands}{
+With omitted or \code{NULL} \code{bias_control}, fixed unbounded second-order
+Epanechnikov density plots support \code{errors="asymptotic"},
+\code{center="bias-corrected"} and explicit \code{band="simultaneous"}
+for one continuous variable and at least ten finite observations.
+The M4 plot correction uses an order-six compact operator with a fitted normal
+guide. Its covariance includes the complete guide influence and cross terms
+under a positive, equally weighted Gaussian-mixture reference distribution at
+the original fitted bandwidth. A full, unstudentized absolute Gaussian maximum
+calibrates the supplied finite grid at \eqn{1-\alpha}, using type-7 quantiles.
+Negative corrected values and interval endpoints are retained.
+
+This is an experimental, simultaneous-only addition. It does not qualify M4
+pointwise, Bonferroni, \code{all}, normal \code{pmzsd} or bootstrap bands.
+Uniform kernels, higher requested orders, bounds, nearest-neighbour bandwidths,
+mixed data and multiple coordinates do not select it. Existing constructions,
+explicit controls, original fitted values, estimator standard errors,
+bandwidth selection and \code{se=FALSE} remain unchanged. Its numerical
+refinement checks, bounded workspace and existing temporary-RNG safeguards
+fail explicitly when their contracts cannot be met; no generator, grid,
+draw count, tolerance or statistical method is substituted.
+
+The coverage experiments condition on the selected bandwidth and supplied
+finite grid. They do not establish a continuum or a universal finite-sample
+coverage guarantee. The experimental-status warning applies to this method.
+}
+
 \subsection{Known-bound beta density inference}{
 With omitted or \code{NULL} \code{bias_control}, fixed second-order beta
 kernels support \code{errors="asymptotic"} and independent bootstrap
