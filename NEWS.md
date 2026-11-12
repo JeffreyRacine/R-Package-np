@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Package-generated bandwidth-selector calls retain their package owner under
+  caller masking and either np/npRmpi attachment order. Argument and formula
+  environments remain with their original callers.
+
 * Density plot empty-window admission respects the effective uniform kernel when a supplied kernel order is ignored.
 
 * Density surface ranges include the selected bias-corrected center and its intervals; explicit ranges and returned plot data are unchanged.
