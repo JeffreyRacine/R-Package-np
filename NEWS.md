@@ -1,4 +1,4 @@
-# R4 documentation: explicit option synchronization precondition
+# npRmpi 0.80-2 (development)
 
 * Stored conditional bandwidth constructors and native consistent-model tests
   reject unused formula-only frame controls without evaluating them. Formula
@@ -277,12 +277,6 @@
 - Document that `autodispatch.option.sync="never"` requires caller-maintained
   computational-option agreement across ranks. This is an existing limitation;
   runtime behavior and communication are unchanged.
-
-# npRmpi 0.80-2 (development)
-
-* Prepared bandwidth searches and automatic calls now publish worker-option
-  agreement only after successful delivery. Restoring earlier options cannot
-  reuse a stale agreement record; synchronization policies and RNG guards are unchanged.
 
 * MPI task sequencing now follows the live session independently of user options() restoration.
 
