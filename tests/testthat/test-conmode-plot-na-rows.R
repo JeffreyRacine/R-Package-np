@@ -20,7 +20,8 @@ test_that("conmode uncertainty uses complete inputs and restores omitted plot ro
                       bootstrap="inid", view="sample") {
     args <- list(errors=errors,band=band,output="data",gradients=gradients,view=view)
     if(errors=="bootstrap") {
-      args$B<-19L;args$bootstrap<-bootstrap
+      # Equality/ownership fixture, not a coverage-precision experiment.
+      args$B<-7L;args$bootstrap<-bootstrap
       if(bootstrap!="inid")args$boot_control<-np_boot_control(blocklen=3L)
     }
     if(errors=="asymptotic" && band %in% c("all","simultaneous"))args$gaussian_draws<-99L

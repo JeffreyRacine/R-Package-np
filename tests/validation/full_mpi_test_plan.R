@@ -19,6 +19,7 @@ npRmpi_full_test_singleton_files <- function() {
     "test-gnn-deleted-query-count-gaussian-off.R",
     "test-gnn-deleted-query-count-gaussian-on.R",
     # Measured conmode probability plots need a separate 300-second budget.
+    "test-conmode-plot-na-rows.R",
     "test-npconmode-proper-probability-contract.R",
     # GNN fit/tree influence oracles need an independent bounded unit.
     "test-regression-gnn-fit-tree.R",
