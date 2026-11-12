@@ -8,8 +8,13 @@ test_that("density plot admission separates empty information from fixed-support
     expect_identical(out,c(0,NA_real_,NA_real_,NA_real_,0),info=kernel)
     b$ckerbound <- "range"
     expect_true(all(is.na(suppressWarnings(admit(b,grid,rep(0,5),rep(0,5))))))
-    b$ckerorder <- 4L
-    expect_identical(admit(b,grid,rep(0,5),rep(0,5)),rep(0,5))
+    for (order in c(4L, 6L, 8L)) {
+      b$ckerorder <- order
+      if (kernel == "uniform")
+        expect_true(all(is.na(suppressWarnings(admit(b,grid,rep(0,5),rep(0,5))))))
+      else
+        expect_identical(admit(b,grid,rep(0,5),rep(0,5)),rep(0,5))
+    }
     b$ckerorder <- 2L
     expect_identical(admit(b,grid,rep(.2,5),rep(.01,5)),rep(.01,5))
   }

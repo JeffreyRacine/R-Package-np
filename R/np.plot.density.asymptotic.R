@@ -1,8 +1,9 @@
-# A nonnegative second-order kernel sum can be zero only when no positive
+# A nonnegative effective kernel sum can be zero only when no positive
 # empirical contribution reaches the target. That does not identify zero
 # uncertainty inside support. This admission is plot-only; raw fits are intact.
 .np_plot_density_marginal_se <- function(bws, ex, estimate, se) {
   positive <- isTRUE(bws[["ncon", exact = TRUE]] == 0L) ||
+    identical(bws[["ckertype", exact = TRUE]], "uniform") ||
     (isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) &&
      isTRUE(bws[["ckertype", exact = TRUE]] %in%
        c("gaussian", "epanechnikov", "uniform", "beta")))

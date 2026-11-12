@@ -1,5 +1,7 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Density plot empty-window admission respects the effective uniform kernel when a supplied kernel order is ignored.
+
 * Density surface ranges include the selected bias-corrected center and its intervals; explicit ranges and returned plot data are unchanged.
 
 * Clarify the experimental pilot-scale limitations of compact density normal
