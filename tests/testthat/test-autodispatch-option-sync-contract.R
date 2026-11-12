@@ -30,6 +30,7 @@ test_that("npRmpi.init keeps autodispatch option snapshot unprimed", {
 
 test_that("ordinary options restoration cannot roll back worker agreement", {
   state <- getFromNamespace(".npRmpi_option_agreement", "npRmpi")
+  unrelated <- as.list(state); unrelated$snapshot <- NULL
   saved <- state$snapshot; on.exit(state$snapshot <- saved, add = TRUE)
   sync <- getFromNamespace(".npRmpi_autodispatch_should_sync_options", "npRmpi")
   old <- options(); on.exit(options(old), add = TRUE)
@@ -46,5 +47,7 @@ test_that("ordinary options restoration cannot roll back worker agreement", {
   expect_true(sync(list(np.tree=FALSE)))
   state$snapshot <- list(np.tree=FALSE)
   expect_false(sync(list(np.tree=FALSE)))
-  expect_identical(ls(state),"snapshot")
+  expect_true("snapshot" %in% ls(state))
+  remaining <- as.list(state); remaining$snapshot <- NULL
+  expect_identical(remaining, unrelated)
 })
