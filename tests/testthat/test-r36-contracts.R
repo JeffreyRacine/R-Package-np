@@ -106,13 +106,16 @@ test_that("native entry values and response labels survive dispatch", {
   withr::local_options(np.messages=FALSE)
   set.seed(3622);n<-80L;X<-data.frame(x=runif(n),z=rnorm(n));Y<-sin(4*X$x)+.2*X$z+rnorm(n,sd=.2)
   counter<-new.env();counter$n<-0L;s_m<-seq_len(40L);c_m<-'native call label'
-  ref<-npregbw(xdat=X,ydat=Y,bws=c(.2,.3),bandwidth.compute=FALSE)
-  b<-npregbw(xdat=X,ydat=Y,bws=c(.2,.3),bandwidth.compute=FALSE,subset={counter$n<-counter$n+1L;s_m})
-  expect_identical(counter$n,1L);expect_identical(b$bw,ref$bw)
-  # Native subset remains an accepted dot, not a formula row-selection request.
-  set.seed(3623);a<-npregbw(xdat=X,ydat=Y,nmulti=1L,itmax=3L,subset=s_m)
-  set.seed(3623);b<-npregbw(xdat=X,ydat=Y,nmulti=1L,itmax=3L)
-  expect_identical(a$bw,b$bw)
+  # R66's native-frame contract rejects unsupported subset without forcing it.
+  # Formula row selection is a separate supported route tested above and below.
+  expect_error(npregbw(xdat=X,ydat=Y,bws=c(.2,.3),bandwidth.compute=FALSE,
+                      subset={counter$n<-counter$n+1L;s_m}),
+               "`subset=` supported only with the formula interface", fixed=TRUE)
+  expect_identical(counter$n,0L)
+  expect_error(npregbw(xdat=X,ydat=Y,nmulti=1L,itmax=3L,
+                      subset={counter$n<-counter$n+1L;s_m}),
+               "`subset=` supported only with the formula interface", fixed=TRUE)
+  expect_identical(counter$n,0L)
   set.seed(3624);a<-npudensbw(dat=X,nmulti=1L,call=c_m)
   set.seed(3624);b<-npudensbw(dat=X,nmulti=1L)
   expect_identical(a$bw,b$bw)
