@@ -1,4 +1,4 @@
-# np 0.80-2 (development)
+# np 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and
   evaluation rows, then restore omitted display positions. Bootstrap, simultaneous
@@ -47,6 +47,7 @@
 * Temporary RNG scopes and regression percentile task validation accept the
   documented binomial RNG kind on newer R runtimes. Existing hidden-state
   refusals, selected generators and caller-state restoration are preserved.
+
 * Fixed-bound two-dimensional uniform and Epanechnikov density plots add
   asymptotic calibrated pointwise/Bonferroni bands and independent symmetric-sd
   and asymmetric-sd bands across all four explicit band types. Joint guide
@@ -96,13 +97,14 @@
   normalized-correlation factor and reconstruction checks. Successful paths,
   covariance values, random streams and calibration are unchanged.
 
-- `npsigtest(bws = y ~ x, ...)` now accepts an explicitly named formula,
+* `npsigtest(bws = y ~ x, ...)` now accepts an explicitly named formula,
   matching the positional formula and existing npRmpi interface. Numeric
   bandwidth inputs retain their existing selection behavior.
 
 * Formula selectors and conditional/grid model frames consume original data
   and NA-policy promises once, preserving saved calls, subset evaluation,
   RNG state ownership and MPI behavior.
+
 * Known-fixed-bound univariate uniform and Epanechnikov density plots now
   support explicit corrected asymptotic pointwise, Bonferroni, simultaneous
   and all bands through a plot-only local-cubic guide/residual construction.
@@ -148,17 +150,17 @@
   Actual-value caches, normal-free laws and one-pass calculations are retained;
   saved Inversion streams remain usable regardless of the caller's normal kind.
 
-- Improve plot-only univariate fixed-bound beta/Gaussian corrected-band
+* Improve plot-only univariate fixed-bound beta/Gaussian corrected-band
   second-moment quadrature, including asymptotic normal pmzsd intervals.
   Resolve narrow variance features using a common positive quadrature rule,
   retaining the original independent refinement check, corrected centers,
   guide fits and numerical tolerances. Estimators and skip-SE paths are unchanged.
 
-- Extend estimate-centered asymptotic joint variability bands to fixed higher-order beta kernels (orders 4, 6 and 8), with finite known bounds and one/two continuous dimensions. Preserve signed contributions, native marginal scales and all existing corrected beta methods.
+* Extend estimate-centered asymptotic joint variability bands to fixed higher-order beta kernels (orders 4, 6 and 8), with finite known bounds and one/two continuous dimensions. Preserve signed contributions, native marginal scales and all existing corrected beta methods.
 
-- Extend estimate-centered density asymptotic joint variability bands to fixed Gaussian and Epanechnikov orders 4, 6 and 8 in one/two continuous dimensions with unbounded or finite known fixed support. Signed kernel contributions, existing marginal intervals and estimators are preserved.
+* Extend estimate-centered density asymptotic joint variability bands to fixed Gaussian and Epanechnikov orders 4, 6 and 8 in one/two continuous dimensions with unbounded or finite known fixed support. Signed kernel contributions, existing marginal intervals and estimators are preserved.
 
-- Estimate-centered density plots now provide finite-grid asymptotic joint variability bands for fixed uniform kernels in one/two continuous dimensions, with unbounded or finite known support. Existing marginal bands and estimators are unchanged; unidentified correlation remains explicitly unavailable.
+* Estimate-centered density plots now provide finite-grid asymptotic joint variability bands for fixed uniform kernels in one/two continuous dimensions, with unbounded or finite known support. Existing marginal bands and estimators are unchanged; unidentified correlation remains explicitly unavailable.
 
 * Add plot-only asymptotic normal pmzsd intervals for univariate fixed-bound
   order-2 beta and Gaussian densities, using complete ratio-pilot variance
@@ -166,7 +168,7 @@
   estimators and skip-SE paths are preserved; q2/bootstrap pmzsd remains outside
   this addition.
 
-- Refuse resolved unsigned fixed-block CDF replay across target tiles when a
+* Refuse resolved unsigned fixed-block CDF replay across target tiles when a
   custom uniform generator supplies no replayable seed state.
 
 * Refuse uncached multi-tile signed fixed/geometric CDF bootstrap replay when a
@@ -191,6 +193,7 @@
 
 * Bias-corrected regression plots now detect unsafe uncached Box-Muller replay
   for retained formulas with quoted predictor names, before changing RNG state.
+
 * Add experimental plot-only FG-D corrected intervals for fixed, known-bound
   order-2 Gaussian density kernels in one or two continuous dimensions:
   asymptotic, symmetric-sd and asymmetric-sd, with explicit pointwise or
@@ -272,11 +275,13 @@
   Plot objects no longer masquerade as fitted estimators or expose overloaded
   error offsets, bootstrap draws, covariance workspaces or fitted objects.
   `plot(result)` replays the retained geometry without refitting or resampling.
+
 * Compound plot arguments now use snake_case (`bias_control`, `boot_control`,
   `gaussian_draws`, `random_seed`, `gradient_order`, etc.). Retired plot
   spellings and `output="both"` fail explicitly. Estimator APIs, control
   constructor arguments, numerical methods and defaults are unchanged.
   Package examples, tests and demos follow the new plot contract.
+
 * Coefficient displays retain their existing geometry: partially linear
   coefficient bars represent one standard error, and smooth-coefficient
   coefficient curves have no confidence bands. Explicit incompatible inference
@@ -289,7 +294,6 @@
   existing analytic SD and asymptotic jackknife methods and defaults unchanged.
   Symmetric MP1 and the original full-t research candidates remain private.
 
-
 * Bias-corrected asymptotic Gaussian density plots now use a complete D8 positive-pilot covariance and full-grid maximum calibration for eligible continuous data. Explicit density bias controls and bootstrap constructions retain their meanings.
 
 * Add six experimental opt-in LC conditional density/CDF inference routes via
@@ -301,9 +305,10 @@
   Initial scalar Gaussian2/fixed-bandwidth and numerical workspace limits,
   conservative subfamilies and small-sample coverage failures are documented.
 
-- Density bandwidth selection honors explicit `transform.bounds` through native
+* Density bandwidth selection honors explicit `transform.bounds` through native
   and formula adapters, including outer smoothed-percentile selection.
-- Density/CDF outer selection rejects replay arguments inconsistent with retained
+
+* Density/CDF outer selection rejects replay arguments inconsistent with retained
   kernel, scaling and manual-bandwidth metadata. Explicit manual selection retains
   its replay rule when `eval.only = TRUE`.
 
@@ -337,23 +342,25 @@
 * Plain `npcopula` plots now preserve an omitted `center` argument instead of
   incorrectly requiring bootstrap errors. Explicit control validation is unchanged.
 
-- Density/CDF smoothed-percentile outer fits now repeat retained bandwidth
+* Density/CDF smoothed-percentile outer fits now repeat retained bandwidth
   selection rules; new bandwidth objects retain value-only provenance. Older
   CV objects without a complete recipe retain explicitly warned compatibility
   behavior. Stopped assessment status is now accurately described.
 
-- Corrected bootstrap plotting now completes its target lifecycle and reports
+* Corrected bootstrap plotting now completes its target lifecycle and reports
   an evolving ETA for the 39 outer calibration samples. Numerical results,
   RNG state, and computational ownership are unchanged.
-- `np_boot_control(calibration = "legacy")` selects the retained legacy
+
+* `np_boot_control(calibration = "legacy")` selects the retained legacy
   bias-corrected bootstrap construction for regression, density, and CDFs.
   It is an explicit compatibility option; existing defaults are unchanged.
-- Regression smoothed-percentile capacity is checked before corrected-row
+
+* Regression smoothed-percentile capacity is checked before corrected-row
   capture using the existing memory forecast and limit. Documentation now
   distinguishes companion bands and support completion, and records the
   unresolved nondefault-selection and regression coverage limitations.
 
-- `npreg`, `npplreg`, `npscoef`, and `npindex`, including their bandwidth selectors,
+* `npreg`, `npplreg`, `npscoef`, and `npindex`, including their bandwidth selectors,
   now require numeric integer/double primary responses and explicitly selected
   evaluation responses. Formerly accepted factor and ordered responses error.
   Categorical predictors and internal auxiliary response encodings are preserved.
@@ -362,12 +369,12 @@
   Klein--Spady retains its numeric 0/1 rule. Unusable automatically discovered
   single-index scoring outcomes leave predictions available without scores.
 
-- Regression smoothed-percentile calibration now carries explicit RNG state
+* Regression smoothed-percentile calibration now carries explicit RNG state
   with each outer task, retaining the selected generator and sampling kind
   when workers have different RNG settings. Calibration seeds and statistical
   calculations are unchanged.
 
-- Add experimental CDF and regression `smoothed-percentile` opt-ins through
+* Add experimental CDF and regression `smoothed-percentile` opt-ins through
   `np_boot_control()`. CDF retains the univariate corrected smoothed-bootstrap
   prototype; regression exposes calibrated unshifted standardized-residual
   percentiles for LC/LL/Bernstein LP means and first derivatives. Regression
@@ -376,15 +383,16 @@
   documented. Exact partial selection and bounded outer geometry reuse retain
   the private regression candidate's arithmetic and RNG.
 
-- Density smoothed-percentile plot subtitles and legends now identify
+* Density smoothed-percentile plot subtitles and legends now identify
   corrected bootstrap curves and calibrated percentile ranks, without
   changing calculations, returned objects or the existing SD-method labels.
 
-- Bias-corrected bootstrap calibration uses common `symmetric-sd` and
+* Bias-corrected bootstrap calibration uses common `symmetric-sd` and
   `asymmetric-sd` names across regression, unconditional density and CDFs,
   preserving existing defaults and older public names. CDF asymmetric
   fixed-bandwidth inid/fixed/geom support and low-draw diagnostics are included.
-- Density `smoothed-percentile` selects the refined calibrated unshifted
+
+* Density `smoothed-percentile` selects the refined calibrated unshifted
   OP1+SC1 construction with multivariate/mixed-data, finite categorical
   near-pooling and ordered-lattice extensions. The original fit is unchanged;
   39 fresh outer samples reselect CV bandwidths for calibration. This opt-in
@@ -397,22 +405,23 @@
   Gaussian q1 paired evidence and broader capability proof are distinguished
   from still-limited multivariate/mixed coverage evidence.
 
-- Defined corrected density reference/joint-scale bootstrap bands now return
+* Defined corrected density reference/joint-scale bootstrap bands now return
   all requested finite bands at low draw counts, including Bonferroni, with
   one aggregate warning and location/scale resolution diagnostics.
 
-- Bias-corrected regression bootstrap bands now offer raw asymmetric
+* Bias-corrected regression bootstrap bands now offer raw asymmetric
   `np_boot_control(calibration="separate-tails")` and conservative
   `calibration="tail-envelope"` choices for wild, inid, fixed and geom.
   Existing method defaults and Mammen weights are preserved. Corrected fixed
   and geom empirical bands use a pilot-anchored selected-block scale; pooled
   studentization and normal-scale intervals retain their existing behavior.
   Finite-sample undercoverage and localized width limitations remain documented.
-- Defined regression empirical bands are returned at low draw counts with one
+
+* Defined regression empirical bands are returned at low draw counts with one
   aggregate resolution warning and saved diagnostics, including Bonferroni.
   Genuine undefined-variance and invalid-input errors remain distinct.
 
-- Corrected unconditional density and distribution plots now accept the
+* Corrected unconditional density and distribution plots now accept the
   default `band="pmzsd"`, using the corrected scale and the normal critical
   value determined by `alpha`. Explicit calibrated bands and legacy routes
   retain their existing behavior.
@@ -488,13 +497,11 @@
   unchanged. Separate bounded confirmation supports regular cases with the
   documented GNN, nominal-level and dependent-data limitations.
 
-
 * Pooled fixed-block bias-corrected bounds use the exact finite-sample
   circular-block score covariance and replicate-specific score studentization.
   Raw-residual block selection, literal draws and fixed model are preserved.
   Regular 95% coverage improved in bounded confirmation; weak GNN means,
   interval-width costs and limited dependent-data evidence remain documented.
-
 
 * Pooled bias-corrected Rademacher bounds now use the residual-pilot
   studentizer with literal plus/minus-one innovations. The fixed model and
@@ -583,35 +590,35 @@
   workspace expands from 128 to 256 columns without changing rank or residual
   support requirements. Existing mean and simple-profile owners are retained.
 
-
-- Bias-corrected regression plots support higher pure coordinate derivatives
+* Bias-corrected regression plots support higher pure coordinate derivatives
   with Gaussian or Mammen bands when the fitted polynomial has at least one
   degree beyond the requested derivative order. Existing mixed-degree and
   gradient.order vectors retain their coordinate-specific meaning.
 
-- Extend iterated bias-corrected fixed-bandwidth regression means to additional
+* Extend iterated bias-corrected fixed-bandwidth regression means to additional
   categorical layouts using a shared-curvature/profile-main auxiliary and full
   covariance. Gaussian and Mammen calibration retain 16 default iterations and
   existing controls. Previously admitted routes are unchanged; sparse pilot
   rank failures remain explicit. Document the bounded coverage evidence and
   unsupported pooled NN/additional-bootstrap extensions.
 
-- Calibrate iterated bias-corrected Gaussian and Mammen regression bands using
+* Calibrate iterated bias-corrected Gaussian and Mammen regression bands using
   replicate-specific residual-pilot studentization. Preserve the corrected
   center, observed SE, 16 iterations and selected model. Record the construction
   in returned inference metadata and describe empirical Gaussian marginal
   quantiles accurately in plot labels. Other bootstrap laws remain unchanged.
 
-- Activate coordinatewise local-to-global bias correction for eligible fixed
+* Activate coordinatewise local-to-global bias correction for eligible fixed
   Gaussian regression plots, reusing the actual fitted observation rows and
   adapted P0 residuals. Preserve frozen settings, bounded storage, and ordinary
   categorical/NN construction. Add `np_bias_control(adaptation=)` with explicit
   reference/override semantics and return effective adaptation settings.
-- Improve narrow-bandwidth local-polynomial fitting, gradient and covariance
+
+* Improve narrow-bandwidth local-polynomial fitting, gradient and covariance
   precision using the accepted ridge with stable QR evaluation and row replay.
   Bandwidth/degree search objectives and ridge policy are unchanged.
 
-- Fixed Gaussian regression simultaneous variability bands now reuse the fitted
+* Fixed Gaussian regression simultaneous variability bands now reuse the fitted
   owner's covariance inputs, including coordinate-specific large-bandwidth
   weights, so joint bands reproduce the reported marginal standard errors.
 
@@ -634,6 +641,7 @@
   scalar/vector auxiliary degree controls, preserving literal overrides and
   recording the resolved polynomial space. Preserve fixed model specifications
   and bounded observation-row storage.
+
 * Honor explicit `xlim` in continuous regression plot panels, including
   derivative and common-scale panels, without changing the inference grid.
 
@@ -644,6 +652,7 @@
   scale-equivariant pilot rules and bounded training-row storage. Return
   effective settings and inference diagnostics. The initial supported scope
   and coverage qualifications are documented in `?np_bias_control`.
+
 * Make Mammen the default wild multiplier throughout plotting. Explicit
   Rademacher remains available. `np_bias_control(construction="legacy")`
   retains the prior regression bootstrap correction when requested.
@@ -666,76 +675,98 @@
   methods. Preserve formula factories, legitimate data consumers and evaluation
   order; native inputs still use ordinary R evaluation rather than a data mask.
 
-- Preserve explicit `data=NULL` when reusing formula-bearing least-squares
+* Preserve explicit `data=NULL` when reusing formula-bearing least-squares
   quantile bandwidth objects, and retain the stored-sample diagnostic for
   prohibited replacement data. Unsupported native data remains an error.
-- Clarify the partially linear formula-bandwidth plot route's `data` support.
-- Native `data=` rejection also handles arguments forwarded through wrapper
+
+* Clarify the partially linear formula-bandwidth plot route's `data` support.
+
+* Native `data=` rejection also handles arguments forwarded through wrapper
   ellipses without forcing their values.
-- Native methods now reject unsupported `data`, including explicit `data=NULL`,
+
+* Native methods now reject unsupported `data`, including explicit `data=NULL`,
   with guidance to use formula calls, explicit inputs or `with(data, ...)`.
   Formula refits and genuine native `data` consumers retain their interfaces.
   Plot routes that do not consume replacement `data` now reject it, while
   the supported partially linear formula-bandwidth route retains that input.
   The IV native calls also diagnose bare unbound response names accompanied
   by `z`, `w` and `data` without evaluating that data argument.
-- Update the getting-started guide to describe supported simultaneous
+
+* Update the getting-started guide to describe supported simultaneous
   asymptotic bands and the required released `crs` dependency.
-- Asymptotic simultaneous plots now report unavailable joint bands when
+
+* Asymptotic simultaneous plots now report unavailable joint bands when
   compact-support degeneracy leaves their correlation or marginal uncertainty
   unidentified, preserving available pointwise and Bonferroni bands. Projected
   class probabilities no longer acquire zero-width simultaneous bands solely
   because clipping or probability projection has flattened their local derivative.
-- Clarify the conditional-response working covariance used by quantile and
+
+* Clarify the conditional-response working covariance used by quantile and
   class-probability bands and its limitations at fixed nonshrinking bandwidths.
-- Copula plots with repeated grid coordinates now draw asymptotic simultaneous
+
+* Copula plots with repeated grid coordinates now draw asymptotic simultaneous
   bands consistently, retaining every requested output row. Identical targets
   share one calibrated band; conflicting duplicates are still rejected.
-- Use portable explicit dependencies for conditional-kernel source fragments,
+
+* Use portable explicit dependencies for conditional-kernel source fragments,
   preserving incremental rebuilds without GNU Makefile extensions. Declare
   the private conditional transport dependency for static R-code checks and
   update the SSHRC funding URL. Estimator computations are unchanged.
-- Conditional density, distribution, quantile and class-probability fitting
+
+* Conditional density, distribution, quantile and class-probability fitting
   and replay now use the same literal categorical kernels on both X and Y.
   Near-upper categorical bandwidths no longer select an approximate constant
   target for some requests. Direct regression and unconditional kernel-sum
   behavior and caller options are preserved. Older conmode objects retain
   stored-value extraction; reconstructing uncertainty around historical stored
   values requires an explicit refit.
-- Document numerical-conditioning limitations of raw-basis conditional
+
+* Document numerical-conditioning limitations of raw-basis conditional
   local-polynomial fits. The Italy examples now centre calendar years and
   apply the same offset to prediction data; estimator arithmetic, defaults
   and conditioning checks are unchanged.
-- Copula distribution plots with only ordered margins now construct adaptive
+
+* Copula distribution plots with only ordered margins now construct adaptive
   nearest-neighbor simultaneous bands using their finite-support CDF factors.
-- Class-probability surfaces reject repeated conditioning-variable selectors
+
+* Class-probability surfaces reject repeated conditioning-variable selectors
   before evaluating or drawing a misaligned grid.
-- Explicit scalar-quantile perspective requests, including least-squares
+
+* Explicit scalar-quantile perspective requests, including least-squares
   quantile objects, now draw their requested surfaces. Default slice plots,
   vector-quantile and gradient layouts retain their existing behavior.
-- Class-probability surfaces draw their available asymptotic intervals.
+
+* Class-probability surfaces draw their available asymptotic intervals.
   Copula surfaces preserve statistical rows while mapping identical display
   coordinates; conflicting duplicates are rejected rather than averaged.
-- Nearest-neighbor copula density bands include shared-observation covariance
+
+* Nearest-neighbor copula density bands include shared-observation covariance
   between the numerator and both estimated marginals, conditional on the
   fitted smoothing state and fixed inverse coordinates. This does not include
   uncertainty from estimating the inverse-coordinate grid.
-- Data-only regression plots preserve the caller's graphics state. Rendered
+
+* Data-only regression plots preserve the caller's graphics state. Rendered
   regression plots retain their existing cleanup behavior.
-- Least-squares quantile objects diagnose duplicate quantile levels before
+
+* Least-squares quantile objects diagnose duplicate quantile levels before
   plot preparation, retaining the existing rejection contract.
-- Correct single-index gradient plots with asymmetric bootstrap bands when
+
+* Correct single-index gradient plots with asymmetric bootstrap bands when
   an index coefficient is negative: lower and upper widths now exchange
   roles before scaling, including all-band data and rendering.
-- Preserve the caller's graphics state during data-only density,
+
+* Preserve the caller's graphics state during data-only density,
   distribution, conditional, single-index, smooth-coefficient and partially
   linear plots. Rendered plots retain their existing cleanup behavior.
-- Class-probability gradient plots now render the legacy `band="pmzsd"`
+
+* Class-probability gradient plots now render the legacy `band="pmzsd"`
   pointwise alias with the correct palette.
-- Conditional-quantile plots reject unsupported derivative orders instead
+
+* Conditional-quantile plots reject unsupported derivative orders instead
   of labelling first derivatives as higher derivatives. First derivatives,
   LSQ and conditional-distribution derivative contracts are unchanged.
-- Quantile, least-squares quantile, class-probability and copula plots now
+
+* Quantile, least-squares quantile, class-probability and copula plots now
   offer Gaussian simultaneous variability bands over each requested finite
   panel grid. Supported local-constant/local-polynomial, continuous-gradient,
   categorical-effect and nearest-neighbor routes follow each estimator's
@@ -744,56 +775,59 @@
   These are variability bands conditional on the documented fitted smoothing
   state, not smoothing-bias-corrected population confidence bands. Existing
   pointwise and Bonferroni contracts are retained.
-- Preserve the accepted conditional-CDF arithmetic for all-large ridge maps
+
+* Preserve the accepted conditional-CDF arithmetic for all-large ridge maps
   and bounded beta-kernel deleted fits. Response translation is now confined
   to constant-reproducing, numerically suitable conditional owners; the
   estimator's existing objective, solve and fixed-regression paths are unchanged.
-- Stabilize conditional local-polynomial distribution fits for saturated
+
+* Stabilize conditional local-polynomial distribution fits for saturated
   responses without changing the basis or accepted solver. Conditional
   categorical-response gradient uncertainty and simultaneous plots now use
   the fitted operator's effective category weights, including exact zero
   uncertainty for a constant effective response.
-- Conditional LC density/distribution gradient bands now reconstruct unordered
+
+* Conditional LC density/distribution gradient bands now reconstruct unordered
   explanatory-factor weights from the estimator's effective native kernel
   owner, including weights near their upper bound. Fitted gradients, marginal
   standard errors, bandwidth selection and other plot routes are unchanged.
-- Density and distribution plots now offer Gaussian simultaneous variability
+
+* Density and distribution plots now offer Gaussian simultaneous variability
   bands for supported fixed and nearest-neighbor specifications, conditional
   LP/gradient panels, and level surfaces. Existing marginal standard errors
   are retained; Gaussian simulation uses 9,999 draws by default. Proper
   projections retain their previous marginal uncertainty contracts; the
   additional four-family joint bands are described above.
-- Correct conditional density/distribution Bonferroni surface multiplicity to
+
+* Correct conditional density/distribution Bonferroni surface multiplicity to
   use the full evaluation grid; previously a vector row count reduced it to one.
 
-
-- Partially linear asymptotic plots warn when the fitted curve is numerically
+* Partially linear asymptotic plots warn when the fitted curve is numerically
   unstable at evaluation points. Their marginal limits are NA at those points,
   and simultaneous limits are NA for the affected panel; other points and
   panels retain their available uncertainty. The fitted curve is preserved.
 
-- Partially linear asymptotic plots reuse their nuisance fits' accepted local
+* Partially linear asymptotic plots reuse their nuisance fits' accepted local
   factorization for influence calculations, preserving fitted values and ridge
   policy. Reconstruction is checked on the plotted SE scale. Training work is
   reused within a plot and consumed in bounded blocks, including nearest-neighbor
   geometry. Pointwise, simultaneous and Bonferroni bands share the corrected SEs.
 
-- Simulated Gaussian critical values are bounded by the analytical pointwise
+* Simulated Gaussian critical values are bounded by the analytical pointwise
   and Bonferroni critical values, preserving band nesting despite Monte Carlo
   variation. Calibration metadata retains the raw simulated critical value.
 
-
-- Unavailable simultaneous-only plot limits retain their NA rows, aligned with
+* Unavailable simultaneous-only plot limits retain their NA rows, aligned with
   retained fitted centers. Smooth-coefficient and partially linear displays
   retain a finite axis range when the requested joint limits are unavailable.
 
-- Regression, single-index and smooth-coefficient joint-band reconstruction,
+* Regression, single-index and smooth-coefficient joint-band reconstruction,
   residual-information and workspace limitations now produce a warning and NA simultaneous limits; `band="all"` retains its
   pointwise and Bonferroni bands. Invalid arguments and unexpected errors
   still fail explicitly. The estimator, ridge policy and reconstruction
   tolerances are unchanged.
 
-- Plot bootstrap defaults previously set to `B=1999` are now `B=9999`,
+* Plot bootstrap defaults previously set to `B=1999` are now `B=9999`,
   including copula plots. Class-probability plots retain `B=399`. Gaussian
   simultaneous calibration defaults to 9,999 draws.
   Bootstrap warnings distinguish bare tail resolution from endpoint precision;
@@ -801,7 +835,7 @@
   the maximum probability. Explicit counts remain unchanged, and estimator
   and hypothesis-test bootstrap defaults are unaffected.
 
-- Gaussian simultaneous plot intervals now include unordered and ordered
+* Gaussian simultaneous plot intervals now include unordered and ordered
   categorical panels for regression, smooth-coefficient and partially linear
   means, and the existing supported gradients. Regression categorical
   gradients retain endpoint cross-covariances and the established reference
@@ -809,7 +843,7 @@
   smoothing is included. Existing categorical contrast definitions and
   bootstrap constructions are preserved.
 
-- Gaussian simultaneous plot bands also support generalized and adaptive
+* Gaussian simultaneous plot bands also support generalized and adaptive
   nearest-neighbor bandwidths. Training residual normalization preserves the
   estimator's training-radius convention. Partially linear mean curves and
   surfaces now use a complete response influence map, including coefficient
@@ -818,7 +852,7 @@
   and bootstrap procedures are unchanged. The additional computation is
   confined to requested asymptotic plot uncertainty.
 
-- Asymptotic Gaussian simultaneous bands now include supported regression,
+* Asymptotic Gaussian simultaneous bands now include supported regression,
   single-index and smooth-coefficient gradients, and regression and
   smooth-coefficient mean surfaces in perspective and rgl plots. Surface
   calibration uses observation influence factors without a square grid
@@ -827,10 +861,10 @@
   simulation reports draw progress and elapsed time using the bootstrap
   heartbeat mechanism.
 
-- Plot joint-band admission now honors the existing legacy argument
+* Plot joint-band admission now honors the existing legacy argument
   abbreviations consistently with full method and band names.
 
-- Regression, single-index and smooth-coefficient mean plots now offer asymptotic Gaussian simultaneous variability
+* Regression, single-index and smooth-coefficient mean plots now offer asymptotic Gaussian simultaneous variability
   bands over each panel's finite grid for fixed-bandwidth LC/LL/LP fits with
   second-order Gaussian or Epanechnikov kernels. `gaussian.draws` controls the
   Gaussian calibration separately from bootstrap `B`; joint requests report
@@ -838,145 +872,165 @@
   the fitted index coefficients; smooth-coefficient bands use the noniterated
   mean and accepted raw residuals, with explicit reconstruction checks.
 
-- `predict()` for location-scale quantile fits now accepts named `tau` to
+* `predict()` for location-scale quantile fits now accepts named `tau` to
   select stored quantiles in the requested order, with aligned standard errors
   and training scores. Omitted or NULL `tau` retains the original behavior;
   unfitted quantiles fail clearly without bandwidth selection or recalibration.
 
-- Local-smoothing quantile refits with explicit data and a new subset now use
+* Local-smoothing quantile refits with explicit data and a new subset now use
   the requested rows when the starting regression bandwidth also had a subset.
   Omitting a new subset continues to replay the original selection.
 
-- Formula subset provenance now survives bandwidth reuse, serialization, and
+* Formula subset provenance now survives bandwidth reuse, serialization, and
   forwarding through lexical callbacks. Single-index evaluation records rows
   removed after `na.pass` or `NULL`, and native vector labels support named
   prediction data. Formula single-index calls no longer retain generic frames.
 
-- Formula single-index evaluation now honors an explicit `na.action` for
+* Formula single-index evaluation now honors an explicit `na.action` for
   predictor rows, including `na.exclude` prediction padding and `na.fail`.
   Omitted evaluation policies, retained training samples and native evaluation
   precedence are unchanged; missing scoring outcomes do not remove predictions.
 
-- Forwarded formula subsets retain caller-local masks and loop variables as
+* Forwarded formula subsets retain caller-local masks and loop variables as
   well as data-column lookup, including single-index and local-smoothing
   quantile fits.
-- Native fits that construct bandwidths keep compact response labels rather
+
+* Native fits that construct bandwidths keep compact response labels rather
   than embedding response values in the reported variable name.
-- Smooth-coefficient refits using z=x report consistent smoothing-role metadata
+
+* Smooth-coefficient refits using z=x report consistent smoothing-role metadata
   and print bandwidth summaries without spurious warnings.
-- Kernel documentation now describes beta support for mixed-data and
+
+* Kernel documentation now describes beta support for mixed-data and
   local-linear/local-polynomial regression and conditional estimation.
 
-- Response-only native refits keep the retained design, while partial design
+* Response-only native refits keep the retained design, while partial design
   replacements still require the other training roles. Smooth-coefficient fits
   using the default z=x retain that convention for prediction and refitting.
-- Fits that select bandwidths use the first realization of supplied search
+
+* Fits that select bandwidths use the first realization of supplied search
   controls. Forwarded local-smoothing quantile subsets retain their data mask.
 
-- Partial positional training replacements no longer combine new observations
+* Partial positional training replacements no longer combine new observations
   with a bandwidth object's old sample. Supply all required training roles;
   the smooth-coefficient default uses the newly supplied predictors for smoothing.
-- Formula-based local-smoothing quantile predictions process positional newdata
+
+* Formula-based local-smoothing quantile predictions process positional newdata
   using trained terms and predictor names, including transformed predictors.
-- Local-smoothing quantile subsets on regression bandwidth objects use the data
+
+* Local-smoothing quantile subsets on regression bandwidth objects use the data
   mask once and accept NULL/TRUE no-op subsets. Stored LSQ bandwidth objects
   report an error for replacement training controls instead of ignoring them.
-- Explicit single-index evaluation outcomes now enforce response-scale
+
+* Explicit single-index evaluation outcomes now enforce response-scale
   compatibility; numeric outcomes remain valid for numeric-labelled ordered
   training responses.
-- Regression bandwidth documentation reflects beta-kernel support for
+
+* Regression bandwidth documentation reflects beta-kernel support for
   local-linear/local-polynomial and mixed-predictor regression.
 
-
-- Match positional native training arguments before reusing retained data, while
+* Match positional native training arguments before reusing retained data, while
   preserving positional evaluation arguments in fitted-object prediction.
 
-- Local-smoothing quantile calls evaluate supplied arguments once in their
+* Local-smoothing quantile calls evaluate supplied arguments once in their
   originating scope, including pooled calls and progress-wrapper re-entry.
   Applying a row-changing subset to a retained formula regression bandwidth
   requires explicit data.
-- Smooth-coefficient predictions preserve known training MSE even when the
+
+* Smooth-coefficient predictions preserve known training MSE even when the
   original fit was scored against alternative outcomes. Vector-quantile
   prediction reports one residual.scale value per tau.
-- Automatic Ichimura diagnostics do not score numeric outcomes against a model
+
+* Automatic Ichimura diagnostics do not score numeric outcomes against a model
   trained on factor codes. Explicit outcomes must use a compatible training-response scale.
-- Conditional density/distribution perspective surfaces and regression plot-data
+
+* Conditional density/distribution perspective surfaces and regression plot-data
   objects retain grid dimensions and trained variable names. Smooth-coefficient plot-data
   objects report unavailable goodness-of-fit scores as NA.
 
-- Initialize guarded native temporaries and remove unused categorical-profile
+* Initialize guarded native temporaries and remove unused categorical-profile
   bookkeeping to avoid compiler warnings without changing estimator arithmetic.
 
-- Local-smoothing quantile fits reuse the retained sample and bandwidth
+* Local-smoothing quantile fits reuse the retained sample and bandwidth
   specification of formula-based regression bandwidth objects.
-- Partially linear plot surfaces retain predictor names and grid dimensions,
+
+* Partially linear plot surfaces retain predictor names and grid dimensions,
   including non-syntactic native predictor names, so their returned model
   objects support print() and summary().
-- Local-smoothing quantile bandwidth selection can re-enter its progress
+
+* Local-smoothing quantile bandwidth selection can re-enter its progress
   wrapper from private method calls without a function-lookup error.
 
-- Native search interrupt handling uses a portable R API on Windows and Unix.
+* Native search interrupt handling uses a portable R API on Windows and Unix.
   For interrupts observed by R, hooks and traceback run after cleanup; an explicit request to
   resume a released search fails with a clear error. Terminal SIGINT handled
   directly by the search dependency retains that dependency's existing error
   behavior; it does not use this R-observed interrupt path.
-- Partially linear plot-data objects report unavailable goodness-of-fit scores
+
+* Partially linear plot-data objects report unavailable goodness-of-fit scores
   as NA instead of shifting the training MSE into the R-squared field.
-- Klein-Spady automatic degree searches reject a single-class complete sample
+
+* Klein-Spady automatic degree searches reject a single-class complete sample
   before entering NOMAD and identify class loss after omission clearly.
-- Automatic single-index prediction diagnostics now tolerate incompatible
+
+* Automatic single-index prediction diagnostics now tolerate incompatible
   factor outcomes; explicit outcome requests remain strictly validated.
-- Prediction residual.scale no longer reuses old training MSE for positional
+
+* Prediction residual.scale no longer reuses old training MSE for positional
   training-data overrides. Smooth-coefficient and local-smoothing quantile
   predictions also report known training MSE, or NA when unavailable, without
   an extra fit. Local-smoothing quantile scale refers to its transformed response.
 
-- Klein-Spady bandwidth selection accepts missing binary outcomes and checks
+* Klein-Spady bandwidth selection accepts missing binary outcomes and checks
   that both classes remain after joint predictor/response omission. Native
   calls no longer reject valid incomplete samples or admit samples that lose
   a response class during omission.
-- Regression prediction with se.fit=TRUE reports available training MSE as
+
+* Regression prediction with se.fit=TRUE reports available training MSE as
   residual.scale, preserving its historical units. Evaluation MSE is never
   substituted; unavailable training information is reported as NA.
 
-- Regression NN bandwidth-constructor refits also validate against the current complete sample.
+* Regression NN bandwidth-constructor refits also validate against the current complete sample.
   Predictor-only regression evaluations report unavailable goodness-of-fit
   scores as NA, without additional fitting work.
-- Contained R-observed native-search progress interrupts now restore R's interrupt/error
+
+* Contained R-observed native-search progress interrupts now restore R's interrupt/error
   hooks and traceback after cleanup. Message-bearing constructed conditions
   retain their original identity and reporting.
 
-- Single-index prediction treats unusable automatically discovered outcomes as
+* Single-index prediction treats unusable automatically discovered outcomes as
   unavailable diagnostics while preserving strict explicit outcome validation.
   Differenced time-series responses align by time. Prediction residual.scale
   retains training MSE units and provenance, and factor-design plots preserve
   non-syntactic predictor names.
-- Fresh stored single-index and partially linear bandwidths report the common
+
+* Fresh stored single-index and partially linear bandwidths report the common
   complete-case sample and omissions. Density/distribution NN bandwidth-constructor refits validate
   their supplied counts against the current complete-case sample.
 
-- Single-index coefficient-only refits retain their degree and bandwidth or
+* Single-index coefficient-only refits retain their degree and bandwidth or
   nearest-neighbor count without re-entering automatic degree search. A supplied
   normalized coefficient vector is used as the first start, including zero
   free coefficients; single-start refits avoid unnecessary OLS initialization.
   A held fixed bandwidth is no longer rejected by a recomputed bandwidth-search
   floor. Validity checks and lower bounds for actual bandwidth searches remain.
 
-- Bandwidth-object refits now report the current training sample size after
+* Bandwidth-object refits now report the current training sample size after
   missing-row removal in regression, density, distribution, conditional density
   and distribution, smooth-coefficient, partially linear and single-index models.
   Sample-size validation uses this current count rather than the original
   bandwidth object's count.
 
-- Native conditional MADS and automatic degree searches now remove jointly
+* Native conditional MADS and automatic degree searches now remove jointly
   incomplete training rows before search setup. Regression MADS and automatic
   degree-search results retain the corresponding omitted-row information.
 
-- Single-index factor predictors now use retained R model-matrix contrasts in
+* Single-index factor predictors now use retained R model-matrix contrasts in
   both Ichimura and Klein-Spady models. Coefficient names/dimensions, prediction,
   gradients and plots share that design. Numeric scores remain numeric; old
   saved bandwidth objects keep their original factor-score interpretation.
-- Klein-Spady coefficient covariance now centers covariates conditionally on
+
+* Klein-Spady coefficient covariance now centers covariates conditionally on
   the fitted index, correcting dependence of reported uncertainty on arbitrary
   predictor translations. Search and point-estimation formulas are unchanged;
   the additional moment calculation runs only when inference is requested.
@@ -2645,7 +2699,9 @@
   their drawn beta, with generated h restricted to the existing search bounds.
   The scale correction can change fresh multistart search results; explicit
   bandwidths, first starts, RNG draws and the search domain are unchanged.
+
 * Kernel-sum formula calls with a subset again allow data to be omitted.
+
 * The internal single-index first-start restoration control is documented.
 
 * Serial smooth-coefficient NOMAD searches restore the first unexpected evaluator
@@ -2659,8 +2715,11 @@
   native evaluation arguments and composed formula/native omission maps.
 
 * LSQ formula dispatch preserves positional subset expressions for the existing formula owner.
+
 * Unconditional NOMAD restart reports and selection now use the existing raw certificate while preserving native recovery scores and official diagnostics.
+
 * Regression MADS restart reports and selection use their existing raw endpoint certificates while preserving native admission and recovery diagnostics.
+
 * Conditional-distribution fixed-degree native restart summaries report their
   existing raw endpoint scores. Official solver diagnostics retain the score
   for the official solution; selection and recovery are unchanged.
