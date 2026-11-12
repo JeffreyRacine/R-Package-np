@@ -39,6 +39,7 @@ Description: Nonparametric (and semiparametric) kernel methods that seamlessly
     splines beyond their endpoints.
 License: GPL
 Encoding: UTF-8
-URL: https://github.com/JeffreyRacine/R-Package-np
+URL: https://github.com/JeffreyRacine/R-Package-np,
+    https://jeffreyracine.github.io/gallery/
 BugReports: https://github.com/JeffreyRacine/R-Package-np/issues
 Repository: CRAN
