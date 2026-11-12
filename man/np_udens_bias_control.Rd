@@ -211,10 +211,13 @@ replace the original curve. Intervals are the corrected center plus or minus
 \eqn{z_{1-\alpha/2}} times this complete scale; no guide-region risk split,
 maximum calibration, variance floor, envelope or bootstrap resampling is used.
 
-These are marginal normal intervals. They do not inherit the simultaneous
-coverage claims of the separate calibrated constructions. Saved-sample
-experiments give useful average coverage, but local sparse-tail deficits and
-residual mixture bias remain. The calculation conditions on the selected
+These are experimental marginal normal intervals. They do not inherit the
+simultaneous coverage claims of the separate calibrated constructions. The
+fitted pilot can substantially understate uncertainty even with complete
+covariance calculations; sparse-tail deficits and residual mixture bias remain.
+See the experimental-status section of \code{\link{plot.np}}. Its warning also
+applies to the separate one-dimensional uniform and Epanechnikov normal
+intervals described there. The calculation conditions on the selected
 bandwidth, fixed bounds and targets; it does not add bandwidth-selection or
 estimated-bound uncertainty. Negative centers and endpoints are retained.
 The complete scale and its distinct normal/reference-law provenance are
@@ -245,9 +248,10 @@ only the variance, not the original corrected center.
 Intervals use ordinary normal critical values without simulated draws, a
 nonlinear guide region, a variance floor or a maximum calibration. They are
 marginal intervals conditional on the bandwidth, fixed bounds and supplied
-targets. Saved-sample coverage is useful on average; sparse-target uncertainty
-and residual bias can still impair local coverage. There is no simultaneous
-coverage claim. Negative centers and endpoints are retained.
+targets. The pilot can substantially understate uncertainty; sparse-target
+information and residual bias can impair coverage even when numerical
+calculations succeed. See the experimental-status section of
+\code{\link{plot.np}}. There is no simultaneous coverage claim. Negative centers and endpoints are retained.
 
 The calculation processes targets in bounded blocks, recomputing target-specific
 compact-support quadrature. It retains the whole requested grid and checks the
