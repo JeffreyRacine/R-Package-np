@@ -1,5 +1,9 @@
 # np 0.80-2 (development)
 
+* Conditional density and distribution perspective plots retain undefined targets
+  and range automatic display limits over finite estimates and interval endpoints.
+  Explicit limits and returned numerical results are unchanged.
+
 * Stored conditional bandwidth constructors and native consistent-model tests
   reject unused formula-only frame controls without evaluating them. Formula
   subset and NA handling retain their existing owner.

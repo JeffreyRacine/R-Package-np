@@ -974,13 +974,9 @@
                                        upper,
                                        lower.all,
                                        upper.all) {
-  lower.values <- c(unlist(lower.all, use.names = FALSE), lower)
-  upper.values <- c(unlist(upper.all, use.names = FALSE), upper)
-  lower.values <- lower.values[is.finite(lower.values)]
-  upper.values <- upper.values[is.finite(upper.values)]
-  if (length(lower.values) && length(upper.values))
-    return(c(min(lower.values), max(upper.values)))
-  .np_plot_finite_range(center)
+  .np_plot_finite_range(c(center, lower, upper,
+    unlist(lower.all, use.names = FALSE),
+    unlist(upper.all, use.names = FALSE)))
 }
 
 .np_plot_interval_payload <- function(estimate,
