@@ -1,5 +1,10 @@
 # np 0.80-2
 
+* Compact two-dimensional corrected density plots compute their complete
+  covariance through centered conditional quadrature and full QR compression.
+  This plot-only capacity improvement retains the quadrature, statistical
+  method, all factor components, tolerances, and existing estimator behavior.
+
 * Univariate whole-line Epanechnikov density plots add explicit asymptotic
   bias-corrected simultaneous bands using the complete M4 guide-influence
   covariance. The addition is plot-only; other bands and existing methods,

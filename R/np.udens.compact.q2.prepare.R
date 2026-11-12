@@ -1,5 +1,6 @@
 # Plot-only common-measure compact q2 preparation. No public admission here.
-# Native quadrature leaves and the normal owner are reused without modification.
+# Compact-only arithmetic leaves preserve the full quadrature law and covariance.
+# The normal owner and generic native quadrature leaves remain unchanged.
 .np_udens_compact_q2_axes <- function(theta,grid,h,kernel,order) {
   lapply(1:2,function(j).np_udens_compact_rule(theta[(2*j-1):(2*j)],order,
     .np_udens_compact_operator_plan(sort(unique(grid[,j])),h[j],kernel)))
@@ -25,6 +26,20 @@
   list(mean=v*a$mean+w*b$mean,variance=v*a$variance+w*b$variance+v*w*d*d,
     cross=v*a$cross+w*b$cross+v*w*outer(d,d[m+seq_len(5L)]),cov=NULL,logmass=lm)
 }
+
+.np_udens_compact_q2_moments_native <- function(cache,axes,gamma,logz,ratio,full) {
+  logs<-lapply(axes,function(a)cbind(a$lv,a$l1v,log(a$prob)))
+  raw<-.Call(C_np_plot_udens_compact_q2_moments,cache$parts,lapply(cache$index,as.integer),
+    logs,as.double(c(gamma,logz)),ratio,as.logical(full))
+  lapply(raw,function(z)setNames(z,c('mean','variance','cross','cov','logmass')))
+}
+.np_udens_compact_q2_covariance_native <- function(prep,B,law,progress=NULL) {
+  axes<-lapply(prep$axes,function(a)cbind(a$lv,a$l1v,log(a$prob)))
+  .Call(C_np_plot_udens_compact_q2_covariance,prep$cache$parts,prep$cache$index,axes,
+    c(prep$theta[5],prep$logz,nrow(prep$x)),prep$ratio,B%*%prep$Iinv,
+    as.integer(law),progress)
+}
+
 .np_udens_compact_q2_stream_moments <- function(x,h,grid,kernel,fit,order,tile=1280L,progress=function(...)NULL) {
   m<-nrow(grid);n<-nrow(x);axes<-.np_udens_compact_q2_axes(fit$theta,grid,h,kernel,order)
   blocks<-lapply(axes,function(a).np_udens_beta_blocks(a$nodes,tile))
@@ -32,7 +47,7 @@
   for(j in seq_along(blocks[[2]]))for(i in seq_along(blocks[[1]])){
     ids<-list(blocks[[1]][[i]],blocks[[2]][[j]])
     p<-.np_udens_compact_q2_tile(x,h,grid,kernel,fit,axes,ids)
-    r<-.np_udens_beta_joint_raw_native(p$cache,p$axes,p$theta[5],p$logz,p$ratio,FALSE)
+    r<-.np_udens_compact_q2_moments_native(p$cache,p$axes,p$theta[5],p$logz,p$ratio,FALSE)
     for(law in 1:2)raw[[law]]<-.np_udens_compact_q2_raw_merge(raw[[law]],r[[law]],m)
     saved[[length(saved)+1L]]<-list(ids=ids,mass=vapply(r,`[[`,numeric(1),'logmass'),mean=lapply(r,`[[`,'mean'))
     done<-done+1L;progress('joint moments',done,total);rm(p,r)
@@ -62,7 +77,7 @@
   K<-z$B%*%solve(z$fit$state$I);C<-NULL;lm<--Inf;mean<-NULL
   for(k in seq_along(z$saved)) {
     s<-z$saved[[k]];p<-.np_udens_compact_q2_tile(z$x,z$h,z$grid,z$kernel,z$fit,z$axes,s$ids)
-    cv<-.np_udens_beta_covariance_native(p,z$B,1L,progress)
+    cv<-.np_udens_compact_q2_covariance_native(p,z$B,1L,progress)
     mb<-s$mean[[2L]][ix]-drop(K%*%s$mean[[2L]][score]);lb<-s$mass[2L]
     rm(p);gc(FALSE)
     if(is.null(C)){C<-cv;lm<-lb;mean<-mb}else{
@@ -78,8 +93,11 @@
 .np_udens_compact_q2_work_forecast <- function(n,m,nodes,unique.axes,held=0,full=TRUE) {
   if(any(nodes>8192)||prod(as.double(nodes))>16777216)stop('compact q2 common-measure work bound')
   t<-pmin(nodes,1280);axis<-24*sum(unique.axes*t);joint<-prod(as.double(t))
+  d<-unique.axes[1L]+3L
+  # Conditional means plus complete QR workspace; no rank truncation.
+  conditional<-d*t[2L]+if(t[1L]>d)d*t[1L]+65*d else 0
   stages<-8*c(builder=held/8+8*n*max(t)+axis+3*joint,
-    covariance=held/8+2*m*m+2*m*256+axis+joint+10*m,
+    covariance=held/8+2*m*m+2*m*256+axis+joint+10*m+conditional+4*sum(t),
     merge=held/8+3*m*m+8*m*64,
     factor=held/8+2*m*m+8*m*64)
   if(!full)stages<-stages["builder"]
