@@ -482,9 +482,9 @@
                   else if ((joint.eligible || quantile.joint) && identical(plot.errors.type, "simultaneous"))
                     .np_plot_joint_panel_range(tcomp, terr)
                   else
-                    c(min(lerr), max(herr))
+                    .np_plot_finite_range(c(tcomp, lerr, herr))
               } else
-                c(min(tcomp),max(tcomp))
+                .np_plot_finite_range(tcomp)
       }
 
       if (plot.behavior != "plot"){

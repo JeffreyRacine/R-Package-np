@@ -521,10 +521,10 @@
             else if (quantreg)
               .np_plot_finite_range(c(tcomp, lerr, herr))
             else
-              c(min(lerr), max(herr))
+              .np_plot_finite_range(c(tcomp, lerr, herr))
           } else if (quantreg)
             .np_plot_finite_range(tcomp) else
-                c(min(tcomp),max(tcomp))
+                .np_plot_finite_range(tcomp)
         # A clamped quantile can be constant while every interval is NA.
         # Expand only automatic display limits; retain the fitted surface.
         if (isTRUE(quantreg) && zlim[1L] == zlim[2L]) {
