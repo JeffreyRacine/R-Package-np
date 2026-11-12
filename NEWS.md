@@ -1,5 +1,8 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Restoring user options no longer rolls back the worker acceleration
+  agreement certificate; failed delivery leaves that certificate invalid.
+
 * Package-generated bandwidth-selector calls retain their package owner under
   caller masking and either np/npRmpi attachment order. Argument and formula
   environments remain with their original callers.

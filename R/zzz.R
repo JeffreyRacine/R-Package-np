@@ -476,7 +476,7 @@ npMacMseriesAccelerateMode <- function(value = getOption("np.macMseries.accelera
     return(invisible(FALSE))
 
   accel <- .npMacMseriesAccelerateOptionValue()
-  last <- getOption("npRmpi.macMseries.accelerate.last.synced", NULL)
+  last <- .npRmpi_option_agreement$accelerate
   if (!isTRUE(force) && identical(accel, last))
     return(invisible(FALSE))
 
@@ -484,11 +484,12 @@ npMacMseriesAccelerateMode <- function(value = getOption("np.macMseries.accelera
   options(npRmpi.runtime.option.sync.active = TRUE)
   on.exit(options(npRmpi.runtime.option.sync.active = old), add = TRUE)
 
+  .npRmpi_option_agreement$accelerate <- NULL
   mpi.bcast.cmd(options,
                 np.macMseries.accelerate = accel,
                 rank = 0L,
                 comm = comm)
-  options(npRmpi.macMseries.accelerate.last.synced = accel)
+  .npRmpi_option_agreement$accelerate <- accel
   invisible(TRUE)
 }
 
