@@ -57,18 +57,11 @@
   if (identical(mode, "never"))
     return(FALSE)
 
-  if (identical(mode, "always")) {
-    .npRmpi_option_agreement$snapshot <- snapshot
+  if (identical(mode, "always"))
     return(TRUE)
-  }
 
   cached <- .npRmpi_option_agreement$snapshot
-  if (!identical(cached, snapshot)) {
-    .npRmpi_option_agreement$snapshot <- snapshot
-    return(TRUE)
-  }
-
-  FALSE
+  !identical(cached, snapshot)
 }
 
 # Retain only the originating owner while a plot temporarily localizes helpers.
@@ -90,9 +83,8 @@
   .npRmpi_autodispatch_require_option_sync()
   snapshot <- .npRmpi_autodispatch_option_snapshot()
   if (.npRmpi_autodispatch_should_sync_options(snapshot)) {
-    complete <- FALSE
-    on.exit(if (!complete)
-      .npRmpi_option_agreement$snapshot <- NULL, add = TRUE)
+    # A failed or interrupted delivery must not certify either snapshot.
+    .npRmpi_option_agreement$snapshot <- NULL
     .npRmpi_bcast_cmd_expr(substitute(base::local({
       opts <- OPTS
       do.call("options", opts)
@@ -107,7 +99,7 @@
     list(OPTS = snapshot,
          VERIFY = isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE)))),
       comm = comm, caller.execute = FALSE)
-    complete <- TRUE
+    .npRmpi_option_agreement$snapshot <- snapshot
   }
   invisible(TRUE)
 }
@@ -3076,6 +3068,7 @@
   opt.snapshot <- .npRmpi_autodispatch_option_snapshot(opt.keys)
   opt.sync <- .npRmpi_autodispatch_should_sync_options(opt.snapshot)
   if (opt.sync) {
+    .npRmpi_option_agreement$snapshot <- NULL
     opt.keys <- names(opt.snapshot)
     opt.vals <- unname(opt.snapshot)
   } else {
@@ -3143,6 +3136,8 @@
   execute <- function() {
     value <- rec.step(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),
                       note = "mpi.bcast.cmd.execute")
+    if (opt.sync)
+      .npRmpi_option_agreement$snapshot <- opt.snapshot
     # Intentional closure write: the outer exit guard owns this acknowledgement.
     publication.acknowledged <<- TRUE
     value

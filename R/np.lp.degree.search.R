@@ -35,7 +35,9 @@
   npObjectiveCacheEnabled()
   snapshot <- .npRmpi_autodispatch_option_snapshot()
   command <- substitute(do.call("options", OPTS), list(OPTS = snapshot))
+  .npRmpi_option_agreement$snapshot <- NULL
   .npRmpi_bcast_cmd_expr(command, comm = comm, caller.execute = FALSE)
+  .npRmpi_option_agreement$snapshot <- snapshot
   invisible(NULL)
 }
 

@@ -1,5 +1,9 @@
 # R4 documentation: explicit option synchronization precondition
 
+* Prepared bandwidth searches and automatic calls now publish worker-option
+  agreement only after successful delivery. Restoring earlier options cannot
+  reuse a stale agreement record; synchronization policies and RNG guards are unchanged.
+
 * Document known experimental coverage limitations of pilot-based normal-scale
   bias-corrected density intervals, including potentially substantial
   uncertainty understatement. All bias-corrected bounds remain pre-beta;
@@ -254,6 +258,10 @@
   runtime behavior and communication are unchanged.
 
 # npRmpi 0.80-2 (development)
+
+* Prepared bandwidth searches and automatic calls now publish worker-option
+  agreement only after successful delivery. Restoring earlier options cannot
+  reuse a stale agreement record; synchronization policies and RNG guards are unchanged.
 
 * MPI task sequencing now follows the live session independently of user options() restoration.
 

@@ -12,6 +12,10 @@ test_that("autodispatch option sync treats a null snapshot as unsynchronized", {
   on.exit(options(old), add = TRUE)
 
   expect_true(should_sync(snapshot))
+  expect_null(state$snapshot)
+  expect_true(should_sync(snapshot))
+  # Only a completed writer may publish agreement; inspection is read-only.
+  state$snapshot <- snapshot
   expect_identical(state$snapshot, snapshot)
   expect_false(should_sync(snapshot))
 })
@@ -32,11 +36,15 @@ test_that("ordinary options restoration cannot roll back worker agreement", {
   options(npRmpi.autodispatch.option.sync="onchange")
   state$snapshot <- NULL
   expect_true(sync(list(np.tree=FALSE)))
+  state$snapshot <- list(np.tree=FALSE)
   op <- options()
   expect_true(sync(list(np.tree=TRUE)))
+  expect_identical(state$snapshot,list(np.tree=FALSE))
+  state$snapshot <- list(np.tree=TRUE)
   options(op)
   expect_identical(state$snapshot,list(np.tree=TRUE))
   expect_true(sync(list(np.tree=FALSE)))
+  state$snapshot <- list(np.tree=FALSE)
   expect_false(sync(list(np.tree=FALSE)))
   expect_identical(ls(state),"snapshot")
 })

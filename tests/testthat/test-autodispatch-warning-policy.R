@@ -7,7 +7,7 @@ test_that("warning conversion participates in the existing option policy", {
  options(npRmpi.autodispatch.option.sync="onchange")
  for(w in c(-1,0,1,2,3)) {
   options(warn=w);s<-snap();expect_identical(s$warn,as.integer(w))
-  expect_true(sync(s));expect_false(sync(s))
+  expect_true(sync(s));state$snapshot<-s;expect_false(sync(s))
  }
  options(npRmpi.autodispatch.option.sync="never",warn=0)
  expect_false(sync(snap()))
