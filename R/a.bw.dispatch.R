@@ -216,21 +216,24 @@
   list(call = call_obj, expressions = expressions)
 }
 
+.np_bw_package_selector_call <- function(call_obj) {
+  selector <- call_obj[[1L]]
+  if (is.symbol(selector) && as.character(selector) %in%
+      c("npregbw", "npplregbw", "npudensbw", "npudistbw", "npcdensbw",
+        "npcdistbw", "npindexbw", "npscoefbw"))
+    call_obj[[1L]] <- call("::", as.name("np"), selector)
+  call_obj
+}
+
 .np_eval_bw_call <- function(call_obj, caller_env = parent.frame(),
                              formula.value = NULL, native.map = NULL,
                              native.frame = NULL) {
   if (!is.call(call_obj))
     stop("bandwidth selector call is malformed", call. = FALSE)
 
-  # Namespace-only estimator calls reconstruct an unqualified selector name.
-  # Resolve that name before executing; never replay a failed search in other
-  # frames. The existence check must not force a caller's active binding, and
-  # arguments must still be evaluated in the original caller environment.
-  selector <- call_obj[[1L]]
-  if (is.symbol(selector) &&
-      !exists(as.character(selector), envir = caller_env, inherits = TRUE) &&
-      as.character(selector) %in% getNamespaceExports("np"))
-    call_obj[[1L]] <- call("::", as.name("np"), selector)
+  # Only package-generated selector heads are bound here. Arguments and
+  # formula environments still belong to the original caller.
+  call_obj <- .np_bw_package_selector_call(call_obj)
 
   formula.expression <- NULL
   formula.index <- NULL
@@ -303,13 +306,14 @@
   if (!is.call(call_obj) || length(call_obj) < 1L)
     return(FALSE)
 
-  fn_expr <- call_obj[[1L]]
+  original.head <- call_obj[[1L]]
+  fn_expr <- .np_bw_package_selector_call(call_obj)[[1L]]
   fn <- .np_try_eval_in_frames(fn_expr, eval_env = caller_env)
   if (!isTRUE(fn$ok) || !is.function(fn$value))
     return(FALSE)
 
   fn_def <- fn$value
-  fn_name <- if (is.symbol(fn_expr)) as.character(fn_expr) else NULL
+  fn_name <- if (is.symbol(original.head)) as.character(original.head) else NULL
   if (!is.null(fn_name) && nzchar(fn_name)) {
     default_name <- paste0(fn_name, ".default")
     default_fn <- get0(default_name, envir = environment(fn_def), inherits = TRUE)
