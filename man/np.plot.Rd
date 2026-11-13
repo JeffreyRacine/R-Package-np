@@ -1323,6 +1323,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
 }
 
+\section{Empty conditional-density windows}{
+For ordinary local-constant conditional-density plots with nonnegative kernels,
+finite empty empirical response windows do not establish zero uncertainty.
+Asymptotic and fixed-bandwidth bootstrap marginal limits are unavailable there.
+The estimates and all requested grid rows are retained; if any member lacks
+uncertainty, the full requested simultaneous band is unavailable. Available
+pointwise and Bonferroni limits are retained. This disclosure does not alter raw
+estimation, corrected inference, derivatives, or declared outside-support zeros.
+}
+
 \value{
   \code{output="data"} returns a \code{\link{np_plot_data}} object without
   drawing; \code{output="plot-data"} draws and returns the same data.

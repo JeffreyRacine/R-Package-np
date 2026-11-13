@@ -1,5 +1,7 @@
 # npRmpi 0.80-3 (private development)
 
+- Ordinary LC conditional-density plots disclose unavailable uncertainty at empty empirical response windows, retaining the full target grid and withholding an unidentifiable full-family simultaneous band. Raw estimates and corrected methods are unchanged.
+
 - Stored-fit routes reject unsupported `na.action` overrides instead of silently
   ignoring them. Existing formula replacement and regression/index prediction
   policies remain supported, with each callback evaluated by its existing owner.
