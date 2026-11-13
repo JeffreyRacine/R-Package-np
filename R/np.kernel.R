@@ -1,3 +1,34 @@
+# Validate syntax without forcing extra argument promises. Public kernel-sum
+# controls and constructor controls retain R's ordinary argument matching.
+.np_ksum_validate_dots <- function(dots, public = FALSE) {
+  if (!length(dots)) return(invisible(NULL))
+  dots <- as.list(dots)
+  if (public) {
+    matched <- match.call(npksum.numeric,
+      as.call(c(list(quote(npksum.numeric)), dots)), expand.dots = FALSE)
+    dots <- as.list(matched[["..."]])
+  }
+  internal <- c("return.derivative.kernel.weights", ".np.internal.power12",
+    ".np.internal.power12.weighted", ".np.internal.bandwidth.divide.weights",
+    ".np.internal.eval.train.index", ".np.internal.fold.geometry",
+    ".np.internal.fold.train.index", ".np.internal.tree.outer.blas")
+  nms <- names(dots)
+  if (!is.null(nms)) dots <- dots[!nms %in% internal]
+  if (!length(dots)) return(invisible(NULL))
+  matched <- match.call(kbandwidth.numeric,
+    as.call(c(list(quote(kbandwidth.numeric), bw = quote(.np.bandwidth)), dots)),
+    expand.dots = FALSE)
+  unused <- matched[["..."]]
+  if (length(unused)) {
+    labels <- names(unused)
+    if (is.null(labels)) labels <- rep("", length(unused))
+    labels[!nzchar(labels)] <- "<unnamed>"
+    stop(sprintf("unused npksum argument(s): %s", paste(labels, collapse = ", ")),
+         call. = FALSE)
+  }
+  invisible(NULL)
+}
+
 npksum <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
@@ -9,6 +40,7 @@ npksum <-
 
 npksum.formula <-
   function(formula, data, newdata, subset, na.action, ...){
+    .np_ksum_validate_dots(substitute(list(...))[-1L], public = TRUE)
 
     dots <- list(...)
     mf <- match.call(expand.dots = FALSE)
@@ -70,6 +102,7 @@ npksum.numeric <-
   .np_reject_native_data(substitute(list(...))[-1L])
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
+    .np_ksum_validate_dots(substitute(list(...))[-1L])
     dots <- list(...)
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
     dots$return.derivative.kernel.weights <- NULL
@@ -157,6 +190,7 @@ npksum.default <-
   .np_reject_native_data(substitute(list(...))[-1L])
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
+    .np_ksum_validate_dots(substitute(list(...))[-1L])
     dots <- list(...)
     internal.power12 <- isTRUE(dots$.np.internal.power12)
     dots$.np.internal.power12 <- NULL

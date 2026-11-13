@@ -1,5 +1,8 @@
 # np 0.80-3 (private development)
 
+* Kernel sums reject unknown extra arguments without evaluating their values,
+  while retaining formula controls and ordinary argument matching.
+
 * Perspective floor and wall grids are painted behind the estimate, intervals
   and overlays. Base surface-data replay uses the same renderer.
 

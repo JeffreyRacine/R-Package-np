@@ -197,6 +197,11 @@ Further arguments passed to the default kernel-sum method.
   }
 }
 \details{
+Arguments in \code{...} must be supported kernel-sum or bandwidth-constructor
+controls. Unknown or misspelt arguments are rejected rather than silently
+ignored. Native calls do not consume formula-only frame controls; use the
+formula interface for \code{subset} and \code{na.action}.
+
   Formula variables of class \code{ts}, including lagged variables, are
   aligned on their common time support before fitting. Other variables
   must already have the length of that intersection. Supply explicitly
