@@ -373,6 +373,10 @@
                       "dens" = tobj$condens)
       tcerr <- if (quantreg) tobj$quanterr else tobj$conderr
       if (is.null(tcerr)) tcerr <- rep.int(NA_real_, length(tcomp))
+      empty.uncertainty <- .np_plot_conditional_empty_mask(bws, tcomp,
+        x.eval[,2L,drop=FALSE], plot.errors.center, gradients,
+        proper.args$proper.requested, plot.errors.method)
+      if (identical(plot.errors.method, "asymptotic")) tcerr[empty.uncertainty] <- NA_real_
       tex <- if (quantreg) x.eval else x.eval[,1]
       tey <- if (quantreg) NA else x.eval[,2]
 
@@ -422,6 +426,9 @@
           bws = bws)
         terr <- terr.obj[["boot.err"]]
         terr.all <- terr.obj[["boot.all.err"]]
+        disclosed <- .np_plot_conditional_empty_bands(terr, terr.all,
+          empty.uncertainty, plot.errors.type)
+        terr <- disclosed$err; terr.all <- disclosed$all.err
 
         pc = (.np_plot_center_is_bias_corrected(plot.errors.center))
         center.val <- if(pc) terr[,3] else tcomp
@@ -839,7 +846,13 @@
         }
 
         
-        ## if there are gradients then we need to repeat the process for each component
+        empty.uncertainty <- .np_plot_conditional_empty_mask(bws, tobj$condens,
+          eydat[seq_len(xi.neval),,drop=FALSE], plot.errors.center, gradients,
+          proper.args$proper.requested, plot.errors.method)
+        if (identical(plot.errors.method, "asymptotic"))
+          tobj$conderr[empty.uncertainty] <- NA_real_
+
+        ## Repeat each gradient component when requested
 
         eval.extract <- function(obj, jj){
           if (gradients) {
@@ -950,6 +963,9 @@
                         bws = bws)
               temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
               temp.all.err <- temp.boot[["boot.all.err"]]
+              disclosed <- .np_plot_conditional_empty_bands(temp.err, temp.all.err,
+                empty.uncertainty, plot.errors.type)
+              temp.err <- disclosed$err; temp.all.err <- disclosed$all.err
               temp.boot <- temp.boot[["bxp"]]
               if (!plot.bxp.out){
                 temp.boot$out <- numeric()
@@ -1172,7 +1188,13 @@
           }
 
           
-          ## if there are gradients then we need to repeat the process for each component
+            empty.uncertainty <- .np_plot_conditional_empty_mask(bws, tobj$condens,
+            subcol(eydat,ei,i)[seq_len(xi.neval),,drop=FALSE], plot.errors.center, gradients,
+            proper.args$proper.requested, plot.errors.method)
+          if (identical(plot.errors.method, "asymptotic"))
+            tobj$conderr[empty.uncertainty] <- NA_real_
+
+          ## Repeat each gradient component when requested
 
           eval.extract <- function(obj, jj){
             if (gradients) {
@@ -1275,6 +1297,9 @@
                           bws = bws)
                 temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
                 temp.all.err <- temp.boot[["boot.all.err"]]
+              disclosed <- .np_plot_conditional_empty_bands(temp.err, temp.all.err,
+                empty.uncertainty, plot.errors.type)
+              temp.err <- disclosed$err; temp.all.err <- disclosed$all.err
                 temp.boot <- temp.boot[["bxp"]]
                 if (!plot.bxp.out){
                   temp.boot$out <- numeric()
