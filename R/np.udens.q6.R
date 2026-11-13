@@ -40,7 +40,8 @@
   # Worst-case support partition; include simultaneous refinement/factor copies.
   nodes <- as.double(order) * (2 * as.double(m) - 1)
   bytes <- 8 * (12 * as.double(m) * nodes + 20 * as.double(m)^2 +
-    8 * as.double(n) * block + 10 * nodes + 4 * n + 4 * B + 4 * order^2)
+    8 * as.double(n) * block + 512 * n + 10 * nodes + 4 * n + 4 * B +
+    4 * order^2 + 2500 * ceiling(B / block))
   if (!is.finite(bytes) || bytes > 192 * 1024^2)
     stop("Q6 inference exceeds its 192 MiB workspace bound", call. = FALSE)
   bytes
