@@ -1,3 +1,8 @@
+# npRmpi 0.80-3 (private development)
+
+* Constant conditional surfaces and surface-data replay expand automatic display
+  limits without changing estimates, intervals or explicit limits.
+
 # npRmpi 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and

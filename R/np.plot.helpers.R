@@ -11380,6 +11380,19 @@ gen.label = function(label, altlabel){
   fallback
 }
 
+# A display-only expansion, also used by constant clamped quantile surfaces.
+# Call only for automatic limits; explicit user limits retain their contract.
+.np_plot_expand_surface_range <- function(limits) {
+  if (length(limits) == 2L && all(is.finite(limits)) &&
+      limits[1L] == limits[2L]) {
+    pad <- .04 * max(1, abs(limits[1L]))
+    expanded <- limits + c(-pad, pad)
+    expanded[!is.finite(expanded)] <- limits[!is.finite(expanded)]
+    return(expanded)
+  }
+  limits
+}
+
 draw.error.bands = function(ex, ely, ehy, lty = .np_plot_lty("interval"), col = par("col")){
   lines(ex,ely,lty=lty,col=col)
   lines(ex,ehy,lty=lty,col=col)
