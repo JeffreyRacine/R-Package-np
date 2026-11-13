@@ -1,4 +1,7 @@
 test_that("conditional gradient bootstrap uses fanout with an active pool", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   boot <- getFromNamespace(".npRmpi_inid_boot_from_conditional_gradient", "npRmpi")
   called <- new.env(parent = emptyenv())
   called$fanout <- FALSE
@@ -75,6 +78,9 @@ test_that("conditional gradient bootstrap uses fanout with an active pool", {
 })
 
 test_that("quantile gradient bootstrap uses fanout with fixed counts", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   boot <- getFromNamespace(".npRmpi_inid_boot_from_quantile_gradient", "npRmpi")
   called <- new.env(parent = emptyenv())
   called$fanout <- FALSE
@@ -154,6 +160,9 @@ test_that("quantile gradient bootstrap uses fanout with fixed counts", {
 })
 
 test_that("quantile level bootstrap uses fanout with fixed counts", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   boot <- getFromNamespace(".npRmpi_inid_boot_from_quantile_level", "npRmpi")
   called <- new.env(parent = emptyenv())
   called$fanout <- FALSE

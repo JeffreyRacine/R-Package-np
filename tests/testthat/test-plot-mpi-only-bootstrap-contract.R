@@ -143,6 +143,9 @@ test_that("plot method entrypoint allows non-bootstrap inside mpi.bcast.cmd cont
 })
 
 test_that("wild bootstrap helper requires MPI fanout and never falls back locally", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   wild_boot_t <- getFromNamespace(".np_wild_boot_t", "npRmpi")
 
   withr::local_options(npRmpi.mpi.initialized = FALSE)

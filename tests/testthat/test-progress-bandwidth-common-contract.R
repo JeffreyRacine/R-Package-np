@@ -499,6 +499,9 @@ test_that("Powell transition retires the native NOMAD provider mode", {
 })
 
 test_that("MPI worker-silence policy is rank-local and non-collective", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   worker_silent <- getFromNamespace(".np_progress_bandwidth_worker_silent", "npRmpi")
   old_initialized <- getOption("npRmpi.mpi.initialized")
   on.exit(options(npRmpi.mpi.initialized = old_initialized), add = TRUE)
@@ -524,6 +527,9 @@ test_that("MPI worker-silence policy is rank-local and non-collective", {
 })
 
 test_that("Powell wrapper replaces a released NOMAD owner instead of leaking child progress", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   begin <- getFromNamespace(".np_progress_begin", "npRmpi")
   end <- getFromNamespace(".np_progress_end", "npRmpi")
   refine <- getFromNamespace(".np_nomad_with_powell_progress", "npRmpi")

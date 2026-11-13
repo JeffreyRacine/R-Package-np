@@ -61,7 +61,7 @@
   key <- as.character(comm)
   if (exists(key, envir = .npRmpi_fanout_state, inherits = FALSE))
     return(get(key, envir = .npRmpi_fanout_state, inherits = FALSE))
-  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) return(NULL)
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE))) return(NULL)
   .npRmpi_fanout_native("owner", comm)
 }
 

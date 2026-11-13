@@ -1,4 +1,7 @@
 test_that("heavy npudisthat apply fanout uses master plus every active worker", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   fanout <- getFromNamespace(".npRmpi_hat_operator_row_fanout", "npRmpi")
 
   captured <- new.env(parent = emptyenv())
@@ -50,6 +53,9 @@ test_that("heavy npudisthat apply fanout uses master plus every active worker", 
 })
 
 test_that("heavy npudenshat apply fanout uses master plus every active worker", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   fanout <- getFromNamespace(".npRmpi_hat_operator_row_fanout", "npRmpi")
 
   captured <- new.env(parent = emptyenv())
@@ -100,6 +106,9 @@ test_that("heavy npudenshat apply fanout uses master plus every active worker", 
 })
 
 test_that("unconditional hat apply fanout is gated away from small or unsupported calls", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   fanout <- getFromNamespace(".npRmpi_hat_operator_row_fanout", "npRmpi")
 
   local_mocked_bindings(

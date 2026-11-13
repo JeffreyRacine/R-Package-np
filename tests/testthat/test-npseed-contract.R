@@ -52,7 +52,7 @@ test_that("npseed fails closed for inconsistent active-pool state", {
   res <- npRmpi_run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
-      "options(npRmpi.pool.active = TRUE)",
+      "get('.npRmpi_session_facts', asNamespace('npRmpi'))(npRmpi.pool.active = TRUE)",
       "set.seed(271828)",
       "before <- .Random.seed",
       "bad <- try(npseed(19), silent = TRUE)",

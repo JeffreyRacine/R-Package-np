@@ -39,6 +39,9 @@ test_that("npRmpi.quit is harmless before MPI initialization", {
 })
 
 test_that("active slave pool guard fails closed before npRmpi.init", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   has.pool <- getFromNamespace(".npRmpi_has_active_slave_pool", "npRmpi")
   old.pool <- getOption("npRmpi.pool.active")
   old.ctx <- getOption("npRmpi.autodispatch.context")

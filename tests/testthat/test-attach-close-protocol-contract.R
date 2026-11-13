@@ -1,4 +1,6 @@
 test_that("attach close helper primitives are stable", {
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption,
+    .npRmpi_session_facts=options, .package="npRmpi")
   tag_fn <- getFromNamespace(".npRmpi_attach_close_ack_tag", "npRmpi")
   release_tag_fn <- getFromNamespace(".npRmpi_attach_close_release_tag", "npRmpi")
   protocol_rank_tag_fn <- getFromNamespace(".npRmpi_protocol_rank_tag", "npRmpi")
@@ -79,6 +81,7 @@ test_that("attach init registers a master-side process-exit close finalizer", {
 })
 
 test_that("attach exit finalizer never queries a finalized MPI runtime", {
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   finalizer <- getFromNamespace(".npRmpi_attach_exit_finalizer", "npRmpi")
   withr::local_options(list(
     npRmpi.attach.close.state = "open",

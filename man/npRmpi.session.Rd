@@ -82,6 +82,14 @@ MPI startup, shutdown, worker-count, and worker-status controls.
   \item{\dots}{Additional arguments passed to \code{mpi.spawn.Rslaves()}.}
 }
 \details{
+Established MPI lifecycle facts (including attach session identity and shutdown
+state) are held by the package. Restoring a saved R options list does not rewind
+these facts. Dispatch preferences remain user-controlled: restoring
+\code{npRmpi.autodispatch = FALSE} retains the existing manual or rank-local
+workflow. Call \code{npRmpi.init(..., autodispatch = TRUE)} explicitly to resume
+automatic dispatch. A saved options list cannot initialize a runtime or establish
+a worker pool.
+
 The package-owned startup routes compare the loaded R and native source
 identities on participating ranks. A mismatch or a worker from an older build
 without an identity record refuses admission. Close the pool and restart all

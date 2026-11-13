@@ -1,4 +1,7 @@
 test_that("conditional fixed localpoly bootstrap core fans out with an active pool", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   core <- getFromNamespace(".np_inid_boot_from_conditional_localpoly_fixed_core", "npRmpi")
   called <- new.env(parent = emptyenv())
   called$fanout <- FALSE
@@ -59,6 +62,9 @@ test_that("conditional fixed localpoly bootstrap core fans out with an active po
 })
 
 test_that("conditional fixed localpoly bootstrap core remains local without a pool", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   core <- getFromNamespace(".np_inid_boot_from_conditional_localpoly_fixed_core", "npRmpi")
   called <- new.env(parent = emptyenv())
   called$fill <- 0L

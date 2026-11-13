@@ -1222,7 +1222,7 @@ npindexhat <-
                                             x.eval.num,
                                             comm = 1L) {
   if (!isTRUE(getOption("npRmpi.hat.operator.fanout", TRUE)) ||
-      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+      !isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) ||
       isTRUE(getOption("npRmpi.autodispatch.context", FALSE)) ||
       isTRUE(getOption("npRmpi.autodispatch.disable", FALSE)) ||
       isTRUE(.npRmpi_autodispatch_called_from_bcast()))

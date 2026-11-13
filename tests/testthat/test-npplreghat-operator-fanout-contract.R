@@ -1,4 +1,7 @@
 test_that("heavy npplreghat apply fanout uses master plus every active worker", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   fanout <- getFromNamespace(".npRmpi_npplreghat_apply_fanout", "npRmpi")
 
   captured <- new.env(parent = emptyenv())
@@ -61,6 +64,9 @@ test_that("heavy npplreghat apply fanout uses master plus every active worker", 
 })
 
 test_that("npplreghat apply fanout is gated away from small work", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   fanout <- getFromNamespace(".npRmpi_npplreghat_apply_fanout", "npRmpi")
 
   local_mocked_bindings(

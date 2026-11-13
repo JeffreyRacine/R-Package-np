@@ -1291,7 +1291,7 @@
 
   # In active MPI sessions, very large wild chunks have triggered allocator
   # instability on some stacks; keep a conservative default cap.
-  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+  if (isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE))) {
     mpi.cap <- suppressWarnings(as.integer(getOption("np.plot.wild.chunk.max.mpi", 64L))[1L])
     if (is.na(mpi.cap) || mpi.cap < 1L)
       mpi.cap <- 64L
@@ -1743,7 +1743,7 @@
 }
 
 .npRmpi_bootstrap_worker_count <- function(comm = 1L) {
-  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)))
     return(0L)
   size <- tryCatch(as.integer(mpi.comm.size(comm = comm)), error = function(e) NA_integer_)
   if (is.na(size) || size <= 1L)
@@ -3358,7 +3358,7 @@
     comm = 1L,
     include.master = TRUE
   )
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (isTRUE(use.mpi)) {
     chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
@@ -7412,7 +7412,7 @@
     NULL
   }
 
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   component.owner <- if (isTRUE(use.mpi))
     .np_plreg_fixed_component_owner(bws = bws, p = p)
@@ -7541,7 +7541,7 @@
   y.eval.t <- as.matrix(y.eval$t)
   x.train.t.list <- lapply(x.train, function(obj) as.matrix(obj$t))
   x.eval.t.list <- lapply(x.eval, function(obj) as.matrix(obj$t))
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
 
   if (isTRUE(use.mpi)) {
@@ -7760,7 +7760,7 @@
   y.eval.t <- as.matrix(y.eval$t)
   x.train.t.list <- lapply(x.train, function(obj) as.matrix(obj$t))
   x.eval.t.list <- lapply(x.eval, function(obj) as.matrix(obj$t))
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
 
   if (isTRUE(use.mpi)) {
@@ -8192,7 +8192,7 @@
     )
   }
 
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (!isTRUE(use.mpi)) {
     t0.local <- fit_one_local(x.train = xdat)
@@ -9080,7 +9080,7 @@
                         first.replication = NULL)
   }
 
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (isTRUE(use.mpi)) {
     chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
@@ -9916,7 +9916,7 @@
   }
 
   chunk.size <- .np_inid_chunk_size(n = state$n, B = B, progress_cap = !is.null(counts.drawer))
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
 
   if (isTRUE(use.mpi)) {
@@ -10312,7 +10312,7 @@
   chunk.size <- .np_inid_chunk_size(
     n = n, B = B, progress_cap = !is.null(counts.drawer)
   )
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
 
   if (isTRUE(use.mpi)) {
@@ -10860,7 +10860,7 @@
     progress.label
   }
 
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (!isTRUE(use.mpi)) {
     t0.local <- fit_one_local(x.train = xdat, y.train = ydat)
@@ -10953,7 +10953,7 @@
   nrow.values <- nrow(values.mat)
   ncol.values <- ncol(values.mat)
   if (nrow.values < 2L ||
-      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+      !isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) ||
       !isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))) {
     if (isTRUE(cdf)) {
       return(.np_condist_project_values_with_plan(
@@ -11122,7 +11122,7 @@
   t0 <- rowSums(ops$num) / .np_normalization_denominator(
     rowSums(ops$den), "conditional bootstrap original sample")
 
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
@@ -14442,7 +14442,7 @@ plotFactor <- function(f, y, ...){
                                                         counts = NULL,
                                                         counts.drawer = NULL,
                                                         progress.label = NULL) {
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (!isTRUE(use.mpi)) {
     return(.np_inid_boot_from_conditional_gradient_local(
@@ -14622,7 +14622,7 @@ plotFactor <- function(f, y, ...){
                                                   tol = 1.490116e-04,
                                                   small = 1.490116e-05,
                                                   itmax = 10000) {
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (!isTRUE(use.mpi)) {
     return(.np_inid_boot_from_quantile_level_local(
@@ -14781,7 +14781,7 @@ plotFactor <- function(f, y, ...){
                                                      tol = 1.490116e-04,
                                                      small = 1.490116e-05,
                                                      itmax = 10000) {
-  use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
+  use.mpi <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
   if (!isTRUE(use.mpi)) {
     return(.np_inid_boot_from_quantile_gradient_local(

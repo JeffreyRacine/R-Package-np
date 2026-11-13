@@ -9,7 +9,7 @@
 }
 
 .npRmpi_sync_mpi_inactive <- function() {
-    options(
+    .npRmpi_session_facts(
         npRmpi.mpi.initialized = FALSE,
         npRmpi.pool.active = FALSE,
         npRmpi.master.only = FALSE
@@ -18,7 +18,7 @@
 }
 
 .npRmpi_mpi_finalize_quiet <- function() {
-    if (!isTRUE(getOption("npRmpi.mpi.initialized", TRUE)))
+    if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", TRUE)))
         return(invisible(FALSE))
 
     state <- tryCatch(.npRmpi_mpi_runtime_state(), error = function(e) NULL)
@@ -35,14 +35,14 @@
         state <- tryCatch(.npRmpi_mpi_runtime_state(), error = function(e) NULL)
         if (!is.null(state) && isTRUE(state[["initialized"]]) &&
             !isTRUE(state[["finalized"]]))
-            options(npRmpi.mpi.initialized = TRUE)
+            .npRmpi_session_facts(npRmpi.mpi.initialized = TRUE)
         return(invisible(FALSE))
     }
     out
 }
 
 mpi.finalize <- function(){
-    if (!isTRUE(getOption("npRmpi.mpi.initialized", TRUE)))
+    if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", TRUE)))
         return(invisible(FALSE))
 
     is.master <- tryCatch(mpi.is.master(), error = function(e) NA)
