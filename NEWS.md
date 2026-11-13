@@ -24,6 +24,11 @@
 
 - Compound plot arguments now use dotted spellings, for example `boot.control`, `bias.control`, `data.overlay` and `gradient.order`. The 0.80-2 snake_case argument spellings are rejected with replacement guidance; no aliases are provided. `np_plot_data` and its existing field names, saved-data replay and extraction remain unchanged. Retired snake_case plot arguments are rejected before evaluating their values, including during saved-data replay; replay retains its existing graphical-override behavior.
 
+- Equivalent direct and grouped probability trim pairs no longer conflict in
+  single-index and conditional-mode plots. Other trim interpretations and
+  genuinely conflicting controls retain their existing behavior. Conditional-mode
+  sample views do not gain grid controls.
+
 # np 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and
