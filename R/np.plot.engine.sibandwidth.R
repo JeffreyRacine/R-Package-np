@@ -598,6 +598,7 @@
             
             plot.args <- list(x = tobj$index[i.sort],
                               y = temp.mean[i.sort] * bws$beta[i],
+                              xlim = xlim,
                               ylim = panel.ylim,
                               cex.axis = scalar_default(cex.axis, par()$cex.axis),
                               cex.lab =  scalar_default(cex.lab, par()$cex.lab),

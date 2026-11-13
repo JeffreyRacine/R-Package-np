@@ -12470,6 +12470,9 @@ plotFactor <- function(f, y, ...){
     for (name in names) setHook(name, NULL, action = "replace")
     force(code)
   }
+  if (!is.null(persp.args$xlim)) xlim <- persp.args$xlim
+  if (!is.null(persp.args$ylim)) ylim <- persp.args$ylim
+  if (!is.null(persp.args$zlim)) zlim <- persp.args$zlim
   background <- persp.args
   background$x <- range(persp.args$x)
   background$y <- range(persp.args$y)
@@ -12956,6 +12959,14 @@ plotFactor <- function(f, y, ...){
   out <- dots[hits]
   names(out) <- substring(names(out), nchar(prefix) + 1L)
   out
+}
+
+# Forward only supplied limits; NULL must not erase a computed automatic range.
+.np_plot_apply_limits <- function(args, xlim = NULL, ylim = NULL, zlim = NULL) {
+  if (!is.null(xlim)) args$xlim <- xlim
+  if (!is.null(ylim)) args$ylim <- ylim
+  if (!is.null(zlim)) args$zlim <- zlim
+  args
 }
 
 .np_plot_merge_user_args <- function(base.args, user.args) {
@@ -13450,7 +13461,7 @@ plotFactor <- function(f, y, ...){
     cex.main = scalar_default(cex.main, graphics::par()$cex.main),
     cex.sub = scalar_default(cex.sub, graphics::par()$cex.sub)
   )
-  if (!xi.factor && !is.null(xlim))
+  if (!is.null(xlim))
     plot.args$xlim <- xlim
   plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
 

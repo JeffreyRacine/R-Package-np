@@ -388,9 +388,23 @@ Named options passed via \code{\dots} include:
       \code{lwd}, \code{main}, \code{sub}, \code{type}, \code{xlab},
       \code{xlim}, \code{ylab}, \code{ylim}, \code{zlab}, \code{zlim}}{
         standard graphical controls forwarded to the underlying plotting
-        primitives when relevant. In continuous two-dimensional regression
-        panels, \code{xlim} sets the display limits without changing the
-        evaluation grid or the family used to calibrate simultaneous bands.
+        primitives when relevant. Supplied limits affect the display, not the
+        evaluation grid, estimates, intervals or the family used to calibrate
+        simultaneous bands. For surface plots, \code{xlim} and \code{ylim}
+        control the two coordinate axes and \code{zlim} controls height.
+        For one-dimensional partially linear and smooth-coefficient panels,
+        \code{xlim} controls X panels and \code{zlim} controls Z panels;
+        \code{ylim} controls the plotted values. Saved-data replay retains
+        these choices. An explicit replay \code{xlim} overrides retained
+        horizontal limits; an explicitly supplied replay \code{zlim} takes
+        precedence on Z panels when both are supplied. A horizontal limit
+        applies to every selected line panel, including factor-level positions;
+        select individual saved panels when different ranges are wanted.
+        Omitted or \code{NULL} limits use automatic ranges. Each renderer
+        retains its restrictions on valid limits. The rgl renderer preserves
+        its handling of constant ranges and missing endpoints; infinite limits
+        or a non-finite rendered coordinate range are refused before scene
+        serialization.
       }
     }
 

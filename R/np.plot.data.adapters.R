@@ -449,7 +449,8 @@
   out
 }
 
-.np_plot_data_from_conmode <- function(raw, request, gradients = FALSE) {
+.np_plot_data_from_conmode <- function(raw, request, gradients = FALSE, style = list()) {
+  style <- style[!vapply(style, is.null, logical(1L))]
   panels <- list(); targets <- .np_plot_data_targets(); inference <- families <- list(); exclusions <- list()
   surface <- !is.null(raw$surface) && !is.null(raw$grid)
   frames <- if (surface) list(raw$surface) else raw
@@ -492,13 +493,15 @@
     if (identical(quantity, "probability_contrast"))
       inference[[owner]]$contrast <- .np_plot_data_contrast(grid,
         match(as.character(d$variable[1L]), names(grid)))
+    if (length(style)) display$style <- style
     panels[[panel_id]] <- .np_plot_data_panel(grid, rep("X", ncol(grid)), values, intervals, display)
   }
   .np_plot_data("npconmode", request, panels, targets, inference, families,
                 family_exclusions = exclusions)
 }
 
-.np_plot_data_from_copula <- function(raw, request, density = FALSE, view = "surface") {
+.np_plot_data_from_copula <- function(raw, request, density = FALSE, view = "surface", style = list()) {
+  style <- style[!vapply(style, is.null, logical(1L))]
   frames <- if (is.data.frame(raw)) setNames(list(raw), view) else raw
   panels <- list(); targets <- .np_plot_data_targets(); inference <- families <- list()
   for (i in seq_along(frames)) {
@@ -526,6 +529,7 @@
     if (empirical) inference[[owner]]$errors <- "none"
     display <- list(kind = if (empirical || view == "sample") "scatter" else "surface",
       view = if (view == "all") if (this.density) "surface" else if (empirical) "empirical" else "contour" else view)
+    if (length(style)) display$style <- style
     panels[[panel_id]] <- .np_plot_data_panel(grid, rep("probability", 2L), values, intervals, display)
   }
   .np_plot_data("npcopula", request, panels, targets, inference, families)

@@ -602,6 +602,7 @@
         main.val <- if (!is.null(main)) main else NULL
         .np_plot_first_render_begin(rgl.first.render)
         rgl.out <- .np_plot_render_surface_rgl(
+          xlim = xlim, ylim = ylim,
           x = x1.eval,
           y = x2.eval,
           z = tdens,
@@ -691,6 +692,7 @@
             phi = phi,
             main = scalar_default(main, "")
           )
+          persp.args <- .np_plot_apply_limits(persp.args, xlim, ylim)
           persp.mat <- .np_plot_render_surface_base_frame(
             persp.args = persp.args,
             xlim = range(x1.eval, finite = TRUE),
@@ -1250,7 +1252,7 @@
             } else {
               plot
             }
-            plot.args <- list()
+            plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
             if (xi.factor) {
               if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
             } else {
@@ -1617,7 +1619,7 @@
               } else {
                 plot
               }
-              plot.args <- list()
+              plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
               if (xi.factor) {
                 if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
               } else {
@@ -1831,7 +1833,7 @@
             } else {
               plot
             }
-            plot.args <- list()
+            plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
             if (xi.factor) {
               if (plot.bootstrap && plot.bxp) plot.args$z <- all.bxp[[plot.index]] else plot.args$f <- allei[,plot.index]
             } else {

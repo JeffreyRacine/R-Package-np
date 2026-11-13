@@ -372,7 +372,9 @@
                                         persp3d.args = list(),
                                         grid3d.args = list(),
                                         widget.args = list(),
-                                        draw.extras = NULL) {
+                                        draw.extras = NULL,
+                                        xlim = NULL,
+                                        ylim = NULL) {
   tryCatch({
     defaults <- .np_plot_rgl_defaults()
     old.opts <- options(
@@ -425,6 +427,8 @@
       y = y,
       z = z,
       zlim = zlim,
+      xlim = xlim,
+      ylim = ylim,
       xlab = xlab,
       ylab = ylab,
       zlab = zlab,
@@ -435,7 +439,18 @@
       back = "lines",
       main = main
     ), persp3d.args)
+    for (axis in c("xlim", "ylim", "zlim")) {
+      limit <- persp3d.call[[axis]]
+      # NA and equal endpoints can be automatic ranges handled by rgl.
+      # Only actual infinities are refused here: they can stall serialization.
+      if (is.numeric(limit) && any(is.infinite(limit)))
+        stop(axis, " must not contain infinite values")
+    }
     do.call(rgl::persp3d, persp3d.call)
+    # rgl can turn finite extreme limits into non-finite scene coordinates.
+    # Refuse that state before scene serialization, which otherwise can stall.
+    if (any(!is.finite(rgl::par3d("bbox"))))
+      stop("surface limits exceed the finite coordinate range supported by rgl")
 
     if (!is.null(draw.extras))
       draw.extras()
