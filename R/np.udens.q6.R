@@ -195,3 +195,112 @@
   list(center = center, se = se, critical = critical,
        lower = center - critical*se, upper = center + critical*se)
 }
+
+# Admission is explicit and precedes data preparation, RNG and any dispatch.
+.np_udens_q6_options <- function(dots, allow = FALSE) {
+  value <- function(public, internal) {
+    z <- dots[[public, exact = TRUE]]
+    if (is.null(z)) dots[[internal, exact = TRUE]] else z
+  }
+  law <- value("bootstrap", "plot.errors.boot.method")
+  if (!identical(law, "smoothed-q6")) return(invisible(FALSE))
+  if (!isTRUE(allow)) stop("smoothed-q6 is available only for supported unconditional density plots", call. = FALSE)
+  ctrl <- dots[["boot.control", exact = TRUE]]
+  calibration <- if (!is.null(ctrl)) .np_plot_boot_calibration(ctrl) else
+    dots[["plot.errors.boot.calibration", exact = TRUE]]
+  if (!identical(value("errors", "plot.errors.method"), "bootstrap") ||
+      !identical(value("center", "plot.errors.center"), "bias-corrected") ||
+      !identical(value("band", "plot.errors.type"), "simultaneous") ||
+      !identical(calibration, "symmetric-sd"))
+    stop("smoothed-q6 requires explicit bootstrap errors, bias-corrected center, simultaneous band and symmetric-sd calibration", call. = FALSE)
+  if (!is.null(dots[["bias.control", exact = TRUE]]) ||
+      isTRUE(dots[["gradients", exact = TRUE]]) || isTRUE(dots[["gradient", exact = TRUE]]) ||
+      "gaussian.draws" %in% names(dots) ||
+      !is.null(dots[["plot.errors.boot.blocklen", exact = TRUE]]) ||
+      (!is.null(ctrl) && (!is.null(ctrl$blocklen) ||
+        !identical(ctrl$nonfixed, "exact") || !identical(ctrl$wild, "mammen"))) ||
+      (!is.null(dots[["plot.errors.boot.nonfixed", exact = TRUE]]) &&
+        !identical(dots[["plot.errors.boot.nonfixed", exact = TRUE]], "exact")) ||
+      (!is.null(dots[["plot.errors.boot.wild", exact = TRUE]]) &&
+        !identical(dots[["plot.errors.boot.wild", exact = TRUE]], "mammen")))
+    stop("smoothed-q6 does not accept custom bias, gradient, Gaussian-draw or dependent/nonfixed/wild controls", call. = FALSE)
+  B <- value("B", "plot.errors.boot.num")
+  if (!is.null(B) && (!is.numeric(B) || length(B) != 1L || !is.finite(B) ||
+      B < 1 || B != floor(B) || B > .Machine$integer.max))
+    stop("Q6 B must be a positive representable integer", call. = FALSE)
+  invisible(TRUE)
+}
+
+.np_udens_q6_spec <- function(bws) {
+  if (!inherits(bws, "bandwidth") ||
+      !identical(bws[["type", exact = TRUE]], "fixed") ||
+      !identical(bws[["ckerbound", exact = TRUE]], "none") ||
+      !isTRUE(bws[["ckertype", exact = TRUE]] %in% c("uniform", "epanechnikov")) ||
+      !isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) ||
+      !isTRUE(bws[["ndim", exact = TRUE]] == 1L) ||
+      !isTRUE(bws[["ncon", exact = TRUE]] == 1L))
+    stop("smoothed-q6 requires q=1 continuous, whole-line, fixed-bandwidth order-two uniform or Epanechnikov density", call. = FALSE)
+  invisible(NULL)
+}
+
+.np_udens_q6_prepare <- function(bws, x, seed) {
+  .np_udens_q6_spec(bws)
+  if (!is.data.frame(x) || ncol(x) != 1L || !nzchar(names(x)[1L]) ||
+      is.object(x[[1L]]) || !is.numeric(x[[1L]]))
+    stop("Q6 requires one ordinary numeric continuous coordinate", call. = FALSE)
+  h <- as.double(.np_physical_bandwidth(bws))
+  .np_udens_q6_geometry(x[[1L]], h, x[[1L]][1L], bws$ckertype)
+  npValidateNonNegativeInteger(seed, "random.seed")
+  list(x=x, h=h, n=nrow(x), q=1L, kernel=bws$ckertype, plot.random.seed=seed,
+    plot.law="smoothed-q6", plot.calibration="symmetric-sd",
+    construction="density-compact-q6-symmetric-v1")
+}
+
+.np_udens_q6_active <- function(state)
+  identical(state[["construction", exact=TRUE]], "density-compact-q6-symmetric-v1")
+
+.np_udens_q6_public_errors <- function(state, grid, alpha, B, band) {
+  if (!.np_udens_q6_active(state) || !identical(band,"simultaneous") ||
+      !is.data.frame(grid) || ncol(grid)!=1L || !nrow(grid) ||
+      !identical(names(grid), names(state$x)))
+    stop("invalid Q6 simultaneous-band request", call.=FALSE)
+  B <- .np_plot_gaussian_integer(B, "Q6 B", .Machine$integer.max)
+  .np_udens_q6_geometry(state$x[[1L]], state$h, grid[[1L]], state$kernel)
+  .np_udens_q6_budget(state$n, length(unique(grid[[1L]])), B)
+  progress <- function(stage,done,total) .np_plot_progress_notify(
+    stage=paste("Q6 density:",stage),done=done,total=total,unit="work")
+  inference <- .np_plot_corrected_activity_run("Constructing Q6 density simultaneous intervals",
+    .np_with_seed(state$plot.random.seed, {
+      reference <- .np_udens_q6_reference(state$x[[1L]],state$h,grid[[1L]],state$kernel,progress)
+      tasks <- .np_udens_q6_plan(get(".Random.seed",.GlobalEnv,inherits=FALSE),state$n,B)
+      draws <- .np_udens_q6_dispatch(tasks,reference)
+      if (!is.matrix(draws) || !identical(dim(draws),c(B,2L)) || any(!is.finite(draws)))
+        stop("incomplete Q6 replicate collection",call.=FALSE)
+      z <- .np_udens_q6_intervals(reference,draws[,1L],alpha)
+      limits <- array(c(z$lower,z$upper),c(nrow(grid),2L,1L),
+        dimnames=list(NULL,c("lower","upper"),as.character(alpha)))
+      bands <- list(simultaneous=limits)
+      resolution <- .np_band_resolution(B,rep("density",nrow(grid)),alpha,
+        rep(TRUE,nrow(grid)),"simultaneous")
+      resolution$calibration <- "smoothed-q6 symmetric-sd"
+      resolution$quantile.type <- 7L
+      resolution$interpolated.index <- 1+(B-1)*(1-alpha)
+      list(center=z$center,se=z$se,critical=z$critical,maximum=draws[,1L],
+        bands=bands,intervals=bands,absolute.intervals=bands,covariance=NULL,
+        resolution=resolution,
+        checks=c(reference$diagnostics,conditional=max(draws[,2L])),
+        settings=list(construction=state$construction,law="smoothed-q6",h=state$h,n=state$n,q=1L,
+          alpha=alpha,B=B,grid.size=length(reference$grid),family.rows=reference$index,
+          family="unique supplied finite grid",available.bands="simultaneous",primary="absolute",
+          quantile.type=7L,calibration="symmetric-sd",
+          maximum.statistic="complete corrected bootstrap root divided by fixed original scale",
+          reference="empirical mixture plus h*sqrt(2/3)*Student6 noise",
+          root.center="full corrected functional T_h(Q6)",
+          covariance="complete corrected-curve influence under Q6",
+          correction="order-six compact operator with refitted normal guide",
+          calibration.status="explicit simultaneous-only Q6 density plot inference"))
+    }))
+  .np_band_resolution_warn(inference$resolution)
+  width <- inference$critical*inference$se
+  list(boot.err=cbind(width,width,inference$center),boot.all.err=NULL,inference=inference,bxp=list())
+}

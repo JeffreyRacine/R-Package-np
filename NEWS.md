@@ -1,5 +1,11 @@
 # npRmpi 0.80-2
 
+* Add explicit plot-only `bootstrap="smoothed-q6"` symmetric-SD simultaneous
+  bands for q=1 whole-line fixed-bandwidth uniform/Epanechnikov densities.
+  The complete corrected functional, Q6 covariance and refitted-guide roots
+  use bounded draw blocks. Existing methods, fitted estimators, bandwidths
+  and se=FALSE are unchanged; finite-grid coverage limitations remain explicit.
+
 * Compound plot arguments now use dotted spellings, for example `boot.control`, `bias.control`, `data.overlay` and `gradient.order`. The 0.80-2 snake_case argument spellings are rejected with replacement guidance; no aliases are provided. `np_plot_data` and its existing field names, saved-data replay and extraction remain unchanged. Retired snake_case plot arguments are rejected before evaluating their values, including during saved-data replay; replay retains its existing graphical-override behavior.
 
 * Compact two-dimensional corrected density plots compute their complete
