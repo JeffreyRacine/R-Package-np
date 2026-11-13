@@ -2,6 +2,8 @@ npcdens <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npcdens")
+    if (!missing(bws) && "na.action" %in% names(mc[["..."]]))
+      .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdens")
     args <- .np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment(),
       data.roles = c("txdat", "tydat"),
@@ -28,6 +30,7 @@ npcdens <-
 npcdens.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdens", data = data, newdata = newdata)
 
 
     dots <- list(...)
@@ -76,6 +79,7 @@ npcdens.formula <-
       cd.args$eydat <- eydat
     }
     cd.args$bws <- bws
+    dots$na.action <- NULL
     ev <- do.call(npcdens, c(cd.args, dots))
 
     ev$omit <- .np_formula_output_action(ev, umf, has.eval)
@@ -106,6 +110,7 @@ npcdens.formula <-
 npcdens.call <-
   function(bws, ...) {
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdens", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
@@ -124,6 +129,7 @@ npcdens.conbandwidth <- function(bws,
                                  proper.control = list(),
                                  ..., se = FALSE){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdens", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 

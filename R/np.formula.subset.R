@@ -1,3 +1,49 @@
+# Unsupported NA controls must be rejected before dots are materialized. The
+# few supported controls remain owned by the existing formula/prediction code.
+.np_fit_na_preflight <- function(bws, expressions, frame, family,
+                                 native = FALSE, data = NULL, newdata = NULL,
+                                 native.eval = FALSE) {
+  if (!("na.action" %in% names(expressions)) ||
+      !is.list(bws) || inherits(bws, "formula"))
+    return(invisible(NULL))
+  value <- function(name) {
+    index <- match(name, names(expressions))
+    if (is.na(index)) return(NULL)
+    eval(substitute(...elt(INDEX), list(INDEX = index)), envir = frame)
+  }
+  # The generic dispatches to formula only in the absence of native training.
+  training <- if (family %in% c("npudens", "npudist")) "tdat" else "txdat"
+  formula <- !native && !is.null(bws[["formula", exact = TRUE]]) &&
+    is.null(value(training))
+  if (formula) {
+    if (!is.null(value(".np.formula.state")) ||
+        !is.null(data) || !is.null(value("data")) ||
+        (family %in% c("npreg", "npindex", "npcdens", "npcdist",
+                       "npqreg", "npconmode", "npscoef", "npplreg") &&
+         "tydat" %in% names(expressions)))
+      return(invisible(NULL))
+    external <- !is.null(newdata) || !is.null(value("newdata"))
+    native.names <- if (family %in% c("npudens", "npudist")) "edat" else
+      if (family %in% c("npcdens", "npcdist")) c("exdat", "eydat") else
+        if (family %in% c("npscoef", "npplreg")) c("exdat", "ezdat") else "exdat"
+    formula.eval <- external && !any(native.names %in% names(expressions))
+    if (family == "npindex" && formula.eval)
+      return(invisible(NULL))
+  }
+  # Regression prediction already restores omitted evaluation rows for this
+  # exact policy. Resolve its value, not the callback; do not broaden it to
+  # arbitrary functions or apply it to retained training.
+  if (family == "npreg" &&
+      (native.eval || "exdat" %in% names(expressions) ||
+       !is.null(newdata) || !is.null(value("newdata")))) {
+    action <- value("na.action")
+    if (identical(action, stats::na.exclude) || identical(action, "na.exclude"))
+      return(invisible(NULL))
+  }
+  stop("na.action override is not supported for this stored-fit route; use the retained omission policy, preprocess replacement native data, or supply replacement formula data",
+       call. = FALSE)
+}
+
 # A stored fit owns its training sample. Inspect supplied syntax only: unused
 # replacement subsets must never be forced outside the original data mask.
 .np_reject_fit_subset <- function(expressions) {

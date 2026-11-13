@@ -1,5 +1,9 @@
 # np 0.80-3 (private development)
 
+- Stored-fit routes reject unsupported `na.action` overrides instead of silently
+  ignoring them. Existing formula replacement and regression/index prediction
+  policies remain supported, with each callback evaluated by its existing owner.
+
 - Class-probability plot families exclude omitted display rows, including
   asymptotic Bonferroni calibration, while preserving their padded output rows.
 
