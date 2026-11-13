@@ -72,8 +72,8 @@
   out
 }
 
-.np_udens_q6_convolution <- function(t, mu, sd, h, kernel, order) {
-  rule <- .np_udens_q6_rule(order)
+.np_udens_q6_convolution <- function(t, mu, sd, h, kernel, order, rule = NULL) {
+  if (is.null(rule)) rule <- .np_udens_q6_rule(order)
   span <- if (kernel == "uniform") 1 else sqrt(5)
   r <- span * rule$x
   w <- span * rule$w * .np_udens_q6_kernel(r, kernel)
@@ -83,14 +83,14 @@
 }
 
 # Columns are complete resamples; every column refits its own normal guide.
-.np_udens_q6_curve <- function(Y, target, h, kernel, order) {
-  mu <- colMeans(Y)
-  sd <- sqrt(colMeans(sweep(Y, 2L, mu)^2))
+.np_udens_q6_curve <- function(Y, target, h, kernel, order, guide = NULL, rule = NULL) {
+  mu <- if (is.null(guide)) colMeans(Y) else guide$mu
+  sd <- if (is.null(guide)) sqrt(colMeans(sweep(Y, 2L, mu)^2)) else guide$sd
   if (any(!is.finite(sd)) || any(sd <= 0))
     stop("Q6 conditional guide variance is not positive finite", call. = FALSE)
   target <- rep(target, length.out = ncol(Y))
   raw <- colMeans(.np_udens_q6_kernel(sweep(Y, 2L, target, "-") / h, kernel)) / h
-  out <- raw - .np_udens_q6_convolution(target, mu, sd, h, kernel, order) +
+  out <- raw - .np_udens_q6_convolution(target, mu, sd, h, kernel, order, rule) +
     dnorm(target, mu, sd)
   if (any(!is.finite(out))) stop("nonfinite Q6 corrected curve", call. = FALSE)
   out
@@ -174,9 +174,13 @@
 
 .np_udens_q6_maximum <- function(Y, reference) {
   maximum <- numeric(ncol(Y)); error <- 0
+  # The guide and quadrature rules depend on this replicate block, not its targets.
+  mu <- colMeans(Y)
+  guide <- list(mu = mu, sd = sqrt(colMeans(sweep(Y, 2L, mu)^2)))
+  low.rule <- .np_udens_q6_rule(48L); high.rule <- .np_udens_q6_rule(64L)
   for (j in seq_along(reference$grid)) {
-    low <- .np_udens_q6_curve(Y, reference$grid[j], reference$h, reference$kernel, 48L)
-    high <- .np_udens_q6_curve(Y, reference$grid[j], reference$h, reference$kernel, 64L)
+    low <- .np_udens_q6_curve(Y, reference$grid[j], reference$h, reference$kernel, 48L, guide, low.rule)
+    high <- .np_udens_q6_curve(Y, reference$grid[j], reference$h, reference$kernel, 64L, guide, high.rule)
     error <- max(error, .np_udens_q6_check(low, high, "conditional curve"))
     root <- (high - reference$reference.center[j]) / reference$se[j]
     maximum <- pmax(maximum, abs(root))
