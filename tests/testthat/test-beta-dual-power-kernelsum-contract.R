@@ -5,7 +5,7 @@ expect_beta_dual_square_equivalent <- function(actual, expected) {
 test_that("beta dual-power rows equal independently evaluated powers", {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
-  dual_sum <- getFromNamespace(".npksum_power12", "np")
+  dual_sum <- getFromNamespace(".npksum_power12", "npRmpi")
 
   training <- data.frame(
     x = c(.017, .08, .21, .47, .73, .94, .989),
@@ -40,8 +40,8 @@ test_that("beta dual-power rows equal independently evaluated powers", {
 test_that("beta dual-power rows preserve deletion and weighted semantics", {
   old <- options(np.messages = FALSE, np.tree = TRUE)
   on.exit(options(old), add = TRUE)
-  dual_sum <- getFromNamespace(".npksum_power12", "np")
-  weighted_sum <- getFromNamespace(".npksum_power12_weighted", "np")
+  dual_sum <- getFromNamespace(".npksum_power12", "npRmpi")
+  weighted_sum <- getFromNamespace(".npksum_power12_weighted", "npRmpi")
 
   training <- data.frame(
     x = c(.03, .14, .29, .46, .63, .78, .92),
@@ -82,7 +82,7 @@ test_that("beta dual-power rows preserve deletion and weighted semantics", {
 })
 
 test_that("second-order beta dual powers match a direct scalar oracle", {
-  dual_sum <- getFromNamespace(".npksum_power12", "np")
+  dual_sum <- getFromNamespace(".npksum_power12", "npRmpi")
   training <- data.frame(x = c(.02, .11, .27, .51, .74, .93))
   evaluation <- data.frame(x = c(.08, .36, .81))
   bandwidth <- .17
@@ -106,7 +106,7 @@ test_that("second-order beta dual powers match a direct scalar oracle", {
 })
 
 test_that("beta dual powers honor empirical range resolution", {
-  dual_sum <- getFromNamespace(".npksum_power12", "np")
+  dual_sum <- getFromNamespace(".npksum_power12", "npRmpi")
   training <- data.frame(x = c(-2.1, -1.4, -.2, .8, 2.7, 4.3))
   evaluation <- data.frame(x = c(-1.7, .4, 3.6))
   arguments <- list(
@@ -124,7 +124,9 @@ test_that("beta dual powers honor empirical range resolution", {
 test_that("beta dual powers share the canonical mixed categorical row", {
   old <- options(np.messages = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old), add = TRUE)
-  dual_sum <- getFromNamespace(".npksum_power12", "np")
+  dual_sum <- getFromNamespace(".npksum_power12", "npRmpi")
+  make_bandwidth <- getFromNamespace("kbandwidth", "npRmpi")
+  unpack_data <- getFromNamespace("untangle", "npRmpi")
   training <- data.frame(
     x = seq(.01, .99, length.out = 24L),
     u = factor(rep(letters[1:3], each = 8L)),
@@ -135,9 +137,9 @@ test_that("beta dual powers share the canonical mixed categorical row", {
   for (mode in c("fixed", "generalized_nn", "adaptive_nn")) {
     continuous_bandwidth <- if (identical(mode, "fixed")) .14 else 12
     for (order in c(2L, 4L, 6L, 8L)) {
-      bandwidth <- np:::kbandwidth(
+      bandwidth <- make_bandwidth(
         bw = c(continuous_bandwidth, .22, .31),
-        xdati = np:::untangle(training),
+        xdati = unpack_data(training),
         xnames = names(training),
         bwtype = mode,
         ckertype = "gaussian"
