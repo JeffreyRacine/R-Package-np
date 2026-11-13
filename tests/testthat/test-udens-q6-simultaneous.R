@@ -53,3 +53,29 @@ test_that("Q6 numerical failures remain failures", {
   expect_error(.np_udens_q6_kernel(1,"gaussian"), "uniform or Epanechnikov")
   expect_error(.np_udens_q6_intervals(list(),c(1,Inf),.05), "maximum calibration")
 })
+
+
+test_that("Q6 blocks retain donor-first then noise stream and a global maximum", {
+  .np_with_seed(42L, {
+    x <- qnorm((seq_len(20L)-.5)/20); n <- length(x); B <- 17L; h <- .6
+    start <- get(".Random.seed", .GlobalEnv)
+    donor <- sample.int(n, n*B, TRUE); noise <- rnorm(n*B)
+    expected <- matrix(x[donor] + h*sqrt(2/3)*qt(pnorm(noise), 6), n, B)
+    end <- get(".Random.seed", .GlobalEnv)
+    for (chunk in c(1L, 7L, 32L)) {
+      tasks <- .np_udens_q6_plan(start, n, B, chunk)
+      actual <- do.call(cbind, lapply(tasks, .np_udens_q6_samples, x=x, h=h))
+      expect_identical(actual, expected)
+      expect_identical(attr(tasks, "rng_final_state"), end)
+      expect_identical(get(".Random.seed", .GlobalEnv), end)
+    }
+    reference <- .np_udens_q6_reference(x, h, c(-1, 0, 1), "uniform")
+    full <- .np_udens_q6_maximum(expected, reference)$maximum
+    parts <- lapply(tasks, .np_udens_q6_chunk, reference=reference)
+    expect_equal(do.call(rbind, parts)[, 1L], full, tolerance=1e-12)
+    tasks[[1L]]$noise.end[2L] <- tasks[[1L]]$noise.end[2L]+1L
+    expect_error(.np_udens_q6_samples(tasks[[1L]], x, h), "inconsistent streams")
+    expect_identical(get(".Random.seed", .GlobalEnv), end)
+    expect_error(.np_udens_q6_plan(start, n, 0L), "invalid Q6 replicate")
+  })
+})
