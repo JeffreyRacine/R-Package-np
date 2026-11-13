@@ -37,6 +37,10 @@
 - Avoid response-vector-sized temporary labels in the shared missing-bandwidth
   regression handoff, preserving final response names and retained data.
 
+- Respect explicit surface height limits when displaying observed data with
+  regression, partially linear and smooth-coefficient surfaces; automatic
+  ranges continue to include the observations.
+
 # np 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and
