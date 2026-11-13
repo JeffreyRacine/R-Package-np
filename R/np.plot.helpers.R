@@ -732,6 +732,11 @@
       sprintf("%s %s guide + residual envelope%s", level, band, scope))
   }
 
+  if (identical(construction, "smoothed-q6")) {
+    candidates <- c(sprintf("%s simultaneous Q6 smoothed bootstrap; corrected center, fixed scale; finite grid", level),
+      sprintf("%s simultaneous Q6; corrected center, finite grid", level))
+  }
+
   if (identical(construction,"conditional-pilot")) {
     candidates <- c(sprintf("%s %s conditional-pilot band; corrected center with score safeguard%s", level, band,
       if(band %in% c("simultaneous","all")) "; finite grid within panel" else ""),
@@ -11089,7 +11094,8 @@ compute.default.error.range <- function(center, err) {
                                              allow_asymptotic_bias = FALSE,
                                              defer_block_selection = FALSE,
                                                allow_residual = FALSE,
-                                               allow_conditional_pilot = FALSE) {
+                                               allow_conditional_pilot = FALSE,
+                                               allow_smoothed_q6 = FALSE) {
   scalar_choice <- function(value, default) {
     if (is.null(value) || length(value) < 1L || is.na(value[1L])) default else value[1L]
   }
@@ -11105,7 +11111,8 @@ compute.default.error.range <- function(center, err) {
   plot.errors.boot.method <- match.arg(
     scalar_choice(plot.errors.boot.method, "wild"),
     c("wild", "inid", "fixed", "geom", if (isTRUE(allow_residual)) "residual",
-      if (isTRUE(allow_conditional_pilot)) "conditional-pilot")
+      if (isTRUE(allow_conditional_pilot)) "conditional-pilot",
+      if (isTRUE(allow_smoothed_q6)) "smoothed-q6")
   )
   plot.errors.boot.nonfixed <- match.arg(
     scalar_choice(plot.errors.boot.nonfixed, "exact"),

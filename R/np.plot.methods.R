@@ -293,8 +293,12 @@ np_render_control <- function(style = c("band", "bar"),
       (identical(center, "estimate") || allow_asymptotic_bias))
 }
 
-.np_plot_normalize_public_dots <- function(dots, context = "plot", allow_asymptotic_bias = FALSE) {
+.np_plot_normalize_public_dots <- function(dots, context = "plot", allow_asymptotic_bias = FALSE,
+                                            allow_smoothed_q6 = FALSE) {
   dots <- .np_plot_unique_args(dots)
+  if (identical(dots[["bootstrap", exact=TRUE]], "smoothed-q6") ||
+      identical(dots[["plot.errors.boot.method", exact=TRUE]], "smoothed-q6"))
+    .np_udens_q6_options(dots, allow_smoothed_q6)
   supplied <- names(dots)
   has <- function(x) x %in% supplied
 
@@ -336,7 +340,7 @@ np_render_control <- function(style = c("band", "bar"),
       stop("unused plot argument: bootstrap list; use scalar bootstrap, B, and boot.control",
            call. = FALSE)
     bootstrap <- .np_plot_scalar_match(dots$bootstrap,
-                                       c("wild", "inid", "fixed", "geom", "residual", "conditional-pilot"),
+                                       c("wild", "inid", "fixed", "geom", "residual", "conditional-pilot", "smoothed-q6"),
                                        "bootstrap")
     dots$bootstrap <- NULL
     dots <- .np_plot_set_normalized_arg(dots, "bootstrap",
@@ -531,12 +535,15 @@ np_render_control <- function(style = c("band", "bar"),
   if (conditional.optin && !inherits(bws,c("conbandwidth","condbandwidth")))
     stop("np_conditional_bias_control requires conditional density/distribution plots",call.=FALSE)
   dots <- .np_plot_normalize_public_dots(dots, context = .plot_context,
+    allow_smoothed_q6 = inherits(bws, "bandwidth"),
     allow_asymptotic_bias = conditional.optin || identical(method, .np_plot_rbandwidth_engine) ||
       identical(method, .np_plot_bandwidth_engine) ||
       identical(method, .np_plot_dbandwidth_engine) ||
       (identical(method, .np_plot_compat_dispatch) &&
        (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth") ||
         inherits(bws, "dbandwidth"))))
+  if (identical(dots[["plot.errors.boot.method", exact=TRUE]], "smoothed-q6"))
+    .np_udens_q6_spec(bws)
   if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&
       !inherits(bws, c("rbandwidth", "bandwidth", "dbandwidth")) && !conditional.optin)
     stop("explicit bootstrap calibration currently requires bias-corrected regression or supported density/distribution inference", call. = FALSE)
@@ -640,7 +647,8 @@ np_render_control <- function(style = c("band", "bar"),
   if (!owns.empty.rows && inherits(bws, c("bandwidth", "dbandwidth"))) {
     # Compact inference owns a child seed in addition to this outer scope.
     # Forward the request without bypassing either existing RNG admission guard.
-    if (.np_udens_m4_request(bws, dots$bias.control,
+    if (identical(dots$plot.errors.boot.method, "smoothed-q6") ||
+        .np_udens_m4_request(bws, dots$bias.control,
         dots$plot.errors.center, dots$plot.errors.method, dots$plot.errors.type,
         dots$plot.errors.boot.calibration) ||
         .np_udens_compact_q2_request(bws, dots$bias.control,
@@ -834,7 +842,7 @@ np_render_control <- function(style = c("band", "bar"),
          call. = FALSE)
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity",
-    allow_asymptotic_bias = TRUE)
+    allow_asymptotic_bias = TRUE, allow_smoothed_q6 = TRUE)
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_condensity <- function(object, ..., .plot_dots_call = NULL) {

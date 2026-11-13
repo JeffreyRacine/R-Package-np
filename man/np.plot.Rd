@@ -216,6 +216,8 @@ Named options passed via \code{\dots} include:
         \code{"wild"}, \code{"inid"}, \code{"fixed"}, and
         \code{"geom"}; density/distribution-family plots support
         \code{"inid"}, \code{"fixed"}, and \code{"geom"}.
+        The explicit density-only \code{"smoothed-q6"} law has the narrow
+        corrected simultaneous-band scope described in Details.
         Experimental regression \code{calibration="smoothed-percentile"}
         additionally uses \code{bootstrap="residual"}; see
         \code{\link{np_boot_control}} for its scope and defaults.
@@ -704,6 +706,40 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   addition does not select M4 for pointwise, Bonferroni, \code{all}, normal or
   bootstrap bands; see \code{\link{np_udens_bias_control}}. Core estimators and
   existing plotting constructions are unchanged.
+
+  The explicit experimental \code{bootstrap="smoothed-q6"} law supports
+  \code{errors="bootstrap"}, \code{center="bias-corrected"},
+  \code{band="simultaneous"} and
+  \code{boot.control=np_boot_control(calibration="symmetric-sd")} together.
+  It is restricted to one continuous numeric variable, a positive retained
+  fixed bandwidth, whole-line second-order uniform or Epanechnikov kernels,
+  at least ten finite observations and positive guide variance. It leaves the
+  fitted estimator and all existing inference choices unchanged. Other bands,
+  asymptotic errors, asymmetric calibration, bounds, nearest-neighbor bandwidths,
+  custom bias controls and dependent-data controls are not admitted by this law.
+
+  Q6 resamples complete observations from the empirical distribution and adds
+  independent \eqn{h\sqrt{2/3}t_6} smoothing noise. The corrected plot curve uses
+  the frozen sixth-order compact operator with a fitted normal guide. Each
+  replicate refits that guide. Roots are centered at the complete corrected
+  functional under Q6, rather than at the observed curve or Q6 density, and
+  divided by the fixed original complete-influence standard errors. A single
+  absolute maximum over the unique supplied finite grid is calibrated with the
+  type-7 empirical quantile. Signed corrected centers and raw endpoints are
+  retained; nonnegative intersections may be reported separately. This is a
+  different law and calibration from \code{smoothed-percentile}.
+
+  Finite-draw resolution is reported without increasing \code{B}; the inherited
+  default is unchanged. Quadrature and finite-workspace certificates can reject
+  an unrepresentable geometry rather than regularizing or downsampling it.
+  The private confirmation used own-CVML bandwidths, four distributions and
+  n=100/400: empirical-grid 95-percent simultaneous coverage was 98.14 percent
+  for uniform and 96.83 percent for Epanechnikov. This does not guarantee
+  continuum or arbitrary-density coverage: the fixed-domain skew-mixture
+  Epanechnikov n=100 cell covered 89.84 percent (95-percent binomial interval
+  85.53--92.97 percent), improving to 95.31 percent at n=400. Other retained
+  positive fixed-bandwidth origins are accepted conditionally without a new
+  bandwidth search, but do not inherit that CVML coverage evidence.
 
   Default bias-corrected unconditional unbounded Gaussian density plots use the D8
   positive-pilot construction for eligible asymptotic requests; see

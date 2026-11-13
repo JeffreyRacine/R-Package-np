@@ -126,32 +126,34 @@
     compact.sd.explicit <- !missing(plot.errors.boot.method) && !missing(plot.errors.type) &&
       identical(as.character(plot.errors.boot.method)[1L], "inid") &&
       error.request$type %in% c("pointwise", "simultaneous", "bonferroni", "all")
+    q6.state <- if (identical(plot.errors.boot.method, "smoothed-q6"))
+      .np_udens_q6_prepare(bws, xdat, if (missing(random.seed)) 42L else random.seed) else NULL
     compact.state <- NULL
-    if (.np_udens_compact_normal_q2_request(bws, bias.control, plot.errors.center,
+    if (is.null(q6.state) && .np_udens_compact_normal_q2_request(bws, bias.control, plot.errors.center,
         error.request$method, error.request$type, plot.errors.boot.calibration))
       compact.state <- .np_udens_compact_normal_q2_public_prepare(bws, xdat,
         plot.errors.alpha, if (missing(random.seed)) 42L else random.seed)
-    if (.np_udens_compact_request(bws, bias.control, plot.errors.center,
+    if (is.null(q6.state) && .np_udens_compact_request(bws, bias.control, plot.errors.center,
         error.request$method, plot.errors.boot.calibration, compact.sd.explicit))
       compact.state <- .np_udens_compact_public_prepare(bws, xdat,
         error.request$method, as.character(plot.errors.boot.method)[1L],
         error.request$type, plot.errors.boot.calibration, plot.errors.alpha,
         if (missing(random.seed)) 42L else random.seed)
-    if (.np_udens_compact_q2_request(bws, bias.control, plot.errors.center,
+    if (is.null(q6.state) && .np_udens_compact_q2_request(bws, bias.control, plot.errors.center,
         error.request$method, error.request$type, plot.errors.boot.calibration, compact.sd.explicit))
       compact.state <- .np_udens_compact_q2_public_prepare(bws, xdat,
         error.request$method, as.character(plot.errors.boot.method)[1L],
         error.request$type, plot.errors.boot.calibration, plot.errors.alpha,
         if (missing(random.seed)) 42L else random.seed)
     fgd.state <- NULL
-    if (.np_udens_fgd_request(bws, bias.control, plot.errors.center,
+    if (is.null(q6.state) && .np_udens_fgd_request(bws, bias.control, plot.errors.center,
         error.request$method, plot.errors.boot.calibration))
       fgd.state <- .np_udens_fgd_public_prepare(bws, xdat,
         error.request$method, as.character(plot.errors.boot.method)[1L],
         error.request$type, plot.errors.boot.calibration, plot.errors.alpha,
         if (missing(random.seed)) 42L else random.seed)
     beta.state <- NULL
-    if (.np_udens_beta_request(bws, bias.control, plot.errors.center,
+    if (is.null(q6.state) && .np_udens_beta_request(bws, bias.control, plot.errors.center,
         error.request$method))
       beta.state <- .np_udens_beta_public_prepare(bws, xdat,
         error.request$method, as.character(plot.errors.boot.method)[1L],
@@ -182,6 +184,7 @@
       allow_asymptotic_simultaneous = joint.eligible,
       # Preserve the request for the density-specific admission check below.
       allow_asymptotic_bias = TRUE,
+      allow_smoothed_q6 = !is.null(q6.state),
       error.request = error.request
     )
 
@@ -200,7 +203,7 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
-    bias.state <- if (!is.null(compact.state)) compact.state else if (!is.null(fgd.state)) fgd.state else if (!is.null(beta.state)) beta.state else .np_udens_plot_prepare(bias.control, bws, xdat,
+    bias.state <- if (!is.null(q6.state)) q6.state else if (!is.null(compact.state)) compact.state else if (!is.null(fgd.state)) fgd.state else if (!is.null(beta.state)) beta.state else .np_udens_plot_prepare(bias.control, bws, xdat,
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
       plot.errors.boot.calibration, blocklen = plot.errors.boot.blocklen,
       block.automatic = density.block.automatic, alpha = plot.errors.alpha,
@@ -209,7 +212,8 @@
     new.bias <- !is.null(bias.state)
     # Presentation only: percentile endpoints are not a maximum-root band.
     annotation.construction <- if (new.bias) {
-      if (identical(bias.state[["normal.pmzsd", exact = TRUE]], TRUE)) NULL
+      if (.np_udens_q6_active(bias.state)) "smoothed-q6"
+      else if (identical(bias.state[["normal.pmzsd", exact = TRUE]], TRUE)) NULL
       else if (.np_udens_compact_active(bias.state) || .np_udens_beta_active(bias.state) || .np_udens_fgd_active(bias.state)) "guide-region"
       else if (identical(bias.state[["plot.calibration", exact = TRUE]],
                     "smoothed-percentile")) "smoothed-percentile" else "positive-covariance"

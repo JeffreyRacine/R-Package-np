@@ -79,3 +79,49 @@ test_that("Q6 blocks retain donor-first then noise stream and a global maximum",
     expect_error(.np_udens_q6_plan(start, n, 0L), "invalid Q6 replicate")
   })
 })
+
+test_that("Q6 admission is an explicit isolated new law", {
+  a <- list(errors="bootstrap", bootstrap="smoothed-q6", center="bias-corrected",
+    band="simultaneous", boot.control=np_boot_control(calibration="symmetric-sd"), B=199L)
+  expect_true(.np_udens_q6_options(a, TRUE))
+  expect_error(.np_udens_q6_options(a), "only.*density")
+  for (key in c("errors", "center", "band", "boot.control")) {
+    b <- a; b[[key]] <- NULL
+    expect_error(.np_udens_q6_options(b, TRUE), "requires explicit")
+  }
+  for (band in c("pointwise", "bonferroni", "all", "pmzsd")) {
+    b<-a; b$band<-band; expect_error(.np_udens_q6_options(b,TRUE), "requires explicit")
+  }
+  for (cal in c("default", "absolute", "asymmetric-sd", "smoothed-percentile")) {
+    b<-a; b$boot.control<-np_boot_control(calibration=cal)
+    expect_error(.np_udens_q6_options(b,TRUE), "requires explicit")
+  }
+  for (B in c(.5, 0, Inf, NA_real_, .Machine$integer.max+1)) {
+    b<-a;b$B<-B;expect_error(.np_udens_q6_options(b,TRUE), "representable integer")
+  }
+  for (extra in list(list(bias.control=np_udens_bias_control()),list(gradients=TRUE),
+      list(gaussian.draws=199L),list(boot.control=np_boot_control(blocklen=2L,calibration="symmetric-sd")),
+      list(boot.control=np_boot_control(nonfixed="frozen",calibration="symmetric-sd")),
+      list(boot.control=np_boot_control(wild="rademacher",calibration="symmetric-sd"))))
+    expect_error(.np_udens_q6_options(modifyList(a,extra),TRUE), "does not accept")
+  b <- structure(list(type="fixed",ckerbound="none",ckertype="uniform",
+    ckerorder=2L,ndim=1L,ncon=1L),class="bandwidth")
+  expect_null(.np_udens_q6_spec(b))
+  for (change in list(list(type="generalized_nn"),list(type="adaptive_nn"),
+      list(ckerbound="fixed"),list(ckerbound="range"),list(ckerorder=4L),
+      list(ndim=0L,ncon=0L),list(ndim=2L,ncon=2L),list(ndim=3L,ncon=3L),
+      list(ncon=0L),list(ckertype="gaussian"),list(ckertype="beta")))
+    expect_error(.np_udens_q6_spec(modifyList(b,change)), "requires q=1")
+  expect_error(.np_plot_normalize_public_dots(a), "only.*density")
+  norm <- .np_plot_normalize_public_dots(a,allow_smoothed_q6=TRUE)
+  expect_identical(norm$plot.errors.boot.method,"smoothed-q6")
+  expect_identical(norm$plot.errors.boot.calibration,"symmetric-sd")
+  expect_identical(.np_plot_normalize_public_dots(norm,allow_smoothed_q6=TRUE),norm)
+  # Adding this enum cannot admit it to another common-option caller.
+  common <- list(plot.behavior="data",plot.errors.method="bootstrap",plot.errors.boot.method="smoothed-q6",
+    plot.errors.boot.blocklen=NULL,plot.errors.center="bias-corrected",plot.errors.type="simultaneous",
+    plot.errors.alpha=.05,plot.errors.style="band",plot.errors.bar="|",xdat=data.frame(x=1:10),common.scale=TRUE,ylim=NULL)
+  expect_error(do.call(.np_plot_normalize_common_options,common), "arg")
+  expect_identical(do.call(.np_plot_normalize_common_options,c(common,list(allow_smoothed_q6=TRUE)))$plot.errors.boot.method,"smoothed-q6")
+  expect_false(.np_udens_q6_active(NULL))
+})
