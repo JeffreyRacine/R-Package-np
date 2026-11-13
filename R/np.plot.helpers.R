@@ -12459,7 +12459,26 @@ plotFactor <- function(f, y, ...){
                                                ylim,
                                                zlim,
                                                grid.args = list()) {
-  persp.mat <- do.call(graphics::persp, persp.args)
+  # Establish the projection without painting data. A second persp call adds
+  # the unchanged surface above the grid; it must not advance a panel or run
+  # the public graphics hooks twice.
+  without.hooks <- function(names, code) {
+    previous <- lapply(names, getHook)
+    on.exit(for (i in seq_along(names))
+      setHook(names[i], previous[[i]], action = "replace"), add = TRUE)
+    for (name in names) setHook(name, NULL, action = "replace")
+    force(code)
+  }
+  background <- persp.args
+  background$x <- range(persp.args$x)
+  background$y <- range(persp.args$y)
+  background$z <- matrix(NA_real_, 2L, 2L)
+  if (is.null(background$xlim)) background$xlim <- range(persp.args$x)
+  if (is.null(background$ylim)) background$ylim <- range(persp.args$y)
+  if (is.null(background$zlim)) background$zlim <- range(persp.args$z, finite = TRUE)
+  background$box <- background$axes <- FALSE
+  background$main <- background$sub <- NULL
+  persp.mat <- without.hooks("persp", do.call(graphics::persp, background))
   .np_plot_draw_box_grid_persp(
     xlim = xlim,
     ylim = ylim,
@@ -12467,7 +12486,10 @@ plotFactor <- function(f, y, ...){
     persp.mat = persp.mat,
     grid.args = grid.args
   )
-  persp.mat
+  graphics::par(new = TRUE)
+  on.exit(graphics::par(new = FALSE), add = TRUE)
+  without.hooks(c("before.plot.new", "plot.new"),
+    do.call(graphics::persp, persp.args))
 }
 
 .np_plot_match_renderer <- function(renderer) {

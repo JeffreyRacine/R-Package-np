@@ -23,7 +23,8 @@ test_that("automatic surface boxes tolerate unavailable targets and preserve dat
     expect_identical(.Random.seed, seed)
     boxes <- Filter(Negate(is.null), lapply(grDevices::recordPlot()[[1L]], function(e) {
       z <- e[[2L]]
-      if (identical(tryCatch(z[[1L]]$name, error = function(e) ""), "C_persp"))
+      if (identical(tryCatch(z[[1L]]$name, error = function(e) ""), "C_persp") &&
+          any(is.finite(z[[4L]])))
         as.double(z[[7L]]) else NULL
     }))
     expect_length(boxes, 1L)

@@ -1,0 +1,46 @@
+test_that("base surface grids precede data and graphics hooks run once", {
+  frame <- getFromNamespace(".np_plot_render_surface_base_frame", "npRmpi")
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off(), add = TRUE)
+  grDevices::dev.control(displaylist = "enable")
+  hooks <- c("before.plot.new", "plot.new", "persp")
+  old <- lapply(hooks, getHook)
+  on.exit(for(i in seq_along(hooks)) setHook(hooks[i], old[[i]], "replace"), add = TRUE)
+  count <- setNames(integer(3),hooks)
+  for (h in hooks) local({ key <- h
+    setHook(key, function() count[key] <<- count[key] + 1L, "replace")
+  })
+  x <- seq(0,1,length.out=5); y <- seq(-1,1,length.out=6)
+  z <- outer(x,y,function(a,b) a+b^2)
+  for (theta in c(0,80,225)) for (scale in c(TRUE,FALSE)) {
+    args <- list(x=x,y=y,z=z,zlim=range(z),theta=theta,phi=5,
+      scale=scale,expand=.8,xlab="x",ylab="y",zlab="z",main="Title")
+    expected <- do.call(graphics::persp,args)
+    count[] <- 0L
+    actual <- frame(args,range(x),range(y),range(z))
+    expect_identical(actual,expected)
+    expect_identical(unname(count),rep(1L,3))
+    records <- lapply(grDevices::recordPlot()[[1L]],function(e)e[[2L]])
+    names <- vapply(records,function(e)tryCatch(e[[1L]]$name,error=function(e)""),"")
+    surfaces <- which(names=="C_persp"); segments <- which(names=="C_segments")
+    expect_length(surfaces,2L)
+    expect_true(all(is.na(records[[surfaces[1L]]][[4L]])))
+    expect_identical(records[[surfaces[2L]]][[4L]],z)
+    expect_true(length(segments)>0L && all(segments>surfaces[1L] & segments<surfaces[2L]))
+    expect_false(graphics::par("new"))
+  }
+  graphics::par(mfrow=c(1,2))
+  frame(args,range(x),range(y),range(z))
+  expect_identical(graphics::par("mfg")[1:2], c(1L,1L))
+  frame(args,range(x),range(y),range(z))
+  expect_identical(graphics::par("mfg")[1:2], c(1L,2L))
+  saved <- lapply(hooks,getHook)
+  bad <- args; bad$col <- "not-a-color"
+  expect_error(frame(bad,range(x),range(y),range(z)))
+  expect_identical(lapply(hooks,getHook),saved)
+  expect_false(graphics::par("new"))
+  # This error occurs on the actual surface pass, after new=TRUE was set.
+  bad <- args; bad$z <- as.vector(z)
+  expect_error(frame(bad,range(x),range(y),range(z)))
+  expect_identical(lapply(hooks,getHook),saved)
+  expect_false(graphics::par("new"))
+})
