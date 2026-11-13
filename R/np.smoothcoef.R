@@ -2,6 +2,8 @@ npscoef <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npscoef")
+    if (!missing(bws) && "na.action" %in% names(mc[["..."]]))
+      .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npscoef")
     args <- .np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment(),
       data.roles = c("txdat", "tydat", "tzdat"),
@@ -30,6 +32,7 @@ npscoef.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
            se = FALSE, ...){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npscoef", data = data, newdata = newdata)
 
 
     dots <- list(...)
@@ -100,6 +103,7 @@ npscoef.formula <-
         sc.args$ezdat <- ezdat
     }
     sc.args$bws <- bws
+    dots$na.action <- NULL
     ev <- do.call(npscoef, c(sc.args, list(se = se), dots))
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
@@ -132,6 +136,7 @@ npscoef.formula <-
 npscoef.call <-
   function(bws, ...) {
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npscoef", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
@@ -1439,6 +1444,7 @@ npscoef.scbandwidth <-
            tol = .Machine$double.eps,
            ...){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npscoef", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 

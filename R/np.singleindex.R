@@ -17,6 +17,8 @@ npindex <-
   function(bws, ..., B = 399){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npindex")
+    if (!missing(bws) && "na.action" %in% names(mc[["..."]]))
+      .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npindex")
     args <- .np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment(),
       data.roles = c("txdat", "tydat"),
@@ -71,6 +73,7 @@ npindex.formula <-
              se = TRUE, ..., se.type = c("asymptotic", "bootstrap")){
     if (!inherits(bws, "formula"))
       .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npindex", data = data, newdata = newdata)
 
 
         if (!is.null(y.eval)) y.eval <- npValidateScalarLogical(y.eval, "y.eval")
@@ -191,8 +194,7 @@ npindex.formula <-
         # The raw formula owner has already applied the training NA policy
         # and retained the evaluation policy above. Native constructors must
         # not receive this consumed formula-only argument a second time.
-        if (raw.formula)
-          dots$na.action <- NULL
+        dots$na.action <- NULL
         ev <- do.call(npindex, c(si.args, list(se = se, se.type = se.type), dots))
         ev$call <- mc
         environment(ev$call) <- .np_call_owner_environment(
@@ -240,6 +242,7 @@ npindex.formula <-
 npindex.call <-
   function(bws, ...) {
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npindex", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
@@ -698,6 +701,7 @@ npindex.sibandwidth <-
            residuals = FALSE, ..., se.type = c("asymptotic", "bootstrap"),
            y.eval = NULL) {
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npindex", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 

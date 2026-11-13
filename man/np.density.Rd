@@ -315,6 +315,16 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   the Wang and van Ryzin (1981) kernel.
 
 }
+\section{Missing-value policies with stored bandwidths}{
+An existing bandwidth object retains its training omission policy. Explicit
+\code{na.action} overrides are supported only by the formula replacement-data
+or replacement-response routes that already own that policy, and by documented
+regression and single-index prediction policies. Unsupported stored native or
+formula evaluation overrides are rejected rather than silently ignored.
+For replacement native inputs, prepare the desired complete data explicitly.
+Reusing retained training does not re-run its missing-value callback.
+}
+
 \value{
   Standard errors are retained only when \code{se = TRUE}. They can be added
   later without repeating bandwidth selection, for example

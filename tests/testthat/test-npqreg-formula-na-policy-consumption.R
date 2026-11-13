@@ -41,5 +41,5 @@ test_that("quantile formula replacement consumes exactly one resolved NA policy"
   expect_error(npqreg(b,data=changed,na.action=reject),"policy rejection sentinel")
   expect_equal(rejected,1L)
   expect_error(npqreg(b,data=d,na.action=na.omit,not.a.control=1),"unused argument")
-  expect_error(npqreg(b,txdat=d["x"],tydat=d["y"],na.action=na.omit),"unused argument")
+  expect_error(npqreg(b,txdat=d["x"],tydat=d["y"],na.action=na.omit),"na.action override is not supported")
 })

@@ -2,6 +2,8 @@ npconmode <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npconmode")
+    if (!missing(bws) && "na.action" %in% names(mc[["..."]]))
+      .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npconmode")
     args <- .np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment(),
       data.roles = c("txdat", "tydat"),
@@ -40,6 +42,7 @@ npconmode <-
 npconmode.formula <-
   function(bws, data = NULL, newdata = NULL, ..., se = FALSE){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npconmode", data = data, newdata = newdata)
 
     se <- npValidateScalarLogical(se, "se")
     dots <- list(...)
@@ -100,6 +103,7 @@ npconmode.formula <-
         cm.args$eydat <- eydat
     }
     cm.args$bws <- bws
+    dots$na.action <- NULL
     ev <- do.call(npconmode, c(cm.args, dots))
 
     output.omit <- .np_formula_output_action(ev, umf, has.eval, native.restored = TRUE)
@@ -113,6 +117,7 @@ npconmode.formula <-
 npconmode.call <-
   function(bws, ...) {
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npconmode", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
@@ -518,6 +523,7 @@ npconmode.conbandwidth <-
             level = NULL,
             ..., se = FALSE){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npconmode", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 

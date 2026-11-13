@@ -2,6 +2,8 @@ npudens <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npudens")
+    if (!missing(bws) && "na.action" %in% names(mc[["..."]]))
+      .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npudens")
     args <- .np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment(),
       data.roles = c("tdat"),
@@ -28,6 +30,7 @@ npudens <-
 npudens.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npudens", data = data, newdata = newdata)
 
 
     dots <- list(...)
@@ -72,6 +75,7 @@ npudens.formula <-
     if (has.eval)
       ud.args$edat <- edat
     ud.args$bws <- bws
+    dots$na.action <- NULL
     ev <- do.call(npudens, c(ud.args, dots))
 
     ev$omit <- .np_formula_output_action(ev, umf, has.eval)
@@ -93,6 +97,7 @@ npudens.formula <-
 npudens.call <-
   function(bws, ...) {
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npudens", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
@@ -105,6 +110,7 @@ npudens.bandwidth <-
            tdat = stop("invoked without training data 'tdat'"),
            edat, ..., se = FALSE){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npudens", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
