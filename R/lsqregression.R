@@ -912,9 +912,9 @@ predict.lsqregression <- function(object, se.fit = FALSE, ..., tau = NULL) {
 }
 
 plot.lsqregression <- function(x, tau = NULL, gradients = FALSE,
-                               data_overlay = NULL,
+                               data.overlay = NULL,
                                xlab = NULL, ylab = NULL, ylim = NULL, ...) {
-  plot.data.overlay <- data_overlay
+  plot.data.overlay <- data.overlay
   dots.call <- match.call(expand.dots = FALSE)$...
   .np_plot_validate_public_dots(
     dots.call,

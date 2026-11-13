@@ -137,7 +137,7 @@ test_that("explicit beta density and distribution interval plot routes run", {
         output = "data",
         neval = 13L,
         errors = errors,
-        random_seed = 1703L
+        random.seed = 1703L
       ), extra)
     )
     dist.plot <- do.call(
@@ -147,7 +147,7 @@ test_that("explicit beta density and distribution interval plot routes run", {
         output = "data",
         neval = 13L,
         errors = errors,
-        random_seed = 1703L
+        random.seed = 1703L
       ), extra)
     )
 
@@ -189,7 +189,7 @@ test_that("beta NN bootstrap plots and bivariate plot evaluation run", {
         neval = 11L,
         errors = "bootstrap",
         B = 2L,
-        random_seed = 1705L
+        random.seed = 1705L
       ),
       "list"
     )
@@ -200,7 +200,7 @@ test_that("beta NN bootstrap plots and bivariate plot evaluation run", {
         neval = 11L,
         errors = "bootstrap",
         B = 2L,
-        random_seed = 1705L
+        random.seed = 1705L
       ),
       "list"
     )
@@ -220,7 +220,7 @@ test_that("beta NN bootstrap plots and bivariate plot evaluation run", {
     neval = 5L,
     errors = "bootstrap",
     B = 2L,
-    random_seed = 1706L
+    random.seed = 1706L
   )
 
   expect_type(xy.plot, "list")

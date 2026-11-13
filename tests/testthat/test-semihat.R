@@ -1202,7 +1202,7 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
       output = "data",
       errors = "bootstrap",
       bootstrap = "wild",
-      boot_control = np_boot_control(wild = "rademacher"),
+      boot.control = np_boot_control(wild = "rademacher"),
       band = "pointwise",
       B = 19
     )

@@ -88,7 +88,7 @@ test_that("npindex public frozen plot-data mean stays on the exact scale", {
       neval = 40L,
       errors = "bootstrap",
       bootstrap = "inid",
-      boot_control = np_boot_control(nonfixed = mode),
+      boot.control = np_boot_control(nonfixed = mode),
       B = 39L,
       band = "pointwise"
     ))$provider)[[1L]]
@@ -132,7 +132,7 @@ test_that("npindex nonfixed frozen bootstrap still supports gradient slices", {
       neval = 20L,
       errors = "bootstrap",
       bootstrap = "inid",
-      boot_control = np_boot_control(nonfixed = "frozen"),
+      boot.control = np_boot_control(nonfixed = "frozen"),
       B = 41L,
       band = "pointwise",
       gradients = TRUE

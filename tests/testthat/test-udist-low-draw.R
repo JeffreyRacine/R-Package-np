@@ -7,8 +7,8 @@ test_that("defined low-draw CDF bands are returned with one resolution warning",
     conditions <- list()
     z <- withCallingHandlers(plot(bw, xdat = x, errors = "bootstrap",
       bootstrap = law, center = "bias-corrected", band = "all", B = 1L,
-      boot_control = np_boot_control(blocklen = if (law == "inid") NULL else 3L),
-      neval = 5L, output = "data", random_seed = 99102905),
+      boot.control = np_boot_control(blocklen = if (law == "inid") NULL else 3L),
+      neval = 5L, output = "data", random.seed = 99102905),
       np_band_resolution_warning = function(w) {
         conditions[[length(conditions) + 1L]] <<- w
         invokeRestart("muffleWarning")

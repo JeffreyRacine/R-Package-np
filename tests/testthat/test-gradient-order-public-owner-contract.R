@@ -35,14 +35,14 @@ test_that("first-derivative fits and extractors reject unsupported explicit orde
         expect_identical(partial.fit$congrad[,2L],fit$congrad[,2L])
         expect_warning(predict(fit,gradients=TRUE,gradient.order=2L),
           "requested order 2.*degree 1")
-        expect_warning(plot(fit,gradients=TRUE,gradient_order=2L,
+        expect_warning(plot(fit,gradients=TRUE,gradient.order=2L,
           errors="none",output="data",neval=4L),"requested order 2.*degree 1")
       } else {
         expect_error(do.call(get(family),c(a,list(gradient.order=2L))),
         "only first derivatives|only for regtype|no available derivative")
       expect_error(predict(fit,gradients=TRUE,gradient.order=2L),
         "only first derivatives|only for regtype|no available derivative")
-      expect_error(plot(fit,gradients=TRUE,gradient_order=2L,
+      expect_error(plot(fit,gradients=TRUE,gradient.order=2L,
         errors="none",output="data",neval=4L),
         "only first derivatives|only for regtype|no requested component")
       }

@@ -59,7 +59,7 @@ test_that("beta endpoint infinities remain in returns but not plot geometry", {
       plotted <- capture_plot_provider(plot(
         bw, xdat = training, ydat = response,
         gradients = TRUE, errors = "none", output = "plot-data",
-        common_scale = common, neval = 11L, xtrim = 0
+        common.scale = common, neval = 11L, xtrim = 0
       ))$provider,
       "infinite endpoint"
     )
@@ -75,7 +75,7 @@ test_that("beta endpoint infinities remain in returns but not plot geometry", {
       plotted <- capture_plot_provider(plot(
         bw, xdat = training, ydat = response,
         gradients = TRUE, errors = "asymptotic", output = "plot-data",
-        common_scale = common, neval = 2L, xtrim = 0
+        common.scale = common, neval = 2L, xtrim = 0
       ))$provider,
       "infinite endpoint"
     )
@@ -130,7 +130,7 @@ test_that("conditional beta endpoint gradients plot and retain infinities", {
       capture_plot_provider(plot(
         bw, xdat = training.x, ydat = training.y,
         gradients = TRUE, errors = "none", output = "plot-data",
-        common_scale = TRUE, neval = 11L, xtrim = 0, ytrim = 0
+        common.scale = TRUE, neval = 11L, xtrim = 0, ytrim = 0
       ))$provider,
       warning = function(condition) {
         endpoint_warnings <<- c(

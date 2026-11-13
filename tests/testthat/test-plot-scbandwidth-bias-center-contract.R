@@ -20,7 +20,7 @@ test_that("smooth coefficient bootstrap bias centers are component-specific", {
     bootstrap = "wild",
     band = "pointwise",
     B = 19L,
-    data_overlay = FALSE,
+    data.overlay = FALSE,
     perspective = FALSE,
     output = "data"
   ))
@@ -60,7 +60,7 @@ test_that("smooth coefficient bias-corrected plot renders center legend", {
       bootstrap = "wild",
       band = "simultaneous",
       B = 29L,
-      data_overlay = FALSE,
+      data.overlay = FALSE,
       perspective = FALSE
     )),
     NA

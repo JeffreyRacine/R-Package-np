@@ -51,12 +51,12 @@ run_exact_frozen_plot_pair <- function(fit, ..., seed = 9001L) {
 
   set.seed(seed)
   suppressWarnings(capture.output(
-    exact <- capture_plot_provider(do.call(plot, c(list(fit), extra, list(boot_control = np_boot_control(nonfixed = "exact")))))$provider
+    exact <- capture_plot_provider(do.call(plot, c(list(fit), extra, list(boot.control = np_boot_control(nonfixed = "exact")))))$provider
   ))
 
   set.seed(seed)
   suppressWarnings(capture.output(
-    frozen <- capture_plot_provider(do.call(plot, c(list(fit), extra, list(boot_control = np_boot_control(nonfixed = "frozen")))))$provider
+    frozen <- capture_plot_provider(do.call(plot, c(list(fit), extra, list(boot.control = np_boot_control(nonfixed = "frozen")))))$provider
   ))
 
   list(exact = exact, frozen = frozen)
@@ -312,7 +312,7 @@ test_that("density plot interval values equal quantiles of their own bootstrap d
     seen<-list();set.seed(9174)
     suppressWarnings(capture.output(out<-plot(fit,output='data',perspective=FALSE,view='fixed',
       errors='bootstrap',bootstrap='inid',B=41L,band='pointwise',center='estimate',neval=7L,
-      boot_control=np_boot_control(nonfixed=mode))))
+      boot.control=np_boot_control(nonfixed=mode))))
     expect_s3_class(out, "np_plot_data")
     expect_equal(length(out$panels),length(seen))
     for (panel in seq_along(out$panels)) {

@@ -6,7 +6,7 @@ test_that("distribution correction uses the public center and absolute surface e
   for (method in c("asymptotic", "bootstrap")) {
     args <- list(x = bw, xdat = x, errors = method, center = "bias-corrected",
       band = "all", neval = 7L, output = "data")
-    args[[if (method == "asymptotic") "gaussian_draws" else "B"]] <- 49L
+    args[[if (method == "asymptotic") "gaussian.draws" else "B"]] <- 49L
     cap <- capture_plot_provider(suppressWarnings(do.call(plot, args)))
     out <- cap$result
     z <- cap$provider$d1

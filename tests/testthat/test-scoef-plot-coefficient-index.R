@@ -9,7 +9,7 @@ test_that("smooth coefficient plots honor the selected coefficient", {
     bw<-npscoefbw(xdat=xd,zdat=zd,ydat=y,bws=.2,regtype='lc',bandwidth.compute=FALSE)
     fit<-npscoef(bws=bw,txdat=xd,tzdat=zd,tydat=y,betas=TRUE)
     for(k in seq_len(q+1L)) {
-      p<-plot(fit,neval=5L,perspective=FALSE,coef=TRUE,coef_index=k,output='data')
+      p<-plot(fit,neval=5L,perspective=FALSE,coef=TRUE,coef.index=k,output='data')
       expect_identical(unique(p$targets$term),c('Intercept',names(xd))[k])
       for(i in seq_along(p$panels)) {
         vars<-p$panels[[i]]$variables;zc<-vars$coordinate[vars$name=='z'];e<-as.data.frame(p,panel=i)
@@ -19,10 +19,10 @@ test_that("smooth coefficient plots honor the selected coefficient", {
         expect_equal(e$estimate,oracle,tolerance=1e-10)
       }
     }
-    expect_error(plot(fit,neval=5L,coef=TRUE,coef_index=q+2L,output='data'),'available coefficients')
-    expect_error(plot(bw,xdat=xd,ydat=y,zdat=zd,neval=5L,coef=TRUE,coef_index=q+2L,output='data'),'available coefficients')
-    mean1<-plot(fit,neval=5L,perspective=FALSE,coef_index=1L,output='data')
-    mean99<-plot(fit,neval=5L,perspective=FALSE,coef_index=99L,output='data')
+    expect_error(plot(fit,neval=5L,coef=TRUE,coef.index=q+2L,output='data'),'available coefficients')
+    expect_error(plot(bw,xdat=xd,ydat=y,zdat=zd,neval=5L,coef=TRUE,coef.index=q+2L,output='data'),'available coefficients')
+    mean1<-plot(fit,neval=5L,perspective=FALSE,coef.index=1L,output='data')
+    mean99<-plot(fit,neval=5L,perspective=FALSE,coef.index=99L,output='data')
     for(i in seq_along(mean1$panels))expect_identical(as.data.frame(mean1,panel=i),as.data.frame(mean99,panel=i))
   }
 })

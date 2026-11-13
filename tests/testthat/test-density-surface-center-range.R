@@ -8,7 +8,7 @@ test_that("density surface boxes enclose the endpoints actually drawn", {
     args <- list(fit, errors = "asymptotic", center = center, view = "fixed",
                  neval = 7L, output = "plot-data", zlim = zlim)
     if (band != "default") args$band <- band
-    if (band %in% c("simultaneous", "all")) args$gaussian_draws <- 199L
+    if (band %in% c("simultaneous", "all")) args$gaussian.draws <- 199L
     seed <- .Random.seed
     out <- suppressWarnings(do.call(plot, args))
     expect_identical(.Random.seed, seed)

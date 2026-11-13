@@ -57,7 +57,7 @@ test_that("density Gaussian plots preserve marginal bands, seed and grid size", 
   expect_length(gradient[[1L]]$band.calibration, 1L)
   expect_true(all(is.finite(gradient[[1L]]$band.errors[[1L]]$simultaneous)))
   expect_error(plot(fit, errors = "asymptotic", band = "pointwise",
-                    gaussian_draws = 9999), "gaussian.draws requires")
+                    gaussian.draws = 9999), "gaussian.draws requires")
 })
 
 test_that("unconditional NN Gaussian plots and unavailable grids keep their shape", {

@@ -20,7 +20,7 @@ test_that("npcdens plot-data centers stay on predict and absolute bootstrap endp
       bootstrap = "inid",
       B = 39L,
       band = "pointwise",
-      boot_control = np_boot_control(nonfixed = nonfixed_mode)
+      boot.control = np_boot_control(nonfixed = nonfixed_mode)
     ))
 
     expect_s3_class(out, "np_plot_data")

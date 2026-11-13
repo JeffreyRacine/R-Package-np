@@ -1,5 +1,7 @@
 # np 0.80-2
 
+* Compound plot arguments now use dotted spellings, for example `boot.control`, `bias.control`, `data.overlay` and `gradient.order`. The 0.80-2 snake_case argument spellings are rejected with replacement guidance; no aliases are provided. `np_plot_data` and its existing field names, saved-data replay and extraction remain unchanged. Retired snake_case plot arguments are rejected before evaluating their values, including during saved-data replay; replay retains its existing graphical-override behavior.
+
 * Compact two-dimensional corrected density plots compute their complete
   covariance through centered conditional quadrature and full QR compression.
   This plot-only capacity improvement retains the quadrature, statistical

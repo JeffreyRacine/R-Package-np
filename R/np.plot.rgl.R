@@ -323,7 +323,7 @@
 
   if (isTRUE(plot.data.overlay)) {
     if (!isTRUE(allow.plot.data.overlay)) {
-      stop("renderer='rgl' does not yet support data_overlay=TRUE. Use renderer='base' or disable overlay.",
+      stop("renderer='rgl' does not yet support data.overlay=TRUE. Use renderer='base' or disable overlay.",
            call. = FALSE)
     }
   }

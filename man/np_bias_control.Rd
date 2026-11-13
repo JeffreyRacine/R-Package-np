@@ -66,7 +66,7 @@ np_bias_control(construction = c("iterated", "legacy"),
     exclusive. Raw bandwidths must be transformed when predictor units change.}
 }
 \details{
-  Supply \code{bias_control=np_bias_control(...)} to the regression plot.
+  Supply \code{bias.control=np_bias_control(...)} to the regression plot.
   Omitting this argument with \code{center="bias-corrected"} uses the iterated
   defaults. \code{center="estimate"} remains the ordinary plot default.
 
@@ -297,12 +297,12 @@ np_bias_control(construction = c("iterated", "legacy"),
   family. Bands are nested and coincide for a singleton family. Gaussian
   and bootstrap marginal limits use absolute studentized draws and an outward
   Bonferroni envelope. \code{band="pmzsd"} retains
-  its normal-quantile times standard-error meaning. Use \code{gaussian_draws}
+  its normal-quantile times standard-error meaning. Use \code{gaussian.draws}
   or \code{B} to control calibration precision. Increasing the number of
   draws can be necessary for remote empirical Bonferroni tails on large grids.
   If \eqn{\alpha/m < 1/B}, the empirical marginal Bonferroni quantile reaches
   the largest simulated absolute statistic before the outward envelope is
-  applied. Here \eqn{B} denotes \code{gaussian_draws} for Gaussian
+  applied. Here \eqn{B} denotes \code{gaussian.draws} for Gaussian
   calibration or \code{B} for bootstrap calibration. Increasing the draw
   count improves tail resolution; the default count does not ensure precise
   Bonferroni tails for every grid size.
@@ -430,9 +430,9 @@ failures must be considered when experimenting with these bounds.
 \examples{
 \dontrun{
 plot(fit, errors="asymptotic", center="bias-corrected",
-     band="simultaneous", bias_control=np_bias_control(), output="data")
+     band="simultaneous", bias.control=np_bias_control(), output="data")
 plot(fit, errors="bootstrap", center="bias-corrected", bootstrap="wild",
-     band="all", bias_control=np_bias_control(iterations=32L), output="data")
+     band="all", bias.control=np_bias_control(iterations=32L), output="data")
 }
 }
 \keyword{hplot}
