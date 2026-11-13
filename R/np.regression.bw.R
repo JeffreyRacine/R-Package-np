@@ -136,7 +136,12 @@ npregbw.NULL <-
     bws = double(dim(xdat)[2])
 
     tbw <- do.call(if (.np.context$public) npregbw.default else .npregbw_auxiliary,
-                   c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
+                   c(list(xdat = xdat,
+                          ydat = if (is.language(ydat) || typeof(ydat) == "bytecode" ||
+                                     any(vapply(dots, function(value)
+                                       is.language(value) || typeof(value) == "bytecode",
+                                       logical(1)))) ydat else quote(ydat),
+                          bws = bws), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     environment(mc) <- .np.context$caller

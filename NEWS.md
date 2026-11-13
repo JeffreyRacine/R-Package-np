@@ -36,6 +36,9 @@
 
 - Supplied plot limits reach line and surface renderers and survive saved-data replay, without changing evaluation grids, estimates or intervals. Automatic ranges remain unchanged when limits are omitted.
 
+- Avoid response-vector-sized temporary labels in the shared missing-bandwidth
+  regression handoff, preserving final response names and retained data.
+
 # npRmpi 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and
