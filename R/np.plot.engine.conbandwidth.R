@@ -486,6 +486,7 @@
                     .np_plot_finite_range(c(tcomp, lerr, herr))
               } else
                 .np_plot_finite_range(tcomp)
+          zlim <- .np_plot_expand_surface_range(zlim)
       }
 
       if (plot.behavior != "plot"){

@@ -526,14 +526,7 @@
           } else if (quantreg)
             .np_plot_finite_range(tcomp) else
                 .np_plot_finite_range(tcomp)
-        # A clamped quantile can be constant while every interval is NA.
-        # Expand only automatic display limits; retain the fitted surface.
-        if (isTRUE(quantreg) && zlim[1L] == zlim[2L]) {
-          zpad <- .04 * max(1, abs(zlim[1L]))
-          expanded <- zlim + c(-zpad, zpad)
-          expanded[!is.finite(expanded)] <- zlim[!is.finite(expanded)]
-          zlim <- expanded
-        }
+        zlim <- .np_plot_expand_surface_range(zlim)
       }
 
       if (plot.behavior != "plot"){

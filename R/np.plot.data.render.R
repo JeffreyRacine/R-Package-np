@@ -97,7 +97,8 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
       args <- utils::modifyList(list(x = as.numeric(g$x), y = as.numeric(g$y), z = g$z,
         xlab = p$variables$label[varying[1L]], ylab = p$variables$label[varying[2L]],
         zlab = label, main = label, theta = 0, phi = 20,
-        zlim = .np_plot_data_limits(c(values$estimate, intervals$lower, intervals$upper, display$overlay$value))),
+        zlim = .np_plot_expand_surface_range(.np_plot_data_limits(
+          c(values$estimate, intervals$lower, intervals$upper, display$overlay$value)))),
         style[!names(style) %in% c("type", "lty", "lwd", "ylim", "xlim")])
       all <- length(lower) > 1L
       if (renderer == "rgl") {
