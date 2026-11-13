@@ -9,8 +9,8 @@ test_that("explicit scalar quantile surfaces preserve their complete grid", {
   fit <- npqreg(bw, txdat = x, tydat = y, tau = .4, se = TRUE)
   seed <- .Random.seed
   out <- plot(fit, perspective = TRUE, errors = "asymptotic", band = "all",
-              gaussian_draws = 9999L, neval = 3L, xtrim = .15,
-              output = "data", view = "fixed", layout = FALSE, data_overlay = FALSE)
+              gaussian.draws = 9999L, neval = 3L, xtrim = .15,
+              output = "data", view = "fixed", layout = FALSE, data.overlay = FALSE)
   expect_length(out$panels, 1L)
   expect_identical(names(plot_coordinates(out, role = "X")), names(x))
   expect_true(is.ordered(plot_coordinates(out, role = "X")$second))
@@ -24,9 +24,9 @@ test_that("explicit scalar quantile surfaces preserve their complete grid", {
                tolerance = 2e-11)
   expect_identical(.Random.seed, seed)
   expect_length(plot(fit, errors = "none", neval = 3L, output = "data",
-                     view = "fixed", data_overlay = FALSE)$panels, 2L)
+                     view = "fixed", data.overlay = FALSE)$panels, 2L)
   expect_length(plot(fit, tau = c(.7, .3), perspective = TRUE, errors = "none",
-                     neval = 3L, output = "data", view = "fixed", data_overlay = FALSE)$panels, 2L)
+                     neval = 3L, output = "data", view = "fixed", data.overlay = FALSE)$panels, 2L)
 
   file <- tempfile(fileext = ".pdf")
   grDevices::pdf(file)
@@ -34,8 +34,8 @@ test_that("explicit scalar quantile surfaces preserve their complete grid", {
   plot.new()
   old <- par(c("cex", "mfrow"))
   tail <- suppressWarnings(plot(fit, tau = 1e-10, perspective = TRUE,
-    errors = "asymptotic", band = "all", gaussian_draws = 9999L, neval = 3L,
-    output = "plot-data", view = "fixed", layout = FALSE, data_overlay = FALSE))
+    errors = "asymptotic", band = "all", gaussian.draws = 9999L, neval = 3L,
+    output = "plot-data", view = "fixed", layout = FALSE, data.overlay = FALSE))
   expect_true(all(is.finite(plot_target(tail, band = "pointwise")$estimate)))
   expect_true(all(is.na(plot_band(tail, "pointwise"))))
   expect_identical(par(c("cex", "mfrow")), old)

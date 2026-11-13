@@ -111,7 +111,7 @@ test_that("npplreg bootstrap plot payload stays finite across frozen nonfixed bw
         neval = 12,
         B = 61,
         band = "pointwise",
-        boot_control = np_boot_control(nonfixed = mode),
+        boot.control = np_boot_control(nonfixed = mode),
         output = "data"
       ))$provider)
 

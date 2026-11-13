@@ -14,9 +14,9 @@ test_that("original higher derivatives preserve the admitted literal laws", {
     expect_identical(one$bands$pointwise,one$bands$bonferroni)
     rng <- .Random.seed
     args <- list(x=fit,errors="bootstrap",center="bias-corrected",band="all",
-      gradients=TRUE,gradient_order=2L,neval=2L,B=63L,output="data",
+      gradients=TRUE,gradient.order=2L,neval=2L,B=63L,output="data",
       bootstrap=if(law=="rademacher")"wild" else law)
-    if(law=="rademacher")args$boot_control <- np_boot_control(wild="rademacher")
+    if(law=="rademacher")args$boot.control <- np_boot_control(wild="rademacher")
     out <- capture_plot_provider(do.call(plot,args))$provider
     for(panel in out) {
       z <- panel$inference

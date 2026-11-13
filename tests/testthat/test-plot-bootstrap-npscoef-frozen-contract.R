@@ -120,7 +120,7 @@ test_that("npscoef frozen surface plot mode is forwarded", {
     output = "data",
     errors = "bootstrap",
     bootstrap = "inid",
-    boot_control = np_boot_control(nonfixed = "frozen"),
+    boot.control = np_boot_control(nonfixed = "frozen"),
     B = 41L,
     band = "pointwise"
   )))

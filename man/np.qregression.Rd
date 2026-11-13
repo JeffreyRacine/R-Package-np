@@ -344,7 +344,7 @@ prediction/evaluation route, or plot route as appropriate.
   Racine (2013).
 
   Conditional-quantile plots support first derivatives only. The default
-  and explicit \code{gradient_order=1} retain that target; other derivative
+  and explicit \code{gradient.order=1} retain that target; other derivative
   orders are rejected before plot fitting or drawing. Higher polynomial
   degrees in the fitted bandwidth object do not add higher-order quantile
   derivatives. This restriction does not apply to \code{nplsqreg} or
@@ -360,7 +360,7 @@ prediction/evaluation route, or plot route as appropriate.
   level surfaces and their interval meshes. Returned evaluation rows retain
   the trained predictor names and ordered-factor support; numeric axis
   coordinates are used only for drawing. The data overlay can be disabled
-  with \code{data_overlay=FALSE}.
+  with \code{data.overlay=FALSE}.
 
   Local-polynomial conditional-response factors use local response moments
   as a working covariance approximation conditional on the accepted design
@@ -405,8 +405,8 @@ prediction/evaluation route, or plot route as appropriate.
   A growing or data-dependent grid needs a corresponding uniform
   linearization and Gaussian-maximum approximation. Unsupported or
   nonregular grids receive a specific unavailable-band notice.
-  \code{gaussian_draws} controls simulation precision and
-  \code{random_seed} controls reproducible calibration. Its temporary seed
+  \code{gaussian.draws} controls simulation precision and
+  \code{random.seed} controls reproducible calibration. Its temporary seed
   scope restores the visible \code{.Random.seed} binding (or its absence),
   but not hidden generator state, including a pending Box--Muller normal or
   custom state absent from that binding. Subsequent caller draws can therefore

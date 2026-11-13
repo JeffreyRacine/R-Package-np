@@ -45,7 +45,7 @@
       .np_plot_data_error()
 
     if (!is.null(xq))
-      stop("grid_control$xq is not applicable to a single-index plot", call. = FALSE)
+      stop("grid.control$xq is not applicable to a single-index plot", call. = FALSE)
     if (!is.null(xtrim))
       xtrim <- .np_plot_conmode_resolve_xtrim(xtrim)
 
@@ -97,7 +97,7 @@
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all")
     if (!missing(gaussian.draws) && !joint.request)
-      stop("gaussian_draws requires asymptotic simultaneous or all bands", call. = FALSE)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- FALSE
     joint.calibration <- NULL
     if (joint.request) {

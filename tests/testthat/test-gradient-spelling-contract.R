@@ -30,7 +30,7 @@ test_that("gradient accessors reject only the retired spelling at entry", {
   }
 })
 
-test_that("plot spelling checks retain the plot-only snake-case boundary", {
+test_that("plot spelling checks retain the canonical dotted boundary", {
   pkg <- environmentName(environment(npreg))
   validate <- getFromNamespace(".np_plot_validate_public_dots", pkg)
   engine <- getFromNamespace(".np_plot_engine_for_bws", pkg)
@@ -38,20 +38,20 @@ test_that("plot spelling checks retain the plot-only snake-case boundary", {
   supported <- c("rbandwidth", "conbandwidth", "condbandwidth", "sibandwidth")
   for (cls in c(supported, "scbandwidth", "plbandwidth", "bandwidth", "dbandwidth")) {
     bws <- structure(list(), class = cls)
-    expect_error(validate(alist(gradient.order = stop("value forced")),
+    expect_error(validate(alist(gradient_order = stop("value forced")),
                           method = engine(bws), bws = bws),
-                 "retired plot argument: gradient.order; use gradient_order",
+                 "retired plot argument: gradient_order; use gradient.order",
                  fixed = TRUE, info = cls)
     if (cls %in% supported)
-      expect_invisible(validate(alist(gradient_order = stop("value forced")),
+      expect_invisible(validate(alist(gradient.order = stop("value forced")),
                                 method = engine(bws), bws = bws))
   }
   for (value in list(NULL, 1.5, Inf, NA_real_, c(2L, 1L)))
-    expect_identical(normalize(list(gradient_order = value)), list(gradient.order = value))
-  expect_error(validate(alist(gradient.order = stop("value forced")),
+    expect_identical(normalize(list(gradient.order = value)), list(gradient.order = value))
+  expect_error(validate(alist(gradient_order = stop("value forced")),
                         method = engine(structure(list(), class = "condbandwidth")),
                         context = "plot.qregression"),
-               "retired plot argument: gradient.order; use gradient_order", fixed = TRUE)
+               "retired plot argument: gradient_order; use gradient.order", fixed = TRUE)
 })
 
 test_that("unsupported quantile orders and single-index limits are unchanged", {

@@ -98,8 +98,8 @@ existing annotations and graphical controls.
 The schema deliberately replaces plot-only \code{d1}/\code{r1}/\code{cd1}
 objects, signed error slots, width arrays and inherited estimator methods.
 Fitted-model APIs and control-constructor arguments are unchanged. For plot
-arguments, use snake_case spellings such as \code{boot_control},
-\code{bias_control}, \code{gaussian_draws} and \code{gradient_order}.
+arguments, use dotted spellings such as \code{boot.control},
+\code{bias.control}, \code{gaussian.draws} and \code{gradient.order}.
 }
 \value{
 \code{as.data.frame} returns the selected grid and values joined to the selected

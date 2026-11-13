@@ -35,13 +35,13 @@ test_that("npreg nonfixed frozen plot bootstrap supports continuous gradients", 
       neval = 20L,
       errors = "bootstrap",
       bootstrap = boot.method,
-      boot_control = np_boot_control(nonfixed = "frozen"),
+      boot.control = np_boot_control(nonfixed = "frozen"),
       B = 41L,
       band = "pointwise",
       gradients = TRUE
     )
     if (identical(boot.method, "geom"))
-      args$boot_control <- np_boot_control(nonfixed = "frozen", blocklen = 4L)
+      args$boot.control <- np_boot_control(nonfixed = "frozen", blocklen = 4L)
 
     expect_no_error(do.call(plot, args))
   }

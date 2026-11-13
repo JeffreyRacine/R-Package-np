@@ -145,7 +145,7 @@ test_that("plot condistribution bootstrap supports mixed-bound fixed helper path
     fit,
     output = "data",
     view = "fixed",
-    data_overlay = FALSE,
+    data.overlay = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
     B = 5L,

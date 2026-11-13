@@ -18,7 +18,7 @@ use \code{"jackknife"} for conditional density asymptotic inference.
 Use \code{"jackknife-mp1"} for the separate asymmetric studentized
 conditional density bootstrap described below.}
 }
-\value{A validated control object for the \code{bias_control} argument of
+\value{A validated control object for the \code{bias.control} argument of
 \code{plot} applied to \code{npcdist} or \code{npcdens} fits or bandwidths.}
 \details{
 These are experimental opt-ins for local constant, one continuous explanatory
@@ -83,7 +83,7 @@ and 25 distinct response targets. Choose, for example, \code{neval=9} for an
 scope. Inputs exceeding the numerical workspace budget of 256 MiB fail before
 resampling; the grid and draw count are never silently reduced. The budget is
 not a bound on total R-process memory. Bootstrap \code{B} and asymptotic
-\code{gaussian_draws} must be integers at least two; defaults are 9999.
+\code{gaussian.draws} must be integers at least two; defaults are 9999.
 Low finite-draw tail resolution is reported. Alpha is propagated throughout
 in \eqn{(0,0.5)}; population coverage evidence is currently for nominal 95\% only.
 
@@ -112,19 +112,19 @@ x <- rnorm(100)
 y <- 0.5*x + rnorm(100)
 model <- npcdist(y ~ x, regtype="lc")
 p <- plot(model, errors="asymptotic", center="bias-corrected",
-          bias_control=np_conditional_bias_control("analytic"),
+          bias.control=np_conditional_bias_control("analytic"),
           band="all", neval=9, output="plot-data")
 p <- plot(model, errors="bootstrap", bootstrap="conditional-pilot",
           center="bias-corrected", band="all", neval=9,
-          bias_control=np_conditional_bias_control("analytic"),
-          boot_control=np_boot_control(calibration="asymmetric-sd"),
+          bias.control=np_conditional_bias_control("analytic"),
+          boot.control=np_boot_control(calibration="asymmetric-sd"),
           output="plot-data")
 
 model.d <- npcdens(y ~ x, regtype="lc")
 p.d <- plot(model.d, errors="bootstrap", bootstrap="conditional-pilot",
             center="bias-corrected", band="all", neval=9,
-            bias_control=np_conditional_bias_control("jackknife-mp1"),
-            boot_control=np_boot_control(calibration="asymmetric-sd"),
+            bias.control=np_conditional_bias_control("jackknife-mp1"),
+            boot.control=np_boot_control(calibration="asymmetric-sd"),
             output="plot-data")
 }
 }

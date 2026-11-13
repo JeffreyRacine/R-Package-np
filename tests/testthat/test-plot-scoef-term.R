@@ -22,7 +22,7 @@ test_that("smooth coefficient plot terms identify the selected coefficient", {
   snapshots <- list()
   for (i in 1:3) {
     out <- plot(fit, neval = 5L, perspective = FALSE, coef = TRUE,
-                coef_index = i, output = "data")
+                coef.index = i, output = "data")
     expect_true(all(out$targets$term == colnames(X)[i]))
     expect_identical(.Random.seed, rng)
     expect_identical(serialize(fit, NULL), original)
@@ -46,7 +46,7 @@ test_that("smooth coefficient plot terms identify the selected coefficient", {
                           regtype = "lc", bandwidth.compute = FALSE, betas = TRUE)
     for (i in 1:3) {
       out <- plot(formula.fit, neval = 5L, perspective = FALSE, coef = TRUE,
-                  coef_index = i, output = "data")
+                  coef.index = i, output = "data")
       expect_identical(out$targets$term, snapshots[[as.character(i)]]$targets$term)
       for (k in seq_along(out$panels))
         expect_equal(out$panels[[k]]$values, snapshots[[as.character(i)]]$panels[[k]]$values,
@@ -54,15 +54,15 @@ test_that("smooth coefficient plot terms identify the selected coefficient", {
     }
     for (gradient in c(FALSE, TRUE)) {
       out <- plot(fit, neval = 5L, perspective = FALSE, gradients = gradient,
-                  coef_index = 1L, output = "data")
+                  coef.index = 1L, output = "data")
       expect_true(all(is.na(out$targets$term)))
       snapshots[[paste0("gradient-", gradient)]] <- out
     }
     before.invalid <- serialize(fit, NULL)
     rng.before.invalid <- .Random.seed
     expect_error(plot(fit, neval = 5L, perspective = FALSE, coef = TRUE,
-                      coef_index = 4L, output = "data"),
-                 "coef_index exceeds the 3 available coefficients", fixed = TRUE)
+                      coef.index = 4L, output = "data"),
+                 "coef.index exceeds the 3 available coefficients", fixed = TRUE)
     expect_identical(serialize(fit, NULL), before.invalid)
     expect_identical(.Random.seed, rng.before.invalid)
   }

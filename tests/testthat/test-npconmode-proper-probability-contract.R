@@ -409,7 +409,7 @@ test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
 
   surf.alias <- plot(fit, view = "fixed", perspective = TRUE,
                      neval = 5L, output = "data",
-                     plot_vars = c("x2", "x1"))
+                     plot.vars = c("x2", "x1"))
   expect_equal(surf.alias$panels[[1]]$variables$name[1:2], c("x2", "x1"))
   expect_equal(surf.alias$panels[[1]]$display$dimensions, c(5L, 5L))
 
@@ -437,13 +437,13 @@ test_that("npconmode fixed surface payload is object-fed and predict-aligned", {
     )
     expect_equal(rgl.rendered, data.only)
   }
-  expect_error(plot(fit, plot_vars = c("x1", "x2"), output = "data"),
+  expect_error(plot(fit, plot.vars = c("x1", "x2"), output = "data"),
                "'plot.vars' is only supported")
   expect_error(plot(fit, perspective = TRUE, persp = FALSE, output = "data"),
                "retired plot argument: persp")
   expect_error(plot(fit, perspective = TRUE, gradients = TRUE, output = "data"),
                "not gradients")
-  expect_error(plot(fit, perspective = TRUE, plot_vars = c("x1", "z"),
+  expect_error(plot(fit, perspective = TRUE, plot.vars = c("x1", "z"),
                     output = "data"),
                "currently require continuous variables")
 

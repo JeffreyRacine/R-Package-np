@@ -33,7 +33,7 @@ test_that("conditional and semiparametric plots share categorical draw labels", 
   for (name in names(models)) {
     for (gradient in if (name %in% c("cdens", "cdist")) c(FALSE, TRUE) else FALSE) {
       args <- list(x = models[[name]], errors = "bootstrap", B = 7L, neval = 3L,
-                   band = "all", perspective = FALSE, common_scale = FALSE,
+                   band = "all", perspective = FALSE, common.scale = FALSE,
                    output = "data")
       if (name != "plreg") args$gradients <- gradient
       out <- suppressWarnings(do.call(plot, args))
@@ -67,7 +67,7 @@ test_that("unused factor levels remain evaluated and labelled in bootstrap plots
         dist = npudistbw(~ x + f, data = d, bws = c(.4, .2), bandwidth.compute = FALSE))
       set.seed(7118)
       out <- suppressWarnings(plot(b, output = "data", errors = "bootstrap", B = 7,
-                  neval = 5L, common_scale = FALSE, band = "all", perspective = FALSE))
+                  neval = 5L, common.scale = FALSE, band = "all", perspective = FALSE))
       expect_identical(out$panels[[2L]]$display$boxplots[[1L]]$names, lev)
       expect_equal(ncol(out$panels[[2L]]$display$boxplots[[1L]]$stats), 3L)
       expect_true(all(is.finite(out$panels[[2L]]$display$boxplots[[1L]]$stats)))

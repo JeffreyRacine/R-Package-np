@@ -24,6 +24,8 @@
 # reachable from this method. Every endpoint comes from the interval table.
 plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
                                band = NULL, renderer = c("base", "rgl")) {
+  .np_plot_check_public_names(.np_plot_dot_names(substitute(list(...))[-1L]),
+                              replay = TRUE)
   if (!is.null(y)) stop("y is not used when replaying plot data", call. = FALSE)
   .np_plot_data_validate(x)
   renderer <- match.arg(renderer)

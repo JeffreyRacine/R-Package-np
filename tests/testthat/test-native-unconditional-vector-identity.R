@@ -33,7 +33,7 @@ test_that("observed native vector roles survive unconditional fits and plots", {
     legacy <- observed; names(legacy$bws[[".np.native.training"]]$dat) <- "tdat"
     if (family=="npudist") expect_error(plot(legacy,errors="asymptotic",center="bias-corrected",neval=6L,output="data"),"invalid CDF correction training frame")
     if (identical(Sys.getenv("N5_FULL"),"true")) {
-      args <- list(errors="bootstrap",bootstrap="inid",B=999L,random_seed=14L,center="bias-corrected",band="all",neval=6L,output="data")
+      args <- list(errors="bootstrap",bootstrap="inid",B=999L,random.seed=14L,center="bias-corrected",band="all",neval=6L,output="data")
       expect_identical(do.call(plot,c(list(observed),args))$panels,do.call(plot,c(list(reference),args))$panels)
     }
   }

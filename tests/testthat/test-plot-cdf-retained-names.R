@@ -19,7 +19,7 @@ test_that("corrected CDF plots preserve retained non-syntactic column names", {
   for (method in if (full) c("asymptotic", "bootstrap") else "asymptotic") {
     args <- list(errors = method, center = "bias-corrected", band = "pointwise",
                  neval = 6L, output = "data")
-    if (method == "bootstrap") args <- c(args, list(B = 999L, bootstrap = "inid", random_seed = 13L))
+    if (method == "bootstrap") args <- c(args, list(B = 999L, bootstrap = "inid", random.seed = 13L))
     expected <- do.call(plot, c(list(reference), args))
     for (object in list(bw, fit, formula.bw)) {
       got <- do.call(plot, c(list(object), args))

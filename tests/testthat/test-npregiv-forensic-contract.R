@@ -72,7 +72,7 @@ test_that("npregiv starting values and first-state replay are coherent", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   expect_silent(plot(replay))
-  expect_silent(plot(replay, data_overlay = TRUE, main = "IV fit",
+  expect_silent(plot(replay, data.overlay = TRUE, main = "IV fit",
                      xlim = range(dat$z), lty = 2))
   expect_silent(plot(replay, gradients = TRUE))
 })
@@ -186,7 +186,7 @@ test_that("npregivderiv evaluation is output-only and S3 accessors stay training
   on.exit(grDevices::dev.off(), add = TRUE)
   expect_silent(plot(evaluated))
   expect_silent(plot(evaluated, gradients = FALSE))
-  expect_silent(plot(evaluated, data_overlay = TRUE, gradients = FALSE,
+  expect_silent(plot(evaluated, data.overlay = TRUE, gradients = FALSE,
                      main = "IV derivative fit", lty = 2))
   expect_output(print(summary(evaluated)),
                 "Bandwidth for E(y-phi(z)|w):", fixed = TRUE)

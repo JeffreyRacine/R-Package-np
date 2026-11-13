@@ -84,18 +84,18 @@ test_that("canonical plot controls normalize to engine controls", {
   dots <- normalize(
     list(
       output = "plot-data",
-      data_overlay = FALSE,
-      data_rug = TRUE,
+      data.overlay = FALSE,
+      data.rug = TRUE,
       layout = "current",
-      factor_boxplot = TRUE,
-      boxplot_outliers = FALSE,
-      coef_index = 2L,
-      gradient_order = c(1L, 2L),
-      common_scale = FALSE,
-      proper_method = "isotonic",
-      proper_control = list(mode = "slice"),
+      factor.boxplot = TRUE,
+      boxplot.outliers = FALSE,
+      coef.index = 2L,
+      gradient.order = c(1L, 2L),
+      common.scale = FALSE,
+      proper.method = "isotonic",
+      proper.control = list(mode = "slice"),
       errors = "asymptotic",
-      render_control = np_render_control(style = "bar", bar = "I", bar.num = 7L)
+      render.control = np_render_control(style = "bar", bar = "I", bar.num = 7L)
     )
   )
 

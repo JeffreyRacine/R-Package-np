@@ -217,7 +217,7 @@ test_that("npplreg plot-data asymptotic and bootstrap intervals are comparable",
     errors = "bootstrap",
     band = "pointwise",
     B = 39L,
-    random_seed = 202605062,
+    random.seed = 202605062,
     neval = 8L
   )
 

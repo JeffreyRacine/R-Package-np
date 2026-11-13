@@ -160,9 +160,9 @@ test_that("ordered regression gradient wild bootstrap targets adjacent differenc
     errors = "bootstrap",
     band = "pmzsd",
     bootstrap = "wild",
-    boot_control = np_boot_control(wild = "rademacher"),
+    boot.control = np_boot_control(wild = "rademacher"),
     B = B,
-    random_seed = 33
+    random.seed = 33
   ))$provider[[1L]]
   expected.hw <- qnorm(0.05 / 2, lower.tail = FALSE) *
     apply(expected.t, 2L, stats::sd)
@@ -270,7 +270,7 @@ test_that("categorical regression gradient asymptotic intervals use native HC0 e
     perspective = FALSE,
     gradients = TRUE,
     errors = "asymptotic",
-    data_overlay = FALSE
+    data.overlay = FALSE
   ))$provider))
   expect_type(out, "list")
   expect_true(all(vapply(out, inherits, logical(1), "npregression")))
@@ -312,7 +312,7 @@ test_that("continuous regression gradient asymptotic intervals remain available"
     perspective = FALSE,
     gradients = TRUE,
     errors = "asymptotic",
-    data_overlay = FALSE
+    data.overlay = FALSE
   ))$provider))
   expect_type(out, "list")
   expect_true(all(vapply(out, inherits, logical(1), "npregression")))

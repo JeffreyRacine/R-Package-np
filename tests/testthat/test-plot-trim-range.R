@@ -3,7 +3,7 @@ test_that("public trim ranges apply to every numeric X margin", {
   b <- npudensbw(~ x + z, data = d, bws = c(.3, .3), bandwidth.compute = FALSE)
   for (surface in c(FALSE, TRUE)) {
     out <- plot(b, output = "data", neval = 5L, perspective = surface,
-                grid_control = np_grid_control(xtrim = c(.1, .8)))
+                grid.control = np_grid_control(xtrim = c(.1, .8)))
     for (p in out$panels) for (j in seq_along(p$grid)) {
       value <- p$grid[[j]]
       role <- if (surface) b$xnames[j] else p$variables$name[j]

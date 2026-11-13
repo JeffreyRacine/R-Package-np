@@ -69,7 +69,7 @@ Named options passed via \code{\dots} include:
         \code{NULL}. Refit with the intended data before plotting; see
         \code{\link{np-data-interfaces}}.
       }
-      \item{\code{grid_control}}{
+      \item{\code{grid.control}}{
         optional detailed grid controls created by
         \code{\link{np_grid_control}}.
       }
@@ -93,7 +93,7 @@ Named options passed via \code{\dots} include:
       \item{\code{xq}, \code{yq}, \code{zq}}{
         quantiles used to hold non-plotted variables fixed when
         constructing slices. Single-index plots have one index axis and reject
-        \code{grid_control$xq}. Their \code{grid_control$xtrim} selects the
+        \code{grid.control$xq}. Their \code{grid.control$xtrim} selects the
         lower and upper quantiles of the fitted index.
       }
       \item{\code{xtrim}, \code{ytrim}, \code{ztrim}}{
@@ -103,21 +103,21 @@ Named options passed via \code{\dots} include:
 
     \strong{Plot content controls}
     \describe{
-      \item{\code{coef}, \code{coef_index}}{
+      \item{\code{coef}, \code{coef.index}}{
         coefficient-function plotting controls for semiparametric
         families where supported. For smooth-coefficient plots with
-        \code{coef = TRUE}, \code{coef_index} selects the intercept as 1
+        \code{coef = TRUE}, \code{coef.index} selects the intercept as 1
         and then the fitted regressors in order. An index beyond the available
         coefficients is an error; it is not replaced by the last coefficient.
       }
-      \item{\code{common_scale}}{
+      \item{\code{common.scale}}{
         a logical value specifying whether multiple panels should share a
         common plotting scale when feasible.
       }
-      \item{\code{gradient_order}, \code{gradients}}{
+      \item{\code{gradient.order}, \code{gradients}}{
         derivative plotting controls for families that support
         gradients/derivatives. For \code{npreg} local-polynomial
-        objects, \code{gradient_order} requests the continuous-predictor
+        objects, \code{gradient.order} requests the continuous-predictor
         derivative order to generate on the plot evaluation grid; if
         omitted the first derivative/effect is plotted. Location-scale
         quantile-regression \code{nplsqreg} objects use the same
@@ -154,7 +154,7 @@ Named options passed via \code{\dots} include:
         one of \code{"plot"}, \code{"data"}, or \code{"plot-data"}.
         Data-returning modes use the common \code{\link{np_plot_data}} schema.
       }
-      \item{\code{proper}, \code{proper_control}, \code{proper_method}}{
+      \item{\code{proper}, \code{proper.control}, \code{proper.method}}{
         controls for proper conditional density/distribution handling
         where implemented.
       }
@@ -194,13 +194,13 @@ Named options passed via \code{\dots} include:
         name depends on whether \code{errors="bootstrap"} or
         \code{errors="asymptotic"}; see Details.
       }
-      \item{\code{boot_control}}{
+      \item{\code{boot.control}}{
         optional detailed bootstrap controls created by
         \code{\link{np_boot_control}}. This controls non-fixed bootstrap
         behavior, wild-bootstrap multipliers, and dependent-bootstrap
         block length.
       }
-      \item{\code{bias_control}}{
+      \item{\code{bias.control}}{
         regression auxiliary settings created by \code{\link{np_bias_control}},
         or optional fixed-bandwidth density settings created by
         \code{\link{np_udens_bias_control}}. Used with
@@ -220,7 +220,7 @@ Named options passed via \code{\dots} include:
         additionally uses \code{bootstrap="residual"}; see
         \code{\link{np_boot_control}} for its scope and defaults.
       }
-      \item{\code{boxplot_outliers}, \code{factor_boxplot}}{
+      \item{\code{boxplot.outliers}, \code{factor.boxplot}}{
         boxplot-style bootstrap summary controls for factor/categorical
         displays when available.
       }
@@ -250,7 +250,7 @@ Named options passed via \code{\dots} include:
 
     \strong{Rendering and view controls}
     \describe{
-      \item{\code{data_overlay}}{
+      \item{\code{data.overlay}}{
         logical; when \code{TRUE}, overlay raw data on regression,
         quantile-regression, single-index, partially linear, and smooth
         coefficient plot surfaces and expand plot limits to include the data. For
@@ -277,22 +277,22 @@ Named options passed via \code{\dots} include:
         \code{legend=list(tau=list(x="topright"), bands=FALSE)} may
         be used when a route distinguishes those legend roles.
       }
-      \item{\code{data_rug}}{
+      \item{\code{data.rug}}{
         logical; when \code{TRUE}, draw a rug-style support cue for the
         plotted coordinates. For ordinary 1D base plots this behaves
         like a standard rug. For eligible 2D surface plots, the base
         renderer draws short floor-rug ticks and
         \code{renderer="rgl"} draws the analogous 3D floor-rug ticks
         on supported surface routes. In this rollout tranche,
-        \code{data_rug=TRUE} is implemented across the current base
+        \code{data.rug=TRUE} is implemented across the current base
         plot families and across supported \code{rgl} surface routes;
         unsupported renderer/geometry combinations still fail clearly
         rather than being ignored silently. On mixed base plot layouts,
         rug marks are drawn for continuous panels and omitted for
         categorical panels.
-        This option is distinct from \code{data_overlay}:
-        \code{data_rug} shows where observations lie in the plotted
-        covariate support, while \code{data_overlay} is the
+        This option is distinct from \code{data.overlay}:
+        \code{data.rug} shows where observations lie in the plotted
+        covariate support, while \code{data.overlay} is the
         regression-only 3D response overlay used on supported surface
         plots. On supported regression surfaces, both options may be
         used together. Default is \code{FALSE}.
@@ -304,7 +304,7 @@ Named options passed via \code{\dots} include:
       \item{\code{phi}, \code{theta}, \code{view}}{
         view controls for bivariate continuous surface plots.
       }
-      \item{\code{render_control}}{
+      \item{\code{render.control}}{
         optional detailed rendering controls created by
         \code{\link{np_render_control}}, including band-versus-bar
         uncertainty display controls.
@@ -343,7 +343,7 @@ Named options passed via \code{\dots} include:
         high-DPI displays. Axis titles retain rgl's native screen-facing text
         orientation while the scene is rotated. For the currently supported \code{npreg},
         \code{npplreg}, and plain mean-surface
-        \code{npscoef} surface routes, \code{data_overlay=TRUE}
+        \code{npscoef} surface routes, \code{data.overlay=TRUE}
         adds observed data as an interactive point cloud. For all
         currently supported \code{rgl} surface routes,
         \code{errors != "none"} adds interval surfaces;
@@ -395,7 +395,7 @@ Named options passed via \code{\dots} include:
 
     \strong{Reproducibility controls}
     \describe{
-      \item{\code{random_seed}}{
+      \item{\code{random.seed}}{
         an optional random seed used to make bootstrap plotting
         reproducible.
       }
@@ -457,7 +457,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   The slice itself is evaluated on a uniformly spaced sequence of
   \eqn{neval} points. By default its limits are the training-data minimum
-  and maximum. Use \code{grid_control = np_grid_control(xtrim = c(a, b))}
+  and maximum. Use \code{grid.control = np_grid_control(xtrim = c(a, b))}
   to select the \code{a} and \code{b} quantiles for each numeric variable
   in the X block, with \code{0 <= a < b <= 1}. This pair is a range,
   not a separate trim amount for each variable. Single-index plots apply
@@ -595,7 +595,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   Known-fixed-bound order-2 beta density plots support a separate corrected
   guide-region plus residual construction in one or two continuous dimensions.
-  With omitted \code{bias_control}, request asymptotic errors or independent
+  With omitted \code{bias.control}, request asymptotic errors or independent
   bootstrap \code{calibration="symmetric-sd"}/\code{"asymmetric-sd"}, and
   explicitly choose pointwise, simultaneous, Bonferroni or all three bands
   together with \code{band="all"}. Range-derived bounds and
@@ -609,7 +609,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   Known-fixed-bound order-2 Gaussian density plots also support corrected
   asymptotic and independent symmetric-sd/asymmetric-sd intervals for one or
-  two continuous coordinates, with omitted \code{bias_control} and explicit
+  two continuous coordinates, with omitted \code{bias.control} and explicit
   pointwise/simultaneous/Bonferroni bands or \code{band="all"}. FG-D combines complete ratio-pilot and empirical
   residual intervals with a nonlinear guide region; it is distinct from beta
   correction and unbounded D8. Range-derived bounds and literal endpoints are
@@ -618,7 +618,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   For one continuous variable, these known-fixed-bound order-2 beta and Gaussian
   density plots additionally support asymptotic normal intervals with omitted
-  \code{band} or \code{band="pmzsd"} and omitted \code{bias_control}.
+  \code{band} or \code{band="pmzsd"} and omitted \code{bias.control}.
   The corrected center is unchanged. The complete influence variance is
   integrated under the normalized positive ratio pilot, including guide and
   cross-covariance terms, and uses ordinary normal critical values.
@@ -674,14 +674,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   and independent symmetric-sd/asymmetric-sd intervals with all four explicit
   band types. These require omitted density bias controls and the same interior
   data/target restrictions. For SD bands explicitly select \code{bootstrap="inid"}
-  and the calibration in \code{boot_control}. Asymptotic simultaneous/all and
+  and the calibration in \code{boot.control}. Asymptotic simultaneous/all and
   bootstrap pmzsd are not admitted by this addition. See
   \code{\link{np_udens_bias_control}} for the distinct uncertainty constructions
   and their conservative, finite-grid evidence.
   For corrected bootstrap bands, supply \code{errors="bootstrap"}, explicit
   \code{bootstrap="inid"}, an explicit band, and
-  \code{boot_control=np_boot_control(calibration="symmetric-sd")} or
-  \code{boot_control=np_boot_control(calibration="asymmetric-sd")}.
+  \code{boot.control=np_boot_control(calibration="symmetric-sd")} or
+  \code{boot.control=np_boot_control(calibration="asymmetric-sd")}.
   Each literal resample refits the guide; the residual functional, rather than
   the complete corrected curve, is bootstrapped at the original empirical
   residual scale. The original nonlinear guide region is included once.
@@ -740,7 +740,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   NA simultaneous limits, preserving other available bands. Unexpected
   calculation errors and material target reconstruction failures remain errors.
 
-  The separately named plot argument \code{gaussian_draws} has a fixed default
+  The separately named plot argument \code{gaussian.draws} has a fixed default
   of 9999 and accepts positive integer counts subject to representability and
   workspace limits, without a fixed one-million upper cap. It applies only to asymptotic
   simultaneous/all requests; \code{B} remains bootstrap-only.
@@ -794,7 +794,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   These checks are bounded: other reconstruction and RNG replay cases remain
   unqualified; non-refusal is not a general RNG safety certificate.
 
-  \code{random_seed} (default 42) controls reproducible calibration. Before
+  \code{random.seed} (default 42) controls reproducible calibration. Before
   changing the seed, a temporary seed scope checks that caller state can be
   restored. It refuses Box--Muller and uncertifiable user-supplied generator
   state, including hidden state absent from \code{.Random.seed}; it never
@@ -808,7 +808,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   These guarantees do not certify arbitrary RNG changes made by user callbacks.
   For the standard asymptotic Gaussian calibration described above (excluding
   the fixed-bound beta and FG-D guide-region constructions), a
-  \code{gaussian_draws} count below
+  \code{gaussian.draws} count below
   \code{ceiling(qnorm(.975)^2 * (1-alpha) / (.1^2 * alpha))} warns and is used
   unchanged. This is an approximate 95 percent Monte Carlo target for relative
   error within 10 percent in the simulated maximum's upper-tail probability.
@@ -824,7 +824,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   tail-rank resolution when \eqn{\lfloor B\alpha/2\rfloor<20} for symmetric-SD
   bootstrap or asymptotic simultaneous calibration, or when
   \eqn{\lfloor B\alpha/4\rfloor<20} for asymmetric-SD bootstrap. Here \eqn{B}
-  denotes the requested \code{gaussian_draws} for asymptotic simulation and
+  denotes the requested \code{gaussian.draws} for asymptotic simulation and
   the requested bootstrap \code{B} otherwise. At \eqn{\alpha=0.05}, these
   warnings occur below 800 and 1600 draws, respectively. Their asymptotic
   pointwise calculation uses a normal quantile without simulated draws.
@@ -834,7 +834,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Simulation uses bounded blocks and the bootstrap progress mechanism to
   report completed draws, elapsed time and estimated time remaining during
   interactive computation. It uses a conservative 64 MiB workspace budget;
-  reduce \code{neval} or \code{gaussian_draws} if the workspace is too large.
+  reduce \code{neval} or \code{gaussian.draws} if the workspace is too large.
   Regression, single-index and smooth-coefficient slice covariance calibration
   is limited to 512 grid points. Density-family plots switch to an
   observation-level factor above 512 points and budget up to 128 MiB for
@@ -855,7 +855,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   For regression derivatives, replace \eqn{L} by the corresponding derivative
   influence map; the training smoother and normalized residuals remain those
   of the fitted mean. Available higher-order continuous partials use the
-  existing \code{gradient_order} contract. For categorical regression
+  existing \code{gradient.order} contract. For categorical regression
   gradients, use the difference of the two endpoint influence rows. Unordered
   factors compare each level with the first retained level; ordered factors
   use adjacent-level differences, with the first forward difference repeated
@@ -901,7 +901,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bootstrap intervals before scaling.
   They retain the scalar-index regression standard-error convention. Smooth-coefficient bands describe the
   noniterated plotted mean or existing slope-coefficient gradient selected by
-  \code{coef_index}, and use fitted raw training residuals in place
+  \code{coef.index}, and use fitted raw training residuals in place
   of the normalized residuals above. These gradients hold the smoothing
   coordinates fixed, including when explanatory and smoothing variables
   overlap; they are not total derivatives through those coordinates.
@@ -1192,7 +1192,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   inid/fixed/geom : fast direct helper path (no internal bandwidth search)
   }
   Raw asymmetric iterated regression bands are available with
-  \code{boot_control=np_boot_control(calibration="separate-tails")};
+  \code{boot.control=np_boot_control(calibration="separate-tails")};
   \code{calibration="tail-envelope"} adds empirical absolute-root protection.
   These options require bootstrap bias-corrected empirical bands and retain
   the selected wild/inid/fixed/geom law. See \code{\link{np_boot_control}}
@@ -1200,8 +1200,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   For non-fixed density/distribution bootstrap, an explicit experimental
   approximation is available via
-  \code{boot_control = np_boot_control(nonfixed = "exact")} or
-  \code{boot_control = np_boot_control(nonfixed = "frozen")}. The default
+  \code{boot.control = np_boot_control(nonfixed = "exact")} or
+  \code{boot.control = np_boot_control(nonfixed = "frozen")}. The default
   \code{"exact"} route recomputes the non-fixed geometry for each resample.
   The experimental \code{"frozen"} route reuses the original-sample
   non-fixed geometry throughout the bootstrap run. This option is currently
@@ -1293,11 +1293,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   plot(fit, errors="bootstrap", bootstrap="inid")
   }
 
-  Compound public plot argument names use snake_case. Retired dotted plot
+  Compound public plot argument names use dotted spellings. Retired snake_case plot
   spellings are rejected with migration guidance. Non-plot APIs and control
   constructor arguments retain their existing names. Use \code{errors},
   \code{bootstrap}, \code{B}, \code{band}, \code{alpha}, \code{center},
-  \code{output}, \code{data_overlay}, \code{data_rug}, \code{layout}, and the
+  \code{output}, \code{data.overlay}, \code{data.rug}, \code{layout}, and the
   control constructors documented in \code{\link{np_boot_control}},
   \code{\link{np_grid_control}}, and \code{\link{np_render_control}}.
 

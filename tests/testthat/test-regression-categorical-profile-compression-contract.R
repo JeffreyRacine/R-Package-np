@@ -418,7 +418,7 @@ test_that("all-categorical regression tree route preserves bootstrap plot payloa
       errors = "bootstrap",
       bootstrap = method,
       B = 41L,
-      boot_control = np_boot_control(blocklen = 3L),
+      boot.control = np_boot_control(blocklen = 3L),
       band = "pointwise"
     )
 

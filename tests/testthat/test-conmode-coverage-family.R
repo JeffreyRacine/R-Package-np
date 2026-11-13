@@ -11,7 +11,7 @@ test_that("class-probability families exclude only omitted coordinates", {
     for(band in c("pointwise","bonferroni","all")) {
       set.seed(72);seed<-.Random.seed
       args<-list(view="sample",errors="asymptotic",band=band,output="data")
-      if(band=="all")args$gaussian_draws<-99L
+      if(band=="all")args$gaussian.draws<-99L
       if(band=="all") {
         expect_warning(a<-do.call(plot,c(list(fit),args)),"below the recommended")
         expect_warning(b<-do.call(plot,c(list(ref),args)),"below the recommended")

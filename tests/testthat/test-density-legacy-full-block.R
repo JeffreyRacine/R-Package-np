@@ -13,7 +13,7 @@ test_that("corrected density legacy rejects a deterministic full circular block"
     a<-settings[[k]];bw<-npudensbw(dat=a$x,bws=a$b,bwtype=a$type,bandwidth.compute=FALSE);fit<-npudens(bw,tdat=a$x)
     before<-serialize(fit,NULL)
     for(band in c("pointwise","bonferroni","simultaneous","all","pmzsd"))for(selector in 1:2) {
-      ctrl<-if(selector==1L)list(boot_control=np_boot_control(calibration="legacy",blocklen=n)) else list(bias_control=np_udens_bias_control("legacy"),boot_control=np_boot_control(blocklen=n))
+      ctrl<-if(selector==1L)list(boot.control=np_boot_control(calibration="legacy",blocklen=n)) else list(bias.control=np_udens_bias_control("legacy"),boot.control=np_boot_control(blocklen=n))
       set.seed(7301);seed<-.Random.seed
       args<-c(list(x=fit,errors="bootstrap",bootstrap="fixed",center="bias-corrected",B=79L,neval=5L,perspective=FALSE,band=band,output="data"),ctrl)
       expect_error(do.call(plot,args),"fixed block length equal to sample size has no resampling variation",fixed=TRUE,info=paste(k,band,selector))

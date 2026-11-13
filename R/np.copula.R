@@ -994,7 +994,7 @@ plot.npcopula <- function(x,
                           bootstrap = c("inid", "fixed", "geom"),
                           B = 9999,
                           center = c("estimate", "bias-corrected"),
-                          boot_control = np_boot_control(),
+                          boot.control = np_boot_control(),
                           output = c("plot", "data", "plot-data"),
                           legend = TRUE,
                           theta = 0.0,
@@ -1006,12 +1006,9 @@ plot.npcopula <- function(x,
                           col = NULL,
                           border = .np_plot_color("surface_border"),
                           zlim = NULL,
-                          gaussian_draws = 9999L,
-                          random_seed = 42L,
+                          gaussian.draws = 9999L,
+                          random.seed = 42L,
                           ...) {
-  boot.control <- boot_control
-  gaussian.draws <- gaussian_draws
-  random.seed <- random_seed
   .np_plot_check_public_names(.np_plot_dot_names(substitute(list(...))[-1L]))
   .np_plot_stop_unused_args(
     intersect(.np_plot_dot_names(substitute(list(...))[-1L]), "neval"),
@@ -1027,7 +1024,7 @@ plot.npcopula <- function(x,
   errors <- match.arg(errors)
   band <- match.arg(band)
   joint.request <- identical(errors, "asymptotic") && band %in% c("simultaneous", "all")
-  if ((!missing(gaussian_draws) || !missing(random_seed)) && !joint.request)
+  if ((!missing(gaussian.draws) || !missing(random.seed)) && !joint.request)
     stop("Gaussian controls require asymptotic simultaneous or all bands", call. = FALSE)
   if (joint.request) {
     gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
@@ -1047,7 +1044,7 @@ plot.npcopula <- function(x,
     stop("B must be a positive numeric scalar", call. = FALSE)
   zlim <- .npcopula_validate_zlim(zlim)
   if (!inherits(boot.control, "np_boot_control"))
-    stop("boot_control must be created by np_boot_control()", call. = FALSE)
+    stop("boot.control must be created by np_boot_control()", call. = FALSE)
   if (isTRUE(boot.control[["calibration", exact = TRUE]] %in%
       c("percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile")))
     stop("this calibration requires supported bias-corrected density, distribution or regression inference", call. = FALSE)
@@ -1059,7 +1056,7 @@ plot.npcopula <- function(x,
     stop("band and alpha require errors != \"none\"", call. = FALSE)
   if (identical(errors, "bootstrap"))
     .np_plot_reject_wild_unsupervised(bootstrap, "copula estimators")
-  dots <- .np_plot_internal_names(list(...))
+  dots <- .np_plot_unique_args(list(...))
   if (!is.null(dots[["bias.control", exact = TRUE]]))
     .np_udist_score_scope(dots[["bias.control", exact = TRUE]], FALSE)
   sub.supplied <- "sub" %in% names(dots)

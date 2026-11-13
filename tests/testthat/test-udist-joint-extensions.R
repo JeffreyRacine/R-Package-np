@@ -6,9 +6,9 @@ test_that("ordered absolute CDF bands retain literal block selections", {
   bw <- npudistbw(dat = x, bws = c(.4, .2), bandwidth.compute = FALSE)
   for (law in c("fixed", "geom")) {
     cap <- capture_plot_provider(suppressWarnings(plot(bw, xdat = x, errors = "bootstrap",
-      bootstrap = law, boot_control = np_boot_control(blocklen = 3L),
+      bootstrap = law, boot.control = np_boot_control(blocklen = 3L),
       center = "bias-corrected", band = "all", B = 49L,
-      neval = 7L, output = "data", random_seed = 1312277931)))
+      neval = 7L, output = "data", random.seed = 1312277931)))
     z <- cap$provider$d1
     flat <- plot_target(cap$result, band = "pointwise")
     expect_identical(z$inference$settings$law, law)

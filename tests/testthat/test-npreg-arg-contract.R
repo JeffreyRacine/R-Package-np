@@ -89,7 +89,7 @@ test_that("lc gradients reject higher-order derivative requests", {
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   expect_error(
-    plot(fit, gradients = TRUE, gradient_order = 2L, output = "data"),
+    plot(fit, gradients = TRUE, gradient.order = 2L, output = "data"),
     "supports only first derivatives for regtype='lc'"
   )
 })

@@ -68,13 +68,13 @@ choice. Omitted/default controls preserve their earlier behavior.
 
 The \code{"legacy"} selection retains the pre-iterated regression and
 pre-joint density/CDF bias-corrected bootstrap constructions. It is shorthand
-for the corresponding family \code{bias_control} with
+for the corresponding family \code{bias.control} with
 \code{construction="legacy"}; it is not a fourth new calibration algorithm.
 It requires corrected bootstrap inference, preserves that legacy route's
 supported bands, laws and returned-error conventions, and rejects an explicitly
 supplied nonlegacy bias control. Omitted calibration remains unchanged.
 
-For known-fixed-bound beta density plots with omitted \code{bias_control},
+For known-fixed-bound beta density plots with omitted \code{bias.control},
 \code{"symmetric-sd"} and \code{"asymmetric-sd"} select the separate refitted
 residual construction described in \code{\link{np_udens_bias_control}}.
 It requires independent resampling and explicit pointwise or simultaneous
@@ -83,7 +83,7 @@ adds the guide region and takes a containing symmetric hull once. Gaussian
 density tail transport and all existing calibration aliases retain their
 meanings; omitted calibration does not silently select a beta SD variant.
 
-For fixed-bound order-2 Gaussian density plots with omitted \code{bias_control},
+For fixed-bound order-2 Gaussian density plots with omitted \code{bias.control},
 the same two SD selections use FG-D: construct complete signed or symmetric
 intervals under the pilot and empirical residual scales, then take their outward
 union. The original empirical residual denominator remains fixed across actual
@@ -171,7 +171,7 @@ the simultaneous envelope; singleton equality is enforced.
 Selecting this regression option with \code{bootstrap} omitted uses
 \code{bootstrap="residual"}; explicitly choosing a different bootstrap law is
 an error. The residual law is exclusive to this option and does not replace
-wild/Mammen or the existing pairs/block laws. With \code{bias_control} omitted,
+wild/Mammen or the existing pairs/block laws. With \code{bias.control} omitted,
 the option uses \code{np_bias_control(adaptation="none")}. Initial scope is
 fixed Gaussian2, one or two numeric predictors, local constant, local linear,
 or Bernstein local polynomial degrees at most three, first derivatives,
@@ -257,15 +257,15 @@ and estimator-specific qualifications.
   accepted as substitutes, so misspelled detailed controls fail before plot
   computation begins.
 
-  Compound public plot arguments use snake_case. The control constructors
+  Compound public plot arguments use dotted spellings. The control constructors
   retain their existing arguments; only the plot-facing argument names change.
   Returned plot data use the common \code{\link{np_plot_data}} schema. Common rendering
-  controls such as \code{data_overlay}, \code{data_rug}, \code{layout}, and
+  controls such as \code{data.overlay}, \code{data.rug}, \code{layout}, and
   \code{output} are supplied directly to \code{plot(...)} rather than through
   \code{np_render_control()}.
 
   Gaussian simultaneous variability bands use the direct plot argument
-  \code{gaussian_draws} (default 9999), including supported density and
+  \code{gaussian.draws} (default 9999), including supported density and
   distribution plots. This controls Gaussian calibration only; \code{B} and
   \code{np_boot_control()} continue to control bootstrap resampling. See
   \code{\link{plot.np}} for supported targets, covariance contracts and
@@ -306,7 +306,7 @@ plot(fit,
      bootstrap = "inid",
      B = 9999,
      band = "pointwise",
-     boot_control = np_boot_control(nonfixed = "exact"))
+     boot.control = np_boot_control(nonfixed = "exact"))
 }
 }
 \keyword{hplot}

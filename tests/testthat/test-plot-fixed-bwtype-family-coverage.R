@@ -146,7 +146,7 @@ test_that("fixed-bwtype plot bootstrap covers supervised wild and unsupervised i
       perspective = FALSE,
       errors = "bootstrap",
       bootstrap = boot.method,
-      boot_control = np_boot_control(blocklen = 3L),
+      boot.control = np_boot_control(blocklen = 3L),
       B = 5L,
       band = "pointwise",
       neval = 11L,
