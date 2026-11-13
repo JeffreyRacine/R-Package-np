@@ -74,7 +74,7 @@
 
     sub.supplied <- !missing(sub)
     coef.index <- .np_plot_match_coef_index(coef.index)
-    common.scale <- .np_plot_match_flag(common.scale, "common_scale")
+    common.scale <- .np_plot_match_flag(common.scale, "common.scale")
 
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
@@ -230,7 +230,7 @@
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all")
     if (!missing(gaussian.draws) && !joint.request)
-      stop("gaussian_draws requires asymptotic simultaneous or all bands", call. = FALSE)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- FALSE
     joint.residual <- NULL
     joint.calibration <- NULL

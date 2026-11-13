@@ -212,9 +212,9 @@
     bias.control <- .np_plot_legacy_bias_control(plot.errors.boot.calibration,
       bias.control, "regression", as.character(plot.errors.center)[1L], error.request$method)
     if (!is.null(bias.control) && !inherits(bias.control,"np_bias_control"))
-      stop("bias_control must be created by np_bias_control()",call.=FALSE)
+      stop("bias.control must be created by np_bias_control()",call.=FALSE)
     if (!is.null(bias.control) && !bias.request)
-      stop("bias_control requires center='bias-corrected' and inference errors",call.=FALSE)
+      stop("bias.control requires center='bias-corrected' and inference errors",call.=FALSE)
     percentile.request <- identical(plot.errors.boot.calibration, "smoothed-percentile")
     if (percentile.request && missing(plot.errors.boot.method)) plot.errors.boot.method <- "residual"
     if (bias.request && is.null(bias.control)) bias.control <- if (percentile.request)
@@ -233,7 +233,7 @@
     if (new.bias && isTRUE(.npRmpi_autodispatch_called_from_bcast()))
       stop("iterated bias inference requires coordinator context; call plot from the master",call.=FALSE)
     if (new.bias && plot.bxp)
-      stop("factor_boxplot is unavailable for iterated bias-corrected intervals",call.=FALSE)
+      stop("factor.boxplot is unavailable for iterated bias-corrected intervals",call.=FALSE)
     if (new.bias && as.character(plot.errors.boot.nonfixed)[1L]!="exact")
       stop("nonfixed='frozen' controls legacy resampling; omit it for iterated correction",call.=FALSE)
     if (percentile.request) {
@@ -247,7 +247,7 @@
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all") && !new.bias
     if (!missing(gaussian.draws) && !joint.request && !(new.bias && error.request$method=="asymptotic"))
-      stop("gaussian_draws requires asymptotic simultaneous or all bands", call. = FALSE)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- FALSE
     joint.residual <- NULL
     if (joint.request) {

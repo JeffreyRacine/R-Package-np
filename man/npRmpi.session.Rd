@@ -192,7 +192,7 @@ requested resampling law. The package does not automatically choose another
 generator. To use a guarded route, explicitly select a built-in uniform
 generator before the call, for example
 \code{RNGkind(kind="Mersenne-Twister")}, and then set the desired seed.
-The plotting argument \code{random_seed} sets a seed; it does not select a
+The plotting argument \code{random.seed} sets a seed; it does not select a
 different RNG implementation.
 
 Loading a generator library is distinct from initializing it for R, and a seed

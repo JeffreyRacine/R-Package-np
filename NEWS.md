@@ -24,6 +24,8 @@
 * Constant conditional surfaces and surface-data replay expand automatic display
   limits without changing estimates, intervals or explicit limits.
 
+- Compound plot arguments now use dotted spellings, for example `boot.control`, `bias.control`, `data.overlay` and `gradient.order`. The 0.80-2 snake_case argument spellings are rejected with replacement guidance; no aliases are provided. `np_plot_data` and its existing field names, saved-data replay and extraction remain unchanged. Retired snake_case plot arguments are rejected before evaluating their values, including during saved-data replay; replay retains its existing graphical-override behavior.
+
 # npRmpi 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and

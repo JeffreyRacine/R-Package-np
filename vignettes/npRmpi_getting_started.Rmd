@@ -107,8 +107,8 @@ smoothing settings. They do not provide joint coverage across separate panels.
 See `?np.plot` for supported targets, working-covariance assumptions and
 unavailability conditions.
 
-For plot calls, use snake_case names such as `gradient_order`, `data_overlay`
-and `data_rug`, and `B` for bootstrap replication counts. Estimator and control
+For plot calls, use dotted names such as `gradient.order`, `data.overlay`
+and `data.rug`, and `B` for bootstrap replication counts. Estimator and control
 constructor arguments retain their documented names, including `gradient.order`.
 With `output = "data"` or `"plot-data"`, the returned `np_plot_data` object stores
 the evaluation grid, target values and absolute interval endpoints. For example,

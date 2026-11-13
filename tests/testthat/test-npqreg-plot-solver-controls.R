@@ -82,7 +82,7 @@ test_that("quantile public bootstrap carries controls across supported block pat
   for (method in c("inid","fixed","geom")) {
     set.seed(815)
     out <- capture_plot_provider(plot(fit,output="data",errors="bootstrap",bootstrap=method,
-                B=3L,boot_control=np_boot_control(blocklen=2L),neval=3L,
+                B=3L,boot.control=np_boot_control(blocklen=2L),neval=3L,
                 center="estimate",perspective=FALSE))$provider
     expect_length(out,1L)
     expect_identical(out[[1L]]$fit.controls,ctl)

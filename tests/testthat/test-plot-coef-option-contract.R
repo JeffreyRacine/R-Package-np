@@ -17,7 +17,7 @@ test_that("plot coef option: npscoef supports coef=TRUE in plot-data mode", {
     plot(
       fit,
       coef = TRUE,
-      coef_index = 1,
+      coef.index = 1,
       perspective = FALSE,
       neval = 20,
       output = "plot-data",

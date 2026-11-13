@@ -10,7 +10,7 @@ Selects joint-scale bias-corrected density intervals, the earlier positive-covar
 \arguments{\item{construction}{The joint-scale envelope, earlier positive-covariance construction, or existing smooth-bootstrap centering route.}}
 \details{
 With \code{center="bias-corrected"}, \code{errors="asymptotic"}, and
-omitted or \code{NULL} \code{bias_control}, fixed unbounded second-order
+omitted or \code{NULL} \code{bias.control}, fixed unbounded second-order
 Gaussian density plots with one to three continuous numeric variables use the
 D8 positive-pilot construction described below, for \eqn{10^{-4}<\alpha<0.5}.
 Other previously supported requests retain their existing construction and
@@ -47,7 +47,7 @@ are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"}, 
 
 
 \subsection{Known-bound beta density inference}{
-With omitted or \code{NULL} \code{bias_control}, fixed second-order beta
+With omitted or \code{NULL} \code{bias.control}, fixed second-order beta
 kernels support \code{errors="asymptotic"} and independent bootstrap
 \code{calibration="symmetric-sd"} or \code{"asymmetric-sd"}. Request
 \code{center="bias-corrected"} and explicitly select \code{band="pointwise"}
@@ -162,7 +162,7 @@ or renormalization. Stored plotting reuses those limits. The selected RNG kind
 and literal resampling law are retained, including Box--Muller continuation.
 Low tail-draw resolution warns and returns finite limits; failed numerical
 certificates and workspace limits are errors. The requested \code{B} or
-\code{gaussian_draws} is never reduced. The current implementation uses bounded
+\code{gaussian.draws} is never reduced. The current implementation uses bounded
 resident workspaces and invocation-owned temporary files, with limits of
 256 MiB aggregate inference workspace and 512 MiB temporary storage. These
 limits are distinct from total R-process memory.
@@ -178,7 +178,7 @@ calibration stream. This statement does not certify arbitrary custom state
 for other plotting constructions.
 
 For a workspace or owned-file budget refusal, reduce the requested grid size
-and/or the explicit \code{B} or \code{gaussian_draws}, as applicable to the
+and/or the explicit \code{B} or \code{gaussian.draws}, as applicable to the
 reported allocation. Reducing draws changes simulation resolution, not the
 requested nominal level. No draw count, grid or method is reduced automatically.
 Temporary-file creation also requires a writable temporary directory with
@@ -198,7 +198,7 @@ Explicit saved density controls keep their original construction and scope.
 }
 
 \subsection{Known-bound univariate normal intervals}{
-With omitted or \code{NULL} \code{bias_control}, known-fixed-bound order-2 beta
+With omitted or \code{NULL} \code{bias.control}, known-fixed-bound order-2 beta
 and Gaussian density plots support \code{errors="asymptotic"},
 \code{center="bias-corrected"} and omitted \code{band} or \code{band="pmzsd"}
 for one continuous variable. Fixed bandwidths, at least ten observations,
@@ -234,7 +234,7 @@ deviation of iid bootstrap refits.
 }
 
 \subsection{Known-bound compact normal intervals in two dimensions}{
-With omitted or \code{NULL} \code{bias_control}, fixed second-order uniform and
+With omitted or \code{NULL} \code{bias.control}, fixed second-order uniform and
 Epanechnikov kernels support corrected asymptotic normal intervals for exactly
 two continuous coordinates. Request omitted \code{band} or \code{band="pmzsd"}.
 The fixed bandwidth, finite coordinatewise bounds, strictly interior data and
@@ -310,7 +310,7 @@ coverage or protect arbitrary sparse-tail distributions.
 }
 
 \subsection{Known-bound Gaussian density inference}{
-With omitted or \code{NULL} \code{bias_control}, fixed second-order Gaussian
+With omitted or \code{NULL} \code{bias.control}, fixed second-order Gaussian
 kernels with known \code{ckerbound="fixed"} bounds use the FG-D plot
 construction for corrected asymptotic and independent symmetric-sd/asymmetric-sd
 intervals. Request explicit pointwise, simultaneous, Bonferroni or

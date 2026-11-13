@@ -120,7 +120,7 @@
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all")
     if (!missing(gaussian.draws) && !joint.request)
-      stop("gaussian_draws requires asymptotic simultaneous or all bands", call. = FALSE)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- joint.request
     if (joint.request)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
@@ -217,7 +217,7 @@
     } else NULL
     joint.eligible <- joint.eligible && !new.bias
     if (new.bias && isTRUE(plot.bxp))
-      stop("positive-covariance density bounds require factor_boxplot=FALSE", call. = FALSE)
+      stop("positive-covariance density bounds require factor.boxplot=FALSE", call. = FALSE)
     first.render <- .np_plot_first_render_state()
     on.exit(.np_plot_activity_end(first.render$activity), add = TRUE)
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&

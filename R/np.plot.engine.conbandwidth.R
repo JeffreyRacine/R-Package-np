@@ -209,7 +209,7 @@
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all")
     if (!missing(gaussian.draws) && !joint.request && !new.conditional)
-      stop("gaussian_draws requires asymptotic simultaneous or all bands", call. = FALSE)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- joint.request && !quantreg && !isTRUE(proper) && !new.conditional
     quantile.joint <- joint.request && isTRUE(quantreg)
     if (joint.request)

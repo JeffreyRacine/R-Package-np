@@ -62,7 +62,7 @@ npcopula(bws, \dots)
      bootstrap = c("inid", "fixed", "geom"),
      B = 9999,
      center = c("estimate", "bias-corrected"),
-     boot_control = np_boot_control(),
+     boot.control = np_boot_control(),
      output = c("plot", "data", "plot-data"),
      legend = TRUE,
      theta = 0.0,
@@ -74,8 +74,8 @@ npcopula(bws, \dots)
      col = NULL,
      border = .np_plot_color("surface_border"),
      zlim = NULL,
-     gaussian_draws = 9999L,
-     random_seed = 42L,
+     gaussian.draws = 9999L,
+     random.seed = 42L,
      \dots)
 }
 
@@ -301,7 +301,7 @@ surface plots.
     \code{"geom"}. Wild bootstrap is not defined for copula surfaces.
   }
 
-  \item{boot_control}{
+  \item{boot.control}{
     optional \code{\link{np_boot_control}} object. For copula surfaces
     the block length is used by the \code{"fixed"} and \code{"geom"}
     block bootstrap routes.
@@ -314,7 +314,7 @@ surface plots.
     bootstrap bias-correction combinations fail clearly.
   }
 
-  \item{gaussian_draws, random_seed}{
+  \item{gaussian.draws, random.seed}{
     Gaussian maximum simulation count and reproducible seed for asymptotic
     \code{band="simultaneous"} or \code{band="all"}. Before changing the
     seed, the temporary seed scope refuses Box--Muller and uncertifiable

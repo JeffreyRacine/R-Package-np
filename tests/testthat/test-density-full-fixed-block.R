@@ -14,7 +14,7 @@ test_that("corrected density refuses a structurally degenerate full fixed block"
   if (!diagnostics) for (cal in calibrations) for (band in bands)
     expect_error(plot(f, errors = "bootstrap", bootstrap = "fixed", center = "bias-corrected",
       band = band, B = 999L, neval = 5L,
-      boot_control = np_boot_control(calibration = cal, blocklen = n), output = "data"),
+      boot.control = np_boot_control(calibration = cal, blocklen = n), output = "data"),
       "fixed block length equal to sample size")
   ns <- asNamespace("npRmpi")
   request <- get(".np_udens_b2_boot_request", ns)
@@ -30,12 +30,12 @@ test_that("corrected density refuses a structurally degenerate full fixed block"
     second <- data.frame(x = seq(-2, 2, length.out = n)^3)
     g <- npudens(bws = npudensbw(dat = second, bws = .7, bandwidth.compute = FALSE), tdat = second)
     if (!diagnostics) expect_error(plot(g, errors="bootstrap",bootstrap="fixed",center="bias-corrected",
-      band="pointwise",B=49L,neval=5L,boot_control=np_boot_control(blocklen=n),output="data"),
+      band="pointwise",B=49L,neval=5L,boot.control=np_boot_control(blocklen=n),output="data"),
       "no resampling variation")
     for (cal in calibrations) for (cfg in list(c("inid", 1), c("fixed", 1), c("fixed", n-1L), c("geom", n))) {
       seed <- .Random.seed
       a <- plot(f, errors="bootstrap",bootstrap=cfg[1],center="bias-corrected",band="all",B=999L,neval=5L,
-        boot_control=np_boot_control(calibration=cal,blocklen=as.numeric(cfg[2])),output="data")
+        boot.control=np_boot_control(calibration=cal,blocklen=as.numeric(cfg[2])),output="data")
       expect_true(all(is.finite(as.data.frame(a, band="pointwise")$std_error)))
       expect_identical(.Random.seed, seed)
       payloads[[paste(cal,cfg[1],cfg[2])]] <- a

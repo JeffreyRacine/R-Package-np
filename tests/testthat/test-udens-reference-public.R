@@ -10,11 +10,11 @@ test_that("explicit joint-scale density surfaces expose absolute endpoints match
   for (method in c("asymptotic", "bootstrap")) {
     args <- list(x = fit, errors = method, center = "bias-corrected",
                  band = "all", neval = 2L, output = "data",
-                 bias_control = np_udens_bias_control())
-    args[[if (method == "asymptotic") "gaussian_draws" else "B"]] <- 199L
+                 bias.control = np_udens_bias_control())
+    args[[if (method == "asymptotic") "gaussian.draws" else "B"]] <- 199L
     if (method == "asymptotic")
       expect_warning(expect_warning(cap <- capture_plot_provider(do.call(plot, args)),
-        "gaussian_draws=199", fixed = TRUE), "gaussian_draws=199", fixed = TRUE)
+        "gaussian.draws=199", fixed = TRUE), "gaussian.draws=199", fixed = TRUE)
     else cap <- capture_plot_provider(do.call(plot, args))
     out <- cap$result
     r <- cap$provider$d1

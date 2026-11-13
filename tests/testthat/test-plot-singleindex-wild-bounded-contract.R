@@ -74,7 +74,7 @@ test_that("single-index fixed wild bootstrap forced block path is finite", {
     neval = 23L,
     output = "data",
     perspective = FALSE,
-    data_overlay = FALSE
+    data.overlay = FALSE
   ))
 
   expect_equal(length(plot_target(out)$estimate), 23L)
