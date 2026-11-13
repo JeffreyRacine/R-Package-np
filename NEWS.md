@@ -1,5 +1,8 @@
 # np 0.80-3 (private development)
 
+* Perspective floor and wall grids are painted behind the estimate, intervals
+  and overlays. Base surface-data replay uses the same renderer.
+
 * Constant conditional surfaces and surface-data replay expand automatic display
   limits without changing estimates, intervals or explicit limits.
 

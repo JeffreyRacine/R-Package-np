@@ -116,7 +116,8 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
         }
         widget <- do.call(.np_plot_render_surface_rgl, args)
       } else {
-        mat <- do.call(graphics::persp, args)
+        mat <- .np_plot_render_surface_base_frame(
+          args, range(args$x), range(args$y), args$zlim)
         if (!is.null(display$overlay)) do.call(.np_plot_overlay_points_persp,
           c(list(x1 = as.numeric(display$overlay$grid[[1L]]),
             x2 = as.numeric(display$overlay$grid[[2L]]), y = display$overlay$value,
