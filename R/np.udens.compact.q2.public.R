@@ -28,27 +28,33 @@
   if(any(!is.finite(width))||!is.finite(jacobian)||jacobian<=0||!is.finite(1/jacobian))
     stop('Compact q2 corrected-band support units are not representable',call.=FALSE)
   normalized<-sweep(sweep(as.matrix(x),2,lower),2,width,'/')
-  h<-as.double(.np_physical_bandwidth(bws))/width
+  physical.h<-as.double(.np_physical_bandwidth(bws));h<-physical.h/width
   .np_udens_compact_q2_validate(normalized,h,normalized[1L,,drop=FALSE],bws[['ckertype',exact=TRUE]])
   if(!is.numeric(alpha)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1)
     stop('Compact q2 corrected bands require alpha in (0,1)',call.=FALSE)
   npValidateNonNegativeInteger(seed,'random.seed')
-  list(x=x,normalized=normalized,h=h,lower=lower,width=width,jacobian=jacobian,kernel=bws[['ckertype',exact=TRUE]],
+  list(x=x,normalized=normalized,h=h,physical.h=physical.h,lower=lower,width=width,jacobian=jacobian,kernel=bws[['ckertype',exact=TRUE]],
     q=2L,n=nrow(x),variant=if(method=='asymptotic')'asymptotic' else calibration,
     plot.law=if(method=='asymptotic')'gaussian' else 'inid',plot.random.seed=seed,
     construction='density-fixed-compact-q2-calibrated-v1')
 }
 
 .np_udens_compact_q2_hidden <- function(x,h,grid,kernel,alpha,band,B=9999L,seed=42L,
-                                       progress=function(...)NULL,variant='asymptotic') {
+                                       progress=function(...)NULL,variant='asymptotic',physical=NULL) {
   .np_udens_compact_q2_validate(x,h,grid,kernel)
   if(!is.numeric(alpha)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1||
      length(variant)!=1L||!variant%in%c('asymptotic','symmetric-sd','asymmetric-sd')||
      length(band)!=1L||!band%in%c('pointwise','simultaneous','bonferroni','all'))
     stop('invalid compact q2 band request',call.=FALSE)
-  original<-grid;grid<-unique(grid);grid<-grid[do.call(order,as.data.frame(grid)),,drop=FALSE]
-  key<-function(x)apply(x,1,function(z)paste(format(z,digits=17,scientific=TRUE),collapse=':'))
-  restore<-match(key(original),key(grid));n<-nrow(x);m<-nrow(grid)
+  if(is.null(physical)) {
+    original<-grid;grid<-unique(grid);grid<-grid[do.call(order,as.data.frame(grid)),,drop=FALSE]
+    key<-function(x)apply(x,1,function(z)paste(format(z,digits=17,scientific=TRUE),collapse=':'))
+    restore<-match(key(original),key(grid))
+  } else {
+    canonical<-.np_udens_compact_physical_grid(grid,physical)
+    grid<-canonical$grid;physical<-canonical$physical;restore<-canonical$restore
+  }
+  n<-nrow(x);m<-nrow(grid)
   sd<-variant!='asymptotic';draws<-sd||band%in%c('simultaneous','all')
   if(draws).np_udens_beta_random_request(if(sd)'multinomial' else 'normal',if(sd)n else m,B,seed,RNGkind())
   disk<-if(sd)4*as.double(n)*B+8*as.double(m)*B+262144 else if(draws)8*as.double(m)*B+8*as.double(m)*m+262144 else 0
@@ -56,7 +62,7 @@
     stop('compact q2 request exceeds owned-storage budget',call.=FALSE)
   store<-if(draws).np_udens_beta_store() else NULL
   if(draws)on.exit(.np_udens_beta_store_close(store),add=TRUE)
-  prepared<-.np_udens_compact_q2_prepare(x,h,grid,kernel,!sd&&draws,store,progress)
+  prepared<-.np_udens_compact_q2_prepare(x,h,grid,kernel,!sd&&draws,store,progress,physical)
   region<-.np_udens_beta_regions(prepared$theta,prepared$Veta,grid,alpha,progress)
   rhat<-prepared$center-prepared$fitted;scales<-list(sqrt(prepared$pilot_variance),sqrt(prepared$empirical_variance))
   if(draws)stream<-.np_udens_beta_random_stream(store,if(sd)'multinomial' else 'normal',if(sd)n else m,B,seed)

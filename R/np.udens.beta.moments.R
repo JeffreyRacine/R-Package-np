@@ -34,7 +34,10 @@
   mu<-guide$mean[ix];B<-guide$cross[ix,,drop=FALSE];K<-B%*%prep$Iinv
   x<-prep$x;grid<-prep$grid[rows,,drop=FALSE]
   da<-list(list(lv=log(x[,1]),l1v=log1p(-x[,1])),list(lv=log(x[,2]),l1v=log1p(-x[,2])))
-  obs<-.np_udens_beta_joint_block_native(prep$axis.cache(grid,da,prep$h,n^(-13/54),prep$inner),seq_len(n),seq_len(n))
+  observed.cache<-if(is.null(prep[['observed.axis',exact=TRUE]]))
+    prep$axis.cache(grid,da,prep$h,n^(-13/54),prep$inner) else prep$observed.axis(rows)
+  obs<-.np_udens_beta_joint_block_native(observed.cache,seq_len(n),seq_len(n))
+  rm(observed.cache)
   Td<-sweep(prep$Td,2,colMeans(prep$Td));residual<-obs-rowMeans(obs)-K%*%t(Td)
   ve<-rowSums(residual^2)/(n*(n-1));emp<-if(full)tcrossprod(residual)/(n*(n-1)) else NULL
   covs<-variances<-identities<-list();Tg<-.np_udens_beta_basis(grid)

@@ -1,5 +1,7 @@
 # npRmpi 0.80-3 (private development)
 
+- Corrected compact uniform density plots retain physical support membership consistently in observed centers, empirical covariance and resampled features. Continuous pilot integration is unchanged.
+
 - Fixed uniform-kernel rows now use the documented open physical support consistently across dense, tree, permutation and sparse polynomial-search paths.
 
 - Keep MPI lifecycle facts independent of restored user options, preserving manual dispatch and established session shutdown.
