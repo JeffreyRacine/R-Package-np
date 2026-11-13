@@ -81,6 +81,11 @@ No coverage between grid points is implied.}
 }
 Coefficient displays of plus/minus one standard error use band \code{"std_error"},
 \code{alpha=NA}, status \code{"display_only"} and no confidence-family claim.
+For class-probability plots, rows padded for missing evaluation coordinates
+remain in the display grid but are excluded from coverage families and
+Bonferroni counts. Defined targets with unavailable uncertainty remain family
+members; an unavailable interval does not silently reduce the requested family.
+
 An empirical copula probability-pair display likewise has no estimated target
 or interval. Asking for a missing band is an error.
 

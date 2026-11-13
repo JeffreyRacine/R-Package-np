@@ -450,7 +450,7 @@
 }
 
 .np_plot_data_from_conmode <- function(raw, request, gradients = FALSE) {
-  panels <- list(); targets <- .np_plot_data_targets(); inference <- families <- list()
+  panels <- list(); targets <- .np_plot_data_targets(); inference <- families <- list(); exclusions <- list()
   surface <- !is.null(raw$surface) && !is.null(raw$grid)
   frames <- if (surface) list(raw$surface) else raw
   for (i in seq_along(frames)) {
@@ -470,6 +470,7 @@
       }
       display <- list(kind = "curve", coordinates = paste0("eval_", match(as.character(d$variable[1L]), names(grid))))
     }
+    exclusions[[panel_id]] <- which(!complete.cases(grid))
     estimate <- d[[if (gradients) "effect" else "probability"]]
     corrected <- if (request$center == "bias-corrected") d$center else rep(NA_real_, nrow(d))
     se <- .np_plot_data_vector(d$stderr, nrow(d), unavailable = TRUE)
@@ -493,7 +494,8 @@
         match(as.character(d$variable[1L]), names(grid)))
     panels[[panel_id]] <- .np_plot_data_panel(grid, rep("X", ncol(grid)), values, intervals, display)
   }
-  .np_plot_data("npconmode", request, panels, targets, inference, families)
+  .np_plot_data("npconmode", request, panels, targets, inference, families,
+                family_exclusions = exclusions)
 }
 
 .np_plot_data_from_copula <- function(raw, request, density = FALSE, view = "surface") {

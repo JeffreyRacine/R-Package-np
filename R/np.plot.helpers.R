@@ -985,7 +985,8 @@
                                       plot.errors.alpha,
                                       plot.errors.type,
                                       plot.errors.center,
-                                      bootstrap_raw = NULL) {
+                                      bootstrap_raw = NULL,
+                                      family_size = length(estimate)) {
   err <- matrix(data = se, nrow = length(estimate), ncol = 3)
   err[,3] <- NA_real_
   all.err <- NULL
@@ -1005,7 +1006,7 @@
       se = se,
       alpha = plot.errors.alpha,
       band.type = plot.errors.type,
-      m = length(estimate)
+      m = family_size
     )
     err[,1:2] <- asym.obj$err
     all.err <- asym.obj$all.err

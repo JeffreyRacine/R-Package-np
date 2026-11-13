@@ -1013,7 +1013,8 @@ np_render_control <- function(style = c("band", "bar"),
         alpha = alpha,
         band = band,
         center = center,
-        bootstrap_raw = boot.raw
+        bootstrap_raw = boot.raw,
+        family_size = sum(complete.cases(xeval))
       )
       if (identical(errors, "asymptotic") && band %in% c("simultaneous", "all")) {
         if (j == 1L) {
@@ -1492,7 +1493,8 @@ np_render_control <- function(style = c("band", "bar"),
                                                   alpha,
                                                   band,
                                                   center = "estimate",
-                                                  bootstrap_raw = NULL) {
+                                                  bootstrap_raw = NULL,
+                                                  family_size = nrow(dat)) {
   payload <- .np_plot_interval_payload(
     estimate = dat$probability,
     se = se,
@@ -1500,7 +1502,8 @@ np_render_control <- function(style = c("band", "bar"),
     plot.errors.alpha = alpha,
     plot.errors.type = band,
     plot.errors.center = center,
-    bootstrap_raw = bootstrap_raw
+    bootstrap_raw = bootstrap_raw,
+    family_size = family_size
   )
   dat$stderr <- if (identical(errors, "bootstrap") &&
                     !is.null(bootstrap_raw$boot.t)) {

@@ -1,5 +1,8 @@
 # np 0.80-3 (private development)
 
+- Class-probability plot families exclude omitted display rows, including
+  asymptotic Bonferroni calibration, while preserving their padded output rows.
+
 * Kernel sums reject unknown extra arguments without evaluating their values,
   while retaining formula controls and ordinary argument matching.
 
