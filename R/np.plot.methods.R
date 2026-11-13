@@ -446,10 +446,17 @@ np_render_control <- function(style = c("band", "bar"),
       stop("grid.control must be created by np_grid_control()", call. = FALSE)
     ctrl <- dots$grid.control
     dots$grid.control <- NULL
-    if (!is.null(ctrl$xtrim))
+    if (!is.null(ctrl$xtrim)) {
+      # These owners interpret a direct pair as lower/upper probabilities.
+      # Elsewhere a numeric vector can mean per-variable symmetric trimming.
+      if (context %in% c("plot.singleindex", "plot.sibandwidth", "plot.conmode") &&
+          is.numeric(dots$xtrim) && length(dots$xtrim) == 2L)
+        dots$xtrim <- structure(list(probs = dots$xtrim),
+                                class = "np_plot_trim_range")
       dots <- .np_plot_set_normalized_arg(dots, "grid.control$xtrim",
                                           "xtrim", structure(list(probs = ctrl$xtrim),
                                             class = "np_plot_trim_range"))
+    }
     if (!is.null(ctrl$xq))
       dots <- .np_plot_set_normalized_arg(dots, "grid.control$xq",
                                           "xq", ctrl$xq)
