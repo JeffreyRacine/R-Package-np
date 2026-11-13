@@ -1966,6 +1966,7 @@ np_render_control <- function(style = c("band", "bar"),
     rgl.controls <- if (is.null(intervals)) .np_plot_rgl_controls(dots) else
       .np_plot_rgl_controls(dots, legend = legend)
     return(.np_plot_render_surface_rgl(
+      xlim = dots$xlim, ylim = dots$ylim,
       x = x1,
       y = x2,
       z = z,
@@ -2020,6 +2021,7 @@ np_render_control <- function(style = c("band", "bar"),
   )
   if (!is.null(intervals) && "sub" %in% names(dots))
     persp.args$sub <- dots$sub
+  persp.args <- .np_plot_apply_limits(persp.args, dots$xlim, dots$ylim)
   persp.mat <- .np_plot_render_surface_base_frame(
     persp.args = persp.args,
     xlim = range(x1, finite = TRUE),
@@ -2314,7 +2316,8 @@ np_render_control <- function(style = c("band", "bar"),
   if (identical(errors, "bootstrap") && isTRUE(perspective))
     stop("surface bootstrap intervals are not yet implemented for plot.conmode; use one-dimensional views or errors=\"asymptotic\"",
          call. = FALSE)
-  plot.user.args <- .np_plot_user_args(dots, "plot")
+  plot.user.args <- .np_plot_apply_limits(
+    .np_plot_user_args(dots, "plot"), dots$xlim, dots$ylim)
   line.user.args <- .np_plot_user_args(dots, "lines")
   if (!is.null(dots$type))
     line.user.args$type <- dots$type
@@ -2371,7 +2374,8 @@ np_render_control <- function(style = c("band", "bar"),
     .np_plot_data_from_conmode(plot.data,
       list(errors = errors, band = band, alpha = alpha, center = center,
            bootstrap = bootstrap, B = B, gradients = gradients, view = view,
-           gaussian_draws = gaussian.draws, random_seed = random.seed), gradients = gradients) else NULL
+           gaussian_draws = gaussian.draws, random_seed = random.seed), gradients = gradients,
+      style = dots[intersect(names(dots), c("xlim", "ylim", "zlim"))]) else NULL
 
   if (isTRUE(perspective)) {
     if (identical(output, "data"))

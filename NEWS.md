@@ -32,6 +32,8 @@
 - Rebuilding retained unconditional uniform-kernel metadata avoids a redundant
   kernel-order advisory; fresh requests and unrelated conditions are unchanged.
 
+- Supplied plot limits reach line and surface renderers and survive saved-data replay, without changing evaluation grids, estimates or intervals. Automatic ranges remain unchanged when limits are omitted.
+
 # np 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and

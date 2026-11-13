@@ -554,6 +554,7 @@
           overlay.x2 <- (bws$xdati$all.dlev[[2]])[as.integer(overlay.x2)]
         .np_plot_first_render_begin(first.render)
         rgl.out <- .np_plot_render_surface_rgl(
+          xlim = xlim, ylim = ylim,
           x = x1.eval,
           y = x2.eval,
           z = treg,
@@ -655,6 +656,7 @@
                              phi = phi,
                              main = main.val)
           persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
+          persp.args <- .np_plot_apply_limits(persp.args, xlim, ylim)
           persp.mat <- .np_plot_render_surface_base_frame(
             persp.args = persp.args,
             xlim = range(x1.eval, finite = TRUE),
@@ -918,12 +920,11 @@
           } else {
             plot
           }
-          plot.args <- list()
+          plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
           if (xi.factor) {
             if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
           } else {
             plot.args$x <- ei
-            if (!is.null(xlim)) plot.args$xlim <- xlim
           }
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- .np_plot_geometry_values(temp.mean)
@@ -1243,12 +1244,11 @@
           } else {
             plot
           }
-          plot.args <- list()
+          plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
           if (xi.factor) {
             if (plot.bootstrap && plot.bxp) plot.args$z <- all.bxp[[i]] else plot.args$f <- allei[,i]
           } else {
             plot.args$x <- allei[,i]
-            if (!is.null(xlim)) plot.args$xlim <- xlim
           }
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- .np_plot_geometry_values(data.eval[,i])

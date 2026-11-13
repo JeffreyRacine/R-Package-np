@@ -479,7 +479,8 @@ npcopula <- function(bws, ...) {
                                         xlab,
                                         ylab,
                                         dots) {
-  persp.args <- .np_plot_user_args(dots, "persp")
+  persp.args <- .np_plot_apply_limits(
+      .np_plot_user_args(dots, "persp"), dots$xlim, dots$ylim)
   z <- .npcopula_clip_z_for_display(grid$z, zlim)
   persp.col <- grDevices::adjustcolor(
     .np_plot_persp_surface_colors(z = z, col = col),
@@ -1035,7 +1036,8 @@ plot.npcopula <- function(x,
   finish.data <- function(value, selected.view = view) .np_plot_data_from_copula(
     value, list(errors = errors, band = band, alpha = alpha, center = center,
                 bootstrap = bootstrap, B = B, gaussian_draws = gaussian.draws,
-                random_seed = random.seed), density = isTRUE(x$density), view = selected.view)
+                random_seed = random.seed), density = isTRUE(x$density), view = selected.view,
+    style = plot.limit.style)
   output <- match.arg(output)
   if (!is.numeric(alpha) || length(alpha) != 1L ||
       is.na(alpha) || alpha <= 0 || alpha >= 0.5)
@@ -1057,6 +1059,11 @@ plot.npcopula <- function(x,
   if (identical(errors, "bootstrap"))
     .np_plot_reject_wild_unsupervised(bootstrap, "copula estimators")
   dots <- .np_plot_unique_args(list(...))
+  plot.limit.style <- dots[intersect(names(dots), c("xlim", "ylim"))]
+  # Height limits belong only to the fresh perspective surface. In view="all"
+  # the saved panels are contour, empirical pairs and an automatic-range density.
+  if (isTRUE(perspective) && surface.view && !identical(x$evaluation, "sample"))
+    plot.limit.style <- .np_plot_apply_limits(plot.limit.style, zlim = zlim)
   if (!is.null(dots[["bias.control", exact = TRUE]]))
     .np_udist_score_scope(dots[["bias.control", exact = TRUE]], FALSE)
   sub.supplied <- "sub" %in% names(dots)
@@ -1213,6 +1220,7 @@ plot.npcopula <- function(x,
       rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
       rgl.controls <- .np_plot_rgl_controls(dots, legend = legend)
       rgl.out <- .np_plot_render_surface_rgl(
+        xlim = dots$xlim, ylim = dots$ylim,
         x = u1,
         y = u2,
         z = z.display,
@@ -1253,7 +1261,8 @@ plot.npcopula <- function(x,
         plot.data = if (identical(output, "plot-data")) finish.data(plot.data) else NULL
       ))
     }
-    persp.args <- .np_plot_user_args(dots, "persp")
+    persp.args <- .np_plot_apply_limits(
+      .np_plot_user_args(dots, "persp"), dots$xlim, dots$ylim)
     persp.col <- grDevices::adjustcolor(
       .np_plot_persp_surface_colors(z = z.display, col = col),
       alpha.f = .np_plot_surface_alpha("base")

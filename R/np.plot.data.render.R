@@ -101,7 +101,14 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
         zlab = label, main = label, theta = 0, phi = 20,
         zlim = .np_plot_expand_surface_range(.np_plot_data_limits(
           c(values$estimate, intervals$lower, intervals$upper, display$overlay$value)))),
-        style[!names(style) %in% c("type", "lty", "lwd", "ylim", "xlim")])
+        style[!names(style) %in% c("type", "lty", "lwd")])
+      if (identical(x$family, "npcopula") && !is.null(style$zlim)) {
+        # Match fresh copula display clipping, leaving all saved numbers intact.
+        args$zlim <- .npcopula_validate_zlim(style$zlim)
+        args$z <- .npcopula_clip_z_for_display(args$z, args$zlim)
+        lower <- .npcopula_clip_z_list_for_display(lower, args$zlim)
+        upper <- .npcopula_clip_z_list_for_display(upper, args$zlim)
+      }
       all <- length(lower) > 1L
       if (renderer == "rgl") {
         args$draw.extras <- function() {
@@ -138,6 +145,11 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
     if (renderer != "base") stop("one-dimensional replay uses the base renderer", call. = FALSE)
     column <- if (length(varying)) varying[1L] else 1L
     coord <- grid[[column]]
+    # A specific Z-role override wins; otherwise preserve the generic replay
+    # xlim override, or the retained Z-role limit when neither is supplied.
+    if (identical(p$variables$role[column], "Z") &&
+        ("zlim" %in% names(dots) || !("xlim" %in% names(dots))))
+      style$xlim <- style$zlim
     categorical <- is.factor(coord) || is.character(coord)
     xpos <- if (categorical) match(as.character(coord), unique(as.character(coord))) else coord
     args <- utils::modifyList(list(x = xpos, y = values$estimate,
