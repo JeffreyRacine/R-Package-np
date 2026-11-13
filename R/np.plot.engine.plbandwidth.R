@@ -482,9 +482,9 @@
                   c(min(lerr),max(herr))
               else
                   c(min(tobj$mean),max(tobj$mean))
+        if (overlay.ok)
+          zlim <- .np_plot_overlay_range(zlim, ydat)
       }
-      if (overlay.ok)
-        zlim <- .np_plot_overlay_range(zlim, ydat)
         
       if (plot.behavior != "plot"){
         r1 = plregression(bws = bws, xcoef = tobj$xcoef,
