@@ -1,5 +1,7 @@
 # npRmpi 0.80-3 (private development)
 
+- Fixed uniform-kernel rows now use the documented open physical support consistently across dense, tree, permutation and sparse polynomial-search paths.
+
 - Keep MPI lifecycle facts independent of restored user options, preserving manual dispatch and established session shutdown.
 
 - Ordinary LC conditional-density plots disclose unavailable uncertainty at empty empirical response windows, retaining the full target grid and withholding an unidentifiable full-family simultaneous band. Raw estimates and corrected methods are unchanged.
