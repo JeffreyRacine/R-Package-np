@@ -30,7 +30,7 @@ test_that("partially linear all-band ragged panels draw without recycling", {
   for (common in c(FALSE, TRUE)) {
     set.seed(19346)
     expect_warning(plot(b, errors = "bootstrap", band = "all", B = 199L,
-      common_scale = common, data_overlay = FALSE, neval = 4L, perspective = FALSE), NA)
+      common.scale = common, data.overlay = FALSE, neval = 4L, perspective = FALSE), NA)
   }
 })
 

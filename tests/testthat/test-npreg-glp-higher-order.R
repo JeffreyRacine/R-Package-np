@@ -240,7 +240,7 @@ test_that("npreg lp mixed-degree derivatives preserve partial availability", {
   on.exit(dev.off(), add = TRUE)
   expect_warning(
     plot.out <- npRmpi_local_regression(plot(
-      bw, xdat = tx, ydat = y, gradients = TRUE, gradient_order = 2L,
+      bw, xdat = tx, ydat = y, gradients = TRUE, gradient.order = 2L,
       errors = "none", output = "data", neval = 8L
     )),
     "exceed polynomial degree"

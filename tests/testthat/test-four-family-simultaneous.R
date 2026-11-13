@@ -111,7 +111,7 @@ test_that("mixed class panels retain complete probability support and row shape"
   fit <- npconmode(b, txdat = x, tydat = y, probabilities = TRUE, se = TRUE)
   seed <- .Random.seed
   z <- plot(fit, errors = "asymptotic", band = "all", output = "data",
-    view = "fixed", neval = 5, level = "b", gaussian_draws = 9999L)
+    view = "fixed", neval = 5, level = "b", gaussian.draws = 9999L)
   expect_identical(.Random.seed, seed)
   expect_length(z$panels, 2L)
   expect_equal(nrow(z$panels[[1]]$grid), 5L)

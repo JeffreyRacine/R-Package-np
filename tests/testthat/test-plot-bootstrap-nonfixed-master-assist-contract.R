@@ -52,7 +52,7 @@ test_that("nonfixed exact and frozen plot bootstraps use all slaves plus master 
     "                  bandwidth.compute = FALSE, regtype = 'lc')",
     "  plot(bw, xdat = data.frame(x = x), ydat = data.frame(y = y),",
     "       neval = 8L, output = 'data', errors = 'bootstrap',",
-    "       bootstrap = 'inid', boot_control = np_boot_control(nonfixed = 'frozen'),",
+    "       bootstrap = 'inid', boot.control = np_boot_control(nonfixed = 'frozen'),",
     "       B = 43L, band = 'pointwise')",
     "})",
     "run_case('npcdist_frozen', {",
@@ -61,7 +61,7 @@ test_that("nonfixed exact and frozen plot bootstraps use all slaves plus master 
     "                  bandwidth.compute = FALSE, regtype = 'lc')",
     "  plot(bw, xdat = data.frame(x = x), ydat = data.frame(y = y),",
     "       neval = 8L, output = 'data', errors = 'bootstrap',",
-    "       bootstrap = 'inid', boot_control = np_boot_control(nonfixed = 'frozen'),",
+    "       bootstrap = 'inid', boot.control = np_boot_control(nonfixed = 'frozen'),",
     "       B = 43L, band = 'pointwise')",
     "})",
     sprintf("cat('%s\\n')", ok_tag)

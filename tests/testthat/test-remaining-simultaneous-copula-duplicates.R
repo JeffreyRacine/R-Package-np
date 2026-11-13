@@ -57,8 +57,8 @@ test_that("repeated copula simultaneous targets are computed once and expanded e
     args <- list(x = x, errors = "asymptotic", band = band,
       view = "fixed", output = output, legend = FALSE)
     if (band %in% c("all", "simultaneous")) {
-      args$gaussian_draws <- 9999L
-      args$random_seed <- 42L
+      args$gaussian.draws <- 9999L
+      args$random.seed <- 42L
     }
     if (identical(output, "plot")) return(do.call(plot, args))
     capture_copula_provider(do.call(plot, args))$provider

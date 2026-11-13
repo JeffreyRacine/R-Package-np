@@ -45,7 +45,7 @@ test_that("regression joint bands preserve marginal intervals and mean payloads"
                 bandwidth.compute = FALSE)
   point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise",
                 neval = 7L, output = "data"))$provider[[1L]]
-  all <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gaussian_draws = 399L,
+  all <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gaussian.draws = 399L,
               neval = 7L, output = "data"))$provider[[1L]]
   expect_identical(all$mean, point$mean)
   expect_identical(all$merr, point$merr)
@@ -53,10 +53,10 @@ test_that("regression joint bands preserve marginal intervals and mean payloads"
   expect_true(all(is.finite(all$band.errors$simultaneous)))
   expect_identical(all$band.calibration$scope, "finite grid within panel")
   grad <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-               neval = 7L, gaussian_draws = 399L, output = "data"))$provider[[1L]]
+               neval = 7L, gaussian.draws = 399L, output = "data"))$provider[[1L]]
   expect_true(all(is.finite(grad$band.errors$simultaneous)))
   expect_equal(dim(grad$band.errors$simultaneous), c(7L, 2L))
-  expect_error(capture_plot_provider(plot(bw, gaussian_draws = 399L, output = "data"))$provider, "requires asymptotic")
+  expect_error(capture_plot_provider(plot(bw, gaussian.draws = 399L, output = "data"))$provider, "requires asymptotic")
   expect_error(plot(bw, errors = "asymptotic", band = "all", B = 199L),
                "bootstrap controls")
 })
@@ -74,14 +74,14 @@ test_that("single-index joint bands condition on fitted coefficients", {
                   bandwidth.compute = FALSE)
   point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise",
                 neval = 7L, output = "data"))$provider[[1L]]
-  all <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gaussian_draws = 399L,
+  all <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gaussian.draws = 399L,
               neval = 7L, output = "data"))$provider[[1L]]
   expect_identical(all$mean, point$mean)
   expect_identical(all$merr, point$merr)
   expect_true(all(is.finite(all$band.errors$simultaneous)))
   expect_match(all$band.calibration$conditioning, "fitted index coefficients")
   grad <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-               neval = 7L, gaussian_draws = 399L, output = "data"))$provider[[1L]]
+               neval = 7L, gaussian.draws = 399L, output = "data"))$provider[[1L]]
   expect_equal(dim(grad$band.errors$simultaneous), c(7L, 2L, 2L))
   expect_true(all(is.finite(grad$band.errors$simultaneous)))
   expect_equal(grad$band.errors$simultaneous[, , 2L],
@@ -102,7 +102,7 @@ test_that("smooth-coefficient mean bands retain the accepted marginal errors", {
                   bandwidth.compute = FALSE)
   point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise", perspective = FALSE,
                 neval = 7L, output = "data"))$provider
-  all <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gaussian_draws = 399L,
+  all <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gaussian.draws = 399L,
               perspective = FALSE, neval = 7L, output = "data"))$provider
   for (i in seq_along(all)) {
     expect_identical(all[[i]]$mean, point[[i]]$mean)
@@ -110,7 +110,7 @@ test_that("smooth-coefficient mean bands retain the accepted marginal errors", {
     expect_true(all(is.finite(all[[i]]$band.errors$simultaneous)))
   }
   grad <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-               perspective = FALSE, neval = 7L, gaussian_draws = 399L, output = "data"))$provider
+               perspective = FALSE, neval = 7L, gaussian.draws = 399L, output = "data"))$provider
   expect_equal(length(grad), 3L)
   for (panel in grad) {
     expect_equal(dim(panel$band.errors$simultaneous), c(7L, 2L))
@@ -147,7 +147,7 @@ test_that("Gaussian mean surfaces calibrate every evaluation point", {
   )
   for (bw in models) {
     out <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", neval = 5L,
-                gaussian_draws = 999L, output = "data"))$provider[[1L]]
+                gaussian.draws = 999L, output = "data"))$provider[[1L]]
     expect_identical(out$band.calibration$grid.size, 25L)
     expect_equal(dim(out$band.errors$simultaneous), c(25L, 2L))
     expect_true(all(is.finite(out$band.errors$simultaneous)))
@@ -189,7 +189,7 @@ test_that("NN joint normalization retains training radii", {
       expect_gt(max(abs(expected - wrong)), 1e-6)
     }
     out <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-                gaussian_draws = 199L, neval = 5L, output = "data"))$provider[[1L]]
+                gaussian.draws = 199L, neval = 5L, output = "data"))$provider[[1L]]
     expect_true(all(is.finite(out$band.errors$simultaneous)))
   }
 })
@@ -252,7 +252,7 @@ test_that("partially linear plots include shared-response covariance", {
   factor <- sweep(H, 2L, drop(E %*% y) / sqrt(rowSums(E^2)), "*")
   expect_equal(a$influence, unclass(factor), ignore_attr = TRUE, tolerance = 1e-10)
   out <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", perspective = FALSE,
-              gaussian_draws = 199L, neval = 5L, output = "data"))$provider
+              gaussian.draws = 199L, neval = 5L, output = "data"))$provider
   point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise", perspective = FALSE,
                 neval = 5L, output = "data"))$provider
   for (j in seq_along(out)) {
@@ -290,9 +290,9 @@ test_that("categorical joint bands retain endpoint covariance and level semantic
                  ignore_attr = TRUE)
   }
   levels <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", output = "data",
-                 perspective = FALSE, gaussian_draws = 199L))$provider
+                 perspective = FALSE, gaussian.draws = 199L))$provider
   grad <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "all", gradients = TRUE,
-               output = "data", perspective = FALSE, gaussian_draws = 199L))$provider
+               output = "data", perspective = FALSE, gaussian.draws = 199L))$provider
   point <- capture_plot_provider(plot(bw, errors = "asymptotic", band = "pointwise", gradients = TRUE,
                 output = "data", perspective = FALSE))$provider
   for (j in seq_len(2L)) {

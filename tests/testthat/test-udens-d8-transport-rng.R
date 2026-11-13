@@ -41,7 +41,7 @@ test_that("D8 transport preserves caller uniform and cached-normal continuation"
       expected<-list(normal=rnorm(4),uniform=runif(4))
       set.seed(5);if(pre)invisible(rnorm(pre));seed<-.Random.seed
       value<-expect_warning(plot(f,errors="asymptotic",center="bias-corrected",band="all",neval=11L,
-        gaussian_draws=B,output="data"),"below the recommended")
+        gaussian.draws=B,output="data"),"below the recommended")
       expect_identical(.Random.seed,seed)
       expect_identical(list(normal=rnorm(4),uniform=runif(4)),expected)
       payloads[[paste(kind,pre,B)]]<-value
@@ -53,7 +53,7 @@ test_that("D8 transport preserves caller uniform and cached-normal continuation"
   }
   RNGkind(normal.kind="Box-Muller");set.seed(5);rm(".Random.seed",envir=.GlobalEnv)
   expect_error(suppressWarnings(plot(f,errors="asymptotic",center="bias-corrected",band="all",neval=11L,
-    gaussian_draws=257L,output="data")),"Box-Muller state is not fully represented",fixed=TRUE)
+    gaussian.draws=257L,output="data")),"Box-Muller state is not fully represented",fixed=TRUE)
   expect_false(exists(".Random.seed",.GlobalEnv,inherits=FALSE))
   if(nzchar(Sys.getenv("N5_SNAPSHOT")))saveRDS(payloads,Sys.getenv("N5_SNAPSHOT"))
 })

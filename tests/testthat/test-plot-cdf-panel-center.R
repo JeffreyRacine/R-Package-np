@@ -32,8 +32,8 @@ test_that("CDF corrected slice drawings use each panel's own coordinates", {
     frozen <- serialize(f, NULL)
     for (cs in c(TRUE, FALSE)) for (band in if (full) c("pointwise", "all") else "pointwise") {
       args <- list(f, neval = 6L, perspective = FALSE, errors = "asymptotic",
-                   band = band, center = "bias-corrected", common_scale = cs)
-      if (band == "all") args <- c(args, list(gaussian_draws = 199L, random_seed = 19L))
+                   band = band, center = "bias-corrected", common.scale = cs)
+      if (band == "all") args <- c(args, list(gaussian.draws = 199L, random.seed = 19L))
       set.seed(73)
       out <- do.call(plot, c(args, list(output = "plot-data")))
       rng <- .Random.seed

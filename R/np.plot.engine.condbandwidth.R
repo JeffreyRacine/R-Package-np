@@ -76,7 +76,7 @@
         (!is.numeric(gradient.order) || !length(gradient.order) ||
          anyNA(gradient.order) || any(!is.finite(gradient.order)) ||
          any(gradient.order != 1)))
-      stop("conditional-quantile plots support only first derivatives ('gradient_order = 1')",
+      stop("conditional-quantile plots support only first derivatives ('gradient.order = 1')",
            call. = FALSE)
 
     if (.np_data_formal_supplied(sys.call(), sys.function()))
@@ -229,7 +229,7 @@
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all")
     if (!missing(gaussian.draws) && !joint.request && !new.conditional)
-      stop("gaussian_draws requires asymptotic simultaneous or all bands", call. = FALSE)
+      stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- joint.request && !quantreg && !isTRUE(proper) && !new.conditional
     quantile.joint <- joint.request && isTRUE(quantreg)
     if (joint.request)

@@ -10,7 +10,7 @@ test_that("partially linear surface payloads retain named dimensions", {
     for (surface in c(FALSE, TRUE)) {
       payload <- plot(fit, output = "data", neval = 5L,
                       errors = "none", perspective = surface,
-                      common_scale = common)
+                      common.scale = common)
       expect_s3_class(payload, "np_plot_data")
       expect_false(any(c("R2", "MSE", "fit") %in% names(payload)))
       expect_output(print(payload), "Plot data: npplreg")

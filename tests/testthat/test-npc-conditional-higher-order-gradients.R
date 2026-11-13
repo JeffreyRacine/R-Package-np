@@ -191,7 +191,7 @@ test_that("conditional plot data honors higher-order gradient requests", {
       xdat = x,
       ydat = y,
       gradients = TRUE,
-      gradient_order = 2L,
+      gradient.order = 2L,
       xq = 0.5,
       yq = 0.5,
       neval = 8,

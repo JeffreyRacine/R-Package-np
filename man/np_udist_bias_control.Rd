@@ -16,7 +16,7 @@ score envelope for supported fixed numeric Gaussian asymptotic bands.}
 \details{
 This private research implementation is undergoing full empirical-range
 qualification. It does not establish a finite-sample coverage guarantee.
-With \code{center="bias-corrected"}, omitting \code{bias_control} selects
+With \code{center="bias-corrected"}, omitting \code{bias.control} selects
 \code{"joint-process"}. The default estimate center remains unchanged. Use
 \code{errors="asymptotic"} for Gaussian calibration or \code{errors="bootstrap"}
 with \code{bootstrap="inid"}, \code{"fixed"} or \code{"geom"} for literal
@@ -37,7 +37,7 @@ With fixed bandwidths, fixed/geom processes use literal selected-law block count
 finite-sample covariance; their reported scales are not IID scales. The automatic
 block length remains \code{b.star(xdat, round=TRUE)[1,1]}, selected once per plot.
 The first input series may not represent dependence elsewhere in multivariate
-data. Explicit \code{boot_control=np_boot_control(blocklen=...)} overrides are
+data. Explicit \code{boot.control=np_boot_control(blocklen=...)} overrides are
 honored. Neither method divides by a replicate studentizer. Full-length fixed
 blocks with zero process variance are unavailable.
 No local or replicate studentizer division, variance floor, trimming, endpoint
@@ -67,7 +67,7 @@ quantiles bounded by the analytic marginal and Bonferroni maximum bounds.
 Inid marginal and joint quantiles use type one. Bonferroni intervals envelope
 the joint band. Singleton bands coincide. Standalone Gaussian Bonferroni uses
 the default joint draws for its envelope; request \code{band="all"} to set
-\code{gaussian_draws} and obtain all bands from the same process. Finite-draw
+\code{gaussian.draws} and obtain all bands from the same process. Finite-draw
 Bonferroni tail resolution and marginal sparse-tail coverage remain limitations.
 Every positive draw count is supported when the provider arithmetic is defined.
 Poorly resolved empirical quantiles return all requested bands with one aggregated
@@ -100,7 +100,7 @@ not receive this marginal envelope. An entirely zero observed process remains
 unavailable.
 
 For supported corrected empirical bootstrap bands, explicit
-\code{boot_control=np_boot_control(calibration="separate-tails")} uses signed
+\code{boot.control=np_boot_control(calibration="separate-tails")} uses signed
 lower and upper empirical tails in CDF units. The simultaneous roots are
 separate quantiles of the family minimum and maximum; endpoints invert those
 signed estimate displacements. \code{calibration="tail-envelope"} additionally
@@ -116,7 +116,7 @@ For fixed numeric Gaussian2 inputs with one or two variables, the inid signed
 bands retain the existing marginal score protection. Its two sides are nested
 outward separately, preserving asymmetry instead of imposing the larger
 uniform displacement on both sides. An explicit asymptotic option,
-\code{bias_control=np_udist_bias_control(calibration="score-envelope")},
+\code{bias.control=np_udist_bias_control(calibration="score-envelope")},
 uses this same side-specific composition with the unchanged Gaussian process.
 Gaussian draws remain reflection-symmetric; this option's possible asymmetry
 comes from the deterministic score envelope, and some bands can remain

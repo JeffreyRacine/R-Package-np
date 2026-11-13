@@ -50,7 +50,7 @@ test_that("ordered-only ANN copula distribution retains empirical CDF covariance
   request <- function(band) {
     args <- list(x = object, view = "fixed", output = "data", errors = "asymptotic", band = band)
     if (band %in% c("all", "simultaneous"))
-      args <- c(args, list(gaussian_draws = 9999L, random_seed = 19L))
+      args <- c(args, list(gaussian.draws = 9999L, random.seed = 19L))
     do.call(method, args)
   }
   pw <- request("pointwise")

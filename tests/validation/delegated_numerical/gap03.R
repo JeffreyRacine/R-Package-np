@@ -35,6 +35,6 @@ test_that("npregiv starting values and first-state replay are coherent", {
     grDevices::pdf()
     on.exit(grDevices::dev.off(), add = TRUE)
     expect_silent(plot(replay))
-    expect_silent(plot(replay, data_overlay = TRUE, main = "IV fit", xlim = range(dat$z), lty = 2))
+    expect_silent(plot(replay, data.overlay = TRUE, main = "IV fit", xlim = range(dat$z), lty = 2))
     expect_silent(plot(replay, gradients = TRUE))
 })

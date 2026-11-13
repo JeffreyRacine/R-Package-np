@@ -21,8 +21,8 @@ test_that("continuous regression panels forward xlim without changing inference"
                  # Keep this renderer test on the qualified multi-chunk route.
                  # The inherited single-chunk MPI argument collision is tracked
                  # separately; changing its dispatcher is outside this repair.
-                 bias_control=np_bias_control(degree=2),gaussian_draws=63L,
-                 neval=3L,common_scale=common,gradients=grad)
+                 bias.control=np_bias_control(degree=2),gaussian.draws=63L,
+                 neval=3L,common.scale=common,gradients=grad)
     reference <- do.call(plot,c(args,list(output="data")))
     seed <- .Random.seed
     value <- do.call(plot,c(args,list(output="plot-data",xlim=c(.8,.2))))

@@ -164,7 +164,7 @@ test_that("session adaptive-nn lc exact geom plot-data completes and reports boo
       "  bootstrap='geom',",
       "  B=19L,",
       "  band='pointwise',",
-      "  boot_control=np_boot_control(nonfixed='exact')))",
+      "  boot.control=np_boot_control(nonfixed='exact')))",
       "stopifnot(is.list(out), inherits(out, 'np_plot_data'))",
       "eval.grid <- data.frame(x = out$panels[[1L]]$grid$eval_1)",
       "fit.oracle <- npreg(bws=fit$bws, txdat=data.frame(x=x), tydat=y, exdat=eval.grid, gradients=FALSE, warn.glp.gradient=FALSE)",
