@@ -29,6 +29,9 @@
   genuinely conflicting controls retain their existing behavior. Conditional-mode
   sample views do not gain grid controls.
 
+- Rebuilding retained unconditional uniform-kernel metadata avoids a redundant
+  kernel-order advisory; fresh requests and unrelated conditions are unchanged.
+
 # np 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and
