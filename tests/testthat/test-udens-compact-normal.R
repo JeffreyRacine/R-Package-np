@@ -37,7 +37,7 @@ test_that("compact normal public assembly retains units and ordinary critical va
   for (kernel in c("uniform","epanechnikov")) {
     z <- .np_udens_compact_normal_moments(x,.2,grid,kernel)
     state <- list(q=1L,n=length(x),variant="asymptotic",normal.pmzsd=TRUE,
-      x=data.frame(x=3+4*x),normalized=matrix(x,ncol=1L),h=.2,
+      x=data.frame(x=3+4*x),normalized=matrix(x,ncol=1L),h=.2,physical.h=.8,
       lower=3,width=4,jacobian=4,kernel=kernel)
     for (alpha in c(.1,.05,.01)) {
       out <- .np_udens_compact_public_errors(state,data.frame(x=3+4*grid),alpha,7L,"pmzsd")

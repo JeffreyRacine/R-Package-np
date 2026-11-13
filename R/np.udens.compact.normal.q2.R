@@ -1,12 +1,18 @@
 # Plot-only compact q2 complete ratio-pilot normal variance.
 # Internal nine-target reference; public admission is qualified separately.
-.np_udens_compact_normal_q2_axis <- function(kernel) {
+.np_udens_compact_normal_q2_axis <- function(kernel,physical=NULL) {
  function(grid,axes,h,rb=NULL,inner=32L){
   parts<-index<-vector('list',2L)
   for(j in 1:2){
-   target<-sort(unique(grid[,j]));index[[j]]<-as.integer(match(grid[,j],target))
+   if(is.null(physical)) {
+     target<-sort(unique(grid[,j]));index[[j]]<-as.integer(match(grid[,j],target));geometry<-NULL
+   } else {
+     raw<-sort(unique(physical$grid[,j]));keep<-match(raw,physical$grid[,j])
+     target<-grid[keep,j];index[[j]]<-as.integer(match(physical$grid[,j],raw))
+     geometry<-.np_udens_compact_geometry_slice(physical,rows=keep,columns=j)
+   }
    pl<-.np_udens_compact_operator_plan(target,h[j],kernel)
-   a<-.np_udens_compact_operator(pl,exp(axes[[j]]$lv))-1
+   a<-.np_udens_compact_operator(pl,exp(axes[[j]]$lv),geometry)-1
    z<-array(0,c(length(target),ncol(a),24L))
    for(s in 1:4){z[,,s]<-a;z[,,s+4L]<-if(j==1L)a else 1;z[,,9L+4L*(s-1L)]<-if(j==1L)1 else -.25*a}
    parts[[j]]<-z
@@ -14,7 +20,7 @@
   list(parts=parts,index=index)
  }
 }
-.np_udens_compact_normal_q2_prepare <- function(x,h,grid,theta,outer,state,kernel,held.bytes=0){
+.np_udens_compact_normal_q2_prepare <- function(x,h,grid,theta,outer,state,kernel,held.bytes=0,physical=NULL){
  .np_udens_compact_normal_q2_validate(x,h,grid,kernel)
  if(length(theta)!=5L||any(!is.finite(theta))||!outer%in%c(16L,32L,64L)||
     length(held.bytes)!=1L||!is.finite(held.bytes)||held.bytes<0)
@@ -26,7 +32,8 @@
   axis<-.np_udens_compact_normal_q2_axis(kernel);cache<-axis(grid,axes,h);Td<-.np_udens_beta_basis(x);lg<-drop(Td%*%theta)-state$A;rho<-n^(-1/3);mats<-list();shifts<-numeric(2)
  for(j in 1:2){v<-exp(axes[[j]]$lv);a<-v/rho;b<-(1-v)/rho;L<-outer(a,log(x[,j]))+outer(b,log1p(-x[,j]))-lbeta(a+1,b+1);L<-sweep(L,2,.5*lg);shifts[j]<-max(L);mats[[j]]<-exp(L-shifts[j])}
  ratio<-tcrossprod(mats[[1]],mats[[2]])/n;if(any(!is.finite(ratio))||any(ratio<=0))stop('C2 ratio cache range');ratio<-log(ratio)+sum(shifts)
- list(x=x,h=h,grid=grid,theta=theta,inner=outer,outer=outer,state=state,axes=axes,cache=cache,ratio=ratio,Td=Td,Iinv=solve(state$I),axis.cache=axis,workspace=bytes,logz=state$A-axes[[1]]$A-axes[[2]]$A)
+ list(x=x,h=h,grid=grid,theta=theta,inner=outer,outer=outer,state=state,axes=axes,cache=cache,ratio=ratio,Td=Td,Iinv=solve(state$I),axis.cache=axis,observed.axis=if(is.null(physical))NULL else
+   .np_udens_compact_observed_axis(x,h,grid,kernel,physical),workspace=bytes,logz=state$A-axes[[1]]$A-axes[[2]]$A)
 }
 
 .np_udens_compact_normal_q2_validate <- function(x,h,grid,kernel) {
@@ -40,7 +47,7 @@
 }
 
 # Research diagonal functional variance; existing native owner unchanged.
-.np_udens_compact_normal_q2_block <- function(x,h,grid,kernel,progress=function(...)NULL,fit=NULL,held.bytes=0) {
+.np_udens_compact_normal_q2_block <- function(x,h,grid,kernel,progress=function(...)NULL,fit=NULL,held.bytes=0,physical=NULL) {
   if(!is.matrix(x)||!is.numeric(x)||ncol(x)!=2L||nrow(x)<10L||
      !is.matrix(grid)||!is.numeric(grid)||ncol(grid)!=2L||!nrow(grid)||nrow(grid)>9L||
      !is.numeric(h)||length(h)!=2L||any(!is.finite(c(x,h,grid)))||
@@ -64,12 +71,12 @@
     workspace<-max(workspace,.np_udens_beta_normal_q2_budget(n,width,theta,outer))
     progress(paste('joint reference pilot',level),0L,1L)
     first<-blocks[[1L]]
-    p<-.np_udens_compact_normal_q2_prepare(x,h,grid[first,,drop=FALSE],theta,outer,fit$state,kernel,held.bytes)
+    p<-.np_udens_compact_normal_q2_prepare(x,h,grid[first,,drop=FALSE],theta,outer,fit$state,kernel,held.bytes,.np_udens_compact_geometry_slice(physical,rows=first))
     initial<-raw(p)[[2L]];target<-initial$mean[length(first)+seq_len(5L)]
     .np_udens_compact_normal_q2_capacity(n,length(first),held.bytes=held.bytes+as.double(object.size(p)))
     fq<-.np_udens_beta_normal_q2_fit(target,theta)
     workspace<-max(workspace,.np_udens_beta_normal_q2_budget(n,width,fq$theta,outer))
-    pq<-.np_udens_compact_normal_q2_prepare(x,h,grid[first,,drop=FALSE],fq$theta,outer,fq$state,kernel,held.bytes+as.double(object.size(p)))
+    pq<-.np_udens_compact_normal_q2_prepare(x,h,grid[first,,drop=FALSE],fq$theta,outer,fq$state,kernel,held.bytes+as.double(object.size(p)),.np_udens_compact_geometry_slice(physical,rows=first))
     workspace<-max(workspace,p$workspace,pq$workspace)
     z<-list(center=numeric(m),se=numeric(m),theta=theta,thetaQ=fq$theta,
       meanQ=numeric(m),D=matrix(0,m,5L),variance.checks=list())
@@ -136,7 +143,7 @@
 # Target-specific quadrature and reference fitting stay local to each block.
 # Only the original x-only guide is shared; no numerical fallback or global cache.
 .np_udens_compact_normal_q2_moments <- function(x,h,grid,kernel,
-                                               progress=function(...)NULL) {
+                                               progress=function(...)NULL,physical=NULL) {
   if(!is.matrix(grid)||!is.numeric(grid)||ncol(grid)!=2L||!nrow(grid)||
      any(!is.finite(grid))||any(grid<=0|grid>=1))
     stop('invalid compact normal q2 evaluation grid',call.=FALSE)
@@ -152,7 +159,7 @@
   for(b in seq_along(blocks)) {
     rows<-blocks[[b]]
     notify<-function(stage,done,total)progress(paste('block',b,'of',length(blocks),stage),done,total)
-    z<-.np_udens_compact_normal_q2_block(x,h,grid[rows,,drop=FALSE],kernel,notify,fit,held)
+    z<-.np_udens_compact_normal_q2_block(x,h,grid[rows,,drop=FALSE],kernel,notify,fit,held,.np_udens_compact_geometry_slice(physical,rows=rows))
     for(k in c('center','se','meanQ'))out[[k]][rows]<-z[[k]]
     out$D[rows,]<-z$D
     out$blocks[[b]]<-list(rows=rows,thetaQ=z$thetaQ,reference=z$reference,
@@ -194,13 +201,13 @@
   if(any(!is.finite(width))||!is.finite(jacobian)||jacobian<=0||!is.finite(1/jacobian))
     stop('Compact q2 normal support units are not representable',call.=FALSE)
   normalized<-sweep(sweep(as.matrix(x),2L,lower),2L,width,'/')
-  h<-as.double(.np_physical_bandwidth(bws))/width
+  physical.h<-as.double(.np_physical_bandwidth(bws));h<-physical.h/width
   if(length(h)!=2L||any(!is.finite(h))||any(h<=0)||any(normalized<=0|normalized>=1))
     stop('Compact q2 normal bands require positive bandwidths and strictly interior observations',call.=FALSE)
   if(!is.numeric(alpha)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=.5)
     stop('Compact q2 normal bands require alpha in (0,0.5)',call.=FALSE)
   npValidateNonNegativeInteger(seed,'random.seed')
-  list(x=x,normalized=normalized,h=h,lower=lower,width=width,jacobian=jacobian,
+  list(x=x,normalized=normalized,h=h,physical.h=physical.h,lower=lower,width=width,jacobian=jacobian,
     kernel=bws[['ckertype',exact=TRUE]],q=2L,n=nrow(x),variant='asymptotic',
     plot.law='gaussian',plot.random.seed=seed,normal.pmzsd=TRUE,
     construction='density-fixed-q2-compact-normal-v1')
@@ -218,7 +225,8 @@
   progress<-function(stage,done,total).np_plot_progress_notify(
     stage=paste('Compact density normal:',stage),done=done,total=total,unit='work')
   z<-.np_plot_corrected_activity_run('Constructing fixed-bound compact q2 normal intervals',
-    .np_udens_compact_normal_q2_moments(state$normalized,state$h,normalized,state$kernel,progress))
+    .np_udens_compact_normal_q2_moments(state$normalized,state$h,normalized,state$kernel,progress,
+      physical=.np_udens_compact_geometry(state,grid)))
   inference<-list(center=z$center/state$jacobian,se=z$se/state$jacobian,bands=list(),
     settings=list(construction=state$construction,calibration='normal-quantile',law='asymptotic',
       kernel=state$kernel,q=2L,n=state$n,alpha=alpha,B=0L,available.bands='pmzsd',grid.size=nrow(grid),

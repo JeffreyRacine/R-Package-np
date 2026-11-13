@@ -25,7 +25,7 @@
   list(mean=v*a$mean+w*b$mean,variance=v*a$variance+w*b$variance+v*w*d*d,
     cross=v*a$cross+w*b$cross+v*w*outer(d,d[m+seq_len(5L)]),cov=NULL,logmass=lm)
 }
-.np_udens_compact_q2_stream_moments <- function(x,h,grid,kernel,fit,order,tile=1280L,progress=function(...)NULL) {
+.np_udens_compact_q2_stream_moments <- function(x,h,grid,kernel,fit,order,tile=1280L,progress=function(...)NULL,physical=NULL) {
   m<-nrow(grid);n<-nrow(x);axes<-.np_udens_compact_q2_axes(fit$theta,grid,h,kernel,order)
   blocks<-lapply(axes,function(a).np_udens_beta_blocks(a$nodes,tile))
   raw<-list(NULL,NULL);saved<-list();done<-0L;total<-length(blocks[[1]])*length(blocks[[2]])
@@ -43,7 +43,7 @@
   .np_udens_beta_check(g$cross[score,,drop=FALSE],st$I,'stream information')
   mu<-g$mean[ix];B<-g$cross[ix,,drop=FALSE];K<-B%*%solve(st$I)
   da<-list(list(lv=log(x[,1]),l1v=log1p(-x[,1])),list(lv=log(x[,2]),l1v=log1p(-x[,2])))
-  obs<-.np_udens_beta_joint_block_native(.np_udens_compact_q2_parts(kernel)(grid,da,h),seq_len(n),seq_len(n))
+  obs<-.np_udens_beta_joint_block_native(.np_udens_compact_normal_q2_axis(kernel,physical)(grid,da,h),seq_len(n),seq_len(n))
   Td<-.np_udens_beta_basis(x);Td<-sweep(Td,2,colMeans(Td));residual<-obs-rowMeans(obs)-K%*%t(Td)
   ve<-rowSums(residual^2)/(n*(n-1))
   variance<-lapply(raw,function(r)(r$variance[ix]-2*rowSums(K*r$cross[ix,,drop=FALSE])+rowSums((K%*%r$cross[score,,drop=FALSE])*K))/n)
@@ -99,7 +99,7 @@
     stop('compact q2 observed-feature workspace budget',call.=FALSE)
   invisible(NULL)
 }
-.np_udens_compact_q2_prepare <- function(x,h,grid,kernel,full,store,progress=function(...)NULL) {
+.np_udens_compact_q2_prepare <- function(x,h,grid,kernel,full,store,progress=function(...)NULL,physical=NULL) {
   .np_udens_compact_q2_validate(x,h,grid,kernel)
   n<-nrow(x);m<-nrow(grid)
   progress('original joint guide',0L,1L);fit<-.np_udens_beta_q2_fit(x);progress('original joint guide',1L,1L)
@@ -108,8 +108,8 @@
   budget<-lapply(axes,function(ax).np_udens_compact_q2_work_forecast(n,m,
     vapply(ax,`[[`,integer(1),'nodes'),vapply(1:2,function(j)length(unique(grid[,j])),integer(1)),held,full))
   # The complete common quadrature is independent of covariance/storage tiles.
-  a<-.np_udens_compact_q2_stream_moments(x,h,grid,kernel,fit,16L,1280L,progress)
-  b<-.np_udens_compact_q2_stream_moments(x,h,grid,kernel,fit,32L,1280L,progress)
+  a<-.np_udens_compact_q2_stream_moments(x,h,grid,kernel,fit,16L,1280L,progress,physical)
+  b<-.np_udens_compact_q2_stream_moments(x,h,grid,kernel,fit,32L,1280L,progress,physical)
   keys<-c('center','fitted','mu','B','observed','pilot_variance','empirical_variance','guide_variance','Veta')
   checks<-setNames(lapply(keys,function(k).np_udens_beta_check(a[[k]],b[[k]],
     paste('compact q2 original',k),if(k=='mu')1e-10 else 1e-9)),keys)
