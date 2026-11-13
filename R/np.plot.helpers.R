@@ -7944,7 +7944,7 @@
 
 .np_make_kbandwidth_unconditional <- function(bws, xdat) {
   xdat <- toFrame(xdat)
-  kbandwidth.numeric(
+  .np_retained_uniform_constructor(kbandwidth.numeric,
     bw = .np_physical_bandwidth(bws),
     bwscaling = FALSE,
     # npksum helper constructors require raw bandwidths; bwscaling flags are
