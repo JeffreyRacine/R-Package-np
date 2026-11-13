@@ -125,3 +125,25 @@ test_that("Q6 admission is an explicit isolated new law", {
   expect_identical(do.call(.np_plot_normalize_common_options,c(common,list(allow_smoothed_q6=TRUE)))$plot.errors.boot.method,"smoothed-q6")
   expect_false(.np_udens_q6_active(NULL))
 })
+
+
+test_that("Q6 scalar normalization cannot bypass its explicit admission", {
+  a <- list(errors="bootstrap", center="bias-corrected", band="simultaneous",
+    boot.control=np_boot_control(calibration="symmetric-sd"), B=199L)
+  for (law in list(factor("smoothed-q6"), c(named="smoothed-q6"))) {
+    a$bootstrap <- law
+    z <- .np_plot_normalize_public_dots(a, allow_smoothed_q6=TRUE)
+    expect_identical(z$plot.errors.boot.method, "smoothed-q6")
+    expect_error(.np_plot_normalize_public_dots(a), "only.*density")
+    for (key in c("errors", "center", "band", "boot.control")) {
+      b <- a; b[[key]] <- NULL
+      expect_error(.np_plot_normalize_public_dots(b, allow_smoothed_q6=TRUE), "requires explicit")
+    }
+    b <- a; b$center <- "estimate"
+    expect_error(.np_plot_normalize_public_dots(b, allow_smoothed_q6=TRUE), "requires explicit")
+    b <- a; b$B <- 1.5
+    expect_error(.np_plot_normalize_public_dots(b, allow_smoothed_q6=TRUE), "representable integer")
+    b <- a; b$gaussian.draws <- 199L
+    expect_error(.np_plot_normalize_public_dots(b, allow_smoothed_q6=TRUE), "does not accept")
+  }
+})

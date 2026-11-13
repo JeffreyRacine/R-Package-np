@@ -345,6 +345,9 @@ np_render_control <- function(style = c("band", "bar"),
     dots$bootstrap <- NULL
     dots <- .np_plot_set_normalized_arg(dots, "bootstrap",
                                         "plot.errors.boot.method", bootstrap)
+    # Scalar normalization can remove names/classes; recheck the explicit Q6 tuple.
+    if (identical(bootstrap, "smoothed-q6"))
+      .np_udens_q6_options(dots, allow_smoothed_q6)
   }
   if (has("B")) {
     B <- dots$B
