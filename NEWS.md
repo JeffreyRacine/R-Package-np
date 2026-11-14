@@ -1,5 +1,8 @@
 # np 0.80-3
 
+- Significance-test bandwidth controls consume their original promises once
+  across selection and testing, preserving stored call syntax and metadata.
+
 - Instrumental-variable formula fits evaluate a supplied NA-policy factory once,
   while applying the resulting policy separately to training and evaluation
   frames. Omitted policies retain their existing behavior through wrappers.

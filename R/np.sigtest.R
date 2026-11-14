@@ -1294,8 +1294,55 @@ npsigtest.rbandwidth <- function(bws,
   "B", "boot.method", "boot.type", "pivot", "joint", "index", "random.seed"
 )
 
+# Selector arguments must consume the same promises as the later test call.
+# Keep data-mask arguments with their existing owners and never force a test
+# control merely to construct the selector call.
+.np_npsig_selector_promises <- function(call, frame, caller) {
+  tagged <- call
+  for (i in seq_along(tagged)[-1L]) tagged[[i]] <- i
+  matched <- match.call(function(bws, xdat, ydat, ...) NULL,
+                        tagged, expand.dots = FALSE)
+  indices <- matched[["..."]]
+  structural <- c("formula", "data", "subset", "na.action", "gdata",
+                  ".np.formula.state")
+  replacements <- list()
+  for (i in seq_along(indices)) {
+    index <- indices[[i]]
+    name <- names(call)[index]
+    if (length(name) && !is.na(name) &&
+        name %in% c(structural, .np_npsig_default_test_args)) next
+    expression <- call[[index]]
+    reference <- .np_formula_promise_expression(
+      substitute(...elt(I), list(I = i)), frame)
+    call[[index]] <- reference
+    replacements[[length(replacements) + 1L]] <-
+      list(reference = reference, expression = expression)
+  }
+  list(call = call, replacements = replacements)
+}
+
+.np_npsig_restore_selector_call <- function(call, replacements) {
+  if (!is.call(call) || !length(replacements)) return(call)
+  restore <- function(arguments) {
+    pairlist.input <- is.pairlist(arguments)
+    for (i in seq_along(arguments)) for (replacement in replacements) {
+      if (identical(arguments[[i]], replacement$reference)) {
+        arguments[i] <- list(replacement$expression)
+        break
+      }
+    }
+    if (pairlist.input) arguments <- as.pairlist(arguments)
+    arguments
+  }
+  call <- restore(call)
+  if (!is.null(call[["..."]])) call[["..."]] <- restore(call[["..."]])
+  call
+}
+
 npsigtest.default <- function(bws, xdat, ydat, ...){
   sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  selector <- .np_npsig_selector_promises(sc, environment(), parent.frame())
+  sc <- selector$call
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat = if it
@@ -1350,6 +1397,10 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
                         native.map = c(bws = "bws", xdat = "xdat", ydat = "ydat"), native.frame = environment(),
                          formula.value = .np_formula_value(formula.input, bws, xdat))
   
+  if (is.call(tbw[["call", exact = TRUE]]))
+    tbw[["call"]] <- .np_npsig_restore_selector_call(
+      tbw[["call", exact = TRUE]], selector$replacements)
+
   call.args <- list(bws = tbw)
   if (!is.null(frame.state))
     call.args$.np.formula.state <- frame.state

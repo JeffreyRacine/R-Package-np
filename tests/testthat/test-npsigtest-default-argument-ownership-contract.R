@@ -220,5 +220,5 @@ test_that("named formulas retain selector semantics and their resolved owner", {
   expect_identical(captured$formula, f)
   expect_false("bandwidth.compute" %in% names(captured$call))
   method(bws = f, bandwidth.compute = FALSE, B = 9L)
-  expect_identical(captured$call$bandwidth.compute, FALSE)
+  expect_identical(eval(captured$call$bandwidth.compute), FALSE)
 })
