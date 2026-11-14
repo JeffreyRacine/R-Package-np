@@ -2,6 +2,10 @@ test_that("selected asymmetric companions admit only their explicit public choic
   a<-list(errors="bootstrap",bootstrap="smoothed-q6",center="bias-corrected",band="all",boot.control=np_boot_control(calibration="asymmetric-sd"))
   for(band in c("pointwise","simultaneous","bonferroni","all")){a$band<-band;expect_true(.np_udens_q6_options(a,TRUE))}
   for(band in c("pmzsd","none",NA_character_)){a$band<-band;expect_error(.np_udens_q6_options(a,TRUE),"requires explicit")}
+  for(value in list(c(named="asymmetric-sd"),c(named="symmetric-sd"),factor("asymmetric-sd"),c("asymmetric-sd","asymmetric-sd"),NA_character_,list("asymmetric-sd"))){
+    z<-a;z$band<-"all";z$boot.control<-NULL;z$plot.errors.boot.calibration<-value
+    expect_error(.np_udens_q6_options(z,TRUE),"requires explicit")
+  }
   expect_error(.np_udens_q6_asymmetric_pointwise_block(1000,10000,999),"workspace bound")
   expect_gte(.np_udens_q6_asymmetric_pointwise_block(30,5,39),1)
   for(B in c(1L,19L,39L,40L,999L)){
