@@ -164,6 +164,35 @@
   args
 }
 
+# Only materialized option values are inspected here. An ordinary caller
+# expression has already evaluated in its original owner; it is not syntax
+# for us to evaluate again. Structural formulas/subset/NA policies are handled
+# separately. Inert lists and expression vectors are deliberately not walked.
+.np_formula_options <- function(args, where) {
+  unsafe <- vapply(args, function(value)
+    is.call(value) || is.symbol(value) || typeof(value) == "bytecode", logical(1L))
+  # Named formula construction can retain the structural formula in dots.
+  # Accept only a real tilde form, never an executable call with a spoofed class.
+  for (i in which(names(args) == "formula")) {
+    value <- args[[i]]
+    if (inherits(value, "formula") && is.call(value) &&
+        length(value) %in% c(2L, 3L) && identical(value[[1L]], quote(`~`)))
+      unsafe[i] <- FALSE
+  }
+  if (any(unsafe)) {
+    labels <- names(args)
+    if (is.null(labels)) labels <- rep.int("", length(args))
+    empty <- is.na(labels) | !nzchar(labels)
+    labels[empty] <- paste0("#", which(empty))
+    stop(paste0(where, ": executable option value(s) ",
+      paste(shQuote(labels[unsafe]), collapse = ", "),
+      " cannot be evaluated again inside a formula handoff; evaluate these ",
+      "options in the caller and pass their resulting values instead."),
+      call. = FALSE)
+  }
+  args
+}
+
 # Existing value-list constructor calls still need the original subset syntax.
 # The constructor's model.frame, not this helper, evaluates that expression.
 .np_formula_dispatch_call <- function(fun, args, expressions, envir) {
@@ -173,6 +202,11 @@
   # and original scope instead of splicing syntax into the formula's scope.
   subsets <- stats::setNames(lapply(indices, function(i)
     as.name(paste0("..", i))), names(expressions)[indices])
+  # This helper is used only for formula entry, before the model-frame owner.
+  # Keep structural syntax and supported NA policies out of option admission.
+  structural <- names(args) %in% c("formula", "bws", "data", "newdata", "na.action")
+  if (!length(structural)) structural <- rep.int(FALSE, length(args))
+  .np_formula_options(args[!structural], "formula dispatch")
   do.call(fun, c(args, subsets), envir = envir)
 }
 

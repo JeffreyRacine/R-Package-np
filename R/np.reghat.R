@@ -1839,7 +1839,7 @@ npreghat.formula <-
     if (has.eval)
       hat.args$exdat <- exdat
 
-    ev <- do.call(npreghat, c(hat.args, dots))
+    ev <- do.call(npreghat, c(hat.args, .np_formula_options(dots, "npreghat.formula")))
     attr(ev, "call") <- match.call(expand.dots = FALSE)
     ev
   }

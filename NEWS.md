@@ -61,6 +61,10 @@
 
 - Preserve literal graphical labels through plot forwarding and saved replay; honor conditional-mode panel labels.
 
+- Formula handoffs reject explicitly quoted or compiled executable option values
+  before they can run again against prepared data. Ordinary evaluated controls,
+  structural formulas and supported callbacks retain their existing behavior.
+
 # np 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and

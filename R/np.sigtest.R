@@ -67,7 +67,7 @@ npsigtest.formula <-
     } else {
       dots <- list(...)
       dots$.np.formula.state <- NULL
-      do.call(npsigtest, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
+      do.call(npsigtest, c(list(xdat = xdat, ydat = ydat, bws = bws), .np_formula_options(dots, "npsigtest.formula")))
     }
     ev$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
     environment(ev$call) <- parent.frame()
@@ -1362,6 +1362,8 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
     .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
   dots[c("bws", "bandwidth.compute", "formula", "data", "xdat", "ydat")] <- NULL
 
+  if (!is.null(frame.state))
+    dots <- .np_formula_options(dots, "npsigtest.default")
   ev <- do.call(npsigtest, c(call.args, dots))
 
   ev$call <- match.call(expand.dots = FALSE)

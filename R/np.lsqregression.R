@@ -1187,7 +1187,7 @@ nplsqregbw.formula <-
     train.omit <- attr(mf, "na.action")
     ydat <- model.response(mf)
     xdat <- mf[, .np_formula_term_names(attr(attr(mf, "terms"), "term.labels")), drop = FALSE]
-    out <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = tau), dots))
+    out <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = .np_formula_options(list(tau = tau), "nplsqregbw.formula")[[1L]]), .np_formula_options(dots, "nplsqregbw.formula")))
     out <- .nplsqreg_record_omit(out, attr(mf, "na.action"))
     out <- .nplsqreg_retain_formula_terms(out, bws, attr(mf, "terms"))
     out <- .nplsqreg_set_response_name(
@@ -1797,15 +1797,15 @@ nplsqreg.formula <-
       eval.omit <- NULL
     }
 
-    bw <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = tau),
-                                dots))
+    bw <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = .np_formula_options(list(tau = tau), "nplsqreg.formula")[[1L]]),
+                                .np_formula_options(dots, "nplsqreg.formula")))
     bw <- .nplsqreg_retain_formula_terms(bw, model.formula, tt)
     fit.args <- list(bws = bw, txdat = xdat, tydat = ydat,
                      gradients = gradients, residuals = residuals,
                      gradient.order = gradient.order, se = se)
     if (has.eval)
       fit.args$exdat <- exdat
-    out <- do.call(nplsqreg, fit.args)
+    out <- do.call(nplsqreg, .np_formula_options(fit.args, "nplsqreg.formula"))
     out$call <- match.call(expand.dots = FALSE)
     out$call <- .nplsqreg_describe_call(out$call, parent.frame())
     out <- .nplsqreg_set_response_name(out, response.name)

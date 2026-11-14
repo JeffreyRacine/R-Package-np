@@ -195,7 +195,7 @@ npindex.formula <-
         # and retained the evaluation policy above. Native constructors must
         # not receive this consumed formula-only argument a second time.
         dots$na.action <- NULL
-        ev <- do.call(npindex, c(si.args, list(se = se, se.type = se.type), dots))
+        ev <- do.call(npindex, c(si.args, list(se = se, se.type = se.type), .np_formula_options(dots, "npindex.formula")))
         ev$call <- mc
         environment(ev$call) <- .np_call_owner_environment(
           parent.frame(), replacement = environment(tt))
@@ -408,6 +408,8 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
     bw.dots$.np_fit_progress_handoff <- NULL
     if (bws.formula)
       bw.dots[c("subset", "na.action")] <- NULL
+    if (bws.formula)
+      bw.dots <- .np_formula_options(bw.dots, "npindex.default")
     bw.args <- c(list(xdat = txdat, ydat = tydat, nomad = nomad), bw.dots)
     tbw <- do.call(
       npindexbw,
@@ -426,6 +428,8 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
           caller_env = parent.frame()
         )
     }
+    if (bws.formula)
+      fit.dots <- .np_formula_options(fit.dots, "npindex.default")
     return(do.call(npindex, c(fit.args, list(se = se, se.type = se.type), fit.dots)))
   }
 
@@ -504,6 +508,8 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
   }
   if (no.bws || bws.formula || is.call(bws))
     call.args$.np_fit_progress_handoff <- TRUE
+  if (!is.null(tbw[["formula", exact = TRUE]]))
+    dots <- .np_formula_options(dots, "npindex.default")
   do.call(npindex, c(call.args, list(se = se, se.type = se.type), dots))
 }
 

@@ -61,6 +61,19 @@
   the appropriate \code{np} function, for example
   \code{npudensbw(dat=data)}.
 
+  Formula interfaces accept already evaluated option values. Ordinary R
+  expressions are evaluated in their existing caller scope, but explicitly
+  quoted calls, symbols or compiled expressions supplied as option values are
+  rejected before a second evaluation inside the formula handoff. Evaluate
+  such options in the caller and pass the resulting values instead. Model
+  formulas, subset expressions and supported function-valued callbacks retain
+  their existing evaluation rules. On estimator routes that forward prepared
+  formula data, this refusal also covers explicitly quoted \code{data} and
+  \code{na.action} values that would otherwise be evaluated again. Pass the
+  data object directly and a function or character NA policy instead; for
+  example, use \code{data = d, na.action = stats::na.omit}, rather than
+  \code{data = quote(d), na.action = quote(stats::na.omit)}.
+
   To others, however, it may be natural to use the formula interface
   that is used for the regression examples, among others. For
   nonparametric regression functions such as \code{\link{npreg}}, you

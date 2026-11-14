@@ -80,7 +80,7 @@ npcdens.formula <-
     }
     cd.args$bws <- bws
     dots$na.action <- NULL
-    ev <- do.call(npcdens, c(cd.args, dots))
+    ev <- do.call(npcdens, c(cd.args, .np_formula_options(dots, "npcdens.formula")))
 
     ev$omit <- .np_formula_output_action(ev, umf, has.eval)
     ev$rows.omit <- as.vector(ev$omit)
@@ -765,7 +765,8 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
-    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+    .np_formula_options(.np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment()), "npcdens.default")
   else list(...)
   do.call(npcdens, c(call.args, fit.dots))
 }
