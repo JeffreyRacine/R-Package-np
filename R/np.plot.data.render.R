@@ -126,6 +126,14 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
             lerr = lower[[1L]], herr = upper[[1L]],
             lerr.all = if (all) lower else NULL, herr.all = if (all) upper else NULL)
         }
+        # Use the renderer's own argument matching for supplied x/y limits.
+        # They have no generated defaults here; zlim does, so retain its style origin.
+        matched.limits <- match.call(.np_plot_render_surface_rgl,
+          as.call(c(list(quote(.np_plot_render_surface_rgl)), args)))
+        args$automatic.limits <- .np_plot_rgl_automatic_limits(list(
+          xlim = matched.limits[["xlim", exact = TRUE]],
+          ylim = matched.limits[["ylim", exact = TRUE]],
+          zlim = style[["zlim", exact = TRUE]]))
         widget <- do.call(.np_plot_render_surface_rgl, .np_plot_literal_labels(args))
       } else {
         mat <- .np_plot_render_surface_base_frame(

@@ -1222,6 +1222,9 @@ plot.npcopula <- function(x,
       rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
       rgl.controls <- .np_plot_rgl_controls(dots, legend = legend)
       rgl.out <- .np_plot_render_surface_rgl(
+        automatic.limits = .np_plot_rgl_automatic_limits(list(
+          xlim = dots$xlim, ylim = dots$ylim,
+          zlim = plot.limit.style[["zlim", exact = TRUE]])),
         xlim = dots$xlim, ylim = dots$ylim,
         x = u1,
         y = u2,

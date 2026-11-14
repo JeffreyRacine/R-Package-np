@@ -563,6 +563,7 @@
         }
         .np_plot_first_render_begin(first.render)
         rgl.out <- .np_plot_render_surface_rgl(
+          automatic.limits = .np_plot_rgl_automatic_limits(saved.plot.style),
           xlim = xlim, ylim = ylim,
           x = x1.eval,
           y = x2.eval,
