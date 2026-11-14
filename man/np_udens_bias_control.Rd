@@ -75,8 +75,9 @@ coverage guarantee. The experimental-status warning applies to this method.
 }
 
 \subsection{Known-bound beta density inference}{
-With omitted or \code{NULL} \code{bias.control}, fixed second-order beta
-kernels support \code{errors="asymptotic"} and independent bootstrap
+With omitted or \code{NULL} \code{bias.control}, fixed beta
+kernels of orders 2, 4, 6 and 8 in one continuous dimension, and order 2
+in two continuous dimensions, support \code{errors="asymptotic"} and independent bootstrap
 \code{calibration="symmetric-sd"} or \code{"asymmetric-sd"}. Request
 \code{center="bias-corrected"} and explicitly select \code{band="pointwise"}
 or \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}. This plot-only construction supports one or two
@@ -87,6 +88,12 @@ literal support endpoints are rejected; no jittering or target deletion occurs.
 Bandwidths, bounds and targets stay fixed during inference. Core fitted values,
 estimator standard errors, bandwidth selection and \code{se=FALSE} are unchanged.
 An object fitted with \code{se=FALSE} can receive explicitly requested plot bands.
+The same plot correction below is used at every admitted native order, with
+the fitted physical bandwidth retained. Higher-order native fits are not
+replaced or coerced to order 2. The higher-order extension does not admit
+normal \code{pmzsd} intervals or two-dimensional higher-order correction.
+Saved-sample coverage at each native order's own bandwidth was conservative;
+this is not a universal guarantee or untouched independent confirmation.
 
 On normalized support, write \eqn{L_r=4K_r-6K_{2r}+4K_{3r}-K_{4r}}.
 Here \eqn{r} is the dimensionless Chen kernel scale, not a distance
