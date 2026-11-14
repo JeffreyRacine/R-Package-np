@@ -1258,13 +1258,14 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   ncon <- length(setup[["cont_flat"]])
   if (identical(template[["type"]], "adaptive_nn"))
     return(rep.int(n - 2L, ncon))
-  if (!incumbent && identical(template[["type"]], "generalized_nn") &&
-      (!is.null(gydat) || !isTRUE(do.full.integral)) &&
+  # Non-beta GNN folds decode every coordinate on the deleted sample.
+  # Admit an original-sample incumbent, then recover in the ordinary fold domain.
+  if (identical(template[["type"]], "generalized_nn") &&
       !identical(template[["cxkertype"]], "beta") &&
       !identical(template[["cykertype"]], "beta"))
-    return(rep.int(n - 2L, ncon))
+    return(rep.int(n - if (incumbent) 1L else 2L, ncon))
   caps <- rep.int(n - 1L, ncon)
-  # Empirical response-grid CDF folds omit both response indices; X omits one.
+  # Preserve the separate beta-containing empirical-grid recovery policy.
   if (is.null(gydat) && isTRUE(do.full.integral))
     caps[seq_len(sum(template[["iycon"]]))] <- n - 2L
   caps

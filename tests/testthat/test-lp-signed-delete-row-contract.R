@@ -173,7 +173,9 @@ test_that("remaining conditional higher-order LOO routes retain qualified transc
       route = "cdist", method = "cv.ls", bwtype = "generalized_nn",
       kernel = "gaussian", order = 8L, bernstein = FALSE,
       degree = c(1L, 1L), bws = c(25L, 29L, 27L),
-      oracle = 3.066587903283053
+      # Independent deleted WLS/CDF score for the existing decimal Gaussian8 kernel.
+      # See fixtures/conditional-cdf-gnn-r77-reference.md.
+      oracle = 3.1542637393732895
     )
   )
 

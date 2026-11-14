@@ -28408,8 +28408,10 @@ static int np_conditional_y_eval_univariate_pair_direct(
     matrix_Y_continuous_train_extern[0],
     num_train,
     matrix_Y_continuous_eval[0][eval_pos],
-    ctx->matrix_bandwidth_y[0][eval_pos],
-    ctx->matrix_bandwidth_y_successor[0][eval_pos],
+    ctx->matrix_bandwidth_y[0][eval_pos] *
+      (ctx->base_exclusion_scale != NULL ? ctx->base_exclusion_scale[0] : 1.0),
+    ctx->matrix_bandwidth_y_successor[0][eval_pos] *
+      (ctx->base_exclusion_scale != NULL ? ctx->base_exclusion_scale[0] : 1.0),
     int_TREE_Y == NP_TREE_TRUE ? ipt_extern_Y : NULL,
     primary,
     successor);
@@ -28460,6 +28462,8 @@ static int np_conditional_y_eval_univariate_direct(
   bandwidth = use_successor ?
     ctx->matrix_bandwidth_y_successor[0][eval_pos] :
     ctx->matrix_bandwidth_y[0][eval_pos];
+  if(ctx->base_exclusion_scale != NULL)
+    bandwidth *= ctx->base_exclusion_scale[0];
   if(!isfinite(eval_y) || !isfinite(bandwidth) || bandwidth <= 0.0)
     return 1;
 
@@ -36729,9 +36733,10 @@ cleanup_adaptive_cdist:
 }
 
 /* Canonical generalized-NN empirical conditional-CDF row owner.  X row i is
- * formed on D_n\{i}.  Response query j uses the bounded exclusion union
- * D_n\{i,j}, while the estimator dot product still excludes only donor i via
- * the X influence row.  The prepared adjacent response radii avoid per-pair
+ * formed on D_n\{i}. Response query j is evaluated on that same deleted
+ * sample: its training occurrence remains a donor when j != i. Mapping a
+ * query back to its stored tree position does not remove that observation.
+ * The prepared adjacent response radii avoid per-pair
  * sorting and retain O(n) auxiliary storage per coordinate. */
 static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
   double *vector_scale_factor,
@@ -36760,8 +36765,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
 
   if(np_conditional_xrow_ctx_prepare_ctx(
        vector_scale_factor,
-       cdfontrain_extern ? &np_conditional_training_identity_geometry :
-         &np_conditional_deleted_identity_geometry,
+       &np_conditional_deleted_identity_geometry,
        &xctx) != 0)
     goto cleanup_gnn_empirical_cdist;
   if(np_conditional_yrow_eval_two_slot_ctx_prepare(
@@ -36771,8 +36775,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
        matrix_Y_ordered_eval_extern,
        matrix_Y_continuous_eval_extern,
        num_eval,
-       cdfontrain_extern ? &np_conditional_training_identity_geometry :
-         &np_conditional_external_geometry,
+       &np_conditional_external_geometry,
        &yctx) != 0)
     goto cleanup_gnn_empirical_cdist;
 
@@ -36930,8 +36933,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
 
   if(np_conditional_xrow_ctx_prepare_ctx(
        vector_scale_factor,
-       cdfontrain_extern ? &np_conditional_training_identity_geometry :
-         &np_conditional_deleted_identity_geometry,
+       &np_conditional_deleted_identity_geometry,
        &xctx) != 0)
     goto cleanup_gnn_empirical_block;
   if(np_conditional_yrow_eval_two_slot_ctx_prepare(
@@ -36941,8 +36943,7 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
        matrix_Y_ordered_eval_extern,
        matrix_Y_continuous_eval_extern,
        num_eval,
-       cdfontrain_extern ? &np_conditional_training_identity_geometry :
-         &np_conditional_external_geometry,
+       &np_conditional_external_geometry,
        &yctx) != 0)
     goto cleanup_gnn_empirical_block;
 

@@ -27,7 +27,7 @@ conditional_gnn_empirical_cdf_oracle <- function(x, y, kx, ky) {
         next
       hy <- vapply(seq_len(ncol(y)), function(d) {
         conditional_gnn_empirical_cdf_radius(
-          y[, d], y[j, d], ky[[d]], c(i, j)
+          y[, d], y[j, d], ky[[d]], i
         )
       }, numeric(1L))
       yrow <- rep.int(1, length(keep))
