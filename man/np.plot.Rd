@@ -709,7 +709,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   The explicit experimental \code{bootstrap="smoothed-q6"} law supports
   \code{errors="bootstrap"}, \code{center="bias-corrected"},
-  \code{band="simultaneous"} and
+  \code{band="pointwise"} or \code{band="simultaneous"}, and
   \code{boot.control=np_boot_control(calibration="symmetric-sd")} together.
   It is restricted to one continuous numeric variable, a positive retained
   fixed bandwidth, whole-line second-order uniform or Epanechnikov kernels,
@@ -725,7 +725,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   functional under Q6, rather than at the observed curve or Q6 density, and
   divided by the fixed original complete-influence standard errors. A single
   absolute maximum over the unique supplied finite grid is calibrated with the
-  type-7 empirical quantile. Signed corrected centers and raw endpoints are
+  type-7 empirical quantile for simultaneous bands. Pointwise intervals instead
+  use the marginal absolute root quantile at each original supplied coordinate;
+  targets do not change within a replicate. Signed corrected centers and raw endpoints are
   retained; nonnegative intersections may be reported separately. This is a
   different law and calibration from \code{smoothed-percentile}.
 
@@ -740,6 +742,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   85.53--92.97 percent), improving to 95.31 percent at n=400. Other retained
   positive fixed-bandwidth origins are accepted conditionally without a new
   bandwidth search, but do not inherit that CVML coverage evidence.
+  Mean pointwise coverage at 90/95/99 percent was 91.18/95.83/99.15 percent
+  for uniform and 90.42/95.25/98.98 percent for Epanechnikov. Local sparse-tail
+  deficits remain: these averages are not uniform-in-location guarantees.
 
   Default bias-corrected unconditional unbounded Gaussian density plots use the D8
   positive-pilot construction for eligible asymptotic requests; see
