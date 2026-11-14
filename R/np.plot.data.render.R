@@ -57,11 +57,11 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
     style <- utils::modifyList(.np_plot_data_field(display, "style", list()), dots)
     if (identical(display$kind, "iv")) {
       spec <- list(curve.args = c(list(x = grid[[1L]], y = values$estimate), display$curve_args),
-        frame.args = utils::modifyList(display$frame_args, dots),
+        frame.args = display$frame_args,
         continuous = display$continuous, overlay = !is.null(display$overlay),
         overlay.x = display$overlay$x, overlay.y = display$overlay$y,
         overlay.args = display$overlay_args, rug = !is.null(display$rug), rug.x = display$rug)
-      .np_iv_plot_render(spec)
+      .np_iv_plot_render(.np_iv_plot_replay_spec(spec, dots))
       next
     }
     varying <- if (!is.null(display$coordinates)) match(display$coordinates, names(grid)) else

@@ -48,6 +48,9 @@
   bandwidth calls while preserving executable-option evaluation and retained
   response-call semantics.
 
+- Preserve explicit frame and style arguments in instrumental-variable plots
+  and saved replay, including automatic ranges requested with explicit NULL.
+
 # np 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and

@@ -792,6 +792,8 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   range(values[keep])
 }
 
+# Keep graphical ownership and NULL policy aligned with .np_iv_plot_replay_spec;
+# test-iv-replay-frame-arguments.R compares the actual fresh/replay primitives.
 .np_iv_plot_spec <- function(object,
                              family = c("npregiv", "npregivderiv"),
                              gradients,
@@ -939,6 +941,49 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   )
 }
 
+# Mirror .np_iv_plot_spec graphical ownership and NULL policy; the fresh/replay
+# primitive contract in test-iv-replay-frame-arguments.R protects both sides.
+.np_iv_plot_replay_spec <- function(spec, dots) {
+  # Preserve IV replay's named-list policy; route accepted graphics to the
+  # same owners as .np_iv_plot_spec without touching stored numerical data.
+  overrides <- utils::modifyList(list(), dots, keep.null = TRUE)
+  curve.names <- c("type", "xlab", "ylab", "xlim", "ylim", "col", "lty", "lwd")
+  point.names <- c("col", "pch", "cex", "bg")
+  if (!isTRUE(spec[["overlay"]]))
+    curve.names <- union(curve.names, point.names)
+  for (name in intersect(names(overrides), curve.names)) {
+    if (name %in% c("col", "lty", "pch", "cex", "bg") &&
+        is.null(overrides[[name]]))
+      spec[["curve.args"]][[name]] <- NULL
+    else
+      spec[["curve.args"]][name] <- overrides[name]
+  }
+  for (name in intersect(names(overrides), point.names))
+    spec[["overlay.args"]][[name]] <- overrides[[name]]
+  frame.names <- setdiff(names(overrides), union(curve.names, point.names))
+  spec[["frame.args"]] <- utils::modifyList(
+    spec[["frame.args"]], overrides[frame.names], keep.null = TRUE)
+
+  log.value <- spec[["frame.args"]][["log"]]
+  valid.log <- is.character(log.value) && length(log.value) == 1L &&
+    !is.na(log.value)
+  for (axis in c("x", "y")) {
+    limit <- paste0(axis, "lim")
+    if (!(limit %in% names(overrides)) || !is.null(overrides[[limit]]))
+      next
+    if (axis == "x" && !isTRUE(spec[["continuous"]]))
+      next
+    values <- spec[["curve.args"]][[axis]]
+    if (isTRUE(spec[["overlay"]]))
+      values <- c(values, spec[[paste0("overlay.", axis)]])
+    else if (axis == "x" && isTRUE(spec[["rug"]]))
+      values <- c(values, spec[["rug.x"]])
+    spec[["curve.args"]][[limit]] <- .np_iv_plot_auto_range(
+      values, axis, logged = valid.log && grepl(axis, log.value, fixed = TRUE))
+  }
+  spec
+}
+
 .np_iv_plot_render <- function(spec) {
   curve.args <- spec[["curve.args"]]
   frame.args <- spec[["frame.args"]]
@@ -950,7 +995,7 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
       initial.args[["col"]] <- NULL
       initial.args[["lty"]] <- NULL
       initial.args[["lwd"]] <- NULL
-      do.call(plot, c(initial.args, frame.args))
+      do.call(plot, .np_plot_merge_override_args(initial.args, frame.args))
       do.call(
         .np_plot_overlay_points_1d,
         c(list(x = spec[["overlay.x"]], y = spec[["overlay.y"]]),
@@ -969,14 +1014,16 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
         xlim = curve.args[["xlim"]],
         ylim = curve.args[["ylim"]]
       )
-      initial.args <- c(initial.args, spec[["overlay.args"]], frame.args)
+      initial.args <- .np_plot_merge_override_args(
+        .np_plot_merge_override_args(initial.args, spec[["overlay.args"]]),
+        frame.args)
       do.call(plot, initial.args)
       line.args <- curve.args[c("x", "y", "type", "col", "lty", "lwd")]
       line.args <- line.args[!vapply(line.args, is.null, logical(1L))]
       do.call(lines, line.args)
     }
   } else {
-    do.call(plot, c(curve.args, frame.args))
+    do.call(plot, .np_plot_merge_override_args(curve.args, frame.args))
   }
 
   if (isTRUE(spec[["rug"]]))
