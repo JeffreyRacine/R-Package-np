@@ -1,4 +1,4 @@
-# Plot-only U5 support-reproducing correction; native order-four estimator is unchanged.
+# Plot-only U5 support-reproducing correction; native estimators are unchanged.
 .np_udens_u5_kernel <- function(name) {
   if (!identical(name, "epanechnikov")) stop("U5 requires Epanechnikov", call.=FALSE)
   list(span=sqrt(5))
@@ -10,22 +10,24 @@
  if(d>1)for(j in 2:d)P[,j+1]<-((2*j-1)*z*P[,j]-(j-1)*P[,j-1])/j
  P
 }
-.np_udens_u5_boundary<-function(name,l,r,order=16L) {
+.np_udens_u5_boundary<-function(name,l,r,order=16L,kernel.order=4L) {
+ if (!isTRUE(kernel.order %in% c(4L,6L,8L))) stop("U5 requires kernel order 4, 6 or 8",call.=FALSE)
+ degree <- as.integer(kernel.order+1L)
  k<-.np_udens_u5_kernel(name);stopifnot(is.finite(l),is.finite(r),l<r,l<=0,r>=0,l>=-k$span,r<=k$span)
  half<-(r-l)/2;mid<-(r+l)/2;rule<-.np_udens_q6_rule(order);u<-mid+half*rule$x
  weight<-function(v)if(name=='uniform')rep(.5,length(v)) else 3/(4*sqrt(5))*(1-v^2/5)
- P<-.np_udens_u5_poly(rule$x);w<-half*rule$w*weight(u);G<-crossprod(P,P*w);p0<-drop(.np_udens_u5_poly(-mid/half));coef<-solve(G,p0)
- L<-function(v) {keep<-v>=l & v<=r;out<-numeric(length(v));out[keep]<-weight(v[keep])*drop(.np_udens_u5_poly((v[keep]-mid)/half)%*%coef);out}
- oracle<-function(v)drop(.np_udens_u5_poly((v-mid)/half)%*%((2*(0:5)+1)/2*p0))/half
+ P<-.np_udens_u5_poly(rule$x,degree);w<-half*rule$w*weight(u);G<-crossprod(P,P*w);p0<-drop(.np_udens_u5_poly(-mid/half,degree));coef<-solve(G,p0)
+ L<-function(v) {keep<-v>=l & v<=r;out<-numeric(length(v));out[keep]<-weight(v[keep])*drop(.np_udens_u5_poly((v[keep]-mid)/half,degree)%*%coef);out}
+ oracle<-function(v)drop(.np_udens_u5_poly((v-mid)/half,degree)%*%((2*(0:degree)+1)/2*p0))/half
  list(L=L,analytic_uniform=oracle,condition=kappa(G,exact=TRUE),l=l,r=r)
 }
 
 # Complete covariance arithmetic copied exactly from the qualified U5 control.
-.np_udens_u5_covariance<-function(z,x,kn,grid,order) {
+.np_udens_u5_covariance<-function(z,x,kn,grid,order,kernel.order=4L) {
  h<-as.double(z$h);n<-length(x);j<-0:z$k;A<-z$a+j;BB<-z$b+z$k-j;weights<-rowMeans(vapply(x,function(t)dbinom(j,z$k,t),numeric(length(j))));abq<-c(z$aQ,z$bQ)
  logmeans<-cbind(digamma(A)-digamma(A+BB),digamma(BB)-digamma(A+BB));m<-drop(crossprod(weights,logmeans));I<-diag(trigamma(abq))-trigamma(sum(abq));TT<-matrix(0,2,2)
  for(k in seq_along(weights))TT<-TT+weights[k]*(diag(trigamma(c(A[k],BB[k])))-trigamma(A[k]+BB[k])+tcrossprod(logmeans[k,]));TT<-TT-tcrossprod(m)
- span<-.np_udens_u5_kernel(kn)$span;ops<-lapply(grid,function(t).np_udens_u5_boundary(kn,max(-span,-t/h),min(span,(1-t)/h)))
+ span<-.np_udens_u5_kernel(kn)$span;ops<-lapply(grid,function(t).np_udens_u5_boundary(kn,max(-span,-t/h),min(span,(1-t)/h),kernel.order=kernel.order))
  limits<-c(-(100+max(abs(lbeta(A,BB))))/min(c(A,abq[1])),(100+max(abs(lbeta(A,BB))))/min(c(BB,abq[2])))
  physical<-sort(unique(c(grid,grid-span*h,grid+span*h)));physical<-physical[physical>0&physical<1];fixed<-c(-80,-40,-20,-10,-5,0,5,10,20,40,80)
  cuts<-sort(unique(c(limits,fixed[fixed>limits[1]&fixed<limits[2]],qlogis(physical))));stopifnot(cuts[1]==limits[1],tail(cuts,1)==limits[2])
@@ -48,11 +50,11 @@
 }
 
 .np_udens_u5_check<-function(a,b,label){e<-max(abs(a-b));lim<-1e-12+1e-9*max(abs(b));if(!is.finite(e)||e>lim)stop(paste(label,e,'>',lim));e}
-.np_udens_u5_guide<-function(grid,h,ab,kn,budget,relative){
+.np_udens_u5_guide<-function(grid,h,ab,kn,budget,relative,kernel.order=4L){
  span<-.np_udens_u5_kernel(kn)$span;low<--(budget+abs(lbeta(ab[1],ab[2])))/ab[1];high<-(budget+abs(lbeta(ab[1],ab[2])))/ab[2]
  softplus<-function(t)pmax(t,0)+log1p(exp(-abs(t)));values<-errors<-numeric(length(grid))
  for(i in seq_along(grid)){
-  g<-grid[i];op<-.np_udens_u5_boundary(kn,max(-span,-g/h),min(span,(1-g)/h));phys<-c(g,g-span*h,g+span*h);phys<-phys[phys>0&phys<1];cut<-sort(unique(c(low,0,qlogis(phys),high)));stopifnot(cut[1]==low,tail(cut,1)==high)
+  g<-grid[i];op<-.np_udens_u5_boundary(kn,max(-span,-g/h),min(span,(1-g)/h),kernel.order=kernel.order);phys<-c(g,g-span*h,g+span*h);phys<-phys[phys>0&phys<1];cut<-sort(unique(c(low,0,qlogis(phys),high)));stopifnot(cut[1]==low,tail(cut,1)==high)
   fun<-function(t){lv<--softplus(-t);lu<--softplus(t);op$L((exp(lv)-g)/h)/h*exp(ab[1]*lv+ab[2]*lu-lbeta(ab[1],ab[2]))}
   for(k in seq_len(length(cut)-1L)){v<-integrate(fun,cut[k],cut[k+1L],rel.tol=relative,abs.tol=1e-12,subdivisions=1000L);values[i]<-values[i]+v$value;errors[i]<-errors[i]+v$abs.error}
  }
@@ -89,7 +91,7 @@
   bytes
 }
 
-.np_udens_u5_moments <- function(x,h,grid,progress=function(...)NULL,block=8L) {
+.np_udens_u5_moments <- function(x,h,grid,progress=function(...)NULL,block=8L,kernel.order=4L) {
   if (!is.numeric(x) || !is.null(dim(x)) || any(!is.finite(x)) ||
       any(x<=0|x>=1) || !is.numeric(grid) || !length(grid) ||
       any(!is.finite(grid)) || any(grid<=0|grid>=1) ||
@@ -111,8 +113,8 @@
   center <- se <- numeric(length(targets)); checks <- list()
   for(first in seq.int(1L,length(targets),by=block)) {
     ix <- first:min(first+block-1L,length(targets)); g <- targets[ix]
-    low <- .np_udens_u5_covariance(z,x,"epanechnikov",g,64L)
-    ref <- .np_udens_u5_covariance(z,x,"epanechnikov",g,96L)
+    low <- .np_udens_u5_covariance(z,x,"epanechnikov",g,64L,kernel.order)
+    ref <- .np_udens_u5_covariance(z,x,"epanechnikov",g,96L,kernel.order)
     errors <- vapply(c("C","center","EA","B","component_means"),function(key)
       .np_udens_u5_check(low[[key]],ref[[key]],paste("refinement",key)),0.0)
     errors <- c(errors,.np_udens_u5_check(ref$mass,1,"mass"),
@@ -122,12 +124,12 @@
     if (min(eigen(ref$C,symmetric=TRUE,only.values=TRUE)$values) < -1e-10 ||
         any(!is.finite(diag(ref$C))) || any(diag(ref$C)<=0))
       stop("U5 complete covariance is not positive finite",call.=FALSE)
-    g1 <- .np_udens_u5_guide(g,h,ab,"epanechnikov",80,1e-10)
-    g2 <- .np_udens_u5_guide(g,h,ab,"epanechnikov",100,2e-11)
+    g1 <- .np_udens_u5_guide(g,h,ab,"epanechnikov",80,1e-10,kernel.order)
+    g2 <- .np_udens_u5_guide(g,h,ab,"epanechnikov",100,2e-11,kernel.order)
     errors <- c(errors,.np_udens_u5_check(g1$value,g2$value,"original guide refinement"))
     span <- sqrt(5)
     observed <- vapply(g,function(t) {
-      op <- .np_udens_u5_boundary("epanechnikov",max(-span,-t/h),min(span,(1-t)/h))
+      op <- .np_udens_u5_boundary("epanechnikov",max(-span,-t/h),min(span,(1-t)/h),kernel.order=kernel.order)
       mean(op$L((x-t)/h)/h)
     },0.0)
     center[ix] <- observed-g2$value+dbeta(g,ab[1],ab[2]);se[ix] <- sqrt(diag(ref$C))
@@ -144,17 +146,17 @@
     identical(center,"bias-corrected") && identical(method,"asymptotic") && identical(band,"pmzsd") &&
     identical(bws[["type",exact=TRUE]],"fixed") && identical(bws[["ckerbound",exact=TRUE]],"fixed") &&
     identical(bws[["ckertype",exact=TRUE]],"epanechnikov") &&
-    isTRUE(bws[["ckerorder",exact=TRUE]]==4L) && isTRUE(bws[["ndim",exact=TRUE]]==1L) &&
+    isTRUE(bws[["ckerorder",exact=TRUE]] %in% c(4L,6L,8L)) && isTRUE(bws[["ndim",exact=TRUE]]==1L) &&
     isTRUE(bws[["ncon",exact=TRUE]]==1L)
 }
 .np_udens_u5_active <- function(state)
-  identical(state[["construction",exact=TRUE]],"density-u5-order4-normal-v1")
+  isTRUE(state[["construction",exact=TRUE]] %in% paste0("density-u5-order",c(4L,6L,8L),"-normal-v1"))
 
 .np_udens_u5_prepare <- function(bws,x) {
   if (!.np_udens_u5_request(bws,NULL,"bias-corrected","asymptotic","pmzsd") ||
       !is.data.frame(x) || ncol(x)!=1L || !nzchar(names(x)[1L]) ||
       !is.numeric(x[[1L]]) || is.object(x[[1L]]) || any(!is.finite(x[[1L]])))
-    stop("invalid U5 fixed-bound order-four data",call.=FALSE)
+    stop("invalid U5 fixed-bound higher-order data",call.=FALSE)
   lower <- bws[["ckerlb",exact=TRUE]];upper <- bws[["ckerub",exact=TRUE]]
   if (!is.numeric(lower) || !is.numeric(upper) || length(lower)!=1L || length(upper)!=1L ||
       any(!is.finite(c(lower,upper))) || upper<=lower)
@@ -167,7 +169,8 @@
     stop("U5 requires strictly interior observations; support endpoints are excluded",call.=FALSE)
   .np_udens_u5_budget(nrow(x),1L)
   list(x=x,normalized=normalized,h=h,lower=lower,width=width,n=nrow(x),q=1L,
-       normal.pmzsd=TRUE,plot.law="gaussian",construction="density-u5-order4-normal-v1")
+       normal.pmzsd=TRUE,plot.law="gaussian",kernel.order=as.integer(bws[["ckerorder",exact=TRUE]]),
+       construction=paste0("density-u5-order",bws[["ckerorder",exact=TRUE]],"-normal-v1"))
 }
 
 .np_udens_u5_public <- function(state,grid,alpha,band) {
@@ -179,14 +182,14 @@
   if (any(!is.finite(target)) || any(target<=0|target>=1))
     stop("U5 bands require strictly interior evaluation points; support endpoints are excluded",call.=FALSE)
   progress <- function(stage,done,total) .np_plot_progress_notify(stage=paste("U5 density:",stage),done=done,total=total,unit="targets")
-  z <- .np_plot_corrected_activity_run("Constructing order-four density normal intervals",
-    .np_udens_u5_moments(state$normalized,state$h,target,progress))
+  z <- .np_plot_corrected_activity_run("Constructing higher-order density normal intervals",
+    .np_udens_u5_moments(state$normalized,state$h,target,progress,kernel.order=state$kernel.order))
   inference <- list(center=z$center/state$width,se=z$se/state$width,bands=list(),
     settings=list(construction=state$construction,calibration="normal-quantile",law="asymptotic",
       kernel="epanechnikov",q=1L,n=state$n,alpha=alpha,B=0L,available.bands="pmzsd",
       grid.size=nrow(grid),family="marginal intervals at supplied interior targets",
       bounds=c(state$lower,state$lower+state$width),bandwidth=state$h*state$width,
-      correction="degree-five support-reproducing operator with fitted beta guide; native order-four fit retained",
+      correction=paste0("degree-",state$kernel.order+1L," support-reproducing operator with fitted beta guide; native fit retained"),
       calibration.status="complete positive-reference covariance with guide and cross terms"),
     reference=list(original.guide=z$original.guide,variance.guide=z$reference.guide,degree=z$reference.degree),
     numerical.checks=list(refinement=z$checks,workspace=z$workspace))

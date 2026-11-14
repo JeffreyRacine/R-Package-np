@@ -2,6 +2,8 @@
 
 ## Private density plot additions
 
+* Extend the fixed-bound U5 normal pointwise correction to Epanechnikov orders six/eight, retaining order-four arithmetic and native fits.
+
 * Explicit Q6 smoothed-bootstrap density inference now provides marginal pointwise bands while retaining its simultaneous calibration.
 * Fixed-bound univariate order-four Epanechnikov density plots add normal pointwise bias-corrected intervals using the support-reproducing beta-guide construction. Native fits and bandwidths are unchanged. Both additions remain experimental; local coverage limitations are documented.
 
