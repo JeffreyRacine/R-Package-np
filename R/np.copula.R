@@ -528,10 +528,10 @@ npcopula <- function(bws, ...) {
   old.par <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(old.par), add = TRUE)
   graphics::par(mfrow = c(2L, 2L))
-  do.call(graphics::contour, c(list(x = grid$u1, y = grid$u2, z = grid$z,
+  do.call(graphics::contour, .np_plot_literal_labels(c(list(x = grid$u1, y = grid$u2, z = grid$z,
                                     xlab = xlab, ylab = ylab,
                                     main = "Copula Contour"),
-                               dots))
+                               dots)))
   .npcopula_draw_surface_base(
     grid = grid,
     zlab = "Copula",
@@ -545,10 +545,10 @@ npcopula <- function(bws, ...) {
     ylab = ylab,
     dots = dots
   )
-  do.call(graphics::plot, c(list(x = empirical$u1, y = empirical$u2,
+  do.call(graphics::plot, .np_plot_literal_labels(c(list(x = empirical$u1, y = empirical$u2,
                                  xlab = xlab, ylab = ylab, cex = .np_plot_cex("copula_pair"),
                                  main = "Empirical Copula"),
-                            dots))
+                            dots)))
   .npcopula_draw_surface_base(
     grid = density.grid,
     zlab = "Copula Density",
@@ -1118,10 +1118,10 @@ plot.npcopula <- function(x,
     empirical <- .npcopula_empirical_eval(x)
     if (identical(output, "data"))
       return(finish.data(empirical, "empirical"))
-    do.call(graphics::plot, c(list(x = empirical$u1, y = empirical$u2,
+    do.call(graphics::plot, .np_plot_literal_labels(c(list(x = empirical$u1, y = empirical$u2,
                                    xlab = xlab, ylab = ylab, cex = .np_plot_cex("copula_pair"),
                                    main = main),
-                              dots))
+                              dots)))
     if (identical(output, "plot-data"))
       return(finish.data(empirical, "empirical"))
     return(invisible(NULL))
@@ -1137,9 +1137,9 @@ plot.npcopula <- function(x,
            call. = FALSE)
     if (identical(output, "data"))
       return(finish.data(as.data.frame(x), "sample"))
-    do.call(graphics::plot, c(list(x = x$u1, y = x$u2,
+    do.call(graphics::plot, .np_plot_literal_labels(c(list(x = x$u1, y = x$u2,
                                    xlab = xlab, ylab = ylab, main = main),
-                              dots))
+                              dots)))
     if (identical(output, "plot-data"))
       return(finish.data(as.data.frame(x), "sample"))
     return(invisible(NULL))
@@ -1337,9 +1337,9 @@ plot.npcopula <- function(x,
     if (identical(renderer, "rgl"))
       stop("renderer='rgl' is supported only for surface views in plot.npcopula",
            call. = FALSE)
-    do.call(graphics::contour, c(list(x = u1, y = u2, z = z,
+    do.call(graphics::contour, .np_plot_literal_labels(c(list(x = u1, y = u2, z = z,
                                       xlab = xlab, ylab = ylab, main = main),
-                                 dots))
+                                 dots)))
   } else {
     if (identical(renderer, "rgl"))
       stop("renderer='rgl' is supported only for surface views in plot.npcopula",
@@ -1349,10 +1349,10 @@ plot.npcopula <- function(x,
     } else {
       col
     }
-    do.call(graphics::image, c(list(x = u1, y = u2, z = z,
+    do.call(graphics::image, .np_plot_literal_labels(c(list(x = u1, y = u2, z = z,
                                     xlab = xlab, ylab = ylab, main = main,
                                     col = image.col),
-                               dots))
+                               dots)))
   }
   if (identical(output, "plot-data"))
     return(finish.data(plot.data))

@@ -450,7 +450,7 @@
       if (is.numeric(limit) && any(is.infinite(limit)))
         stop(axis, " must not contain infinite values")
     }
-    surface.ids <- do.call(rgl::persp3d, persp3d.call)
+    surface.ids <- do.call(rgl::persp3d, .np_plot_literal_labels(persp3d.call, expression.labels = TRUE))
     # rgl can turn finite extreme limits into non-finite scene coordinates.
     # Refuse that state before scene serialization, which otherwise can stall.
     if (any(!is.finite(rgl::par3d("bbox"))))

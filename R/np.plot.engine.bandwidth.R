@@ -757,7 +757,7 @@
             if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
           )
           .np_plot_first_render_begin(first.render)
-          do.call(plot.fun, plot.args)
+          do.call(plot.fun, .np_plot_literal_labels(plot.args))
           .np_plot_first_render_end(first.render)
           if (plot.rug && !xi.factor)
             .np_plot_draw_rug_1d(xdat[,i])
@@ -928,7 +928,7 @@
             if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
           )
           .np_plot_first_render_begin(first.render)
-          do.call(plot.fun, plot.args)
+          do.call(plot.fun, .np_plot_literal_labels(plot.args))
           .np_plot_first_render_end(first.render)
           if (plot.rug && !xi.factor)
             .np_plot_draw_rug_1d(xdat[,i])

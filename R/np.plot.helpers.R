@@ -7369,7 +7369,7 @@ plotFactor <- function(f, y, ...){
     base.args$lty <- "blank"
   if (is.fac && !has.user.pch)
     base.args$pch <- .np_plot_pch("factor_estimate")
-  do.call(graphics::plot.default, base.args)
+  do.call(graphics::plot.default, .np_plot_literal_labels(base.args))
   if (add.axis)
     axis(1, at = seq_along(levels(f)), labels = levels(f))
 
@@ -7752,7 +7752,7 @@ plotFactor <- function(f, y, ...){
   if (is.null(background$zlim)) background$zlim <- range(persp.args$z, finite = TRUE)
   background$box <- background$axes <- FALSE
   background$main <- background$sub <- NULL
-  persp.mat <- without.hooks("persp", do.call(graphics::persp, background))
+  persp.mat <- without.hooks("persp", do.call(graphics::persp, .np_plot_literal_labels(background)))
   .np_plot_draw_box_grid_persp(
     xlim = xlim,
     ylim = ylim,
@@ -7763,7 +7763,7 @@ plotFactor <- function(f, y, ...){
   graphics::par(new = TRUE)
   on.exit(graphics::par(new = FALSE), add = TRUE)
   without.hooks(c("before.plot.new", "plot.new"),
-    do.call(graphics::persp, persp.args))
+    do.call(graphics::persp, .np_plot_literal_labels(persp.args)))
 }
 
 .np_plot_match_renderer <- function(renderer) {
@@ -8743,7 +8743,7 @@ plotFactor <- function(f, y, ...){
       data.args$lty <- NULL
       data.args$lwd <- NULL
       data.args$col <- NULL
-      do.call(graphics::plot, data.args)
+      do.call(graphics::plot, .np_plot_literal_labels(data.args))
     } else {
       overlay.args <- plot.args
       overlay.args$x <- overlay.x
@@ -8754,7 +8754,7 @@ plotFactor <- function(f, y, ...){
       overlay.args$pch <- scalar_default(overlay.args$pch, 20)
       overlay.args$cex <- scalar_default(overlay.args$cex, 0.5)
       overlay.args$col <- .np_plot_color("data_overlay")
-      do.call(graphics::plot, overlay.args)
+      do.call(graphics::plot, .np_plot_literal_labels(overlay.args))
     }
   } else {
     empty.args <- plot.args
@@ -8762,7 +8762,7 @@ plotFactor <- function(f, y, ...){
     empty.args$y <- value[, 1L]
     empty.args$type <- "n"
     empty.args$xaxt <- if (xi.factor) "n" else "s"
-    do.call(graphics::plot, empty.args)
+    do.call(graphics::plot, .np_plot_literal_labels(empty.args))
     if (xi.factor)
       graphics::axis(1, at = mat.x, labels = as.character(ei[seq_len(nkeep)]))
   }

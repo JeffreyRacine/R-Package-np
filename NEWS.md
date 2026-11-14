@@ -59,6 +59,8 @@
 
 - Avoid expanding complete response vectors into internal LSQ bandwidth labels.
 
+- Preserve literal graphical labels through plot forwarding and saved replay; honor conditional-mode panel labels.
+
 # np 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and

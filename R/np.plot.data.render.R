@@ -71,16 +71,16 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
       which(vapply(grid, function(g) length(unique(g)) > 1L, logical(1L)))
     if (identical(display$kind, "coefficients")) {
       if (renderer != "base") stop("coefficient displays use the base renderer", call. = FALSE)
-      positions <- do.call(graphics::barplot, utils::modifyList(list(height = values$estimate,
+      positions <- do.call(graphics::barplot, .np_plot_literal_labels(utils::modifyList(list(height = values$estimate,
         names.arg = grid[[1L]], ylab = label, xlab = "Regressor"),
-        style[intersect(names(style), c("col", "border", "main", "sub", "xlab", "ylab", "ylim", "xlim"))]))
+        style[intersect(names(style), c("col", "border", "main", "sub", "xlab", "ylab", "ylim", "xlim"))])))
       if (nrow(intervals)) draw.error.bars(as.vector(positions), intervals$lower, intervals$upper)
       next
     }
     if (identical(display$kind, "scatter")) {
       if (renderer != "base") stop("probability-pair replay uses the base renderer", call. = FALSE)
-      do.call(graphics::plot, utils::modifyList(list(x = grid[[1L]], y = grid[[2L]],
-        xlab = p$variables$label[1L], ylab = p$variables$label[2L], main = label), style))
+      do.call(graphics::plot, .np_plot_literal_labels(utils::modifyList(list(x = grid[[1L]], y = grid[[2L]],
+        xlab = p$variables$label[1L], ylab = p$variables$label[2L], main = label), style)))
       next
     }
     if (identical(display$kind, "surface") && length(varying) == 2L) {
@@ -88,8 +88,8 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
       if (isTRUE(display$view %in% c("contour", "image"))) {
         if (renderer != "base") stop("contour/image replay uses the base renderer", call. = FALSE)
         fun <- if (display$view == "contour") graphics::contour else graphics::image
-        do.call(fun, utils::modifyList(list(x = g$x, y = g$y, z = g$z,
-          xlab = p$variables$label[varying[1L]], ylab = p$variables$label[varying[2L]], main = label), style))
+        do.call(fun, .np_plot_literal_labels(utils::modifyList(list(x = g$x, y = g$y, z = g$z,
+          xlab = p$variables$label[varying[1L]], ylab = p$variables$label[varying[2L]], main = label), style)))
         next
       }
       lower <- upper <- list()
@@ -126,7 +126,7 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
             lerr = lower[[1L]], herr = upper[[1L]],
             lerr.all = if (all) lower else NULL, herr.all = if (all) upper else NULL)
         }
-        widget <- do.call(.np_plot_render_surface_rgl, args)
+        widget <- do.call(.np_plot_render_surface_rgl, .np_plot_literal_labels(args))
       } else {
         mat <- .np_plot_render_surface_base_frame(
           args, range(args$x), range(args$y), args$zlim)
@@ -165,7 +165,7 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
         display$overlay$value))),
       style[!names(style) %in% c("theta", "phi", "zlim", "zlab")])
     if (categorical) args$xaxt <- "n"
-    do.call(graphics::plot, args)
+    do.call(graphics::plot, .np_plot_literal_labels(args))
     if (categorical) graphics::axis(1, at = unique(xpos), labels = unique(as.character(coord)))
     if (!is.null(display$overlay)) {
       fun <- if (categorical) .np_plot_overlay_points_factor else .np_plot_overlay_points_1d
