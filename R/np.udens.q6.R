@@ -214,9 +214,9 @@
     dots[["plot.errors.boot.calibration", exact = TRUE]]
   if (!identical(value("errors", "plot.errors.method"), "bootstrap") ||
       !identical(value("center", "plot.errors.center"), "bias-corrected") ||
-      !isTRUE(value("band", "plot.errors.type") %in% c("pointwise", "simultaneous")) ||
+      !isTRUE(value("band", "plot.errors.type") %in% c("pointwise", "simultaneous", "bonferroni", "all")) ||
       !identical(calibration, "symmetric-sd"))
-    stop("smoothed-q6 requires explicit bootstrap errors, bias-corrected center, pointwise or simultaneous band and symmetric-sd calibration", call. = FALSE)
+    stop("smoothed-q6 requires explicit bootstrap errors, bias-corrected center, pointwise, simultaneous, bonferroni or all band and symmetric-sd calibration", call. = FALSE)
   if (!is.null(dots[["bias.control", exact = TRUE]]) ||
       isTRUE(dots[["gradients", exact = TRUE]]) || isTRUE(dots[["gradient", exact = TRUE]]) ||
       "gaussian.draws" %in% names(dots) ||
@@ -264,8 +264,8 @@
   identical(state[["construction", exact=TRUE]], "density-compact-q6-symmetric-v1")
 
 .np_udens_q6_public_errors <- function(state, grid, alpha, B, band) {
-  if (identical(band, "pointwise"))
-    return(.np_udens_q6_pointwise_public(state, grid, alpha, B))
+  if (isTRUE(band %in% c("pointwise","bonferroni","all")))
+    return(.np_udens_q6_pointwise_public(state, grid, alpha, B, band))
   if (!.np_udens_q6_active(state) || !identical(band,"simultaneous") ||
       !is.data.frame(grid) || ncol(grid)!=1L || !nrow(grid) ||
       !identical(names(grid), names(state$x)))

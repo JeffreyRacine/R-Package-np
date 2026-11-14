@@ -23,7 +23,7 @@ test_that('pointwise admission leaves other unsupported bands rejected', {
  a<-list(errors='bootstrap',bootstrap='smoothed-q6',center='bias-corrected',band='pointwise',boot.control=np_boot_control(calibration='symmetric-sd'))
  expect_true(.np_udens_q6_options(a,TRUE))
  expect_error(.np_udens_q6_options(a,FALSE),'only.*density')
- for(b in c('all','bonferroni','pmzsd')){z<-a;z$band<-b;expect_error(.np_udens_q6_options(z,TRUE),'requires explicit')}
+ for(b in c('pmzsd')){z<-a;z$band<-b;expect_error(.np_udens_q6_options(z,TRUE),'requires explicit')}
  z<-a;z$boot.control<-np_boot_control(calibration='asymmetric-sd');expect_error(.np_udens_q6_options(z,TRUE),'requires explicit')
  expect_error(.np_udens_q6_pointwise_budget(100,50,1e8),'workspace bound')
  expect_true(.np_udens_q6_pointwise_budget(100,50,9999)<192*1024^2)

@@ -89,7 +89,7 @@ test_that("Q6 admission is an explicit isolated new law", {
     b <- a; b[[key]] <- NULL
     expect_error(.np_udens_q6_options(b, TRUE), "requires explicit")
   }
-  for (band in c("bonferroni", "all", "pmzsd")) {
+  for (band in c("pmzsd")) {
     b<-a; b$band<-band; expect_error(.np_udens_q6_options(b,TRUE), "requires explicit")
   }
   for (cal in c("default", "absolute", "asymmetric-sd", "smoothed-percentile")) {
