@@ -623,8 +623,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   construction; see \code{\link{npqreg}} for its supported level and
   gradient targets and conditioning assumptions.
 
-  Known-fixed-bound order-2 beta density plots support a separate corrected
-  guide-region plus residual construction in one or two continuous dimensions.
+  Known-fixed-bound beta density plots support a separate corrected
+  guide-region plus residual construction: orders 2, 4, 6 and 8 for one
+  continuous dimension, and order 2 for two continuous dimensions.
   With omitted \code{bias.control}, request asymptotic errors or independent
   bootstrap \code{calibration="symmetric-sd"}/\code{"asymmetric-sd"}, and
   explicitly choose pointwise, simultaneous, Bonferroni or all three bands
@@ -1280,8 +1281,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Fixed-bandwidth beta kernels of orders 4, 6 and 8 also support these
   estimate-centered joint variability bands in one or two continuous
   dimensions with finite known fixed bounds. Their signed observation
-  contributions are retained; this does not extend beta bias-corrected
-  methods or change the native marginal standard errors.
+  contributions are retained; native marginal standard errors are unchanged.
+  The separate univariate beta corrected construction described above accepts
+  these orders only for explicit calibrated bands; higher-order normal intervals
+  and two-dimensional corrected bands remain unsupported.
   This higher-order addition does not admit CDFs, conditional estimators,
   nearest-neighbour bandwidths, range bounds or bias-corrected requests.
 

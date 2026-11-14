@@ -6,6 +6,8 @@
 
 ## Private density plot additions
 
+* Fixed-bound univariate beta plots admit native orders four, six and eight for explicit asymptotic and symmetric/asymmetric SD pointwise, simultaneous, Bonferroni and all bands, using the unchanged guide-region/residual construction. Native fits, normal pmzsd and higher-order q2 support are unchanged.
+
 * Explicit asymmetric Q6 adds signed pointwise and Bonferroni/all companions on the same full empirical-range family. Raw Bonferroni limits, simultaneous hull and finite-draw warnings remain distinct; existing simultaneous and symmetric results are preserved.
 
 * Explicit asymmetric Q6 density inference adds simultaneous bands on the full empirical-range grid. Each resample rebuilds that grid; signed maxima retain their signs. The corrected center, symmetric Q6 and all existing inference choices remain unchanged.
