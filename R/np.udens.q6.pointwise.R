@@ -8,6 +8,18 @@
   bytes
 }
 
+.np_udens_q6_pointwise_block <- function(n, m, B) {
+  # Preserve the original admission boundary, then use the remaining envelope.
+  .np_udens_q6_pointwise_budget(n, m, B)
+  if (B < 1L) stop("invalid Q6 pointwise replicate count", call. = FALSE)
+  base <- .np_udens_q6_budget(n, m, B)
+  targets <- min(m, floor((192 * 1024^2 - base - 32 * m) / (48 * B)) - 1)
+  if (targets < 1L)
+    stop("Q6 pointwise inference exceeds its 192 MiB workspace bound", call. = FALSE)
+  .np_udens_q6_pointwise_budget(n, m, B, targets)
+  as.integer(targets)
+}
+
 .np_udens_q6_pointwise_chunk <- function(task, reference) {
   Y <- .np_udens_q6_samples(task, reference$x, reference$h)
   mu <- colMeans(Y)
@@ -27,12 +39,12 @@
 
 .np_udens_q6_pointwise_reduce <- function(reference, tasks, alpha) {
   B <- sum(vapply(tasks, function(z) z$bsz, 0L))
-  .np_udens_q6_pointwise_budget(length(reference$x), length(reference$grid), B)
+  block <- .np_udens_q6_pointwise_block(length(reference$x), length(reference$grid), B)
   if (!is.numeric(alpha) || length(alpha) != 1L || !is.finite(alpha) || alpha <= 0 || alpha >= .5)
     stop("invalid Q6 pointwise alpha", call. = FALSE)
   critical <- numeric(length(reference$grid)); error <- 0
-  for (first in seq.int(1L, length(reference$grid), by = 8L)) {
-    ix <- first:min(first + 7L, length(reference$grid))
+  for (first in seq.int(1L, length(reference$grid), by = block)) {
+    ix <- first:min(first + block - 1L, length(reference$grid))
     part <- reference
     for (field in c("grid", "center", "reference.center", "se")) part[[field]] <- reference[[field]][ix]
     part$covariance <- NULL

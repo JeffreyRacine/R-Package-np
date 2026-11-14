@@ -28,3 +28,16 @@ test_that('pointwise admission leaves other unsupported bands rejected', {
  expect_error(.np_udens_q6_pointwise_budget(100,50,1e8),'workspace bound')
  expect_true(.np_udens_q6_pointwise_budget(100,50,9999)<192*1024^2)
 })
+
+test_that('Q6 pointwise blocks respect the same fixed memory envelope', {
+ for(n in c(20L,200L,1000L)) for(B in c(31L,999L,9999L,120000L)) {
+  m<-50L
+  k<-.np_udens_q6_pointwise_block(n,m,B)
+  expect_true(k>=min(8L,m) && k<=m)
+  expect_true(.np_udens_q6_pointwise_budget(n,m,B,k)<=192*1024^2)
+  if(k<m) expect_error(.np_udens_q6_pointwise_budget(n,m,B,k+1L),'workspace bound')
+ }
+ expect_equal(.np_udens_q6_pointwise_block(200L,50L,9999L),50L)
+ expect_error(.np_udens_q6_pointwise_block(100L,50L,1e8),'workspace bound')
+ expect_error(.np_udens_q6_pointwise_block(20L,5L,0L),'replicate count')
+})
