@@ -767,12 +767,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   The explicit experimental \code{bootstrap="smoothed-q6"} law supports
   \code{errors="bootstrap"}, \code{center="bias-corrected"},
-  \code{band="pointwise"} or \code{band="simultaneous"}, and
+  \code{band="pointwise"}, \code{band="simultaneous"},
+  \code{band="bonferroni"} or \code{band="all"}, and
   \code{boot.control=np_boot_control(calibration="symmetric-sd")} together.
   It is restricted to one continuous numeric variable, a positive retained
   fixed bandwidth, whole-line second-order uniform or Epanechnikov kernels,
   at least ten finite observations and positive guide variance. It leaves the
-  fitted estimator and all existing inference choices unchanged. Other bands,
+  fitted estimator and all existing inference choices unchanged. Normal-scale \code{pmzsd},
   asymptotic errors, asymmetric calibration, bounds, nearest-neighbor bandwidths,
   custom bias controls and dependent-data controls are not admitted by this law.
 
@@ -785,7 +786,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   absolute maximum over the unique supplied finite grid is calibrated with the
   type-7 empirical quantile for simultaneous bands. Pointwise intervals instead
   use the marginal absolute root quantile at each original supplied coordinate;
-  targets do not change within a replicate. Signed corrected centers and raw endpoints are
+  targets do not change within a replicate. Bonferroni uses the type-7 marginal
+  absolute quantile at alpha divided by the number of unique targets, combined
+  with the simultaneous hull. Raw Bonferroni endpoints are retained separately
+  in the inference record. All component bands use the same primitive draw plan;
+  no extra draws or target deletion improves finite-B resolution. Signed corrected centers and raw endpoints are
   retained; nonnegative intersections may be reported separately. This is a
   different law and calibration from \code{smoothed-percentile}.
 
