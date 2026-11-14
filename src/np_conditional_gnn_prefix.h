@@ -39,6 +39,7 @@ static void np_cgnn_compensated(double v, double *s, double *e) {
 }
 #include "np_conditional_gnn_local.h"
 #include "np_conditional_gnn_stable.h"
+#include "np_conditional_gnn_signed.h"
 typedef struct {
   int n, folds, moments, failed, ykernel, *active, *first, *end, *orderRank;
   const double *y;
@@ -699,6 +700,7 @@ void np_conditional_gnn_notice_emit(void) {
 typedef struct {
   NPGNNConditionalPrefix integral;
   NPConditionalQRDeleted qr;
+  NPGNNSignedRow signed_row;
   NPConditionalXRowCtx xctx;
   NPConditionalYRowCtx yctx;
   NPGNNIntegralGeometry geometry;
@@ -712,6 +714,7 @@ static void np_cgnn_cleanup(void *raw, Rboolean jump) {
   NPGNNConditionalPrefix *c = &a->integral;
   (void)jump;
   np_cqr_deleted_clear(&a->qr);
+  np_cgnn_signed_clear(&a->signed_row);
   np_cgnn_stable_clear(&c->stable_moments);
   free(c->ones);free(c->coefficient_work);
   np_conditional_xrow_ctx_clear(&a->xctx);
@@ -781,7 +784,9 @@ static SEXP np_cgnn_body(void *raw) {
     fail = 1;
   c->n = c->folds = n;
   c->moments = fail ? 0 : terms;
-  c->stable=!scalar && terms>1 && (KERNEL_reg_extern==4 || uniform);
+  const int signed_local=!scalar && terms>1 && KERNEL_reg_extern>=5 && KERNEL_reg_extern<=7;
+  c->stable=!scalar && terms>1;
+  if(!fail && signed_local)fail=np_cgnn_signed_prepare(&a->signed_row,n,terms);
   c->coefficient_count=c->moments*n;
   if(c->stable){
     if((size_t)n>INT_MAX/((size_t)3*terms+1))fail=1;
@@ -897,7 +902,9 @@ static SEXP np_cgnn_body(void *raw) {
   const double k0 = allck[KERNEL_reg_extern](0.0);
   for (int i = first; i < first + count && !fail; ++i) {
     np_progress_bandwidth_loop_step();
-    if ((c->stable ? np_conditional_deleted_from_ctx_core(x,&a->qr,i,1,0,a->row,NULL) :
+    NPLPSolvePolicyDiagnostics policy={0,0};
+    if ((signed_local ? np_conditional_xrow_from_ctx_impl(x,i,1,0,a->row,&policy) :
+        c->stable ? np_conditional_deleted_from_ctx_core(x,&a->qr,i,1,0,a->row,NULL) :
         np_conditional_xrow_from_ctx(x, i, a->row)) ||
         (!scalar && !np_cgnn_deleted_support_sufficient(
           c->order, x->kw, int_TREE_X == NP_TREE_TRUE ? ipt_lookup_extern_X : NULL,
@@ -934,7 +941,16 @@ static SEXP np_cgnn_body(void *raw) {
       a->folds[3 * n + i] = hi;
     }
     double denominator = 0.0, self = 0.0, sum = 0.0, error = 0.0;
-    if(c->stable){
+    if(signed_local && policy.ridge_steps==0 && policy.ridge_total==0.0){
+      if(np_cgnn_signed_row(&a->signed_row,matrix_X_continuous_train_extern[0],
+          x->kw,pos,np_glp_cv_cache.terms,c->stable_coef+(size_t)i*terms,
+          x->mean_row,c->radius+i)){
+        np_conditional_failure_record(NP_CONDITIONAL_NUMERICAL_FAILURE,i+1);
+        fail=1;break;
+      }
+      for(int j=0;j<n;j++)a->row[int_TREE_X==NP_TREE_TRUE?ipt_extern_X[j]:j]=x->mean_row[j];
+      denominator=1.;
+    } else if(c->stable && !signed_local){
       /* The successful deleted-row producer above owns this same fold's
        * factor. No X weights or factor storage changed since that call. */
       const NPConditionalLocalQRStatus rank=
@@ -1043,12 +1059,14 @@ static SEXP np_cgnn_body(void *raw) {
   np_conditional_xrow_ctx_clear(x);
   np_conditional_yrow_ctx_clear(&a->yctx);
   if(c->stable){
+    c->stable_moments.signed_arithmetic=signed_local;
     for(int i=0;i<n;i++)if(c->radius[i]>0)c->full_rows++;else c->deficient_rows++;
-    fail=np_cgnn_local_prepare(&c->local,n,uniform?0:2,c->order,c->self,c->first,c->end);
+    fail=np_cgnn_local_prepare(&c->local,n,uniform?0:2*(KERNEL_reg_extern-3),c->order,c->self,c->first,c->end);
     if(!fail && c->full_rows)fail=np_cgnn_stable_prepare(&c->stable_moments,n,
-      terms-1+(uniform?0:2),c->order,c->self,c->first,c->end,c->radius);
+      terms-1+(uniform?0:2*(KERNEL_reg_extern-3)),c->order,c->self,c->first,c->end,c->radius);
     if(!fail && c->full_rows)fail=npc_gnn_recipes(&c->stable_moments,n,terms,c->order,
-      c->radius,c->self,c->stable_coef,!uniform,k0);
+      c->radius,c->self,c->stable_coef,!uniform,k0,
+      signed_local?c->local.kernel:NULL,signed_local?2*(KERNEL_reg_extern-3):0);
   } else if (!uniform)
     fail = np_cgnn_local_prepare(&c->local, n, 2*(KERNEL_reg_extern-3),
                                   c->order, c->self, c->first, c->end);

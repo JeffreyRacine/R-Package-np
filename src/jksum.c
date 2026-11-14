@@ -28324,7 +28324,8 @@ static int np_conditional_xrow_influence(
   int eval_idx,
   int eval_pos,
   int drop_eval_self,
-  double *row_out){
+  double *row_out,
+  NPLPSolvePolicyDiagnostics *policy_out){
   const int num_train = num_obs_train_extern;
   const int k = np_glp_cv_cache.nterms;
   const double ridge_fraction = 1.0/(double)MAX(1, num_train);
@@ -28398,6 +28399,7 @@ static int np_conditional_xrow_influence(
        np_lp_rank_upper_bound_from_weights(ctx->kw, num_train, k),
        &diagnostics) != NP_LP_SOLVE_POLICY_OK)
     return 1;
+  if(policy_out != NULL)*policy_out=diagnostics;
 
   if(ctx->weighted_design != NULL){
     const char trans_n = 'N';
@@ -28785,7 +28787,7 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_xrow_from_ctx_impl(
       }
 
       if(np_conditional_xrow_influence(
-           ctx, eval_idx, eval_pos, drop_eval_self, row_out) != 0)
+           ctx, eval_idx, eval_pos, drop_eval_self, row_out, diagnostics) != 0)
         goto cleanup_xrow_from_ctx;
 complete_xrow_influence:
       ;
@@ -38829,7 +38831,7 @@ static int np_conditional_ann_tree_xrow(NPConditionalANNTreeBlock *b,
     for(int j = 0; j < n; ++j) row[j] = b->x->kw[j]/sum;
     return 0;
   }
-  return np_conditional_xrow_influence(b->x, evaluation, evaluation, 1, row);
+  return np_conditional_xrow_influence(b->x, evaluation, evaluation, 1, row, NULL);
 }
 
 static NPConditionalAdaptiveExactStatus

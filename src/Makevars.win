@@ -90,3 +90,6 @@ jksum.o reghat_fast.o np_plot_projection.o: regression_precision.h
 
 # Configure generates source identity and complete object dependencies.
 include np_worker_identity_deps.mk
+
+# Conditional GNN coefficient and integration consumers.
+jksum.o: np_conditional_gnn_prefix.h np_conditional_gnn_local.h np_conditional_gnn_stable.h np_conditional_gnn_signed.h np_conditional_gnn_gauss4.h conditional_gnn_coefficients.h conditional_deleted_qr.h conditional_deleted_qr_fast.h conditional_deleted_dot.h
