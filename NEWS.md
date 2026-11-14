@@ -1,7 +1,71 @@
+# np 0.80-3
+
 ## Private density plot additions
 
 * Explicit Q6 smoothed-bootstrap density inference now provides marginal pointwise bands while retaining its simultaneous calibration.
 * Fixed-bound univariate order-four Epanechnikov density plots add normal pointwise bias-corrected intervals using the support-reproducing beta-guide construction. Native fits and bandwidths are unchanged. Both additions remain experimental; local coverage limitations are documented.
+
+
+- Corrected compact uniform density plots retain physical support membership consistently in observed centers, empirical covariance and resampled features. Continuous pilot integration is unchanged.
+
+- Fixed uniform-kernel rows now use the documented open physical support consistently across dense, tree, permutation and sparse polynomial-search paths.
+
+- Ordinary LC conditional-density plots disclose unavailable uncertainty at empty empirical response windows, retaining the full target grid and withholding an unidentifiable full-family simultaneous band. Raw estimates and corrected methods are unchanged.
+
+- Stored-fit routes reject unsupported `na.action` overrides instead of silently
+  ignoring them. Existing formula replacement and regression/index prediction
+  policies remain supported, with each callback evaluated by its existing owner.
+
+- Class-probability plot families exclude omitted display rows, including
+  asymptotic Bonferroni calibration, while preserving their padded output rows.
+
+- Kernel sums reject unknown extra arguments without evaluating their values,
+  while retaining formula controls and ordinary argument matching.
+
+- Perspective floor and wall grids are painted behind the estimate, intervals
+  and overlays. Base surface-data replay uses the same renderer.
+
+- Constant conditional surfaces and surface-data replay expand automatic display
+  limits without changing estimates, intervals or explicit limits.
+
+- Compound plot arguments now use dotted spellings, for example `boot.control`, `bias.control`, `data.overlay` and `gradient.order`. The 0.80-2 snake_case argument spellings are rejected with replacement guidance; no aliases are provided. `np_plot_data` and its existing field names, saved-data replay and extraction remain unchanged. Retired snake_case plot arguments are rejected before evaluating their values, including during saved-data replay; replay retains its existing graphical-override behavior.
+
+- Equivalent direct and grouped probability trim pairs no longer conflict in
+  single-index and conditional-mode plots. Other trim interpretations and
+  genuinely conflicting controls retain their existing behavior. Conditional-mode
+  sample views do not gain grid controls.
+
+- Rebuilding retained unconditional uniform-kernel metadata avoids a redundant
+  kernel-order advisory; fresh requests and unrelated conditions are unchanged.
+
+- Supplied plot limits reach line and surface renderers and survive saved-data replay, without changing evaluation grids, estimates or intervals. Automatic ranges remain unchanged when limits are omitted.
+
+- Avoid response-vector-sized temporary labels in the shared missing-bandwidth
+  regression handoff, preserving final response names and retained data.
+
+- Respect explicit surface height limits when displaying observed data with
+  regression, partially linear and smooth-coefficient surfaces; automatic
+  ranges continue to include the observations.
+
+- Preserve explicit X/Z coordinate labels in partially linear and smooth-
+  coefficient line panels, including saved-data replay and separate scales.
+
+- Avoid oversized temporary response labels in partially linear child
+  bandwidth calls while preserving executable-option evaluation and retained
+  response-call semantics.
+
+- Preserve explicit frame and style arguments in instrumental-variable plots
+  and saved replay, including automatic ranges requested with explicit NULL.
+
+- Keep rgl interval surfaces and rugs within explicit display limits while
+  retaining visible legends.
+
+- Reject unsupported grid controls in copula plots, conditional-mode sample
+  views and their saved-data replay instead of passing on ignored requests.
+
+- Avoid expanding complete response vectors into internal LSQ bandwidth labels.
+
+- Preserve literal graphical labels through plot forwarding and saved replay; honor conditional-mode panel labels.
 
 # np 0.80-2
 

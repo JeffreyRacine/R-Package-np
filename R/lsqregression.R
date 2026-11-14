@@ -973,7 +973,7 @@ plot.lsqregression <- function(x, tau = NULL, gradients = FALSE,
   publisher <- .npreg_plot_empty_publisher("plot.nplsqreg")
   args$.np.empty.report <- publisher$record
   value <- .npreg_finish_plot_call(
-    .np_with_seed(random.seed, do.call(.np_plot_condbandwidth_engine, args)), publisher)
+    .np_with_seed(random.seed, do.call(.np_plot_condbandwidth_engine, .np_plot_literal_labels(args))), publisher)
   .np_plot_data_finish(value, x$bws, args, .np_plot_condbandwidth_engine, random.seed)
 }
 

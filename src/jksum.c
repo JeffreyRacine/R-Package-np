@@ -1234,8 +1234,8 @@ double np_rect(const double z){
   return (z*z < 1.0)?0.5:0.0;
 }
 
-/* NN radii are distances. Standardizing an exact boundary distance by a
- * rounded reciprocal can move it inside the documented open support. */
+/* Fixed bandwidths and NN radii use physical distances. Standardizing an
+ * exact boundary by a rounded reciprocal can move it inside open support. */
 static inline double np_nn_rect(const double difference, const double radius)
 {
   return fabs(difference) < radius ? 0.5 : 0.0;
@@ -1246,7 +1246,7 @@ static inline double np_nn_rect(const double difference, const double radius)
 static inline void np_nn_rect_box(const int kernel, const int nn_bandwidth,
                                   double *lower, double *upper)
 {
-  if(nn_bandwidth && (kernel == 8 || (kernel >= 14 && kernel <= 18))) {
+  if(kernel == 8 || (nn_bandwidth && kernel >= 14 && kernel <= 18)) {
     *lower = nextafter(*lower, -INFINITY);
     *upper = nextafter(*upper, INFINITY);
   }
@@ -5027,8 +5027,8 @@ void np_p_ckernelv(const int KERNEL,
                                    np_cdf_rect, np_reserved_ckernel };
   double bounded_lower = 0.0, bounded_denominator = 0.0;
   double p_bounded_lower = 0.0, p_bounded_denominator = 0.0;
-  const int uniform_nn = nn_bandwidth && KERNEL == 8;
-  const int p_uniform_nn = nn_bandwidth && P_KERNEL == 8;
+  const int uniform_normal = KERNEL == 8;
+  const int p_uniform_normal = P_KERNEL == 8;
 #define NP_P_CKERNEL_VALUE(kind, uniform, observation) \
   ((uniform) ? np_nn_rect(x-xt[observation], h) : \
    k[kind]((x-xt[observation])*zscale))
@@ -5075,14 +5075,14 @@ void np_p_ckernelv(const int KERNEL,
       } else {
         if(p_xl == NULL){
           for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_nn, i)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
+            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_normal, i)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
           }
         } else {
           for (int m = 0; m < p_xl->n; m++){
             const int istart = p_xl->istart[m];
             const int nlev = p_xl->nlev[m];
             for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_nn, i)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
+              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_normal, i)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
             }
           }
         }
@@ -5138,7 +5138,7 @@ void np_p_ckernelv(const int KERNEL,
           swap_xxt ? bounded_lower : bounded_lower_vec[i],
           swap_xxt ? bounded_denominator : bounded_den_vec[i]) :
          np_cker_bounded_cdf(KERNEL, eval, train, h, bound_lb, bound_ub)) :
-        invnorm*NP_P_CKERNEL_VALUE(KERNEL, uniform_nn, i);
+        invnorm*NP_P_CKERNEL_VALUE(KERNEL, uniform_normal, i);
 
       result[i] = xw[j]*kn;
       kbuf[i] = kn;
@@ -5151,7 +5151,7 @@ void np_p_ckernelv(const int KERNEL,
             swap_xxt ? p_bounded_lower : bounded_lower_vec[i],
             swap_xxt ? p_bounded_denominator : bounded_den_vec[i]) :
            np_cker_bounded_cdf(P_KERNEL, eval, train, h, bound_lb, bound_ub)) :
-          p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_nn, i);
+          p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_normal, i);
         p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
           pkn*(do_score ? ((xt[i]-x)*zscale) : 1.0);
       }
@@ -5180,7 +5180,7 @@ void np_p_ckernelv(const int KERNEL,
             swap_xxt ? bounded_lower : bounded_lower_vec[i],
             swap_xxt ? bounded_denominator : bounded_den_vec[i]) :
            np_cker_bounded_cdf(KERNEL, eval, train, h, bound_lb, bound_ub)) :
-          invnorm*NP_P_CKERNEL_VALUE(KERNEL, uniform_nn, i);
+          invnorm*NP_P_CKERNEL_VALUE(KERNEL, uniform_normal, i);
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
@@ -5201,7 +5201,7 @@ void np_p_ckernelv(const int KERNEL,
               swap_xxt ? p_bounded_lower : bounded_lower_vec[i],
               swap_xxt ? p_bounded_denominator : bounded_den_vec[i]) :
              np_cker_bounded_cdf(P_KERNEL, eval, train, h, bound_lb, bound_ub)) :
-            p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_nn, i);
+            p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_normal, i);
           p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
             pkn*(do_score ? ((xt[i]-x)*zscale) : 1.0);
         }
@@ -6589,8 +6589,7 @@ void np_ckernelv(const int KERNEL,
     case 7: NP_CKERNELV_APPLY(np_epan8); break;
 
     case 8:
-      if(nn_bandwidth) NP_CKERNELV_APPLY_VALUE(np_nn_rect(x-xt[i], h));
-      else NP_CKERNELV_APPLY(np_rect);
+      NP_CKERNELV_APPLY_VALUE(np_nn_rect(x-xt[i], h));
       break;
     case 9: NP_CKERNELV_APPLY(np_reserved_ckernel); break;
 
@@ -12956,6 +12955,7 @@ typedef struct {
   double *row_cont_const;
   double *row_xeval;
   double *row_hinv;
+  double **row_bandwidth; /* Borrowed from the enclosing fixed-row owner. */
   double *bb;
 } NPLPTreeSupportCtx;
 
@@ -13017,6 +13017,7 @@ static inline int np_lp_tree_support_prepare_row(NPLPTreeSupportCtx *ctx,
   int all_largeh = (num_reg_continuous > 0);
 
   ctx->xl.n = 0;
+  ctx->row_bandwidth = matrix_bandwidth;
 
   for(l = 0; l < num_reg_continuous; l++){
     const int kc = kernel_c[l];
@@ -13043,6 +13044,7 @@ static inline int np_lp_tree_support_prepare_row(NPLPTreeSupportCtx *ctx,
       ctx->bb[2*l+1] = -cksup[kc][0];
       ctx->bb[2*l] = (fabs(ctx->bb[2*l]) == DBL_MAX) ? ctx->bb[2*l] : (xeval + ctx->bb[2*l]*h);
       ctx->bb[2*l+1] = (fabs(ctx->bb[2*l+1]) == DBL_MAX) ? ctx->bb[2*l+1] : (xeval + ctx->bb[2*l+1]*h);
+      np_nn_rect_box(kc, 0, &ctx->bb[2*l], &ctx->bb[2*l+1]);
     }
   }
 
@@ -13059,7 +13061,9 @@ static inline int np_lp_tree_support_prepare_row(NPLPTreeSupportCtx *ctx,
 
 static inline double np_lp_cont_weight_scaled(const int kc,
                                                const double z,
-                                               const double hinv){
+                                               const double hinv,
+                                               const double difference,
+                                               const double bandwidth){
   switch(kc){
     case 4:
     {
@@ -13067,7 +13071,7 @@ static inline double np_lp_cont_weight_scaled(const int kc,
       return (z2 < 5.0) ? ((0.33541019662496845446 - 0.067082039324993690892*z2)*hinv) : 0.0;
     }
     case 8:
-      return (z*z < 1.0) ? (0.5*hinv) : 0.0;
+      return np_nn_rect(difference, bandwidth)*hinv;
     default:
       return allck[kc](z)*hinv;
   }
@@ -13099,8 +13103,10 @@ static inline double np_lp_tree_support_weight(const NPLPTreeSupportCtx *ctx,
     if(ctx->row_largeh[l]){
       w *= ctx->row_cont_const[l];
     } else {
-      const double z = (ctx->row_xeval[l] - matrix_X_continuous[l][tree_idx])*ctx->row_hinv[l];
-      w *= np_lp_cont_weight_scaled(kc, z, ctx->row_hinv[l]);
+      const double difference = ctx->row_xeval[l] - matrix_X_continuous[l][tree_idx];
+      const double z = difference*ctx->row_hinv[l];
+      w *= np_lp_cont_weight_scaled(kc, z, ctx->row_hinv[l],
+                                   difference, ctx->row_bandwidth[l][0]);
     }
 
     if(w == 0.0)
@@ -13691,9 +13697,9 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
           if(ii <= j)
             continue;
 
-          w = np_lp_cont_weight_scaled(kc0,
-                                        (xeval0 - matrix_X_continuous[0][ii])*hinv0,
-                                        hinv0);
+          const double difference = xeval0 - matrix_X_continuous[0][ii];
+          w = np_lp_cont_weight_scaled(kc0, difference*hinv0, hinv0,
+                                      difference, sctx.row_bandwidth[0][0]);
           if(w != 0.0){
             if(track_lowsupport){
               np_lp_cvls_support_add(j, nterms, support_count);

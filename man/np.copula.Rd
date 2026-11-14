@@ -142,6 +142,9 @@ estimated and where it is evaluated.
     \code{evaluation="grid"}, and \code{u} is omitted.
     This is a constructor argument; \code{plot} uses the object's stored
     probability coordinates and rejects plot-level \code{neval}.
+    Nonempty \code{grid.control}, \code{xtrim} and \code{xq} requests
+    are also rejected; specify probability coordinates with \code{u} in
+    \code{npcopula()}. Saved plot-data replay cannot change these coordinates.
   }
 
   \item{target}{

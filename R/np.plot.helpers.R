@@ -990,7 +990,8 @@
                                       plot.errors.alpha,
                                       plot.errors.type,
                                       plot.errors.center,
-                                      bootstrap_raw = NULL) {
+                                      bootstrap_raw = NULL,
+                                      family_size = length(estimate)) {
   err <- matrix(data = se, nrow = length(estimate), ncol = 3)
   err[,3] <- NA_real_
   all.err <- NULL
@@ -1010,7 +1011,7 @@
       se = se,
       alpha = plot.errors.alpha,
       band.type = plot.errors.type,
-      m = length(estimate)
+      m = family_size
     )
     err[,1:2] <- asym.obj$err
     all.err <- asym.obj$all.err
@@ -5342,7 +5343,7 @@
 
 .np_make_kbandwidth_unconditional <- function(bws, xdat) {
   xdat <- toFrame(xdat)
-  kbandwidth.numeric(
+  .np_retained_uniform_constructor(kbandwidth.numeric,
     bw = .np_physical_bandwidth(bws),
     bwscaling = FALSE,
     # npksum helper constructors require raw bandwidths; bwscaling flags are
@@ -7191,6 +7192,19 @@ gen.label = function(label, altlabel){
   fallback
 }
 
+# A display-only expansion, also used by constant clamped quantile surfaces.
+# Call only for automatic limits; explicit user limits retain their contract.
+.np_plot_expand_surface_range <- function(limits) {
+  if (length(limits) == 2L && all(is.finite(limits)) &&
+      limits[1L] == limits[2L]) {
+    pad <- .04 * max(1, abs(limits[1L]))
+    expanded <- limits + c(-pad, pad)
+    expanded[!is.finite(expanded)] <- limits[!is.finite(expanded)]
+    return(expanded)
+  }
+  limits
+}
+
 draw.error.bands = function(ex, ely, ehy, lty = .np_plot_lty("interval"), col = par("col")){
   lines(ex,ely,lty=lty,col=col)
   lines(ex,ehy,lty=lty,col=col)
@@ -7360,7 +7374,7 @@ plotFactor <- function(f, y, ...){
     base.args$lty <- "blank"
   if (is.fac && !has.user.pch)
     base.args$pch <- .np_plot_pch("factor_estimate")
-  do.call(graphics::plot.default, base.args)
+  do.call(graphics::plot.default, .np_plot_literal_labels(base.args))
   if (add.axis)
     axis(1, at = seq_along(levels(f)), labels = levels(f))
 
@@ -7721,7 +7735,29 @@ plotFactor <- function(f, y, ...){
                                                ylim,
                                                zlim,
                                                grid.args = list()) {
-  persp.mat <- do.call(graphics::persp, persp.args)
+  # Establish the projection without painting data. A second persp call adds
+  # the unchanged surface above the grid; it must not advance a panel or run
+  # the public graphics hooks twice.
+  without.hooks <- function(names, code) {
+    previous <- lapply(names, getHook)
+    on.exit(for (i in seq_along(names))
+      setHook(names[i], previous[[i]], action = "replace"), add = TRUE)
+    for (name in names) setHook(name, NULL, action = "replace")
+    force(code)
+  }
+  if (!is.null(persp.args$xlim)) xlim <- persp.args$xlim
+  if (!is.null(persp.args$ylim)) ylim <- persp.args$ylim
+  if (!is.null(persp.args$zlim)) zlim <- persp.args$zlim
+  background <- persp.args
+  background$x <- range(persp.args$x)
+  background$y <- range(persp.args$y)
+  background$z <- matrix(NA_real_, 2L, 2L)
+  if (is.null(background$xlim)) background$xlim <- range(persp.args$x)
+  if (is.null(background$ylim)) background$ylim <- range(persp.args$y)
+  if (is.null(background$zlim)) background$zlim <- range(persp.args$z, finite = TRUE)
+  background$box <- background$axes <- FALSE
+  background$main <- background$sub <- NULL
+  persp.mat <- without.hooks("persp", do.call(graphics::persp, .np_plot_literal_labels(background)))
   .np_plot_draw_box_grid_persp(
     xlim = xlim,
     ylim = ylim,
@@ -7729,7 +7765,10 @@ plotFactor <- function(f, y, ...){
     persp.mat = persp.mat,
     grid.args = grid.args
   )
-  persp.mat
+  graphics::par(new = TRUE)
+  on.exit(graphics::par(new = FALSE), add = TRUE)
+  without.hooks(c("before.plot.new", "plot.new"),
+    do.call(graphics::persp, .np_plot_literal_labels(persp.args)))
 }
 
 .np_plot_match_renderer <- function(renderer) {
@@ -8195,6 +8234,14 @@ plotFactor <- function(f, y, ...){
   out <- dots[hits]
   names(out) <- substring(names(out), nchar(prefix) + 1L)
   out
+}
+
+# Forward only supplied limits; NULL must not erase a computed automatic range.
+.np_plot_apply_limits <- function(args, xlim = NULL, ylim = NULL, zlim = NULL) {
+  if (!is.null(xlim)) args$xlim <- xlim
+  if (!is.null(ylim)) args$ylim <- ylim
+  if (!is.null(zlim)) args$zlim <- zlim
+  args
 }
 
 .np_plot_merge_user_args <- function(base.args, user.args) {
@@ -8688,7 +8735,7 @@ plotFactor <- function(f, y, ...){
     cex.main = scalar_default(cex.main, graphics::par()$cex.main),
     cex.sub = scalar_default(cex.sub, graphics::par()$cex.sub)
   )
-  if (!xi.factor && !is.null(xlim))
+  if (!is.null(xlim))
     plot.args$xlim <- xlim
   plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
 
@@ -8701,7 +8748,7 @@ plotFactor <- function(f, y, ...){
       data.args$lty <- NULL
       data.args$lwd <- NULL
       data.args$col <- NULL
-      do.call(graphics::plot, data.args)
+      do.call(graphics::plot, .np_plot_literal_labels(data.args))
     } else {
       overlay.args <- plot.args
       overlay.args$x <- overlay.x
@@ -8712,7 +8759,7 @@ plotFactor <- function(f, y, ...){
       overlay.args$pch <- scalar_default(overlay.args$pch, 20)
       overlay.args$cex <- scalar_default(overlay.args$cex, 0.5)
       overlay.args$col <- .np_plot_color("data_overlay")
-      do.call(graphics::plot, overlay.args)
+      do.call(graphics::plot, .np_plot_literal_labels(overlay.args))
     }
   } else {
     empty.args <- plot.args
@@ -8720,7 +8767,7 @@ plotFactor <- function(f, y, ...){
     empty.args$y <- value[, 1L]
     empty.args$type <- "n"
     empty.args$xaxt <- if (xi.factor) "n" else "s"
-    do.call(graphics::plot, empty.args)
+    do.call(graphics::plot, .np_plot_literal_labels(empty.args))
     if (xi.factor)
       graphics::axis(1, at = mat.x, labels = as.character(ei[seq_len(nkeep)]))
   }

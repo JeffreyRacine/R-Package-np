@@ -69,6 +69,10 @@
       legend3d.args
     )
     legend3d.call <- .np_plot_rgl_scale_legend_geometry(legend3d.call)
+    # The legend is a view background, not geometry to be clipped.
+    legend.scene <- rgl::currentSubscene3d()
+    on.exit(rgl::useSubscene3d(legend.scene), add = TRUE)
+    rgl::useSubscene3d(rgl::subsceneInfo("root")$id)
     do.call(rgl::legend3d, legend3d.call)
     return(invisible(TRUE))
   }
@@ -372,7 +376,9 @@
                                         persp3d.args = list(),
                                         grid3d.args = list(),
                                         widget.args = list(),
-                                        draw.extras = NULL) {
+                                        draw.extras = NULL,
+                                        xlim = NULL,
+                                        ylim = NULL) {
   tryCatch({
     defaults <- .np_plot_rgl_defaults()
     old.opts <- options(
@@ -425,6 +431,8 @@
       y = y,
       z = z,
       zlim = zlim,
+      xlim = xlim,
+      ylim = ylim,
       xlab = xlab,
       ylab = ylab,
       zlab = zlab,
@@ -435,10 +443,28 @@
       back = "lines",
       main = main
     ), persp3d.args)
-    do.call(rgl::persp3d, persp3d.call)
+    for (axis in c("xlim", "ylim", "zlim")) {
+      limit <- persp3d.call[[axis]]
+      # NA and equal endpoints can be automatic ranges handled by rgl.
+      # Only actual infinities are refused here: they can stall serialization.
+      if (is.numeric(limit) && any(is.infinite(limit)))
+        stop(axis, " must not contain infinite values")
+    }
+    surface.ids <- do.call(rgl::persp3d, .np_plot_literal_labels(persp3d.call, expression.labels = TRUE))
+    # rgl can turn finite extreme limits into non-finite scene coordinates.
+    # Refuse that state before scene serialization, which otherwise can stall.
+    if (any(!is.finite(rgl::par3d("bbox"))))
+      stop("surface limits exceed the finite coordinate range supported by rgl")
 
-    if (!is.null(draw.extras))
+    if (!is.null(draw.extras)) {
+      parent.scene <- rgl::currentSubscene3d()
+      clip.scene <- unname(surface.ids[names(surface.ids) == "clipregion"])
+      if (length(clip.scene) == 1L)
+        rgl::useSubscene3d(clip.scene)
       draw.extras()
+      if (length(clip.scene) == 1L)
+        rgl::useSubscene3d(parent.scene)
+    }
 
     grid.side <- c("x", "y+", "z")
     if (!is.null(grid3d.args$side)) {

@@ -1,7 +1,7 @@
 # Compact fixed-bound normal intervals: complete influence under the ratio pilot.
 # The observation operator and the original corrected center are unchanged.
 .np_udens_compact_normal_moments <- function(x,h,grid,kernel,
-                                            progress=function(...) NULL) {
+                                            progress=function(...) NULL,physical=NULL) {
   if (!is.numeric(x) || length(x)<10L || !is.numeric(grid) || !length(grid) ||
       any(!is.finite(c(x,grid,h))) || any(x<=0|x>=1) || any(grid<=0|grid>=1) ||
       length(h)!=1L || h<=0 || length(kernel)!=1L ||
@@ -50,7 +50,8 @@
     }
     observed<-matrix(0,m,n)
     for(ids in .np_udens_beta_blocks(n,tile))
-      observed[,ids]<-.np_udens_compact_operator(plan,x[ids])-1
+      observed[,ids]<-.np_udens_compact_operator(plan,x[ids],
+        .np_udens_compact_geometry_slice(physical,observations=ids))-1
     fitted<-exp(drop(Tg%*%theta)-st$A)
     fittedQ<-exp(drop(Tg%*%p$fit$theta)-sq$A)
     G<-sweep(sweep(Tg,2,sq$mean),1,fittedQ,'*')

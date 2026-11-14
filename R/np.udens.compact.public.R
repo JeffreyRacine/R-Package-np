@@ -42,13 +42,13 @@
   if(any(!is.finite(width))||!is.finite(jacobian)||jacobian<=0||!is.finite(1/jacobian))
     stop('Compact corrected-band support units are not representable',call.=FALSE)
   normalized<-sweep(sweep(as.matrix(x),2,lower),2,width,'/')
-  h<-as.double(.np_physical_bandwidth(bws))/width
+  physical.h<-as.double(.np_physical_bandwidth(bws));h<-physical.h/width
   if(length(h)!=ncol(x)||any(!is.finite(h))||any(h<=0)||any(normalized<=0|normalized>=1))
     stop('Compact corrected bands require positive bandwidths and strictly interior observations',call.=FALSE)
   if(!is.numeric(alpha)||length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1)
     stop('Compact corrected bands require alpha in (0,1)',call.=FALSE)
   npValidateNonNegativeInteger(seed,'random.seed')
-  state<-list(x=x,normalized=normalized,h=h,lower=lower,width=width,jacobian=jacobian,
+  state<-list(x=x,normalized=normalized,h=h,physical.h=physical.h,lower=lower,width=width,jacobian=jacobian,
     kernel=bws[['ckertype',exact=TRUE]],q=ncol(x),n=nrow(x),variant=variant,plot.law=if(method=='asymptotic')'gaussian' else 'inid',
     plot.random.seed=seed,construction='density-fixed-compact-cubic-v1')
   if(normal)state$normal.pmzsd<-TRUE
@@ -69,8 +69,8 @@
   progress<-function(stage,done,total).np_plot_progress_notify(stage=paste('Compact density:',stage),done=done,total=total,unit='work')
   result<-.np_plot_corrected_activity_run('Constructing fixed-bound Compact density intervals',
     if(.np_udens_compact_q2_active(state))
-      .np_udens_compact_q2_hidden(state$normalized,state$h,normalized,state$kernel,alpha,band,B,state$plot.random.seed,progress,variant=state$variant)
-    else .np_udens_compact_hidden(state$normalized[,1L],state$h,normalized[,1L],state$kernel,alpha,band,B,state$plot.random.seed,progress,variant=state$variant))
+      .np_udens_compact_q2_hidden(state$normalized,state$h,normalized,state$kernel,alpha,band,B,state$plot.random.seed,progress,variant=state$variant,physical=.np_udens_compact_geometry(state,grid))
+    else .np_udens_compact_hidden(state$normalized[,1L],state$h,normalized[,1L],state$kernel,alpha,band,B,state$plot.random.seed,progress,variant=state$variant,physical=.np_udens_compact_geometry(state,grid)))
   for(key in c('center','lower','upper','pilot_se','empirical_se'))result[[key]]<-result[[key]]/state$jacobian
   if(any(!is.finite(unlist(result[c('center','lower','upper','pilot_se','empirical_se')]))))
     stop('Compact corrected-band output units are not representable',call.=FALSE)

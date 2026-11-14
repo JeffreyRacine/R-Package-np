@@ -1,3 +1,53 @@
+# Plot-only disclosure: a finite zero LC density with nonnegative effective
+# kernels and finite response support has no positive empirical joint mass.
+# Undefined conditioning windows and declared outside-support zeros are distinct.
+.np_plot_conditional_empty_mask <- function(bws, estimate, ey, center,
+                                            gradients, proper, method) {
+  empty <- rep.int(FALSE, length(estimate))
+  if (!identical(center, "estimate") || isTRUE(gradients) || isTRUE(proper) ||
+      !(method %in% c("asymptotic", "bootstrap")) ||
+      (identical(method, "bootstrap") && !identical(bws$type, "fixed"))) return(empty)
+  zero <- is.finite(estimate) & estimate == 0
+  if (!any(zero)) return(empty)
+  spec <- npConditionalRegEngineSpec(bws, where = "conditional density plot")
+  if (!(identical(spec$reg.engine, "lc") ||
+        (length(spec$degree.engine) && all(spec$degree.engine == 0L))))
+    return(empty)
+  positive <- function(ncon, kernel, order) isTRUE(ncon == 0L) ||
+    identical(kernel, "uniform") ||
+    (isTRUE(order == 2L) && kernel %in% c("gaussian", "epanechnikov", "beta"))
+  if (!positive(bws$xncon, bws$cxkertype, bws$cxkerorder) ||
+      !positive(bws$yncon, bws$cykertype, bws$cykerorder)) return(empty)
+  # A full-support continuous response kernel cannot certify an empty window.
+  if (!(isTRUE(bws$yncon < bws$yndim) ||
+        (isTRUE(bws$yncon > 0L) && bws$cykertype %in% c("uniform", "epanechnikov"))))
+    return(empty)
+  empty <- zero
+  if (identical(bws$cykerbound, "fixed")) {
+    for (j in which(bws$iycon)) {
+      if (is.finite(bws$cykerlb[j])) empty[ey[[j]] < bws$cykerlb[j]] <- FALSE
+      if (is.finite(bws$cykerub[j])) empty[ey[[j]] > bws$cykerub[j]] <- FALSE
+    }
+  }
+  if (any(empty)) .np_warning(sprintf(paste0(
+    "conditional density uncertainty is unavailable at %d grid target(s) with no positive empirical joint kernel contribution; ",
+    "retaining estimates and the full grid, with NA marginal limits there and no full-family simultaneous band"), sum(empty)),
+    call. = FALSE)
+  empty
+}
+
+.np_plot_conditional_empty_bands <- function(err, all.err, empty, type) {
+  if (!any(empty)) return(list(err = err, all.err = all.err))
+  rows <- which(empty)
+  if (identical(type, "simultaneous")) err[, 1:2] <- NA_real_ else
+    err[rows, 1:2] <- NA_real_
+  if (!is.null(all.err)) for (name in names(all.err)) {
+    if (identical(name, "simultaneous")) all.err[[name]][, 1:2] <- NA_real_ else
+      all.err[[name]][rows, 1:2] <- NA_real_
+  }
+  list(err = err, all.err = all.err)
+}
+
 # A nonnegative effective kernel sum can be zero only when no positive
 # empirical contribution reaches the target. That does not identify zero
 # uncertainty inside support. This admission is plot-only; raw fits are intact.

@@ -30,6 +30,9 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
   .np_plot_data_validate(x)
   renderer <- match.arg(renderer)
   dots <- list(...)
+  if (x$family %in% c("npcopula", "npconmode"))
+    .np_plot_reject_unconstructed_grid(dots, "saved copula/conditional-mode replay",
+                                      "create new plot data to change the grid")
   panels <- if (is.null(panel)) names(x$panels) else .np_plot_data_select(panel, names(x$panels), "panel")
   jobs <- list()
   for (pid in panels) {
@@ -57,27 +60,27 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
     style <- utils::modifyList(.np_plot_data_field(display, "style", list()), dots)
     if (identical(display$kind, "iv")) {
       spec <- list(curve.args = c(list(x = grid[[1L]], y = values$estimate), display$curve_args),
-        frame.args = utils::modifyList(display$frame_args, dots),
+        frame.args = display$frame_args,
         continuous = display$continuous, overlay = !is.null(display$overlay),
         overlay.x = display$overlay$x, overlay.y = display$overlay$y,
         overlay.args = display$overlay_args, rug = !is.null(display$rug), rug.x = display$rug)
-      .np_iv_plot_render(spec)
+      .np_iv_plot_render(.np_iv_plot_replay_spec(spec, dots))
       next
     }
     varying <- if (!is.null(display$coordinates)) match(display$coordinates, names(grid)) else
       which(vapply(grid, function(g) length(unique(g)) > 1L, logical(1L)))
     if (identical(display$kind, "coefficients")) {
       if (renderer != "base") stop("coefficient displays use the base renderer", call. = FALSE)
-      positions <- do.call(graphics::barplot, utils::modifyList(list(height = values$estimate,
+      positions <- do.call(graphics::barplot, .np_plot_literal_labels(utils::modifyList(list(height = values$estimate,
         names.arg = grid[[1L]], ylab = label, xlab = "Regressor"),
-        style[intersect(names(style), c("col", "border", "main", "sub", "xlab", "ylab", "ylim", "xlim"))]))
+        style[intersect(names(style), c("col", "border", "main", "sub", "xlab", "ylab", "ylim", "xlim"))])))
       if (nrow(intervals)) draw.error.bars(as.vector(positions), intervals$lower, intervals$upper)
       next
     }
     if (identical(display$kind, "scatter")) {
       if (renderer != "base") stop("probability-pair replay uses the base renderer", call. = FALSE)
-      do.call(graphics::plot, utils::modifyList(list(x = grid[[1L]], y = grid[[2L]],
-        xlab = p$variables$label[1L], ylab = p$variables$label[2L], main = label), style))
+      do.call(graphics::plot, .np_plot_literal_labels(utils::modifyList(list(x = grid[[1L]], y = grid[[2L]],
+        xlab = p$variables$label[1L], ylab = p$variables$label[2L], main = label), style)))
       next
     }
     if (identical(display$kind, "surface") && length(varying) == 2L) {
@@ -85,8 +88,8 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
       if (isTRUE(display$view %in% c("contour", "image"))) {
         if (renderer != "base") stop("contour/image replay uses the base renderer", call. = FALSE)
         fun <- if (display$view == "contour") graphics::contour else graphics::image
-        do.call(fun, utils::modifyList(list(x = g$x, y = g$y, z = g$z,
-          xlab = p$variables$label[varying[1L]], ylab = p$variables$label[varying[2L]], main = label), style))
+        do.call(fun, .np_plot_literal_labels(utils::modifyList(list(x = g$x, y = g$y, z = g$z,
+          xlab = p$variables$label[varying[1L]], ylab = p$variables$label[varying[2L]], main = label), style)))
         next
       }
       lower <- upper <- list()
@@ -99,8 +102,16 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
       args <- utils::modifyList(list(x = as.numeric(g$x), y = as.numeric(g$y), z = g$z,
         xlab = p$variables$label[varying[1L]], ylab = p$variables$label[varying[2L]],
         zlab = label, main = label, theta = 0, phi = 20,
-        zlim = .np_plot_data_limits(c(values$estimate, intervals$lower, intervals$upper, display$overlay$value))),
-        style[!names(style) %in% c("type", "lty", "lwd", "ylim", "xlim")])
+        zlim = .np_plot_expand_surface_range(.np_plot_data_limits(
+          c(values$estimate, intervals$lower, intervals$upper, display$overlay$value)))),
+        style[!names(style) %in% c("type", "lty", "lwd")])
+      if (identical(x$family, "npcopula") && !is.null(style$zlim)) {
+        # Match fresh copula display clipping, leaving all saved numbers intact.
+        args$zlim <- .npcopula_validate_zlim(style$zlim)
+        args$z <- .npcopula_clip_z_for_display(args$z, args$zlim)
+        lower <- .npcopula_clip_z_list_for_display(lower, args$zlim)
+        upper <- .npcopula_clip_z_list_for_display(upper, args$zlim)
+      }
       all <- length(lower) > 1L
       if (renderer == "rgl") {
         args$draw.extras <- function() {
@@ -115,9 +126,10 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
             lerr = lower[[1L]], herr = upper[[1L]],
             lerr.all = if (all) lower else NULL, herr.all = if (all) upper else NULL)
         }
-        widget <- do.call(.np_plot_render_surface_rgl, args)
+        widget <- do.call(.np_plot_render_surface_rgl, .np_plot_literal_labels(args))
       } else {
-        mat <- do.call(graphics::persp, args)
+        mat <- .np_plot_render_surface_base_frame(
+          args, range(args$x), range(args$y), args$zlim)
         if (!is.null(display$overlay)) do.call(.np_plot_overlay_points_persp,
           c(list(x1 = as.numeric(display$overlay$grid[[1L]]),
             x2 = as.numeric(display$overlay$grid[[2L]]), y = display$overlay$value,
@@ -136,6 +148,14 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
     if (renderer != "base") stop("one-dimensional replay uses the base renderer", call. = FALSE)
     column <- if (length(varying)) varying[1L] else 1L
     coord <- grid[[column]]
+    # A specific Z-role override wins; otherwise preserve the generic replay
+    # xlim override, or the retained Z-role limit when neither is supplied.
+    if (identical(p$variables$role[column], "Z") &&
+        ("zlim" %in% names(dots) || !("xlim" %in% names(dots))))
+      style$xlim <- style$zlim
+    if (identical(p$variables$role[column], "Z") &&
+        ("zlab" %in% names(dots) || !("xlab" %in% names(dots))))
+      style$xlab <- style$zlab
     categorical <- is.factor(coord) || is.character(coord)
     xpos <- if (categorical) match(as.character(coord), unique(as.character(coord))) else coord
     args <- utils::modifyList(list(x = xpos, y = values$estimate,
@@ -145,7 +165,7 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
         display$overlay$value))),
       style[!names(style) %in% c("theta", "phi", "zlim", "zlab")])
     if (categorical) args$xaxt <- "n"
-    do.call(graphics::plot, args)
+    do.call(graphics::plot, .np_plot_literal_labels(args))
     if (categorical) graphics::axis(1, at = unique(xpos), labels = unique(as.character(coord)))
     if (!is.null(display$overlay)) {
       fun <- if (categorical) .np_plot_overlay_points_factor else .np_plot_overlay_points_1d

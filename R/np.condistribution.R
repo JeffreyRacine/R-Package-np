@@ -2,6 +2,8 @@ npcdist <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npcdist")
+    if (!missing(bws) && "na.action" %in% names(mc[["..."]]))
+      .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdist")
     args <- .np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment(),
       data.roles = c("txdat", "tydat"),
@@ -28,6 +30,7 @@ npcdist <-
 npcdist.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdist", data = data, newdata = newdata)
 
     dots <- list(...)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
@@ -75,6 +78,7 @@ npcdist.formula <-
       cd.args$eydat <- eydat
     }
     cd.args$bws <- bws
+    dots$na.action <- NULL
     ev <- do.call(npcdist, c(cd.args, dots))
 
     ev$omit <- .np_formula_output_action(ev, umf, has.eval)
@@ -105,6 +109,7 @@ npcdist.formula <-
 npcdist.call <-
   function(bws, ...) {
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdist", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
@@ -124,6 +129,7 @@ npcdist.condbandwidth <-
            proper.control = list(),
            ..., se = FALSE){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdist", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 

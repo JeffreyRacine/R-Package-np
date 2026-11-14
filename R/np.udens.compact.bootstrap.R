@@ -94,14 +94,19 @@
   list(roots=roots,theta=refits$theta,iterations=refits$iterations,checks=checks)
 }
 
-.np_udens_compact_sd_hidden <- function(x,h,grid,kernel,alpha,variant,band,B,seed,progress) {
+.np_udens_compact_sd_hidden <- function(x,h,grid,kernel,alpha,variant,band,B,seed,progress,physical=NULL) {
   if(!is.numeric(x)||length(x)<10L||!is.numeric(grid)||!length(grid)||
      any(!is.finite(c(x,grid,h)))||any(x<=0|x>=1)||any(grid<=0|grid>=1)||
      length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1||
      length(variant)!=1L||!variant%in%c('symmetric-sd','asymmetric-sd')||
      length(band)!=1L||!band%in%c('pointwise','bonferroni','simultaneous','all'))
     stop('invalid compact corrected SD request',call.=FALSE)
-  original<-grid;grid<-sort(unique(grid));restore<-match(original,grid)
+  if(is.null(physical)) {
+    original<-grid;grid<-sort(unique(grid));restore<-match(original,grid)
+  } else {
+    canonical<-.np_udens_compact_physical_grid(grid,physical)
+    grid<-canonical$grid;physical<-canonical$physical;restore<-canonical$restore
+  }
   n<-length(x);m<-length(grid)
   .np_udens_beta_random_request('multinomial',n,B,seed,RNGkind())
   disk<-4*as.double(n)*B+8*as.double(m)*B+262144
@@ -110,7 +115,7 @@
      8*(8*as.double(B)+6*as.double(m)*n+12*m)+48*1024^2>256*1024^2)
     stop('compact bootstrap request exceeds owned workspace/storage budget',call.=FALSE)
   store<-.np_udens_beta_store();on.exit(.np_udens_beta_store_close(store),add=TRUE)
-  prepared<-.np_udens_compact_prepare(x,h,grid,kernel,FALSE,progress)
+  prepared<-.np_udens_compact_prepare(x,h,grid,kernel,FALSE,progress,physical)
   region<-.np_udens_beta_regions(prepared$theta,prepared$Veta,matrix(grid,ncol=1L),alpha,progress)
   stream<-.np_udens_beta_random_stream(store,'multinomial',n,B,seed)
   bootstrap<-.np_udens_compact_sd_roots(x,h,grid,kernel,prepared,stream,store,progress)

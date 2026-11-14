@@ -186,7 +186,8 @@ npplregbw.plbandwidth =
 
   }
 
-.npplregbw_retain_child_training <- function(children, xdat, ydat, zdat) {
+.npplregbw_retain_child_training <- function(children, xdat, ydat, zdat,
+                                           literal.response.call = FALSE) {
   # These calls were made inside package activations, not user formula frames.
   # Keep the native samples needed by an extracted child without serializing
   # an enclosing namespace and the constructor's transient search state.
@@ -194,6 +195,13 @@ npplregbw.plbandwidth =
     children[[i]] <- .np_bws_retain_native_training(
       children[[i]], xdat = zdat,
       ydat = if (i == 1L) ydat else xdat[, i - 1L])
+    # Compact constructor expressions must not become caller-data fallbacks.
+    # Restore only an existing response argument, without creating a call.
+    if (literal.response.call && !is.null(children[[i]]$call) &&
+        "ydat" %in% names(children[[i]]$call) &&
+        is.language(children[[i]]$call[["ydat"]]))
+      children[[i]]$call[["ydat"]] <-
+        children[[i]][[".np.native.training", exact = TRUE]][["ydat", exact = TRUE]]
   }
   children
 }
@@ -221,7 +229,8 @@ npplregbw.plbandwidth =
     child.reg.args$degree <- child.degree[[1L]]
   plband$yzbw <- do.call(
     .npregbw_auxiliary,
-    c(list(xdat = zdat, ydat = ydat, bws = bws[1, ]), child.reg.args)
+    c(list(xdat = zdat, ydat = if (any(vapply(child.reg.args, function(value)
+      is.language(value) || typeof(value) == "bytecode", logical(1)))) ydat else quote(ydat), bws = bws[1, ]), child.reg.args)
   )
 
   for (i in seq_len(dim(xdat)[2])) {
@@ -230,13 +239,15 @@ npplregbw.plbandwidth =
       child.reg.args$degree <- child.degree[[i + 1L]]
     plband[[i + 1L]] <- do.call(
       .npregbw_auxiliary,
-      c(list(xdat = zdat, ydat = xdat[, i], bws = bws[i + 1L, ]), child.reg.args)
+      c(list(xdat = zdat, ydat = if (any(vapply(child.reg.args, function(value)
+      is.language(value) || typeof(value) == "bytecode", logical(1)))) xdat[, i] else quote(xdat[, i]), bws = bws[i + 1L, ]), child.reg.args)
     )
   }
 
   plbw.args <- c(
     list(
-      bws = .npplregbw_retain_child_training(plband, xdat, ydat, zdat),
+      bws = .npplregbw_retain_child_training(plband, xdat, ydat, zdat,
+                                           literal.response.call = TRUE),
       nobs = dim(xdat)[1],
       fval = {
         fv <- unlist(lapply(plband, function(bwi) bwi$fval))
@@ -589,6 +600,9 @@ npplregbw.plbandwidth =
         nomad.inner.nmulti = nomad.inner.nmulti,
         random.seed = random.seed
       )
+      if (!any(vapply(child.args, function(value)
+        is.language(value) || typeof(value) == "bytecode", logical(1))))
+        child.args$ydat <- quote(child.responses[[i]]$values)
       do.call(.npregbw_auxiliary, child.args)
     }, finally = {
       .np_progress_bandwidth_set_context(old.context)
@@ -625,7 +639,8 @@ npplregbw.plbandwidth =
 
   plbw.args <- c(
     list(
-      bws = .npplregbw_retain_child_training(child.list, xdat, ydat, zdat),
+      bws = .npplregbw_retain_child_training(child.list, xdat, ydat, zdat,
+                                           literal.response.call = TRUE),
       nobs = dim(xdat)[1],
       fval = if (all(!is.finite(child.fval))) NA_real_ else sum(child.fval[is.finite(child.fval)]),
       num.feval = sum(child.feval),

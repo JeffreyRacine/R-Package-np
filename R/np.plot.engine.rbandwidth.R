@@ -502,9 +502,9 @@
               }
               else
                   c(min(tobj$mean),max(tobj$mean))
+        if (overlay.ok)
+          zlim <- .np_plot_overlay_range(zlim, ydat)
       }
-      if (overlay.ok)
-        zlim <- .np_plot_overlay_range(zlim, ydat)
         
       if (plot.behavior != "plot"){
         r1 = npregression(bws = bws,
@@ -554,6 +554,7 @@
           overlay.x2 <- (bws$xdati$all.dlev[[2]])[as.integer(overlay.x2)]
         .np_plot_first_render_begin(first.render)
         rgl.out <- .np_plot_render_surface_rgl(
+          xlim = xlim, ylim = ylim,
           x = x1.eval,
           y = x2.eval,
           z = treg,
@@ -655,6 +656,7 @@
                              phi = phi,
                              main = main.val)
           persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
+          persp.args <- .np_plot_apply_limits(persp.args, xlim, ylim)
           persp.mat <- .np_plot_render_surface_base_frame(
             persp.args = persp.args,
             xlim = range(x1.eval, finite = TRUE),
@@ -918,12 +920,11 @@
           } else {
             plot
           }
-          plot.args <- list()
+          plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
           if (xi.factor) {
             if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
           } else {
             plot.args$x <- ei
-            if (!is.null(xlim)) plot.args$xlim <- xlim
           }
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- .np_plot_geometry_values(temp.mean)
@@ -989,7 +990,7 @@
             type.val <- plot.args$type
             plot.args$type <- "n"
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             do.call(.np_plot_overlay_points_1d,
                     c(list(x = xdat[,i], y = ydat),
@@ -1028,7 +1029,7 @@
               base.args$xaxt <- "n"
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             .np_plot_first_render_begin(first.render)
-            do.call(graphics::plot.default, base.args)
+            do.call(graphics::plot.default, .np_plot_literal_labels(base.args))
             .np_plot_first_render_end(first.render)
             if (add.axis)
               axis(1, at = axis.at, labels = axis.labels)
@@ -1055,7 +1056,7 @@
             }
           } else {
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(xdat[,i])
@@ -1243,12 +1244,11 @@
           } else {
             plot
           }
-          plot.args <- list()
+          plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
           if (xi.factor) {
             if (plot.bootstrap && plot.bxp) plot.args$z <- all.bxp[[i]] else plot.args$f <- allei[,i]
           } else {
             plot.args$x <- allei[,i]
-            if (!is.null(xlim)) plot.args$xlim <- xlim
           }
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- .np_plot_geometry_values(data.eval[,i])
@@ -1297,7 +1297,7 @@
             type.val <- plot.args$type
             plot.args$type <- "n"
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             do.call(.np_plot_overlay_points_1d,
                     c(list(x = xdat[,i], y = ydat),
@@ -1335,7 +1335,7 @@
             }
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             .np_plot_first_render_begin(first.render)
-            do.call(graphics::plot.default, base.args)
+            do.call(graphics::plot.default, .np_plot_literal_labels(base.args))
             .np_plot_first_render_end(first.render)
             if (add.axis)
               axis(1, at = axis.at, labels = axis.labels)
@@ -1362,7 +1362,7 @@
             }
           } else {
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(xdat[,i])

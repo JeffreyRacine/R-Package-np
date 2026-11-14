@@ -1,17 +1,22 @@
 # A single finite target family, with common innovations for both covariance laws.
 .np_udens_compact_hidden <- function(x,h,grid,kernel,alpha,band,B=9999L,seed=42L,
-                                    progress=function(...)NULL,variant='asymptotic') {
+                                    progress=function(...)NULL,variant='asymptotic',physical=NULL) {
   if(!identical(variant,'asymptotic'))
-    return(.np_udens_compact_sd_hidden(x,h,grid,kernel,alpha,variant,band,B,seed,progress))
+    return(.np_udens_compact_sd_hidden(x,h,grid,kernel,alpha,variant,band,B,seed,progress,physical))
   if(!is.numeric(x)||length(x)<10L||!is.numeric(grid)||!length(grid)||
      any(!is.finite(c(x,grid,h)))||any(x<=0|x>=1)||any(grid<=0|grid>=1)||
      length(alpha)!=1L||!is.finite(alpha)||alpha<=0||alpha>=1||
      length(band)!=1L||!band%in%c('pointwise','bonferroni','simultaneous','all'))
     stop('invalid compact corrected-band request',call.=FALSE)
-  original<-grid;grid<-sort(unique(grid));restore<-match(original,grid)
+  if(is.null(physical)) {
+    original<-grid;grid<-sort(unique(grid));restore<-match(original,grid)
+  } else {
+    canonical<-.np_udens_compact_physical_grid(grid,physical)
+    grid<-canonical$grid;physical<-canonical$physical;restore<-canonical$restore
+  }
   draws<-band%in%c('simultaneous','all');m<-length(grid)
   if(draws).np_udens_beta_random_request('normal',m,B,seed,RNGkind())
-  prepared<-.np_udens_compact_prepare(x,h,grid,kernel,draws,progress)
+  prepared<-.np_udens_compact_prepare(x,h,grid,kernel,draws,progress,physical)
   region<-.np_udens_beta_regions(prepared$theta,prepared$Veta,matrix(grid,ncol=1L),alpha,progress)
   rhat<-prepared$center-prepared$fitted
   scales<-list(sqrt(prepared$pilot_variance),sqrt(prepared$empirical_variance))

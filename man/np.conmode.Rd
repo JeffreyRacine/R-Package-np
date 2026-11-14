@@ -373,7 +373,10 @@ prediction/evaluation route, or plot route as appropriate.
     \code{grid.control}, \code{perspective}, \code{plot.vars},
     \code{renderer}, and graphics arguments. The default
     \code{view="sample"} draws the stored fitted probabilities/effects at the
-    fitted evaluation points. The \code{view="fixed"} route constructs
+    fitted evaluation points. Explicit sample views reject nonempty grid
+    controls and \code{neval}, \code{xtrim} or \code{xq}; use a fixed view
+    to construct a grid. Saved plot-data replay likewise cannot change the
+    retained grid. The \code{view="fixed"} route constructs
     one-dimensional object-fed slices over each conditioning variable, holding
     the remaining variables at their \code{uocquantile} median/mode values;
     \code{np_grid_control(xtrim=..., xq=...)} may be used to adjust the slice
@@ -446,6 +449,16 @@ prediction/evaluation route, or plot route as appropriate.
   }
 
 }
+\section{Missing-value policies with stored bandwidths}{
+An existing bandwidth object retains its training omission policy. Explicit
+\code{na.action} overrides are supported only by the formula replacement-data
+or replacement-response routes that already own that policy, and by documented
+regression and single-index prediction policies. Unsupported stored native or
+formula evaluation overrides are rejected rather than silently ignored.
+For replacement native inputs, prepare the desired complete data explicitly.
+Reusing retained training does not re-run its missing-value callback.
+}
+
 \value{
   \code{npconmode} returns a \code{conmode} object with the following
   components:
