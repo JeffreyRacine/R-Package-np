@@ -1,4 +1,4 @@
-# npRmpi 0.80-3 (private development)
+# npRmpi 0.80-3
 
 - Corrected compact uniform density plots retain physical support membership consistently in observed centers, empirical covariance and resampled features. Continuous pilot integration is unchanged.
 
@@ -15,13 +15,13 @@
 - Class-probability plot families exclude omitted display rows, including
   asymptotic Bonferroni calibration, while preserving their padded output rows.
 
-* Kernel sums reject unknown extra arguments without evaluating their values,
+- Kernel sums reject unknown extra arguments without evaluating their values,
   while retaining formula controls and ordinary argument matching.
 
-* Perspective floor and wall grids are painted behind the estimate, intervals
+- Perspective floor and wall grids are painted behind the estimate, intervals
   and overlays. Base surface-data replay uses the same renderer.
 
-* Constant conditional surfaces and surface-data replay expand automatic display
+- Constant conditional surfaces and surface-data replay expand automatic display
   limits without changing estimates, intervals or explicit limits.
 
 - Compound plot arguments now use dotted spellings, for example `boot.control`, `bias.control`, `data.overlay` and `gradient.order`. The 0.80-2 snake_case argument spellings are rejected with replacement guidance; no aliases are provided. `np_plot_data` and its existing field names, saved-data replay and extraction remain unchanged. Retired snake_case plot arguments are rejected before evaluating their values, including during saved-data replay; replay retains its existing graphical-override behavior.
