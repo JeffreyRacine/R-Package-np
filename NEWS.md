@@ -44,6 +44,10 @@
 - Preserve explicit X/Z coordinate labels in partially linear and smooth-
   coefficient line panels, including saved-data replay and separate scales.
 
+- Avoid oversized temporary response labels in partially linear child
+  bandwidth calls while preserving executable-option evaluation and retained
+  response-call semantics.
+
 # np 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and
