@@ -10,7 +10,7 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
     calibration = NULL, blocklen = NULL, block.automatic = FALSE,
     alpha = .05, random.seed = 42L, compact.sd.explicit = FALSE) {
   if (.np_udens_u5_request(bws, control, center, method, band, calibration))
-    return(.np_udens_u5_prepare(bws, x))
+    return(.np_udens_u5_prepare(bws, x, random.seed))
   if (.np_udens_m4_request(bws, control, center, method, band, calibration))
     return(.np_udens_m4_prepare(bws, x, random.seed))
   if (.np_udens_compact_normal_q2_request(bws, control, center, method, band, calibration))
@@ -101,7 +101,7 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
 .np_udens_plot_errors <- function(state, grid, alpha, B, band, design = NULL) {
   names(grid) <- names(state$x)
   if (.np_udens_u5_active(state))
-    return(.np_udens_u5_public(state, grid, alpha, band))
+    return(.np_udens_u5_public(state, grid, alpha, band, B))
   if (.np_udens_q6_active(state))
     return(.np_udens_q6_public_errors(state, grid, alpha, B, band))
   if (.np_udens_m4_active(state))

@@ -2,6 +2,8 @@
 
 ## Private density plot additions
 
+* U5 density plots now provide normal pointwise/Bonferroni and full-covariance Gaussian simultaneous/all bands for orders four/six/eight. Full influence QR retains every direction; native fits and existing methods are unchanged.
+
 * Extend the fixed-bound U5 normal pointwise correction to Epanechnikov orders six/eight, retaining order-four arithmetic and native fits.
 
 * Explicit Q6 smoothed-bootstrap density inference now provides marginal pointwise bands while retaining its simultaneous calibration.
