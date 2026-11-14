@@ -1389,7 +1389,7 @@ npqreg.formula <-
       q.args$exdat <- exdat
     q.args$bws <- bws
     dots$na.action <- NULL
-    tbw <- do.call(npqreg, c(q.args, .npqreg_fit_dots(dots)))
+    tbw <- do.call(npqreg, c(q.args, .np_formula_options(.npqreg_fit_dots(dots), "npqreg.formula")))
 
     tbw$omit <- .np_formula_output_action(tbw, umf, has.eval, native.restored = TRUE)
     train.omit <- attr(tmf, "na.action")
@@ -1785,6 +1785,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
       .np_formula_dispatch_call(npcdistbw, bw.args,
         substitute(list(...))[-1L], environment())
     }
+    fit.dots <- .np_formula_options(fit.dots, "npqreg.default")
     return(do.call(npqreg, c(list(bws = tbw, se = se, .np.formula.state = frame.state), fit.dots)))
   }
 
@@ -1828,6 +1829,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
       .np_formula_dispatch_call(npcdistbw, bw.args,
         substitute(list(...))[-1L], environment())
     }
+    fit.dots <- .np_formula_options(fit.dots, "npqreg.default")
     return(do.call(npqreg, c(list(bws = tbw, se = se, .np.formula.state = frame.state), fit.dots)))
   }
 
@@ -1975,5 +1977,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     fit.dots <- .npqreg_fit_dots(dots)
   else
     fit.dots <- .npqreg_fit_dots(dots, allow.bandwidth.controls = TRUE)
+  if (!is.null(tbw[["formula", exact = TRUE]]))
+    fit.dots <- .np_formula_options(fit.dots, "npqreg.default")
   do.call(npqreg, c(call.args, fit.dots))
 }

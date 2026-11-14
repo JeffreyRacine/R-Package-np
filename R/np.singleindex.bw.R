@@ -50,7 +50,7 @@ npindexbw.formula <-
     .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
       "npindexbw", match.call(expand.dots = FALSE), parent.frame(),
       formula, mf, capture$na.action)
-    tbw <- do.call(npindexbw, c(list(xdat = xdat, ydat = quote(ydat)), list(...)))
+    tbw <- do.call(npindexbw, c(list(xdat = xdat, ydat = quote(ydat)), .np_formula_options(list(...), "npindexbw.formula")))
 
     .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }

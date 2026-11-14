@@ -1344,7 +1344,7 @@ nplsqregbw.formula <-
       "nplsqregbw", match.call(expand.dots = FALSE), parent.frame(),
       bws, mf, NULL, ynames = .nplsqreg_formula_response_name(bws),
       scalar.children = length(tau) > 1L)
-    out <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = tau), dots))
+    out <- do.call(nplsqregbw, c(list(xdat = xdat, ydat = ydat, tau = .np_formula_options(list(tau = tau), "nplsqregbw.formula")[[1L]]), .np_formula_options(dots, "nplsqregbw.formula")))
     .npRmpi_bw_formula_finish(out, .npRmpi.bw.metadata)
   }
 
@@ -1986,17 +1986,17 @@ nplsqreg.formula <-
 
     out <- if (has.eval) {
       do.call(nplsqreg.default,
-              c(list(txdat = xdat, tydat = ydat, tau = tau,
+              .np_formula_options(c(list(txdat = xdat, tydat = ydat, tau = tau,
                      exdat = exdat, gradients = gradients,
                      residuals = residuals,
                      gradient.order = gradient.order, se = se),
-                dots))
+                dots), "nplsqreg.formula"))
     } else {
       do.call(nplsqreg.default,
-              c(list(txdat = xdat, tydat = ydat, tau = tau,
+              .np_formula_options(c(list(txdat = xdat, tydat = ydat, tau = tau,
                      gradients = gradients, residuals = residuals,
                      gradient.order = gradient.order, se = se),
-                dots))
+                dots), "nplsqreg.formula"))
     }
     out$call <- match.call(expand.dots = FALSE)
     out$call <- .nplsqreg_describe_call(out$call, parent.frame())

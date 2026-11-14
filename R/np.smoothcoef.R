@@ -104,7 +104,7 @@ npscoef.formula <-
     }
     sc.args$bws <- bws
     dots$na.action <- NULL
-    ev <- do.call(npscoef, c(sc.args, list(se = se), dots))
+    ev <- do.call(npscoef, c(sc.args, list(se = se), .np_formula_options(dots, "npscoef.formula")))
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
       if (!is.null(ev$bws))
@@ -336,7 +336,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
-    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+    .np_formula_options(.np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment()), "npscoef.default")
   else list(...)
   do.call(npscoef, c(call.args, list(se = se), fit.dots))
 

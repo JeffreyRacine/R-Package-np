@@ -72,7 +72,7 @@ npcdistbw.formula <-
     seed.args <- c(list(xdat = xdat, ydat = ydat),
                    if (has.gval) list(gydat = gydat) else list(),
                    dots)
-    tbw <- do.call(npcdistbw, seed.args)
+    tbw <- do.call(npcdistbw, .np_formula_options(seed.args, "npcdistbw.formula"))
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))

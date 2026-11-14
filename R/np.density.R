@@ -76,7 +76,7 @@ npudens.formula <-
       ud.args$edat <- edat
     ud.args$bws <- bws
     dots$na.action <- NULL
-    ev <- do.call(npudens, c(ud.args, dots))
+    ev <- do.call(npudens, c(ud.args, .np_formula_options(dots, "npudens.formula")))
 
     ev$omit <- .np_formula_output_action(ev, umf, has.eval)
     eval.omit <- if (isTRUE(ev$trainiseval)) train.omit else ev$omit
@@ -445,7 +445,8 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
-    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+    .np_formula_options(.np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment()), "npudens.default")
   else list(...)
   do.call(npudens, c(call.args, fit.dots))
 }

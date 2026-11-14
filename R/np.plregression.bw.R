@@ -38,7 +38,7 @@ npplregbw.formula <-
     tbw <- do.call(npplregbw,
                   c(list(xdat = roles$x, ydat = model.response(roles$yz),
                          zdat = roles$yz[, .np_formula_term_names(spec$chromoly[[3L]]), drop = FALSE]),
-                    dots))
+                    .np_formula_options(dots, "npplregbw.formula")))
 
     .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }

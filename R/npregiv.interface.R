@@ -240,7 +240,8 @@ npregiv.formula <- function(y, data = NULL, subset, na.action,
   if (!is.null(effective.xeval))
     native.args$xeval <- effective.xeval
 
-  fit <- do.call(npregiv, c(native.args, list(...)))
+  fit <- do.call(npregiv, .np_formula_options(
+    c(native.args, list(...)), "npregiv.formula"))
   .np_iv_formula_metadata(
     fit = fit, parsed = parsed, train.frame = train.frame,
     eval.frame = eval.frame, call = mc,
@@ -296,7 +297,8 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   if (!is.null(effective.xeval))
     native.args$xeval <- effective.xeval
 
-  fit <- do.call(npregivderiv, c(native.args, list(...)))
+  fit <- do.call(npregivderiv, .np_formula_options(
+    c(native.args, list(...)), "npregivderiv.formula"))
   .np_iv_formula_metadata(
     fit = fit, parsed = parsed, train.frame = train.frame,
     eval.frame = eval.frame, call = mc,

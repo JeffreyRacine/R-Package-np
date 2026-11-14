@@ -1585,7 +1585,7 @@ npcopula.default <- function(bws,
            u.auto = prepared$u.auto,
            se = se)
     )
-    return(do.call(npcopula.default, args))
+    return(do.call(npcopula.default, .np_formula_options(args, "npcopula.default")))
   }
 
   .npRmpi_require_active_slave_pool(where = "npcopula()")

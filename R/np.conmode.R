@@ -104,7 +104,7 @@ npconmode.formula <-
     }
     cm.args$bws <- bws
     dots$na.action <- NULL
-    ev <- do.call(npconmode, c(cm.args, dots))
+    ev <- do.call(npconmode, c(cm.args, .np_formula_options(dots, "npconmode.formula")))
 
     output.omit <- .np_formula_output_action(ev, umf, has.eval, native.restored = TRUE)
     ev <- .npConmodeRecordSampleOmissions(ev, train.omit,
@@ -942,7 +942,10 @@ npconmode.default <- function(bws, txdat, tydat,
   call.args$se <- se
   call.args$level <- level
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
-    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+    .np_formula_options(.np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment()), "npconmode.default")
   else list(...)
+  if (!is.null(tbw[["formula", exact = TRUE]]))
+    call.args <- .np_formula_options(call.args, "npconmode.default")
   do.call(npconmode, c(call.args, fit.dots))
 }

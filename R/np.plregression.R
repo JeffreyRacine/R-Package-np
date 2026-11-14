@@ -72,7 +72,7 @@ npplreg.formula <-
     }
     pl.args$bws <- bws
     dots$na.action <- NULL
-    ev <- do.call(npplreg, c(pl.args, dots))
+    ev <- do.call(npplreg, c(pl.args, .np_formula_options(dots, "npplreg.formula")))
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
       if (!is.null(ev$bws))
@@ -953,7 +953,8 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
-    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+    .np_formula_options(.np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment()), "npplreg.default")
   else list(...)
   do.call(npplreg, c(call.args, fit.dots))
 }

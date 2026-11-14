@@ -98,7 +98,7 @@ npksum.formula <-
     if (!miss.new)
       call_args$exdat <- exdat
 
-    tobj <- do.call(npksum, c(call_args, dots))
+    tobj <- do.call(npksum, c(call_args, .np_formula_options(dots, "npksum.formula")))
 
     tobj$formula <- formula
     tobj$na.action <- attr(mf, "na.action")

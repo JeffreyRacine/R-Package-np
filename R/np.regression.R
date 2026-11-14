@@ -345,7 +345,7 @@ npreg.formula <-
         reg.args$eydat <- eydat
     }
     dots$na.action <- NULL
-    ev <- do.call(npreg, c(reg.args, list(se = se), dots))
+    ev <- do.call(npreg, c(reg.args, list(se = se), .np_formula_options(dots, "npreg.formula")))
     if (!is.null(ev$bws)) {
       preserve.bws.call <- inherits(bws, "rbandwidth") && !is.null(bws$call)
       bw.call <- mc[c(1, match(c("bws", "data", "subset", "na.action"),
@@ -1318,6 +1318,8 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     fit.dots <- dots
     fit.dots$remin <- NULL
     fit.dots$.np_fit_progress_handoff <- TRUE
+    if (!is.null(frame.state))
+      fit.dots <- .np_formula_options(fit.dots, "npreg.default")
     return(do.call(npreg, c(reg.args, list(se = se), fit.dots)))
   }
 
@@ -1432,7 +1434,8 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
-    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+    .np_formula_options(.np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment()), "npreg.default")
   else list(...)
   ev <- do.call(npreg, c(call.args, list(se = se), fit.dots))
 

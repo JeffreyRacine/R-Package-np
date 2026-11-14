@@ -48,7 +48,7 @@ npregbw.formula <-
     .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
       "npregbw", .np_formula_call_public(match.call(expand.dots = FALSE)), parent.frame(),
       formula, mf, capture$na.action)
-    tbw <- do.call(npregbw, c(list(xdat = xdat, ydat = quote(ydat)), dots))
+    tbw <- do.call(npregbw, c(list(xdat = xdat, ydat = quote(ydat)), .np_formula_options(dots, "npregbw.formula")))
 
     .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
