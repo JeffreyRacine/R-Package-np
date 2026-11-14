@@ -127,8 +127,12 @@
     compact.sd.explicit <- !missing(plot.errors.boot.method) && !missing(plot.errors.type) &&
       identical(as.character(plot.errors.boot.method)[1L], "inid") &&
       error.request$type %in% c("pointwise", "simultaneous", "bonferroni", "all")
-    q6.state <- if (identical(plot.errors.boot.method, "smoothed-q6"))
-      .np_udens_q6_prepare(bws, xdat, if (missing(random.seed)) 42L else random.seed) else NULL
+    q6.state <- if (identical(plot.errors.boot.method, "smoothed-q6")) {
+      if (identical(plot.errors.boot.calibration, "asymmetric-sd"))
+        .np_udens_q6_asymmetric_prepare(bws,xdat,if (missing(random.seed)) 42L else random.seed,
+          list(vary=1L,xtrim=xtrim,xq=xq)) else
+        .np_udens_q6_prepare(bws,xdat,if (missing(random.seed)) 42L else random.seed)
+    } else NULL
     compact.state <- NULL
     if (is.null(q6.state) && .np_udens_compact_normal_q2_request(bws, bias.control, plot.errors.center,
         error.request$method, error.request$type, plot.errors.boot.calibration))
@@ -213,7 +217,7 @@
     new.bias <- !is.null(bias.state)
     # Presentation only: percentile endpoints are not a maximum-root band.
     annotation.construction <- if (new.bias) {
-      if (.np_udens_q6_active(bias.state)) "smoothed-q6"
+      if (.np_udens_q6_active(bias.state) || .np_udens_q6_asymmetric_active(bias.state)) "smoothed-q6"
       else if (identical(bias.state[["normal.pmzsd", exact = TRUE]], TRUE)) NULL
       else if (.np_udens_compact_active(bias.state) || .np_udens_beta_active(bias.state) || .np_udens_fgd_active(bias.state)) "guide-region"
       else if (identical(bias.state[["plot.calibration", exact = TRUE]],

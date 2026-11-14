@@ -102,6 +102,8 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
   names(grid) <- names(state$x)
   if (.np_udens_u5_active(state))
     return(.np_udens_u5_public(state, grid, alpha, band, B))
+  if (.np_udens_q6_asymmetric_active(state))
+    return(.np_udens_q6_asymmetric_public(state,grid,alpha,B,band,design))
   if (.np_udens_q6_active(state))
     return(.np_udens_q6_public_errors(state, grid, alpha, B, band))
   if (.np_udens_m4_active(state))

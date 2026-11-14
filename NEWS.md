@@ -2,6 +2,8 @@
 
 ## Private density plot additions
 
+* Explicit asymmetric Q6 density inference adds simultaneous bands on the full empirical-range grid. Each resample rebuilds that grid; signed maxima retain their signs. The corrected center, symmetric Q6 and all existing inference choices remain unchanged.
+
 * Explicit symmetric Q6 density inference adds Bonferroni/all bands using the same draw plan. Raw Bonferroni endpoints and the simultaneous companion hull are separately retained; finite-B warnings do not change the requested draws.
 
 * U5 density plots now provide normal pointwise/Bonferroni and full-covariance Gaussian simultaneous/all bands for orders four/six/eight. Full influence QR retains every direction; native fits and existing methods are unchanged.

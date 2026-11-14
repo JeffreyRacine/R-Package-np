@@ -774,10 +774,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   fixed bandwidth, whole-line second-order uniform or Epanechnikov kernels,
   at least ten finite observations and positive guide variance. It leaves the
   fitted estimator and all existing inference choices unchanged. Normal-scale \code{pmzsd},
-  asymptotic errors, asymmetric calibration, bounds, nearest-neighbor bandwidths,
+  asymptotic errors, bounds, nearest-neighbor bandwidths,
   custom bias controls and dependent-data controls are not admitted by this law.
 
-  Q6 resamples complete observations from the empirical distribution and adds
+  Symmetric Q6 resamples complete observations from the empirical distribution and adds
   independent \eqn{h\sqrt{2/3}t_6} smoothing noise. The corrected plot curve uses
   the frozen sixth-order compact operator with a fitted normal guide. Each
   replicate refits that guide. Roots are centered at the complete corrected
@@ -793,6 +793,24 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   no extra draws or target deletion improves finite-B resolution. Signed corrected centers and raw endpoints are
   retained; nonnegative intersections may be reported separately. This is a
   different law and calibration from \code{smoothed-percentile}.
+
+  Explicit \code{calibration="asymmetric-sd"} with this law instead supports
+  simultaneous bands on the full empirical-range grid only (the default
+  \code{xtrim=0}, or \code{grid.control=np_grid_control(xtrim=c(0,1))}). Its center and original fixed-coordinate influence
+  scale are unchanged. In each complete resample the same equally spaced grid
+  fractions are rebuilt between that resample's minimum and maximum. The root
+  subtracts the Q6 density at that selected coordinate, rather than the
+  corrected fixed-coordinate functional. The original scale is a fixed
+  weighting function here, not a claimed variance for the random-coordinate
+  statistic. Separate signed maxima and type-7 quantiles at \eqn{1-\alpha/2}
+  form the lower and upper endpoints; signed critical values are not clipped
+  to zero. Nondefault trimming, fixed physical grids, marginal/Bonferroni/all
+  bands and multivariate requests remain unqualified for this new calibration.
+  In a 1,024-original own-CVML study, empirical-grid 95-percent simultaneous
+  coverage was 96.88 percent for uniform and 96.29 percent for Epanechnikov.
+  These bands were wider than the symmetric alternative; the Epanechnikov
+  skew-mixture cell covered 88.28 percent at n=100 and 93.75 percent at n=400.
+  These are finite-grid results, not a continuum-coverage guarantee.
 
   Finite-draw resolution is reported without increasing \code{B}; the inherited
   default is unchanged. Quadrature and finite-workspace certificates can reject
