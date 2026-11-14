@@ -723,6 +723,20 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bootstrap bands; see \code{\link{np_udens_bias_control}}. Core estimators and
   existing plotting constructions are unchanged.
 
+  For a univariate fourth-order Epanechnikov density with known finite
+  \code{ckerbound="fixed"} bounds, \code{errors="asymptotic"},
+  \code{center="bias-corrected"} and \code{band="pmzsd"} use a
+  degree-five support-reproducing plot correction with a fitted beta guide.
+  The native fourth-order fit and its bandwidth remain unchanged; the plotted
+  corrected center is distinct from that fit. The normal pointwise scale uses
+  the complete positive-reference influence covariance, including guide and
+  cross terms. Data and evaluation coordinates must be strictly interior;
+  exact support endpoints, range bounds and other bands are not admitted by
+  this construction. No bandwidth selection occurs during this correction.
+  In a 2,048-original fixed-grid CVLS study, mean pointwise coverage was
+  90.42/95.16/98.97 percent at nominal 90/95/99 percent. Local mixture deficits
+  remain; these averages do not imply uniform coverage over all locations.
+
   The explicit experimental \code{bootstrap="smoothed-q6"} law supports
   \code{errors="bootstrap"}, \code{center="bias-corrected"},
   \code{band="pointwise"} or \code{band="simultaneous"}, and
