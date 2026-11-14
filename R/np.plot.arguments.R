@@ -61,3 +61,22 @@
     stop("duplicate plot argument", call. = FALSE)
   dots
 }
+
+# do.call evaluates language arguments. Graphical labels have already been
+# evaluated by their caller and must arrive at graphics as literal values.
+# Keep this at the existing call boundary, preserving its evaluation frame.
+.np_plot_literal_labels <- function(args, expression.labels = FALSE) {
+  for (name in intersect(c("main", "sub", "xlab", "ylab", "zlab"), names(args))) {
+    value <- args[[name, exact = TRUE]]
+    # RGL passes labels through further do.call boundaries internally.
+    if (expression.labels && (is.call(value) || is.symbol(value)))
+      value <- as.expression(value)
+    if (is.language(value))
+      args[name] <- list(substitute(quote(LABEL), list(LABEL = value)))
+  }
+  args
+}
+
+.np_plot_conmode_panel_title <- function(main, variable) {
+  if (is.language(main)) main else paste(main, variable, sep = ": ")
+}

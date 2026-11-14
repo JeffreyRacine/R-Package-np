@@ -3797,7 +3797,7 @@ genTimingStr <- function(x){
     if (isFALSE(getOption("npRmpi.profile.summary", TRUE)))
       return("")
 
-    if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+    if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)))
       return("")
 
     comm <- 1L
@@ -4180,7 +4180,7 @@ npLpCompleteTermStatus <- function(basis = "glp", degree, nobs = Inf,
                      where, length(rows), location, reason)
   if (!external)
     stop(message, call. = FALSE)
-  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) ||
       (isTRUE(mpi.is.master()) && isTRUE(mpi.comm.rank(0L) == 0L)))
     .np_warning(paste0(message,
       "; returning NA for fitted values and associated outputs. ",

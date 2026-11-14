@@ -390,9 +390,31 @@ Named options passed via \code{\dots} include:
       \code{lwd}, \code{main}, \code{sub}, \code{type}, \code{xlab},
       \code{xlim}, \code{ylab}, \code{ylim}, \code{zlab}, \code{zlim}}{
         standard graphical controls forwarded to the underlying plotting
-        primitives when relevant. In continuous two-dimensional regression
-        panels, \code{xlim} sets the display limits without changing the
-        evaluation grid or the family used to calibrate simultaneous bands.
+        primitives when relevant. Supplied limits affect the display, not the
+        evaluation grid, estimates, intervals or the family used to calibrate
+        simultaneous bands. For surface plots, \code{xlim} and \code{ylim}
+        control the two coordinate axes and \code{zlim} controls height.
+        For one-dimensional partially linear and smooth-coefficient panels,
+        \code{xlim} controls X panels and \code{zlim} controls Z panels;
+        \code{ylim} controls the plotted values. Saved-data replay retains
+        these choices. An explicit replay \code{xlim} overrides retained
+        horizontal limits; an explicitly supplied replay \code{zlim} takes
+        precedence on Z panels when both are supplied. A horizontal limit
+        applies to every selected line panel, including factor-level positions;
+        select individual saved panels when different ranges are wanted.
+        On these line panels, \code{xlab} labels X coordinates and
+        \code{zlab} labels Z coordinates; \code{ylab} labels the plotted
+        values. A supplied label applies to every panel of that role.
+        Saved replay retains these labels. A replay \code{xlab} alone
+        overrides every horizontal label; an explicitly supplied
+        \code{zlab} takes precedence on Z panels. Empty strings suppress
+        label text, while \code{NULL} restores the generated label.
+        Mathematical labels can be supplied using \code{expression()}.
+        Omitted or \code{NULL} limits use automatic ranges. Each renderer
+        retains its restrictions on valid limits. The rgl renderer preserves
+        its handling of constant ranges and missing endpoints; infinite limits
+        or a non-finite rendered coordinate range are refused before scene
+        serialization.
       }
     }
 
@@ -1384,6 +1406,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   control constructors documented in \code{\link{np_boot_control}},
   \code{\link{np_grid_control}}, and \code{\link{np_render_control}}.
 
+}
+
+\section{Empty conditional-density windows}{
+For ordinary local-constant conditional-density plots with nonnegative kernels,
+finite empty empirical response windows do not establish zero uncertainty.
+Asymptotic and fixed-bandwidth bootstrap marginal limits are unavailable there.
+The estimates and all requested grid rows are retained; if any member lacks
+uncertainty, the full requested simultaneous band is unavailable. Available
+pointwise and Bonferroni limits are retained. This disclosure does not alter raw
+estimation, corrected inference, derivatives, or declared outside-support zeros.
 }
 
 \value{

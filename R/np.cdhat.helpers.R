@@ -297,7 +297,7 @@
     return(NULL)
 
   if (!isTRUE(getOption("npRmpi.hat.operator.fanout", TRUE)) ||
-      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+      !isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) ||
       isTRUE(getOption("npRmpi.autodispatch.context", FALSE)) ||
       isTRUE(getOption("npRmpi.autodispatch.disable", FALSE)) ||
       isTRUE(.npRmpi_autodispatch_called_from_bcast()))
@@ -936,7 +936,7 @@
                                         return.norm = FALSE,
                                         allow.empty.rows = TRUE) {
   if (!isTRUE(getOption("npRmpi.cdhat.apply.fanout", TRUE)) ||
-      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+      !isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)) ||
       isTRUE(getOption("npRmpi.autodispatch.context", FALSE)) ||
       isTRUE(getOption("npRmpi.autodispatch.disable", FALSE)) ||
       isTRUE(.npRmpi_autodispatch_called_from_bcast()))

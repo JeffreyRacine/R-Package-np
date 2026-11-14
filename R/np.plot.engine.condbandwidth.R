@@ -525,14 +525,7 @@
           } else if (quantreg)
             .np_plot_finite_range(tcomp) else
                 .np_plot_finite_range(tcomp)
-        # A clamped quantile can be constant while every interval is NA.
-        # Expand only automatic display limits; retain the fitted surface.
-        if (isTRUE(quantreg) && zlim[1L] == zlim[2L]) {
-          zpad <- .04 * max(1, abs(zlim[1L]))
-          expanded <- zlim + c(-zpad, zpad)
-          expanded[!is.finite(expanded)] <- zlim[!is.finite(expanded)]
-          zlim <- expanded
-        }
+        zlim <- .np_plot_expand_surface_range(zlim)
       }
 
       if (plot.behavior != "plot"){
@@ -609,6 +602,7 @@
         main.val <- if (!is.null(main)) main else NULL
         .np_plot_first_render_begin(rgl.first.render)
         rgl.out <- .np_plot_render_surface_rgl(
+          xlim = xlim, ylim = ylim,
           x = x1.eval,
           y = x2.eval,
           z = tdens,
@@ -698,6 +692,7 @@
             phi = phi,
             main = scalar_default(main, "")
           )
+          persp.args <- .np_plot_apply_limits(persp.args, xlim, ylim)
           persp.mat <- .np_plot_render_surface_base_frame(
             persp.args = persp.args,
             xlim = range(x1.eval, finite = TRUE),
@@ -1257,7 +1252,7 @@
             } else {
               plot
             }
-            plot.args <- list()
+            plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
             if (xi.factor) {
               if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
             } else {
@@ -1319,7 +1314,7 @@
                 data.args$lty <- NULL
                 data.args$lwd <- NULL
                 data.args$col <- NULL
-                do.call(graphics::plot, data.args)
+                do.call(graphics::plot, .np_plot_literal_labels(data.args))
               } else {
                 data.args <- plot.args
                 data.args$x <- overlay.x
@@ -1330,10 +1325,10 @@
                 data.args$pch <- scalar_default(data.args$pch, 20)
                 data.args$cex <- scalar_default(data.args$cex, 0.5)
                 data.args$col <- .np_plot_color("data_overlay")
-                do.call(graphics::plot, data.args)
+                do.call(graphics::plot, .np_plot_literal_labels(data.args))
               }
             } else {
-              do.call(plot.fun, plot.args)
+              do.call(plot.fun, .np_plot_literal_labels(plot.args))
             }
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
@@ -1624,7 +1619,7 @@
               } else {
                 plot
               }
-              plot.args <- list()
+              plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
               if (xi.factor) {
                 if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
               } else {
@@ -1669,7 +1664,7 @@
                 plot.args,
                 if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
               )
-              do.call(plot.fun, plot.args)
+              do.call(plot.fun, .np_plot_literal_labels(plot.args))
               if (plot.rug && !xi.factor)
                 .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
@@ -1838,7 +1833,7 @@
             } else {
               plot
             }
-            plot.args <- list()
+            plot.args <- .np_plot_apply_limits(list(), xlim = xlim)
             if (xi.factor) {
               if (plot.bootstrap && plot.bxp) plot.args$z <- all.bxp[[plot.index]] else plot.args$f <- allei[,plot.index]
             } else {
@@ -1869,7 +1864,7 @@
               plot.args,
               if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
             )
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 

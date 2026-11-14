@@ -1,4 +1,7 @@
 test_that("conditional proper projection fans out matrix bootstrap values with an active pool", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   project <- getFromNamespace(".npRmpi_project_conditional_proper_values", "npRmpi")
   called <- new.env(parent = emptyenv())
   called$fanout <- FALSE
@@ -49,6 +52,9 @@ test_that("conditional proper projection fans out matrix bootstrap values with a
 })
 
 test_that("conditional proper projection uses distribution projection for cdf routes", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   project <- getFromNamespace(".npRmpi_project_conditional_proper_values", "npRmpi")
   called <- new.env(parent = emptyenv())
   called$fanout <- FALSE
@@ -86,6 +92,9 @@ test_that("conditional proper projection uses distribution projection for cdf ro
 })
 
 test_that("conditional proper projection remains local for vector and no-pool routes", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   project <- getFromNamespace(".npRmpi_project_conditional_proper_values", "npRmpi")
   called <- new.env(parent = emptyenv())
   called$fanout <- FALSE

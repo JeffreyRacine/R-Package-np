@@ -949,7 +949,7 @@
 }
 
 .npRmpi_autodispatch_warn_nested <- function() {
-  if (isTRUE(getOption("npRmpi.profile.active", FALSE)) &&
+  if (isTRUE(.npRmpi_session_fact("npRmpi.profile.active", FALSE)) &&
       isTRUE(.npRmpi_manual_bcast_in_context())) {
     return(invisible(FALSE))
   }
@@ -961,9 +961,9 @@
 }
 
 .npRmpi_has_active_slave_pool <- function(comm = 1L) {
-  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)))
     return(FALSE)
-  if (!isTRUE(getOption("npRmpi.pool.active", FALSE)))
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.pool.active", FALSE)))
     return(FALSE)
   size <- tryCatch(mpi.comm.size(comm), error = function(e) NA_integer_)
   rank <- tryCatch(mpi.comm.rank(comm), error = function(e) NA_integer_)
@@ -1015,7 +1015,7 @@
 .npRmpi_master_only_mode <- function(comm = 1L) {
   if (!isTRUE(getOption("npRmpi.master.only", FALSE)))
     return(FALSE)
-  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)))
     return(FALSE)
   size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) NA_integer_)
   rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) NA_integer_)
@@ -1044,6 +1044,11 @@
 # Sequence ownership follows the live session, not a user options snapshot.
 .npRmpi_spmd_state <- new.env(parent = emptyenv())
 .npRmpi_spmd_state$seq_id <- 0L
+.npRmpi_spmd_state$lifecycle <- list(
+  npRmpi.mpi.initialized = FALSE, npRmpi.pool.active = FALSE,
+  npRmpi.profile.active = FALSE, npRmpi.attach.close.state = "closed",
+  npRmpi.attach.session.id = NA_integer_, npRmpi.attach.session.counter = 0L,
+  npRmpi.attach.exit.finalizer = NULL)
 
 .npRmpi_spmd_seq_get <- function() {
   seq.id <- .npRmpi_spmd_state$seq_id
@@ -1999,7 +2004,7 @@
     return(invisible())
   }
 
-  if (!isTRUE(getOption("npRmpi.pool.active", FALSE))) {
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.pool.active", FALSE))) {
     .np_backend_seed_local(seed)
     return(invisible())
   }

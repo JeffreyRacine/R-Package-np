@@ -153,21 +153,23 @@
 }
 
 .np_plot_data <- function(family, request, panels, targets, inference = list(),
-                          coverage_families = list(), diagnostics = list()) {
+                          coverage_families = list(), diagnostics = list(),
+                          family_exclusions = list()) {
   out <- structure(list(schema_version = 1L, family = family, request = request,
     panels = panels, targets = targets, inference = inference,
     coverage_families = coverage_families, diagnostics = diagnostics),
     class = "np_plot_data")
-  out <- .np_plot_data_family_events(out)
+  out <- .np_plot_data_family_events(out, family_exclusions)
   .np_plot_data_validate(out)
   out
 }
 
-.np_plot_data_family_events <- function(x) {
+.np_plot_data_family_events <- function(x, exclusions = list()) {
   records <- list()
   for (panel_id in names(x$panels)) {
     d <- x$panels[[panel_id]]$intervals
-    keep <- which(d$status != "display_only")
+    keep <- which(d$status != "display_only" &
+                    !d$row_id %in% exclusions[[panel_id]])
     x$panels[[panel_id]]$intervals$family_id[] <- NA_character_
     if (!length(keep)) next
     d <- d[keep, , drop = FALSE]

@@ -1,3 +1,28 @@
+# These are observations of package-owned lifecycle transitions, not user
+# preferences. Generic options restoration must not rewind an active session.
+.npRmpi_session_fact <- function(name, default = NULL) {
+  facts <- .npRmpi_spmd_state$lifecycle
+  if (name %in% names(facts)) facts[[name, exact = TRUE]] else default
+}
+
+.npRmpi_session_facts <- function(...) {
+  values <- list(...)
+  suspendInterrupts({
+    keys <- intersect(names(values), names(.npRmpi_spmd_state$lifecycle))
+    .npRmpi_spmd_state$lifecycle[keys] <- values[keys]
+    old <- options(values)
+  })
+  invisible(old)
+}
+
+.npRmpi_session_comm_replaced <- function(comm) {
+  if (identical(as.integer(comm), 1L)) {
+    .npRmpi_session_facts(npRmpi.pool.active = FALSE)
+    .npRmpi_attach_state_reset()
+  }
+  invisible(NULL)
+}
+
 .npRmpi_session_apply_options <- function(autodispatch = NULL,
                                           np.messages = NULL,
                                           autodispatch.verify.options = NULL,
@@ -94,16 +119,16 @@
 }
 
 .npRmpi_attach_state_reset <- function() {
-  options(npRmpi.attach.close.state = "closed")
-  options(npRmpi.attach.session.id = NA_integer_)
+  .npRmpi_session_facts(npRmpi.attach.close.state = "closed")
+  .npRmpi_session_facts(npRmpi.attach.session.id = NA_integer_)
   invisible(TRUE)
 }
 
 .npRmpi_attach_exit_finalizer <- function(e) {
   tryCatch({
-    state <- as.character(getOption("npRmpi.attach.close.state", "closed"))[1L]
+    state <- as.character(.npRmpi_session_fact("npRmpi.attach.close.state", "closed"))[1L]
     if (!identical(state, "open") ||
-        !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+        !isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)))
       return(invisible(FALSE))
     world <- .npRmpi_safe_int(mpi.comm.size(0L))
     comm <- .npRmpi_safe_int(mpi.comm.size(1L))
@@ -118,22 +143,22 @@
 }
 
 .npRmpi_attach_register_exit_finalizer <- function() {
-  if (!is.null(getOption("npRmpi.attach.exit.finalizer", NULL)))
+  if (!is.null(.npRmpi_session_fact("npRmpi.attach.exit.finalizer", NULL)))
     return(invisible(FALSE))
   env <- new.env(parent = emptyenv())
   reg.finalizer(env, .npRmpi_attach_exit_finalizer, onexit = TRUE)
-  options(npRmpi.attach.exit.finalizer = env)
+  .npRmpi_session_facts(npRmpi.attach.exit.finalizer = env)
   invisible(TRUE)
 }
 
 .npRmpi_attach_next_session_id <- function() {
-  sid <- suppressWarnings(as.integer(getOption("npRmpi.attach.session.counter", 0L)))
+  sid <- suppressWarnings(as.integer(.npRmpi_session_fact("npRmpi.attach.session.counter", 0L)))
   if (!is.finite(sid) || sid < 0L)
     sid <- 0L
   sid <- as.integer(sid + 1L)
   if (!is.finite(sid) || sid < 1L)
     sid <- 1L
-  options(npRmpi.attach.session.counter = sid)
+  .npRmpi_session_facts(npRmpi.attach.session.counter = sid)
   sid
 }
 
@@ -167,7 +192,7 @@
 }
 
 .npRmpi_attach_send_close_ack <- function(comm = 1L,
-                                          session_id = getOption("npRmpi.attach.session.id", NA_integer_)) {
+                                          session_id = .npRmpi_session_fact("npRmpi.attach.session.id", NA_integer_)) {
   rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
   if (is.na(rank) || rank < 1L)
     return(invisible(FALSE))
@@ -186,7 +211,7 @@
 
 .npRmpi_attach_send_close_release <- function(comm = 1L,
                                               ranks,
-                                              session_id = getOption("npRmpi.attach.session.id", NA_integer_),
+                                              session_id = .npRmpi_session_fact("npRmpi.attach.session.id", NA_integer_),
                                               barrier = TRUE) {
   ranks <- as.integer(ranks)
   ranks <- sort(unique(ranks[is.finite(ranks) & ranks >= 1L]))
@@ -222,7 +247,7 @@
 }
 
 .npRmpi_attach_wait_close_release <- function(comm = 1L,
-                                              session_id = getOption("npRmpi.attach.session.id", NA_integer_),
+                                              session_id = .npRmpi_session_fact("npRmpi.attach.session.id", NA_integer_),
                                               timeout_sec = .npRmpi_attach_close_ack_timeout(),
                                               poll_sleep = 0.01) {
   rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
@@ -262,7 +287,7 @@
 }
 
 .npRmpi_attach_collect_close_acks <- function(comm = 1L,
-                                              session_id = getOption("npRmpi.attach.session.id", NA_integer_),
+                                              session_id = .npRmpi_session_fact("npRmpi.attach.session.id", NA_integer_),
                                               expected = NULL,
                                               timeout_sec = .npRmpi_attach_close_ack_timeout(),
                                               poll_sleep = 0.01) {
@@ -411,7 +436,7 @@
 .npRmpi_session_attach_worker_loop <- function(comm = 1L,
                                                nonblock = TRUE,
                                                sleep = 0.1,
-                                               session_id = getOption("npRmpi.attach.session.id", NA_integer_)) {
+                                               session_id = .npRmpi_session_fact("npRmpi.attach.session.id", NA_integer_)) {
   options(echo = FALSE)
   recv.timeout <- .npRmpi_session_recv_timeout()
   .npRmpi_worker_loop(
@@ -470,7 +495,7 @@ npRmpi.init <- function(...,
   quiet <- npValidateScalarLogical(quiet, "quiet")
   sleep <- npValidatePositiveFiniteNumeric(sleep, "sleep")
 
-  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE))) {
     stop(
       paste(
         "MPI runtime is not initialized in this R session.",
@@ -502,7 +527,7 @@ npRmpi.init <- function(...,
       comm <- 1L
       .npRmpi_fanout_assert_idle(comm)
     }
-    if (isTRUE(getOption("npRmpi.profile.active", FALSE)))
+    if (isTRUE(.npRmpi_session_fact("npRmpi.profile.active", FALSE)))
       stop(paste(
         "npRmpi.init(mode='attach') cannot convert a profile-managed pool.",
         "Keep the profile/manual workflow, or use mode='spawn' to reuse",
@@ -511,8 +536,8 @@ npRmpi.init <- function(...,
   }
   reuse <- .npRmpi_session_has_active_pool(comm = comm) &&
     (identical(mode, "spawn") ||
-     (isTRUE(getOption("npRmpi.pool.active", FALSE)) &&
-      identical(getOption("npRmpi.attach.close.state"), "open")))
+     (isTRUE(.npRmpi_session_fact("npRmpi.pool.active", FALSE)) &&
+      identical(.npRmpi_session_fact("npRmpi.attach.close.state"), "open")))
   if (reuse)
     .npRmpi_worker_identity_admit(comm)
 
@@ -546,7 +571,7 @@ npRmpi.init <- function(...,
       where = "npRmpi.init() reused-slave SPMD reset"
     )
     options(npRmpi.master.only = FALSE)
-    options(npRmpi.pool.active = TRUE)
+    .npRmpi_session_facts(npRmpi.pool.active = TRUE)
     if (!quiet)
       mpi.hostinfo(comm)
     return(invisible(TRUE))
@@ -556,7 +581,7 @@ npRmpi.init <- function(...,
     mpi.spawn.Rslaves(..., nslaves = nslaves, comm = comm, quiet = quiet, nonblock = nonblock, sleep = sleep)
     mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE, comm = comm)
     options(npRmpi.master.only = FALSE)
-    options(npRmpi.pool.active = TRUE)
+    .npRmpi_session_facts(npRmpi.pool.active = TRUE)
     return(invisible(TRUE))
   }
 
@@ -569,7 +594,7 @@ npRmpi.init <- function(...,
   np.mpi.initialize()
   mpi.barrier(0)
   options(npRmpi.master.only = FALSE)
-  options(npRmpi.pool.active = TRUE)
+  .npRmpi_session_facts(npRmpi.pool.active = TRUE)
 
   rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
   rank <- if (is.na(rank)) 0L else as.integer(rank)
@@ -579,8 +604,8 @@ npRmpi.init <- function(...,
   sid <- suppressWarnings(as.integer(sid.msg)[1L])
   if (!is.finite(sid) || sid < 1L)
     sid <- as.integer(sid.local)
-  options(npRmpi.attach.session.id = sid)
-  options(npRmpi.attach.close.state = "open")
+  .npRmpi_session_facts(npRmpi.attach.session.id = sid)
+  .npRmpi_session_facts(npRmpi.attach.close.state = "open")
 
   if (rank == 0L) {
     .npRmpi_attach_register_exit_finalizer()
@@ -633,7 +658,7 @@ npRmpi.quit <- function(force = FALSE,
   reset <- function(active = FALSE) {
     .npRmpi_session_reset_spmd_state()
     .npRmpi_attach_state_reset()
-    options(npRmpi.master.only = FALSE, npRmpi.pool.active = active)
+    .npRmpi_session_facts(npRmpi.master.only = FALSE, npRmpi.pool.active = active)
   }
   runtime <- .npRmpi_session_runtime_state()
   if (!runtime[["initialized"]] || runtime[["finalized"]]) {
@@ -679,7 +704,7 @@ npRmpi.quit <- function(force = FALSE,
   }
   if (identical(mode, "attach")) {
     comm <- 1L
-    attach.state <- as.character(getOption("npRmpi.attach.close.state", "open"))[1L]
+    attach.state <- as.character(.npRmpi_session_fact("npRmpi.attach.close.state", "open"))[1L]
     if (identical(attach.state, "closed"))
       fail("attach close state contradicts an active communicator; session remains poisoned")
     if (identical(attach.state, "closing")) {
@@ -692,9 +717,9 @@ npRmpi.quit <- function(force = FALSE,
     if (length(size.attach) != 1L || is.na(size.attach) || size.attach < 2L)
       fail("npRmpi cannot confirm the attach communicator; session remains poisoned")
     lease.drain.ok <- drain.leases()
-    options(npRmpi.attach.close.state = "closing")
+    .npRmpi_session_facts(npRmpi.attach.close.state = "closing")
     expected <- seq_len(size.attach - 1L)
-    sid <- suppressWarnings(as.integer(getOption("npRmpi.attach.session.id", NA_integer_))[1L])
+    sid <- suppressWarnings(as.integer(.npRmpi_session_fact("npRmpi.attach.session.id", NA_integer_))[1L])
     recv.timeout <- .npRmpi_session_recv_timeout()
     if (recv.timeout > 0) base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
     broadcast.ok <- isTRUE(attempt({
@@ -750,7 +775,7 @@ npRmpi.session.info <- function(comm=1){
   env_no_reuse <- Sys.getenv("NP_RMPI_NO_REUSE_SLAVES", unset="")
 
   mpi_ver <- .npRmpi_safe(mpi.get.version(), fallback = NA)
-  mpi_initialized <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE))
+  mpi_initialized <- isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE))
   if (mpi_initialized) {
     comm_size <- .npRmpi_safe_int(mpi.comm.size(comm))
     comm_rank <- .npRmpi_safe_int(mpi.comm.rank(comm))

@@ -27,14 +27,18 @@ mpi.comm.size <- function(comm=1){
 }
 
 mpi.comm.dup <- function(comm, newcomm){
-        .Call("mpi_comm_dup", as.integer(comm), as.integer(newcomm),
+        out <- .Call("mpi_comm_dup", as.integer(comm), as.integer(newcomm),
     PACKAGE = "npRmpi")
+    if (identical(out, 1L)) .npRmpi_session_comm_replaced(newcomm)
+    out
 }
 
 mpi.comm.split <- function(comm = 1, color = 0, key = mpi.comm.rank(comm), newcomm = 2){
-        .Call("mpi_comm_split", as.integer(comm), as.integer(color),
+        out <- .Call("mpi_comm_split", as.integer(comm), as.integer(color),
               as.integer(key), as.integer(newcomm),
     PACKAGE = "npRmpi")
+    if (identical(out, 1L)) .npRmpi_session_comm_replaced(newcomm)
+    out
 }
 
 mpi.comm.remote.size <- function(comm=2){
@@ -46,7 +50,9 @@ mpi.comm.free <- function(comm=1){
     tmp<-paste("It seems no members(slaves) associated with comm", comm)
     stop(tmp)
      }
-     .Call("mpi_comm_free",as.integer(comm),PACKAGE = "npRmpi")
+     out <- .Call("mpi_comm_free",as.integer(comm),PACKAGE = "npRmpi")
+    if (identical(out, 1L)) .npRmpi_session_comm_replaced(comm)
+    out
 }
 
 mpi.abort <- function(comm=1){
@@ -64,7 +70,9 @@ mpi.comm.disconnect <- function(comm=1){
      }
      if (!is.loaded("mpi_comm_disconnect"))
         stop("MPI_Comm_disconnect is not supported.")
-     .Call("mpi_comm_disconnect",as.integer(comm),PACKAGE = "npRmpi")
+     out <- .Call("mpi_comm_disconnect",as.integer(comm),PACKAGE = "npRmpi")
+    if (identical(out, 1L)) .npRmpi_session_comm_replaced(comm)
+    out
 }
 
 mpi.comm.spawn <- function(slave, 
@@ -87,7 +95,7 @@ mpi.comm.spawn <- function(slave,
     if (!is.numeric(nslaves) || length(nslaves) != 1L || is.na(nslaves) ||
         !is.finite(nslaves) || nslaves != floor(nslaves) || nslaves <= 0)
         stop("Choose a positive number of slaves.")
-    .Call("mpi_comm_spawn",
+    out <- .Call("mpi_comm_spawn",
                 as.character(slave),
                 as.character(slavearg),
                 as.integer(nslaves),
@@ -96,12 +104,17 @@ mpi.comm.spawn <- function(slave,
         as.integer(intercomm),
 		as.integer(quiet),
 		PACKAGE = "npRmpi")
+    if (length(out) == 1L && !is.na(out) && out > 0L)
+        .npRmpi_session_comm_replaced(intercomm)
+    out
 }
 
 mpi.comm.get.parent <- function(comm=2){
     if (!is.loaded("mpi_comm_get_parent"))
         stop("MPI_Comm_get_parent is not supported.")
-    .Call("mpi_comm_get_parent", as.integer(comm),PACKAGE = "npRmpi")
+    out <- .Call("mpi_comm_get_parent", as.integer(comm),PACKAGE = "npRmpi")
+    if (identical(out, 1L)) .npRmpi_session_comm_replaced(comm)
+    out
 }
 
 mpi.comm.is.null <- function(comm){
@@ -110,9 +123,11 @@ mpi.comm.is.null <- function(comm){
 }
 
 mpi.intercomm.merge <- function(intercomm=2,high=0,comm=1){
-    .Call("mpi_intercomm_merge", as.integer(intercomm),
+    out <- .Call("mpi_intercomm_merge", as.integer(intercomm),
                      as.integer(high),
                      as.integer(comm),PACKAGE = "npRmpi")
+    if (identical(out, 1L)) .npRmpi_session_comm_replaced(comm)
+    out
 }
 
 mpi.comm.c2f <- function(comm=1){

@@ -6,7 +6,7 @@
 .npRmpi_finalize_before_unload <- function(where = "R process exit") {
   state <- .npRmpi_exit_finalizer_state
   if (isTRUE(state$running) ||
-      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+      !isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)))
     return(invisible(FALSE))
 
   state$running <- TRUE
@@ -34,7 +34,7 @@
     return(invisible(FALSE))
   }
   if (comm.size >= 2L) {
-    close.mode <- if (isTRUE(getOption("npRmpi.profile.active", FALSE))) {
+    close.mode <- if (isTRUE(.npRmpi_session_fact("npRmpi.profile.active", FALSE))) {
       "spawn"
     } else {
       "auto"
@@ -220,7 +220,7 @@
 
 .onUnload <- function (lpath){
   tryCatch(.Call("C_np_release_static_buffers", PACKAGE = "npRmpi"), error = function(e) NULL)
-  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+  if (isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE)))
     tryCatch(.npRmpi_finalize_before_unload("namespace unload"), error = function(e) NULL)
 }
 
@@ -244,7 +244,7 @@
   }
 
 	if (nzchar(Sys.getenv("NP_RMPI_SKIP_INIT"))) {
-    options(npRmpi.mpi.initialized = FALSE)
+    .npRmpi_session_facts(npRmpi.mpi.initialized = FALSE)
     if (is.null(getOption("np.messages")))
       options(np.messages = TRUE)
 
@@ -280,8 +280,7 @@
       options(npRmpi.autodispatch.warned.nested = FALSE)
     if (is.null(getOption("npRmpi.master.only")))
       options(npRmpi.master.only = FALSE)
-    if (is.null(getOption("npRmpi.pool.active")))
-      options(npRmpi.pool.active = FALSE)
+    .npRmpi_session_facts(npRmpi.pool.active = FALSE)
     if (is.null(getOption("npRmpi.conflicts.warn")))
       options(npRmpi.conflicts.warn = TRUE)
     if (is.null(getOption("npRmpi.conflicts.warned")))
@@ -322,7 +321,7 @@
 	
   if(!.Call("mpi_initialize",PACKAGE="npRmpi"))
     stop("Cannot start MPI_Init(). Exit")
-  options(npRmpi.mpi.initialized = TRUE)
+  .npRmpi_session_facts(npRmpi.mpi.initialized = TRUE)
   reg.finalizer(
     .npRmpi_exit_finalizer_state,
     .npRmpi_exit_finalizer,
@@ -364,8 +363,7 @@
     options(npRmpi.autodispatch.warned.nested = FALSE)
   if (is.null(getOption("npRmpi.master.only")))
     options(npRmpi.master.only = FALSE)
-  if (is.null(getOption("npRmpi.pool.active")))
-    options(npRmpi.pool.active = FALSE)
+  .npRmpi_session_facts(npRmpi.pool.active = FALSE)
   if (is.null(getOption("npRmpi.conflicts.warn")))
     options(npRmpi.conflicts.warn = TRUE)
   if (is.null(getOption("npRmpi.conflicts.warned")))

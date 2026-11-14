@@ -482,9 +482,9 @@
                   c(min(lerr),max(herr))
               else
                   c(min(tobj$mean),max(tobj$mean))
+        if (overlay.ok)
+          zlim <- .np_plot_overlay_range(zlim, ydat)
       }
-      if (overlay.ok)
-        zlim <- .np_plot_overlay_range(zlim, ydat)
         
       if (plot.behavior != "plot"){
         r1 = plregression(bws = bws, xcoef = tobj$xcoef,
@@ -536,6 +536,7 @@
           overlay.x2 <- (bws$zdati$all.dlev[[1]])[as.integer(overlay.x2)]
         .np_plot_first_render_begin(first.render)
         rgl.out <- .np_plot_render_surface_rgl(
+          xlim = xlim, ylim = ylim,
           x = x1.eval,
           y = z1.eval,
           z = treg,
@@ -633,6 +634,7 @@
                              phi = phi,
                              main = scalar_default(main, ""))
           persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
+          persp.args <- .np_plot_apply_limits(persp.args, xlim, ylim)
           persp.mat <- .np_plot_render_surface_base_frame(
             persp.args = persp.args,
             xlim = range(x1.eval, finite = TRUE),
@@ -874,7 +876,7 @@
           } else {
             plot
           }
-          plot.args <- list()
+          plot.args <- .np_plot_apply_limits(list(), xlim = if (xOrZ == "x") xlim else zlim)
           if (xi.factor) {
             if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
           } else {
@@ -895,8 +897,9 @@
             panel.ylim <- .np_plot_overlay_range(panel.ylim, ydat)
           if (!is.null(panel.ylim))
             plot.args$ylim <- panel.ylim
-          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
-                                      paste(toupper(xOrZ), i, sep = ""))
+          plot.args$xlab <- scalar_default(if (xOrZ == "x") xlab else zlab,
+                                      gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                      paste(toupper(xOrZ), i, sep = "")))
           plot.args$ylab <- scalar_default(ylab, response.axis.label)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
@@ -922,7 +925,7 @@
             type.val <- plot.args$type
             plot.args$type <- "n"
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
             do.call(.np_plot_overlay_points_1d,
@@ -963,7 +966,7 @@
               base.args$xaxt <- "n"
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             .np_plot_first_render_begin(first.render)
-            do.call(graphics::plot.default, base.args)
+            do.call(graphics::plot.default, .np_plot_literal_labels(base.args))
             .np_plot_first_render_end(first.render)
             if (add.axis)
               axis(1, at = axis.at, labels = axis.labels)
@@ -987,7 +990,7 @@
             }
           } else {
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             if (plot.rug)
               .np_plot_draw_rug_1d(if (xOrZ == "x") xdat[,i] else zdat[,i])
@@ -1197,7 +1200,7 @@
           } else {
             plot
           }
-          plot.args <- list()
+          plot.args <- .np_plot_apply_limits(list(), xlim = if (xOrZ == "x") xlim else zlim)
           if (xi.factor) {
             if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
           } else {
@@ -1213,8 +1216,9 @@
             else
               c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
                 max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
-          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
-                                      paste(toupper(xOrZ), i, sep = ""))
+          plot.args$xlab <- scalar_default(if (xOrZ == "x") xlab else zlab,
+                                      gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                      paste(toupper(xOrZ), i, sep = "")))
           plot.args$ylab <- scalar_default(ylab, response.axis.label)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
@@ -1232,7 +1236,7 @@
             type.val <- plot.args$type
             plot.args$type <- "n"
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
             do.call(.np_plot_overlay_points_1d,
@@ -1252,7 +1256,7 @@
               .np_plot_draw_rug_1d(overlay.x)
           } else {
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(if (xOrZ == "x") xdat[,i] else zdat[,i])
@@ -1423,7 +1427,7 @@
           } else {
             plot
           }
-          plot.args <- list()
+          plot.args <- .np_plot_apply_limits(list(), xlim = if (xOrZ == "x") xlim else zlim)
           if (xi.factor) {
             if (plot.bootstrap && plot.bxp) plot.args$z <- all.bxp[[plot.index]] else plot.args$f <- allei[,plot.index]
           } else {
@@ -1432,8 +1436,9 @@
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- data.eval[,plot.index]
           plot.args$ylim <- c(y.min, y.max)
-          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
-                                      paste(toupper(xOrZ), i, sep = ""))
+          plot.args$xlab <- scalar_default(if (xOrZ == "x") xlab else zlab,
+                                      gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                      paste(toupper(xOrZ), i, sep = "")))
           plot.args$ylab <- scalar_default(ylab, response.axis.label)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
@@ -1459,7 +1464,7 @@
             type.val <- plot.args$type
             plot.args$type <- "n"
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
             do.call(.np_plot_overlay_points_1d,
@@ -1499,7 +1504,7 @@
               base.args$xaxt <- "n"
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             .np_plot_first_render_begin(first.render)
-            do.call(graphics::plot.default, base.args)
+            do.call(graphics::plot.default, .np_plot_literal_labels(base.args))
             .np_plot_first_render_end(first.render)
             if (add.axis)
               axis(1, at = axis.at, labels = axis.labels)
@@ -1523,7 +1528,7 @@
             }
           } else {
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             if (plot.rug)
               .np_plot_draw_rug_1d(if (xOrZ == "x") xdat[,i] else zdat[,i])

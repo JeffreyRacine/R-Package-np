@@ -1,6 +1,9 @@
 warn_nested <- getFromNamespace(".npRmpi_autodispatch_warn_nested", "npRmpi")
 
 test_that("nested autodispatch warning still fires outside profile/manual context", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   old.warned <- getOption("npRmpi.autodispatch.warned.nested")
   old.profile <- getOption("npRmpi.profile.active")
   old.manual <- getOption("npRmpi.manual.bcast.context")
@@ -22,6 +25,9 @@ test_that("nested autodispatch warning still fires outside profile/manual contex
 })
 
 test_that("nested autodispatch warning is suppressed in canonical profile/manual context", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   old.warned <- getOption("npRmpi.autodispatch.warned.nested")
   old.profile <- getOption("npRmpi.profile.active")
   old.manual <- getOption("npRmpi.manual.bcast.context")

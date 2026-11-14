@@ -2,6 +2,8 @@ npqreg <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npqreg")
+    if (!missing(bws) && "na.action" %in% names(mc[["..."]]))
+      .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npqreg")
     args <- .np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment(),
       data.roles = c("txdat", "tydat"),
@@ -1337,6 +1339,7 @@ npqreg <-
 npqreg.formula <-
   function(bws, data = NULL, newdata = NULL, ..., se = FALSE){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npqreg", data = data, newdata = newdata)
 
     se <- npValidateScalarLogical(se, "se")
     dots <- list(...)
@@ -1385,6 +1388,7 @@ npqreg.formula <-
     if (has.eval)
       q.args$exdat <- exdat
     q.args$bws <- bws
+    dots$na.action <- NULL
     tbw <- do.call(npqreg, c(q.args, .npqreg_fit_dots(dots)))
 
     tbw$omit <- .np_formula_output_action(tbw, umf, has.eval, native.restored = TRUE)
@@ -1415,6 +1419,7 @@ npqreg.formula <-
 npqreg.call <-
   function(bws, ...) {
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npqreg", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
@@ -1453,6 +1458,7 @@ npqreg.condbandwidth <-
            small = 1.490116e-05, itmax = 10000,
            ..., se = FALSE){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npqreg", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 

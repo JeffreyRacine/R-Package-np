@@ -2,6 +2,9 @@
 # enter the existing scoped local R/native owner and restore it on failure.
 # Numerical MPI coverage stays in the external focused subprocess matrix.
 test_that("conditional hat tasks use and restore the scoped local owner", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   ns <- asNamespace("npRmpi")
   fanout <- get(".npRmpi_cdhat_apply_fanout", ns)
   local.owner <- get(".npRmpi_with_local_regression", ns)

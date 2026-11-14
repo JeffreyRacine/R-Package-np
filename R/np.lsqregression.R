@@ -1410,6 +1410,15 @@ nplsqregbw.NULL <- function(...) {
   as.call(parts)
 }
 
+.nplsqreg_bw_response_arg <- function(ydat, dots) {
+  # Keep executable options on the original value handoff. Ordinary options
+  # cannot rebind the producer's response before the callee forces it.
+  if (is.language(ydat) || typeof(ydat) == "bytecode" ||
+      any(vapply(dots, function(value)
+        is.language(value) || typeof(value) == "bytecode", logical(1))))
+    ydat else quote(ydat)
+}
+
 nplsqregbw.default <-
   function(bws,
            xdat = stop("invoked without data 'xdat'"),
@@ -1683,7 +1692,8 @@ nplsqregbw.default <-
     }
 
     if (missing(bws)) {
-      start.bws <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat), reg.dots))
+      start.bws <- do.call(npregbw, c(list(xdat = xdat,
+                                           ydat = .nplsqreg_bw_response_arg(ydat, reg.dots)), reg.dots))
     } else if (isa(bws, "lsqregressionbandwidth")) {
       return(nplsqregbw.lsqregressionbandwidth(bws, tau = tau))
     } else if (isa(bws, "rbandwidth")) {
@@ -1692,7 +1702,8 @@ nplsqregbw.default <-
              call. = FALSE)
       start.bws <- bws
     } else {
-      start.bws <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat,
+      start.bws <- do.call(npregbw, c(list(xdat = xdat,
+                                           ydat = .nplsqreg_bw_response_arg(ydat, c(list(bws = bws), reg.dots)),
                                            bws = bws,
                                            bandwidth.compute = FALSE), reg.dots))
     }
@@ -1744,7 +1755,8 @@ nplsqregbw.default <-
         fixed.reg.dots$regtype <- "lp"
         fixed.reg.dots$degree <- as.integer(degree.search$fixed.degree)
         fixed.reg.dots$bernstein.basis <- degree.search$bernstein.basis
-        fixed.bws <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat),
+        fixed.bws <- do.call(npregbw, c(list(xdat = xdat,
+                                           ydat = .nplsqreg_bw_response_arg(ydat, fixed.reg.dots)),
                                         fixed.reg.dots))
         fixed.bws <- .nplsqreg_canonical_lp_template(
           template = fixed.bws,

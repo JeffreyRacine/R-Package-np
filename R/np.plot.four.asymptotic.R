@@ -639,7 +639,7 @@
   # curve at fixed covariates. Preserve that renderer and its interpretation.
   if (is.factor(dat$x) && !is.ordered(dat$x) &&
       !identical(dat$view[1L], "fixed"))
-    return(do.call(.np_plot_conmode_panel, c(list(dat = dat), args)))
+    return(do.call(.np_plot_conmode_panel, .np_plot_literal_labels(c(list(dat = dat), args))))
   bands <- if(identical(band,"all")) c("bonferroni", "simultaneous", "pointwise") else band
   columns <- if(identical(band,"all")) unlist(lapply(bands, function(b) paste0(b, c(".lower", ".upper")))) else c("lower","upper")
   if (!all(columns %in% names(dat)))
@@ -652,7 +652,7 @@
   # legacy interval so it cannot overdraw one band with an ambiguous style.
   central <- dat
   central$lower <- central$upper <- NULL
-  do.call(.np_plot_conmode_panel, c(list(dat = central), args))
+  do.call(.np_plot_conmode_panel, .np_plot_literal_labels(c(list(dat = central), args)))
   x <- if (is.factor(dat$x)) as.numeric(dat$x) else dat$x
   ord <- order(x)
   colors <- .np_plot_all_band_colors()

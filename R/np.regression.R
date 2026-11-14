@@ -120,6 +120,8 @@ npreg <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npreg")
+    if (!missing(bws) && "na.action" %in% names(mc[["..."]]))
+      .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npreg")
     args <- .np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment(),
       data.roles = c("txdat", "tydat"),
@@ -261,6 +263,7 @@ npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
            se = FALSE, ...){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npreg", data = data, newdata = newdata)
 
 
     dots <- list(...)
@@ -341,6 +344,7 @@ npreg.formula <-
       if (y.eval)
         reg.args$eydat <- eydat
     }
+    dots$na.action <- NULL
     ev <- do.call(npreg, c(reg.args, list(se = se), dots))
     if (!is.null(ev$bws)) {
       preserve.bws.call <- inherits(bws, "rbandwidth") && !is.null(bws$call)
@@ -423,6 +427,7 @@ npreg.formula <-
 npreg.call <-
   function(bws, ...) {
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npreg", native = TRUE)
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
@@ -453,6 +458,7 @@ npreg.rbandwidth <-
            residuals = FALSE, se = FALSE,
            ...){
     .np_reject_fit_subset(substitute(list(...))[-1L])
+    .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npreg", native = TRUE, native.eval = !missing(exdat))
 
   .np_regression_forward(.npreg_fit_impl, environment(),
     match.call(expand.dots = FALSE), match.call(), parent.frame(),

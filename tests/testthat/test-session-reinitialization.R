@@ -5,6 +5,14 @@ reinit_fixture <- function(world = 1L, pool = TRUE, owner = "spawn",
   e <- new.env(parent = environment(npRmpi.init))
   e$.npRmpi_option_agreement <- new.env(parent=emptyenv())
   e$.npRmpi_option_agreement$snapshot <- NULL
+  # This pure transport fixture supplies simulated lifecycle facts. Real
+  # options-restoration ownership is covered by session-fact tests.
+  e$.npRmpi_session_fact <- getOption
+  e$.npRmpi_session_facts <- options
+  e$.npRmpi_attach_state_reset <- function() {
+    options(npRmpi.attach.close.state="closed", npRmpi.attach.session.id=NA_integer_)
+    invisible(TRUE)
+  }
   e$events <- character()
   e$asNamespace <- function(package) e
   e$.npRmpi_profile_clear <- function() invisible(NULL)

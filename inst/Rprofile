@@ -52,13 +52,13 @@ if (!invisible(library(npRmpi, logical.return = TRUE))) {
 # Profile/manual-broadcast launches keep automatic route selection available
 # inside explicitly broadcast commands.
 options(npRmpi.autodispatch = TRUE)
-options(npRmpi.profile.active = TRUE)
+get(".npRmpi_session_facts", asNamespace("npRmpi"))(npRmpi.profile.active = TRUE)
 
 # Guard against explicit Rmpi attachment inside profile scripts. Under the
 # embedded npRmpi backend, attaching Rmpi then calling mpi.comm.rank() in this
 # mode can crash the process; fail fast with remediation instead.
 .npRmpi_profile_rmpi_attach_guard <- function(...) {
-  if (!isTRUE(getOption("npRmpi.profile.active", FALSE)))
+  if (!isTRUE(get(".npRmpi_session_fact", asNamespace("npRmpi"))("npRmpi.profile.active", FALSE)))
     return(invisible(NULL))
   msg <- paste(
     "npRmpi profile mode does not support attaching package 'Rmpi' in script body.",

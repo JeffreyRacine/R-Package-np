@@ -178,6 +178,9 @@ test_that("summary timing formatter prefers object timing.profile over global pr
 })
 
 test_that("summary timing formatter includes MPI session line when initialized", {
+  # This fixture supplies a simulated lifecycle owner; real snapshot ownership
+  # is tested independently in test-session-fact-ownership.R.
+  testthat::local_mocked_bindings(.npRmpi_session_fact=getOption, .package="npRmpi")
   timing.fun <- getFromNamespace("genTimingStr", "npRmpi")
 
   old.summary <- getOption("npRmpi.profile.summary")

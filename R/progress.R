@@ -3,7 +3,7 @@
 }
 
 .np_progress_is_master <- function() {
-  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE))) {
     return(TRUE)
   }
 
@@ -253,7 +253,7 @@
 }
 
 .np_progress_bandwidth_worker_silent <- function() {
-  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+  if (!isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE))) {
     return(FALSE)
   }
 
@@ -2067,7 +2067,7 @@
     return(invisible(NULL))
   }
 
-  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+  if (isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE))) {
     attach.size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) NA_integer_)
     attach.rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) NA_integer_)
 
@@ -2298,7 +2298,7 @@
     options(np.messages = FALSE)
     .np_progress_runtime$bandwidth_label <- as.character(label)[1L]
 
-    if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+    if (isTRUE(.npRmpi_session_fact("npRmpi.mpi.initialized", FALSE))) {
       attach.size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) NA_integer_)
       attach.rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) NA_integer_)
 

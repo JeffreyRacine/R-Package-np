@@ -356,6 +356,16 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
 
 }
 
+\section{Missing-value policies with stored bandwidths}{
+An existing bandwidth object retains its training omission policy. Explicit
+\code{na.action} overrides are supported only by the formula replacement-data
+or replacement-response routes that already own that policy, and by documented
+regression and single-index prediction policies. Unsupported stored native or
+formula evaluation overrides are rejected rather than silently ignored.
+For replacement native inputs, prepare the desired complete data explicitly.
+Reusing retained training does not re-run its missing-value callback.
+}
+
 \value{
 
   \code{npindex} returns a \code{singleindex} object.  The generic

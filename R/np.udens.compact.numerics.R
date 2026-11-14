@@ -18,12 +18,18 @@
   list(target=target,h=h,kernel=kernel,span=span,s=s,poly=poly,coefficients=coefficients,mass=mass,condition=condition)
 }
 
-.np_udens_compact_operator <- function(plan,u) {
+.np_udens_compact_operator <- function(plan,u,physical=NULL) {
+  if(!is.null(physical) && (!identical(plan$kernel,'uniform') ||
+     ncol(physical$x)!=1L || nrow(physical$x)!=length(u) ||
+     nrow(physical$grid)!=length(plan$target) || length(physical$h)!=1L))
+    stop('compact physical operator shape mismatch',call.=FALSE)
   out<-matrix(0,length(plan$target),length(u))
   for(i in seq_along(plan$target)) {
     z<-(u-plan$target[i])/plan$s;c<-plan$coefficients[i,]
     base<-plan$poly[1L]+plan$poly[3L]*z^2
-    base[abs(u-plan$target[i])>=plan$span*plan$h]<-0
+    outside<-if(is.null(physical))abs(u-plan$target[i])>=plan$span*plan$h else
+      abs(physical$x[,1L]-physical$grid[i,1L])>=physical$h
+    base[outside]<-0
     out[i,]<-base*(((c[4L]*z+c[3L])*z+c[2L])*z+c[1L])/(plan$s*plan$mass[i])
   }
   out
@@ -56,7 +62,7 @@
   result
 }
 
-.np_udens_compact_moments <- function(x,plan,theta,order,full,progress=function(...)NULL) {
+.np_udens_compact_moments <- function(x,plan,theta,order,full,progress=function(...)NULL,physical=NULL) {
   n<-length(x);m<-length(plan$target);st<-.np_udens_compact_rule(theta,order,plan)
   # All targets share one knot-union measure; preparation is not repeated per pair.
   tile<-max(1L,min(512L,floor(4*1024^2/(8*max(n,m)))))
@@ -93,7 +99,8 @@
   U<-t(solve(canonical$I,t(sweep(Td,2,colMeans(Td)))))
   Ueta<-sweep(U,2,theta+1,'/');Veta<-crossprod(Ueta)/(n*(n-1))
   observed<-matrix(0,m,n)
-  for(ids in .np_udens_beta_blocks(n,tile))observed[,ids]<-.np_udens_compact_operator(plan,x[ids])-1
+  for(ids in .np_udens_beta_blocks(n,tile))observed[,ids]<-.np_udens_compact_operator(plan,x[ids],
+    .np_udens_compact_geometry_slice(physical,observations=ids))-1
   rows<-observed-rowMeans(observed)-B%*%t(U)
   ev<-rowSums(rows*rows)/(n*(n-1));empirical<-if(full)tcrossprod(rows)/(n*(n-1)) else NULL
   if(any(!is.finite(c(pv,ev)))||any(pv<=0)||any(ev<=0))stop('compact plot residual scale is not positive',call.=FALSE)
@@ -106,14 +113,14 @@
     guide_residual_mean=guide.mean,theta=theta,nodes=st$nodes,tail=st$tail)
 }
 
-.np_udens_compact_prepare <- function(x,h,grid,kernel,full=TRUE,progress=function(...)NULL) {
+.np_udens_compact_prepare <- function(x,h,grid,kernel,full=TRUE,progress=function(...)NULL,physical=NULL) {
   n<-length(x);m<-length(grid);plan<-.np_udens_compact_operator_plan(grid,h,kernel)
   # Charge observed/influence copies, both refinement results and factor scratch.
   bytes<-8*(8*as.double(m)*n+12*as.double(m)^2+12*512*max(m,n))+64*1024^2
   if(!is.finite(bytes)||bytes>256*1024^2)stop('compact plot inference workspace forecast exceeds 256 MiB',call.=FALSE)
   progress('compact guide',0L,1L);fit<-.np_udens_beta_q1_fit(x);progress('compact guide',1L,1L)
-  a<-.np_udens_compact_moments(x,plan,fit$theta,128L,full,progress)
-  b<-.np_udens_compact_moments(x,plan,fit$theta,256L,full,progress)
+  a<-.np_udens_compact_moments(x,plan,fit$theta,128L,full,progress,physical)
+  b<-.np_udens_compact_moments(x,plan,fit$theta,256L,full,progress,physical)
   fields<-c('center','fitted','mu','B','observed','pilot_variance','empirical_variance','guide_variance','Veta','ratio_normalization')
   if(full)fields<-c(fields,'covariance','empirical','guide_covariance')
   a$checks<-setNames(lapply(fields,function(k).np_udens_beta_check(a[[k]],b[[k]],paste('compact',k),if(k=='mu')1e-10 else 1e-9)),fields)

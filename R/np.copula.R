@@ -481,7 +481,8 @@ npcopula <- function(bws, ...) {
                                         xlab,
                                         ylab,
                                         dots) {
-  persp.args <- .np_plot_user_args(dots, "persp")
+  persp.args <- .np_plot_apply_limits(
+      .np_plot_user_args(dots, "persp"), dots$xlim, dots$ylim)
   z <- .npcopula_clip_z_for_display(grid$z, zlim)
   persp.col <- grDevices::adjustcolor(
     .np_plot_persp_surface_colors(z = z, col = col),
@@ -529,10 +530,10 @@ npcopula <- function(bws, ...) {
   old.par <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(old.par), add = TRUE)
   graphics::par(mfrow = c(2L, 2L))
-  do.call(graphics::contour, c(list(x = grid$u1, y = grid$u2, z = grid$z,
+  do.call(graphics::contour, .np_plot_literal_labels(c(list(x = grid$u1, y = grid$u2, z = grid$z,
                                     xlab = xlab, ylab = ylab,
                                     main = "Copula Contour"),
-                               dots))
+                               dots)))
   .npcopula_draw_surface_base(
     grid = grid,
     zlab = "Copula",
@@ -546,10 +547,10 @@ npcopula <- function(bws, ...) {
     ylab = ylab,
     dots = dots
   )
-  do.call(graphics::plot, c(list(x = empirical$u1, y = empirical$u2,
+  do.call(graphics::plot, .np_plot_literal_labels(c(list(x = empirical$u1, y = empirical$u2,
                                  xlab = xlab, ylab = ylab, cex = .np_plot_cex("copula_pair"),
                                  main = "Empirical Copula"),
-                            dots))
+                            dots)))
   .npcopula_draw_surface_base(
     grid = density.grid,
     zlab = "Copula Density",
@@ -1130,7 +1131,8 @@ plot.npcopula <- function(x,
   finish.data <- function(value, selected.view = view) .np_plot_data_from_copula(
     value, list(errors = errors, band = band, alpha = alpha, center = center,
                 bootstrap = bootstrap, B = B, gaussian_draws = gaussian.draws,
-                random_seed = random.seed), density = isTRUE(x$density), view = selected.view)
+                random_seed = random.seed), density = isTRUE(x$density), view = selected.view,
+    style = plot.limit.style)
   output <- match.arg(output)
   if (!is.numeric(alpha) || length(alpha) != 1L ||
       is.na(alpha) || alpha <= 0 || alpha >= 0.5)
@@ -1152,6 +1154,13 @@ plot.npcopula <- function(x,
   if (identical(errors, "bootstrap"))
     .np_plot_reject_wild_unsupervised(bootstrap, "copula estimators")
   dots <- .np_plot_unique_args(list(...))
+  .np_plot_reject_unconstructed_grid(dots, "plot.npcopula",
+                                    "set probability coordinates with u in npcopula()")
+  plot.limit.style <- dots[intersect(names(dots), c("xlim", "ylim"))]
+  # Height limits belong only to the fresh perspective surface. In view="all"
+  # the saved panels are contour, empirical pairs and an automatic-range density.
+  if (isTRUE(perspective) && surface.view && !identical(x$evaluation, "sample"))
+    plot.limit.style <- .np_plot_apply_limits(plot.limit.style, zlim = zlim)
   if (!is.null(dots[["bias.control", exact = TRUE]]))
     .np_udist_score_scope(dots[["bias.control", exact = TRUE]], FALSE)
   sub.supplied <- "sub" %in% names(dots)
@@ -1204,10 +1213,10 @@ plot.npcopula <- function(x,
     empirical <- .npcopula_empirical_eval(x)
     if (identical(output, "data"))
       return(finish.data(empirical, "empirical"))
-    do.call(graphics::plot, c(list(x = empirical$u1, y = empirical$u2,
+    do.call(graphics::plot, .np_plot_literal_labels(c(list(x = empirical$u1, y = empirical$u2,
                                    xlab = xlab, ylab = ylab, cex = .np_plot_cex("copula_pair"),
                                    main = main),
-                              dots))
+                              dots)))
     if (identical(output, "plot-data"))
       return(finish.data(empirical, "empirical"))
     return(invisible(NULL))
@@ -1223,9 +1232,9 @@ plot.npcopula <- function(x,
            call. = FALSE)
     if (identical(output, "data"))
       return(finish.data(as.data.frame(x), "sample"))
-    do.call(graphics::plot, c(list(x = x$u1, y = x$u2,
+    do.call(graphics::plot, .np_plot_literal_labels(c(list(x = x$u1, y = x$u2,
                                    xlab = xlab, ylab = ylab, main = main),
-                              dots))
+                              dots)))
     if (identical(output, "plot-data"))
       return(finish.data(as.data.frame(x), "sample"))
     return(invisible(NULL))
@@ -1308,6 +1317,7 @@ plot.npcopula <- function(x,
       rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
       rgl.controls <- .np_plot_rgl_controls(dots, legend = legend)
       rgl.out <- .np_plot_render_surface_rgl(
+        xlim = dots$xlim, ylim = dots$ylim,
         x = u1,
         y = u2,
         z = z.display,
@@ -1348,7 +1358,8 @@ plot.npcopula <- function(x,
         plot.data = if (identical(output, "plot-data")) finish.data(plot.data) else NULL
       ))
     }
-    persp.args <- .np_plot_user_args(dots, "persp")
+    persp.args <- .np_plot_apply_limits(
+      .np_plot_user_args(dots, "persp"), dots$xlim, dots$ylim)
     persp.col <- grDevices::adjustcolor(
       .np_plot_persp_surface_colors(z = z.display, col = col),
       alpha.f = .np_plot_surface_alpha("base")
@@ -1421,9 +1432,9 @@ plot.npcopula <- function(x,
     if (identical(renderer, "rgl"))
       stop("renderer='rgl' is supported only for surface views in plot.npcopula",
            call. = FALSE)
-    do.call(graphics::contour, c(list(x = u1, y = u2, z = z,
+    do.call(graphics::contour, .np_plot_literal_labels(c(list(x = u1, y = u2, z = z,
                                       xlab = xlab, ylab = ylab, main = main),
-                                 dots))
+                                 dots)))
   } else {
     if (identical(renderer, "rgl"))
       stop("renderer='rgl' is supported only for surface views in plot.npcopula",
@@ -1433,10 +1444,10 @@ plot.npcopula <- function(x,
     } else {
       col
     }
-    do.call(graphics::image, c(list(x = u1, y = u2, z = z,
+    do.call(graphics::image, .np_plot_literal_labels(c(list(x = u1, y = u2, z = z,
                                     xlab = xlab, ylab = ylab, main = main,
                                     col = image.col),
-                               dots))
+                               dots)))
   }
   if (identical(output, "plot-data"))
     return(finish.data(plot.data))

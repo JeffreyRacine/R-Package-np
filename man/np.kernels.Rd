@@ -52,9 +52,9 @@
   \deqn{K_U(u)=\frac{1}{2}\mathbf{1}(|u|<1)}
   via \code{ckertype="uniform"} (order ignored).
 
-  With nearest-neighbor bandwidths, the uniform kernel compares the absolute
-  distance directly with the computed radius: points at the radius are
-  excluded. Tree search uses a conservative candidate box and the same final
+  With fixed or nearest-neighbor bandwidths, the normal uniform kernel
+  compares the absolute physical distance directly with the bandwidth or
+  computed radius: points at that distance are excluded. Tree search uses a conservative candidate box and the same final
   distance comparison, so rounding of standardized distances or tree endpoints
   cannot change this boundary convention.
 
