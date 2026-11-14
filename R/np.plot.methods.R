@@ -155,6 +155,26 @@ np_render_control <- function(style = c("band", "bar"),
   stop(msg, call. = FALSE)
 }
 
+.np_plot_reject_unconstructed_grid <- function(dots, context, hint,
+                                               controls = c("xtrim", "xq", "neval")) {
+  bad <- controls[vapply(controls, function(nm)
+    !is.null(dots[[nm, exact = TRUE]]), logical(1L))]
+  ctrl <- dots[["grid.control", exact = TRUE]]
+  if (!is.null(ctrl)) {
+    if (!inherits(ctrl, "np_grid_control"))
+      stop("grid.control must be created by np_grid_control()", call. = FALSE)
+    fields <- c("xtrim", "xq", "slices")
+    fields <- fields[vapply(fields, function(nm)
+      !is.null(ctrl[[nm, exact = TRUE]]), logical(1L))]
+    if (length(fields))
+      bad <- c(bad, paste0("grid.control$", fields))
+  }
+  if (length(bad))
+    stop(sprintf("%s does not construct a grid; unsupported controls: %s; %s",
+                 context, paste(bad, collapse = ", "), hint), call. = FALSE)
+  invisible(NULL)
+}
+
 .np_plot_par_arg_names <- function() {
   setdiff(
     get(".Pars", envir = asNamespace("graphics"), inherits = FALSE),
@@ -2328,6 +2348,9 @@ np_render_control <- function(style = c("band", "bar"),
   if (is.null(view))
     view <- if (isTRUE(perspective) || length(grid.supplied)) "fixed" else "sample"
   view <- .np_plot_scalar_match(view, c("sample", "fixed"), "view")
+  if (identical(view, "sample"))
+    .np_plot_reject_unconstructed_grid(dots, "plot.conmode(view='sample')",
+                                      "use view='fixed' for grid controls")
   if (isTRUE(perspective) && !identical(view, "fixed"))
     stop("surface plot.conmode payloads require view='fixed'",
          call. = FALSE)

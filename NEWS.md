@@ -53,7 +53,11 @@
 - Preserve explicit frame and style arguments in instrumental-variable plots
   and saved replay, including automatic ranges requested with explicit NULL.
 
-* Keep rgl interval surfaces and rugs within explicit display limits while retaining visible legends.
+- Keep rgl interval surfaces and rugs within explicit display limits while
+  retaining visible legends.
+
+- Reject unsupported grid controls in copula plots, conditional-mode sample
+  views and their saved-data replay instead of passing on ignored requests.
 
 # npRmpi 0.80-2
 

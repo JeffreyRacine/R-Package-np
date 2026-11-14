@@ -372,7 +372,10 @@ prediction/evaluation route, or plot route as appropriate.
     \code{grid.control}, \code{perspective}, \code{plot.vars},
     \code{renderer}, and graphics arguments. The default
     \code{view="sample"} draws the stored fitted probabilities/effects at the
-    fitted evaluation points. The \code{view="fixed"} route constructs
+    fitted evaluation points. Explicit sample views reject nonempty grid
+    controls and \code{neval}, \code{xtrim} or \code{xq}; use a fixed view
+    to construct a grid. Saved plot-data replay likewise cannot change the
+    retained grid. The \code{view="fixed"} route constructs
     one-dimensional object-fed slices over each conditioning variable, holding
     the remaining variables at their \code{uocquantile} median/mode values;
     \code{np_grid_control(xtrim=..., xq=...)} may be used to adjust the slice

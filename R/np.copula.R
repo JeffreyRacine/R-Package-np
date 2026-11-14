@@ -1154,6 +1154,8 @@ plot.npcopula <- function(x,
   if (identical(errors, "bootstrap"))
     .np_plot_reject_wild_unsupervised(bootstrap, "copula estimators")
   dots <- .np_plot_unique_args(list(...))
+  .np_plot_reject_unconstructed_grid(dots, "plot.npcopula",
+                                    "set probability coordinates with u in npcopula()")
   plot.limit.style <- dots[intersect(names(dots), c("xlim", "ylim"))]
   # Height limits belong only to the fresh perspective surface. In view="all"
   # the saved panels are contour, empirical pairs and an automatic-range density.
