@@ -215,8 +215,9 @@
   if (!identical(value("errors", "plot.errors.method"), "bootstrap") ||
       !identical(value("center", "plot.errors.center"), "bias-corrected") ||
       !isTRUE(value("band", "plot.errors.type") %in% c("pointwise", "simultaneous", "bonferroni", "all")) ||
-      !identical(calibration, "symmetric-sd"))
-    stop("smoothed-q6 requires explicit bootstrap errors, bias-corrected center, pointwise, simultaneous, bonferroni or all band and symmetric-sd calibration", call. = FALSE)
+      (!identical(calibration, "symmetric-sd") &&
+       !(identical(calibration, "asymmetric-sd") && identical(value("band", "plot.errors.type"), "simultaneous"))))
+    stop("smoothed-q6 requires explicit bootstrap errors, bias-corrected center, pointwise, simultaneous, bonferroni or all band and symmetric-sd calibration (asymmetric-sd supports simultaneous only)", call. = FALSE)
   if (!is.null(dots[["bias.control", exact = TRUE]]) ||
       isTRUE(dots[["gradients", exact = TRUE]]) || isTRUE(dots[["gradient", exact = TRUE]]) ||
       "gaussian.draws" %in% names(dots) ||
