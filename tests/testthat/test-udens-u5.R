@@ -1,7 +1,7 @@
-test_that('U5 admission changes only fixed order-four normal corrected density', {
+test_that('U5 admission changes only fixed higher-order normal corrected density', {
  b<-structure(list(type='fixed',ckerbound='fixed',ckertype='epanechnikov',ckerorder=4L,ndim=1L,ncon=1L),class='bandwidth')
- expect_true(.np_udens_u5_request(b,NULL,'bias-corrected','asymptotic','pmzsd'))
- cases<-list(type=c('generalized_nn','adaptive_nn'),ckerbound=c('none','range'),ckertype=c('uniform','gaussian','beta'),ckerorder=c(2L,6L,8L),ndim=c(0L,2L,3L),ncon=c(0L,2L))
+ for(order in c(4L,6L,8L)){z<-b;z$ckerorder<-order;expect_true(.np_udens_u5_request(z,NULL,'bias-corrected','asymptotic','pmzsd'))}
+ cases<-list(type=c('generalized_nn','adaptive_nn'),ckerbound=c('none','range'),ckertype=c('uniform','gaussian','beta'),ckerorder=c(2L,3L,10L),ndim=c(0L,2L,3L),ncon=c(0L,2L))
  for(k in names(cases))for(v in cases[[k]]){z<-b;z[[k]]<-v;expect_false(.np_udens_u5_request(z,NULL,'bias-corrected','asymptotic','pmzsd'))}
  for(band in c('pointwise','bonferroni','simultaneous','all'))expect_false(.np_udens_u5_request(b,NULL,'bias-corrected','asymptotic',band))
  expect_false(.np_udens_u5_request(b,NULL,'estimate','asymptotic','pmzsd'))

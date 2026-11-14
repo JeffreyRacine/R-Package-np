@@ -732,7 +732,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   For a univariate fourth-order Epanechnikov density with known finite
   \code{ckerbound="fixed"} bounds, \code{errors="asymptotic"},
   \code{center="bias-corrected"} and \code{band="pmzsd"} use a
-  degree-five support-reproducing plot correction with a fitted beta guide.
+  degree-(order+1) support-reproducing plot correction with a fitted beta guide.
   The native fourth-order fit and its bandwidth remain unchanged; the plotted
   corrected center is distinct from that fit. The normal pointwise scale uses
   the complete positive-reference influence covariance, including guide and
