@@ -493,7 +493,11 @@
     if (identical(quantity, "probability_contrast"))
       inference[[owner]]$contrast <- .np_plot_data_contrast(grid,
         match(as.character(d$variable[1L]), names(grid)))
-    if (length(style)) display$style <- style
+    if (length(style)) {
+      display$style <- style
+      if (!surface && length(frames) > 1L && !is.null(style$main))
+        display$style$main <- .np_plot_conmode_panel_title(style$main, names(frames)[i])
+    }
     panels[[panel_id]] <- .np_plot_data_panel(grid, rep("X", ncol(grid)), values, intervals, display)
   }
   .np_plot_data("npconmode", request, panels, targets, inference, families,

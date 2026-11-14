@@ -1314,7 +1314,7 @@
                 data.args$lty <- NULL
                 data.args$lwd <- NULL
                 data.args$col <- NULL
-                do.call(graphics::plot, data.args)
+                do.call(graphics::plot, .np_plot_literal_labels(data.args))
               } else {
                 data.args <- plot.args
                 data.args$x <- overlay.x
@@ -1325,10 +1325,10 @@
                 data.args$pch <- scalar_default(data.args$pch, 20)
                 data.args$cex <- scalar_default(data.args$cex, 0.5)
                 data.args$col <- .np_plot_color("data_overlay")
-                do.call(graphics::plot, data.args)
+                do.call(graphics::plot, .np_plot_literal_labels(data.args))
               }
             } else {
-              do.call(plot.fun, plot.args)
+              do.call(plot.fun, .np_plot_literal_labels(plot.args))
             }
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
@@ -1664,7 +1664,7 @@
                 plot.args,
                 if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
               )
-              do.call(plot.fun, plot.args)
+              do.call(plot.fun, .np_plot_literal_labels(plot.args))
               if (plot.rug && !xi.factor)
                 .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
@@ -1864,7 +1864,7 @@
               plot.args,
               if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
             )
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 

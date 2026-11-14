@@ -1033,7 +1033,7 @@
             type.val <- plot.args$type
             plot.args$type <- "n"
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
             do.call(.np_plot_overlay_points_1d,
@@ -1074,7 +1074,7 @@
               base.args$xaxt <- "n"
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             .np_plot_first_render_begin(first.render)
-            do.call(graphics::plot.default, base.args)
+            do.call(graphics::plot.default, .np_plot_literal_labels(base.args))
             .np_plot_first_render_end(first.render)
             if (add.axis)
               axis(1, at = axis.at, labels = axis.labels)
@@ -1098,7 +1098,7 @@
             }
           } else {
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             if (plot.rug)
               .np_plot_draw_rug_1d(if (xOrZ == "x") xdat[,i] else zdat[,i])
@@ -1388,7 +1388,7 @@
               type.val <- plot.args$type
               plot.args$type <- "n"
               .np_plot_first_render_begin(first.render)
-              do.call(plot.fun, plot.args)
+              do.call(plot.fun, .np_plot_literal_labels(plot.args))
               .np_plot_first_render_end(first.render)
               overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
               do.call(.np_plot_overlay_points_1d,
@@ -1429,7 +1429,7 @@
                 base.args$xaxt <- "n"
               base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
               .np_plot_first_render_begin(first.render)
-              do.call(graphics::plot.default, base.args)
+              do.call(graphics::plot.default, .np_plot_literal_labels(base.args))
               .np_plot_first_render_end(first.render)
               if (add.axis)
                 axis(1, at = axis.at, labels = axis.labels)
@@ -1453,7 +1453,7 @@
               }
             } else {
               .np_plot_first_render_begin(first.render)
-              do.call(plot.fun, plot.args)
+              do.call(plot.fun, .np_plot_literal_labels(plot.args))
               .np_plot_first_render_end(first.render)
               if (plot.rug && !xi.factor)
                 .np_plot_draw_rug_1d(if (xOrZ == "x") xdat[,i] else zdat[,i])
@@ -1701,7 +1701,7 @@
             type.val <- plot.args$type
             plot.args$type <- "n"
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             overlay.x <- if (xOrZ == "x") xdat[,i] else zdat[,i]
             do.call(.np_plot_overlay_points_1d,
@@ -1741,7 +1741,7 @@
             }
             base.args <- .np_plot_merge_user_args(base.args, plot.user.args)
             .np_plot_first_render_begin(first.render)
-            do.call(graphics::plot.default, base.args)
+            do.call(graphics::plot.default, .np_plot_literal_labels(base.args))
             .np_plot_first_render_end(first.render)
             if (add.axis)
               axis(1, at = axis.at, labels = axis.labels)
@@ -1765,7 +1765,7 @@
             }
           } else {
             .np_plot_first_render_begin(first.render)
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(if (xOrZ == "x") xdat[,i] else zdat[,i])

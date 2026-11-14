@@ -1039,7 +1039,7 @@
               plot.args,
               if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
             )
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
@@ -1373,7 +1373,7 @@
                 plot.args,
                 if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
               )
-              do.call(plot.fun, plot.args)
+              do.call(plot.fun, .np_plot_literal_labels(plot.args))
               if (plot.rug && !xi.factor)
                 .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 
@@ -1568,7 +1568,7 @@
               plot.args,
               if (xi.factor && plot.bootstrap && plot.bxp) bxp.args else plot.user.args
             )
-            do.call(plot.fun, plot.args)
+            do.call(plot.fun, .np_plot_literal_labels(plot.args))
             if (plot.rug && !xi.factor)
               .np_plot_draw_rug_1d(if (xOrY == "x") xdat[,i] else ydat[,i])
 

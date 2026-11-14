@@ -673,7 +673,7 @@ np_render_control <- function(style = c("band", "bar"),
     npValidateNonNegativeInteger(random.seed, "random.seed")
     dots$random.seed <- random.seed
     value <- .np_plot_progress_run(.np_udens_resolution_run(
-      do.call(method, c(list(bws = bws), dots))), enabled = TRUE, label = progress.label)
+      do.call(method, .np_plot_literal_labels(c(list(bws = bws), dots)))), enabled = TRUE, label = progress.label)
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   if (!owns.empty.rows && .np_udens_d8_default(bws, dots$bias.control,
@@ -684,7 +684,7 @@ np_render_control <- function(style = c("band", "bar"),
     npValidateNonNegativeInteger(random.seed, "random.seed")
     dots$random.seed <- random.seed
     value <- .np_plot_progress_run(.np_udens_resolution_run(
-      do.call(method, c(list(bws = bws), dots))), enabled = TRUE, label = progress.label)
+      do.call(method, .np_plot_literal_labels(c(list(bws = bws), dots)))), enabled = TRUE, label = progress.label)
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   if (!owns.empty.rows && inherits(bws, c("bandwidth", "dbandwidth"))) {
@@ -707,20 +707,20 @@ np_render_control <- function(style = c("band", "bar"),
       dots$random.seed <- random.seed
     value <- .np_plot_progress_run(
       .np_with_seed(random.seed, .np_udens_resolution_run(
-        do.call(method, c(list(bws = bws), dots)))),
+        do.call(method, .np_plot_literal_labels(c(list(bws = bws), dots))))),
       enabled = progress.enabled, label = progress.label)
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   if(!owns.empty.rows) {
     value <- .np_plot_progress_run(
-      .np_with_seed(random.seed, do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))),
+      .np_with_seed(random.seed, do.call(method, .np_plot_literal_labels(c(list(bws = .npRmpi_autodispatch_untag(bws)), dots)))),
       enabled = progress.enabled, label = progress.label)
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   publisher <- .npreg_plot_empty_publisher(.plot_context)
   dots$.np.empty.report <- publisher$record
   value <- .np_plot_progress_run(.npreg_finish_plot_call(
-    .np_with_seed(random.seed, do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))), publisher),
+    .np_with_seed(random.seed, do.call(method, .np_plot_literal_labels(c(list(bws = .npRmpi_autodispatch_untag(bws)), dots)))), publisher),
     enabled = progress.enabled, label = progress.label)
   .np_plot_data_finish(value, bws, dots, method, random.seed)
 }
@@ -765,21 +765,21 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   if ("rbandwidth" %in% cls)
-    return(do.call(.np_plot_rbandwidth_engine, c(list(bws = bws), dots)))
+    return(do.call(.np_plot_rbandwidth_engine, .np_plot_literal_labels(c(list(bws = bws), dots))))
   if ("conbandwidth" %in% cls)
-    return(do.call(.np_plot_conbandwidth_engine, c(list(bws = bws), dots)))
+    return(do.call(.np_plot_conbandwidth_engine, .np_plot_literal_labels(c(list(bws = bws), dots))))
   if ("condbandwidth" %in% cls)
-    return(do.call(.np_plot_condbandwidth_engine, c(list(bws = bws), dots)))
+    return(do.call(.np_plot_condbandwidth_engine, .np_plot_literal_labels(c(list(bws = bws), dots))))
   if ("plbandwidth" %in% cls)
-    return(do.call(.np_plot_plbandwidth_engine, c(list(bws = bws), dots)))
+    return(do.call(.np_plot_plbandwidth_engine, .np_plot_literal_labels(c(list(bws = bws), dots))))
   if ("sibandwidth" %in% cls)
-    return(do.call(.np_plot_sibandwidth_engine, c(list(bws = bws), dots)))
+    return(do.call(.np_plot_sibandwidth_engine, .np_plot_literal_labels(c(list(bws = bws), dots))))
   if ("scbandwidth" %in% cls)
-    return(do.call(.np_plot_scbandwidth_engine, c(list(bws = bws), dots)))
+    return(do.call(.np_plot_scbandwidth_engine, .np_plot_literal_labels(c(list(bws = bws), dots))))
   if ("dbandwidth" %in% cls)
-    return(do.call(.np_plot_dbandwidth_engine, c(list(bws = bws), dots)))
+    return(do.call(.np_plot_dbandwidth_engine, .np_plot_literal_labels(c(list(bws = bws), dots))))
   if ("bandwidth" %in% cls)
-    return(do.call(.np_plot_bandwidth_engine, c(list(bws = bws), dots)))
+    return(do.call(.np_plot_bandwidth_engine, .np_plot_literal_labels(c(list(bws = bws), dots))))
 
   stop("unsupported bandwidth class for plotting")
 }
@@ -875,9 +875,9 @@ np_render_control <- function(style = c("band", "bar"),
     identical(as.character(dots$plot.behavior)[1L], "data")
 
   if (use.local.plot)
-    return(.npRmpi_with_local_regression(do.call(.np_plot_from_slot, plot.args)))
+    return(.npRmpi_with_local_regression(do.call(.np_plot_from_slot, .np_plot_literal_labels(plot.args))))
 
-  do.call(.np_plot_from_slot, plot.args)
+  do.call(.np_plot_from_slot, .np_plot_literal_labels(plot.args))
 }
 .np_plot_npdensity <- function(object, ..., .plot_dots_call = NULL) {
   .np_plot_validate_public_dots(
@@ -892,7 +892,7 @@ np_render_control <- function(style = c("band", "bar"),
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity",
     allow_asymptotic_bias = TRUE)
-  do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
+  do.call(.np_plot_from_slot, .np_plot_literal_labels(c(list(object = object, slot = "bws"), dots)))
 }
 .np_plot_condensity <- function(object, ..., .plot_dots_call = NULL) {
   .np_plot_validate_public_dots(
@@ -905,7 +905,7 @@ np_render_control <- function(style = c("band", "bar"),
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.condensity",
     allow_asymptotic_bias = inherits(dots[["bias.control",exact=TRUE]],"np_conditional_bias_control"))
   dots <- .np_conditional_replay_proper(object, dots)
-  do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
+  do.call(.np_plot_from_slot, .np_plot_literal_labels(c(list(object = object, slot = "bws"), dots)))
 }
 .np_plot_condistribution <- function(object, ..., .plot_dots_call = NULL) {
   .np_plot_validate_public_dots(
@@ -918,7 +918,7 @@ np_render_control <- function(style = c("band", "bar"),
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.condistribution",
     allow_asymptotic_bias = inherits(dots[["bias.control",exact=TRUE]],"np_conditional_bias_control"))
   dots <- .np_conditional_replay_proper(object, dots)
-  do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
+  do.call(.np_plot_from_slot, .np_plot_literal_labels(c(list(object = object, slot = "bws"), dots)))
 }
 .np_plot_npdistribution <- function(object, ..., .plot_dots_call = NULL)
   .np_plot_from_slot(object, "bws", ...,
@@ -949,7 +949,7 @@ np_render_control <- function(style = c("band", "bar"),
   old.local <- getOption("npRmpi.local.regression.mode", FALSE)
   options(npRmpi.local.regression.mode = TRUE)
   on.exit(options(npRmpi.local.regression.mode = old.local), add = TRUE)
-  do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
+  do.call(.np_plot_from_slot, .np_plot_literal_labels(c(list(object = object, slot = "bws"), dots)))
 }
 .np_plot_conmode_data <- function(object,
                                   gradients = FALSE,
@@ -2151,7 +2151,7 @@ np_render_control <- function(style = c("band", "bar"),
       list(formula = y ~ x, xlab = xlab, ylab = ylab, main = main),
       plot.user.args
     )
-    do.call(graphics::boxplot, args)
+    do.call(graphics::boxplot, .np_plot_literal_labels(args))
     return(invisible(NULL))
   }
 
@@ -2180,10 +2180,10 @@ np_render_control <- function(style = c("band", "bar"),
     args$ylim <- c(-1, 1)
   if (is.factor(x)) {
     args$xaxt <- "n"
-    do.call(graphics::plot, args)
+    do.call(graphics::plot, .np_plot_literal_labels(args))
     graphics::axis(1L, at = seq_along(levels(x)), labels = levels(x))
   } else {
-    do.call(graphics::plot, args)
+    do.call(graphics::plot, .np_plot_literal_labels(args))
   }
   if (isTRUE(data_rug) && is.numeric(xplot))
     graphics::rug(xplot)
@@ -2439,7 +2439,8 @@ np_render_control <- function(style = c("band", "bar"),
       list(errors = errors, band = band, alpha = alpha, center = center,
            bootstrap = bootstrap, B = B, gradients = gradients, view = view,
            gaussian_draws = gaussian.draws, random_seed = random.seed), gradients = gradients,
-      style = dots[intersect(names(dots), c("xlim", "ylim", "zlim"))]) else NULL
+      style = dots[intersect(names(dots), c("xlim", "ylim", "zlim",
+                                          "xlab", "ylab", "zlab", "main"))]) else NULL
 
   if (isTRUE(perspective)) {
     if (identical(output, "data"))
@@ -2477,7 +2478,7 @@ np_render_control <- function(style = c("band", "bar"),
     .np_plot_variability_panel_begin(annotation.context)
     panel.dots <- plot.user.args
     if (!is.null(dots$main) && length(plot.data) > 1L)
-      panel.dots$main <- paste(dots$main, names(plot.data)[i], sep = ": ")
+      panel.dots$main <- .np_plot_conmode_panel_title(dots$main, names(plot.data)[i])
     joint.all <- identical(errors, "asymptotic") && (identical(band, "all") || isTRUE(gradients)) &&
       !is.null(attr(plot.data[[i]], "band.calibration", exact = TRUE))
     panel <- if (joint.all) function(...) .np_plot_conmode_all_panel(..., legend = legend, band = band) else
@@ -2488,6 +2489,9 @@ np_render_control <- function(style = c("band", "bar"),
       level = level,
       plot.user.args = panel.dots,
       line.user.args = line.user.args,
+      main = dots$main,
+      xlab = dots$xlab,
+      ylab = dots$ylab,
       data_rug = data.rug,
       annotation = .np_plot_variability_annotation_spec(
         errors, band, alpha, center,
@@ -2541,7 +2545,7 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   do.call(.np_plot_call_method,
-          c(list(method = .np_plot_compat_dispatch, bws = obj.bws), dots))
+          .np_plot_literal_labels(c(list(method = .np_plot_compat_dispatch, bws = obj.bws), dots)))
 }
 .np_plot_plregression <- function(object, ..., .plot_dots_call = NULL) {
   obj.bws <- .np_plot_restore_bandwidth_from_call(
@@ -2587,10 +2591,10 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   do.call(.np_plot_call_method,
-          c(list(method = .np_plot_compat_dispatch,
+          .np_plot_literal_labels(c(list(method = .np_plot_compat_dispatch,
                  bws = obj.bws,
                  where = "plot.plregression()"),
-            dots))
+            dots)))
 }
 
 .np_plot_bandwidth <- function(bws, ...) {

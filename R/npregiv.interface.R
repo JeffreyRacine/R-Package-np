@@ -995,7 +995,7 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
       initial.args[["col"]] <- NULL
       initial.args[["lty"]] <- NULL
       initial.args[["lwd"]] <- NULL
-      do.call(plot, .np_plot_merge_override_args(initial.args, frame.args))
+      do.call(plot, .np_plot_literal_labels(.np_plot_merge_override_args(initial.args, frame.args)))
       do.call(
         .np_plot_overlay_points_1d,
         c(list(x = spec[["overlay.x"]], y = spec[["overlay.y"]]),
@@ -1017,13 +1017,13 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
       initial.args <- .np_plot_merge_override_args(
         .np_plot_merge_override_args(initial.args, spec[["overlay.args"]]),
         frame.args)
-      do.call(plot, initial.args)
+      do.call(plot, .np_plot_literal_labels(initial.args))
       line.args <- curve.args[c("x", "y", "type", "col", "lty", "lwd")]
       line.args <- line.args[!vapply(line.args, is.null, logical(1L))]
       do.call(lines, line.args)
     }
   } else {
-    do.call(plot, .np_plot_merge_override_args(curve.args, frame.args))
+    do.call(plot, .np_plot_literal_labels(.np_plot_merge_override_args(curve.args, frame.args)))
   }
 
   if (isTRUE(spec[["rug"]]))

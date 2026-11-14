@@ -425,7 +425,7 @@
                             lwd = scalar_default(lwd, par()$lwd))
           plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
           .np_plot_first_render_begin(first.render)
-          do.call(plot, plot.args)
+          do.call(plot, .np_plot_literal_labels(plot.args))
           .np_plot_first_render_end(first.render)
           if (overlay.ok)
             do.call(.np_plot_overlay_points_1d,
@@ -504,7 +504,7 @@
                             lwd = scalar_default(lwd, par()$lwd))
           plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
           .np_plot_first_render_begin(first.render)
-          do.call(plot, plot.args)
+          do.call(plot, .np_plot_literal_labels(plot.args))
           .np_plot_first_render_end(first.render)
           if (overlay.ok)
             do.call(.np_plot_overlay_points_1d,
@@ -623,7 +623,7 @@
                               lwd = scalar_default(lwd, par()$lwd))
             plot.args <- .np_plot_merge_user_args(plot.args, plot.user.args)
             .np_plot_first_render_begin(first.render)
-            do.call(plot, plot.args)
+            do.call(plot, .np_plot_literal_labels(plot.args))
             .np_plot_first_render_end(first.render)
             if (plot.rug)
               .np_plot_draw_rug_1d(train.index)
