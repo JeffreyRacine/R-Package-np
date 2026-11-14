@@ -1,5 +1,9 @@
 # npRmpi 0.80-3
 
+- RGL surfaces give automatically calculated clipping limits a small display-only
+  margin, reducing clipping artifacts at flat boundary regions during rotation.
+  Explicit limits, estimates, intervals and saved plot data remain unchanged.
+
 - Corrected compact uniform density plots retain physical support membership consistently in observed centers, empirical covariance and resampled features. Continuous pilot integration is unchanged.
 
 - Fixed uniform-kernel rows now use the documented open physical support consistently across dense, tree, permutation and sparse polynomial-search paths.

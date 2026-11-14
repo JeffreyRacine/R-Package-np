@@ -340,7 +340,13 @@ Named options passed via \code{\dots} include:
         \code{theta=0}, \code{phi=-70}, and \code{fov=55} to approximate
         the base perspective in the square interactive viewport. The widget
         automatically uses up to two backing-store pixels per CSS pixel on
-        high-DPI displays. Axis titles retain rgl's native screen-facing text
+        high-DPI displays. Automatically calculated finite surface clipping
+        limits receive a display-only margin of 0.1\% of their range at each
+        end to reduce clipping artifacts where flat regions coincide with an
+        automatic boundary. This margin is not a guarantee for coordinates
+        whose magnitude is very large relative to their range. Explicit
+        limits, including supported \code{rgl.persp3d.*} overrides, numerical
+        estimates, intervals and returned plot data are unchanged. Axis titles retain rgl's native screen-facing text
         orientation while the scene is rotated. For the currently supported \code{npreg},
         \code{npplreg}, and plain mean-surface
         \code{npscoef} surface routes, \code{data.overlay=TRUE}

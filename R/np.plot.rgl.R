@@ -359,6 +359,30 @@
   invisible(NULL)
 }
 
+# Keep user-limit provenance separate from ranges calculated for rendering.
+.np_plot_rgl_automatic_limits <- function(style) {
+  axes <- c("xlim", "ylim", "zlim")
+  axes[vapply(axes, function(axis) is.null(style[[axis, exact = TRUE]]),
+              logical(1L))]
+}
+
+# WebGL transforms clipping planes and vertices in floating-point arithmetic.
+# Leave a small clearance around automatic boundaries, without moving any data.
+.np_plot_rgl_pad_automatic_limits <- function(args, automatic, overrides) {
+  axes <- setdiff(intersect(c("xlim", "ylim", "zlim"), automatic), names(overrides))
+  for (axis in axes) {
+    limits <- args[[axis, exact = TRUE]]
+    # NULL has no clipping plane; NA/equal limits keep rgl's existing handling.
+    if (!is.numeric(limits) || length(limits) != 2L ||
+        any(!is.finite(limits))) next
+    span <- limits[2L] - limits[1L]
+    if (!is.finite(span) || span <= 0) next
+    expanded <- limits + c(-1, 1) * (0.001 * span)
+    if (all(is.finite(expanded))) args[[axis]] <- expanded
+  }
+  args
+}
+
 .np_plot_render_surface_rgl <- function(x,
                                         y,
                                         z,
@@ -378,7 +402,8 @@
                                         widget.args = list(),
                                         draw.extras = NULL,
                                         xlim = NULL,
-                                        ylim = NULL) {
+                                        ylim = NULL,
+                                        automatic.limits = character()) {
   tryCatch({
     defaults <- .np_plot_rgl_defaults()
     old.opts <- options(
@@ -443,6 +468,8 @@
       back = "lines",
       main = main
     ), persp3d.args)
+    persp3d.call <- .np_plot_rgl_pad_automatic_limits(
+      persp3d.call, automatic.limits, persp3d.args)
     for (axis in c("xlim", "ylim", "zlim")) {
       limit <- persp3d.call[[axis]]
       # NA and equal endpoints can be automatic ranges handled by rgl.

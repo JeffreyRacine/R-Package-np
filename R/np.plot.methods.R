@@ -2027,6 +2027,7 @@ np_render_control <- function(style = c("band", "bar"),
     rgl.controls <- if (is.null(intervals)) .np_plot_rgl_controls(dots) else
       .np_plot_rgl_controls(dots, legend = legend)
     return(.np_plot_render_surface_rgl(
+        automatic.limits = .np_plot_rgl_automatic_limits(dots),
       xlim = dots$xlim, ylim = dots$ylim,
       x = x1,
       y = x2,
