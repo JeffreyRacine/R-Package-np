@@ -68,3 +68,6 @@ jksum.o categorical_profile_tile.o: conditional_literal.h $(NP_CONDITIONAL_JKSUM
 # Shared accepted-policy precision workspace and replay consumers.
 regression_precision.o: regression_precision.h regression_contrast.h jksum_lp_solve.h
 jksum.o reghat_fast.o np_plot_projection.o: regression_precision.h
+
+# Conditional GNN coefficient and integration consumers.
+jksum.o: np_conditional_gnn_prefix.h np_conditional_gnn_local.h np_conditional_gnn_stable.h np_conditional_gnn_signed.h np_conditional_gnn_gauss4.h conditional_gnn_coefficients.h conditional_deleted_qr.h conditional_deleted_qr_fast.h conditional_deleted_dot.h

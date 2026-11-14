@@ -10,6 +10,7 @@ typedef struct {
 } NPGNNStableQuery;
 typedef struct {
   int n, degree, base, nodes, width;
+  int signed_arithmetic;
   NPConditionalQRAcc *coefficients;
   size_t used, capacity;
   double *center, *scale, *translation, *moment, *fit, *error;
@@ -24,6 +25,23 @@ static double np_cgnn_stable_choose(int n, int k) {
   double value = 1.0;
   for (int j = 1; j <= k; ++j) value *= (double)(n + 1 - j) / j;
   return value;
+}
+/* Signed recipes need the binomial factors at the same precision as the
+ * polynomial expansion. Keep the positive-kernel arithmetic unchanged. */
+static NPConditionalQRAcc np_cgnn_signed_choose(int n,int k) {
+ NPConditionalQRAcc value={1.0,0.0};
+ if(k>n-k)k=n-k;
+ for(int j=1;j<=k;j++){
+  const double numerator=(double)(n+1-j);
+  if(value.hi>DBL_MAX/numerator){
+   value=cqr_dd_div(value,(double)j);
+   value=cqr_dd_mul(value,(NPConditionalQRAcc){numerator,0});
+  } else {
+   value=cqr_dd_mul(value,(NPConditionalQRAcc){numerator,0});
+   value=cqr_dd_div(value,(double)j);
+  }
+ }
+ return value;
 }
 static double np_cgnn_stable_power(double x, int n) {
   double value = 1.0;
@@ -105,7 +123,7 @@ static int np_cgnn_stable_prepare(NPGNNStableMoments *c, int n, int degree,
       b = s ? c->scale[node]/s : 0.0;
     for (int p = 0; p <= degree; ++p) for (int j = 0; j <= p; ++j)
       c->translation[(size_t)node*width*width + p*width+j] =
-        np_cgnn_stable_choose(p,j)*np_cgnn_stable_power(a,p-j)*np_cgnn_stable_power(b,j);
+        (c->signed_arithmetic?np_cgnn_signed_choose(p,j).hi:np_cgnn_stable_choose(p,j))*np_cgnn_stable_power(a,p-j)*np_cgnn_stable_power(b,j);
   }
   /* Recipes are indexed in sorted rank, not original identity. */
   for (int r = 0; r < n; ++r) {
@@ -164,12 +182,21 @@ static NPConditionalQRAcc npc_gnn_power(NPConditionalQRAcc a,int n){
 }
 static int npc_gnn_recipes(NPGNNStableMoments *c,int n,int k,
  const NPGNNConditionalOrder *order,const double *radius,const double *h,
- const NPConditionalQRAcc *coef,int epan,double k0){
+ const NPConditionalQRAcc *coef,int epan,double k0,const double *kernel,int kernel_degree){
  NPConditionalQRAcc *poly=np_cgnn_calloc(c->width,sizeof(*poly));if(!poly)return 1;
  for(int r=0;r<n;r++){
   const int i=order[r].id;if(!(radius[i]>0))continue;
   memset(poly,0,c->width*sizeof(*poly));
   for(int t=0;t<k;t++){
+   if(kernel){
+    NPConditionalQRAcc ratio=cqr_dd_div((NPConditionalQRAcc){radius[i],0},h[i]);
+    for(int m=0;m<=kernel_degree;m++)if(kernel[m]!=0){
+     NPConditionalQRAcc v=cqr_dd_mul(coef[(size_t)i*k+t],
+       cqr_dd_mul((NPConditionalQRAcc){kernel[m],0},npc_gnn_power(ratio,m)));
+     np_cqr_add(poly+t+m,v.hi);np_cqr_add(poly+t+m,v.lo);
+    }
+    continue;
+   }
    NPConditionalQRAcc v=cqr_dd_mul(coef[(size_t)i*k+t],(NPConditionalQRAcc){k0,0});
    np_cqr_add(poly+t,v.hi);np_cqr_add(poly+t,v.lo);
    if(epan){double ratio=radius[i]/h[i];v=cqr_dd_mul(v,(NPConditionalQRAcc){-.2*ratio*ratio,0});np_cqr_add(poly+t+2,v.hi);np_cqr_add(poly+t+2,v.lo);}
@@ -182,7 +209,8 @@ static int npc_gnn_recipes(NPGNNStableMoments *c,int n,int k,
     NPConditionalQRAcc sum={0,0};
     for(int p=j;p<=c->degree;p++){
      NPConditionalQRAcc v=cqr_dd_mul(poly[p],cqr_dd_mul(npc_gnn_power(a,p-j),npc_gnn_power(b,j)));
-     v=cqr_dd_mul(v,(NPConditionalQRAcc){np_cgnn_stable_choose(p,j),0});np_cqr_add(&sum,v.hi);np_cqr_add(&sum,v.lo);
+     v=cqr_dd_mul(v,kernel?np_cgnn_signed_choose(p,j):
+       (NPConditionalQRAcc){np_cgnn_stable_choose(p,j),0});np_cqr_add(&sum,v.hi);np_cqr_add(&sum,v.lo);
     }
     if(!R_FINITE(sum.hi)||!R_FINITE(sum.lo)){free(poly);return 1;}
     c->coefficients[at*c->width+j]=sum;
@@ -198,6 +226,21 @@ static void np_cgnn_stable_evaluate(NPGNNStableMoments *c,const double *ones,
  for(int r=0;r<c->n;r++){
   const int i=c->ids[r];if(!active[i] || !(radius[i]>0))continue;
   for(int z=0;z<nq;z++){
+   if(c->signed_arithmetic){
+    double sum=0.0,error=0.0;
+    for(size_t at=c->start[r];at<c->start[r+1];at++){
+     NPGNNStableQuery *q=c->query+at;if(c->stamp[q->node]!=c->epoch)continue;
+     const double *moment=c->moment+(size_t)q->node*c->width*9;
+     for(int p=0;p<=c->degree;p++){
+      const NPConditionalQRAcc v=c->coefficients[at*c->width+p];
+      const double m=moment[p*nq+z],product=v.hi*m;
+      np_cgnn_compensated(product,&sum,&error);
+      error+=fma(v.hi,m,-product)+v.lo*m;
+     }
+    }
+    c->fit[(size_t)i*nq+z]=sum+error;
+    continue;
+   }
    NPConditionalQRAcc sum={0,0};
    for(size_t at=c->start[r];at<c->start[r+1];at++){
     NPGNNStableQuery *q=c->query+at;if(c->stamp[q->node]!=c->epoch)continue;
