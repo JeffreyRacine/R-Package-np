@@ -23,7 +23,7 @@
 }
 
 # Complete covariance arithmetic copied exactly from the qualified U5 control.
-.np_udens_u5_covariance<-function(z,x,kn,grid,order,kernel.order=4L) {
+.np_udens_u5_covariance<-function(z,x,kn,grid,order,kernel.order=4L,gram=FALSE) {
  h<-as.double(z$h);n<-length(x);j<-0:z$k;A<-z$a+j;BB<-z$b+z$k-j;weights<-rowMeans(vapply(x,function(t)dbinom(j,z$k,t),numeric(length(j))));abq<-c(z$aQ,z$bQ)
  logmeans<-cbind(digamma(A)-digamma(A+BB),digamma(BB)-digamma(A+BB));m<-drop(crossprod(weights,logmeans));I<-diag(trigamma(abq))-trigamma(sum(abq));TT<-matrix(0,2,2)
  for(k in seq_along(weights))TT<-TT+weights[k]*(diag(trigamma(c(A[k],BB[k])))-trigamma(A[k]+BB[k])+tcrossprod(logmeans[k,]));TT<-TT-tcrossprod(m)
@@ -44,7 +44,8 @@
    AA<-tcrossprod(sweep(AX,2,sqrt(qprob),'*'))-tcrossprod(EA);AT<-AX%*%(sweep(T,2,m)*qprob);HI<-H%*%solve(I)
    expanded<-(AA+AT%*%t(HI)+HI%*%t(AT)+HI%*%TT%*%t(HI))/n
    means<-t(AX%*%(component*w));CQ<-EA-drop(AX%*%gprob)+gg
-   list(C=direct,expanded=expanded,center=CQ,EA=EA,B=BG,H=H,HI=HI,component_means=means,AX=AX,T=T,lv=lv,l1v=l1v,w=w,nodes=length(t),mass=sum(qprob),mean=drop(crossprod(qprob,T)),psi_mean=drop(psi%*%qprob),residual_only=AA/n)
+   factor <- if(gram) .np_udens_u5_gram_factor(sweep(centered,2,sqrt(qprob/n),'*')) else NULL
+   list(factor=factor,C=direct,expanded=expanded,center=CQ,EA=EA,B=BG,H=H,HI=HI,component_means=means,AX=AX,T=T,lv=lv,l1v=l1v,w=w,nodes=length(t),mass=sum(qprob),mean=drop(crossprod(qprob,T)),psi_mean=drop(psi%*%qprob),residual_only=AA/n)
   }
  calc(order)
 }
@@ -91,7 +92,7 @@
   bytes
 }
 
-.np_udens_u5_moments <- function(x,h,grid,progress=function(...)NULL,block=8L,kernel.order=4L) {
+.np_udens_u5_moments <- function(x,h,grid,progress=function(...)NULL,block=8L,kernel.order=4L,joint=FALSE) {
   if (!is.numeric(x) || !is.null(dim(x)) || any(!is.finite(x)) ||
       any(x<=0|x>=1) || !is.numeric(grid) || !length(grid) ||
       any(!is.finite(grid)) || any(grid<=0|grid>=1) ||
@@ -137,13 +138,25 @@
     progress("complete marginal moments",max(ix),length(targets))
   }
   if (any(!is.finite(c(center,se)))) stop("nonfinite U5 moments",call.=FALSE)
-  list(center=center[index],se=se[index],checks=checks,workspace=workspace,
+  out <- list(center=center[index],se=se[index],checks=checks,workspace=workspace,
        original.guide=ab,reference.guide=fq$ab,reference.degree=k)
+  if(joint) {
+    .np_udens_u5_joint_budget(n,length(targets),1L)
+    low <- .np_udens_u5_covariance(z,x,"epanechnikov",targets,64L,kernel.order)
+    high <- .np_udens_u5_covariance(z,x,"epanechnikov",targets,96L,kernel.order,gram=TRUE)
+    out$joint.checks <- c(.np_udens_u5_check(low$C,high$C,"joint refinement"),
+      .np_udens_u5_check(high$C,high$expanded,"joint expanded covariance"),
+      .np_udens_u5_check(tcrossprod(high$factor),high$C,"joint factor covariance"),
+      .np_udens_u5_check(se^2,diag(high$C),"joint marginal covariance"))
+    out$factor <- high$factor;out$joint.se <- se
+    progress("complete joint covariance",length(targets),length(targets))
+  }
+  out
 }
 
 .np_udens_u5_request <- function(bws,control,center,method,band,calibration=NULL) {
   inherits(bws,"bandwidth") && is.null(control) && is.null(calibration) &&
-    identical(center,"bias-corrected") && identical(method,"asymptotic") && identical(band,"pmzsd") &&
+    identical(center,"bias-corrected") && identical(method,"asymptotic") && isTRUE(band %in% c("pmzsd","pointwise","bonferroni","simultaneous","all")) &&
     identical(bws[["type",exact=TRUE]],"fixed") && identical(bws[["ckerbound",exact=TRUE]],"fixed") &&
     identical(bws[["ckertype",exact=TRUE]],"epanechnikov") &&
     isTRUE(bws[["ckerorder",exact=TRUE]] %in% c(4L,6L,8L)) && isTRUE(bws[["ndim",exact=TRUE]]==1L) &&
@@ -152,7 +165,8 @@
 .np_udens_u5_active <- function(state)
   isTRUE(state[["construction",exact=TRUE]] %in% paste0("density-u5-order",c(4L,6L,8L),"-normal-v1"))
 
-.np_udens_u5_prepare <- function(bws,x) {
+.np_udens_u5_prepare <- function(bws,x,random.seed=42L) {
+  npValidateNonNegativeInteger(random.seed,"random.seed")
   if (!.np_udens_u5_request(bws,NULL,"bias-corrected","asymptotic","pmzsd") ||
       !is.data.frame(x) || ncol(x)!=1L || !nzchar(names(x)[1L]) ||
       !is.numeric(x[[1L]]) || is.object(x[[1L]]) || any(!is.finite(x[[1L]])))
@@ -169,33 +183,78 @@
     stop("U5 requires strictly interior observations; support endpoints are excluded",call.=FALSE)
   .np_udens_u5_budget(nrow(x),1L)
   list(x=x,normalized=normalized,h=h,lower=lower,width=width,n=nrow(x),q=1L,
-       normal.pmzsd=TRUE,plot.law="gaussian",kernel.order=as.integer(bws[["ckerorder",exact=TRUE]]),
+       normal.pmzsd=TRUE,plot.law="gaussian",plot.random.seed=random.seed,kernel.order=as.integer(bws[["ckerorder",exact=TRUE]]),
        construction=paste0("density-u5-order",bws[["ckerorder",exact=TRUE]],"-normal-v1"))
 }
 
-.np_udens_u5_public <- function(state,grid,alpha,band) {
-  if (!.np_udens_u5_active(state) || !identical(band,"pmzsd") ||
+# Complete positive-weight influence factor: retain all represented directions.
+.np_udens_u5_gram_factor <- function(D) {
+  if (!is.matrix(D) || !is.numeric(D) || !nrow(D) || ncol(D)<nrow(D) || any(!is.finite(D)))
+    stop("invalid U5 complete influence factor",call.=FALSE)
+  z <- qr(t(D),LAPACK=TRUE); R <- qr.R(z,complete=FALSE); m <- nrow(D)
+  if (!identical(dim(R),c(m,m)) || !identical(sort(z$pivot),seq_len(m)))
+    stop("incomplete U5 full QR factor",call.=FALSE)
+  F <- matrix(0,m,m); F[z$pivot,] <- t(R)
+  .np_udens_u5_check(tcrossprod(F),tcrossprod(D),"complete Gram reconstruction")
+  F
+}
+
+.np_udens_u5_joint_budget <- function(n,m,B) {
+  bytes <- .np_udens_u5_budget(n,m,block=m)+8*(6*as.double(m)^2+256*m+3*B)
+  if (!is.finite(bytes) || bytes>192*1024^2)
+    stop("U5 joint inference exceeds its 192 MiB workspace bound",call.=FALSE)
+  bytes
+}
+
+.np_udens_u5_public <- function(state,grid,alpha,band,B=9999L) {
+  if (!.np_udens_u5_active(state) || !isTRUE(band %in% c("pmzsd","pointwise","bonferroni","simultaneous","all")) ||
       !is.data.frame(grid) || ncol(grid)!=1L || !nrow(grid) ||
       !identical(names(grid),names(state$x)) || !is.numeric(grid[[1L]]) ||
-      any(!is.finite(grid[[1L]]))) stop("invalid U5 pointwise request",call.=FALSE)
+      any(!is.finite(grid[[1L]])) || !is.numeric(alpha) || length(alpha)!=1L ||
+      !is.finite(alpha) || alpha<=0 || alpha>=.5) stop("invalid U5 band request",call.=FALSE)
   target <- (grid[[1L]]-state$lower)/state$width
   if (any(!is.finite(target)) || any(target<=0|target>=1))
     stop("U5 bands require strictly interior evaluation points; support endpoints are excluded",call.=FALSE)
-  progress <- function(stage,done,total) .np_plot_progress_notify(stage=paste("U5 density:",stage),done=done,total=total,unit="targets")
+  joint <- band %in% c("simultaneous","all");m <- length(unique(target))
+  if (joint) { B <- .np_plot_gaussian_integer(B,"gaussian.draws",.Machine$integer.max)
+    .np_udens_u5_joint_budget(state$n,m,B);.np_plot_gaussian_draws(B,alpha,m) }
+  progress <- function(stage,done,total) .np_plot_progress_notify(stage=paste("U5 density:",stage),done=done,total=total,unit="work")
   z <- .np_plot_corrected_activity_run("Constructing higher-order density normal intervals",
-    .np_udens_u5_moments(state$normalized,state$h,target,progress,kernel.order=state$kernel.order))
-  inference <- list(center=z$center/state$width,se=z$se/state$width,bands=list(),
-    settings=list(construction=state$construction,calibration="normal-quantile",law="asymptotic",
-      kernel="epanechnikov",q=1L,n=state$n,alpha=alpha,B=0L,available.bands="pmzsd",
-      grid.size=nrow(grid),family="marginal intervals at supplied interior targets",
-      bounds=c(state$lower,state$lower+state$width),bandwidth=state$h*state$width,
+    .np_udens_u5_moments(state$normalized,state$h,target,progress,kernel.order=state$kernel.order,joint=joint))
+  center <- z$center/state$width;se <- z$se/state$width
+  critical <- c(pointwise=qnorm(alpha/2,lower.tail=FALSE),bonferroni=qnorm(alpha/(2*m),lower.tail=FALSE))
+  maxima <- NULL
+  if (joint) {
+    maxima <- .np_with_seed(state$plot.random.seed, {
+      ans <- numeric(B)
+      for(first in seq.int(1L,B,by=128L)) {
+        ix <- first:min(first+127L,B);Z <- matrix(rnorm(m*length(ix)),m)
+        ans[ix] <- apply(abs((z$factor %*% Z)/z$joint.se),2L,max)
+        progress("Gaussian maximum calibration",max(ix),B)
+      }
+      ans
+    })
+    if(any(!is.finite(maxima)))stop("nonfinite U5 Gaussian maximum",call.=FALSE)
+    critical <- c(critical,simultaneous=unname(quantile(maxima,1-alpha,type=7L)))
+  }
+  requested <- if(band=="all")c("pointwise","simultaneous","bonferroni") else band
+  bands <- setNames(lapply(requested,function(k) {
+    width <- critical[[if(k=="pmzsd")"pointwise" else k]]*se
+    array(c(center-width,center+width),c(nrow(grid),2L,1L),dimnames=list(NULL,c("lower","upper"),as.character(alpha)))
+  }),requested)
+  inference <- list(center=center,se=se,bands=bands,intervals=bands,absolute.intervals=bands,
+    critical=critical,maximum=maxima,covariance=NULL,
+    settings=list(construction=state$construction,calibration=if(joint)"Gaussian maximum and normal quantiles" else "normal-quantile",law="asymptotic",
+      kernel="epanechnikov",kernel.order=state$kernel.order,q=1L,n=state$n,alpha=alpha,B=if(joint)B else 0L,available.bands=requested,
+      grid.size=m,family="unique supplied interior targets",family.rows=match(target,sort(unique(target))),
+      bounds=c(state$lower,state$lower+state$width),bandwidth=state$h*state$width,primary="absolute",quantile.type=7L,
       correction=paste0("degree-",state$kernel.order+1L," support-reproducing operator with fitted beta guide; native fit retained"),
+      bonferroni.construction="normal quantile at alpha divided by unique family size; no simulated hull",
       calibration.status="complete positive-reference covariance with guide and cross terms"),
     reference=list(original.guide=z$original.guide,variance.guide=z$reference.guide,degree=z$reference.degree),
-    numerical.checks=list(refinement=z$checks,workspace=z$workspace))
-  inference <- .np_plot_bias_normal(inference,alpha)
-  inference$intervals <- inference$absolute.intervals <- inference$bands
-  endpoints <- inference$bands$pmzsd
-  list(boot.err=cbind(inference$center-endpoints[,1L,1L],endpoints[,2L,1L]-inference$center,inference$center),
-       boot.all.err=NULL,inference=inference,bxp=list())
+    numerical.checks=list(refinement=z$checks,workspace=z$workspace,joint=z$joint.checks))
+  if(band=="pmzsd") inference <- .np_plot_bias_normal(inference,alpha)
+  widths <- lapply(bands,function(v)cbind(center-v[,1L,1L],v[,2L,1L]-center))
+  list(boot.err=unname(cbind(widths[[if(band=="all")"pointwise" else band]],center)),
+       boot.all.err=if(band=="all")widths else NULL,inference=inference,bxp=list())
 }
