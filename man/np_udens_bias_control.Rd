@@ -46,6 +46,34 @@ are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"}, 
 \code{"bonferroni"} and \code{"all"} retain their calibrated constructions.
 
 
+
+\subsection{Whole-line Epanechnikov simultaneous bands}{
+With omitted or \code{NULL} \code{bias_control}, fixed unbounded second-order
+Epanechnikov density plots support \code{errors="asymptotic"},
+\code{center="bias-corrected"} and explicit \code{band="simultaneous"}
+for one continuous variable and at least ten finite observations.
+The M4 plot correction uses an order-six compact operator with a fitted normal
+guide. Its covariance includes the complete guide influence and cross terms
+under a positive, equally weighted Gaussian-mixture reference distribution at
+the original fitted bandwidth. A full, unstudentized absolute Gaussian maximum
+calibrates the supplied finite grid at \eqn{1-\alpha}, using type-7 quantiles.
+Negative corrected values and interval endpoints are retained.
+
+This is an experimental, simultaneous-only addition. It does not qualify M4
+pointwise, Bonferroni, \code{all}, normal \code{pmzsd} or bootstrap bands.
+Uniform kernels, higher requested orders, bounds, nearest-neighbour bandwidths,
+mixed data and multiple coordinates do not select it. Existing constructions,
+explicit controls, original fitted values, estimator standard errors,
+bandwidth selection and \code{se=FALSE} remain unchanged. Its numerical
+refinement checks, bounded workspace and existing temporary-RNG safeguards
+fail explicitly when their contracts cannot be met; no generator, grid,
+draw count, tolerance or statistical method is substituted.
+
+The coverage experiments condition on the selected bandwidth and supplied
+finite grid. They do not establish a continuum or a universal finite-sample
+coverage guarantee. The experimental-status warning applies to this method.
+}
+
 \subsection{Known-bound beta density inference}{
 With omitted or \code{NULL} \code{bias.control}, fixed second-order beta
 kernels support \code{errors="asymptotic"} and independent bootstrap
@@ -265,8 +293,8 @@ standard errors and \code{se=FALSE} are unchanged.
 
 \subsection{Two-dimensional compact calibrated and SD bands}{
 With omitted density bias controls, fixed second-order uniform and Epanechnikov
-kernels support corrected asymptotic \code{band="pointwise"} and
-\code{"bonferroni"}, and independent \code{"symmetric-sd"} or
+kernels support corrected asymptotic \code{band="pointwise"},
+\code{"simultaneous"}, \code{"bonferroni"} and \code{"all"}, and independent \code{"symmetric-sd"} or
 \code{"asymmetric-sd"} calibration with explicit \code{"pointwise"},
 \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"} bands.
 The SD route requires explicit \code{bootstrap="inid"} and calibration in
@@ -283,7 +311,14 @@ both the complete ratio-pilot and empirical influence variances; endpoints take
 their containing envelope and include a separate nonlinear guide region. The
 risk allocation remains alpha/2 for the guide and alpha/2 for the residual.
 Analytic pointwise and Bonferroni bands do not require Gaussian draws or a full
-covariance matrix. Asymptotic simultaneous/all calibration is not admitted here.
+covariance matrix. Simultaneous calibration uses the complete covariance under
+each reference measure, the maintained full Gaussian correlation factor and
+one shared normal stream. It uses the type-7 empirical quantile of the absolute
+finite-grid maximum at probability \eqn{1-\alpha/2}. All-band output includes
+the unchanged pointwise and Bonferroni companions. Near-null covariance
+directions are retained without a positive-eigenvalue cutoff or added jitter.
+Different floating-point covariance factorizations need not give identical
+finite-stream endpoints even when they represent the same Gaussian law.
 
 SD bands use literal shared multinomial counts and one actual joint-guide refit
 per draw. Roots are standardized by the original empirical residual scale;

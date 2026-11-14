@@ -4,9 +4,11 @@ test_that('compact q2 calibrated admission preserves neighboring methods', {
     .np_udens_compact_q2_request(b,control,center,method,band,calibration,explicit)
   for(kernel in c('uniform','epanechnikov')) {
     z<-modifyList(b,list(ckertype=kernel))
-    expect_true(request(z));expect_true(request(z,band='bonferroni'))
-    # Normal keeps its separate owner; Gaussian-factor S/all remains unqualified.
-    for(band in c('pmzsd','simultaneous','all'))expect_false(request(z,band=band))
+    for(band in c('pointwise','simultaneous','bonferroni','all'))
+      expect_true(request(z,band=band))
+    # Normal keeps its separate owner; explicit calibration is never remapped.
+    expect_false(request(z,band='pmzsd'))
+    expect_false(request(z,band='simultaneous',calibration='symmetric-sd'))
     for(cal in c('symmetric-sd','asymmetric-sd'))for(band in c('pointwise','simultaneous','bonferroni','all')) {
       expect_true(request(z,'bootstrap',band,cal,TRUE))
       expect_false(request(z,'bootstrap',band,cal,FALSE))
