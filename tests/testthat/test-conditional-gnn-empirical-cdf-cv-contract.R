@@ -23,7 +23,7 @@ test_that("empirical conditional-CDF CV uses exact pair-local geometry", {
     "    xrow <- xrow/sum(xrow)",
     "    for (j in seq_len(n)) {",
     "      if (i==j) next",
-    "      hy <- vapply(seq_len(ncol(y)),function(d) radius(y[,d],y[j,d],ky[[d]],c(i,j)),numeric(1L))",
+    "      hy <- vapply(seq_len(ncol(y)),function(d) radius(y[,d],y[j,d],ky[[d]],i),numeric(1L))",
     "      yrow <- rep.int(1,length(keep))",
     "      for (d in seq_len(ncol(y))) yrow <- yrow*pnorm((y[j,d]-y[keep,d])/hy[[d]])",
     "      fit <- sum(xrow*yrow); indicator <- as.integer(all(y[i,]<=y[j,]))",

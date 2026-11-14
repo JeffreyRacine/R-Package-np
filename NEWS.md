@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+- Correct conditional-distribution generalized nearest-neighbor cross-validation on the full training response grid: each fold now removes only its held-out observation from response bandwidth selection, both response and explanatory counts are decoded on the deleted sample, and automatic recovery uses matching count limits.
+
 - Significance-test bandwidth controls consume their original promises once
   across selection and testing, preserving stored call syntax and metadata.
 

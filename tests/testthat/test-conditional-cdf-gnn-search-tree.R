@@ -53,7 +53,7 @@ test_that("compact GNN CDF search trees preserve literal deleted-fold objectives
           c(1,rep(0,degree))))*w
         for (j in seq_len(nrow(grid))) {
           if (empirical && i==j) next
-          donor <- if (empirical) setdiff(keep,j) else keep
+          donor <- keep # Query j is not an additional deleted observation.
           hy <- sort(abs(y$y[donor]-grid$y[j]))[k]
           prediction <- sum(influence*P((grid$y[j]-y$y[keep])/hy))
           expected <- expected+(as.integer(y$y[i]<=grid$y[j])-prediction)^2

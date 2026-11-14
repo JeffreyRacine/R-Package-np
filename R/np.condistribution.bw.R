@@ -1412,13 +1412,14 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   ncon <- length(setup[["cont_flat"]])
   if (identical(template[["type"]], "adaptive_nn"))
     return(rep.int(n - 2L, ncon))
-  if (!incumbent && identical(template[["type"]], "generalized_nn") &&
-      (!is.null(gydat) || !isTRUE(do.full.integral)) &&
+  # Non-beta GNN folds decode every coordinate on the deleted sample.
+  # Admit an original-sample incumbent, then recover in the ordinary fold domain.
+  if (identical(template[["type"]], "generalized_nn") &&
       !identical(template[["cxkertype"]], "beta") &&
       !identical(template[["cykertype"]], "beta"))
-    return(rep.int(n - 2L, ncon))
+    return(rep.int(n - if (incumbent) 1L else 2L, ncon))
   caps <- rep.int(n - 1L, ncon)
-  # Empirical response-grid CDF folds omit both response indices; X omits one.
+  # Preserve the separate beta-containing empirical-grid recovery policy.
   if (is.null(gydat) && isTRUE(do.full.integral))
     caps[seq_len(sum(template[["iycon"]]))] <- n - 2L
   caps
@@ -2961,12 +2962,15 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
     function(point) {
       caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
         isTRUE(opt.args$do.full.integral))
+      incumbent.caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
+        isTRUE(opt.args$do.full.integral), incumbent = TRUE)
       nn.indices <- seq_along(setup$cont_flat)
       nn.point <- round(point[nn.indices])
-      if (any(nn.point < 1L | nn.point > caps))
+      if (any(nn.point < 1L | nn.point > incumbent.caps))
         return(list(found = FALSE))
       .np_nn_find_raw_valid_start(
         point = point, nn.indices = nn.indices, caps = caps,
+        incumbent.caps = incumbent.caps,
         raw.eval = function(candidate) {
           out <- .npcdistbw_nomad_eval_point(
             point = candidate, template = template, setup = setup,
