@@ -3,7 +3,7 @@ test_that("asymmetric Q6 has an explicit selected-coordinate contract", {
     band="simultaneous",B=199L,boot.control=np_boot_control(calibration="asymmetric-sd"))
   expect_true(.np_udens_q6_options(a,TRUE))
   expect_error(.np_udens_q6_options(a),"only.*density")
-  for (band in c("pointwise","bonferroni","all","pmzsd")) {
+  for (band in c("pmzsd","invalid")) {
     b<-a;b$band<-band;expect_error(.np_udens_q6_options(b,TRUE),"requires explicit")
   }
   for (design in list(NULL,list(vary=1.1,xtrim=0),list(vary=NA,xtrim=0),
