@@ -1,5 +1,9 @@
 # npRmpi 0.80-3
 
+- Instrumental-variable formula fits evaluate a supplied NA-policy factory once,
+  while applying the resulting policy separately to training and evaluation
+  frames. Omitted policies retain their existing behavior through wrappers.
+
 - RGL surfaces give automatically calculated clipping limits a small display-only
   margin, reducing clipping artifacts at flat boundary regions during rotation.
   Explicit limits, estimates, intervals and saved plot data remain unchanged.

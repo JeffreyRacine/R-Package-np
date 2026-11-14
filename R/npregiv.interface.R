@@ -202,7 +202,9 @@ npregiv.formula <- function(y, data = NULL, subset, na.action,
   mc[[1L]] <- quote(npregiv)
   parsed <- .np_iv_parse_formula(y, where = where)
   train.frame <- .np_iv_training_frame(
-    parsed = parsed, method.call = mc, data = data,
+    parsed = parsed, method.call = if (missing(na.action)) mc else
+      .np_formula_frame_promises(
+        mc, environment(), map = c(na.action = "na.action")), data = data,
     where = where, eval.env = parent.frame()
   )
   ydat <- model.response(train.frame)
@@ -257,7 +259,9 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   mc[[1L]] <- quote(npregivderiv)
   parsed <- .np_iv_parse_formula(y, where = where)
   train.frame <- .np_iv_training_frame(
-    parsed = parsed, method.call = mc, data = data,
+    parsed = parsed, method.call = if (missing(na.action)) mc else
+      .np_formula_frame_promises(
+        mc, environment(), map = c(na.action = "na.action")), data = data,
     where = where, eval.env = parent.frame()
   )
   ydat <- model.response(train.frame)
