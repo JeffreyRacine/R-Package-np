@@ -399,6 +399,14 @@ Named options passed via \code{\dots} include:
         precedence on Z panels when both are supplied. A horizontal limit
         applies to every selected line panel, including factor-level positions;
         select individual saved panels when different ranges are wanted.
+        On these line panels, \code{xlab} labels X coordinates and
+        \code{zlab} labels Z coordinates; \code{ylab} labels the plotted
+        values. A supplied label applies to every panel of that role.
+        Saved replay retains these labels. A replay \code{xlab} alone
+        overrides every horizontal label; an explicitly supplied
+        \code{zlab} takes precedence on Z panels. Empty strings suppress
+        label text, while \code{NULL} restores the generated label.
+        Mathematical labels can be supplied using \code{expression()}.
         Omitted or \code{NULL} limits use automatic ranges. Each renderer
         retains its restrictions on valid limits. The rgl renderer preserves
         its handling of constant ranges and missing endpoints; infinite limits

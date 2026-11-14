@@ -899,8 +899,9 @@
             panel.ylim <- .np_plot_overlay_range(panel.ylim, ydat)
           if (!is.null(panel.ylim))
             plot.args$ylim <- panel.ylim
-          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
-                                      paste(toupper(xOrZ), i, sep = ""))
+          plot.args$xlab <- scalar_default(if (xOrZ == "x") xlab else zlab,
+                                      gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                      paste(toupper(xOrZ), i, sep = "")))
           plot.args$ylab <- scalar_default(ylab, response.axis.label)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
@@ -1217,8 +1218,9 @@
             else
               c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
                 max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
-          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
-                                      paste(toupper(xOrZ), i, sep = ""))
+          plot.args$xlab <- scalar_default(if (xOrZ == "x") xlab else zlab,
+                                      gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                      paste(toupper(xOrZ), i, sep = "")))
           plot.args$ylab <- scalar_default(ylab, response.axis.label)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
@@ -1489,8 +1491,9 @@
           if (!(xi.factor && plot.bootstrap && plot.bxp))
             plot.args$y <- data.eval[,plot.index]
           plot.args$ylim <- c(y.min, y.max)
-          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
-                                      paste(toupper(xOrZ), i, sep = ""))
+          plot.args$xlab <- scalar_default(if (xOrZ == "x") xlab else zlab,
+                                      gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                      paste(toupper(xOrZ), i, sep = "")))
           plot.args$ylab <- scalar_default(ylab, response.axis.label)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")

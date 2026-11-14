@@ -150,6 +150,9 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
     if (identical(p$variables$role[column], "Z") &&
         ("zlim" %in% names(dots) || !("xlim" %in% names(dots))))
       style$xlim <- style$zlim
+    if (identical(p$variables$role[column], "Z") &&
+        ("zlab" %in% names(dots) || !("xlab" %in% names(dots))))
+      style$xlab <- style$zlab
     categorical <- is.factor(coord) || is.character(coord)
     xpos <- if (categorical) match(as.character(coord), unique(as.character(coord))) else coord
     args <- utils::modifyList(list(x = xpos, y = values$estimate,
