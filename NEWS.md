@@ -59,6 +59,8 @@
 - Reject unsupported grid controls in copula plots, conditional-mode sample
   views and their saved-data replay instead of passing on ignored requests.
 
+- Avoid expanding complete response vectors into internal LSQ bandwidth labels.
+
 # npRmpi 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and
