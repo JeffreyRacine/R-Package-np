@@ -30,6 +30,9 @@ plot.np_plot_data <- function(x, y = NULL, ..., panel = NULL, target = NULL,
   .np_plot_data_validate(x)
   renderer <- match.arg(renderer)
   dots <- list(...)
+  if (x$family %in% c("npcopula", "npconmode"))
+    .np_plot_reject_unconstructed_grid(dots, "saved copula/conditional-mode replay",
+                                      "create new plot data to change the grid")
   panels <- if (is.null(panel)) names(x$panels) else .np_plot_data_select(panel, names(x$panels), "panel")
   jobs <- list()
   for (pid in panels) {
