@@ -795,7 +795,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   different law and calibration from \code{smoothed-percentile}.
 
   Explicit \code{calibration="asymmetric-sd"} with this law instead supports
-  simultaneous bands on the full empirical-range grid only (the default
+  pointwise, simultaneous, Bonferroni and all bands on the full empirical-range grid only (the default
   \code{xtrim=0}, or \code{grid.control=np_grid_control(xtrim=c(0,1))}). Its center and original fixed-coordinate influence
   scale are unchanged. In each complete resample the same equally spaced grid
   fractions are rebuilt between that resample's minimum and maximum. The root
@@ -804,13 +804,21 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   weighting function here, not a claimed variance for the random-coordinate
   statistic. Separate signed maxima and type-7 quantiles at \eqn{1-\alpha/2}
   form the lower and upper endpoints; signed critical values are not clipped
-  to zero. Nondefault trimming, fixed physical grids, marginal/Bonferroni/all
-  bands and multivariate requests remain unqualified for this new calibration.
+  to zero. Pointwise intervals use the signed marginal roots and equal-tail
+  type-7 quantiles. Bonferroni uses alpha/(2m) in each tail and the explicit
+  simultaneous hull; raw Bonferroni endpoints remain in the inference record.
+  All components share one primitive draw plan. The marginal scale is not a
+  random-grid standard error. Nondefault trimming, fixed physical grids and
+  multivariate requests remain unqualified for this new calibration.
   In a 1,024-original own-CVML study, empirical-grid 95-percent simultaneous
   coverage was 96.88 percent for uniform and 96.29 percent for Epanechnikov.
   These bands were wider than the symmetric alternative; the Epanechnikov
   skew-mixture cell covered 88.28 percent at n=100 and 93.75 percent at n=400.
-  These are finite-grid results, not a continuum-coverage guarantee.
+  Mean pointwise 95-percent coverage in the same bank was94.46 percent for
+  uniform and95.68 percent for Epanechnikov; local mixture deficits remain.
+  The Bonferroni hull covered97.36/97.75 percent, while raw tails at999 draws
+  and50 targets are resolution-limited. These are finite-grid results, not a
+  continuum-coverage guarantee.
 
   Finite-draw resolution is reported without increasing \code{B}; the inherited
   default is unchanged. Quadrature and finite-workspace certificates can reject

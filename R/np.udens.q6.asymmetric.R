@@ -79,6 +79,8 @@
 }
 
 .np_udens_q6_asymmetric_public <- function(state, grid, alpha, B, band, design) {
+  if (isTRUE(band %in% c("pointwise","bonferroni","all")))
+    return(.np_udens_q6_asymmetric_pointwise_public(state,grid,alpha,B,band,design))
   if (!identical(band,"simultaneous"))
     stop("asymmetric Q6 currently supports simultaneous bands only",call.=FALSE)
   family <- .np_udens_q6_asymmetric_family(state,grid,design)
