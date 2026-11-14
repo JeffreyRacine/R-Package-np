@@ -69,6 +69,10 @@
       legend3d.args
     )
     legend3d.call <- .np_plot_rgl_scale_legend_geometry(legend3d.call)
+    # The legend is a view background, not geometry to be clipped.
+    legend.scene <- rgl::currentSubscene3d()
+    on.exit(rgl::useSubscene3d(legend.scene), add = TRUE)
+    rgl::useSubscene3d(rgl::subsceneInfo("root")$id)
     do.call(rgl::legend3d, legend3d.call)
     return(invisible(TRUE))
   }
@@ -446,14 +450,21 @@
       if (is.numeric(limit) && any(is.infinite(limit)))
         stop(axis, " must not contain infinite values")
     }
-    do.call(rgl::persp3d, persp3d.call)
+    surface.ids <- do.call(rgl::persp3d, persp3d.call)
     # rgl can turn finite extreme limits into non-finite scene coordinates.
     # Refuse that state before scene serialization, which otherwise can stall.
     if (any(!is.finite(rgl::par3d("bbox"))))
       stop("surface limits exceed the finite coordinate range supported by rgl")
 
-    if (!is.null(draw.extras))
+    if (!is.null(draw.extras)) {
+      parent.scene <- rgl::currentSubscene3d()
+      clip.scene <- unname(surface.ids[names(surface.ids) == "clipregion"])
+      if (length(clip.scene) == 1L)
+        rgl::useSubscene3d(clip.scene)
       draw.extras()
+      if (length(clip.scene) == 1L)
+        rgl::useSubscene3d(parent.scene)
+    }
 
     grid.side <- c("x", "y+", "z")
     if (!is.null(grid3d.args$side)) {

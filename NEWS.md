@@ -53,6 +53,8 @@
 - Preserve explicit frame and style arguments in instrumental-variable plots
   and saved replay, including automatic ranges requested with explicit NULL.
 
+* Keep rgl interval surfaces and rugs within explicit display limits while retaining visible legends.
+
 # npRmpi 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and
