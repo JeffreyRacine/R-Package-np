@@ -16,6 +16,8 @@ extern SEXP C_np_plot_udens_beta_joint_block(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_udens_beta_joint_moments(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_udens_beta_series_means(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_udens_beta_joint_covariance(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_compact_q2_moments(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_compact_q2_covariance(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_udens_beta_factor(SEXP);
 extern SEXP C_np_plot_udens_beta_region_objective(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_udens_d8_column(SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -124,6 +126,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_plot_udens_beta_joint_moments", (DL_FUNC) &C_np_plot_udens_beta_joint_moments, 6},
     {"C_np_plot_udens_beta_series_means", (DL_FUNC) &C_np_plot_udens_beta_series_means, 6},
     {"C_np_plot_udens_beta_joint_covariance", (DL_FUNC) &C_np_plot_udens_beta_joint_covariance, 8},
+    {"C_np_plot_udens_compact_q2_moments", (DL_FUNC) &C_np_plot_udens_compact_q2_moments, 6},
+    {"C_np_plot_udens_compact_q2_covariance", (DL_FUNC) &C_np_plot_udens_compact_q2_covariance, 8},
     {"C_np_plot_udens_beta_factor", (DL_FUNC) &C_np_plot_udens_beta_factor, 1},
     {"C_np_plot_udens_beta_region_objective", (DL_FUNC) &C_np_plot_udens_beta_region_objective, 5},
     {"C_np_plot_udens_d8_column", (DL_FUNC) &C_np_plot_udens_d8_column, 5},
