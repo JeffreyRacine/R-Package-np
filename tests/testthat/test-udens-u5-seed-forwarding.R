@@ -1,6 +1,6 @@
 test_that('U5 receives the public plotting seed for fitted and bandwidth routes', {
   if (!spawn_mpi_slaves()) skip('MPI pool unavailable')
-  withr::defer(close_mpi_slaves())
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   pkg <- getNamespaceName(environment(.np_udens_u5_prepare))
   withr::local_options(np.messages=FALSE, np.plot.progress=FALSE, np.tree=FALSE)
   original <- .np_udens_u5_prepare
