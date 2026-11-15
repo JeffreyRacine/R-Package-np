@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* `npsigtest()` consumes an NA policy after preparing fresh or replacement formula data, preserving once-only evaluation and retained-data refusal semantics.
+
 * Stabilize signed higher-order Epanechnikov generalized nearest-neighbor conditional-density CVLS arithmetic on clustered explanatory data, preserving the existing rank and ridge decisions.
 
 * Correct conditional-distribution generalized nearest-neighbor cross-validation on the full training response grid: each fold now removes only its held-out observation from response bandwidth selection, both response and explanatory counts are decoded on the deleted sample, and automatic recovery uses matching count limits.
