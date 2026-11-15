@@ -248,6 +248,8 @@
 }
 
 .np_udens_q6_prepare <- function(bws, x, seed) {
+  if (isTRUE(bws[["ndim", exact=TRUE]] == 2L))
+    return(.np_udens_q6_q2_prepare(bws, x, seed))
   .np_udens_q6_spec(bws)
   if (!is.data.frame(x) || ncol(x) != 1L || !nzchar(names(x)[1L]) ||
       is.object(x[[1L]]) || !is.numeric(x[[1L]]))

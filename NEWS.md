@@ -82,6 +82,8 @@
 
 ## Density plot additions
 
+* Explicit symmetric Q6 density plot bands now support two continuous coordinates with fixed whole-line order-two uniform/Epanechnikov kernels. Paired smoothed resamples and the complete bivariate guide preserve dependence; pointwise, simultaneous, Bonferroni and all bands remain experimental and conservative in the bounded q=2 confirmation. Existing methods and native estimators are unchanged.
+
 * Fixed-bound univariate beta plots admit native orders four, six and eight for explicit asymptotic and symmetric/asymmetric SD pointwise, simultaneous, Bonferroni and all bands, using the unchanged guide-region/residual construction. Native fits, normal pmzsd and higher-order q2 support are unchanged.
 
 * Explicit asymmetric Q6 adds signed pointwise and Bonferroni/all companions on the same full empirical-range family. Raw Bonferroni limits, simultaneous hull and finite-draw warnings remain distinct; existing simultaneous and symmetric results are preserved.

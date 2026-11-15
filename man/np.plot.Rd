@@ -761,9 +761,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \code{band="pointwise"}, \code{band="simultaneous"},
   \code{band="bonferroni"} or \code{band="all"}, and
   \code{boot.control=np_boot_control(calibration="symmetric-sd")} together.
-  It is restricted to one continuous numeric variable, a positive retained
+  It is restricted to one or two continuous numeric variables, positive retained
   fixed bandwidth, whole-line second-order uniform or Epanechnikov kernels,
-  at least ten finite observations and positive guide variance. It leaves the
+  at least ten finite observations and positive guide variance (positive definite
+  full guide covariance for two variables). It leaves the
   fitted estimator and all existing inference choices unchanged. Normal-scale \code{pmzsd},
   asymptotic errors, bounds, nearest-neighbor bandwidths,
   custom bias controls and dependent-data controls are not admitted by this law.
@@ -785,7 +786,17 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   retained; nonnegative intersections may be reported separately. This is a
   different law and calibration from \code{smoothed-percentile}.
 
-  Explicit \code{calibration="asymmetric-sd"} with this law instead supports
+  For two variables, the symmetric construction resamples a common observation
+  donor for both coordinates and adds independent coordinate smoothing noise.
+  It uses the product corrected operator, refits the full bivariate normal guide,
+  and retains all five guide influence directions and their cross terms. The
+  shared paired draws preserve joint dependence without storing a dense target
+  covariance matrix. A bounded 512-original, 100-target confirmation found
+  conservative 95-percent simultaneous coverage (99.61/100 percent for uniform/
+  Epanechnikov); this is not a general near-nominal coverage guarantee.
+
+  Explicit \code{calibration="asymmetric-sd"} with this law remains restricted
+  to one continuous variable and instead supports
   pointwise, simultaneous, Bonferroni and all bands on the full empirical-range grid only (the default
   \code{xtrim=0}, or \code{grid.control=np_grid_control(xtrim=c(0,1))}). Its center and original fixed-coordinate influence
   scale are unchanged. In each complete resample the same equally spaced grid
