@@ -163,7 +163,18 @@
     }
     x
   }
-  project(metadata)
+  out <- project(metadata)
+  # LSQ carries its omission record and formula terms separately. Its metadata
+  # finisher does not consume this frame; preserve projection callbacks first.
+  if (is.list(out) && !is.object(out)) {
+    plan <- .subset2(out, "formula", exact = TRUE)
+    if (is.list(plan) && !is.object(plan) &&
+        identical(.subset2(plan, "producer", exact = TRUE), "nplsqregbw")) {
+      plan[["frame"]] <- NULL
+      out[["formula"]] <- plan
+    }
+  }
+  out
 }
 
 .npRmpi_bw_restore_public_owner <- function(result, originals) {

@@ -4,6 +4,8 @@
 
 * Reuse exactly unchanged ordinary formula columns after NA processing, preserving callback effects, row metadata and copy-on-modify ownership.
 
+* Avoid transmitting an unused LSQ formula metadata frame while preserving its training samples, omission records and worker reuse.
+
 * Reuse matching native training roles from existing validated worker leases, preserving explicit replacements, automatic row-name state and lease mutation checks.
 
 * Avoid retransmitting matching native training roles already carried by an unleased bandwidth in the same MPI call; preserve explicit replacement data, saved calls and computational ownership.
