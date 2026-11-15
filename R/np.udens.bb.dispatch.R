@@ -50,7 +50,7 @@
   out
 }
 
-# Namespace-bound fanout: every complete resample is evaluated by a worker.
+# Namespace-bound static fanout shares complete resamples across master and workers.
 .np_udens_bb_dispatch <- function(tasks,reference) {
   .npRmpi_bootstrap_fanout_enabled(n=reference$n,
     B=sum(vapply(tasks,function(t)t$bsz,0L)),chunk.size=16L,
