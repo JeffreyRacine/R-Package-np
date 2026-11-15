@@ -1770,7 +1770,10 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     frame.state <- new.env(parent = emptyenv())
     bw.args$.np.formula.state <- frame.state
     on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
-    bw.call <- as.call(c(list(quote(npcdistbw)), bw.args))
+    # These are values, not caller expressions. Inspect without evaluating
+    # language-valued options again before formula admission rejects them.
+    bw.call <- as.call(c(list(quote(npcdistbw)), lapply(bw.args, function(value)
+      if (is.language(value)) substitute(quote(VALUE), list(VALUE = value)) else value)))
     use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
       bw.call,
       caller_env = parent.frame()
@@ -1814,7 +1817,9 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     frame.state <- new.env(parent = emptyenv())
     bw.args$.np.formula.state <- frame.state
     on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
-    bw.call <- as.call(c(list(quote(npcdistbw)), bw.args))
+    # Keep already evaluated values literal during progress inspection.
+    bw.call <- as.call(c(list(quote(npcdistbw)), lapply(bw.args, function(value)
+      if (is.language(value)) substitute(quote(VALUE), list(VALUE = value)) else value)))
     use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
       bw.call,
       caller_env = parent.frame()

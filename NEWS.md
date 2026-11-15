@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Quantile formula progress inspection preserves evaluated option values without executing them again.
+
 * `npsigtest()` consumes an NA policy after preparing fresh or replacement formula data, preserving once-only evaluation and retained-data refusal semantics.
 
 * Stabilize signed higher-order Epanechnikov generalized nearest-neighbor conditional-density CVLS arithmetic on clustered explanatory data, preserving the existing rank and ridge decisions.
