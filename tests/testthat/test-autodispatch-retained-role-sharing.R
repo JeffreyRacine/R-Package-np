@@ -30,6 +30,12 @@ test_that("same-call native roles preserve exact values and explicit overrides",
   q <- prep(value=x2); expect_length(compact(q$p,q$mc)$derived.bindings,1L)
   q <- prep(owner=FALSE);expect_identical(compact(q$p,q$mc),q$p)
   q <- prep(family="npksum");expect_identical(compact(q$p,q$mc),q$p)
+  # Same row-name values do not imply the same automatic-row-name state.
+  rows <- x[seq_len(nrow(x)), , drop = FALSE]
+  q <- prep(value = rows)
+  expect_length(compact(q$p, q$mc)$derived.bindings, 1L)
+  expect_identical(.row_names_info(q$p$tmpvals[[as.character(q$p$call$txdat)]], 0L),
+                   .row_names_info(rows, 0L))
   expect_true(plain(x));expect_true(plain(matrix(1:6,2)))
   expect_true(plain(ordered(c("a","b"))));expect_false(plain(as.Date("2020-01-01")))
   expect_false(plain(structure(1:4, hidden=new.env())))
@@ -108,4 +114,28 @@ test_that("automatic native dispatch sends and restores retained roles", {
   expect_false(any(grepl(".__npRmpi", all.names(derived$call), fixed = TRUE)))
   replay <- eval(derived$call)
   expect_identical(fitted(replay), fitted(derived))
+})
+
+
+test_that("transport certificates preserve text encoding in data and attributes", {
+  scope <- environment(getFromNamespace(".npRmpi_autodispatch_derive_native_roles", "npRmpi"))
+  same <- get(".npRmpi_transport_same_value", scope)
+  utf8 <- "caf\u00e9"
+  latin <- iconv(utf8, from = "UTF-8", to = "latin1")
+  expect_false(is.na(latin))
+  Encoding(utf8) <- "UTF-8"
+  Encoding(latin) <- "latin1"
+  expect_identical(utf8, latin)
+  expect_false(same(utf8, latin))
+  expect_true(same(utf8, utf8))
+  a <- structure(c(1L, 1L), levels = utf8, class = "factor")
+  b <- structure(c(1L, 1L), levels = latin, class = "factor")
+  expect_identical(a, b)
+  expect_false(same(a, b))
+  expect_false(same(data.frame(g = a), data.frame(g = b)))
+  expect_true(same(data.frame(g = a), data.frame(g = a)))
+  expect_false(same(setNames(1:2, c(utf8, "x")),
+                    setNames(1:2, c(latin, "x"))))
+  expect_false(same(matrix(1:2, dimnames = list(c(utf8, "x"), NULL)),
+                    matrix(1:2, dimnames = list(c(latin, "x"), NULL))))
 })

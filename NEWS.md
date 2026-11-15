@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Reuse matching native training roles from existing validated worker leases, preserving explicit replacements, automatic row-name state and lease mutation checks.
+
 * Avoid retransmitting matching native training roles already carried by an unleased bandwidth in the same MPI call; preserve explicit replacement data, saved calls and computational ownership.
 
 * Avoid unnecessary data copies while removing internal MPI dispatch tags, preserving stored calls and retained training samples.

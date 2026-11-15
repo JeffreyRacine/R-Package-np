@@ -1217,15 +1217,19 @@
       assign(nm, bundle[[nm]], envir = eval.env)
   }
 
-  # These names refer only to certified ordinary components of a bandwidth
-  # transmitted in this same invocation. Coordinator checks precede transport.
+  # These names refer only to certified ordinary components of the bandwidth
+  # sent in this invocation or bound from an existing validated live lease.
   derived <- payload[["derived.bindings", exact = TRUE]]
   if (length(derived)) {
     for (nm in names(derived)) {
       descriptor <- derived[[nm]]
       source <- get(descriptor[["source"]], envir = eval.env, inherits = FALSE)
       native <- .subset2(source, ".np.native.training", exact = TRUE)
-      assign(nm, native[[descriptor[["component"]]]], envir = eval.env)
+      component <- descriptor[["component"]]
+      if (!is.list(native) || !component %in% names(native) ||
+          is.null(native[[component]]))
+        stop("autodispatch retained training component is unavailable", call. = FALSE)
+      assign(nm, native[[component]], envir = eval.env)
     }
   }
 
@@ -2518,6 +2522,36 @@
   TRUE
 }
 
+# Equality of decoded text does not imply the same stored encoding marks.
+# Inputs have already passed the ordinary-value certificate before this walk.
+.npRmpi_transport_same_encoding <- function(value, retained) {
+  if (is.character(value) && !identical(Encoding(value), Encoding(retained)))
+    return(FALSE)
+  if (is.list(value)) {
+    for (i in seq_along(unclass(value)))
+      if (!.npRmpi_transport_same_encoding(.subset2(value, i),
+                                          .subset2(retained, i))) return(FALSE)
+  }
+  a <- attributes(value)
+  b <- attributes(retained)
+  for (i in seq_along(a))
+    if (!.npRmpi_transport_same_encoding(a[[i]], b[[i]])) return(FALSE)
+  TRUE
+}
+
+.npRmpi_transport_same_value <- function(value, retained) {
+  if (!.npRmpi_transport_plain_value(value) ||
+      !.npRmpi_transport_plain_value(retained)) return(FALSE)
+  # identical() compares row-name values, not their automatic/explicit flag.
+  if (typeof(retained) == "list" &&
+      (typeof(value) != "list" ||
+       !identical(.row_names_info(value, 0L), .row_names_info(retained, 0L))))
+    return(FALSE)
+  identical(value, retained, num.eq = FALSE, single.NA = FALSE,
+            attrib.as.set = FALSE) &&
+    .npRmpi_transport_same_encoding(value, retained)
+}
+
 .npRmpi_autodispatch_native_roles <- list(
   npreg = c(txdat = "xdat", tydat = "ydat"),
   npudens = c(tdat = "dat"), npudist = c(tdat = "dat"),
@@ -2538,8 +2572,18 @@
   if (!is.call(call) || !isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE)) ||
       anyDuplicated(names(call)) || !is.symbol(call[["bws"]])) return(prepared)
   source <- as.character(call[["bws"]])
+  leased <- intersect(names(prepared$lease.bindings),
+                      names(prepared$lease.replacements))
   values <- c(prepared$tmpvals, prepared$prepublish)
-  if (!source %in% names(values)) return(prepared) # Valid leases are separate.
+  if (source %in% leased) {
+    id <- prepared$lease.bindings[[source]]
+    canonical <- get0(id, envir = .npRmpi_lease_state$store, inherits = FALSE)
+    if (is.null(canonical)) return(prepared)
+    # The existing resolver admitted this exact store key. Compare against
+    # what ranks will actually bind, not the normalized public fingerprint.
+    values[source] <- list(.npRmpi_autodispatch_untag(canonical))
+  }
+  if (!source %in% names(values)) return(prepared)
   bws <- values[[source]]
   if (typeof(bws) != "list") return(prepared)
   native <- .subset2(bws, ".np.native.training", exact = TRUE)
@@ -2555,11 +2599,11 @@
         !component %in% names(native)) next
     retained <- native[[component]]
     value <- values[[target]]
-    if (is.null(retained) || !.npRmpi_transport_plain_value(retained) ||
-        !identical(value, retained, num.eq = FALSE, single.NA = FALSE,
-                   attrib.as.set = FALSE)) next
-    # The source is the exact untagged bandwidth already being sent in this
-    # invocation. No call replay, caller lookup, new lease or worker scan.
+    if (is.null(retained) ||
+        !.npRmpi_transport_same_value(value, retained)) next
+    # The source is the exact untagged bandwidth sent in this invocation or
+    # already admitted by the existing lease resolver. No call replay, caller
+    # lookup, new lease or worker scan.
     prepared$derived.bindings[[target]] <- c(source = source, component = component)
     prepared$derived.replacements[target] <- list(value)
     prepared$tmpvals[target] <- NULL
