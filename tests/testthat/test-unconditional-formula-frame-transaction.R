@@ -52,7 +52,7 @@ test_that("unconditional formula fits share one prepared training sample", {
     expect_identical(count, 1L)
     expect_true(isTRUE(auto[["se", exact = TRUE]]))
     expect_false(".np.formula.state" %in% names(auto$bws$call))
-    expect_false(".np.formula.state" %in% names(auto$bws$call$...))
+    expect_false(".np.formula.state" %in% c(names(auto$bws$call), names(auto$bws$call$...)))
     count <- 0L
     named.auto <- fit.fun(formula = f, data = d, bwmethod = "normal-reference", se = TRUE)
     expect_identical(count, 1L)

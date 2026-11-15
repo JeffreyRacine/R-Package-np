@@ -52,7 +52,7 @@ npcdensbw.formula <-
     tbw <- do.call(npcdensbw, c(list(xdat = xdat, ydat = ydat), .np_formula_options(dots, "npcdensbw.formula")))
 
     ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
+    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npcdensbw")
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
     tbw$rows.omit <- as.vector(attr(mf,"na.action"))
@@ -3922,7 +3922,7 @@ npcdensbw.NULL <-
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npcdensbw")
 
     tbw
   }
@@ -4434,7 +4434,7 @@ npcdensbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npcdensbw")
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat))

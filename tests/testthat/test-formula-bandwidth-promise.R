@@ -8,7 +8,7 @@ test_that("formula selector handoff reuses a numeric bandwidth promise", {
   bandwidth <- function() { hits <<- hits + 1L; .3 * hits }
   fit <- npreg(y ~ x, data = d, bws = bandwidth(), bandwidth.compute = FALSE)
   expect_identical(hits, 1L)
-  expect_identical(fit$bws$call[["..."]][["bws"]], quote(bandwidth()))
+  expect_identical(fit$bws$call[["bws"]], quote(bandwidth()))
   expect_equal(as.numeric(fit$bws$bw), .3, tolerance = 0)
   ref <- npreg(y ~ x, data = d, bws = .3, bandwidth.compute = FALSE)
   expect_equal(fitted(fit), fitted(ref), tolerance = 1e-12)

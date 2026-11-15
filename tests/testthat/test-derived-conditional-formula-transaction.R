@@ -39,7 +39,7 @@ test_that("derived conditional formulas share one constructor and fit sample", {
       refit <- fun(bws = fit$bws)
       expect_identical(counter$n, 0L)
       expect_identical(fitted(refit), fitted(fit))
-      expect_false(".np.formula.state" %in% names(fit$bws$call$...))
+      expect_false(".np.formula.state" %in% c(names(fit$bws$call), names(fit$bws$call$...)))
     }
     controls <- if (family == "npqreg") list(bwmethod = "normal-reference") else
       list(bandwidth.compute = FALSE)

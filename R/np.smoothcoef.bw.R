@@ -162,7 +162,7 @@ npscoefbw.NULL <-
 
     ## clean up (possible) inconsistencies due to recursion ...
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npscoefbw")
 
     tbw <-
       updateBwNameMetadata(nameList = list(ynames = deparse(substitute(ydat))),
@@ -4161,7 +4161,7 @@ npscoefbw.default <-
     }
 
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npscoefbw")
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat,

@@ -166,6 +166,21 @@
 
 }
 
+\section{Stored calls and updates}{
+  Newly created bandwidth objects and fitted objects that retain public calls
+  record the exported generic from the originating package, with arguments
+  supplied through \code{...} expanded as syntax. Where the estimator supports
+  it, \code{update()} replays that call using ordinary R evaluation rules.
+  \code{update(object, evaluate = FALSE)} returns the call without evaluating
+  its data, controls or NA-policy expressions. Evaluated updates rerun those
+  expressions and require their usual bindings to remain available.
+
+  Retained-training and replacement-data restrictions are unchanged. Objects
+  without public calls do not acquire update support. Older objects whose
+  stored calls name private methods or lost local arguments should be recreated
+  from the original public call; working legacy calls remain usable.
+}
+
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
  The kernel methods in \code{npRmpi} employ the so-called

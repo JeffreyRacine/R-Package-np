@@ -143,7 +143,7 @@
         original.call[[name]] <- value
       }
     }
-    result$call <- original.call
+    result$call <- .np_public_replay_call(original.call, "npindexbw")
     # Native training is retained by value; retaining the call's frame would
     # pin unrelated caller data. Formula methods restore their own call owner.
     environment(result$call) <- if (is.null(result$formula)) NULL else caller.env

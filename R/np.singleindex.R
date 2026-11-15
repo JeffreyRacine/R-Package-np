@@ -196,7 +196,7 @@ npindex.formula <-
         # not receive this consumed formula-only argument a second time.
         dots$na.action <- NULL
         ev <- do.call(npindex, c(si.args, list(se = se, se.type = se.type), .np_formula_options(dots, "npindex.formula")))
-        ev$call <- mc
+        ev$call <- .np_public_replay_call(mc, "npindex")
         environment(ev$call) <- .np_call_owner_environment(
           parent.frame(), replacement = environment(tt))
 

@@ -145,7 +145,8 @@ npregbw.NULL <-
 
     ## clean up (possible) inconsistencies due to recursion ...
     environment(mc) <- .np.context$caller
-    tbw$call <- mc
+    tbw$call <- if (isTRUE(.np.context$public))
+      .np_public_replay_call(mc, "npregbw") else mc
 
     tbw <- updateBwNameMetadata(nameList =
                                 list(ynames = deparse(.np.context$response)),
@@ -3826,7 +3827,8 @@ npregbw.default <-
 
     mc <- .np.context$call
     environment(mc) <- .np.context$caller
-    tbw$call <- mc
+    tbw$call <- if (isTRUE(.np.context$public))
+      .np_public_replay_call(mc, "npregbw") else mc
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat))

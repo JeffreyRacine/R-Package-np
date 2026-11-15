@@ -114,7 +114,7 @@ npplregbw.NULL =
 
     ## clean up (possible) inconsistencies due to recursion ...
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npplregbw")
 
     tbw <-
       updateBwNameMetadata(nameList = list(ynames = .npplregbw_sanitize_yname(deparse(substitute(ydat)))),
@@ -1175,7 +1175,7 @@ npplregbw.default =
         tbw$nobs.omit <- length(rows.omit)
         mc <- match.call(expand.dots = FALSE)
         environment(mc) <- parent.frame()
-        tbw$call <- mc
+        tbw$call <- .np_public_replay_call(mc, "npplregbw")
         tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
         return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat, zdat = zdat))
       }
@@ -1212,7 +1212,7 @@ npplregbw.default =
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npplregbw")
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     if (!is.null(stored.data)) {

@@ -823,3 +823,27 @@
   list(txdat = roles$x, tydat = model.response(roles$yz),
        tzdat = roles$yz[, .np_formula_term_names(bws$chromoly[[3L]]), drop = FALSE])
 }
+
+# Stored public calls are syntax, not a second evaluation of user arguments.
+.np_public_replay_call <- function(call, generic, frame = parent.frame()) {
+  call <- .np_formula_call_public(call)
+  if ("na.action" %in% c(names(call), names(call[["..."]]))) {
+    if ("na.action" %in% names(call) &&
+        exists("na.action", envir = frame, inherits = FALSE) &&
+        .np_na_promise_missing("na.action", frame))
+      call[["na.action"]] <- NULL
+    call <- .np_omit_missing_na_call(call, frame)
+  }
+  parts <- as.list(call)
+  index <- match("...", names(parts), nomatch = 0L)
+  if (index) {
+    parts <- c(parts[seq_len(index - 1L)], as.list(parts[[index]]),
+      if (index < length(parts)) parts[seq.int(index + 1L, length(parts))])
+  }
+  parts[[1L]] <- as.call(list(as.name("::"), as.name("npRmpi"),
+                             as.name(generic)))
+  out <- as.call(parts)
+  for (name in setdiff(names(attributes(call)), "names"))
+    attr(out, name) <- attr(call, name, exact = TRUE)
+  out
+}

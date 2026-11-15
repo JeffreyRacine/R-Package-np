@@ -73,7 +73,7 @@ test_that("MPI package aliases evaluate function heads and data exactly once", {
   },finally=mpi.bcast.cmd(rm("npcmstest",envir=.GlobalEnv),caller.execute=TRUE))
   bwfun <- npregbw
   b <- bwfun(y~x,data=d,bws=.4,bandwidth.compute=FALSE)
-  expect_true(is.symbol(b$call[[1L]]))
+  expect_identical(b$call[[1L]], quote(npRmpi::npregbw))
   expect_null(attr(b$call,".npRmpi.bound.call.owner",exact=TRUE))
   mpi.bcast.cmd(assign("npregbw",function(...)stop("wrong global constructor"),
                       envir=.GlobalEnv),caller.execute=TRUE)

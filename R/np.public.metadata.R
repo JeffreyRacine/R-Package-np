@@ -36,9 +36,10 @@
                                     xterms = NULL, chromoly = NULL,
                                     ynames = names(frame)[attr(terms, "response")],
                                     scalar.children = FALSE) {
+  call <- .np_public_replay_call(call, producer, frame = parent.frame())
   environment(call) <- owner
   if (identical(producer, "nplsqregbw"))
-    call <- .nplsqreg_describe_call(call, owner)
+    environment(call) <- .np_call_owner_environment(owner)
   list(producer = producer, call = call, formula = formula, frame = frame,
        na.action = na.action, terms = terms, xterms = xterms,
        chromoly = chromoly, ynames = ynames, omit = attr(frame, "na.action"),

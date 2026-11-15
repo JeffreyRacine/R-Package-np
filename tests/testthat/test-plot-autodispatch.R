@@ -87,7 +87,7 @@ test_that("autodispatch keeps npreg formula fits plotable", {
   expect_false(is.null(fit$bws$formula))
   # Constructor-first dispatch retains the actual formula-method call.
   # Protect usable formula state, not the former synthetic generic call.
-  expect_identical(as.character(fit$bws$call[[1L]]), "npregbw.formula")
+  expect_identical(fit$bws$call[[1L]], quote(npRmpi::npregbw))
   expect_identical(all.vars(fit$bws$formula), c("y", "x1", "x2"))
   expect_false(grepl("\\.__npRmpi_autod_", paste(deparse(fit$bws$call), collapse = " ")))
   refit <- npreg(bws = fit$bws)

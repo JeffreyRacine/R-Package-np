@@ -70,8 +70,8 @@ test_that("regression transactions and saved refits reuse their training sample"
   auto <- npreg(f, data = d, nmulti = 1L)
   expect_identical(unname(calls), c(1L, 1L))
   expect_false(".np.formula.state" %in% names(auto$bws$call))
-  expect_false(".np.formula.state" %in% names(auto$bws$call$...))
-  expect_false(".np.formula.state" %in% names(auto$call$...))
+  expect_false(".np.formula.state" %in% c(names(auto$bws$call), names(auto$bws$call$...)))
+  expect_false(".np.formula.state" %in% c(names(auto$call), names(auto$call$...)))
   expect_identical(attr(one$bws$terms, "predvars"),
                    quote(list(counted.y(y), counted.x(x))))
   # A stochastic formula must use the same draw for constructor and fit.

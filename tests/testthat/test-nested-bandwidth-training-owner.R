@@ -50,9 +50,9 @@ test_that("local-smoothing quantile children retain distinct pilot responses", {
     tau = c(.25, .75), bandwidth.compute = FALSE, nomad = FALSE,
     regtype = "ll", se = TRUE)
   for (one in model$tau.fits) {
-    expect_true(is.symbol(one$call[[1L]]))
+    expect_identical(one$call[[1L]], quote(npRmpi::nplsqreg))
     expect_null(environment(one$call))
-    expect_true(is.symbol(one$bws$call[[1L]]))
+    expect_identical(one$bws$call[[1L]], quote(npRmpi::nplsqregbw))
     expect_null(environment(one$bws$call))
     expect_identical(one$fit$bws[[".np.native.training"]]$ydat, one$bws$qdat)
     children <- list(one$fit)

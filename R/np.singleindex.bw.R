@@ -130,7 +130,7 @@ npindexbw.NULL <-
 
     ## clean up (possible) inconsistencies due to recursion ...
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npindexbw")
 
     tbw <- updateBwNameMetadata(nameList =
                                 list(ynames = deparse(substitute(ydat))),
@@ -3185,7 +3185,7 @@ npindexbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npindexbw")
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     if (!is.null(prepared)) tbw[["index.design"]] <- prepared$schema

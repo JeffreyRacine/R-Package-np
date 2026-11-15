@@ -59,7 +59,7 @@ test_that("conditional fitting reuses one prepared training frame", {
     counter$n <- 0L
     auto <- fit.fun(formula = f, data = d, bandwidth.compute = FALSE)
     expect_identical(counter$n, 1L)
-    expect_false(".np.formula.state" %in% names(auto$bws$call$...))
+    expect_false(".np.formula.state" %in% c(names(auto$bws$call), names(auto$bws$call$...)))
     expect_false(grepl("getFromNamespace",
       paste(deparse(attr(terms(bw), "predvars")), collapse = ""), fixed = TRUE))
     counter$n <- 0L
