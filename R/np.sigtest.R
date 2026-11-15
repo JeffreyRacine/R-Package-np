@@ -377,12 +377,17 @@ npsigtest.formula <-
     ydat <- model.response(tmf)
     xdat <- tmf[, .np_formula_term_names(attr(attr(tmf, "terms"),"term.labels")), drop = FALSE]
 
-    ev <- if (is.null(frame.state)) {
+    ev <- if (is.null(frame.state) && (is.null(data) || policy.index == 0L)) {
       npsigtest(xdat = xdat, ydat = ydat, bws = bws, ...)
     } else {
       dots <- list(...)
       dots$.np.formula.state <- NULL
-      do.call(npsigtest, c(list(xdat = xdat, ydat = ydat, bws = bws), .np_formula_options(dots, "npsigtest.formula")))
+      # The fresh/replacement frame owner has already applied this policy.
+      # Retained training keeps its refusal; replacement without a policy
+      # keeps the original lazy forwarding path above.
+      dots$na.action <- NULL
+      do.call(npsigtest, c(list(xdat = xdat, ydat = ydat, bws = bws),
+                         .np_formula_options(dots, "npsigtest.formula")))
     }
     ev$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
     environment(ev$call) <- parent.frame()
