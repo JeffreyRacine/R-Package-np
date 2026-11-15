@@ -1,84 +1,84 @@
 # npRmpi 0.80-3
 
-- Stabilize signed higher-order Epanechnikov generalized nearest-neighbor conditional-density CVLS arithmetic on clustered explanatory data, preserving the existing rank and ridge decisions.
+* Stabilize signed higher-order Epanechnikov generalized nearest-neighbor conditional-density CVLS arithmetic on clustered explanatory data, preserving the existing rank and ridge decisions.
 
-- Correct conditional-distribution generalized nearest-neighbor cross-validation on the full training response grid: each fold now removes only its held-out observation from response bandwidth selection, both response and explanatory counts are decoded on the deleted sample, and automatic recovery uses matching count limits.
+* Correct conditional-distribution generalized nearest-neighbor cross-validation on the full training response grid: each fold now removes only its held-out observation from response bandwidth selection, both response and explanatory counts are decoded on the deleted sample, and automatic recovery uses matching count limits.
 
-- Significance-test bandwidth controls consume their original promises once
+* Significance-test bandwidth controls consume their original promises once
   across selection and testing, preserving stored call syntax and metadata.
 
-- Instrumental-variable formula fits evaluate a supplied NA-policy factory once,
+* Instrumental-variable formula fits evaluate a supplied NA-policy factory once,
   while applying the resulting policy separately to training and evaluation
   frames. Omitted policies retain their existing behavior through wrappers.
 
-- RGL surfaces give automatically calculated clipping limits a small display-only
+* RGL surfaces give automatically calculated clipping limits a small display-only
   margin, reducing clipping artifacts at flat boundary regions during rotation.
   Explicit limits, estimates, intervals and saved plot data remain unchanged.
 
-- Corrected compact uniform density plots retain physical support membership consistently in observed centers, empirical covariance and resampled features. Continuous pilot integration is unchanged.
+* Corrected compact uniform density plots retain physical support membership consistently in observed centers, empirical covariance and resampled features. Continuous pilot integration is unchanged.
 
-- Fixed uniform-kernel rows now use the documented open physical support consistently across dense, tree, permutation and sparse polynomial-search paths.
+* Fixed uniform-kernel rows now use the documented open physical support consistently across dense, tree, permutation and sparse polynomial-search paths.
 
-- Keep MPI lifecycle facts independent of restored user options, preserving manual dispatch and established session shutdown.
+* Keep MPI lifecycle facts independent of restored user options, preserving manual dispatch and established session shutdown.
 
-- Ordinary LC conditional-density plots disclose unavailable uncertainty at empty empirical response windows, retaining the full target grid and withholding an unidentifiable full-family simultaneous band. Raw estimates and corrected methods are unchanged.
+* Ordinary LC conditional-density plots disclose unavailable uncertainty at empty empirical response windows, retaining the full target grid and withholding an unidentifiable full-family simultaneous band. Raw estimates and corrected methods are unchanged.
 
-- Stored-fit routes reject unsupported `na.action` overrides instead of silently
+* Stored-fit routes reject unsupported `na.action` overrides instead of silently
   ignoring them. Existing formula replacement and regression/index prediction
   policies remain supported, with each callback evaluated by its existing owner.
 
-- Class-probability plot families exclude omitted display rows, including
+* Class-probability plot families exclude omitted display rows, including
   asymptotic Bonferroni calibration, while preserving their padded output rows.
 
-- Kernel sums reject unknown extra arguments without evaluating their values,
+* Kernel sums reject unknown extra arguments without evaluating their values,
   while retaining formula controls and ordinary argument matching.
 
-- Perspective floor and wall grids are painted behind the estimate, intervals
+* Perspective floor and wall grids are painted behind the estimate, intervals
   and overlays. Base surface-data replay uses the same renderer.
 
-- Constant conditional surfaces and surface-data replay expand automatic display
+* Constant conditional surfaces and surface-data replay expand automatic display
   limits without changing estimates, intervals or explicit limits.
 
-- Compound plot arguments now use dotted spellings, for example `boot.control`, `bias.control`, `data.overlay` and `gradient.order`. The 0.80-2 snake_case argument spellings are rejected with replacement guidance; no aliases are provided. `np_plot_data` and its existing field names, saved-data replay and extraction remain unchanged. Retired snake_case plot arguments are rejected before evaluating their values, including during saved-data replay; replay retains its existing graphical-override behavior.
+* Compound plot arguments now use dotted spellings, for example `boot.control`, `bias.control`, `data.overlay` and `gradient.order`. The 0.80-2 snake_case argument spellings are rejected with replacement guidance; no aliases are provided. `np_plot_data` and its existing field names, saved-data replay and extraction remain unchanged. Retired snake_case plot arguments are rejected before evaluating their values, including during saved-data replay; replay retains its existing graphical-override behavior.
 
-- Equivalent direct and grouped probability trim pairs no longer conflict in
+* Equivalent direct and grouped probability trim pairs no longer conflict in
   single-index and conditional-mode plots. Other trim interpretations and
   genuinely conflicting controls retain their existing behavior. Conditional-mode
   sample views do not gain grid controls.
 
-- Rebuilding retained unconditional uniform-kernel metadata avoids a redundant
+* Rebuilding retained unconditional uniform-kernel metadata avoids a redundant
   kernel-order advisory; fresh requests and unrelated conditions are unchanged.
 
-- Supplied plot limits reach line and surface renderers and survive saved-data replay, without changing evaluation grids, estimates or intervals. Automatic ranges remain unchanged when limits are omitted.
+* Supplied plot limits reach line and surface renderers and survive saved-data replay, without changing evaluation grids, estimates or intervals. Automatic ranges remain unchanged when limits are omitted.
 
-- Avoid response-vector-sized temporary labels in the shared missing-bandwidth
+* Avoid response-vector-sized temporary labels in the shared missing-bandwidth
   regression handoff, preserving final response names and retained data.
 
-- Respect explicit surface height limits when displaying observed data with
+* Respect explicit surface height limits when displaying observed data with
   regression, partially linear and smooth-coefficient surfaces; automatic
   ranges continue to include the observations.
 
-- Preserve explicit X/Z coordinate labels in partially linear and smooth-
+* Preserve explicit X/Z coordinate labels in partially linear and smooth-
   coefficient line panels, including saved-data replay and separate scales.
 
-- Avoid oversized temporary response labels in partially linear child
+* Avoid oversized temporary response labels in partially linear child
   bandwidth calls while preserving executable-option evaluation and retained
   response-call semantics.
 
-- Preserve explicit frame and style arguments in instrumental-variable plots
+* Preserve explicit frame and style arguments in instrumental-variable plots
   and saved replay, including automatic ranges requested with explicit NULL.
 
-- Keep rgl interval surfaces and rugs within explicit display limits while
+* Keep rgl interval surfaces and rugs within explicit display limits while
   retaining visible legends.
 
-- Reject unsupported grid controls in copula plots, conditional-mode sample
+* Reject unsupported grid controls in copula plots, conditional-mode sample
   views and their saved-data replay instead of passing on ignored requests.
 
-- Avoid expanding complete response vectors into internal LSQ bandwidth labels.
+* Avoid expanding complete response vectors into internal LSQ bandwidth labels.
 
-- Preserve literal graphical labels through plot forwarding and saved replay; honor conditional-mode panel labels.
+* Preserve literal graphical labels through plot forwarding and saved replay; honor conditional-mode panel labels.
 
-- Formula handoffs reject explicitly quoted or compiled executable option values
+* Formula handoffs reject explicitly quoted or compiled executable option values
   before they can run again against prepared data. Ordinary evaluated controls,
   structural formulas and supported callbacks retain their existing behavior.
 
