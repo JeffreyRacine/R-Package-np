@@ -381,7 +381,7 @@ npcdensbw.conbandwidth <-
 
     .np_density_bw_progress(bandwidth.compute, bwsolver, FALSE, {
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npcdensbw")
-    dot.args <- list(...)
+    dot.args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       dot.args$nomad.opts <- nomad.opts
     elapsed.start <- proc.time()[3]
@@ -612,7 +612,8 @@ npcdensbw.conbandwidth <-
     if (.npRmpi_autodispatch_active() &&
         !keep_local_prepared_nn)
       return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+        .npRmpi_autodispatch_expand_dots_call(
+          .np_omit_missing_na_call(match.call(expand.dots = FALSE), environment())),
         parent.frame(), owner.name = "npcdensbw.conbandwidth"))
 
     xdat = xdat[goodrows,,drop = FALSE]
@@ -3901,7 +3902,7 @@ npcdensbw.NULL <-
            bws, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     .np_nomad_native_reject_unsupported_options_from_dots(
       dots,
       "native npcdens NOMAD route"
@@ -4157,7 +4158,7 @@ npcdensbw.default <-
                        lp = "Local-Polynomial")
 
     search.mc.names <- names(mc)
-    lp.dot.args <- list(...)
+    lp.dot.args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       lp.dot.args$nomad.opts <- nomad.opts
     .np_degree_reject_unknown_dots(
@@ -4279,7 +4280,8 @@ npcdensbw.default <-
       if (.npRmpi_autodispatch_active() &&
           !keep_local_prepared_nn)
         return(.npRmpi_autodispatch_call(
-          .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+          .npRmpi_autodispatch_expand_dots_call(
+          .np_omit_missing_na_call(match.call(expand.dots = FALSE), environment())),
           parent.frame(), owner.name = "npcdensbw.default"))
     }
     reg.bwmethod <- if (is.null(reg.args$bwmethod)) "cv.ls" else reg.args$bwmethod

@@ -134,7 +134,7 @@ npudistbw.NULL <-
       on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
       .npRmpi_local_entry_begin(.np.local.entry)
     }
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     .np_nomad_native_reject_unsupported_options_from_dots(
       dots,
       "native npudist NOMAD route"
@@ -145,7 +145,8 @@ npudistbw.NULL <-
         if (anyNA(dat.preflight) && !any(stats::complete.cases(dat.preflight)))
           stop("Data has no rows without NAs")
       return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+        .npRmpi_autodispatch_expand_dots_call(
+          .np_omit_missing_na_call(match.call(expand.dots = FALSE), environment())),
         parent.frame(), owner.name = "npudistbw.NULL"))
       }
 
@@ -864,7 +865,7 @@ npudistbw.dbandwidth <-
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudistbw")
-    dot.args <- list(...)
+    dot.args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     internal.certify <- dot.args[[".beta.range.certify", exact = TRUE]]
     beta.range.certify <- if (is.null(internal.certify)) {
       TRUE
@@ -919,7 +920,8 @@ npudistbw.dbandwidth <-
       if (anyNA(dat.preflight) && !any(stats::complete.cases(dat.preflight)))
         stop("Data has no rows without NAs")
       return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+        .npRmpi_autodispatch_expand_dots_call(
+          .np_omit_missing_na_call(match.call(expand.dots = FALSE), environment())),
         parent.frame(), owner.name = "npudistbw.dbandwidth"))
     }
 
@@ -1295,7 +1297,8 @@ npudistbw.default <-
       if (anyNA(dat.preflight) && !any(stats::complete.cases(dat.preflight)))
         stop("Data has no rows without NAs")
       return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
+        .npRmpi_autodispatch_expand_dots_call(
+          .np_omit_missing_na_call(match.call(expand.dots = FALSE), environment())),
         parent.frame(), owner.name = "npudistbw.default"))
     }
 
@@ -1342,7 +1345,7 @@ npudistbw.default <-
 
     ## next grab dummies for actual bandwidth selection and perform call
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     dot.names <- names(dots)
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("gdat","bandwidth.compute", "nmulti", "powell.remin", "bwsolver", "itmax",

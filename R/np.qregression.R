@@ -1342,7 +1342,7 @@ npqreg.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npqreg", data = data, newdata = newdata)
 
     se <- npValidateScalarLogical(se, "se")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
     dots$.np.formula.state <- NULL
 
@@ -1424,7 +1424,7 @@ npqreg.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npqreg, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npqreg.condbandwidth))
+      bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npqreg.condbandwidth))
   }
 
 npqreg.conbandwidth <-
@@ -1466,7 +1466,7 @@ npqreg.condbandwidth <-
     fit.start <- proc.time()[3]
     se <- npValidateScalarLogical(se, "se")
     tau <- .npqreg_validate_tau(tau)
-    fit.dots <- list(...)
+    fit.dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (missing(exdat) && !is.null(fit.dots[["newdata", exact = TRUE]]))
       exdat <- .np_native_newdata_parts(fit.dots[["newdata", exact = TRUE]],
                                        list(exdat = bws$xnames), "npqreg")$exdat
@@ -1501,7 +1501,7 @@ npqreg.condbandwidth <-
     }
     if (isTRUE(parallel.cond))
       on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = 1L), add = TRUE)
-    dispatch.call <- match.call()
+    dispatch.call <- .np_omit_missing_na_call(match.call(), environment())
     dispatch.call$se <- se
     dispatch.call$.np_conditional_cat_se_demand <- cat.se.demand
     if (.npRmpi_npqreg_should_localize(bws) &&
@@ -1853,7 +1853,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
   }
   if (isTRUE(parallel.cond))
     on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = 1L), add = TRUE)
-  dispatch.call <- match.call()
+  dispatch.call <- .np_omit_missing_na_call(match.call(), environment())
   dispatch.call$se <- se
   dispatch.call$.np_conditional_cat_se_demand <-
     early.dots[[".np_conditional_cat_se_demand", exact = TRUE]]
@@ -1977,7 +1977,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
       call.args <- c(call.args, list(tydat))
     }
   }
-  dots <- if (!is.null(tbw[["formula", exact = TRUE]])) early.dots else list(...)
+  dots <- if (!is.null(tbw[["formula", exact = TRUE]])) early.dots else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   if (has.explicit.bws)
     fit.dots <- .npqreg_fit_dots(dots)
   else

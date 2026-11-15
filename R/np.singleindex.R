@@ -80,7 +80,7 @@ npindex.formula <-
         raw.formula <- inherits(bws, "formula")
         dots <- if (raw.formula)
           .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
-        else list(...)
+        else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
         # Preserve an explicit evaluation policy before training-response
         # replacement consumes its control arguments. Retained training and
         # native evaluation routes keep their existing separate owners.
@@ -247,7 +247,7 @@ npindex.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npindex, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npindex.sibandwidth))
+      bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npindex.sibandwidth))
   }
 
 .np_index_kernel_args <- function(bws) {
@@ -364,7 +364,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
   nomad <- npValidateNomadControl(nomad, "nomad")
   dots <- if (bws.formula)
     .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   npRejectLegacyBooleanErrors(dots, "npindex")
   se <- npValidateScalarLogical(se, "se")
   se.type <- match.arg(se.type)
@@ -380,7 +380,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
       !bws.formula &&
       !bws.call &&
       (explicit.sibandwidth || identical(degree.select.value, "manual"))) {
-    dispatch.call <- match.call()
+    dispatch.call <- .np_omit_missing_na_call(match.call(), environment())
     if (explicit.sibandwidth && isTRUE(.np_progress_enabled(domain = "bandwidth")))
       dispatch.call$.np_lc_fixed_progress_route <- TRUE
     if (!explicit.sibandwidth && !no.txdat && !no.tydat) {
@@ -717,7 +717,7 @@ npindex.sibandwidth <-
     se.type <- match.arg(se.type)
     asymptotic.se <- isTRUE(se) && identical(se.type, "asymptotic")
     bootstrap.se <- isTRUE(se) && identical(se.type, "bootstrap")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectLegacyBooleanErrors(dots, "npindex")
     npRejectLegacyBootstrapCount(names(dots), "npindex")
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
@@ -815,7 +815,7 @@ npindex.sibandwidth <-
     }
     if (.npRmpi_autodispatch_active() &&
         !(isTRUE(gradients) && identical(bws$type, "generalized_nn"))) {
-      dispatch.call <- match.call()
+      dispatch.call <- .np_omit_missing_na_call(match.call(), environment())
       if (identical(bws$method, "ichimura") &&
           identical(spec$regtype.engine, "lc") &&
           identical(bws$type, "fixed") &&

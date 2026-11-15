@@ -359,6 +359,9 @@ npsigtest.formula <-
                          names(substitute(list(...))[-1L]), nomatch = 0L)
     frame.state <- if (state.index > 0L) ...elt(state.index) else NULL
     policy.index <- match("na.action", names(substitute(list(...))[-1L]), nomatch = 0L)
+    if (policy.index > 0L &&
+        .np_na_promise_missing(paste0("..", policy.index), environment()))
+      policy.index <- 0L
     policy.override <- if (policy.index > 0L) list(na.action = ...elt(policy.index)) else list()
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -380,7 +383,7 @@ npsigtest.formula <-
     ev <- if (is.null(frame.state) && (is.null(data) || policy.index == 0L)) {
       npsigtest(xdat = xdat, ydat = ydat, bws = bws, ...)
     } else {
-      dots <- list(...)
+      dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
       dots$.np.formula.state <- NULL
       # The fresh/replacement frame owner has already applied this policy.
       # Retained training keeps its refusal; replacement without a policy
@@ -927,7 +930,7 @@ npsigtest.rbandwidth <- function(bws,
 
   .np_npsig_validate_lp_degree(bws = bws, xdat = xdat, index = index)
 
-  extra.args <- list(...)
+  extra.args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   npRejectLegacyBootstrapCount(names(extra.args), "npsigtest")
   boot.type <- match.arg(boot.type)
   boot.method <- match.arg(boot.method)
@@ -1911,7 +1914,7 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
   if(!no.ydat)
     call.args$ydat <- ydat
 
-  dots <- if (is.null(frame.state)) list(...) else
+  dots <- if (is.null(frame.state)) .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE) else
     .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
   dots[c("bws", "bandwidth.compute", "formula", "data", "xdat", "ydat")] <- NULL
 

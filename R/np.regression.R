@@ -24,7 +24,7 @@
 }
 
 .npreg_complete <- function(...) {
-  args <- list(...)
+  args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   args[[".np.require.complete"]] <- TRUE
   do.call(npreg, args)
 }
@@ -266,7 +266,7 @@ npreg.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npreg", data = data, newdata = newdata)
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectLegacyBooleanErrors(dots, "npreg")
     se <- npValidateScalarLogical(se, "se")
     explicit.eval.exclude <- .npreg_explicit_eval_exclude(dots)
@@ -432,7 +432,7 @@ npreg.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     ev <- do.call(npreg, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npreg.rbandwidth))
+      bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npreg.rbandwidth))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
     return(ev)
@@ -484,7 +484,7 @@ npreg.rbandwidth <-
       on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
       .npRmpi_local_entry_begin(.np.local.entry)
     }
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectLegacyBooleanErrors(dots, "npreg")
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     reg.spec.raw <- npValidatedConditionalRegSpec(
@@ -1325,7 +1325,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
 
   has.fixed.bws.value <- !missing(bws) && !isa(bws, "rbandwidth")
   if (.npRmpi_autodispatch_active() && !npNomadControlRequested(nomad) && !isTRUE(has.fixed.bws.value))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npreg.default"))
+    return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npreg.default"))
 
   sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
@@ -1436,7 +1436,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npreg.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   ev <- do.call(npreg, c(call.args, list(se = se), fit.dots))
 
   ev$call <- match.call(expand.dots = FALSE)

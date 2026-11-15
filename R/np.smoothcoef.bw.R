@@ -108,7 +108,7 @@ npscoefbw.NULL <-
       .npRmpi_local_entry_begin(.np.local.entry)
     }
     mc <- match.call(expand.dots = FALSE)
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     dot.names <- names(dots)
     nomad.requested <- "nomad" %in% dot.names &&
       (npValidateNomadControl(dots$nomad, "nomad") %in% c("true", "auto"))
@@ -142,7 +142,8 @@ npscoefbw.NULL <-
       search.engine = search.engine.value
     )
     if (.npRmpi_autodispatch_active() && !isTRUE(automatic.degree.search))
-      return(.npRmpi_autodispatch_call(mc, parent.frame(), owner.name = "npscoefbw.NULL"))
+      return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(mc, environment()),
+        parent.frame(), owner.name = "npscoefbw.NULL"))
 
     miss.z <- missing(zdat)
 
@@ -157,7 +158,7 @@ npscoefbw.NULL <-
     bw.args <- list(xdat = xdat, ydat = ydat, bws = bws)
     if (!miss.z)
       bw.args$zdat <- zdat
-    tbw <- do.call(npscoefbw.default, c(bw.args, list(...)))
+    tbw <- do.call(npscoefbw.default, c(bw.args, .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)))
 
     ## clean up (possible) inconsistencies due to recursion ...
     environment(mc) <- parent.frame()
@@ -2446,7 +2447,7 @@ npscoefbw.scbandwidth <-
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectUnsupportedBwsolver(dots, "npscoefbw")
 
     ## Save seed prior to setting
@@ -2514,7 +2515,7 @@ npscoefbw.scbandwidth <-
       .npRmpi_local_entry_begin(.np.local.entry)
     }
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npscoefbw.scbandwidth"))
+      return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npscoefbw.scbandwidth"))
 
     .np_require_numeric_response(ydat, "npscoefbw", "ydat")
     if (!(is.vector(ydat) || is.factor(ydat)))
@@ -3883,7 +3884,7 @@ npscoefbw.default <-
       on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
       .npRmpi_local_entry_begin(.np.local.entry)
     }
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npscoefbw")
@@ -4002,7 +4003,7 @@ npscoefbw.default <-
     )
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(scale.factor.search.lower)
     if (.npRmpi_autodispatch_active() && is.null(degree.search))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npscoefbw.default"))
+      return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npscoefbw.default"))
 
     ## first grab dummy args for scbandwidth() and perform 'bootstrap'
     ## bandwidth call

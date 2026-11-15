@@ -4,7 +4,8 @@
                                  native = FALSE, data = NULL, newdata = NULL,
                                  native.eval = FALSE) {
   if (!("na.action" %in% names(expressions)) ||
-      !is.list(bws) || inherits(bws, "formula"))
+      !is.list(bws) || inherits(bws, "formula") ||
+      length(.np_missing_na_dots(expressions, frame)))
     return(invisible(NULL))
   value <- function(name) {
     index <- match(name, names(expressions))
@@ -60,10 +61,31 @@
   substitute(base::evalq(EXPRESSION, FRAME), list(EXPRESSION = expression, FRAME = frame))
 }
 
+# missing() must inspect the original formal/dots promise. Evaluating its value
+# or its substituted expression would lose omission or run a policy factory.
+.np_na_promise_missing <- function(name, frame) {
+  eval(substitute(base::missing(ARG), list(ARG = as.name(name))), envir = frame)
+}
+
+.np_missing_na_dots <- function(expressions, frame) {
+  indices <- which(names(expressions) == "na.action")
+  # Duplicate names keep their existing argument-admission failure.
+  if (length(indices) != 1L || !exists("...", frame, inherits = FALSE))
+    return(integer())
+  indices[vapply(indices, function(i)
+    .np_na_promise_missing(paste0("..", i), frame), logical(1L))]
+}
+
 .np_formula_frame_promises <- function(args, frame,
                                         map = c(data = "data", na.action = "na.action")) {
-  for (name in intersect(names(map), names(args)))
+  for (name in intersect(names(map), names(args))) {
+    if (identical(name, "na.action") &&
+        .np_na_promise_missing(map[[name]], frame)) {
+      args[[name]] <- NULL
+      next
+    }
     args[[name]] <- .np_formula_promise_expression(as.name(map[[name]]), frame)
+  }
   args
 }
 
@@ -144,10 +166,24 @@
   indices
 }
 
+.np_omit_missing_na_call <- function(call, frame) {
+  if (!"na.action" %in% c(names(call), names(call[["..."]]))) return(call)
+  dots <- eval(quote(substitute(list(...))), envir = frame)[-1L]
+  if (!length(.np_missing_na_dots(dots, frame))) return(call)
+  if ("na.action" %in% names(call)) call[["na.action"]] <- NULL
+  if ("na.action" %in% names(call[["..."]])) {
+    dots <- as.list(call[["..."]])
+    dots <- dots[names(dots) != "na.action"]
+    call[["..."]] <- if (length(dots)) as.pairlist(dots) else NULL
+  }
+  call
+}
+
 .np_formula_dispatch_args <- function(method, expressions, promise.frame,
                                       data.roles = character(), call = NULL,
                                       caller = NULL, omit.subset = TRUE) {
   omitted <- if (omit.subset) .np_formula_subset_indices(method, expressions) else integer()
+  omitted <- union(omitted, .np_missing_na_dots(expressions, promise.frame))
   diagnose <- length(data.roles) && "data" %in% names(expressions)
   if (!length(omitted) && !diagnose)
     return(eval(quote(list(...)), envir = promise.frame))

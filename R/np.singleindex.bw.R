@@ -69,7 +69,7 @@ npindexbw.NULL <-
       .npRmpi_local_entry_begin(.np.local.entry)
     }
     mc <- match.call(expand.dots = FALSE)
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     dot.names <- names(dots)
     only.beta <- "only.optimize.beta" %in% dot.names &&
       npValidateScalarLogical(dots[["only.optimize.beta", exact = TRUE]], "only.optimize.beta")
@@ -120,7 +120,8 @@ npindexbw.NULL <-
            isTRUE(collective.degree.search) ||
            isTRUE(ichimura.lp.nomad.degree.search) ||
            .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
-      return(.np_index_dispatch(mc, xdat, ydat, parent.frame(),
+      return(.np_index_dispatch(.np_omit_missing_na_call(mc, environment()),
+                               xdat, ydat, parent.frame(),
                                owner.name = "npindexbw.NULL"))
 
     xdat <- toFrame(xdat)
@@ -2817,7 +2818,7 @@ npindexbw.default <-
     }
     mc <- match.call(expand.dots = FALSE)
     search.mc.names <- names(mc)
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npindexbw")
@@ -2862,7 +2863,8 @@ npindexbw.default <-
            isTRUE(collective.degree.search) ||
            isTRUE(ichimura.lp.nomad.degree.search) ||
            .npRmpi_safe_int(mpi.comm.size(1L)) > 2L))
-      return(.np_index_dispatch(mc, xdat, ydat, parent.frame(),
+      return(.np_index_dispatch(.np_omit_missing_na_call(mc, environment()),
+                               xdat, ydat, parent.frame(),
                                owner.name = "npindexbw.default"))
 
     xdat <- toFrame(xdat)
@@ -3216,7 +3218,7 @@ npindexbw.sibandwidth <-
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectUnsupportedBwsolver(dots, "npindexbw")
 
     ## Save seed prior to setting
@@ -3268,7 +3270,7 @@ npindexbw.sibandwidth <-
       .npRmpi_local_entry_begin(.np.local.entry)
     }
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npindexbw.sibandwidth"))
+      return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npindexbw.sibandwidth"))
 
     # Preserve the same native representation the estimator consumes. The
     # reconstructed bandwidth is published before outer wrappers can add it.

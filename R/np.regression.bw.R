@@ -70,7 +70,7 @@ npregbw.NULL <-
   .np_reject_native_frame_args(.np.context$dots)
 
     mc <- .np.context$call
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     legacy.remin <- "remin" %in% names(dots)
     if (isTRUE(legacy.remin)) {
       legacy.remin.value <- npValidateScalarLogical(dots$remin, "remin")
@@ -3524,7 +3524,7 @@ npregbw.default <-
       on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
       .npRmpi_local_entry_begin(.np.local.entry)
     }
-    lp.dot.args <- list(...)
+    lp.dot.args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if ("remin" %in% names(lp.dot.args)) {
       legacy.remin <- npValidateScalarLogical(lp.dot.args$remin, "remin")
       warning("npregbw: argument 'remin' is deprecated; use 'powell.remin' and 'nomad.remin'",

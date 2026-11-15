@@ -59,7 +59,8 @@ npplregbw.NULL =
       .npRmpi_local_entry_begin(.np.local.entry)
     }
     mc <- match.call(expand.dots = FALSE)
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L],
+                                      environment(), omit.subset = FALSE)
     dot.names <- names(dots)
     nomad.requested <- "nomad" %in% dot.names &&
       (npValidateNomadControl(dots$nomad, "nomad") %in% c("true", "auto"))
@@ -95,7 +96,8 @@ npplregbw.NULL =
     if (.npRmpi_autodispatch_active() &&
         !isTRUE(automatic.degree.search) &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
-      return(.npRmpi_autodispatch_call(mc, parent.frame(), owner.name = "npplregbw.NULL"))
+      return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(mc, environment()),
+        parent.frame(), owner.name = "npplregbw.NULL"))
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
@@ -147,7 +149,7 @@ npplregbw.plbandwidth =
     }
     if (.npRmpi_autodispatch_active() &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npplregbw.plbandwidth"))
+      return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npplregbw.plbandwidth"))
 
     xdat = toFrame(xdat)
     zdat = toFrame(zdat)
@@ -899,7 +901,7 @@ npplregbw.default =
     zdat <- toFrame(zdat)
     .np_require_numeric_response(ydat, "npplregbw", "ydat")
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectUnsupportedBwsolver(dots, "npplregbw")
     dot.names <- names(dots)
     mc <- match.call(expand.dots = FALSE)
@@ -1026,7 +1028,7 @@ npplregbw.default =
     if (.npRmpi_autodispatch_active() &&
         is.null(degree.search) &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npplregbw.default"))
+      return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npplregbw.default"))
 
     reg.args <- list(
       regtype = spec$regtype.engine,

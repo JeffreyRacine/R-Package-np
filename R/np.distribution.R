@@ -34,7 +34,7 @@ npudist.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npudist", data = data, newdata = newdata)
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
     dots$.np.formula.state <- NULL
     dots$formula <- NULL
@@ -92,7 +92,7 @@ npudist.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npudist, .np_retained_training_args(
-      bws, c(tdat = "dat"), list(...), npudist.dbandwidth))
+      bws, c(tdat = "dat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npudist.dbandwidth))
   }
 
 npudist.dbandwidth <-
@@ -108,7 +108,7 @@ npudist.dbandwidth <-
     se <- npValidateScalarLogical(se, "se")
     ann.se <- se && identical(bws[["type", exact = TRUE]], "adaptive_nn") &&
       bws[["ncon", exact = TRUE]] > 0L
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     fit.start <- proc.time()[3]
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     native.newdata <- dots[["newdata", exact = TRUE]]
@@ -134,7 +134,7 @@ npudist.dbandwidth <-
         if (anyNA(edat.preflight) && !any(stats::complete.cases(edat.preflight)))
           stop("Evaluation data has no rows without NAs")
       }
-      result <- .npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npudist.dbandwidth")
+      result <- .npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npudist.dbandwidth")
       return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
     }
 
@@ -336,7 +336,7 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
       (missing(bws) || "bws" %in% names(sc)) &&
       !bws.formula.early &&
       !tdat.formula.early && !inherits(formula.input, "formula"))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npudist.default"))
+    return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npudist.default"))
 
   if (!missing(bws) && inherits(bws, "formula")) {
     dots <- .np_formula_dispatch_args(
@@ -436,6 +436,6 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npudist.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   do.call(npudist, c(call.args, fit.dots))
 }

@@ -1,8 +1,12 @@
 # Validate syntax without forcing extra argument promises. Public kernel-sum
 # controls and constructor controls retain R's ordinary argument matching.
-.np_ksum_validate_dots <- function(dots, public = FALSE) {
+.np_ksum_validate_dots <- function(dots, public = FALSE, frame = NULL) {
   if (!length(dots)) return(invisible(NULL))
   dots <- as.list(dots)
+  if (is.environment(frame)) {
+    omitted <- .np_missing_na_dots(dots, frame)
+    if (length(omitted)) dots <- dots[-omitted]
+  }
   if (public) {
     matched <- match.call(npksum.numeric,
       as.call(c(list(quote(npksum.numeric)), dots)), expand.dots = FALSE)
@@ -54,7 +58,7 @@ npksum <-
 
 npksum.formula <-
   function(formula, data, newdata, subset, na.action, ...){
-    .np_ksum_validate_dots(substitute(list(...))[-1L], public = TRUE)
+    .np_ksum_validate_dots(substitute(list(...))[-1L], public = TRUE, frame = environment())
     dots <- list(...)
     .npRmpi_require_active_slave_pool(where = "npksum()")
     if (.npRmpi_master_local_entry_needed()) {
@@ -119,6 +123,8 @@ npksum.integer <-
     mc[["..."]] <- as.pairlist(lapply(dots, function(value) {
       if (is.language(value)) substitute(quote(VALUE), list(VALUE = value)) else value
     }))
+  } else if ("..." %in% names(mc)) {
+    mc[["..."]] <- NULL
   }
   .npRmpi_autodispatch_expand_dots_call(mc)
 }
@@ -135,8 +141,8 @@ npksum.numeric <-
   .np_reject_native_data(substitute(list(...))[-1L])
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
-    .np_ksum_validate_dots(substitute(list(...))[-1L])
-    dots <- list(...)
+    .np_ksum_validate_dots(substitute(list(...))[-1L], frame = environment())
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
     dots$return.derivative.kernel.weights <- NULL
     # Computation controls must survive numeric-bandwidth redispatch, not be
@@ -156,12 +162,12 @@ npksum.numeric <-
       on.exit(.npRmpi_local_entry_end(.np.local.entry), add=TRUE)
       .npRmpi_local_entry_begin(.np.local.entry)
     }
-    if (.npRmpi_npksum_should_localize(bws, list(...)) &&
+    if (.npRmpi_npksum_should_localize(bws, .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(
-        .npRmpi_npksum_owned_call(match.call(expand.dots = FALSE), list(...)),
+        .npRmpi_npksum_owned_call(match.call(expand.dots = FALSE), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)),
         parent.frame(), owner.name = "npksum.numeric"))
 
     txdat <- toFrame(txdat)
@@ -236,8 +242,8 @@ npksum.default <-
   .np_reject_native_data(substitute(list(...))[-1L])
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
-    .np_ksum_validate_dots(substitute(list(...))[-1L])
-    dots <- list(...)
+    .np_ksum_validate_dots(substitute(list(...))[-1L], frame = environment())
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     internal.power12 <- isTRUE(dots$.np.internal.power12)
     dots$.np.internal.power12 <- NULL
     internal.power12.weighted <-
@@ -306,7 +312,7 @@ npksum.default <-
     }
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(
-        .npRmpi_npksum_owned_call(match.call(expand.dots = FALSE), list(...)),
+        .npRmpi_npksum_owned_call(match.call(expand.dots = FALSE), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)),
         parent.frame(), owner.name = "npksum.default"))
 
     miss.ty <- missing(tydat)

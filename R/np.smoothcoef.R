@@ -35,7 +35,7 @@ npscoef.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npscoef", data = data, newdata = newdata)
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectLegacyBooleanErrors(dots, "npscoef")
     se <- npValidateScalarLogical(se, "se")
 
@@ -143,7 +143,7 @@ npscoef.call <-
     roles <- c(txdat = "xdat", tydat = "ydat")
     if (!is.null(bws$zdati))
       roles <- c(roles, tzdat = "zdat")
-    do.call(npscoef, .np_retained_training_args(bws, roles, list(...), npscoef.scbandwidth))
+    do.call(npscoef, .np_retained_training_args(bws, roles, .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npscoef.scbandwidth))
   }
 
 .np_scoef_fit_progress_begin <- function(handoff = FALSE, detail = NULL) {
@@ -205,7 +205,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       (missing(bws) || "bws" %in% names(sc)) &&
       !formula.forwarded && !formula.only &&
       (explicit.scbandwidth || identical(degree.select.value, "manual")))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npscoef.default"))
+    return(.npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npscoef.default"))
 
   sc.names <- names(sc)
 
@@ -338,7 +338,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npscoef.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   do.call(npscoef, c(call.args, list(se = se), fit.dots))
 
 }
@@ -377,7 +377,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     maxiter <- as.integer(maxiter)
     tol <- as.double(tol)
     regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     fit.progress.allow <- !isFALSE(dots$.np_fit_progress_allow) &&
       isTRUE(.np_progress_enabled(domain = "bandwidth"))
     fit.progress.handoff <- fit.progress.allow && isTRUE(dots$.np_fit_progress_handoff)
@@ -1449,7 +1449,7 @@ npscoef.scbandwidth <-
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
-    npRejectLegacyBooleanErrors(list(...), "npscoef")
+    npRejectLegacyBooleanErrors(.np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), "npscoef")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     se <- npValidateScalarLogical(se, "se")
     iterate <- npValidateScalarLogical(iterate, "iterate")
@@ -1473,14 +1473,14 @@ npscoef.scbandwidth <-
     if (.npRmpi_npscoef_should_localize(bws) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     fit.progress.allow <- !isFALSE(dots$.np_fit_progress_allow)
     use.master.fit.progress <- .npRmpi_autodispatch_active() &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       isTRUE(fit.progress.allow) &&
       isTRUE(.np_progress_enabled(domain = "bandwidth"))
     if (!use.master.fit.progress && .npRmpi_autodispatch_active()) {
-      result <- .npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npscoef.scbandwidth")
+      result <- .npRmpi_autodispatch_call(.np_omit_missing_na_call(match.call(), environment()), parent.frame(), owner.name = "npscoef.scbandwidth")
       # A native replacement fit can adopt z=x. Preserve that role decision
       # when restoring the selected bandwidth's other labels and telemetry.
       if (is.null(result$bws[["formula", exact = TRUE]]) &&

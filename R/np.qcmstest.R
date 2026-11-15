@@ -259,10 +259,11 @@ npqcmstest <- function(formula,
 
 
   if (...length())
-    npRejectLegacyBootstrapCount(names(list(...)), "npqcmstest")
+    npRejectLegacyBootstrapCount(names(.np_formula_dispatch_args(NULL, substitute(list(...))[-1L],
+      environment(), omit.subset = FALSE)), "npqcmstest")
   .npRmpi_require_active_slave_pool(where = "npqcmstest()")
   if (.npRmpi_autodispatch_active()) {
-    dispatch.call <- match.call()
+    dispatch.call <- .np_omit_missing_na_call(match.call(), environment())
     if (!missing(formula) && missing(xdat) && missing(ydat) && !missing(subset))
       dispatch.call[c("data", "subset")] <- .np_formula_subset_inputs(
         data, match.call()[["subset"]], parent.frame())

@@ -1593,7 +1593,7 @@ npcopula.default <- function(bws,
 
   .npRmpi_require_active_slave_pool(where = "npcopula()")
   # Preserve ordinary native-dot forcing when no formula owns subset.
-  list(...)
+  .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   evaluation <- .npcopula_validate_evaluation(evaluation)
   neval <- .npcopula_validate_neval(neval)
   start.time <- proc.time()[3]

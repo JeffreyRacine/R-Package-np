@@ -2049,7 +2049,7 @@ npreghat.formula <-
     .np_reject_fit_subset(substitute(list(...))[-1L])
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
@@ -2096,7 +2096,7 @@ npreghat.call <-
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     args <- .np_retained_training_args(
       bws, c(txdat = "xdat", y = "ydat"), dots, npreghat.rbandwidth,
       training = "txdat")
@@ -2144,7 +2144,7 @@ npreghat.rbandwidth <-
 
 
     no.ex <- missing(exdat)
-    private.dots <- list(...)
+    private.dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     require.finite <- isTRUE(private.dots[[".np.require.finite", exact = TRUE]])
     defer.empty <- isTRUE(private.dots[[".np.defer.empty.rows", exact = TRUE]])
     reg.spec.raw <- npValidatedConditionalRegSpec(

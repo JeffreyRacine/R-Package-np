@@ -1,6 +1,11 @@
 # Formula frame arguments have no semantics in native bandwidth/kernel calls.
 # Inspect syntax only; rejected subset/NA promises must never be evaluated.
-.np_reject_native_frame_args <- function(dots) {
+.np_reject_native_frame_args <- function(dots, frame = parent.frame()) {
+  if ("na.action" %in% names(dots) && exists("...", frame, inherits = FALSE)) {
+    original <- eval(quote(substitute(list(...))), envir = frame)[-1L]
+    if (length(.np_missing_na_dots(original, frame)))
+      dots <- dots[names(dots) != "na.action"]
+  }
   unsupported <- intersect(c("subset", "na.action"), names(dots))
   if (length(unsupported))
     stop(sprintf("%s supported only with the formula interface; for native calls, subset and handle missing values in the input data explicitly.",

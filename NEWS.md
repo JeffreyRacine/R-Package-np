@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Treat genuinely missing forwarded `na.action` arguments as omitted across formula and native handoffs. Explicit policies and `NULL` retain their existing behavior and refusal rules.
+
 * Quantile formula progress inspection preserves evaluated option values without executing them again.
 
 * `npsigtest()` consumes an NA policy after preparing fresh or replacement formula data, preserving once-only evaluation and retained-data refusal semantics.

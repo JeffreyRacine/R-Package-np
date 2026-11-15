@@ -33,7 +33,7 @@ npplreg.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npplreg", data = data, newdata = newdata)
 
     se <- npValidateScalarLogical(se, "se")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
     dots$.np.formula.state <- NULL
     frame <- if (is.null(frame.state)) .np_plreg_formula_frame(bws, data, overrides = dots)
@@ -101,7 +101,7 @@ npplreg.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npplreg, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat", tzdat = "zdat"), list(...), npplreg.plbandwidth))
+      bws, c(txdat = "xdat", tydat = "ydat", tzdat = "zdat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npplreg.plbandwidth))
   }
 
 .np_plreg_fit_progress_targets <- function(xnames) {
@@ -514,7 +514,7 @@ npplreg.plbandwidth <-
     fit.start <- proc.time()[3]
     residuals <- npValidateScalarLogical(residuals, "residuals")
     se <- npValidateScalarLogical(se, "se")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     .npRmpi_require_active_slave_pool(where = "npplreg()")
     if (.npRmpi_master_local_entry_needed()) {
@@ -530,7 +530,7 @@ npplreg.plbandwidth <-
         .npRmpi_autodispatch_active() &&
         is.null(bws$degree.search) &&
         !isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
-      dispatch.call <- match.call()
+      dispatch.call <- .np_omit_missing_na_call(match.call(), environment())
       dispatch.call$se <- se
       dispatch.call$.np.defer.empty.rows <- TRUE
       result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npplreg.plbandwidth")
@@ -790,7 +790,7 @@ npplreg.plbandwidth <-
     fit.progress.active <- FALSE
     return(.npreg_finish_empty_rows(ev, empty.state$rows,
       omitted = if(no.exz) integer(0) else which(!keep.eval),
-      defer = isTRUE(list(...)[[".np.defer.empty.rows", exact = TRUE]]),
+      defer = isTRUE(.np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)[[".np.defer.empty.rows", exact = TRUE]]),
       owner = "npplreg", row.labels = if(no.exz) NULL else row.names(exdat)))
   }
 
@@ -828,7 +828,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
       !formula.forwarded && !formula.only &&
       (explicit.plbandwidth || identical(degree.select.value, "manual")) &&
       !isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
-    dispatch.call <- match.call()
+    dispatch.call <- .np_omit_missing_na_call(match.call(), environment())
     dispatch.call$se <- se
     return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npplreg.default"))
   }
@@ -955,6 +955,6 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npplreg.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   do.call(npplreg, c(call.args, fit.dots))
 }

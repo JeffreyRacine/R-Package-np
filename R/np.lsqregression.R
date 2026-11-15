@@ -1400,7 +1400,9 @@ nplsqregbw.NULL <- function(...) {
       substitute(quote(VALUE), list(VALUE = value)) else value)
   }
   if (materialize) {
-    dots <- lapply(eval(quote(list(...)), owner), function(value) {
+    dots <- lapply(.np_formula_dispatch_args(
+      NULL, eval(quote(substitute(list(...))), owner)[-1L], owner,
+      omit.subset = FALSE), function(value) {
       if (is.language(value)) substitute(quote(VALUE), list(VALUE = value)) else value
     })
     parts <- c(parts, dots)
@@ -1505,7 +1507,7 @@ nplsqregbw.default <-
       warm.start.degree <- vector("list", length(tau.raw))
       previous.idx <- NA_integer_
       full.extra.args <- .nplsqreg_normalize_dots(
-        c(list(...), if (length(nomad.opts)) list(nomad.opts = nomad.opts) else list()),
+        c(.np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), if (length(nomad.opts)) list(nomad.opts = nomad.opts) else list()),
         where = "nplsqregbw")
       refined.extra.args <- full.extra.args
       tau.search.controls <- NULL
@@ -1589,7 +1591,7 @@ nplsqregbw.default <-
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute,
                                                  "bandwidth.compute")
     dots <- .nplsqreg_normalize_dots(
-      c(list(...), if (length(nomad.opts)) list(nomad.opts = nomad.opts) else list()),
+      c(.np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), if (length(nomad.opts)) list(nomad.opts = nomad.opts) else list()),
       where = "nplsqregbw")
     scalar.mc <- match.call(expand.dots = FALSE)
     scalar.mc.names <- names(scalar.mc)
@@ -2042,7 +2044,7 @@ nplsqreg.lsqregressionbandwidth <-
       if (is.null(bws$tau.bws) || length(bws$tau.bws) != length(tau))
         stop("vector nplsqreg bandwidth object lacks per-tau bandwidth state",
              call. = FALSE)
-      fit.dots <- list(...)
+      fit.dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
       defer.empty <- isTRUE(fit.dots[[".np.defer.empty.rows", exact = TRUE]])
       fit.dots$.np.defer.empty.rows <- TRUE
       empty.state <- new.env(hash = FALSE, parent = emptyenv())
@@ -2095,7 +2097,7 @@ nplsqreg.default <-
   .nplsqreg_check_reuse_data(bws, substitute(list(...))[-1L])
 
 
-    dots.dispatch <- list(...)
+    dots.dispatch <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectLegacyBooleanErrors(dots.dispatch, "nplsqreg")
     .npRmpi_require_active_slave_pool(where = "nplsqreg()")
     mc.dispatch <- match.call()
