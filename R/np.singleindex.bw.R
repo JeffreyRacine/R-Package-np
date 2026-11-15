@@ -50,7 +50,7 @@ npindexbw.formula <-
     tbw <- do.call(npindexbw, c(list(xdat = xdat, ydat = quote(ydat)), .np_formula_options(list(...), "npindexbw.formula")))
 
     ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- match.call(expand.dots = FALSE)
+    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npindexbw")
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
     tbw$rows.omit <- as.vector(attr(mf,"na.action"))
@@ -82,7 +82,7 @@ npindexbw.NULL <-
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npindexbw")
 
     tbw <- updateBwNameMetadata(nameList =
                                 list(ynames = deparse(substitute(ydat))),
@@ -2185,7 +2185,7 @@ npindexbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npindexbw")
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     if (!is.null(prepared)) tbw[["index.design"]] <- prepared$schema

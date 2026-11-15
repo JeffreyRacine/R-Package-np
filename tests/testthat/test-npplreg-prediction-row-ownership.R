@@ -140,6 +140,9 @@ test_that("plreg prediction SE rejects malformed maps without residual value fil
   prepare <- get(".np_plreg_predict_se_data", ns)
   infer <- get(".np_plreg_predict_se", ns)
   broken <- fit
+  # Neither current retained training nor a legacy native call remains.
+  broken$bws[[".np.native.training"]] <- NULL
+  broken$bws[[".np.formula.training"]] <- NULL
   broken$call$txdat <- NULL
   expect_error(prepare(bw, broken), "call does not contain 'txdat'", fixed = TRUE)
   broken <- fit

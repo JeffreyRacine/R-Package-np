@@ -320,7 +320,7 @@ npreg.formula <-
     }
     dots$na.action <- NULL
     ev <- do.call(npreg, c(reg.args, list(se = se), .np_formula_options(dots, "npreg.formula")))
-    ev$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
+    ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npreg")
     environment(ev$call) <- parent.frame()
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
@@ -393,7 +393,7 @@ npreg.call <-
 
     ev <- do.call(npreg, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npreg.rbandwidth))
-    ev$call <- match.call(expand.dots = FALSE)
+    ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npreg")
     environment(ev$call) <- parent.frame()
     return(ev)
   }
@@ -944,7 +944,8 @@ npreg.rbandwidth <-
     ev$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
 
 
-    ev$call <- .np.context$call
+    ev$call <- if (isTRUE(.np.context$public))
+      .np_public_replay_call(.np.context$call, "npreg") else .np.context$call
     environment(ev$call) <- .np.context$caller
     return(.npreg_finish_empty_rows(ev, empty.rows, eval.rows.omit,
       defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]),
@@ -1008,7 +1009,11 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     fit.dots$.np_fit_progress_handoff <- TRUE
     if (!is.null(frame.state))
       fit.dots <- .np_formula_options(fit.dots, "npreg.default")
-    return(do.call(npreg, c(reg.args, list(se = se), fit.dots)))
+    ev <- do.call(npreg, c(reg.args, list(se = se), fit.dots))
+    ev$call <- .np_public_replay_call(match.call(definition = function(...) NULL,
+    call = sys.call(), expand.dots = FALSE, envir = parent.frame()), "npreg")
+    environment(ev$call) <- parent.frame()
+    return(ev)
   }
 
   ## here we check to see if the function was called with tdat =
@@ -1120,7 +1125,8 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   ev <- do.call(npreg, c(call.args, list(se = se), fit.dots))
 
-  ev$call <- match.call(expand.dots = FALSE)
+  ev$call <- .np_public_replay_call(match.call(definition = function(...) NULL,
+    call = sys.call(), expand.dots = FALSE, envir = parent.frame()), "npreg")
   environment(ev$call) <- parent.frame()
   return(ev)
 }

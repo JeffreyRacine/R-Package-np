@@ -36,7 +36,7 @@ npplregbw.formula <-
                          zdat = roles$yz[, .np_formula_term_names(spec$chromoly[[3L]]), drop = FALSE]),
                     .np_formula_options(dots, "npplregbw.formula")))
 
-    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
+    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npplregbw")
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
     tbw$rows.omit <- as.vector(attr(frame, "na.action"))
@@ -77,7 +77,7 @@ npplregbw.NULL =
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npplregbw")
 
     tbw <-
       updateBwNameMetadata(nameList = list(ynames = .npplregbw_sanitize_yname(deparse(substitute(ydat)))),
@@ -1028,7 +1028,7 @@ npplregbw.default =
         tbw$nobs.omit <- length(rows.omit)
         mc <- match.call(expand.dots = FALSE)
         environment(mc) <- parent.frame()
-        tbw$call <- mc
+        tbw$call <- .np_public_replay_call(mc, "npplregbw")
         tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
         return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat, zdat = zdat))
       }
@@ -1065,7 +1065,7 @@ npplregbw.default =
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npplregbw")
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
     if (!is.null(stored.data)) {

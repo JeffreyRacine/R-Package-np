@@ -52,7 +52,7 @@ npudensbw.formula <-
     .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], mf)
     dots$.np.formula.state <- NULL
     tbw <- do.call(npudensbw, c(list(dat = dat), .np_formula_options(dots, "npudensbw.formula")))
-    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
+    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npudensbw")
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
     tbw$terms <- attr(mf,"terms")
@@ -94,7 +94,7 @@ npudensbw.NULL <-
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npudensbw")
 
     tbw
   }
@@ -1246,7 +1246,7 @@ npudensbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npudensbw")
 
     return(.np_bws_retain_native_training(tbw, dat = dat))
   }

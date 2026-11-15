@@ -74,6 +74,7 @@ npplreg.formula <-
     pl.args$bws <- bws
     dots$na.action <- NULL
     ev <- do.call(npplreg, c(pl.args, .np_formula_options(dots, "npplreg.formula")))
+    ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npplreg")
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
       if (!is.null(ev$bws))
@@ -101,8 +102,10 @@ npplreg.call <-
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
-    do.call(npplreg, .np_retained_training_args(
+    ev <- do.call(npplreg, .np_retained_training_args(
       bws, c(txdat = "xdat", tydat = "ydat", tzdat = "zdat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npplreg.plbandwidth))
+    ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npplreg")
+    ev
   }
 
 .np_plreg_fit_progress_targets <- function(xnames) {
@@ -757,7 +760,7 @@ npplreg.plbandwidth <-
     ev$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
 
     
-    ev$call <- match.call(expand.dots = FALSE)
+    ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npplreg")
     environment(ev$call) <- parent.frame()
     fit.progress <- .np_progress_end(fit.progress)
     fit.progress.active <- FALSE
@@ -896,5 +899,8 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npplreg.default")
   else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
-  do.call(npplreg, c(call.args, fit.dots))
+  ev <- do.call(npplreg, c(call.args, fit.dots))
+  ev$call <- .np_public_replay_call(match.call(definition = function(...) NULL,
+    call = sys.call(), expand.dots = FALSE, envir = parent.frame()), "npplreg")
+  ev
 }

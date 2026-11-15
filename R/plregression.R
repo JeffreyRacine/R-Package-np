@@ -158,12 +158,21 @@ residuals.plregression <- function(object, ...) {
 }
 
 .np_plreg_predict_se_data <- function(bws, fit) {
-  # Use this prediction's training arguments, including any data override.
-  # Formula calls already contain the jointly prepared x/y/z roles here.
-  fit.call <- fit[["call", exact = TRUE]]
-  txdat <- toFrame(.np_eval_call_arg(fit.call, "txdat"))
-  tydat <- .np_eval_call_arg(fit.call, "tydat")
-  tzdat <- toFrame(.np_eval_call_arg(fit.call, "tzdat"))
+  # The prediction fit owns its effective training sample, including overrides.
+  # Public replay syntax is descriptive and need not contain native roles.
+  current <- .np_plreg_bws(fit, where = "predict.npplreg")
+  if (!is.null(current[[".np.native.training", exact = TRUE]]) ||
+      !is.null(current[[".np.formula.training", exact = TRUE]])) {
+    txdat <- toFrame(.np_eval_bws_call_arg(current, "xdat"))
+    tydat <- .np_eval_bws_call_arg(current, "ydat")
+    tzdat <- toFrame(.np_eval_bws_call_arg(current, "zdat"))
+  } else {
+    # Preserve valid historical fits whose prepared roles lived in the call.
+    fit.call <- fit[["call", exact = TRUE]]
+    txdat <- toFrame(.np_eval_call_arg(fit.call, "txdat"))
+    tydat <- .np_eval_call_arg(fit.call, "tydat")
+    tzdat <- toFrame(.np_eval_call_arg(fit.call, "tzdat"))
+  }
 
   keep.rows <- rep_len(TRUE, nrow(txdat))
   rows.omit <- attr(na.omit(data.frame(txdat, tydat, tzdat)), "na.action")

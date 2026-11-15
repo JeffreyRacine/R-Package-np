@@ -34,8 +34,8 @@ test_that("npregbw formula and default paths preserve current metadata shape", {
   expect_false("terms" %in% names(bw_default))
   expect_true(all(c("call", "rows.omit", "nobs.omit") %in% names(bw_default)))
 
-  expect_identical(as.character(bw_formula$call[[1L]]), "npregbw.formula")
-  expect_identical(as.character(bw_default$call[[1L]]), "npregbw.NULL")
+  expect_identical(bw_formula$call[[1L]], quote(np::npregbw))
+  expect_identical(bw_default$call[[1L]], quote(np::npregbw))
   expect_identical(attr(bw_formula$terms, "term.labels"), "x")
 
   expect_identical(bw_formula$nobs.omit, 0L)

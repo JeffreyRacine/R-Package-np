@@ -34,7 +34,7 @@ npregbw.formula <-
     tbw <- do.call(npregbw, c(list(xdat = xdat, ydat = quote(ydat)), .np_formula_options(dots, "npregbw.formula")))
 
     ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
+    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npregbw")
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
     tbw$rows.omit <- as.vector(attr(mf,"na.action"))
@@ -88,7 +88,8 @@ npregbw.NULL <-
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- .np.context$call
     environment(mc) <- .np.context$caller
-    tbw$call <- mc
+    tbw$call <- if (isTRUE(.np.context$public))
+      .np_public_replay_call(mc, "npregbw") else mc
 
     tbw <- updateBwNameMetadata(nameList =
                                 list(ynames = deparse(.np.context$response)),
@@ -3067,7 +3068,8 @@ npregbw.default <-
       tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
       mc <- .np.context$call
       environment(mc) <- .np.context$caller
-      tbw$call <- mc
+      tbw$call <- if (isTRUE(.np.context$public))
+      .np_public_replay_call(mc, "npregbw") else mc
       return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat))
     }
 
@@ -3088,7 +3090,8 @@ npregbw.default <-
 
     mc <- .np.context$call
     environment(mc) <- .np.context$caller
-    tbw$call <- mc
+    tbw$call <- if (isTRUE(.np.context$public))
+      .np_public_replay_call(mc, "npregbw") else mc
 
     return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat))
     

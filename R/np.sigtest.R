@@ -77,7 +77,7 @@ npsigtest.formula <-
       do.call(npsigtest, c(list(xdat = xdat, ydat = ydat, bws = bws),
                          .np_formula_options(dots, "npsigtest.formula")))
     }
-    ev$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
+    ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npsigtest")
     environment(ev$call) <- parent.frame()
     ev$rows.omit <- as.vector(attr(umf,"na.action"))
     ev$nobs.omit <- length(ev$rows.omit)
@@ -93,7 +93,7 @@ npsigtest.call <-
     ev <- npsigtest(xdat = .np_eval_bws_call_arg(bws, "xdat"),
                     ydat = .np_eval_bws_call_arg(bws, "ydat"),
                     bws = bws, ...)
-    ev$call <- match.call(expand.dots = FALSE)
+    ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npsigtest")
     environment(ev$call) <- parent.frame()
     return(ev)
   }
@@ -103,7 +103,7 @@ npsigtest.npregression <-
     .np_reject_fit_subset(substitute(list(...))[-1L])
 
     ev <- npsigtest(bws$bws, ...)
-    ev$call <- match.call(expand.dots = FALSE)
+    ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npsigtest")
     environment(ev$call) <- parent.frame()
     return(ev)
   }
@@ -1425,7 +1425,7 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
     dots <- .np_formula_options(dots, "npsigtest.default")
   ev <- do.call(npsigtest, c(call.args, dots))
 
-  ev$call <- match.call(expand.dots = FALSE)
+  ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npsigtest")
   environment(ev$call) <- parent.frame()
   return(ev)
 }

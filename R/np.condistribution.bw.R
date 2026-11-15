@@ -75,7 +75,7 @@ npcdistbw.formula <-
     tbw <- do.call(npcdistbw, c(bw.args, .np_formula_options(dots, "npcdistbw.formula")))
 
     ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
+    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npcdistbw")
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
     tbw$rows.omit <- as.vector(attr(mf,"na.action"))
@@ -2610,7 +2610,7 @@ npcdistbw.NULL <-
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npcdistbw")
 
     tbw
   }
@@ -3066,7 +3066,7 @@ npcdistbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- mc
+    tbw$call <- .np_public_replay_call(mc, "npcdistbw")
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
     if (isTRUE(lc.lp0.search.engine)) {
       tbw$regtype <- public.spec$regtype

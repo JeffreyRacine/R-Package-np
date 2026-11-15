@@ -35,8 +35,8 @@ test_that("npcdistbw formula and default paths preserve current metadata shape",
   expect_false("variableNames" %in% names(bw_default))
   expect_true(all(c("call", "rows.omit", "nobs.omit") %in% names(bw_default)))
 
-  expect_identical(as.character(bw_formula$call[[1L]]), "npcdistbw.formula")
-  expect_identical(as.character(bw_default$call[[1L]]), "npcdistbw.NULL")
+  expect_identical(bw_formula$call[[1L]], quote(np::npcdistbw))
+  expect_identical(bw_default$call[[1L]], quote(np::npcdistbw))
   expect_identical(attr(bw_formula$terms, "term.labels"), c("y", "x"))
   expect_identical(bw_formula$variableNames$response, "y")
   expect_identical(bw_formula$variableNames$terms, "x")

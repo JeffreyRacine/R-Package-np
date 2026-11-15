@@ -27,8 +27,8 @@ test_that("significance selector controls use the original promises once", {
     expect_identical(a$bws$bw, b$bws$bw, info = route)
     expect_false(grepl("evalq|<environment|selector\\$", paste(deparse(a$bws$call), collapse = " ")), info = route)
     if (route != "native") {
-      expect_identical(a$bws$call[["..."]][["nmulti"]], quote(starts()))
-      expect_identical(a$bws$call[["..."]][["ckertype"]], quote(kernel()))
+      expect_identical(a$bws$call[["nmulti"]], quote(starts()))
+      expect_identical(a$bws$call[["ckertype"]], quote(kernel()))
     }
   }
 })
