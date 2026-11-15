@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Avoid retransmitting matching native training roles already carried by an unleased bandwidth in the same MPI call; preserve explicit replacement data, saved calls and computational ownership.
+
 * Avoid unnecessary data copies while removing internal MPI dispatch tags, preserving stored calls and retained training samples.
 
 * Avoid duplicating already prepared formula columns when constructing model frames, preserving retained samples and callback behavior.

@@ -1217,6 +1217,18 @@
       assign(nm, bundle[[nm]], envir = eval.env)
   }
 
+  # These names refer only to certified ordinary components of a bandwidth
+  # transmitted in this same invocation. Coordinator checks precede transport.
+  derived <- payload[["derived.bindings", exact = TRUE]]
+  if (length(derived)) {
+    for (nm in names(derived)) {
+      descriptor <- derived[[nm]]
+      source <- get(descriptor[["source"]], envir = eval.env, inherits = FALSE)
+      native <- .subset2(source, ".np.native.training", exact = TRUE)
+      assign(nm, native[[descriptor[["component"]]]], envir = eval.env)
+    }
+  }
+
   call.owner <- payload[["call.owner", exact = TRUE]]
   if (!is.null(call.owner)) {
     # Preserve the already selected package definition even when a rank has
@@ -1250,6 +1262,9 @@
         tmpreplace[[nm]] <- get(nm, envir = eval.env, inherits = FALSE)
     }
   }
+  if (length(derived))
+    for (nm in names(derived))
+      tmpreplace[nm] <- list(get(nm, envir = eval.env, inherits = FALSE))
   if (!is.null(tmpreplace) && length(tmpreplace))
     res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpreplace)
   metadata <- payload[["public.metadata", exact = TRUE]]
@@ -2470,6 +2485,89 @@
   stop(eval.res$error)
 }
 
+# Values admitted to same-call transport sharing have no reference-bearing
+# state or user-defined extraction. Other values keep the ordinary payload.
+.npRmpi_transport_plain_value <- function(x, depth = 0L) {
+  if (depth > 3L || isS4(x)) return(FALSE)
+  a <- attributes(x)
+  cl <- attr(x, "class", exact = TRUE)
+  if (typeof(x) == "list") {
+    if (!identical(cl, "data.frame") ||
+        any(!names(a) %in% c("names", "row.names", "class"))) return(FALSE)
+    if (!all(vapply(a, function(v) is.atomic(v) && is.null(attributes(v)),
+                    logical(1L)))) return(FALSE)
+    return(all(vapply(x, .npRmpi_transport_plain_value, logical(1L),
+                      depth = depth + 1L)))
+  }
+  if (!typeof(x) %in% c("logical", "integer", "double", "complex", "raw", "character"))
+    return(FALSE)
+  if (!is.null(cl) && !identical(cl, "factor") &&
+      !identical(cl, c("ordered", "factor"))) return(FALSE)
+  if (any(!names(a) %in% c("names", "dim", "dimnames", "class", "levels")))
+    return(FALSE)
+  for (nm in names(a)) {
+    value <- a[[nm]]
+    if (identical(nm, "dimnames")) {
+      if (!is.list(value) || is.object(value) ||
+          any(!names(attributes(value)) %in% "names") ||
+          !all(vapply(value, function(v)
+          (is.null(v) || is.character(v)) && is.null(attributes(v)), logical(1L))))
+        return(FALSE)
+    } else if (!is.atomic(value) || !is.null(attributes(value))) return(FALSE)
+  }
+  TRUE
+}
+
+.npRmpi_autodispatch_native_roles <- list(
+  npreg = c(txdat = "xdat", tydat = "ydat"),
+  npudens = c(tdat = "dat"), npudist = c(tdat = "dat"),
+  npcdens = c(txdat = "xdat", tydat = "ydat"),
+  npcdist = c(txdat = "xdat", tydat = "ydat"),
+  npindex = c(txdat = "xdat", tydat = "ydat"),
+  npscoef = c(txdat = "xdat", tydat = "ydat", tzdat = "zdat"),
+  npplreg = c(txdat = "xdat", tydat = "ydat", tzdat = "zdat"),
+  npqreg = c(txdat = "xdat", tydat = "ydat"),
+  npconmode = c(txdat = "xdat", tydat = "ydat"),
+  npreghat = c(txdat = "xdat", y = "ydat"))
+
+.npRmpi_autodispatch_derive_native_roles <- function(prepared, mc) {
+  roles <- .npRmpi_autodispatch_native_roles[[
+    sub("\\..*$", "", .npRmpi_autodispatch_call_name(mc))]]
+  if (is.null(roles)) return(prepared)
+  call <- prepared$call
+  if (!is.call(call) || !isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE)) ||
+      anyDuplicated(names(call)) || !is.symbol(call[["bws"]])) return(prepared)
+  source <- as.character(call[["bws"]])
+  values <- c(prepared$tmpvals, prepared$prepublish)
+  if (!source %in% names(values)) return(prepared) # Valid leases are separate.
+  bws <- values[[source]]
+  if (typeof(bws) != "list") return(prepared)
+  native <- .subset2(bws, ".np.native.training", exact = TRUE)
+  if (typeof(native) != "list" || is.object(native) ||
+      !identical(names(attributes(native)), "names") || anyDuplicated(names(native)))
+    return(prepared)
+  for (arg in intersect(names(roles), names(call))) {
+    expr <- call[[arg]]
+    if (!is.symbol(expr)) next
+    target <- as.character(expr)
+    component <- roles[[arg]]
+    if (identical(source, target) || !target %in% names(values) ||
+        !component %in% names(native)) next
+    retained <- native[[component]]
+    value <- values[[target]]
+    if (is.null(retained) || !.npRmpi_transport_plain_value(retained) ||
+        !identical(value, retained, num.eq = FALSE, single.NA = FALSE,
+                   attrib.as.set = FALSE)) next
+    # The source is the exact untagged bandwidth already being sent in this
+    # invocation. No call replay, caller lookup, new lease or worker scan.
+    prepared$derived.bindings[[target]] <- c(source = source, component = component)
+    prepared$derived.replacements[target] <- list(value)
+    prepared$tmpvals[target] <- NULL
+    prepared$prepublish[target] <- NULL
+  }
+  prepared
+}
+
 .npRmpi_autodispatch_materialize_call <- function(mc, caller_env, comm = 1L) {
   mc <- .npRmpi_autodispatch_expand_dots_call(mc)
   arg.list <- as.list(mc)
@@ -3065,6 +3163,8 @@
       else if (!is.null(prepared$prepublish[[nm]]))
         prepared$prepublish[[nm]] <- .npRmpi_autodispatch_untag(prepared$prepublish[[nm]])
 
+  prepared <- .npRmpi_autodispatch_derive_native_roles(prepared, mc)
+
   if (length(prepared$prepublish)) {
     publications <- if (is.null(bundle.name)) prepared$prepublish else
       setNames(list(prepared$prepublish), bundle.name)
@@ -3110,6 +3210,7 @@
     opt.vals = opt.vals,
     opt.verify = opt.verify,
     lease.bindings = prepared$lease.bindings,
+    derived.bindings = prepared$derived.bindings,
     publication = publication,
     public.metadata = if (is.null(public.metadata)) NULL else
       .npRmpi_bw_metadata_wire(public.metadata)
@@ -3219,7 +3320,7 @@
   }
   cleaned <- TRUE
   tmpreplace <- c(prepared$tmpvals, prepared$prepublish,
-                  prepared$lease.replacements)
+                  prepared$lease.replacements, prepared$derived.replacements)
   rec <- make.rec()
 
   if (is.list(result)) {
