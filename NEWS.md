@@ -2,6 +2,8 @@
 
 * Avoid copying ordinary training and evaluation columns when complete-case filtering keeps every row, preserving row names, class methods and copy-on-modify ownership.
 
+* Reuse exactly unchanged ordinary formula columns after NA processing, preserving callback effects, row metadata and copy-on-modify ownership.
+
 * Avoid duplicating already prepared formula columns when constructing model frames, preserving retained samples and callback behavior.
 
 * Record affected public constructor and fitted-object calls with the originating package and expanded argument syntax, so ordinary `update()` replay does not depend on private S3 method names. Preserve callback evaluation counts and existing retained-data policies. Recreate older objects whose stored calls cannot be replayed.

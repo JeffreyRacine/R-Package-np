@@ -375,7 +375,7 @@
   attr(frame, "terms") <- retained
   if (!is.null(.np.capture)) frame <- .np_formula_complete_training_frame(frame)
   if (!is.null(.np.capture)) attr(frame, ".np.subset") <- subset.spec
-  frame
+  .np_formula_share_prepared_columns(frame, aligned)
 }
 
 # Native training owners use complete cases even when a model-frame policy
