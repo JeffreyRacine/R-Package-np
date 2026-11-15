@@ -217,7 +217,9 @@ Named options passed via \code{\dots} include:
         \code{"geom"}; density/distribution-family plots support
         \code{"inid"}, \code{"fixed"}, and \code{"geom"}.
         The explicit density-only \code{"smoothed-q6"} law has the narrow
-        corrected simultaneous-band scope described in Details.
+        corrected-band scope described in Details. The separate density-only
+        \code{"smoothed-beta-binomial"} law supports a fixed-bound order-four
+        Epanechnikov symmetric-SD construction, also described in Details.
         Experimental regression \code{calibration="smoothed-percentile"}
         additionally uses \code{bootstrap="residual"}; see
         \code{\link{np_boot_control}} for its scope and defaults.
@@ -755,6 +757,38 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   In a 2,048-original fixed-grid CVLS study, mean pointwise coverage was
   90.42/95.16/98.97 percent at nominal 90/95/99 percent. Local mixture deficits
   remain; these averages do not imply uniform coverage over all locations.
+
+
+  The explicit experimental \code{bootstrap="smoothed-beta-binomial"} law
+  supports only one continuous numeric variable, a retained fixed bandwidth,
+  an order-four Epanechnikov kernel and supplied finite
+  \code{ckerbound="fixed"} bounds. It requires \code{errors="bootstrap"},
+  \code{center="bias-corrected"}, an explicit \code{band="pointwise"},
+  \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}, and
+  \code{boot.control=np_boot_control(calibration="symmetric-sd")}. Observations
+  and targets must be strictly inside the bounds. Range or one-sided bounds,
+  nearest-neighbor bandwidths, mixed data, other kernel orders, two-dimensional
+  data, asymmetric calibration and \code{pmzsd} are not supported by this law.
+  The beta distribution describes its resampling guide, not the density kernel.
+
+  On the unit support, fit the positive beta guide with shapes \eqn{a,b}, set
+  \eqn{k=\lceil 2n^{2/5}\rceil}, and assign mixture weight
+  \eqn{w_j=n^{-1}\sum_i {k\choose j}x_i^j(1-x_i)^{k-j}} for \eqn{j=0,\ldots,k}.
+  Draw a component with these weights and then a \eqn{\mathrm{Beta}(a+j,b+k-j)}
+  observation. Each replicate refits the guide for the same complete
+  degree-five support-reproducing correction; bandwidth and target coordinates
+  are held fixed. Roots subtract the complete corrected functional under this
+  resampling law and use the original complete-influence scale, including guide
+  and cross terms. Pointwise bands use marginal absolute-root quantiles;
+  simultaneous bands use a maximum over the unique supplied finite grid.
+  Bonferroni uses the marginal quantile at alpha divided by the family size
+  with the explicit simultaneous hull; raw Bonferroni endpoints remain in the
+  inference record. Type-7 quantiles and finite-draw resolution warnings apply.
+  All component bands reuse one draw plan. Signed corrected curves and raw
+  endpoints remain available without truncation. This explicit law does not
+  change the meaning of \code{"inid"}, \code{"smoothed-q6"}, existing beta-kernel
+  bands or estimator standard errors. Coverage remains experimental and is not
+  guaranteed uniformly over distributions or boundary shapes.
 
   The explicit experimental \code{bootstrap="smoothed-q6"} law supports
   \code{errors="bootstrap"}, \code{center="bias-corrected"},
