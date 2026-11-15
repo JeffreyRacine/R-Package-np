@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Avoid duplicating already prepared formula columns when constructing model frames, preserving retained samples and callback behavior.
+
 * Record affected public constructor and fitted-object calls with the originating package and expanded argument syntax, so ordinary `update()` replay does not depend on private S3 method names. Preserve callback evaluation counts and existing retained-data policies. Recreate older objects whose stored calls cannot be replayed.
 
 * Treat genuinely missing forwarded `na.action` arguments as omitted across formula and native handoffs. Explicit policies and `NULL` retain their existing behavior and refusal rules.

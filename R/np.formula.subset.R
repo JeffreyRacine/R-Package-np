@@ -330,7 +330,9 @@
     vapply(auxiliary, NROW, integer(1L)) != NROW(aligned[[1L]]) else logical()
   frame.call <- match.call()
   frame.call[[1L]] <- quote(stats::model.frame)
-  frame.call[["formula"]] <- tt
+  # Preserve already prepared column values when evaluating the terms object.
+  # Use the base primitive so caller bindings cannot replace this value handoff.
+  frame.call[["formula"]] <- as.call(list(base::quote, tt))
   frame.call["data"] <- list(data)
   frame.call$.np.capture <- NULL
   frame.call$.np.auxiliary <- NULL
