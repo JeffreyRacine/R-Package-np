@@ -421,10 +421,10 @@ npscoefbw.NULL <-
   if (!any(keep.rows))
     stop("Data has no rows without NAs")
 
-  xdat <- xdat[keep.rows, , drop = FALSE]
-  ydat <- ydat[keep.rows]
+  xdat <- .np_data_rows(xdat, keep.rows)
+  ydat <- .np_data_rows(ydat, keep.rows, frame = FALSE)
   if (!miss.z)
-    zdat <- zdat[keep.rows, , drop = FALSE]
+    zdat <- .np_data_rows(zdat, keep.rows)
 
   yvec <- if (is.factor(ydat)) {
     dlev(ydat)[as.integer(ydat)]
@@ -2550,11 +2550,11 @@ npscoefbw.scbandwidth <-
     if (!any(keep.rows))
       stop("Data has no rows without NAs")
 
-    xdat <- xdat[keep.rows,,drop = FALSE]
-    ydat <- ydat[keep.rows]
+    xdat <- .np_data_rows(xdat, keep.rows)
+    ydat <- .np_data_rows(ydat, keep.rows, frame = FALSE)
 
     if(!miss.z)
-      zdat <- zdat[keep.rows,, drop = FALSE]
+      zdat <- .np_data_rows(zdat, keep.rows)
 
     nrow = dim(xdat)[1]
     ncol = dim(xdat)[2]
@@ -4079,9 +4079,9 @@ npscoefbw.default <-
       keep.rows <- rep_len(TRUE, NROW(xdat))
       if (length(rows.omit)) keep.rows[as.integer(rows.omit)] <- FALSE
       if (!any(keep.rows)) stop("Data has no rows without NAs")
-      search.xdat <- xdat[keep.rows, , drop = FALSE]
-      search.ydat <- ydat[keep.rows]
-      search.zdat <- if (miss.z) NULL else zdat[keep.rows, , drop = FALSE]
+      search.xdat <- .np_data_rows(xdat, keep.rows)
+      search.ydat <- .np_data_rows(ydat, keep.rows, frame = FALSE)
+      search.zdat <- if (miss.z) NULL else .np_data_rows(zdat, keep.rows)
       degree.search$nobs <- sum(keep.rows)
 
       eval_fun <- function(degree.vec) {

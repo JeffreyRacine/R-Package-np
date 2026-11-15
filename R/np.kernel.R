@@ -460,7 +460,7 @@ npksum.default <-
     if (!any(keep.rows))
       stop("Data has no rows without NAs")
 
-    txdat <- txdat[keep.rows,,drop = FALSE]
+    txdat <- .np_data_rows(txdat, keep.rows)
 
     if (!miss.ty)
       tydat <- tydat[keep.rows,, drop = FALSE]

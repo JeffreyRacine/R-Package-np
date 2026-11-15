@@ -117,7 +117,7 @@ npudenshat <- function(bws,
   if (!any(keep.rows))
     stop("Training data has no rows without NAs")
 
-  tdat <- tdat[keep.rows, , drop = FALSE]
+  tdat <- .np_data_rows(tdat, keep.rows)
   if (!is.null(y))
     y <- y[keep.rows, , drop = FALSE]
 
@@ -128,7 +128,7 @@ npudenshat <- function(bws,
       keep.eval[as.integer(rows.omit.eval)] <- FALSE
     if (!any(keep.eval))
       stop("Evaluation data has no rows without NAs")
-    edat <- edat[keep.eval, , drop = FALSE]
+    edat <- .np_data_rows(edat, keep.eval)
   }
 
   n.train <- nrow(tdat)

@@ -245,9 +245,9 @@ npplreg.call <-
     if (!any(keep.rows))
       stop("Training data has no rows without NAs")
 
-    xdat <- xdat[keep.rows, , drop = FALSE]
-    ydat <- ydat[keep.rows]
-    zdat <- zdat[keep.rows, , drop = FALSE]
+    xdat <- .np_data_rows(xdat, keep.rows)
+    ydat <- .np_data_rows(ydat, keep.rows, frame = FALSE)
+    zdat <- .np_data_rows(zdat, keep.rows)
 
     no.exz <- missing(exdat)
     if (!no.exz) {
@@ -263,8 +263,8 @@ npplreg.call <-
       if (!any(keep.eval))
         stop("Evaluation data has no rows without NAs")
 
-      exdat <- exdat[keep.eval, , drop = FALSE]
-      ezdat <- ezdat[keep.eval, , drop = FALSE]
+      exdat <- .np_data_rows(exdat, keep.eval)
+      ezdat <- .np_data_rows(ezdat, keep.eval)
     }
 
     tmp.ty <- .np_plreg_numeric_response(ydat, bws$bw$yzbw$ydati)
@@ -562,9 +562,9 @@ npplreg.plbandwidth <-
     if (!any(keep.rows))
       stop("Training data has no rows without NAs")
 
-    txdat <- txdat[keep.rows,,drop = FALSE]
-    tydat <- tydat[keep.rows]
-    tzdat <- tzdat[keep.rows,,drop = FALSE]
+    txdat <- .np_data_rows(txdat, keep.rows)
+    tydat <- .np_data_rows(tydat, keep.rows, frame = FALSE)
+    tzdat <- .np_data_rows(tzdat, keep.rows)
 
     native.newdata <- dots[["newdata", exact = TRUE]]
     if (missing(exdat) && missing(ezdat) && !is.null(native.newdata)) {
@@ -580,7 +580,7 @@ npplreg.plbandwidth <-
     if (no.exz && !no.ey) {
       if (length(eydat) != length(keep.rows))
         stop("'eydat' must have one value per original training row", call. = FALSE)
-      eydat <- eydat[keep.rows]
+      eydat <- .np_data_rows(eydat, keep.rows, frame = FALSE)
     }
 
     if (!no.exz){
@@ -605,10 +605,10 @@ npplreg.plbandwidth <-
       if (!any(keep.eval))
         stop("Evaluation data has no rows without NAs")
 
-      exdat <- exdat[keep.eval,,drop = FALSE]
+      exdat <- .np_data_rows(exdat, keep.eval)
       if (!no.ey)
-        eydat <- eydat[keep.eval]
-      ezdat <- ezdat[keep.eval,,drop = FALSE]
+        eydat <- .np_data_rows(eydat, keep.eval, frame = FALSE)
+      ezdat <- .np_data_rows(ezdat, keep.eval)
     }
 
     ## tmp.ty and tmp.ey are the numeric representations of tydat and eydat

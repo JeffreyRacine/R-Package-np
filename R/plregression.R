@@ -183,9 +183,9 @@ residuals.plregression <- function(object, ...) {
   if (!any(keep.rows))
     stop("Training data has no rows without NAs")
 
-  txdat <- txdat[keep.rows, , drop = FALSE]
-  tydat <- tydat[keep.rows]
-  tzdat <- tzdat[keep.rows, , drop = FALSE]
+  txdat <- .np_data_rows(txdat, keep.rows)
+  tydat <- .np_data_rows(tydat, keep.rows, frame = FALSE)
+  tzdat <- .np_data_rows(tzdat, keep.rows)
 
   exdat <- toFrame(fit$evalx)
   ezdat <- toFrame(fit$evalz)
@@ -214,8 +214,8 @@ residuals.plregression <- function(object, ...) {
     return(napredict(fit[["omit", exact = TRUE]],
                      rep(NA_real_, nrow(dat$exdat))))
 
-  exdat.work <- dat$exdat[keep.eval, , drop = FALSE]
-  ezdat.work <- dat$ezdat[keep.eval, , drop = FALSE]
+  exdat.work <- .np_data_rows(dat$exdat, keep.eval)
+  ezdat.work <- .np_data_rows(dat$ezdat, keep.eval)
   neval <- nrow(exdat.work)
   block.size <- .np_plreg_predict_se_block_size(nrow(dat$txdat))
   se.work <- numeric(neval)

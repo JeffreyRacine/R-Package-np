@@ -571,8 +571,8 @@ npconmode.conbandwidth <-
     if (!any(keep.rows))
       stop("Training data has no rows without NAs")
 
-    txdat <- txdat[keep.rows,,drop = FALSE]
-    tydat <- tydat[keep.rows,,drop = FALSE]
+    txdat <- .np_data_rows(txdat, keep.rows)
+    tydat <- .np_data_rows(tydat, keep.rows)
 
     if (!no.ex){
       keep.eval <- rep_len(TRUE, nrow(exdat))
@@ -581,10 +581,10 @@ npconmode.conbandwidth <-
       if (.npConmodeOmitLength(eval.omit) > 0L)
         keep.eval[as.integer(eval.omit)] <- FALSE
 
-      exdat <- exdat[keep.eval,,drop = FALSE]
+      exdat <- .np_data_rows(exdat, keep.eval)
 
       if (!no.ey)
-        eydat <- eydat[keep.eval,,drop = FALSE]
+        eydat <- .np_data_rows(eydat, keep.eval)
 
       if (!any(keep.eval))
         stop("Evaluation data has no rows without NAs")
