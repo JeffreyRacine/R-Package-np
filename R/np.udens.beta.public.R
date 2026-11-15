@@ -10,13 +10,22 @@
   identical(state[['construction',exact=TRUE]],'density-fixed-beta-guide-residual-v1')
 }
 
+# The existing R9 plot operator is independent of the fitted native order.
+# Higher-order admission is restricted to its calibrated q1 construction.
+.np_udens_beta_order_request <- function(bws, band) {
+  isTRUE(bws[['ckerorder', exact=TRUE]] == 2L) ||
+    (isTRUE(bws[['ndim', exact=TRUE]] == 1L) &&
+     isTRUE(bws[['ckerorder', exact=TRUE]] %in% c(4L, 6L, 8L)) &&
+     isTRUE(band %in% c('pointwise', 'simultaneous', 'bonferroni', 'all')))
+}
+
 .np_udens_beta_public_prepare <- function(bws,x,method,bootstrap,band,calibration,alpha,seed) {
   if(!identical(bws[['ckerbound',exact=TRUE]],'fixed'))
     stop("beta corrected bands require known ckerbound='fixed' bounds; range bounds are not supported",call.=FALSE)
-  if(!identical(bws[['type',exact=TRUE]],'fixed') || !isTRUE(bws[['ckerorder',exact=TRUE]]==2L) ||
+  if(!identical(bws[['type',exact=TRUE]],'fixed') || !.np_udens_beta_order_request(bws,band) ||
      !isTRUE(bws[['ndim',exact=TRUE]]%in%1:2) ||
      !isTRUE(bws[['ncon',exact=TRUE]]==bws[['ndim',exact=TRUE]]))
-    stop('beta corrected bands require fixed order-2 bandwidths and one or two continuous coordinates',call.=FALSE)
+    stop('beta corrected bands require fixed bandwidths: order 2 for one or two continuous coordinates, or orders 4/6/8 for one coordinate with an explicit calibrated band',call.=FALSE)
   normal <- .np_udens_bounded_normal_request(bws,method,band,calibration,alpha)
   if(!normal && !band%in%c('pointwise','simultaneous','bonferroni','all'))
     stop("beta corrected bands require explicit band='pointwise', 'simultaneous', 'bonferroni' or 'all'",call.=FALSE)

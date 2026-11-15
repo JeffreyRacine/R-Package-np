@@ -82,6 +82,44 @@
   before they can run again against prepared data. Ordinary evaluated controls,
   structural formulas and supported callbacks retain their existing behavior.
 
+## Density plot additions
+
+* Fixed-bound univariate beta plots admit native orders four, six and eight for explicit asymptotic and symmetric/asymmetric SD pointwise, simultaneous, Bonferroni and all bands, using the unchanged guide-region/residual construction. Native fits, normal pmzsd and higher-order q2 support are unchanged.
+
+* Explicit asymmetric Q6 adds signed pointwise and Bonferroni/all companions on the same full empirical-range family. Raw Bonferroni limits, simultaneous hull and finite-draw warnings remain distinct; existing simultaneous and symmetric results are preserved.
+
+* Explicit asymmetric Q6 density inference adds simultaneous bands on the full empirical-range grid. Each resample rebuilds that grid; signed maxima retain their signs. The corrected center, symmetric Q6 and all existing inference choices remain unchanged.
+
+* Explicit symmetric Q6 density inference adds Bonferroni/all bands using the same draw plan. Raw Bonferroni endpoints and the simultaneous companion hull are separately retained; finite-B warnings do not change the requested draws.
+
+* U5 density plots now provide normal pointwise/Bonferroni and full-covariance Gaussian simultaneous/all bands for orders four/six/eight. Full influence QR retains every direction; native fits and existing methods are unchanged.
+
+* Extend the fixed-bound U5 normal pointwise correction to Epanechnikov orders six/eight, retaining order-four arithmetic and native fits.
+
+* Explicit Q6 smoothed-bootstrap density inference now provides marginal pointwise bands while retaining its simultaneous calibration.
+* Fixed-bound univariate order-four Epanechnikov density plots add normal pointwise bias-corrected intervals using the support-reproducing beta-guide construction. Native fits and bandwidths are unchanged. Both additions remain experimental; local coverage limitations are documented.
+
+* Add explicit plot-only `bootstrap="smoothed-q6"` symmetric-SD simultaneous
+  bands for q=1 whole-line fixed-bandwidth uniform/Epanechnikov densities.
+  The complete corrected functional, Q6 covariance and refitted-guide roots
+  use bounded draw blocks. Existing methods, fitted estimators, bandwidths
+  and se=FALSE are unchanged; finite-grid coverage limitations remain explicit.
+
+* Compact two-dimensional corrected density plots compute their complete
+  covariance through centered conditional quadrature and full QR compression.
+  This plot-only capacity improvement retains the quadrature, statistical
+  method, all factor components, tolerances, and existing estimator behavior.
+
+* Univariate whole-line Epanechnikov density plots add explicit asymptotic
+  bias-corrected simultaneous bands using the complete M4 guide-influence
+  covariance. The addition is plot-only; other bands and existing methods,
+  selected bandwidths, fitted estimators and se=FALSE are unchanged.
+
+* Known-fixed-bound two-dimensional uniform and Epanechnikov corrected density
+  plots add asymptotic simultaneous and all-band requests using the complete
+  covariance and existing Gaussian factor. Existing pointwise, Bonferroni,
+  normal and SD constructions, fitted estimators and RNG behavior are retained.
+
 # npRmpi 0.80-2
 
 * Class-probability plots reconstruct uncertainty on complete training and
