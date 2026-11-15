@@ -43,12 +43,22 @@
                         expand.dots = FALSE)
   context <- list(call = matched, expanded = expanded, caller = caller,
                   response = response, dots = dots, public = public)
+  omitted <- .np_missing_na_dots(dots, frame)
+  if (length(omitted)) {
+    context$dots <- dots[-omitted]
+    # The execution copy must omit the same optional argument before dispatch.
+    context$expanded[["na.action"]] <- NULL
+    retained <- as.list(context$call[["..."]])
+    retained <- retained[names(retained) != "na.action"]
+    context$call[["..."]] <- if (length(retained)) as.pairlist(retained) else NULL
+  }
   args <- as.list(call)[-1L]
   forwarded <- list()
   for (name in names(args)) {
     if (identical(name, "...")) {
       values <- as.list(args[[name]])
       for (i in seq_along(values)) values[[i]] <- as.name(paste0("..", i))
+      if (length(omitted)) values <- values[-omitted]
       forwarded <- c(forwarded, values)
     } else forwarded[[name]] <- as.name(name)
   }

@@ -9,7 +9,7 @@
 }
 
 .npreg_complete <- function(...) {
-  args <- list(...)
+  args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   args[[".np.require.complete"]] <- TRUE
   do.call(npreg, args)
 }
@@ -248,7 +248,8 @@ npreg.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npreg", data = data, newdata = newdata)
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectLegacyBooleanErrors(dots, "npreg")
     se <- npValidateScalarLogical(se, "se")
     explicit.eval.exclude <- .npreg_explicit_eval_exclude(dots)
@@ -391,7 +392,7 @@ npreg.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     ev <- do.call(npreg, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npreg.rbandwidth))
+      bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npreg.rbandwidth))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
     return(ev)
@@ -435,7 +436,7 @@ npreg.rbandwidth <-
 
     fit.start <- proc.time()[3]
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     native.newdata <- dots[["newdata", exact = TRUE]]
     output.request <- .np_regression_output_request(
       se, gradients, dots[[".np.gradient.errors", exact = TRUE]])
@@ -1116,7 +1117,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npreg.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   ev <- do.call(npreg, c(call.args, list(se = se), fit.dots))
 
   ev$call <- match.call(expand.dots = FALSE)

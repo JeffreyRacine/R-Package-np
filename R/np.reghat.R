@@ -1803,7 +1803,7 @@ npreghat.formula <-
     .np_reject_fit_subset(substitute(list(...))[-1L])
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
@@ -1850,7 +1850,7 @@ npreghat.call <-
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     args <- .np_retained_training_args(
       bws, c(txdat = "xdat", y = "ydat"), dots, npreghat.rbandwidth,
       training = "txdat")
@@ -1903,7 +1903,7 @@ npreghat.rbandwidth <-
       stop("'ridge' must be one finite nonnegative number", call. = FALSE)
     constraint.output <- identical(output, "constraint")
     matrix.output <- identical(output, "matrix") || constraint.output
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectLegacyLpArgs(names(dots), where = "npreghat")
 
     allow.empty.rows <- !missing(exdat) &&

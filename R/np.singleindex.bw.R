@@ -1896,7 +1896,7 @@ npindexbw.default <-
     p <- ncol(xdat)
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npindexbw")
@@ -2217,7 +2217,7 @@ npindexbw.sibandwidth <-
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectUnsupportedBwsolver(dots, "npindexbw")
 
     ## Save seed prior to setting

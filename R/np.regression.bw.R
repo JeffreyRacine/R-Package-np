@@ -67,7 +67,7 @@ npregbw.NULL <-
   .np_reject_native_data(.np.context$dots)
   .np_reject_native_frame_args(.np.context$dots)
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     .np_nomad_native_reject_unsupported_options_from_dots(
       dots,
       "native npreg NOMAD route"
@@ -482,7 +482,7 @@ npregbw.rbandwidth <-
   .np_reject_native_frame_args(.np.context$dots)
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       .np_nomad_native_reject_unsupported_options_for_route(
         opts = nomad.opts,
@@ -2788,7 +2788,7 @@ npregbw.default <-
   .np_reject_native_frame_args(.np.context$dots)
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npregbw")
-    lp.dot.args <- list(...)
+    lp.dot.args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       .np_nomad_native_reject_unsupported_options_for_route(
         opts = nomad.opts,

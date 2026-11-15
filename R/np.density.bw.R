@@ -70,7 +70,7 @@ npudensbw.NULL <-
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     .np_nomad_native_reject_unsupported_options_from_dots(
       dots,
       "native npudens NOMAD route"
@@ -796,7 +796,7 @@ npudensbw.bandwidth <-
     .np_density_bw_progress(bandwidth.compute, bwsolver, eval.only, {
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudensbw")
-    dot.args <- list(...)
+    dot.args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     internal.certify <- dot.args[[".beta.range.certify", exact = TRUE]]
     beta.range.certify <- if (is.null(internal.certify)) {
       TRUE
@@ -1213,7 +1213,7 @@ npudensbw.default <-
 
     ## next grab dummies for actual bandwidth selection and perform call
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     dot.names <- names(dots)
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bandwidth.compute", "nmulti", "powell.remin", "bwsolver", "itmax", "ftol", "tol",

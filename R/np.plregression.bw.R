@@ -758,7 +758,7 @@ npplregbw.default =
     zdat <- toFrame(zdat)
     .np_require_numeric_response(ydat, "npplregbw", "ydat")
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectUnsupportedBwsolver(dots, "npplregbw")
     dot.names <- names(dots)
     mc <- match.call(expand.dots = FALSE)

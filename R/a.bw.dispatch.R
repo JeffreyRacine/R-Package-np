@@ -138,6 +138,10 @@
   if (!is.environment(frame) || is.null(names(map)) ||
       anyDuplicated(names(map)) || any(!nzchar(names(map))))
     stop("invalid native bandwidth handoff", call. = FALSE)
+  if ("na.action" %in% names(call_obj)) {
+    dots <- eval(quote(substitute(list(...))), envir = frame)[-1L]
+    if (length(.np_missing_na_dots(dots, frame))) call_obj$na.action <- NULL
+  }
   tagged <- call_obj
   indices <- seq_along(tagged)[-1L]
   for (i in indices) tagged[[i]] <- i
@@ -189,6 +193,7 @@
   native.names <- names(native.dots)
   if (is.null(native.names)) native.names <- rep("", length(native.dots))
   expressions <- list()
+  omitted <- integer()
   # Numeric bandwidths may already have been forced by generic dispatch.
   # Reuse that same promise, just as for the formula's data/NA arguments.
   for (name in intersect(c("data", "na.action", "gdata", "bws"), names(roles))) {
@@ -197,6 +202,7 @@
       identical(native[[n]], index), logical(1L))]
     if (length(formal)) {
       source <- as.name(map[[formal]])
+      promise.name <- map[[formal]]
     } else {
       position <- which(vapply(as.list(native.dots), identical, logical(1L), index))
       argument <- native.names[position]
@@ -209,10 +215,17 @@
       if (length(dot) != 1L || is.na(dot))
         stop("cannot identify original formula data promise", call. = FALSE)
       source <- substitute(...elt(I), list(I = dot))
+      promise.name <- paste0("..", dot)
+    }
+    if (identical(name, "na.action") &&
+        .np_na_promise_missing(promise.name, frame)) {
+      omitted <- c(omitted, index)
+      next
     }
     expressions[name] <- list(.np_formula_dot_expression(call_obj[[index]], caller_env))
     call_obj[[index]] <- .np_formula_promise_expression(source, frame)
   }
+  if (length(omitted)) call_obj <- call_obj[-omitted]
   list(call = call_obj, expressions = expressions)
 }
 

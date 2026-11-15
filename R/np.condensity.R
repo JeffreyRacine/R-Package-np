@@ -33,7 +33,8 @@ npcdens.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdens", data = data, newdata = newdata)
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
     dots$.np.formula.state <- NULL
     dots$formula <- NULL
@@ -115,7 +116,7 @@ npcdens.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npcdens, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npcdens.conbandwidth))
+      bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npcdens.conbandwidth))
   }
 
 
@@ -135,7 +136,7 @@ npcdens.conbandwidth <- function(bws,
 
 
   se <- npValidateScalarLogical(se, "se")
-  dots <- list(...)
+  dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   lp.first.se.demand <- .np_conditional_first_se_demand(
     dots[[".np_lp_first_se_demand", exact = TRUE]], bws$xncon)
   cat.se.demand <- .np_conditional_cat_se_demand(
@@ -767,6 +768,6 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npcdens.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   do.call(npcdens, c(call.args, fit.dots))
 }

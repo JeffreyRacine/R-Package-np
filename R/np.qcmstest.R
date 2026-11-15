@@ -25,7 +25,8 @@ npqcmstest <- function(formula,
 
 
   if (...length())
-    npRejectLegacyBootstrapCount(names(list(...)), "npqcmstest")
+    npRejectLegacyBootstrapCount(names(.np_formula_dispatch_args(NULL, substitute(list(...))[-1L],
+      environment(), omit.subset = FALSE)), "npqcmstest")
 
   .np_cms_validate_model(model, quantile = TRUE)
 

@@ -1,8 +1,12 @@
 # Validate syntax without forcing extra argument promises. Public kernel-sum
 # controls and constructor controls retain R's ordinary argument matching.
-.np_ksum_validate_dots <- function(dots, public = FALSE) {
+.np_ksum_validate_dots <- function(dots, public = FALSE, frame = NULL) {
   if (!length(dots)) return(invisible(NULL))
   dots <- as.list(dots)
+  if (is.environment(frame)) {
+    omitted <- .np_missing_na_dots(dots, frame)
+    if (length(omitted)) dots <- dots[-omitted]
+  }
   if (public) {
     matched <- match.call(npksum.numeric,
       as.call(c(list(quote(npksum.numeric)), dots)), expand.dots = FALSE)
@@ -40,7 +44,7 @@ npksum <-
 
 npksum.formula <-
   function(formula, data, newdata, subset, na.action, ...){
-    .np_ksum_validate_dots(substitute(list(...))[-1L], public = TRUE)
+    .np_ksum_validate_dots(substitute(list(...))[-1L], public = TRUE, frame = environment())
 
     dots <- list(...)
     mf <- match.call(expand.dots = FALSE)
@@ -102,8 +106,8 @@ npksum.numeric <-
   .np_reject_native_data(substitute(list(...))[-1L])
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
-    .np_ksum_validate_dots(substitute(list(...))[-1L])
-    dots <- list(...)
+    .np_ksum_validate_dots(substitute(list(...))[-1L], frame = environment())
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
     dots$return.derivative.kernel.weights <- NULL
     # Computation controls must survive numeric-bandwidth redispatch, not be
@@ -190,8 +194,8 @@ npksum.default <-
   .np_reject_native_data(substitute(list(...))[-1L])
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
-    .np_ksum_validate_dots(substitute(list(...))[-1L])
-    dots <- list(...)
+    .np_ksum_validate_dots(substitute(list(...))[-1L], frame = environment())
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     internal.power12 <- isTRUE(dots$.np.internal.power12)
     dots$.np.internal.power12 <- NULL
     internal.power12.weighted <-

@@ -45,7 +45,8 @@ npconmode.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npconmode", data = data, newdata = newdata)
 
     se <- npValidateScalarLogical(se, "se")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
     dots$.np.formula.state <- NULL
     dots$formula <- NULL
@@ -122,7 +123,7 @@ npconmode.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npconmode, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npconmode.conbandwidth))
+      bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npconmode.conbandwidth))
   }
 
 npconmode.condbandwidth <-
@@ -536,7 +537,7 @@ npconmode.conbandwidth <-
     .np_require_paired_rows(txdat, tydat, "txdat", "tydat")
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
-    native.newdata <- list(...)[["newdata", exact = TRUE]]
+    native.newdata <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)[["newdata", exact = TRUE]]
     if (missing(exdat) && !is.null(native.newdata)) {
       native.eval <- .np_native_newdata_parts(
         native.newdata, list(exdat = bws$xnames), "npconmode")
@@ -940,7 +941,7 @@ npconmode.default <- function(bws, txdat, tydat,
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npconmode.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   if (!is.null(tbw[["formula", exact = TRUE]]))
     call.args <- .np_formula_options(call.args, "npconmode.default")
   do.call(npconmode, c(call.args, fit.dots))

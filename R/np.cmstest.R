@@ -133,7 +133,8 @@ npcmstest <- function(formula,
 
 
   if (...length())
-    npRejectLegacyBootstrapCount(names(list(...)), "npcmstest")
+    npRejectLegacyBootstrapCount(names(.np_formula_dispatch_args(NULL, substitute(list(...))[-1L],
+      environment(), omit.subset = FALSE)), "npcmstest")
   
   .np_cms_validate_model(model, quantile = FALSE)
 

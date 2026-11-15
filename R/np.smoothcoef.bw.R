@@ -128,7 +128,7 @@ npscoefbw.NULL <-
     bw.args <- list(xdat = xdat, ydat = ydat, bws = bws)
     if (!miss.z)
       bw.args$zdat <- zdat
-    tbw <- do.call(npscoefbw.default, c(bw.args, list(...)))
+    tbw <- do.call(npscoefbw.default, c(bw.args, .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)))
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
@@ -575,7 +575,7 @@ npscoefbw.scbandwidth <-
 
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npscoefbw")
@@ -2985,7 +2985,7 @@ npscoefbw.default <-
 
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npscoefbw")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       dots$nomad.opts <- nomad.opts
     npRejectUnsupportedBwsolver(dots, "npscoefbw")

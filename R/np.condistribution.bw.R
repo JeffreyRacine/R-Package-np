@@ -187,7 +187,7 @@ npcdistbw.condbandwidth <-
     .np_density_bw_progress(bandwidth.compute, bwsolver, FALSE, {
 
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npcdistbw")
-    dot.args <- list(...)
+    dot.args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       dot.args$nomad.opts <- nomad.opts
     elapsed.start <- proc.time()[3]
@@ -2589,7 +2589,7 @@ npcdistbw.NULL <-
            bws, ...){
   .np_reject_native_data(substitute(list(...))[-1L])
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     .np_nomad_native_reject_unsupported_options_from_dots(
       dots,
       "native npcdist NOMAD route"
@@ -2831,7 +2831,7 @@ npcdistbw.default <-
                        lp = "Local-Polynomial")
 
     search.mc.names <- names(mc)
-    lp.dot.args <- list(...)
+    lp.dot.args <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     if (length(nomad.opts))
       lp.dot.args$nomad.opts <- nomad.opts
     .np_degree_reject_unknown_dots(

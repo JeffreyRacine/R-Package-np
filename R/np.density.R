@@ -33,7 +33,8 @@ npudens.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npudens", data = data, newdata = newdata)
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
     dots$.np.formula.state <- NULL
     dots$formula <- NULL
@@ -102,7 +103,7 @@ npudens.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npudens, .np_retained_training_args(
-      bws, c(tdat = "dat"), list(...), npudens.bandwidth))
+      bws, c(tdat = "dat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npudens.bandwidth))
   }
 
 npudens.bandwidth <-
@@ -118,7 +119,7 @@ npudens.bandwidth <-
   se <- npValidateScalarLogical(se, "se")
   ann.se <- se && identical(bws[["type", exact = TRUE]], "adaptive_nn") &&
     bws[["ncon", exact = TRUE]] > 0L
-  dots <- list(...)
+  dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   fit.start <- proc.time()[3]
   fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
 
@@ -414,6 +415,6 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npudens.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   do.call(npudens, c(call.args, fit.dots))
 }

@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Treat genuinely missing forwarded `na.action` arguments as omitted across formula and native handoffs. Explicit policies and `NULL` retain their existing behavior and refusal rules.
+
 * `npsigtest()` consumes an NA policy after preparing fresh or replacement formula data, preserving once-only evaluation and retained-data refusal semantics.
 
 * Stabilize signed higher-order Epanechnikov generalized nearest-neighbor conditional-density CVLS arithmetic on clustered explanatory data, preserving the existing rank and ridge decisions.

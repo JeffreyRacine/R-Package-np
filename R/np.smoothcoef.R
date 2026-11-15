@@ -35,7 +35,8 @@ npscoef.formula <-
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npscoef", data = data, newdata = newdata)
 
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectLegacyBooleanErrors(dots, "npscoef")
     se <- npValidateScalarLogical(se, "se")
 
@@ -143,7 +144,7 @@ npscoef.call <-
     roles <- c(txdat = "xdat", tydat = "ydat")
     if (!is.null(bws$zdati))
       roles <- c(roles, tzdat = "zdat")
-    do.call(npscoef, .np_retained_training_args(bws, roles, list(...), npscoef.scbandwidth))
+    do.call(npscoef, .np_retained_training_args(bws, roles, .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npscoef.scbandwidth))
   }
 
 .np_scoef_fit_progress_begin <- function(handoff = FALSE, detail = NULL) {
@@ -302,7 +303,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npscoef.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   do.call(npscoef, c(call.args, list(se = se), fit.dots))
 
 }
@@ -341,7 +342,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     maxiter <- as.integer(maxiter)
     tol <- as.double(tol)
     regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     fit.progress.allow <- !isFALSE(dots$.np_fit_progress_allow) &&
       isTRUE(.np_progress_enabled(domain = "bandwidth"))
     fit.progress.handoff <- fit.progress.allow && isTRUE(dots$.np_fit_progress_handoff)
@@ -1406,7 +1407,7 @@ npscoef.scbandwidth <-
 
   .np_reject_native_data(substitute(list(...))[-1L])
 
-    npRejectLegacyBooleanErrors(list(...), "npscoef")
+    npRejectLegacyBooleanErrors(.np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), "npscoef")
     .np_require_numeric_response(tydat, "npscoef", "tydat")
     if (!missing(eydat))
       .np_require_numeric_response(eydat, "npscoef", "eydat")

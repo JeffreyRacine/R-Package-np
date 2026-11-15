@@ -80,7 +80,8 @@ npindex.formula <-
         raw.formula <- inherits(bws, "formula")
         dots <- if (raw.formula)
           .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
-        else list(...)
+        else .np_formula_dispatch_args(
+          NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
         # Preserve an explicit evaluation policy before training-response
         # replacement consumes its control arguments. Retained training and
         # native evaluation routes keep their existing separate owners.
@@ -247,7 +248,7 @@ npindex.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npindex, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npindex.sibandwidth))
+      bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npindex.sibandwidth))
   }
 
 .np_index_kernel_args <- function(bws) {
@@ -370,7 +371,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
   nomad <- npValidateNomadControl(nomad, "nomad")
   dots <- if (!missing(bws) && inherits(bws, "formula"))
     .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   npRejectLegacyBooleanErrors(dots, "npindex")
   se <- npValidateScalarLogical(se, "se")
   se.type <- match.arg(se.type)
@@ -535,7 +536,7 @@ npindex.sibandwidth <-
     se.type <- match.arg(se.type)
     asymptotic.se <- isTRUE(se) && identical(se.type, "asymptotic")
     bootstrap.se <- isTRUE(se) && identical(se.type, "bootstrap")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     npRejectLegacyBooleanErrors(dots, "npindex")
     npRejectLegacyBootstrapCount(names(dots), "npindex")
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)

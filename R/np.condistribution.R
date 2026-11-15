@@ -32,7 +32,8 @@ npcdist.formula <-
     .np_reject_fit_subset(substitute(list(...))[-1L])
     .np_fit_na_preflight(bws, substitute(list(...))[-1L], environment(), "npcdist", data = data, newdata = newdata)
 
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
     dots$.np.formula.state <- NULL
     dots$formula <- NULL
@@ -114,7 +115,7 @@ npcdist.call <-
   .np_reject_native_data(substitute(list(...))[-1L])
 
     do.call(npcdist, .np_retained_training_args(
-      bws, c(txdat = "xdat", tydat = "ydat"), list(...), npcdist.condbandwidth))
+      bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npcdist.condbandwidth))
   }
 
 
@@ -135,7 +136,7 @@ npcdist.condbandwidth <-
 
 
     se <- npValidateScalarLogical(se, "se")
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
     lp.first.se.demand <- .np_conditional_first_se_demand(
       dots[[".np_lp_first_se_demand", exact = TRUE]], bws$xncon)
     cat.se.demand <- .np_conditional_cat_se_demand(
@@ -757,6 +758,6 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
     .np_formula_options(.np_formula_dispatch_args(
       NULL, substitute(list(...))[-1L], environment()), "npcdist.default")
-  else list(...)
+  else .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE)
   do.call(npcdist, c(call.args, fit.dots))
 }
