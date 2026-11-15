@@ -574,7 +574,7 @@ np_render_control <- function(style = c("band", "bar"),
        (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth") ||
         inherits(bws, "dbandwidth"))))
   if (identical(dots[["plot.errors.boot.method", exact=TRUE]], "smoothed-q6"))
-    .np_udens_q6_spec(bws)
+    .np_udens_q6_public_spec(bws, dots[["plot.errors.boot.calibration", exact=TRUE]])
   if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&
       !inherits(bws, c("rbandwidth", "bandwidth", "dbandwidth")) && !conditional.optin)
     stop("explicit bootstrap calibration currently requires bias-corrected regression or supported density/distribution inference", call. = FALSE)
