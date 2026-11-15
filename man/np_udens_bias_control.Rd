@@ -48,7 +48,7 @@ are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"}, 
 
 
 \subsection{Whole-line Epanechnikov simultaneous bands}{
-With omitted or \code{NULL} \code{bias_control}, fixed unbounded second-order
+With omitted or \code{NULL} \code{bias.control}, fixed unbounded second-order
 Epanechnikov density plots support \code{errors="asymptotic"},
 \code{center="bias-corrected"} and explicit \code{band="simultaneous"}
 for one continuous variable and at least ten finite observations.
