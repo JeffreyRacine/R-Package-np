@@ -701,6 +701,9 @@ np_render_control <- function(style = c("band", "bar"),
     # Compact inference owns a child seed in addition to this outer scope.
     # Forward the request without bypassing either existing RNG admission guard.
     if (identical(dots$plot.errors.boot.method, "smoothed-q6") ||
+        .np_udens_u5_request(bws, dots$bias.control,
+        dots$plot.errors.center, dots$plot.errors.method, dots$plot.errors.type,
+        dots$plot.errors.boot.calibration) ||
         .np_udens_m4_request(bws, dots$bias.control,
         dots$plot.errors.center, dots$plot.errors.method, dots$plot.errors.type,
         dots$plot.errors.boot.calibration) ||
