@@ -209,7 +209,12 @@ extern SEXP C_np_plot_udens_d8_column(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_rng_scope_materialize(void);
 extern SEXP C_np_rng_scope_restore_absent(void);
 
+extern SEXP C_np_plot_udens_bb_factor(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_plot_udens_bb_guide(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+
 static const R_CallMethodDef CallEntries[] = {
+  {"C_np_plot_udens_bb_factor", (DL_FUNC) &C_np_plot_udens_bb_factor, 6},
+  {"C_np_plot_udens_bb_guide", (DL_FUNC) &C_np_plot_udens_bb_guide, 6},
     {"C_np_worker_native_identity", (DL_FUNC) &C_np_worker_native_identity, 0},
     {"C_np_rng_scope_materialize", (DL_FUNC) &C_np_rng_scope_materialize, 0},
     {"C_np_rng_scope_restore_absent", (DL_FUNC) &C_np_rng_scope_restore_absent, 0},
