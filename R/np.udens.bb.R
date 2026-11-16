@@ -39,10 +39,10 @@
   weights <- rowMeans(vapply(x,function(t) dbinom(j,k,t),numeric(k+1L)))
   if(any(!is.finite(weights)) || any(weights<0)) stop("invalid beta-binomial mixture weights",call.=FALSE)
   .np_udens_bb_check(sum(weights),1,"reference mass")
-  logQ <- c(sum(weights*(digamma(A)-digamma(sum(ab)+k))),
-            sum(weights*(digamma(BB)-digamma(sum(ab)+k))))
+  log.moments <- .np_udens_bb_log_moments(ab,k,weights)
+  logQ <- attr(log.moments,"mean",exact=TRUE)
   fq <- .np_udens_u5_fitmom(logQ,ab)
-  z <- list(k=k,a=ab[1],b=ab[2],aQ=fq$ab[1],bQ=fq$ab[2],h=h)
+  z <- list(k=k,a=ab[1],b=ab[2],aQ=fq$ab[1],bQ=fq$ab[2],h=h,bb.log.moments=log.moments)
   original <- .np_udens_bb_curve(plan,x,fit=fit)
   reference.center <- se <- numeric(length(targets));checks <- list()
   for(first in seq.int(1L,length(targets),by=8L)) {

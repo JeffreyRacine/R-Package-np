@@ -68,12 +68,14 @@
 # with certified positive weights. The expanded covariance remains an oracle.
 .np_udens_bb_covariance <- function(z,x,grid,order) {
   .np_udens_u5_budget(length(x),length(grid),block=length(grid))
-  old <- .np_udens_u5_covariance(z,x,"epanechnikov",grid,order,4L)
   j <- 0:z$k;A <- z$a+j;BB <- z$b+z$k-j
   weights <- rowMeans(vapply(x,function(t) dbinom(j,z$k,t),numeric(length(j))))
+  moments <- z[["bb.log.moments",exact=TRUE]]
+  if (is.null(moments)) moments <- .np_udens_bb_log_moments(c(z$a,z$b),z$k,weights)
+  old <- .np_udens_u5_covariance(z,x,"epanechnikov",grid,order,4L,log.moments=moments)
   component <- exp(sweep(outer(old$lv,A)+outer(old$l1v,BB),2L,lbeta(A,BB),"-"))
   q <- drop(component %*% weights)*old$w
-  m <- drop(crossprod(weights,cbind(digamma(A)-digamma(A+BB),digamma(BB)-digamma(A+BB))))
+  m <- attr(moments,"mean",exact=TRUE)
   factor <- .np_udens_bb_factor(q,old$T,old$AX,old$HI,m,length(x))
   covariance <- tcrossprod(factor$factor)
   checks <- c(expanded=.np_udens_bb_check(covariance,old$expanded,"complete expanded covariance"),
@@ -81,4 +83,14 @@
   old$C <- covariance;old$psi_mean <- factor$mean;old$positive.factor <- factor$factor
   old$positive.checks <- list(refinement=checks,correction=factor$correction,moments=factor$moments)
   old
+}
+
+# Component-level preparation shared by guide matching and both representations
+# of the complete BB covariance. Keep the small sum in paired precision until
+# the final rounding; rounded component means alone are not the sum oracle.
+.np_udens_bb_log_moments <- function(ab,k,weights) {
+  if (!is.numeric(ab) || !is.null(dim(ab)) || !is.numeric(k) ||
+      !is.null(dim(k)) || !is.numeric(weights) || !is.null(dim(weights)))
+    stop("beta-binomial log moments require numeric vectors",call.=FALSE)
+  .Call(C_np_plot_udens_bb_log_moments,as.double(ab),as.double(k),as.double(weights))
 }

@@ -84,3 +84,41 @@ SEXP C_np_plot_udens_bb_guide(SEXP G,SEXP H,SEXP LV,SEXP LQ,SEXP PROB,SEXP OP) {
  for(R_xlen_t i=0;i<m;i++){R_CheckUserInterrupt();double sum=0,c=0;for(R_xlen_t j=0;j<n;j++){double v=(lv[j]<=-M_LN2?exp(lv[j])-g[i]:(1-g[i])-exp(lq[j]))/h;if(v<op[i+6*m]||v>op[i+7*m])continue;double z=(v-op[i+8*m])/op[i+9*m],prev=1,now=z,poly=op[i]+op[i+m]*z;for(int k=2;k<=5;k++){double next=((2*k-1)*z*now-(k-1)*prev)/k;poly+=op[i+k*m]*next;prev=now;now=next;}double term=(3/(4*sqrt(5)))*(1-v*v/5)*poly*pr[j];double y=term-c,t=sum+y;c=(t-sum)-y;sum=t;}REAL(ans)[i]=sum/h;}
  UNPROTECT(1);return ans;
 }
+
+/* Accurate analytic log moments of the same beta-binomial mixture.
+ * Binary64 pairs, fma, and bounded series; no long-double precision assumption. */
+static pair bb_log(pair x) {
+ int e; double f=frexp(x.h,&e); pair y={f,ldexp(x.l,-e)};
+ pair z=divp(sub(y,val(1)),add(y,val(1))),z2=mul(z,z),term=z,s=z;
+ for(int j=3;j<=65;j+=2){term=mul(term,z2);s=add(s,divp(term,val(j)));}
+ pair ln2={0x1.62e42fefa39efp-1,0x1.abc9e3b39803fp-56};
+ return add(mul(val(2),s),mul(val(e),ln2));
+}
+static pair bb_psi(pair x) {
+ pair recur=val(0);
+ while(x.h<32){recur=add(recur,divp(val(1),x));x=add(x,val(1));}
+ pair inv=divp(val(1),x),inv2=mul(inv,inv),power=inv2;
+ pair s=sub(bb_log(x),mul(val(.5),inv));
+ const double num[]={1,-1,1,-1,1,-691,1,-3617,43867,-174611,77683,-236364091};
+ const double den[]={12,120,252,240,132,32760,12,8160,14364,6600,276,65520};
+ for(int j=0;j<12;j++){s=sub(s,mul(divp(val(num[j]),val(den[j])),power));power=mul(power,inv2);}
+ return sub(s,recur);
+}
+SEXP C_np_plot_udens_bb_log_moments(SEXP AB,SEXP K,SEXP W) {
+ if(TYPEOF(AB)!=REALSXP || XLENGTH(AB)!=2 || TYPEOF(K)!=REALSXP || XLENGTH(K)!=1 || TYPEOF(W)!=REALSXP)
+  error("beta-binomial log moments require double shapes, degree and weights");
+ double kd=REAL(K)[0],a=REAL(AB)[0],b=REAL(AB)[1];
+ if(!R_FINITE(a)||!R_FINITE(b)||a<=0||b<=0||!R_FINITE(kd)||kd<0||kd!=floor(kd)||kd>INT_MAX-1||XLENGTH(W)!=(R_xlen_t)kd+1||!R_FINITE(a+b+kd))
+  error("invalid beta-binomial log-moment dimensions or shapes");
+ int k=(int)kd;pair mass=val(0),m[2]={ {0,0},{0,0} };
+ for(int j=0;j<=k;j++){if(!R_FINITE(REAL(W)[j])||REAL(W)[j]<0)error("invalid beta-binomial log-moment weight");mass=add(mass,val(REAL(W)[j]));}
+ if(fabs(dval(sub(mass,val(1))))>1e-12)error("material beta-binomial log-moment mass error");
+ pair total=bb_psi(add(add(val(a),val(b)),val(k)));
+ SEXP ans=PROTECT(allocMatrix(REALSXP,k+1,2));SEXP mean=PROTECT(allocVector(REALSXP,2));
+ for(int j=0;j<=k;j++){
+  R_CheckUserInterrupt();pair v[2]={sub(bb_psi(add(val(a),val(j))),total),sub(bb_psi(add(val(b),val(k-j))),total)};
+  for(int l=0;l<2;l++){double t=dval(v[l]);if(!R_FINITE(t)||t>=0)error("invalid beta-binomial analytic log moment");REAL(ans)[j+l*(R_xlen_t)(k+1)]=t;m[l]=add(m[l],mul(val(REAL(W)[j]),v[l]));}
+ }
+ for(int l=0;l<2;l++)REAL(mean)[l]=dval(m[l]);
+ setAttrib(ans,install("mean"),mean);UNPROTECT(2);return ans;
+}
