@@ -3107,16 +3107,10 @@
         x[i] <- list(.npRmpi_autodispatch_untag(xi))
     }
   }
-  # Removing an absent attribute can wrap a shared vector; later serialization
-  # materializes that wrapper. Leave untagged values untouched.
-  if (!is.null(attr(x, "npRmpi.dispatch.mode", exact = TRUE)))
-    attr(x, "npRmpi.dispatch.mode") <- NULL
-  if (!is.null(attr(x, "npRmpi.autodispatch.remote", exact = TRUE)))
-    attr(x, "npRmpi.autodispatch.remote") <- NULL
-  if (!is.null(attr(x, "npRmpi.autodispatch.fingerprint", exact = TRUE)))
-    attr(x, "npRmpi.autodispatch.fingerprint") <- NULL
-  if (!is.null(attr(x, "npRmpi.autodispatch.lease", exact = TRUE)))
-    attr(x, "npRmpi.autodispatch.lease") <- NULL
+  attr(x, "npRmpi.dispatch.mode") <- NULL
+  attr(x, "npRmpi.autodispatch.remote") <- NULL
+  attr(x, "npRmpi.autodispatch.fingerprint") <- NULL
+  attr(x, "npRmpi.autodispatch.lease") <- NULL
   x
 }
 
