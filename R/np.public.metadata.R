@@ -37,6 +37,7 @@
                                     ynames = names(frame)[attr(terms, "response")],
                                     scalar.children = FALSE) {
   call <- .np_public_replay_call(call, producer, frame = parent.frame())
+  call <- .np_bw_selector_formula_call(call, producer, parent.frame())
   environment(call) <- owner
   if (identical(producer, "nplsqregbw"))
     environment(call) <- .np_call_owner_environment(owner)

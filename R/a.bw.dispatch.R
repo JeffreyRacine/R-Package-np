@@ -193,6 +193,7 @@
   native.names <- names(native.dots)
   if (is.null(native.names)) native.names <- rep("", length(native.dots))
   expressions <- list()
+  handoff <- list()
   omitted <- integer()
   # Numeric bandwidths may already have been forced by generic dispatch.
   # Reuse that same promise, just as for the formula's data/NA arguments.
@@ -224,9 +225,54 @@
     }
     expressions[name] <- list(.np_formula_dot_expression(call_obj[[index]], caller_env))
     call_obj[[index]] <- .np_formula_promise_expression(source, frame)
+    handoff[name] <- list(call_obj[[index]])
   }
   if (length(omitted)) call_obj <- call_obj[-omitted]
-  list(call = call_obj, expressions = expressions)
+  list(call = call_obj, expressions = expressions, handoff = handoff)
+}
+
+.np_bw_selector_finish_call <- function(call, expressions, formula.expression = NULL) {
+  for (name in names(expressions)) {
+    if (name %in% names(call))
+      call[[name]] <- expressions[[name]]
+    else if (name %in% names(call[["..."]]))
+      call[["..."]][[name]] <- expressions[[name]]
+  }
+  if (!is.null(formula.expression)) call[["formula"]] <- formula.expression
+  call
+}
+
+.np_bw_selector_formula_call <- function(call, producer, method.frame) {
+  # Only the method invoked immediately by this selector owns its public
+  # syntax. Matching arguments or finding an ancestor would also match a
+  # nested callback replay, which must retain its own metadata.
+  ns <- asNamespace("npRmpi")
+  generic <- get0(producer, envir = ns, mode = "function", inherits = FALSE)
+  method <- get0(paste0(producer, ".formula"), envir = ns,
+                 mode = "function", inherits = FALSE)
+  frames <- sys.frames()
+  k <- which(vapply(frames, identical, logical(1L), method.frame))
+  if (length(k) != 1L || k < 5L ||
+      !identical(sys.function(k), method) ||
+      !identical(sys.function(k - 1L), generic) ||
+      !is.primitive(sys.function(k - 2L)) ||
+      !identical(sys.call(k - 2L), sys.call(k - 3L)) ||
+      sys.parents()[[k - 2L]] != k - 3L ||
+      !identical(sys.function(k - 3L), base::eval) ||
+      !identical(sys.function(k - 4L), .np_eval_bw_call)) return(call)
+  owner <- frames[[k - 4L]]
+  descriptor <- get0(".np.bw.selector.public", envir = owner, inherits = FALSE)
+  value.env <- get0("value.env", envir = owner, inherits = FALSE)
+  if (!is.list(descriptor) || !is.environment(value.env) ||
+      !identical(frames[[k - 2L]], value.env)) return(call)
+  for (name in names(descriptor$expressions)) {
+    actual <- if (name %in% names(call)) call[[name]] else call[["..."]][[name]]
+    if (!identical(actual, descriptor$handoff[[name]])) return(call)
+  }
+  if (!is.null(descriptor$formula.expression) &&
+      !identical(call[["formula"]], descriptor$handoff[["formula"]])) return(call)
+  .np_bw_selector_finish_call(call, descriptor$expressions,
+                             descriptor$formula.expression)
 }
 
 .np_bw_package_selector_call <- function(call_obj) {
@@ -283,14 +329,18 @@
   # restore the public call and its owner before returning the object.
   value.env <- if (length(native$values))
     list2env(native$values, parent = caller_env) else caller_env
+  # This syntax-only descriptor exists solely around the original eval. It
+  # is read by the immediate formula producer, never stored in a result.
+  .np.bw.selector.public <- if (is.null(formula.value)) NULL else list(
+    expressions = native$expressions, formula.expression = formula.expression,
+    handoff = c(native[["handoff", exact = TRUE]],
+      if (!is.null(formula.index)) list(formula = call_obj[[formula.index]])))
   result <- eval(native$call, envir = value.env)
+  .np.bw.selector.public <- NULL
   if (is.list(result) && is.call(result[["call"]])) {
-    for (name in names(native$expressions)) {
-      if (name %in% names(result[["call"]]))
-        result[["call"]][[name]] <- native$expressions[[name]]
-      else if (name %in% names(result[["call"]][["..."]]))
-        result[["call"]][["..."]][[name]] <- native$expressions[[name]]
-    }
+    result[["call"]] <- .np_bw_selector_finish_call(result[["call"]],
+      native$expressions,
+      if (!is.null(result[["formula"]])) formula.expression else NULL)
     if (identical(environment(result[["call"]]), value.env))
       environment(result[["call"]]) <- caller_env
   }
@@ -306,12 +356,6 @@
       }
     }
   }
-  # Execute with the already-resolved value, but preserve the user's formula
-  # expression in the existing call metadata. No handoff state is retained.
-  if (!is.null(formula.expression) && is.list(result) &&
-      !is.null(result[["formula"]]) &&
-      is.call(result[["call"]]))
-    result[["call"]][["formula"]] <- formula.expression
   result
 }
 
