@@ -242,13 +242,14 @@
   call
 }
 
-.np_bw_selector_formula_call <- function(call, producer, method.frame) {
+.np_bw_selector_formula_call <- function(call, producer, method.frame,
+                                            method.name = "formula") {
   # Only the method invoked immediately by this selector owns its public
   # syntax. Matching arguments or finding an ancestor would also match a
   # nested callback replay, which must retain its own metadata.
   ns <- asNamespace("npRmpi")
   generic <- get0(producer, envir = ns, mode = "function", inherits = FALSE)
-  method <- get0(paste0(producer, ".formula"), envir = ns,
+  method <- get0(paste0(producer, ".", method.name), envir = ns,
                  mode = "function", inherits = FALSE)
   frames <- sys.frames()
   k <- which(vapply(frames, identical, logical(1L), method.frame))
@@ -288,7 +289,8 @@
 # publication. Only the original late selector supplies call environments.
 .np_bw_selector_finish <- function(result, expressions,
                                     formula.expression = NULL,
-                                    value.env = NULL, caller_env = NULL) {
+                                    value.env = NULL, caller_env = NULL,
+                                    public.names = NULL) {
   if (is.list(result) && is.call(result[["call"]])) {
     result[["call"]] <- .np_bw_selector_finish_call(result[["call"]],
       expressions,
@@ -302,8 +304,10 @@
       field <- switch(name, dat = "xnames", xdat = "xnames",
                       ydat = "ynames", zdat = "znames")
       if (!is.null(field) && identical(result[[field]], binding)) {
-        label <- deparse(expressions[[name]])
-        if (field != "ynames") label <- paste(label, collapse = "")
+        label <- if (!is.null(public.names[[name]])) public.names[[name]] else {
+          text <- deparse(expressions[[name]])
+          if (field != "ynames") paste(text, collapse = "") else text
+        }
         result <- updateBwNameMetadata(stats::setNames(list(label), field), result)
       }
     }
@@ -358,10 +362,13 @@
     list2env(native$values, parent = caller_env) else caller_env
   # This syntax-only descriptor exists solely around the original eval. It
   # is read by the immediate formula producer, never stored in a result.
-  .np.bw.selector.public <- if (is.null(formula.value)) NULL else list(
+  .np.bw.selector.public <- list(
     expressions = native$expressions, formula.expression = formula.expression,
-    handoff = c(native[["handoff", exact = TRUE]],
-      if (!is.null(formula.index)) list(formula = call_obj[[formula.index]])))
+    handoff = if (is.null(formula.value)) stats::setNames(
+      lapply(names(native$expressions), function(name)
+        as.name(paste0(".np_native_", name))), names(native$expressions)) else
+      c(native[["handoff", exact = TRUE]],
+        if (!is.null(formula.index)) list(formula = call_obj[[formula.index]])))
   result <- eval(native$call, envir = value.env)
   .np.bw.selector.public <- NULL
   result <- .np_bw_selector_finish(result, native$expressions,

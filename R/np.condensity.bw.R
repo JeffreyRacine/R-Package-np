@@ -3913,8 +3913,10 @@ npcdensbw.NULL <-
     # Final public metadata must precede immutable worker publication.
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    .npRmpi.bw.metadata <- list(producer = "npcdensbw",
-      call = .np_public_replay_call(mc, "npcdensbw"))
+    public.call <- .np_public_replay_call(mc, "npcdensbw")
+    public.call <- .np_bw_selector_formula_call(public.call, "npcdensbw",
+      environment(), method.name = "NULL")
+    .npRmpi.bw.metadata <- list(producer = "npcdensbw", call = public.call)
 
     tbw <- do.call(npcdensbw.default, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
     .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)

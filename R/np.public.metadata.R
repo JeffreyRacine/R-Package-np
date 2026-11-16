@@ -331,17 +331,25 @@
   value
 }
 
-# Certify only the immediate native regression selector before promise binding.
-# This descriptor is syntax only; rejected shapes retain the incumbent route.
+# Certify the immediate native selector before promise binding. Conditional
+# producers share regression's ownership check; their labels are carried from
+# the coordinator so workers never re-deparse an expression under local options.
 .npRmpi_bw_native_selector_plan <- function(mc, owner.name, definition,
                                             owner, caller) {
-  if (!identical(owner.name, "npregbw.default") ||
-      !identical(definition, npregbw.default)) return(NULL)
+  if (!is.character(owner.name) || length(owner.name) != 1L || is.na(owner.name))
+    return(NULL)
+  producer <- sub("[.]default$", "", owner.name)
+  if (!producer %in% c("npregbw", "npcdensbw", "npcdistbw") ||
+      !identical(owner.name, paste0(producer, ".default")) ||
+      !identical(definition, get0(owner.name, envir = asNamespace("npRmpi"),
+                                 mode = "function", inherits = FALSE))) return(NULL)
+  generic <- get0(producer, envir = asNamespace("npRmpi"),
+                  mode = "function", inherits = FALSE)
   frames <- sys.frames()
   parents <- sys.parents()
   k <- which(vapply(frames, identical, logical(1L), owner))
   if (length(k) != 1L || k < 5L ||
-      !identical(sys.function(k - 1L), npregbw) ||
+      !identical(sys.function(k - 1L), generic) ||
       !is.primitive(sys.function(k - 2L)) ||
       !identical(sys.call(k - 2L), sys.call(k - 3L)) ||
       parents[[k - 2L]] != k - 3L ||
@@ -362,6 +370,7 @@
         logical(1L)))) return(NULL)
   allowed <- vapply(keys, function(name) {
     expr <- expressions[[name]]
+    if (!identical(producer, "npregbw")) return(TRUE)
     is.symbol(expr) || (identical(name, "bws") &&
       is.numeric(expr) && is.null(attributes(expr)))
   }, logical(1L))
