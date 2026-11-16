@@ -1,5 +1,14 @@
 # npRmpi 0.80-3
 
+* Reuse already transmitted conditional training data in public-call metadata
+  when its original shape and attributes can be reconstructed exactly, without
+  expanding compact inputs during the reuse check. Other inputs retain the
+  existing materialized MPI route without an extra copy for lease metadata.
+
+* Finalize conditional selector calls before worker publication and avoid
+  publishing temporary bandwidths that conditional quantile and mode fits
+  cannot reuse. Caller-owned bandwidths retain their existing lifetime.
+
 * Completed conditional-density and conditional-distribution bandwidths can
   reuse their retained worker data during automatic MPI estimation. Intermediate
   degree-search candidates remain unleased; public bandwidth ownership and

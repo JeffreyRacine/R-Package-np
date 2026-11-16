@@ -198,6 +198,159 @@
   result
 }
 
+# Literal metadata may reuse data already sent in this invocation. Shape and
+# original call fingerprints are certified before replacing any literal. These
+# private references are never evaluated as R expressions or retained in results.
+.npRmpi_bw_literal_plain <- function(x) {
+  attrs <- attributes(x)
+  if (is.data.frame(x)) attrs[["row.names"]] <- .row_names_info(x, 0L)
+  out <- if (is.list(x)) lapply(x, .npRmpi_bw_literal_plain) else {
+    out <- vector(typeof(x), length(x))
+    out[] <- unclass(x)
+    out
+  }
+  attributes(out) <- NULL
+  attributes(out) <- attrs
+  out
+}
+
+.npRmpi_bw_literal_frame <- function(x) {
+  attrs <- attributes(x)
+  identical(attr(x, "class", exact = TRUE), "data.frame") &&
+    length(attrs) <= 8L &&
+    all(vapply(x, .npRmpi_transport_plain_value, logical(1L))) &&
+    all(vapply(attrs, function(a) is.atomic(a) && is.null(attributes(a)),
+               logical(1L)))
+}
+
+.npRmpi_bw_literal_rebuild <- function(source, code) {
+  bad <- function() stop("invalid internal literal data reference", call. = FALSE)
+  if (!is.data.frame(source) || !is.character(code) || length(code) != 1L ||
+      is.na(code) || nchar(code, type = "bytes") > 32L) bad()
+  if (grepl("^F[01]:[1-8](,[1-8]){0,7}$", code)) {
+    parts <- strsplit(substring(code, 2L), ":", fixed = TRUE)[[1L]]
+    order <- as.integer(strsplit(parts[[2L]], ",", fixed = TRUE)[[1L]])
+    attrs <- attributes(source)
+    if (!.npRmpi_bw_literal_frame(source) || anyDuplicated(order) ||
+        length(order) != length(attrs) || any(order > length(attrs))) bad()
+    out <- .npRmpi_bw_literal_plain(source)
+    attrs[["row.names"]] <- if (identical(parts[[1L]], "1"))
+      c(NA_integer_, -nrow(source)) else .row_names_info(source, 0L)
+    attributes(out) <- NULL
+    attributes(out) <- attrs[order]
+    return(out)
+  }
+  if (!.npRmpi_transport_plain_value(source)) bad()
+  if (code %in% c("C0", "C1")) {
+    if (length(source) != 1L) bad()
+    out <- .npRmpi_bw_literal_plain(.subset2(source, 1L))
+    if (identical(code, "C1")) names(out) <- attr(source, "row.names")
+    return(out)
+  }
+  if (!code %in% paste0("M", 0:3) || !length(source)) bad()
+  flag <- as.integer(substring(code, 2L))
+  out <- unlist(lapply(source, function(x)
+    .npRmpi_bw_literal_plain(unclass(x))),
+    use.names = FALSE)
+  dim(out) <- c(nrow(source), length(source))
+  if (flag > 0L) dimnames(out) <- list(
+    if (bitwAnd(flag, 1L)) attr(source, "row.names") else NULL,
+    if (bitwAnd(flag, 2L)) names(source) else NULL)
+  out
+}
+
+.npRmpi_bw_literal_code <- function(value, source) {
+  if (!is.data.frame(source)) return(NULL)
+  if (is.data.frame(value)) {
+    if (!.npRmpi_bw_literal_frame(value) ||
+        !.npRmpi_bw_literal_frame(source) ||
+        !setequal(names(attributes(value)), names(attributes(source)))) return(NULL)
+    code <- paste0("F", as.integer(.row_names_info(value, 1L) < 0L), ":",
+      paste(match(names(attributes(value)), names(attributes(source))), collapse = ","))
+  } else {
+    if (!.npRmpi_transport_plain_value(value) ||
+        !.npRmpi_transport_plain_value(source)) return(NULL)
+    if (is.matrix(value)) {
+      if (!length(source)) return(NULL)
+      if (any(!names(attributes(value)) %in% c("dim", "dimnames"))) return(NULL)
+      dn <- dimnames(value)
+      flag <- if (is.null(dn)) 0L else
+        as.integer(!is.null(dn[[1L]])) + 2L * as.integer(!is.null(dn[[2L]]))
+      code <- paste0("M", flag)
+    } else if (is.atomic(value) && is.null(dim(value)) && length(source) == 1L)
+      code <- if (is.null(names(value))) "C0" else "C1"
+    else return(NULL)
+  }
+  # Hash the literal in its actual call position, before reconstruction reads.
+  wrap <- function(x) as.call(list(as.name(".np.literal"), value = x))
+  before <- .npRmpi_autodispatch_fingerprint(wrap(value))
+  if (is.na(before)) return(NULL)
+  out <- .npRmpi_bw_literal_rebuild(source, code)
+  if (!identical(before, .npRmpi_autodispatch_fingerprint(wrap(out))) ||
+      !identical(value, out, num.eq = FALSE, single.NA = FALSE,
+                 attrib.as.set = FALSE) ||
+      !.npRmpi_transport_same_encoding(value, out)) return(NULL)
+  code
+}
+
+.npRmpi_bw_literals_encode <- function(metadata, original, call, values) {
+  refs <- character()
+  for (target in c("f", "s")) for (role in c("xdat", "ydat")) {
+    value <- if (identical(target, "f")) original$formula$call[[role]] else
+      original[["selector.native", exact = TRUE]][[role]]
+    if (is.null(value) || is.language(value)) next
+    token <- call[[role]]
+    if (!is.symbol(token)) next
+    token <- as.character(token)
+    if (!token %in% names(values)) next
+    code <- .npRmpi_bw_literal_code(value, values[[token]])
+    if (is.null(code)) next
+    refs[paste0(target, ".", role)] <- code
+    if (identical(target, "f")) metadata$formula$call[role] <- list(NULL)
+    else metadata[["selector.native"]][role] <- list(NULL)
+  }
+  if (length(refs)) metadata$literal <- refs
+  metadata
+}
+
+.npRmpi_bw_literals_complete <- function(metadata) {
+  for (target in c("f", "s")) for (role in c("xdat", "ydat")) {
+    value <- if (identical(target, "f"))
+      metadata[["formula", exact = TRUE]][["call", exact = TRUE]][[role]] else
+      metadata[["selector.native", exact = TRUE]][[role]]
+    if (!is.null(value) && !is.language(value)) return(FALSE)
+  }
+  TRUE
+}
+
+.npRmpi_bw_literals_decode <- function(metadata, call, values) {
+  refs <- metadata[["literal", exact = TRUE]]
+  if (is.null(refs)) return(metadata)
+  if (!is.character(refs) || !length(refs) || length(refs) > 4L ||
+      anyNA(refs) || is.null(names(refs)) || anyNA(names(refs)) ||
+      anyDuplicated(names(refs)) ||
+      any(!names(refs) %in% c("f.xdat", "f.ydat", "s.xdat", "s.ydat")))
+    stop("invalid internal literal metadata", call. = FALSE)
+  for (name in names(refs)) {
+    target <- substr(name, 1L, 1L)
+    role <- substring(name, 3L)
+    slot <- if (identical(target, "f")) metadata$formula$call else
+      metadata[["selector.native", exact = TRUE]]
+    if ((identical(target, "f") && !is.call(slot)) ||
+        (identical(target, "s") && !is.list(slot)) ||
+        !role %in% names(slot) || !is.null(slot[[role]]))
+      stop("invalid internal literal target", call. = FALSE)
+    token <- call[[role]]
+    if (!is.symbol(token) || !as.character(token) %in% names(values))
+      stop("internal literal data reference is unavailable", call. = FALSE)
+    out <- .npRmpi_bw_literal_rebuild(values[[as.character(token)]], refs[[name]])
+    if (identical(target, "f")) metadata$formula$call[role] <- list(out)
+    else metadata[["selector.native"]][role] <- list(out)
+  }
+  metadata$literal <- NULL
+  metadata
+}
+
 .npRmpi_bw_metadata_wire <- function(metadata) {
   # The coordinator has already used this local owner decision; it is not
   # descriptive metadata and does not belong in the worker payload.
@@ -383,6 +536,24 @@
 # Certify the immediate native selector before promise binding. Conditional
 # producers share regression's ownership check; their labels are carried from
 # the coordinator so workers never re-deparse an expression under local options.
+.npRmpi_bw_selector_name_plan <- function(expressions, owner) {
+  roles <- intersect(names(expressions), c("xdat", "ydat"))
+  prepared <- get("bw.args", envir = owner, inherits = FALSE)
+  needed <- roles[vapply(roles, function(name) {
+    # Both certified default owners have already resolved their public labels.
+    # Reuse them without querying a custom frame's names accessor again.
+    field <- switch(name, xdat = "xnames", ydat = "ynames")
+    identical(prepared[[field, exact = TRUE]], paste0(".np_native_", name))
+  }, logical(1L))]
+  if (!length(needed)) return(NULL)
+  # Conditional producers take labels from prepared column names. Preserve the
+  # rare explicit sentinel name, without deparsing ordinary literal samples.
+  setNames(lapply(needed, function(name) {
+    text <- deparse(expressions[[name]])
+    if (identical(name, "ydat")) text else paste(text, collapse = "")
+  }), needed)
+}
+
 .npRmpi_bw_native_selector_plan <- function(mc, owner.name, definition,
                                             owner, caller) {
   if (!is.character(owner.name) || length(owner.name) != 1L || is.na(owner.name))

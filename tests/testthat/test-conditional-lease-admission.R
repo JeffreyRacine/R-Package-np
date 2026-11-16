@@ -147,3 +147,19 @@ test_that("selector labels belong to the coordinator formatting context", {
   expect_identical(finish(before, expressions, public.names = labels), expected)
   expect_identical(finish(expected, expressions, public.names = labels), expected)
 })
+
+test_that("conditional selector labels are formatted only when consumed", {
+  plan <- getFromNamespace(".npRmpi_bw_selector_name_plan", "npRmpi")
+  owner <- list2env(list(bw.args = list(xnames = "x", ynames = "y")),
+                   parent = emptyenv())
+  expect_null(plan(list(xdat = 1:100000, ydat = 4:6, bws = .5), owner))
+  owner$bw.args$xnames <- ".np_native_xdat"
+  owner$bw.args$ynames <- ".np_native_ydat"
+  expressions <- list(xdat = quote(x/1e5), ydat = quote(y/1e5), bws = .5)
+  expected <- lapply(expressions[1:2], deparse)
+  expect_identical(plan(expressions, owner), expected)
+  owner$bw.args$ynames <- "y"
+  expect_identical(plan(expressions, owner), expected["xdat"])
+  owner$bw.args$xnames <- c(".np_native_xdat", "another")
+  expect_null(plan(expressions, owner))
+})

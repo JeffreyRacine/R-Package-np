@@ -1291,6 +1291,8 @@
   if (!is.null(tmpreplace) && length(tmpreplace))
     res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpreplace)
   metadata <- payload[["public.metadata", exact = TRUE]]
+  if (!is.null(metadata[["literal", exact = TRUE]]))
+    metadata <- .npRmpi_bw_literals_decode(metadata, payload$call, tmpreplace)
   if (!is.null(metadata)) {
     res <- .npRmpi_native_identity_apply(res, metadata$identity)
     res <- .npRmpi_native_names_apply(res, metadata$names)
@@ -3326,6 +3328,21 @@
   if (!is.null(public.metadata))
     public.metadata$identity <- .npRmpi_native_identity_bind(
       public.metadata$identity, prepared$call, prepared$tmpnames)
+  wire.metadata <- if (is.null(public.metadata)) NULL else
+    .npRmpi_bw_metadata_wire(public.metadata)
+  if (publication$producer %in% c("npcdensbw", "npcdistbw")) {
+    wire.metadata <- .npRmpi_bw_literals_encode(wire.metadata, public.metadata,
+      prepared$call, c(prepared$tmpvals, prepared$prepublish,
+                      prepared$lease.replacements, prepared$derived.replacements))
+    if (!.npRmpi_bw_literals_complete(wire.metadata)) {
+      # Only the new conditional lease needs this exact reconstruction.
+      # Keep the incumbent materialized computation and coordinator finish
+      # instead of sending an additional copy of unrepresentable call data.
+      publication$kind <- "none"
+      wire.metadata <- wire.metadata[
+        intersect(names(wire.metadata), c("identity", "names"))]
+    }
+  }
   payload <- list(
     invocation = invocation,
     call = prepared$call,
@@ -3339,8 +3356,7 @@
     lease.bindings = prepared$lease.bindings,
     derived.bindings = prepared$derived.bindings,
     publication = publication,
-    public.metadata = if (is.null(public.metadata)) NULL else
-      .npRmpi_bw_metadata_wire(public.metadata)
+    public.metadata = wire.metadata
   )
   if (isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE))) {
     head <- prepared$call[[1L]]
@@ -3605,10 +3621,8 @@
   if (!is.null(selector.native)) {
     metadata$selector.native <- selector.native
     if (producer %in% c("npcdensbw", "npcdistbw"))
-      metadata$selector.names <- setNames(lapply(names(selector.native), function(name) {
-        text <- deparse(selector.native[[name]])
-        if (identical(name, "ydat")) text else paste(text, collapse = "")
-      }), names(selector.native))
+      metadata$selector.names <- .npRmpi_bw_selector_name_plan(selector.native,
+                                                             sys.frame(method))
   }
   identity.families <- c("npplreg", "npscoef", "npcdens", "npcdist", "npqreg", "nplsqreg",
                          "npplregbw", "npscoefbw", "npcdensbw", "npcdistbw", "nplsqregbw")
