@@ -6,6 +6,8 @@
 
 * Avoid transmitting an unused LSQ formula metadata frame while preserving its training samples, omission records and worker reuse.
 * Reuse matching training roles from validated worker formula frames without retransmitting the same sample; preserve explicit replacements and retained-frame ownership.
+* MPI plotting retains an existing valid bandwidth lease through plot entry while preserving dispatch-mode and mutation checks.
+
 * Reuse validated worker bandwidths for native regression fits with named training data and supplied numeric bandwidths, preserving public calls and existing expression routes.
 
 * Avoid transmitting caller environments on generated partially linear formula data roles while preserving public evaluation metadata.

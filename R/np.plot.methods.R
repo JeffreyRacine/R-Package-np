@@ -531,6 +531,17 @@ np_render_control <- function(style = c("band", "bar"),
   dots
 }
 
+.npRmpi_plot_bandwidth <- function(bws) {
+  # Plot entry still removes dispatch tags, but may reuse the caller's handle.
+  # The unchanged resolver verifies full identity and ownership at each use.
+  fields <- .npRmpi_lease_handle_fields(bws)
+  handle <- if (!is.null(fields))
+    attr(bws, "npRmpi.autodispatch.lease", exact = TRUE) else NULL
+  value <- .npRmpi_autodispatch_untag(bws)
+  if (!is.null(handle)) attr(value, "npRmpi.autodispatch.lease") <- handle
+  value
+}
+
 .np_plot_call_method <- function(method, bws, ..., where = "plot()",
                                  .plot_dots_call = NULL,
                                  .plot_context = where) {
@@ -730,14 +741,14 @@ np_render_control <- function(style = c("band", "bar"),
   }
   if(!owns.empty.rows) {
     value <- .np_plot_progress_run(
-      .np_with_seed(random.seed, do.call(method, .np_plot_literal_labels(c(list(bws = .npRmpi_autodispatch_untag(bws)), dots)))),
+      .np_with_seed(random.seed, do.call(method, .np_plot_literal_labels(c(list(bws = .npRmpi_plot_bandwidth(bws)), dots)))),
       enabled = progress.enabled, label = progress.label)
     return(.np_plot_data_finish(value, bws, dots, method, random.seed))
   }
   publisher <- .npreg_plot_empty_publisher(.plot_context)
   dots$.np.empty.report <- publisher$record
   value <- .np_plot_progress_run(.npreg_finish_plot_call(
-    .np_with_seed(random.seed, do.call(method, .np_plot_literal_labels(c(list(bws = .npRmpi_autodispatch_untag(bws)), dots)))), publisher),
+    .np_with_seed(random.seed, do.call(method, .np_plot_literal_labels(c(list(bws = .npRmpi_plot_bandwidth(bws)), dots)))), publisher),
     enabled = progress.enabled, label = progress.label)
   .np_plot_data_finish(value, bws, dots, method, random.seed)
 }
