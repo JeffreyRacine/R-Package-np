@@ -1224,6 +1224,13 @@
     for (nm in names(derived)) {
       descriptor <- derived[[nm]]
       source <- get(descriptor[["source"]], envir = eval.env, inherits = FALSE)
+      if (is.list(descriptor) && !is.null(descriptor[["formula", exact = TRUE]])) {
+        training <- .subset2(source, ".np.formula.training", exact = TRUE)
+        frame <- training[["frame", exact = TRUE]]
+        assign(nm, .npRmpi_formula_role_extract(frame, descriptor[["formula"]]),
+               envir = eval.env)
+        next
+      }
       native <- .subset2(source, ".np.native.training", exact = TRUE)
       component <- descriptor[["component"]]
       if (!is.list(native) || !component %in% names(native) ||
@@ -2564,6 +2571,58 @@
   npconmode = c(txdat = "xdat", tydat = "ydat"),
   npreghat = c(txdat = "xdat", y = "ydat"))
 
+# Formula descriptors are made only from an existing resolver-approved lease.
+# Reading that prepared frame must not evaluate formulas or rebuild its sample.
+.npRmpi_formula_role_extract <- function(frame, descriptor) {
+  columns <- descriptor[["columns", exact = TRUE]]
+  if (!is.data.frame(frame) || !is.integer(columns) || !length(columns) ||
+      anyNA(columns) || any(columns < 1L | columns > length(frame)))
+    stop("autodispatch retained formula columns are unavailable", call. = FALSE)
+  if (identical(descriptor[["kind", exact = TRUE]], "frame")) {
+    value <- lapply(columns, function(i) .subset2(frame, i))
+    attributes(value) <- descriptor[["attrs", exact = TRUE]]
+    return(value)
+  }
+  if (!identical(descriptor[["kind", exact = TRUE]], "vector") ||
+      length(columns) != 1L)
+    stop("invalid autodispatch formula role descriptor", call. = FALSE)
+  value <- .subset2(frame, columns[[1L]])
+  if (!identical(attributes(value), descriptor[["attrs", exact = TRUE]]))
+    attributes(value) <- descriptor[["attrs", exact = TRUE]]
+  value
+}
+
+.npRmpi_formula_role_descriptor <- function(frame, target, response = NULL) {
+  if (isS4(frame) || typeof(frame) != "list" ||
+      !identical(attr(frame, "class", exact = TRUE), "data.frame") ||
+      !.npRmpi_transport_plain_value(target)) return(NULL)
+  column.names <- attr(frame, "names", exact = TRUE)
+  if (is.null(column.names) || anyNA(column.names) || anyDuplicated(column.names))
+    return(NULL)
+  attrs <- attributes(target)
+  if (typeof(target) == "list") {
+    columns <- match(attr(target, "names", exact = TRUE), column.names)
+    attrs$row.names <- .row_names_info(target, 0L)
+    kind <- "frame"
+  } else {
+    if (!is.null(attr(target, "dim", exact = TRUE)) ||
+        !is.character(response) || length(response) != 1L || is.na(response))
+      return(NULL)
+    columns <- match(response, column.names)
+    kind <- "vector"
+  }
+  if (!length(columns) || anyNA(columns)) return(NULL)
+  for (i in columns) {
+    column <- .subset2(frame, i)
+    if (!is.null(attr(column, "dim", exact = TRUE)) ||
+        !.npRmpi_transport_plain_value(column)) return(NULL)
+  }
+  descriptor <- list(kind = kind, columns = as.integer(columns), attrs = attrs)
+  if (!.npRmpi_transport_same_value(target,
+        .npRmpi_formula_role_extract(frame, descriptor))) return(NULL)
+  descriptor
+}
+
 .npRmpi_autodispatch_derive_native_roles <- function(prepared, mc) {
   roles <- .npRmpi_autodispatch_native_roles[[
     sub("\\..*$", "", .npRmpi_autodispatch_call_name(mc))]]
@@ -2587,7 +2646,13 @@
   bws <- values[[source]]
   if (typeof(bws) != "list") return(prepared)
   native <- .subset2(bws, ".np.native.training", exact = TRUE)
-  if (typeof(native) != "list" || is.object(native) ||
+  frame <- NULL
+  if (is.null(native) && source %in% leased) {
+    training <- .subset2(bws, ".np.formula.training", exact = TRUE)
+    if (!is.list(training)) return(prepared)
+    frame <- training[["frame", exact = TRUE]]
+    if (is.null(frame)) return(prepared)
+  } else if (typeof(native) != "list" || is.object(native) ||
       !identical(names(attributes(native)), "names") || anyDuplicated(names(native)))
     return(prepared)
   for (arg in intersect(names(roles), names(call))) {
@@ -2595,16 +2660,25 @@
     if (!is.symbol(expr)) next
     target <- as.character(expr)
     component <- roles[[arg]]
-    if (identical(source, target) || !target %in% names(values) ||
-        !component %in% names(native)) next
-    retained <- native[[component]]
+    if (identical(source, target) || !target %in% names(values)) next
     value <- values[[target]]
-    if (is.null(retained) ||
-        !.npRmpi_transport_same_value(value, retained)) next
+    if (!is.null(frame)) {
+      response <- if (identical(component, "ydat"))
+        bws[["ynames", exact = TRUE]] else NULL
+      descriptor <- .npRmpi_formula_role_descriptor(frame, value, response)
+      if (is.null(descriptor)) next
+      binding <- list(source = source, formula = descriptor)
+    } else {
+      if (!component %in% names(native)) next
+      retained <- native[[component]]
+      if (is.null(retained) ||
+          !.npRmpi_transport_same_value(value, retained)) next
+      binding <- c(source = source, component = component)
+    }
     # The source is the exact untagged bandwidth sent in this invocation or
     # already admitted by the existing lease resolver. No call replay, caller
     # lookup, new lease or worker scan.
-    prepared$derived.bindings[[target]] <- c(source = source, component = component)
+    prepared$derived.bindings[[target]] <- binding
     prepared$derived.replacements[target] <- list(value)
     prepared$tmpvals[target] <- NULL
     prepared$prepublish[target] <- NULL
