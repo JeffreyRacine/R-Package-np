@@ -1,5 +1,9 @@
 # np 0.80-3
 
+* Plot-only `smoothed-beta-binomial` symmetric-SD density bands now also support
+  fixed-bound, univariate Epanechnikov orders six and eight, retaining the complete
+  guide correction and original-scale uncertainty. All other restrictions remain.
+
 * Plot-only smoothed-beta-binomial bands now compute their analytic log moments
   with compensated precision, retaining the existing covariance tolerances.
 

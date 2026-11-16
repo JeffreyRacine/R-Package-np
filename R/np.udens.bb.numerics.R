@@ -10,7 +10,16 @@
   ratio
 }
 
-.np_udens_bb_operator <- function(grid,h) {
+# One exact order contract shared by public state and the transported guide plan.
+.np_udens_bb_order <- function(order) {
+  if (!is.numeric(order) || is.object(order) || !is.null(dim(order)) ||
+      length(order)!=1L || !is.finite(order) || !order %in% c(4L,6L,8L))
+    stop("beta-binomial kernel order must be 4, 6 or 8",call.=FALSE)
+  as.integer(order)
+}
+
+.np_udens_bb_operator <- function(grid,h,kernel.order=4L) {
+  degree <- .np_udens_bb_order(kernel.order)+1L
   if (!is.numeric(grid) || !length(grid) || any(!is.finite(grid)) ||
       any(grid<=0|grid>=1) || !is.numeric(h) || length(h)!=1L || !is.finite(h) || h<=0)
     stop("beta-binomial operator requires interior targets and a positive bandwidth",call.=FALSE)
@@ -18,16 +27,28 @@
   t(vapply(grid,function(g) {
     l <- max(-sqrt(5),-g/h);r <- min(sqrt(5),(1-g)/h)
     half <- (r-l)/2;mid <- (r+l)/2;u <- mid+half*rule$x
-    P <- .np_udens_u5_poly(rule$x,5L)
+    P <- .np_udens_u5_poly(rule$x,degree)
     w <- half*rule$w*(3/(4*sqrt(5)))*(1-u^2/5)
-    G <- crossprod(P,P*w);p0 <- drop(.np_udens_u5_poly(-mid/half,5L))
+    G <- crossprod(P,P*w);p0 <- drop(.np_udens_u5_poly(-mid/half,degree))
     c(solve(G,p0),l,r,mid,half)
-  },numeric(10L)))
+  },numeric(degree+5L)))
 }
 
-.np_udens_bb_guide_plan <- function(grid,h) {
-  list(grid=as.double(grid),h=as.double(h),operator=.np_udens_bb_operator(grid,h),
+.np_udens_bb_guide_plan <- function(grid,h,kernel.order=4L) {
+  kernel.order <- .np_udens_bb_order(kernel.order)
+  list(grid=as.double(grid),h=as.double(h),kernel.order=kernel.order,
+       operator=.np_udens_bb_operator(grid,h,kernel.order),
        rules=list(`32`=.np_udens_q6_rule(32L),`48`=.np_udens_q6_rule(48L)))
+}
+
+# The old registered entry preserves degree-five finite-stream arithmetic.
+# Higher degrees share validation/storage and the qualified target-side formula.
+.np_udens_bb_evaluate <- function(plan,lx,lq,prob) {
+  order <- .np_udens_bb_order(plan[["kernel.order",exact=TRUE]])
+  if(order==4L) .Call(C_np_plot_udens_bb_guide,plan$grid,plan$h,
+    as.double(lx),as.double(lq),as.double(prob),plan$operator)
+  else .Call(C_np_plot_udens_bb_guide_order,plan$grid,plan$h,
+    as.double(lx),as.double(lq),as.double(prob),plan$operator,order+1L)
 }
 
 .np_udens_bb_guide <- function(plan,ab,budget,order) {
@@ -53,7 +74,7 @@
   softplus <- function(t) pmax(t,0)+log1p(exp(-abs(t)))
   lv <- -softplus(-t);lq <- -softplus(t)
   prob <- exp(ab[1]*lv+ab[2]*lq-lbeta(ab[1],ab[2]))*w
-  value <- .Call(C_np_plot_udens_bb_guide,grid,h,lv,lq,prob,plan$operator)
+  value <- .np_udens_bb_evaluate(plan,lv,lq,prob)
   if (any(!is.finite(value))) stop("nonfinite beta-binomial guide integral",call.=FALSE)
   list(value=value,mass=sum(prob),nodes=length(t),segments=length(half))
 }
@@ -72,7 +93,8 @@
   weights <- rowMeans(vapply(x,function(t) dbinom(j,z$k,t),numeric(length(j))))
   moments <- z[["bb.log.moments",exact=TRUE]]
   if (is.null(moments)) moments <- .np_udens_bb_log_moments(c(z$a,z$b),z$k,weights)
-  old <- .np_udens_u5_covariance(z,x,"epanechnikov",grid,order,4L,log.moments=moments)
+  kernel.order <- if(is.null(z[["kernel.order",exact=TRUE]]))4L else .np_udens_bb_order(z[["kernel.order",exact=TRUE]])
+  old <- .np_udens_u5_covariance(z,x,"epanechnikov",grid,order,kernel.order,log.moments=moments)
   component <- exp(sweep(outer(old$lv,A)+outer(old$l1v,BB),2L,lbeta(A,BB),"-"))
   q <- drop(component %*% weights)*old$w
   m <- attr(moments,"mean",exact=TRUE)

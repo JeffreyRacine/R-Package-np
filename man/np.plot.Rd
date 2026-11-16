@@ -218,7 +218,7 @@ Named options passed via \code{\dots} include:
         \code{"inid"}, \code{"fixed"}, and \code{"geom"}.
         The explicit density-only \code{"smoothed-q6"} law has the narrow
         corrected-band scope described in Details. The separate density-only
-        \code{"smoothed-beta-binomial"} law supports a fixed-bound order-four
+        \code{"smoothed-beta-binomial"} law supports fixed-bound order-four, -six and -eight
         Epanechnikov symmetric-SD construction, also described in Details.
         Experimental regression \code{calibration="smoothed-percentile"}
         additionally uses \code{bootstrap="residual"}; see
@@ -761,7 +761,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   The explicit experimental \code{bootstrap="smoothed-beta-binomial"} law
   supports only one continuous numeric variable, a retained fixed bandwidth,
-  an order-four Epanechnikov kernel and supplied finite
+  an order-four, -six or -eight Epanechnikov kernel and supplied finite
   \code{ckerbound="fixed"} bounds. It requires \code{errors="bootstrap"},
   \code{center="bias-corrected"}, an explicit \code{band="pointwise"},
   \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}, and
@@ -776,7 +776,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \eqn{w_j=n^{-1}\sum_i {k\choose j}x_i^j(1-x_i)^{k-j}} for \eqn{j=0,\ldots,k}.
   Draw a component with these weights and then a \eqn{\mathrm{Beta}(a+j,b+k-j)}
   observation. Each replicate refits the guide for the same complete
-  degree-five support-reproducing correction; bandwidth and target coordinates
+  degree-five, -seven or -nine support-reproducing correction for kernel orders
+  four, six or eight respectively; bandwidth and target coordinates
   are held fixed. Roots subtract the complete corrected functional under this
   resampling law and use the original complete-influence scale, including guide
   and cross terms. Pointwise bands use marginal absolute-root quantiles;

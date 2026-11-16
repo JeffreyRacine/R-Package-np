@@ -58,14 +58,15 @@ SEXP C_np_plot_udens_bb_factor(SEXP Q,SEXP T,SEXP A,SEXP HI,SEXP M,SEXP NS){
 #include <Rinternals.h>
 #include <math.h>
 #include <limits.h>
-SEXP C_np_plot_udens_bb_guide(SEXP G,SEXP H,SEXP LV,SEXP LQ,SEXP PROB,SEXP OP) {
+#define BB_GUIDE_EVALUATE_LOOP(DEGREE,NODE_SIDE) do { for(R_xlen_t i=0;i<m;i++){R_CheckUserInterrupt();double sum=0,c=0;for(R_xlen_t j=0;j<n;j++){double v=((NODE_SIDE?lv[j]<=-M_LN2:g[i]<=.5)?exp(lv[j])-g[i]:(1-g[i])-exp(lq[j]))/h;if(v<op[i+(DEGREE+1)*m]||v>op[i+(DEGREE+2)*m])continue;double z=(v-op[i+(DEGREE+3)*m])/op[i+(DEGREE+4)*m],prev=1,now=z,poly=op[i]+op[i+m]*z;for(int k=2;k<=DEGREE;k++){double next=((2*k-1)*z*now-(k-1)*prev)/k;poly+=op[i+k*m]*next;prev=now;now=next;}double term=(3/(4*sqrt(5)))*(1-v*v/5)*poly*pr[j];double y=term-c,t=sum+y;c=(t-sum)-y;sum=t;}REAL(ans)[i]=sum/h;} } while(0)
+static SEXP bb_guide_evaluate(SEXP G,SEXP H,SEXP LV,SEXP LQ,SEXP PROB,SEXP OP,int degree) {
  if(TYPEOF(G)!=REALSXP || TYPEOF(H)!=REALSXP || TYPEOF(LV)!=REALSXP ||
     TYPEOF(LQ)!=REALSXP || TYPEOF(PROB)!=REALSXP || TYPEOF(OP)!=REALSXP)
    error("beta-binomial guide requires double arrays");
  R_xlen_t m=XLENGTH(G),n=XLENGTH(LV);SEXP d=getAttrib(OP,R_DimSymbol);
  if(m<1 || m>INT_MAX || n<1 || n>192000 || XLENGTH(H)!=1 ||
     XLENGTH(LQ)!=n || XLENGTH(PROB)!=n || TYPEOF(d)!=INTSXP || XLENGTH(d)!=2 ||
-    INTEGER(d)[0]!=m || INTEGER(d)[1]!=10 || XLENGTH(OP)!=10*m)
+    INTEGER(d)[0]!=m || INTEGER(d)[1]!=degree+5 || XLENGTH(OP)!=(degree+5)*m)
    error("invalid beta-binomial guide dimensions");
  double h=REAL(H)[0];if(!R_FINITE(h)||h<=0)error("positive bandwidth required");
  const double*g=REAL(G),*lv=REAL(LV),*lq=REAL(LQ),*pr=REAL(PROB),*op=REAL(OP);
@@ -75,14 +76,29 @@ SEXP C_np_plot_udens_bb_guide(SEXP G,SEXP H,SEXP LV,SEXP LQ,SEXP PROB,SEXP OP) {
      error("invalid guide node or probability");
  for(R_xlen_t i=0;i<m;i++){
    if(!R_FINITE(g[i]) || g[i]<=0 || g[i]>=1)error("guide targets must be strictly interior");
-   for(int j=0;j<10;j++)if(!R_FINITE(op[i+j*m]))error("nonfinite guide operator");
-   if(op[i+6*m]>0 || op[i+7*m]<0 || op[i+6*m]>=op[i+7*m] ||
-      op[i+6*m]<-sqrt(5) || op[i+7*m]>sqrt(5) || op[i+9*m]<=0)
+   for(int j=0;j<degree+5;j++)if(!R_FINITE(op[i+j*m]))error("nonfinite guide operator");
+   if(op[i+(degree+1)*m]>0 || op[i+(degree+2)*m]<0 || op[i+(degree+1)*m]>=op[i+(degree+2)*m] ||
+      op[i+(degree+1)*m]<-sqrt(5) || op[i+(degree+2)*m]>sqrt(5) || op[i+(degree+4)*m]<=0)
      error("invalid guide support operator");
  }
  SEXP ans=PROTECT(allocVector(REALSXP,m));
- for(R_xlen_t i=0;i<m;i++){R_CheckUserInterrupt();double sum=0,c=0;for(R_xlen_t j=0;j<n;j++){double v=(lv[j]<=-M_LN2?exp(lv[j])-g[i]:(1-g[i])-exp(lq[j]))/h;if(v<op[i+6*m]||v>op[i+7*m])continue;double z=(v-op[i+8*m])/op[i+9*m],prev=1,now=z,poly=op[i]+op[i+m]*z;for(int k=2;k<=5;k++){double next=((2*k-1)*z*now-(k-1)*prev)/k;poly+=op[i+k*m]*next;prev=now;now=next;}double term=(3/(4*sqrt(5)))*(1-v*v/5)*poly*pr[j];double y=term-c,t=sum+y;c=(t-sum)-y;sum=t;}REAL(ans)[i]=sum/h;}
+ if(degree==5) { BB_GUIDE_EVALUATE_LOOP(5,1); }
+ else if(degree==7) { BB_GUIDE_EVALUATE_LOOP(7,0); }
+ else { BB_GUIDE_EVALUATE_LOOP(9,0); }
  UNPROTECT(1);return ans;
+}
+
+/* Retain the original six-argument degree-five entry and operation order. */
+SEXP C_np_plot_udens_bb_guide(SEXP G,SEXP H,SEXP LV,SEXP LQ,SEXP PROB,SEXP OP) {
+ return bb_guide_evaluate(G,H,LV,LQ,PROB,OP,5);
+}
+SEXP C_np_plot_udens_bb_guide_order(SEXP G,SEXP H,SEXP LV,SEXP LQ,SEXP PROB,SEXP OP,SEXP DEGREE) {
+ if((TYPEOF(DEGREE)!=INTSXP && TYPEOF(DEGREE)!=REALSXP) || XLENGTH(DEGREE)!=1)
+  error("beta-binomial guide degree must be 5, 7 or 9");
+ double value=TYPEOF(DEGREE)==INTSXP?(double)INTEGER(DEGREE)[0]:REAL(DEGREE)[0];
+ if(!R_FINITE(value) || (value!=5 && value!=7 && value!=9))
+  error("beta-binomial guide degree must be 5, 7 or 9");
+ return bb_guide_evaluate(G,H,LV,LQ,PROB,OP,(int)value);
 }
 
 /* Accurate analytic log moments of the same beta-binomial mixture.
