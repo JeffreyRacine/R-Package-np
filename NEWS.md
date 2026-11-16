@@ -1,5 +1,8 @@
 # npRmpi 0.80-3
 
+* Plot-only smoothed-beta-binomial bands now compute their analytic log moments
+  with compensated precision, retaining the existing covariance tolerances.
+
 * Refine fixed-bound bivariate beta plot quadrature using the complete target
   family and bounded preparation storage, preserving the corrected estimator,
   numerical tolerances and currently supported band methods.
