@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Restore fitting, standard errors, prediction and plot-data without error bands for the bundled OECD bandwidth object by adding its missing local-linear engine metadata. Preserve the old bandwidths and dataset; add no training-data copy. Validate these bundled-object routes during release checks.
+
 * Reuse exactly unchanged ordinary formula columns after NA processing, preserving callback effects, row metadata and copy-on-modify ownership.
 
 * Avoid duplicating already prepared formula columns when constructing model frames, preserving retained samples and callback behavior.
