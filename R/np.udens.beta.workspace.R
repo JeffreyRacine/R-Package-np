@@ -1,6 +1,6 @@
 # Additional inference arrays, not whole-process RSS. Counts are doubles for
 # arithmetic; both retained numerical rules and serialization copies are charged.
-.np_udens_beta_workspace <- function(n,grid,theta,full,B=9999L,workers=0L,variance.nodes=0L) {
+.np_udens_beta_workspace <- function(n,grid,theta,full,B=9999L,workers=0L,variance.nodes=0L,q2.rules=NULL) {
   m<-nrow(grid);q<-ncol(grid);tile<-min(m,64L);cap<-256*1024^2
   if(!is.numeric(n)||length(n)!=1L||!is.finite(n)||n<10||!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<1||
      !is.numeric(workers)||length(workers)!=1L||!is.finite(workers)||workers<0)
@@ -16,17 +16,24 @@
       0L,variance.nodes) else 0
     stages<-c(moments=max(moments,extra),calibration=if(full)factor else bootstrap)
   } else {
-    nodes<-vapply(c(32L,64L),function(order)vapply(1:2,function(j)
-      .np_udens_beta_marginal_rule(theta[(2*j-1):(2*j)],order)$nodes,integer(1)),integer(2))
+    nodes<-if(is.null(q2.rules))vapply(c(32L,64L),function(order)vapply(1:2,function(j)
+      .np_udens_beta_marginal_rule(theta[(2*j-1):(2*j)],order)$nodes,integer(1)),integer(2)) else
+      vapply(q2.rules$moments,function(p)vapply(p$axes,`[[`,integer(1L),"nodes"),integer(2L))
     unique.axes<-vapply(1:2,function(j)length(unique(grid[,j])),integer(1))
     if(any(nodes>1600L)||any(apply(nodes,2,prod)>2560000))stop('beta plot joint refinement node cap',call.=FALSE)
     # Main/refined cached axis factors, joint weights, guide/data/output arrays.
     retained<-8*(24*sum(unique.axes*rowSums(nodes))+sum(apply(nodes,2,prod))+16*n+40*m+16*sum(nodes))
     preparation<-retained+8*(5*n*max(nodes)+2*max(apply(nodes,2,prod)))
     moments<-retained+8*(3*24*n*sum(pmin(unique.axes,tile))+12*tile*n+12*tile*256+20*tile^2)
-    covariance<-retained+8*(4*m^2+4*m*256+40*m)
+    # Geometry-owned full covariance serializes the two preparations before
+    # calibration. Only the active cache/ratio and all small axes remain live.
+    covariance.retained<-if(is.null(q2.rules))retained else
+      8*(max(24*colSums(unique.axes*nodes)+apply(nodes,2,prod))+
+         16*n+40*m+32*sum(nodes))
+    covariance<-covariance.retained+8*(4*m^2+4*m*256+40*m)
     # Bound SD numerical-series factors independently of target Cartesian layout.
-    series.nodes<-vapply(c(32L,64L),function(order)vapply(.np_udens_beta_series_rule(theta,order)$axes,`[[`,integer(1),'nodes'),integer(2))
+    series.nodes<-if(is.null(q2.rules))vapply(c(32L,64L),function(order)vapply(.np_udens_beta_series_rule(theta,order)$axes,`[[`,integer(1),'nodes'),integer(2)) else
+      vapply(q2.rules$series,function(p)vapply(p$axes,`[[`,integer(1L),'nodes'),integer(2L))
     projection<-8*(24*sum(unique.axes*rowSums(series.nodes))+3*257*sum(series.nodes[,2])+3*24*257*sum(unique.axes)+16*B+12*m*32+12*n*32+40*m)
     stages<-c(preparation=preparation,moments=moments,calibration=if(full)covariance else projection)
   }

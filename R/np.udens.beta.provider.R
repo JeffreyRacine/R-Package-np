@@ -7,12 +7,16 @@
   # Reject oversized families before materializing the family quadrature plan.
   if(q==1L).np_udens_beta_workspace(n,grid,theta,full,B,workers)
   variance.plan<-if(q==1L).np_udens_q1_operator_plan(theta,h,grid[,1L]) else NULL
+  q2.rules<-if(q==2L)list(
+    moments=lapply(c(32L,36L),function(k).np_udens_beta_q2_axes(theta,h,grid,k)),
+    series=lapply(c(32L,36L),function(k).np_udens_beta_q2_axes(c((theta[1:4]+1)*.5-1,0),h,grid,k))) else NULL
   workspace<-.np_udens_beta_workspace(n,grid,theta,full,B,workers,
-    variance.nodes=if(q==1L)variance.plan$refined.nodes else 0L)
+    variance.nodes=if(q==1L)variance.plan$refined.nodes else 0L,q2.rules=q2.rules)
   out<-list(theta=theta,history=fit$history,center=numeric(m),fitted=numeric(m),mu=numeric(m),
     pilot_variance=numeric(m),empirical_variance=numeric(m),guide_variance=numeric(m),
     B=matrix(0,m,length(theta)),B_refined=matrix(0,m,length(theta)),
     observed_files=list(),checks=list(workspace=workspace))
+  if(q==2L)out$q2.rules<-q2.rules
   dense.block<-full&&q==1L
   blocks<-.np_udens_beta_blocks(m,if(dense.block)m else 64L)
   if(dense.block) {
@@ -21,8 +25,8 @@
       stop('beta plot univariate dense workspace budget',call.=FALSE)
   }
   if(q==2L) {
-    main<-.np_udens_beta_q2_moment_prepare(x,h,grid,theta,64L,32L,fit$state)
-    refined<-.np_udens_beta_q2_moment_prepare(x,h,grid,theta,128L,64L,fit$state)
+    main<-.np_udens_beta_q2_moment_prepare(x,h,grid,theta,64L,32L,fit$state,prepared.axes=q2.rules$moments[[1L]])
+    refined<-.np_udens_beta_q2_moment_prepare(x,h,grid,theta,128L,36L,fit$state,prepared.axes=q2.rules$moments[[2L]])
   }
   for(j in seq_along(blocks)) {
     ix<-blocks[[j]]
@@ -53,7 +57,11 @@
     progress('moments/refinement',max(ix),m)
   }
   if(full&&q==2L) {
+    main.record<-.np_udens_beta_q2_preparation_write(main,store,'preparation-main.rds')
+    refined.record<-.np_udens_beta_q2_preparation_write(refined,store,'preparation-refined.rds')
+    rm(main,refined);gc(FALSE)
     for(law in 0:1) {
+      main<-.np_udens_beta_q2_preparation_read(main.record)
       progress(paste(c('guide','ratio')[law+1L],'covariance main'),0L,1L)
       a<-.np_udens_beta_covariance_native(main,out$B,law,progress)
       .np_udens_beta_check(diag(a),if(law==0L)out$guide_variance else out$pilot_variance,
@@ -62,7 +70,8 @@
       path<-.np_udens_beta_store_file(store,paste0('covariance-',law,'.bin'),8*as.double(m)*m)
       connection<-file(path,'wb')
       tryCatch(writeBin(as.vector(a),connection,size=8L,endian='little'),finally=close(connection))
-      rm(a);gc(FALSE)
+      rm(a,main);gc(FALSE)
+      refined<-.np_udens_beta_q2_preparation_read(refined.record)
       progress(paste(c('guide','ratio')[law+1L],'covariance refinement'),0L,1L)
       b<-.np_udens_beta_covariance_native(refined,out$B_refined,law,progress)
       .np_udens_positive_gram_check(b)
@@ -70,7 +79,7 @@
       a<-tryCatch(matrix(readBin(connection,'double',n=as.double(m)*m,size=8L,endian='little'),m),finally=close(connection))
       out$checks[[paste0('covariance_law_',law)]]<-.np_udens_beta_dense_compare(a,b,'full residual covariance')
       if(law==1L)out$covariance<-a
-      rm(a,b);gc(FALSE)
+      rm(a,b,refined);gc(FALSE)
     }
   }
   out
@@ -126,8 +135,13 @@
     roots$next_draw<-B+1L
     return(list(roots=roots,theta=thetas,iterations=iterations))
   } else {
-    main<-.np_udens_beta_series_projection(.np_udens_beta_series_rule(theta,32L),h,n,grid,inner[1L],axis.cache)
-    refined<-.np_udens_beta_series_projection(.np_udens_beta_series_rule(theta,64L),h,n,grid,inner[2L],axis.cache)
+    rules<-prepared[["q2.rules",exact=TRUE]]
+    main.rule<-if(is.null(rules)).np_udens_beta_series_rule(theta,32L) else
+      .np_udens_beta_series_rule(theta,32L,rules$series[[1L]],h,grid)
+    refined.rule<-if(is.null(rules)).np_udens_beta_series_rule(theta,64L) else
+      .np_udens_beta_series_rule(theta,36L,rules$series[[2L]],h,grid)
+    main<-.np_udens_beta_series_projection(main.rule,h,n,grid,inner[1L],axis.cache)
+    refined<-.np_udens_beta_series_projection(refined.rule,h,n,grid,inner[2L],axis.cache)
     original<-.np_udens_beta_series_means_native(main,matrix(theta,1L))
     original.ref<-.np_udens_beta_series_means_native(refined,matrix(theta,1L))
     .np_udens_beta_check(original$mu,original.ref$mu,'bootstrap original mean refinement',1e-10)

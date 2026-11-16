@@ -35,7 +35,7 @@
 
 # Additional admission for full grids refused by the incumbent cheap bound.
 # This bounds live plot workspace, not R's entire heap or process RSS.
-.np_udens_beta_normal_q2_capacity <- function(n,m,theta=NULL,outer=NULL,thetaQ=theta) {
+.np_udens_beta_normal_q2_capacity <- function(n,m,theta=NULL,outer=NULL,thetaQ=theta,prepared.nodes=NULL) {
   if(!is.numeric(n)||length(n)!=1L||!is.finite(n)||n<10||n!=floor(n)||
      !is.numeric(m)||length(m)!=1L||!is.finite(m)||m<1||m!=floor(m))
     stop('invalid beta normal q2 workspace geometry',call.=FALSE)
@@ -43,8 +43,8 @@
   retained<-200*m+60*n+65536
   stages<-c(input=160*block*n,guide=28*600000)
   if(!is.null(theta)) {
-    nodes<-vapply(list(theta,thetaQ),function(th)vapply(list(th[1:2],th[3:4]),
-      function(a).np_udens_beta_marginal_rule(a,outer)$nodes,integer(1L)),integer(2L))
+    nodes<-if(is.null(prepared.nodes))vapply(list(theta,thetaQ),function(th)vapply(list(th[1:2],th[3:4]),
+      function(a).np_udens_beta_marginal_rule(a,outer)$nodes,integer(1L)),integer(2L)) else prepared.nodes
     products<-apply(nodes,2L,prod)
     if(any(nodes>1600L)||any(products>2560000L))
       stop('beta normal q2 plot workspace exceeds 192 MiB',call.=FALSE)
@@ -60,9 +60,9 @@
   bytes
 }
 
-.np_udens_beta_normal_q2_budget <- function(n,m,theta,outer) {
-  nodes<-vapply(list(theta[1:2],theta[3:4]),function(a)
-    .np_udens_beta_marginal_rule(a,outer)$nodes,integer(1L))
+.np_udens_beta_normal_q2_budget <- function(n,m,theta,outer,prepared.nodes=NULL) {
+  nodes<-if(is.null(prepared.nodes))vapply(list(theta[1:2],theta[3:4]),function(a)
+    .np_udens_beta_marginal_rule(a,outer)$nodes,integer(1L)) else prepared.nodes
   # Both guide preparations, row caches, ratio arrays and native work coexist.
   bytes<-8*(12*as.double(n)*max(nodes)+4*prod(as.double(nodes))+
     96*as.double(m)*sum(nodes)+40*as.double(m)^2+200*m+60*n)
@@ -88,18 +88,22 @@
   raw<-function(p).np_udens_beta_joint_raw_native(p$cache,p$axes,p$theta[5L],p$logz,p$ratio,FALSE)
   blocks<-.np_udens_beta_blocks(m,16L)
   for(level in 1:2) {
-    inner<-c(64L,128L)[level];outer<-c(32L,64L)[level]
+    inner<-c(64L,128L)[level];outer<-c(32L,36L)[level]
+    axes<-.np_udens_beta_q2_axes(theta,h,grid,outer)
+    nodes<-vapply(axes$axes,`[[`,integer(1L),"nodes")
     width<-min(16L,m)
-    workspace<-max(workspace,.np_udens_beta_normal_q2_budget(n,width,theta,outer))
-    if(expanded.capacity)workspace<-max(workspace,.np_udens_beta_normal_q2_capacity(n,m,theta,outer))
+    workspace<-max(workspace,.np_udens_beta_normal_q2_budget(n,width,theta,outer,nodes))
+    if(expanded.capacity)workspace<-max(workspace,.np_udens_beta_normal_q2_capacity(n,m,theta,outer,prepared.nodes=cbind(nodes,nodes)))
     progress(paste('joint reference pilot',level),0L,1L)
     first<-blocks[[1L]]
-    p<-.np_udens_beta_q2_moment_prepare(x,h,grid[first,,drop=FALSE],theta,inner,outer,fit$state)
+    p<-.np_udens_beta_q2_moment_prepare(x,h,grid[first,,drop=FALSE],theta,inner,outer,fit$state,prepared.axes=axes)
     initial<-raw(p)[[2L]];target<-initial$mean[length(first)+seq_len(5L)]
     fq<-.np_udens_beta_normal_q2_fit(target,theta)
-    workspace<-max(workspace,.np_udens_beta_normal_q2_budget(n,width,fq$theta,outer))
-    if(expanded.capacity)workspace<-max(workspace,.np_udens_beta_normal_q2_capacity(n,m,theta,outer,fq$theta))
-    pq<-.np_udens_beta_q2_moment_prepare(x,h,grid[first,,drop=FALSE],fq$theta,inner,outer,fq$state)
+    axesQ<-.np_udens_beta_q2_axes(fq$theta,h,grid,outer)
+    nodesQ<-vapply(axesQ$axes,`[[`,integer(1L),"nodes")
+    workspace<-max(workspace,.np_udens_beta_normal_q2_budget(n,width,fq$theta,outer,nodesQ))
+    if(expanded.capacity)workspace<-max(workspace,.np_udens_beta_normal_q2_capacity(n,m,theta,outer,fq$theta,cbind(nodes,nodesQ)))
+    pq<-.np_udens_beta_q2_moment_prepare(x,h,grid[first,,drop=FALSE],fq$theta,inner,outer,fq$state,prepared.axes=axesQ)
     z<-list(center=numeric(m),se=numeric(m),theta=theta,thetaQ=fq$theta,
       meanQ=numeric(m),D=matrix(0,m,5L),variance.checks=list())
     for(rows in blocks) {
