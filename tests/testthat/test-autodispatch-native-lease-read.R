@@ -16,8 +16,9 @@ test_that("untagging removes real dispatch tags and preserves unrelated structur
 
 
 test_that("reading unchanged native inputs preserves their published MPI lease", {
+  skip_on_cran()
   skip_if_not(spawn_mpi_slaves(1L), "MPI runtime not available")
-  on.exit(close_mpi_slaves(), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   ns <- asNamespace("npRmpi")
   resolve <- get(".npRmpi_lease_resolve", ns)
   for (family in c("npreg", "npscoef")) {
