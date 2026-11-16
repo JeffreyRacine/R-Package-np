@@ -2375,7 +2375,7 @@ npreghat.rbandwidth <-
     if (!any(keep.rows))
       stop("Training data has no rows without NAs")
 
-    txdat <- .np_data_rows(txdat, keep.rows)
+    txdat <- txdat[keep.rows, , drop = FALSE]
     if (!is.null(y))
       y <- y[keep.rows, , drop = FALSE]
 
@@ -2386,7 +2386,7 @@ npreghat.rbandwidth <-
         keep.eval[as.integer(rows.omit.eval)] <- FALSE
       if (!any(keep.eval))
         stop("Evaluation data has no rows without NAs")
-      exdat <- .np_data_rows(exdat, keep.eval)
+      exdat <- exdat[keep.eval, , drop = FALSE]
     }
 
     operator.spec <- .npreghat_operator_spec(

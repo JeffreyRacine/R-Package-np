@@ -17,7 +17,7 @@
   .np_require_paired_rows(xdat, ydat, "xdat", "ydat")
   keep <- complete.cases(xdat, ydat)
   if (!any(keep)) stop("Data has no rows without NAs", call. = FALSE)
-  frame <- .np_data_rows(xdat, keep)
+  frame <- xdat[keep, , drop = FALSE]
   for (name in names(frame)[categorical]) {
     original <- frame[[name]]
     if (is.logical(original)) original <- factor(original, levels = c(FALSE, TRUE))

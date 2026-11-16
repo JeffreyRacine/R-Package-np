@@ -187,8 +187,8 @@
       if (!any(keep.rows))
         stop("Data has no rows without NAs")
 
-      xdat <- .np_data_rows(xdat, keep.rows)
-      ydat <- .np_data_rows(ydat, keep.rows)
+      xdat <- xdat[keep.rows,,drop = FALSE]
+      ydat <- ydat[keep.rows,,drop = FALSE]
 
     }
 

@@ -137,9 +137,9 @@
       if (!any(keep.rows))
         stop("Training data has no rows without NAs")
 
-      xdat <- .np_data_rows(xdat, keep.rows)
-      ydat <- .np_data_rows(ydat, keep.rows, frame = FALSE)
-      zdat <- .np_data_rows(zdat, keep.rows)
+      xdat <- xdat[keep.rows,,drop = FALSE]
+      ydat <- ydat[keep.rows]
+      zdat <- zdat[keep.rows,,drop = FALSE]
     }
 
 

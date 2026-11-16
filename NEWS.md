@@ -1,7 +1,5 @@
 # npRmpi 0.80-3
 
-* Avoid copying ordinary training and evaluation columns when complete-case filtering keeps every row, preserving row names, class methods and copy-on-modify ownership.
-
 * Reuse exactly unchanged ordinary formula columns after NA processing, preserving callback effects, row metadata and copy-on-modify ownership.
 
 * Avoid transmitting an unused LSQ formula metadata frame while preserving its training samples, omission records and worker reuse.

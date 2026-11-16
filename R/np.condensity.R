@@ -313,8 +313,8 @@ npcdens.conbandwidth <- function(bws,
   if (!any(keep.rows))
     stop("Data has no rows without NAs")
 
-  txdat <- .np_data_rows(txdat, keep.rows)
-  tydat <- .np_data_rows(tydat, keep.rows)
+  txdat <- txdat[keep.rows,,drop = FALSE]
+  tydat <- tydat[keep.rows,,drop = FALSE]
 
   eval.rows.omit <- integer(0)
   if (!no.exy){
@@ -326,8 +326,8 @@ npcdens.conbandwidth <- function(bws,
     if (!any(keep.eval))
       stop("Data has no rows without NAs")
 
-    exdat <- .np_data_rows(exdat, keep.eval)
-    eydat <- .np_data_rows(eydat, keep.eval)
+    exdat <- exdat[keep.eval,,drop = FALSE]
+    eydat <- eydat[keep.eval,,drop = FALSE]
   }
 
 

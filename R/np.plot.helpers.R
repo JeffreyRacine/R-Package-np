@@ -13968,9 +13968,9 @@ plotFactor <- function(f, y, ...){
     if (!any(keep.rows))
       stop("Training data has no rows without NAs")
 
-    xdat <- .np_data_rows(xdat, keep.rows)
-    ydat <- .np_data_rows(ydat, keep.rows, frame = FALSE)
-    zdat <- .np_data_rows(zdat, keep.rows)
+    xdat <- xdat[keep.rows, , drop = FALSE]
+    ydat <- ydat[keep.rows]
+    zdat <- zdat[keep.rows, , drop = FALSE]
 
     exdat <- toFrame(exdat)
     ezdat <- toFrame(ezdat)
@@ -13983,8 +13983,8 @@ plotFactor <- function(f, y, ...){
     if (!any(keep.eval))
       stop("Evaluation data has no rows without NAs")
 
-    exdat <- .np_data_rows(exdat, keep.eval)
-    ezdat <- .np_data_rows(ezdat, keep.eval)
+    exdat <- exdat[keep.eval, , drop = FALSE]
+    ezdat <- ezdat[keep.eval, , drop = FALSE]
 
     fit <- npplreg(
       bws = bws,
@@ -15049,8 +15049,8 @@ plotFactor <- function(f, y, ...){
       if (!any(keep.rows))
         stop("Training data has no rows without NAs")
 
-      xdat <- .np_data_rows(xdat, keep.rows)
-      ydat <- .np_data_rows(ydat, keep.rows)
+      xdat <- xdat[keep.rows, , drop = FALSE]
+      ydat <- ydat[keep.rows, , drop = FALSE]
 
       eval.omit <- NULL
       if (!no.ex) {
@@ -15058,7 +15058,7 @@ plotFactor <- function(f, y, ...){
         eval.omit <- .np_current_rows_omit(exdat)
         if (length(eval.omit) > 0L)
           keep.eval[as.integer(eval.omit)] <- FALSE
-        exdat <- .np_data_rows(exdat, keep.eval)
+        exdat <- exdat[keep.eval, , drop = FALSE]
       }
 
       tnrow <- nrow(xdat)

@@ -493,12 +493,12 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (!any(keep.rows))
       stop("Training data has no rows without NAs")
 
-    txdat <- .np_data_rows(txdat, keep.rows)
-    tydat <- .np_data_rows(tydat, keep.rows, frame = FALSE)
+    txdat <- txdat[keep.rows,,drop = FALSE]
+    tydat <- tydat[keep.rows]
     if (miss.ex && !miss.ey)
-      eydat <- .np_data_rows(eydat, keep.rows, frame = FALSE)
+      eydat <- eydat[keep.rows]
     if (!miss.z)
-      tzdat <- .np_data_rows(tzdat, keep.rows)
+      tzdat <- tzdat[keep.rows,, drop = FALSE]
 
     if (!miss.ex){
       keep.eval <- rep_len(TRUE, nrow(exdat))
@@ -511,11 +511,11 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       if (length(rows.omit) > 0L)
         keep.eval[as.integer(rows.omit)] <- FALSE
 
-      exdat <- .np_data_rows(exdat, keep.eval)
+      exdat <- exdat[keep.eval,,drop = FALSE]
       if (!miss.ey)
-        eydat <- .np_data_rows(eydat, keep.eval, frame = FALSE)
+        eydat <- eydat[keep.eval]
       if (eval.z)
-        ezdat <- .np_data_rows(ezdat, keep.eval)
+        ezdat <- ezdat[keep.eval,, drop = FALSE]
 
       if (!any(keep.eval))
         stop("Evaluation data has no rows without NAs")
