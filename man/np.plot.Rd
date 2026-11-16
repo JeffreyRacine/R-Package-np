@@ -665,8 +665,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   rejected. All slices form one finite calibration family. See
   \code{\link{np_udens_bias_control}} for assumptions and endpoint rules.
 
-  For one continuous variable, these known-fixed-bound order-2 beta and Gaussian
-  density plots additionally support asymptotic normal intervals with omitted
+  For one continuous variable, known-fixed-bound beta kernels of orders 2, 4, 6
+  and 8 and order-2 Gaussian density plots additionally support asymptotic normal intervals with omitted
   \code{band} or \code{band="pmzsd"} and omitted \code{bias.control}.
   The corrected center is unchanged. The complete influence variance is
   integrated under the normalized positive ratio pilot, including guide and
@@ -683,7 +683,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   that limit still stop. This is distinct from full-covariance calibrated bands
   and does not bound the memory used by the entire R process.
   This normal approximation can be
-  less accurate at sparse boundary targets in small samples. Two-dimensional
+  less accurate at sparse boundary targets in small samples. Higher-order beta
+  marginal coverage can also be low at individual targets in multimodal
+  distributions, especially with small selected bandwidths; favorable average
+  coverage is not a uniform pointwise guarantee. This admission does not provide
+  normal Bonferroni or simultaneous bands. Two-dimensional
   Gaussian normal intervals, bootstrap pmzsd, estimated bounds and literal
   support endpoints are not admitted by this additional construction. See
   \code{\link{np_udens_bias_control}} for its assumptions and limitations.
@@ -1349,8 +1353,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   dimensions with finite known fixed bounds. Their signed observation
   contributions are retained; native marginal standard errors are unchanged.
   The separate univariate beta corrected construction described above accepts
-  these orders only for explicit calibrated bands; higher-order normal intervals
-  and two-dimensional corrected bands remain unsupported.
+  these orders for calibrated bands and marginal asymptotic \code{pmzsd};
+  two-dimensional higher-order corrected bands remain unsupported.
   This higher-order addition does not admit CDFs, conditional estimators,
   nearest-neighbour bandwidths, range bounds or bias-corrected requests.
 

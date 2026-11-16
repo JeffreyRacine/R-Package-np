@@ -1,4 +1,4 @@
-test_that("higher beta orders enter only the existing q1 calibrated construction", {
+test_that("higher beta orders retain the existing q1 calibrated construction", {
   x <- data.frame(x = seq(.05, .95, length.out = 20L))
   base <- structure(list(type="fixed", ckertype="beta", ckerorder=2L,
     ckerbound="fixed", ndim=1L, ncon=1L, bw=.2, scaling=FALSE,
@@ -33,7 +33,7 @@ test_that("higher beta admission retains normal q2 and unsupported-owner refusal
   }
   for (order in c(4L,6L,8L)) {
     b <- base;b$ckerorder <- order
-    for (band in c("pmzsd","none"))
+    for (band in "none")
       expect_error(.np_udens_beta_public_prepare(b,x,"asymptotic","inid",
         band,NULL,.05,42L),"beta corrected bands require fixed bandwidths")
     for (change in list(list(ndim=2L,ncon=2L),list(ndim=3L,ncon=3L),
@@ -54,4 +54,25 @@ test_that("higher beta admission retains normal q2 and unsupported-owner refusal
   base$ckerorder <- 2L
   expect_true(.np_udens_beta_order_request(base,"pmzsd"))
   base$ndim <- 2L;expect_true(.np_udens_beta_order_request(base,"all"))
+})
+
+
+test_that("higher beta pmzsd uses the unchanged marginal normal state", {
+  x <- data.frame(x=seq(.05,.95,length.out=20L))
+  b <- structure(list(type="fixed",ckertype="beta",ckerorder=2L,
+    ckerbound="fixed",ndim=1L,ncon=1L,bw=.2,scaling=FALSE,
+    ckerlb=0,ckerub=1),class="bandwidth")
+  prepare <- function(b,method="asymptotic",calibration=NULL,alpha=.05)
+    .np_udens_beta_public_prepare(b,x,method,"inid","pmzsd",calibration,alpha,42L)
+  ref <- prepare(b)
+  expect_true(ref$normal.pmzsd)
+  for (order in c(4L,6L,8L)) {
+    b$ckerorder <- order
+    expect_identical(prepare(b),ref)
+    expect_error(prepare(b,"bootstrap","symmetric-sd"),"asymptotic")
+    expect_error(prepare(b,calibration="symmetric-sd"),"calibration")
+    for (alpha in c(0,.5,1)) expect_error(prepare(b,alpha=alpha),"alpha")
+    b2 <- b;b2$ndim <- b2$ncon <- 2L
+    expect_error(prepare(b2),"fixed bandwidths")
+  }
 })
