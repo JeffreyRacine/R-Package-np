@@ -979,8 +979,8 @@ npqreg.condbandwidth <-
     if (!any(keep.rows))
       stop("Training data has no rows without NAs")
 
-    txdat <- .np_data_rows(txdat, keep.rows)
-    tydat <- .np_data_rows(tydat, keep.rows)
+    txdat <- txdat[keep.rows,,drop = FALSE]
+    tydat <- tydat[keep.rows,,drop = FALSE]
 
     eval.omit <- NULL
     if (!no.ex){
@@ -988,7 +988,7 @@ npqreg.condbandwidth <-
       eval.omit <- .np_current_rows_omit(exdat)
       if (length(eval.omit) > 0L)
         keep.eval[as.integer(eval.omit)] <- FALSE
-      exdat <- .np_data_rows(exdat, keep.eval)
+      exdat <- exdat[keep.eval,,drop = FALSE]
     }
     
     tnrow = dim(txdat)[1]

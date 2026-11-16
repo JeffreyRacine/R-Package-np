@@ -198,12 +198,12 @@
       if (!any(keep.rows))
         stop("Data has no rows without NAs")
 
-      xdat <- .np_data_rows(xdat, keep.rows)
+      xdat <- xdat[keep.rows,,drop = FALSE]
 
       if(!miss.z)
-        zdat <- .np_data_rows(zdat, keep.rows)
+        zdat <- zdat[keep.rows,,drop = FALSE]
       
-      ydat <- .np_data_rows(ydat, keep.rows, frame = FALSE)
+      ydat <- ydat[keep.rows]
     }
 
     ## ydat = as.double(ydat)

@@ -1174,8 +1174,8 @@ np_render_control <- function(style = c("band", "bar"),
   # Numerical plot owners use the compact paired sample, retaining its order.
   if (anyNA(xtrain) || anyNA(ytrain)) {
     keep <- complete.cases(xtrain, ytrain)
-    xtrain <- .np_data_rows(xtrain, keep)
-    ytrain <- .np_data_rows(ytrain, keep)
+    xtrain <- xtrain[keep, , drop = FALSE]
+    ytrain <- ytrain[keep, , drop = FALSE]
   }
   list(xtrain = xtrain, ytrain = ytrain)
 }

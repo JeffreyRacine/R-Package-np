@@ -42,7 +42,7 @@ npudisthat <- function(bws,
   if (!any(keep.rows))
     stop("Training data has no rows without NAs")
 
-  tdat <- .np_data_rows(tdat, keep.rows)
+  tdat <- tdat[keep.rows, , drop = FALSE]
   if (!is.null(y))
     y <- y[keep.rows, , drop = FALSE]
 
@@ -53,7 +53,7 @@ npudisthat <- function(bws,
       keep.eval[as.integer(rows.omit.eval)] <- FALSE
     if (!any(keep.eval))
       stop("Evaluation data has no rows without NAs")
-    edat <- .np_data_rows(edat, keep.eval)
+    edat <- edat[keep.eval, , drop = FALSE]
   }
 
   n.train <- nrow(tdat)

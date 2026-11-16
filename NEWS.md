@@ -1,7 +1,5 @@
 # np 0.80-3
 
-* Avoid copying ordinary training and evaluation columns when complete-case filtering keeps every row, preserving row names, class methods and copy-on-modify ownership.
-
 * Reuse exactly unchanged ordinary formula columns after NA processing, preserving callback effects, row metadata and copy-on-modify ownership.
 
 * Avoid duplicating already prepared formula columns when constructing model frames, preserving retained samples and callback behavior.

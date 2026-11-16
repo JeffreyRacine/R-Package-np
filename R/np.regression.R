@@ -647,10 +647,10 @@ npreg.rbandwidth <-
     if (!any(keep.rows))
       stop("Training data has no rows without NAs")
 
-    txdat <- .np_data_rows(txdat, keep.rows)
-    tydat <- .np_data_rows(tydat, keep.rows, frame = FALSE)
+    txdat <- txdat[keep.rows,,drop = FALSE]
+    tydat <- tydat[keep.rows]
     if (no.ex && !no.ey)
-      eydat <- .np_data_rows(eydat, keep.rows, frame = FALSE)
+      eydat <- eydat[keep.rows]
     resid.response <- tydat
 
     ## no.ex = missing(exdat)
@@ -669,9 +669,9 @@ npreg.rbandwidth <-
       if (!any(keep.eval))
         stop("Evaluation data has no rows without NAs")
 
-      exdat <- .np_data_rows(exdat, keep.eval)
+      exdat <- exdat[keep.eval,,drop = FALSE]
       if (!no.ey)
-        eydat <- .np_data_rows(eydat, keep.eval, frame = FALSE)
+        eydat <- eydat[keep.eval]
     }
 
     if (identical(bws$regtype, "lp") &&

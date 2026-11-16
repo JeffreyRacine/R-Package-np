@@ -1573,8 +1573,8 @@ npPreparedObjectiveDestroyConditionalDensity <- function() {
   if (length(rows.omit) > 0L)
     keep.rows[as.integer(rows.omit)] <- FALSE
 
-  xdat <- .np_data_rows(xdat, keep.rows)
-  ydat <- .np_data_rows(ydat, keep.rows)
+  xdat <- xdat[keep.rows,, drop = FALSE]
+  ydat <- ydat[keep.rows,, drop = FALSE]
 
   ymat <- toMatrix(ydat)
   xmat <- toMatrix(xdat)
@@ -4023,8 +4023,8 @@ npcdensbw.default <-
       keep.rows <- rep_len(TRUE, NROW(xdat))
       if (length(rows.omit)) keep.rows[as.integer(rows.omit)] <- FALSE
       if (!any(keep.rows)) stop("Data has no rows without NAs")
-      search.xdat <- .np_data_rows(xdat, keep.rows)
-      search.ydat <- .np_data_rows(ydat, keep.rows)
+      search.xdat <- xdat[keep.rows, , drop = FALSE]
+      search.ydat <- ydat[keep.rows, , drop = FALSE]
       degree.search$nobs <- sum(keep.rows)
 
       eval_fun <- function(degree.vec) {
