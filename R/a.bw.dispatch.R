@@ -284,6 +284,33 @@
   call_obj
 }
 
+# One owner for the selector's public call and names, including early MPI
+# publication. Only the original late selector supplies call environments.
+.np_bw_selector_finish <- function(result, expressions,
+                                    formula.expression = NULL,
+                                    value.env = NULL, caller_env = NULL) {
+  if (is.list(result) && is.call(result[["call"]])) {
+    result[["call"]] <- .np_bw_selector_finish_call(result[["call"]],
+      expressions,
+      if (!is.null(result[["formula"]])) formula.expression else NULL)
+    if (!is.null(value.env) && identical(environment(result[["call"]]), value.env))
+      environment(result[["call"]]) <- caller_env
+  }
+  if (is.list(result)) {
+    for (name in names(expressions)) {
+      binding <- paste0(".np_native_", name)
+      field <- switch(name, dat = "xnames", xdat = "xnames",
+                      ydat = "ynames", zdat = "znames")
+      if (!is.null(field) && identical(result[[field]], binding)) {
+        label <- deparse(expressions[[name]])
+        if (field != "ynames") label <- paste(label, collapse = "")
+        result <- updateBwNameMetadata(stats::setNames(list(label), field), result)
+      }
+    }
+  }
+  result
+}
+
 .np_eval_bw_call <- function(call_obj, caller_env = parent.frame(),
                              formula.value = NULL, native.map = NULL,
                              native.frame = NULL) {
@@ -337,25 +364,8 @@
       if (!is.null(formula.index)) list(formula = call_obj[[formula.index]])))
   result <- eval(native$call, envir = value.env)
   .np.bw.selector.public <- NULL
-  if (is.list(result) && is.call(result[["call"]])) {
-    result[["call"]] <- .np_bw_selector_finish_call(result[["call"]],
-      native$expressions,
-      if (!is.null(result[["formula"]])) formula.expression else NULL)
-    if (identical(environment(result[["call"]]), value.env))
-      environment(result[["call"]]) <- caller_env
-  }
-  if (is.list(result)) {
-    for (name in names(native$expressions)) {
-      binding <- paste0(".np_native_", name)
-      field <- switch(name, dat = "xnames", xdat = "xnames",
-                      ydat = "ynames", zdat = "znames")
-      if (!is.null(field) && identical(result[[field]], binding)) {
-        label <- deparse(native$expressions[[name]])
-        if (field != "ynames") label <- paste(label, collapse = "")
-        result <- updateBwNameMetadata(stats::setNames(list(label), field), result)
-      }
-    }
-  }
+  result <- .np_bw_selector_finish(result, native$expressions,
+    formula.expression, value.env, caller_env)
   result
 }
 

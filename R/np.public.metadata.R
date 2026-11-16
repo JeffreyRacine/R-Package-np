@@ -309,3 +309,41 @@
   }
   value
 }
+
+# Certify only the immediate native regression selector before promise binding.
+# This descriptor is syntax only; rejected shapes retain the incumbent route.
+.npRmpi_bw_native_selector_plan <- function(mc, owner.name, definition,
+                                            owner, caller) {
+  if (!identical(owner.name, "npregbw.default") ||
+      !identical(definition, npregbw.default)) return(NULL)
+  frames <- sys.frames()
+  parents <- sys.parents()
+  k <- which(vapply(frames, identical, logical(1L), owner))
+  if (length(k) != 1L || k < 5L ||
+      !identical(sys.function(k - 1L), npregbw) ||
+      !is.primitive(sys.function(k - 2L)) ||
+      !identical(sys.call(k - 2L), sys.call(k - 3L)) ||
+      parents[[k - 2L]] != k - 3L ||
+      !identical(sys.function(k - 3L), base::eval) ||
+      !identical(sys.function(k - 4L), .np_eval_bw_call)) return(NULL)
+  holder <- frames[[k - 4L]]
+  value.env <- get0("value.env", holder, inherits = FALSE)
+  native <- get0("native", holder, inherits = FALSE)
+  if (!is.environment(value.env) || !identical(caller, value.env) ||
+      !is.list(native) || !length(native[["values", exact = TRUE]])) return(NULL)
+  expressions <- native[["expressions", exact = TRUE]]
+  keys <- names(expressions)
+  if (!is.list(expressions) || !length(keys) || anyDuplicated(keys) ||
+      !all(c("xdat", "ydat") %in% keys) ||
+      !all(keys %in% c("xdat", "ydat", "bws")) ||
+      !all(vapply(keys, function(name)
+        identical(mc[[name]], as.name(paste0(".np_native_", name))),
+        logical(1L)))) return(NULL)
+  allowed <- vapply(keys, function(name) {
+    expr <- expressions[[name]]
+    is.symbol(expr) || (identical(name, "bws") &&
+      is.numeric(expr) && is.null(attributes(expr)))
+  }, logical(1L))
+  if (!all(allowed)) return(NULL)
+  expressions
+}

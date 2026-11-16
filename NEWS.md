@@ -6,6 +6,7 @@
 
 * Avoid transmitting an unused LSQ formula metadata frame while preserving its training samples, omission records and worker reuse.
 * Reuse matching training roles from validated worker formula frames without retransmitting the same sample; preserve explicit replacements and retained-frame ownership.
+* Reuse validated worker bandwidths for native regression fits with named training data and supplied numeric bandwidths, preserving public calls and existing expression routes.
 
 * Finalize selector-owned formula call metadata before publishing reusable worker bandwidths, preserving nested callbacks and the existing public calls.
 

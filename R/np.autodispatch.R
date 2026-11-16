@@ -1282,6 +1282,8 @@
   if (!is.null(metadata)) {
     res <- .npRmpi_native_identity_apply(res, metadata$identity)
     res <- .npRmpi_native_names_apply(res, metadata$names)
+    if (!is.null(metadata[["selector.native", exact = TRUE]]))
+      res <- .np_bw_selector_finish(res, metadata[["selector.native", exact = TRUE]])
     res <- .npRmpi_bw_formula_apply(res, metadata$formula)
   }
   publication.ack <- .npRmpi_lease_prepare_local(res, publication)
@@ -3447,6 +3449,9 @@
     if (!is.null(public.metadata)) {
       result <- .npRmpi_native_identity_apply(result, public.metadata$identity)
       result <- .npRmpi_native_names_apply(result, public.metadata$names)
+      if (!is.null(public.metadata[["selector.native", exact = TRUE]]))
+        result <- .np_bw_selector_finish(result,
+          public.metadata[["selector.native", exact = TRUE]])
       result <- .npRmpi_bw_formula_apply(result, public.metadata$formula)
     }
     result <- .npRmpi_autodispatch_attach_timing(
@@ -3569,6 +3574,9 @@
   }
   owner.call <- sys.call(method)
   mc <- .npRmpi_autodispatch_bind_call_owner(mc, owner.name, owner.call, definition)
+  selector.native <- .npRmpi_bw_native_selector_plan(mc, owner.name,
+    definition, sys.frame(method),
+    if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
   mc <- .npRmpi_autodispatch_bind_data_promises(mc, owner = sys.frame(method),
     owner.call = owner.call, definition = definition,
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
@@ -3577,6 +3585,7 @@
     list(names = .npRmpi_native_name_plan(definition, sys.frame(method),
       if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv(), values = mc),
       formula = .npRmpi_bw_formula_owner_plan(producer)) else NULL
+  if (!is.null(selector.native)) metadata$selector.native <- selector.native
   identity.families <- c("npplreg", "npscoef", "npcdens", "npcdist", "npqreg", "nplsqreg",
                          "npplregbw", "npscoefbw", "npcdensbw", "npcdistbw", "nplsqregbw")
   if (sub("\\..*$", "", owner.name) %in% identity.families &&
