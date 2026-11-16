@@ -36,7 +36,7 @@ npplregbw.formula <-
       formula, frame, capture$na.action, terms = attr(roles$yz, "terms"), xterms = attr(roles$x, "terms"),
       chromoly = spec$chromoly, ynames = names(roles$yz)[attr(attr(roles$yz, "terms"), "response")])
     tbw <- do.call(npplregbw,
-                  c(list(xdat = roles$x, ydat = model.response(roles$yz),
+                  c(list(xdat = .npRmpi_plreg_role_wire(roles$x), ydat = model.response(roles$yz),
                          zdat = roles$yz[, .np_formula_term_names(spec$chromoly[[3L]]), drop = FALSE]),
                     .np_formula_options(dots, "npplregbw.formula")))
 

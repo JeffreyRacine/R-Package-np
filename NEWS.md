@@ -8,6 +8,7 @@
 * Reuse matching training roles from validated worker formula frames without retransmitting the same sample; preserve explicit replacements and retained-frame ownership.
 * Reuse validated worker bandwidths for native regression fits with named training data and supplied numeric bandwidths, preserving public calls and existing expression routes.
 
+* Avoid transmitting caller environments on generated partially linear formula data roles while preserving public evaluation metadata.
 * Finalize selector-owned formula call metadata before publishing reusable worker bandwidths, preserving nested callbacks and the existing public calls.
 
 * Reuse matching native training roles from existing validated worker leases, preserving explicit replacements, automatic row-name state and lease mutation checks.

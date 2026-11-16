@@ -47,7 +47,7 @@ npplreg.formula <-
     bws <- .np_bws_retain_fit_frame(bws, frame)
     roles <- .np_plreg_formula_split(frame, bws$terms, bws$xterms)
     response.name <- names(roles$yz)[attr(bws$terms, "response")]
-    pl.args <- list(txdat = roles$x, tydat = model.response(roles$yz),
+    pl.args <- list(txdat = .npRmpi_plreg_role_wire(roles$x), tydat = model.response(roles$yz),
                     tzdat = roles$yz[, .np_formula_term_names(bws$chromoly[[3L]]), drop = FALSE],
                     se = se)
     umf <- frame
@@ -65,7 +65,7 @@ npplreg.formula <-
       }
       umf <- .np_formula_model_frame(tt, data = newdata)
       evaluation <- .np_plreg_formula_split(umf, yzterms, bws$xterms)
-      pl.args$exdat <- evaluation$x
+      pl.args$exdat <- .npRmpi_plreg_role_wire(evaluation$x)
       pl.args$ezdat <- evaluation$yz[, .np_formula_term_names(bws$chromoly[[3L]]), drop = FALSE]
       if (response.eval)
         pl.args$eydat <- model.response(evaluation$yz)
@@ -83,6 +83,11 @@ npplreg.formula <-
     # Residuals always index the training sample, independently of evaluation.
     if (ev$residuals)
       ev$resid <- naresid(attr(frame, "na.action"), ev$resid)
+    # Only the wrapper-owned evaluation role may recover this caller owner.
+    # Explicit native exdat keeps its own attributes even if values match.
+    if (is.null(dots[["exdat", exact = TRUE]]))
+      ev$evalx <- .npRmpi_plreg_role_restore(ev$evalx,
+        if (has.eval) evaluation$x else roles$x)
     # Native evaluation already owns its row omissions and padding.
     if (native.eval)
       return(ev)

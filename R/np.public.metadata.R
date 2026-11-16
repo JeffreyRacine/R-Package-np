@@ -347,3 +347,21 @@
   if (!all(allowed)) return(NULL)
   expressions
 }
+
+# Formula wrappers own these generated descriptive terms. Native arithmetic
+# consumes their prepared columns, not the caller's evaluation environment.
+.npRmpi_plreg_role_wire <- function(x) {
+  tt <- attr(x, "terms", exact = TRUE)
+  if (inherits(tt, "terms") && is.environment(attr(tt, ".Environment", exact = TRUE))) {
+    attr(tt, ".Environment") <- emptyenv()
+    attr(x, "terms") <- tt
+  }
+  x
+}
+
+.npRmpi_plreg_role_restore <- function(x, original) {
+  expected <- attr(.npRmpi_plreg_role_wire(original), "terms", exact = TRUE)
+  if (!is.null(expected) && identical(attr(x, "terms", exact = TRUE), expected))
+    attr(x, "terms") <- attr(original, "terms", exact = TRUE)
+  x
+}

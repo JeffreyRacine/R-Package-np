@@ -264,7 +264,7 @@
       fit.coef <- if (identical(plot.errors.method, "asymptotic")) {
         npplreg(
           bws = bws,
-          txdat = xdat,
+          txdat = .npRmpi_plreg_role_wire(xdat),
           tydat = ydat,
           tzdat = zdat,
           se = TRUE
@@ -279,6 +279,7 @@
           se = plot.errors || plot.behavior != "plot"
         )
       }
+      fit.coef$evalx <- .npRmpi_plreg_role_restore(fit.coef$evalx, xdat)
       cf <- as.double(fit.coef$xcoef)
       se <- as.double(fit.coef$xcoeferr)
       cf.names <- if (!is.null(names(fit.coef$xcoef))) names(fit.coef$xcoef) else bws$xnames

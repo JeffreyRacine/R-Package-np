@@ -7338,10 +7338,10 @@
     prefer.local.single_worker = prefer.local.single_worker,
     master_local_chunk = TRUE,
     required.bindings = list(
-      txdat = txdat,
+      txdat = .npRmpi_plreg_role_wire(txdat),
       ydat = ydat,
       tzdat = tzdat,
-      exdat = exdat,
+      exdat = .npRmpi_plreg_role_wire(exdat),
       ezdat = ezdat,
       bws = bws,
       x.train.num = x.train.num,
@@ -13988,14 +13988,16 @@ plotFactor <- function(f, y, ...){
 
     fit <- npplreg(
       bws = bws,
-      txdat = xdat,
+      txdat = .npRmpi_plreg_role_wire(xdat),
       tydat = ydat,
       tzdat = zdat,
-      exdat = exdat,
+      exdat = .npRmpi_plreg_role_wire(exdat),
       ezdat = ezdat,
       se = TRUE,
       .np.defer.empty.rows = TRUE
     )
+
+    fit$evalx <- .npRmpi_plreg_role_restore(fit$evalx, exdat)
 
     empty.rows <- attr(fit, ".np.empty.rows", exact = TRUE)
     valid <- is.finite(fit$mean)
