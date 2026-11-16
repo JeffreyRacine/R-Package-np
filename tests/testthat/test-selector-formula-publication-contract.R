@@ -52,17 +52,21 @@ test_that("direct formula fits consume their already-finalized worker bandwidth"
 test_that("a callback replay is not the outer selector's own constructor", {
   if (!spawn_mpi_slaves(1L)) skip("MPI pool unavailable")
   on.exit(close_mpi_slaves(), add = TRUE)
-  selector <- getFromNamespace(".np_eval_bw_call", "npRmpi")
-  child <- NULL; busy <- FALSE
-  policy <- function(frame) {
+  # The callback owns only its observation state, not the test runner or the
+  # fitted objects/closures retained by preceding tests in this file.
+  observer <- new.env(parent = baseenv())
+  observer$child <- NULL
+  observer$busy <- FALSE
+  policy <- eval(quote(function(frame) {
     if (!busy) {
       busy <<- TRUE
       on.exit({ busy <<- FALSE }, add = TRUE)
       frames <- sys.frames()
       at <- which(vapply(seq_along(frames), function(i)
-        identical(sys.function(i), selector), logical(1L)))
-      expect_gt(length(at), 0L)
-      owner <- frames[[tail(at, 1L)]]
+        identical(sys.function(i), get(".np_eval_bw_call",
+          envir = asNamespace("npRmpi"))), logical(1L)))
+      testthat::expect_gt(length(at), 0L)
+      owner <- frames[[at[[length(at)]]]]
       replay <- get("native", owner)$call
       # The prepared-frame capture belongs to one fitter invocation and is
       # intentionally single-use. The child replays the exact formula/data
@@ -70,16 +74,22 @@ test_that("a callback replay is not the outer selector's own constructor", {
       replay[[".np.formula.state"]] <- NULL
       if (".np.formula.state" %in% names(replay[["..."]]))
         replay[["..."]][[".np.formula.state"]] <- NULL
-      child <<- eval(replay, get("value.env", owner))
+      got <- eval(replay, get("value.env", owner))
+      # Observe the ownership contract without retaining the synthetic child's
+      # handoff closures in the policy later transported with the outer fit.
+      child <<- list(is.bandwidth = inherits(got, "rbandwidth"),
+                     formula.head = got$call$formula[[1L]],
+                     data.is.call = is.call(got$call$data))
     }
     stats::na.omit(frame)
-  }
+  }), observer)
   i <- seq_len(24L); d <- data.frame(x = sin(i), y = cos(i))
   fit <- npreg(y ~ x, data = d, na.action = policy, bws = .5,
                bandwidth.compute = FALSE, se = FALSE)
-  expect_s3_class(child, "rbandwidth")
-  expect_identical(child$call$formula[[1L]], quote(quote))
-  expect_true(is.call(child$call$data))
+  child <- observer$child
+  expect_true(child$is.bandwidth)
+  expect_identical(child$formula.head, quote(quote))
+  expect_true(child$data.is.call)
   expect_identical(fit$bws$call$formula, quote(y ~ x))
   expect_identical(fit$bws$call$data, quote(d))
 })
