@@ -72,19 +72,12 @@ npcdistbw.formula <-
     seed.args <- c(list(xdat = xdat, ydat = ydat),
                    if (has.gval) list(gydat = gydat) else list(),
                    dots)
+    .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
+      "npcdistbw", match.call(expand.dots = FALSE), parent.frame(),
+      formula, mf, capture$na.action)
+    .npRmpi.bw.metadata$variableNames <- variableNames
     tbw <- do.call(npcdistbw, .np_formula_options(seed.args, "npcdistbw.formula"))
-
-    ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npcdistbw")
-    environment(tbw$call) <- parent.frame()
-    tbw$formula <- formula
-    tbw$rows.omit <- as.vector(attr(mf,"na.action"))
-    tbw$nobs.omit <- length(tbw$rows.omit)
-    tbw$terms <- attr(mf,"terms")
-    tbw <- .np_bws_retain_formula_training(tbw, mf, capture$na.action)
-    tbw$variableNames <- variableNames
-
-    tbw
+    .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
 
 .npRmpi_with_local_cdist_eval <- function(expr) {
@@ -3139,14 +3132,14 @@ npcdistbw.NULL <-
 
     bws = double(ncol(ydat)+ncol(xdat))
 
-    tbw <- do.call(npcdistbw.default, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
-
-    ## clean up (possible) inconsistencies due to recursion ...
+    # Final public metadata must precede immutable worker publication.
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- .np_public_replay_call(mc, "npcdistbw")
+    .npRmpi.bw.metadata <- list(producer = "npcdistbw",
+      call = .np_public_replay_call(mc, "npcdistbw"))
 
-    tbw
+    tbw <- do.call(npcdistbw.default, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
+    .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
 
 npcdistbw.default <-

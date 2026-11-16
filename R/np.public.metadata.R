@@ -3,6 +3,17 @@
 # an executable method. The original formula wrapper reapplies this pure finish.
 .npRmpi_bw_formula_apply <- function(value, plan) {
   if (is.null(plan)) return(value)
+  if (plan$producer %in% c("npcdensbw", "npcdistbw")) {
+    value$call <- plan$call
+    if (is.null(plan[["formula", exact = TRUE]])) return(value)
+    value$formula <- plan$formula
+    value$rows.omit <- as.vector(attr(plan$frame, "na.action"))
+    value$nobs.omit <- length(value$rows.omit)
+    value$terms <- plan$terms
+    value <- .np_bws_retain_formula_training(value, plan$frame, plan$na.action)
+    value$variableNames <- plan$variableNames
+    return(value)
+  }
   if (identical(plan$producer, "nplsqregbw")) {
     # The vector combiner inherits its first scalar child's metadata. The
     # original formula wrapper appended aggregate terms after the tau fields.
@@ -69,9 +80,16 @@
   expected <- get0(paste0(producer, ".formula"), envir = asNamespace("npRmpi"),
                    mode = "function", inherits = FALSE)
   if (!is.function(expected)) return(NULL)
+  native <- if (producer %in% c("npcdensbw", "npcdistbw"))
+    get0(paste0(producer, ".NULL"), envir = asNamespace("npRmpi"),
+         mode = "function", inherits = FALSE) else NULL
+  native.plan <- NULL
   parents <- sys.parents()
   at <- sys.parent()
   while (at > 0L) {
+    if (is.function(native) && identical(sys.function(at), native))
+      native.plan <- get0(".npRmpi.bw.metadata", envir = sys.frame(at),
+                         inherits = FALSE)
     if (identical(sys.function(at), expected)) {
       plan <- get0(".npRmpi.bw.metadata", envir = sys.frame(at), inherits = FALSE)
       # Vector-tau wrappers change only formula terms and labels on children;
@@ -82,7 +100,7 @@
     }
     at <- parents[[at]]
   }
-  NULL
+  native.plan
 }
 
 .npRmpi_native_name_plan <- function(definition, owner, caller, values,
@@ -187,7 +205,8 @@
   for (original in originals) {
     if (is.null(original[["formula", exact = TRUE]])) next
     if (!inherits(original, c("rbandwidth", "sibandwidth", "scbandwidth",
-                             "plbandwidth", "lsqregressionbandwidth"))) next
+                             "plbandwidth", "lsqregressionbandwidth",
+                             "conbandwidth", "condbandwidth"))) next
     restore <- function(value, reference) {
       fields <- c("call", "formula", "terms", "xterms", ".np.formula.training")
       metadata <- function(x) {

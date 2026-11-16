@@ -49,19 +49,12 @@ npcdensbw.formula <-
     dots <- list(...)
     .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], mf)
     dots$.np.formula.state <- NULL
+    .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
+      "npcdensbw", match.call(expand.dots = FALSE), parent.frame(),
+      formula, mf, capture$na.action)
+    .npRmpi.bw.metadata$variableNames <- variableNames
     tbw <- do.call(npcdensbw, c(list(xdat = xdat, ydat = ydat), .np_formula_options(dots, "npcdensbw.formula")))
-
-    ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npcdensbw")
-    environment(tbw$call) <- parent.frame()
-    tbw$formula <- formula
-    tbw$rows.omit <- as.vector(attr(mf,"na.action"))
-    tbw$nobs.omit <- length(tbw$rows.omit)
-    tbw$terms <- attr(mf,"terms")
-    tbw <- .np_bws_retain_formula_training(tbw, mf, capture$na.action)
-    tbw$variableNames <- variableNames
-
-    tbw
+    .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
 
 .npcdensbw_assert_bounded_cvls_supported <- function(bws,
@@ -3917,14 +3910,14 @@ npcdensbw.NULL <-
 
     bws = double(ncol(ydat)+ncol(xdat))
 
-    tbw <- do.call(npcdensbw.default, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
-
-    ## clean up (possible) inconsistencies due to recursion ...
+    # Final public metadata must precede immutable worker publication.
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
-    tbw$call <- .np_public_replay_call(mc, "npcdensbw")
+    .npRmpi.bw.metadata <- list(producer = "npcdensbw",
+      call = .np_public_replay_call(mc, "npcdensbw"))
 
-    tbw
+    tbw <- do.call(npcdensbw.default, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
+    .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
 
 npcdensbw.default <-

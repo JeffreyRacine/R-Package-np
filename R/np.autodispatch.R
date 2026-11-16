@@ -240,16 +240,19 @@
 .npRmpi_lease_capability_table <- function() {
   data.frame(
     producer = c("npregbw", "nplsqregbw", "npplregbw", "npindexbw", "npscoefbw",
-                 ".npscoefbw_nomad_context_prepare"),
-    kind = c(rep("leased_public", 5L), "scoped_internal"),
+                 ".npscoefbw_nomad_context_prepare",
+                 "npcdensbw", "npcdistbw"),
+    kind = c(rep("leased_public", 5L), "scoped_internal", rep("leased_public", 2L)),
     capability = c("bw.npreg", "bw.nplsqreg", "bw.npplreg", "bw.npindex", "bw.npscoef",
-                   "internal.npscoef.nomad_context"),
+                   "internal.npscoef.nomad_context",
+                   "bw.npcdens", "bw.npcdist"),
     consumer = c("npreg", "nplsqreg", "npplreg", "npindex", "npscoef",
-                 ".npscoefbw_nomad_pool_start"),
-    argument = c(rep("bws", 5L), "ctx"),
+                 ".npscoefbw_nomad_pool_start", "npcdens", "npcdist"),
+    argument = c(rep("bws", 5L), "ctx", rep("bws", 2L)),
     expected_class = c("rbandwidth", "lsqregressionbandwidth", "plbandwidth",
-                       "sibandwidth", "scbandwidth", "list"),
-    fingerprint_policy = c(rep("bandwidth.v1", 5L), "context.v1"),
+                       "sibandwidth", "scbandwidth", "list",
+                       "conbandwidth", "condbandwidth"),
+    fingerprint_policy = c(rep("bandwidth.v1", 5L), "context.v1", rep("bandwidth.v1", 2L)),
     stringsAsFactors = FALSE
   )
 }
@@ -274,7 +277,13 @@
 .npRmpi_lease_producer <- function(mc) {
   if (.npRmpi_lease_is_context_call(mc))
     return(".npscoefbw_nomad_context_prepare")
-  sub("\\..*$", "", .npRmpi_autodispatch_call_name(mc))
+  producer <- sub("\\..*$", "", .npRmpi_autodispatch_call_name(mc))
+  # Inner conditional methods return candidates that the search still modifies.
+  # Only a completed default-method result is a reusable publication producer.
+  if (producer %in% c("npcdensbw", "npcdistbw") &&
+      (!isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE)) ||
+       !identical(mc[[1L]], as.name(paste0(producer, ".default"))))) return("")
+  producer
 }
 
 .npRmpi_lease_require_open <- function() {
@@ -3575,13 +3584,14 @@
     owner.call = owner.call, definition = definition,
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
   producer <- .npRmpi_lease_producer(mc)
-  metadata <- if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw"))
+  metadata <- if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw",
+                         "npcdensbw", "npcdistbw"))
     list(names = list(), formula = .npRmpi_bw_formula_owner_plan(producer)) else NULL
   if (!is.null(selector.native)) metadata$selector.native <- selector.native
   identity.families <- c("npplreg", "npscoef", "npcdens", "npcdist", "npqreg", "nplsqreg",
                          "npplregbw", "npscoefbw", "npcdensbw", "npcdistbw", "nplsqregbw")
   if (sub("\\..*$", "", owner.name) %in% identity.families &&
-      is.null(metadata$formula)) {
+      is.null(metadata$formula[["formula", exact = TRUE]])) {
     identity <- .npRmpi_native_identity_plan(definition, mc, sys.frame(method),
       if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
     if (length(identity)) {
@@ -3589,7 +3599,8 @@
       metadata$identity <- identity
     }
   }
-  if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw"))
+  if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw",
+                         "npcdensbw", "npcdistbw"))
     metadata$names <- .npRmpi_native_name_plan(definition, sys.frame(method),
       if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv(),
       values = mc, identity.roles = names(metadata$identity))

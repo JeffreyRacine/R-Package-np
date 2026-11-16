@@ -1,5 +1,10 @@
 # npRmpi 0.80-3
 
+* Completed conditional-density and conditional-distribution bandwidths can
+  reuse their retained worker data during automatic MPI estimation. Intermediate
+  degree-search candidates remain unleased; public bandwidth ownership and
+  invalidation rules are unchanged.
+
 * Avoid retransmitting native MPI name metadata already supplied by the same call's identity metadata, preserving existing labels and ownership.
 
 * Restore fitting, standard errors, prediction and plot-data without error bands for the bundled OECD bandwidth object by adding its missing local-linear engine metadata. Preserve the old bandwidths and dataset; add no training-data copy. Validate these bundled-object routes during release checks.
