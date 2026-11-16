@@ -85,14 +85,16 @@
   NULL
 }
 
-.npRmpi_native_name_plan <- function(definition, owner, caller, values) {
+.npRmpi_native_name_plan <- function(definition, owner, caller, values,
+                                    identity.roles = character()) {
   if (!is.function(definition)) return(list())
   out <- list()
   for (name in c("ynames", "xnames", "znames")) {
     roles <- switch(name, ynames = c("ydat", "tydat"),
       xnames = c("xdat", "txdat", "dat", "tdat"), znames = c("zdat", "tzdat"))
     role <- intersect(roles, names(formals(definition)))
-    if (length(role) && role[[1L]] %in% names(values) &&
+    if (length(role) && !role[[1L]] %in% identity.roles &&
+        role[[1L]] %in% names(values) &&
         is.atomic(values[[role[[1L]]]]) && is.null(dim(values[[role[[1L]]]]))) {
       expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))), owner)
       out[name] <- list(.np_formula_dot_expression(expr, caller))

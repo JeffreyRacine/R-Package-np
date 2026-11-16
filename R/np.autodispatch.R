@@ -3576,9 +3576,7 @@
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
   producer <- .npRmpi_lease_producer(mc)
   metadata <- if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw"))
-    list(names = .npRmpi_native_name_plan(definition, sys.frame(method),
-      if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv(), values = mc),
-      formula = .npRmpi_bw_formula_owner_plan(producer)) else NULL
+    list(names = list(), formula = .npRmpi_bw_formula_owner_plan(producer)) else NULL
   if (!is.null(selector.native)) metadata$selector.native <- selector.native
   identity.families <- c("npplreg", "npscoef", "npcdens", "npcdist", "npqreg", "nplsqreg",
                          "npplregbw", "npscoefbw", "npcdensbw", "npcdistbw", "nplsqregbw")
@@ -3591,6 +3589,10 @@
       metadata$identity <- identity
     }
   }
+  if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw"))
+    metadata$names <- .npRmpi_native_name_plan(definition, sys.frame(method),
+      if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv(),
+      values = mc, identity.roles = names(metadata$identity))
   .npRmpi_with_deferred_package_warnings({
     result <- .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env,
       comm = comm, warn_nested = TRUE, public.metadata = metadata,
