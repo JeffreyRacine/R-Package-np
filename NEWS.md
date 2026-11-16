@@ -1,5 +1,11 @@
 # np 0.80-3
 
+* Plot-only, fixed-bound univariate beta bias correction now admits kernel orders
+  4, 6 and 8 for asymptotic `band="pmzsd"`, retaining the existing corrected center
+  and complete ratio-pilot normal variance. Calibrated bands are unchanged.
+  Sparse-boundary and small-bandwidth multimodal pointwise limitations remain;
+  this does not add higher-order two-dimensional or bootstrap normal bands.
+
 * Plot-only `smoothed-beta-binomial` symmetric-SD density bands now also support
   fixed-bound, univariate Epanechnikov orders six and eight, retaining the complete
   guide correction and original-scale uncertainty. All other restrictions remain.
