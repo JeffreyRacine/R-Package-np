@@ -242,6 +242,16 @@
   call
 }
 
+.np_bw_selector_call_identical <- function(a, b) {
+  if (identical(a, b)) return(TRUE)
+  if (!is.call(a) || !is.call(b) ||
+      (is.null(attr(a, "srcref", exact = TRUE)) &&
+       is.null(attr(b, "srcref", exact = TRUE)))) return(FALSE)
+  attr(a, "srcref") <- NULL
+  attr(b, "srcref") <- NULL
+  identical(a, b)
+}
+
 .np_bw_selector_formula_call <- function(call, producer, method.frame,
                                             method.name = "formula") {
   # Only the method invoked immediately by this selector owns its public
@@ -257,7 +267,7 @@
       !identical(sys.function(k), method) ||
       !identical(sys.function(k - 1L), generic) ||
       !is.primitive(sys.function(k - 2L)) ||
-      !identical(sys.call(k - 2L), sys.call(k - 3L)) ||
+      !.np_bw_selector_call_identical(sys.call(k - 2L), sys.call(k - 3L)) ||
       sys.parents()[[k - 2L]] != k - 3L ||
       !identical(sys.function(k - 3L), base::eval) ||
       !identical(sys.function(k - 4L), .np_eval_bw_call)) return(call)

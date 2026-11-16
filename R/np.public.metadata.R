@@ -18,7 +18,7 @@
       logical(1L)))) return(FALSE)
   owner <- NULL
   if (k >= 5L && is.primitive(sys.function(k - 2L)) &&
-      identical(sys.call(k - 2L), sys.call(k - 3L)) &&
+      .np_bw_selector_call_identical(sys.call(k - 2L), sys.call(k - 3L)) &&
       sys.parents()[[k - 2L]] == k - 3L &&
       identical(sys.function(k - 3L), base::eval) &&
       identical(sys.function(k - 4L), .np_eval_bw_call)) {
@@ -571,7 +571,7 @@
   if (length(k) != 1L || k < 5L ||
       !identical(sys.function(k - 1L), generic) ||
       !is.primitive(sys.function(k - 2L)) ||
-      !identical(sys.call(k - 2L), sys.call(k - 3L)) ||
+      !.np_bw_selector_call_identical(sys.call(k - 2L), sys.call(k - 3L)) ||
       parents[[k - 2L]] != k - 3L ||
       !identical(sys.function(k - 3L), base::eval) ||
       !identical(sys.function(k - 4L), .np_eval_bw_call)) return(NULL)

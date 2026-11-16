@@ -1,5 +1,8 @@
 # npRmpi 0.80-3
 
+* Preserve certified MPI bandwidth reuse when an installation retains R source
+  annotations, without relaxing expression or caller-ownership checks.
+
 * Reuse already transmitted conditional training data in public-call metadata
   when its original shape and attributes can be reconstructed exactly, without
   expanding compact inputs during the reuse check. Other inputs retain the
