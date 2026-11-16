@@ -3138,7 +3138,8 @@ npcdistbw.NULL <-
     public.call <- .np_public_replay_call(mc, "npcdistbw")
     public.call <- .np_bw_selector_formula_call(public.call, "npcdistbw",
       environment(), method.name = "NULL")
-    .npRmpi.bw.metadata <- list(producer = "npcdistbw", call = public.call)
+    .npRmpi.bw.metadata <- list(producer = "npcdistbw", call = public.call,
+      temporary = .npRmpi_bw_publication_temporary("npcdistbw", environment()))
 
     tbw <- do.call(npcdistbw.default, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
     .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)

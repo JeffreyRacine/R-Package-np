@@ -282,7 +282,8 @@
   # Only a completed default-method result is a reusable publication producer.
   if (producer %in% c("npcdensbw", "npcdistbw") &&
       (!isTRUE(attr(mc, ".npRmpi.bound.call.owner", exact = TRUE)) ||
-       !identical(mc[[1L]], as.name(paste0(producer, ".default"))))) return("")
+       !identical(mc[[1L]], as.name(paste0(producer, ".default"))) ||
+       isTRUE(attr(mc, ".npRmpi.publication.temporary", exact = TRUE)))) return("")
   producer
 }
 
@@ -857,6 +858,8 @@
   # Expanding arguments does not change the already established call owner.
   attr(out, ".npRmpi.bound.call.owner") <-
     attr(mc, ".npRmpi.bound.call.owner", exact = TRUE)
+  attr(out, ".npRmpi.publication.temporary") <-
+    attr(mc, ".npRmpi.publication.temporary", exact = TRUE)
   out
 }
 
@@ -3351,6 +3354,7 @@
     payload$call.owner <- as.character(owner)
     payload$call.binding <- as.character(head)
     attr(payload$call, ".npRmpi.bound.call.owner") <- NULL
+    attr(payload$call, ".npRmpi.publication.temporary") <- NULL
   }
 
   # Package command temporaries belong to this child frame, never a worker's
@@ -3589,6 +3593,15 @@
   metadata <- if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw",
                          "npcdensbw", "npcdistbw"))
     list(names = list(), formula = .npRmpi_bw_formula_owner_plan(producer)) else NULL
+  if (producer %in% c("npcdensbw", "npcdistbw") &&
+      (if (!is.null(metadata$formula))
+         isTRUE(metadata$formula[["temporary", exact = TRUE]]) else
+         .npRmpi_bw_publication_temporary(producer, sys.frame(method)))) {
+    attr(mc, ".npRmpi.publication.temporary") <- TRUE
+    producer <- .npRmpi_lease_producer(mc)
+    metadata <- NULL
+    selector.native <- NULL
+  }
   if (!is.null(selector.native)) {
     metadata$selector.native <- selector.native
     if (producer %in% c("npcdensbw", "npcdistbw"))

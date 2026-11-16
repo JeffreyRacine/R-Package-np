@@ -113,3 +113,37 @@ test_that("conditional call-only metadata preserves native state and owner", {
     expect_null(after[["formula", exact = TRUE]])
   }
 })
+
+test_that("a certified temporary decision survives argument expansion only internally", {
+  producer <- getFromNamespace(".npRmpi_lease_producer", "npRmpi")
+  expand <- getFromNamespace(".npRmpi_autodispatch_expand_dots_call", "npRmpi")
+  wire <- getFromNamespace(".npRmpi_bw_metadata_wire", "npRmpi")
+  for (family in c("npcdensbw", "npcdistbw")) {
+    call <- as.call(list(as.name(paste0(family, ".default")), xdat = quote(x),
+                        ydat = quote(y), ... = pairlist(bandwidth.compute = FALSE)))
+    attr(call, ".npRmpi.bound.call.owner") <- TRUE
+    expect_identical(producer(expand(call)), family)
+    attr(call, ".npRmpi.publication.temporary") <- TRUE
+    expect_identical(producer(expand(call)), "")
+    metadata <- list(formula = list(producer = family, call = quote(f()), temporary = TRUE))
+    projected <- wire(metadata)
+    expect_null(projected$formula[["temporary", exact = TRUE]])
+    expect_true(metadata$formula$temporary)
+  }
+  temporary <- getFromNamespace(".npRmpi_bw_publication_temporary", "npRmpi")
+  expect_false(temporary("npcdistbw", environment()))
+  expect_false(temporary("npregbw", environment()))
+})
+
+test_that("selector labels belong to the coordinator formatting context", {
+  finish <- getFromNamespace(".np_bw_selector_finish", "npRmpi")
+  old <- options(scipen = 999); on.exit(options(old), add = TRUE)
+  expressions <- list(xdat = quote(x/1e5), ydat = quote(y/1e5))
+  labels <- lapply(expressions, deparse)
+  before <- list(call = quote(npcdensbw(xdat = .np_native_xdat, ydat = .np_native_ydat)),
+                 xnames = ".np_native_xdat", ynames = ".np_native_ydat")
+  expected <- finish(before, expressions)
+  options(scipen = 0)
+  expect_identical(finish(before, expressions, public.names = labels), expected)
+  expect_identical(finish(expected, expressions, public.names = labels), expected)
+})

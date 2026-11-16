@@ -1,3 +1,46 @@
+# An internal secondary fit cannot consume a conditional bandwidth lease.
+# Certify only its immediate package-owned selector/formula-dispatch chain;
+# user wrappers, callback ancestors and previously returned bandwidths are not
+# evidence of temporary ownership. The caller carries this decision once.
+.npRmpi_bw_publication_temporary <- function(producer, method.frame) {
+  consumer <- switch(producer, npcdensbw = "npconmode.default",
+                     npcdistbw = "npqreg.default")
+  if (is.null(consumer)) return(FALSE)
+  ns <- asNamespace("npRmpi")
+  generic <- get0(producer, ns, mode = "function", inherits = FALSE)
+  frames <- sys.frames()
+  k <- which(vapply(frames, identical, logical(1L), method.frame))
+  if (length(k) != 1L || k < 4L ||
+      !identical(sys.function(k - 1L), generic)) return(FALSE)
+  methods <- paste0(producer, c(".formula", ".NULL", ".default"))
+  if (!any(vapply(methods, function(name)
+      identical(sys.function(k), get0(name, ns, mode = "function", inherits = FALSE)),
+      logical(1L)))) return(FALSE)
+  owner <- NULL
+  if (k >= 5L && is.primitive(sys.function(k - 2L)) &&
+      identical(sys.call(k - 2L), sys.call(k - 3L)) &&
+      sys.parents()[[k - 2L]] == k - 3L &&
+      identical(sys.function(k - 3L), base::eval) &&
+      identical(sys.function(k - 4L), .np_eval_bw_call)) {
+    holder <- frames[[k - 4L]]
+    value.env <- get0("value.env", holder, inherits = FALSE)
+    if (!is.environment(value.env) ||
+        !identical(frames[[k - 2L]], value.env)) return(FALSE)
+    owner <- get0("native.frame", holder, inherits = FALSE)
+  } else if (identical(sys.function(k - 2L), base::do.call) &&
+             identical(sys.function(k - 3L), .np_formula_dispatch_call)) {
+    holder <- frames[[k - 3L]]
+    if (!identical(get0("fun", holder, inherits = FALSE), generic)) return(FALSE)
+    owner <- get0("envir", holder, inherits = FALSE)
+    if (!is.environment(owner) ||
+        !identical(frames[[sys.parents()[[k]]]], owner)) return(FALSE)
+  }
+  if (!is.environment(owner)) return(FALSE)
+  at <- which(vapply(frames, identical, logical(1L), owner))
+  length(at) == 1L && identical(sys.function(at),
+    get0(consumer, ns, mode = "function", inherits = FALSE))
+}
+
 # Metadata belonging to the public producer must precede immutable publication.
 # Descriptors contain values already owned by that producer, never its frame or
 # an executable method. The original formula wrapper reapplies this pure finish.
@@ -52,10 +95,13 @@
   environment(call) <- owner
   if (identical(producer, "nplsqregbw"))
     environment(call) <- .np_call_owner_environment(owner)
-  list(producer = producer, call = call, formula = formula, frame = frame,
+  plan <- list(producer = producer, call = call, formula = formula, frame = frame,
        na.action = na.action, terms = terms, xterms = xterms,
        chromoly = chromoly, ynames = ynames, omit = attr(frame, "na.action"),
        scalar.children = scalar.children)
+  if (producer %in% c("npcdensbw", "npcdistbw"))
+    plan$temporary <- .npRmpi_bw_publication_temporary(producer, parent.frame())
+  plan
 }
 
 .npRmpi_bw_formula_finish <- function(value, plan) {
@@ -153,6 +199,9 @@
 }
 
 .npRmpi_bw_metadata_wire <- function(metadata) {
+  # The coordinator has already used this local owner decision; it is not
+  # descriptive metadata and does not belong in the worker payload.
+  if (is.list(metadata$formula)) metadata$formula$temporary <- NULL
   # Formula evaluation belongs to the coordinator that already made the model
   # frame. Worker leases retain its descriptive AST and data, not that caller's
   # unrelated objects. bandwidth.v1 already treats these environments this way;
