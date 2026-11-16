@@ -350,12 +350,16 @@
 
 # Formula wrappers own these generated descriptive terms. Native arithmetic
 # consumes their prepared columns, not the caller's evaluation environment.
+.npRmpi_terms_owner_wire <- function(tt) {
+  if (inherits(tt, "terms") && is.environment(attr(tt, ".Environment", exact = TRUE)))
+    attr(tt, ".Environment") <- emptyenv()
+  tt
+}
+
 .npRmpi_plreg_role_wire <- function(x) {
   tt <- attr(x, "terms", exact = TRUE)
-  if (inherits(tt, "terms") && is.environment(attr(tt, ".Environment", exact = TRUE))) {
-    attr(tt, ".Environment") <- emptyenv()
-    attr(x, "terms") <- tt
-  }
+  if (inherits(tt, "terms") && is.environment(attr(tt, ".Environment", exact = TRUE)))
+    attr(x, "terms") <- .npRmpi_terms_owner_wire(tt)
   x
 }
 

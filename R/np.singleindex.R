@@ -175,6 +175,7 @@ npindex.formula <-
             bws
         }
 
+        if (inherits(si.bws, "sibandwidth")) txdat <- .np_index_role_wire(txdat)
         si.args <- list(txdat = txdat, tydat = tydat, y.eval = y.eval)
         if (has.eval) {
           response <- .np_index_diagnostics_response(response,
@@ -811,7 +812,10 @@ npindex.sibandwidth <-
       )
       result <- do.call(npindex, local.args)
       result <- .npRmpi_autodispatch_tag_result(result, mode = "auto")
-      return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
+      result <- .npRmpi_restore_nomad_fit_bws_metadata(result, bws)
+      result$bws <- .np_index_bandwidth_terms_restore(
+        result$bws, bws[["index.design", exact = TRUE]][["terms", exact = TRUE]])
+      return(result)
     }
     if (.npRmpi_autodispatch_active() &&
         !(isTRUE(gradients) && identical(bws$type, "generalized_nn"))) {
@@ -828,7 +832,10 @@ npindex.sibandwidth <-
       }
       dispatch.call$.np.defer.empty.rows <- TRUE
       result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npindex.sibandwidth")
-      return(.npreg_finish_empty_rows(.npRmpi_restore_nomad_fit_bws_metadata(result, bws),
+      result <- .npRmpi_restore_nomad_fit_bws_metadata(result, bws)
+      result$bws <- .np_index_bandwidth_terms_restore(
+        result$bws, bws[["index.design", exact = TRUE]][["terms", exact = TRUE]])
+      return(.npreg_finish_empty_rows(result,
         defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]), owner = "npindex"))
     }
 

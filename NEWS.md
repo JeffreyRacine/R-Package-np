@@ -9,6 +9,7 @@
 * MPI plotting retains an existing valid bandwidth lease through plot entry while preserving dispatch-mode and mutation checks.
 
 * Reuse validated worker bandwidths for native regression fits with named training data and supplied numeric bandwidths, preserving public calls and existing expression routes.
+* Single-index MPI transport omits resolved descriptive formula environments and restores their original public ownership.
 
 * Avoid transmitting caller environments on generated partially linear formula data roles while preserving public evaluation metadata.
 * Finalize selector-owned formula call metadata before publishing reusable worker bandwidths, preserving nested callbacks and the existing public calls.

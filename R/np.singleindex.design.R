@@ -94,6 +94,52 @@
   if (is.null(design)) bws$xnames else design$raw.names
 }
 
+# Prepared ordinary designs no longer evaluate their formula environment.
+# Keep original public terms locally and project only the transient wire header.
+.np_index_terms_wire <- function(tt) {
+  owner <- attr(tt, ".Environment", exact = TRUE)
+  if (!identical(class(tt), c("terms", "formula")) ||
+      !is.environment(owner) || identical(owner, baseenv()) ||
+      identical(owner, globalenv()) || identical(owner, emptyenv()))
+    return(tt)
+  .npRmpi_terms_owner_wire(tt)
+}
+
+.np_index_role_wire <- function(xdat) {
+  tt <- attr(xdat, ".np.index.terms", exact = TRUE)
+  if (!is.null(tt)) attr(xdat, ".np.index.terms") <- .np_index_terms_wire(tt)
+  xdat
+}
+
+.np_index_bandwidth_terms_restore <- function(bws, schema.terms,
+                                             role.terms = schema.terms) {
+  if (is.null(bws) || is.null(schema.terms)) return(bws)
+  design <- bws[["index.design", exact = TRUE]]
+  if (!is.null(design) &&
+      identical(design[["terms", exact = TRUE]], .np_index_terms_wire(schema.terms))) {
+    design[["terms"]] <- schema.terms
+    bws[["index.design"]] <- design
+  }
+  restore.role <- function(x) {
+    if (!is.null(role.terms) &&
+        identical(attr(x, ".np.index.terms", exact = TRUE),
+                  .np_index_terms_wire(role.terms)))
+      attr(x, ".np.index.terms") <- role.terms
+    x
+  }
+  training <- bws[[".np.native.training", exact = TRUE]]
+  if (!is.null(training[["xdat", exact = TRUE]])) {
+    training[["xdat"]] <- restore.role(training[["xdat", exact = TRUE]])
+    bws[[".np.native.training"]] <- training
+  }
+  call <- bws[["call", exact = TRUE]]
+  if (is.call(call) && is.data.frame(call[["xdat"]])) {
+    call[["xdat"]] <- restore.role(call[["xdat"]])
+    bws[["call"]] <- call
+  }
+  bws
+}
+
 # Resolve contrasts in the calling session, not independently on each rank.
 # The private transport cache is consumed by the constructor and never retained
 # in the public training frame. Numeric-only calls keep the original payload.
@@ -105,6 +151,10 @@
   if (is.null(prepared)) prepared <- .np_index_design_train(xdat, ydat)
   if (is.null(prepared))
     return(.npRmpi_autodispatch_call(mc, caller.env, owner.name = owner.name))
+  original.terms <- prepared$schema$terms
+  original.role.terms <- attr(xdat, ".np.index.terms", exact = TRUE)
+  prepared$schema$terms <- .np_index_terms_wire(original.terms)
+  xdat <- .np_index_role_wire(xdat)
   attr(xdat, ".np.index.prepared") <- prepared
   mc[[data.names[1L]]] <- xdat
   mc[[data.names[2L]]] <- ydat
@@ -123,7 +173,7 @@
       attr(call[["xdat"]], ".np.index.prepared") <- NULL
       bws[["call"]] <- call
     }
-    bws
+    .np_index_bandwidth_terms_restore(bws, original.terms, original.role.terms)
   }
   if (inherits(result, "singleindex"))
     result$bws <- clean.bandwidth(result$bws)
