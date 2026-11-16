@@ -68,7 +68,7 @@ test_that("beta-binomial admission adds only its explicit statistical tuple", {
     ckerorder=4L,ndim=1L,ncon=1L,ckerlb=0,ckerub=1),class="bandwidth")
   expect_null(.np_udens_bb_spec(b))
   changes <- list(type=c("adaptive_nn","generalized_nn"),ckerbound=c("none","range"),
-    ckertype=c("uniform","gaussian","beta"),ckerorder=c(2L,6L,8L),ndim=c(2L,3L),ncon=0L)
+    ckertype=c("uniform","gaussian","beta"),ckerorder=c(2L,3L,5L,7L,10L),ndim=c(2L,3L),ncon=0L)
   for(key in names(changes))for(value in changes[[key]]) {
     bad <- b;bad[[key]] <- value;expect_error(.np_udens_bb_spec(bad),"requires q=1")
   }

@@ -62,5 +62,6 @@
     required.bindings=list(.np_udens_bb_chunk=.np_udens_bb_chunk,
       .np_udens_bb_samples=.np_udens_bb_samples,.np_udens_bb_curve=.np_udens_bb_curve,
       .np_udens_bb_fit=.np_udens_bb_fit,.np_udens_bb_draw=.np_udens_bb_draw,
-      .np_udens_bb_guide=.np_udens_bb_guide),reference=reference)
+      .np_udens_bb_guide=.np_udens_bb_guide,.np_udens_bb_evaluate=.np_udens_bb_evaluate,
+      .np_udens_bb_order=.np_udens_bb_order),reference=reference)
 }

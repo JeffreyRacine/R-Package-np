@@ -19,18 +19,18 @@
   high <- .np_udens_bb_guide(plan,ab,100,48L)
   refinement <- .np_udens_u5_check(low$value,high$value,"beta-binomial complete guide expectation") /
     (1e-12+1e-9*max(abs(high$value)))
-  observed <- .Call(C_np_plot_udens_bb_guide,plan$grid,plan$h,
-                   as.double(lx),as.double(lq),rep(1/length(x),length(x)),plan$operator)
+  observed <- .np_udens_bb_evaluate(plan,lx,lq,rep(1/length(x),length(x)))
   center <- observed-high$value+dbeta(plan$grid,ab[1],ab[2])
   if(any(!is.finite(center))) stop("nonfinite beta-binomial corrected curve",call.=FALSE)
   list(center=center,guide=ab,refinement=refinement)
 }
 
-.np_udens_bb_reference <- function(x,h,grid,progress=function(...)NULL) {
+.np_udens_bb_reference <- function(x,h,grid,progress=function(...)NULL,kernel.order=4L) {
+  kernel.order <- .np_udens_bb_order(kernel.order)
   if(!is.numeric(x) || is.object(x) || !is.null(dim(x)) || any(!is.finite(x)) ||
      any(x<=0|x>=1)) stop("beta-binomial observations must be strictly interior numeric values",call.=FALSE)
   .np_udens_bb_budget(length(x),length(grid))
-  plan <- .np_udens_bb_guide_plan(sort(unique(grid)),h);targets <- plan$grid
+  plan <- .np_udens_bb_guide_plan(sort(unique(grid)),h,kernel.order);targets <- plan$grid
   fit <- .np_udens_beta_q1_fit(x);ab <- fit$theta+1
   if(max(abs(digamma(ab)-digamma(sum(ab))-c(mean(log(x)),mean(log1p(-x)))))>=2e-8)
     stop("beta-binomial original guide score exceeds its frozen tolerance",call.=FALSE)
@@ -42,7 +42,7 @@
   log.moments <- .np_udens_bb_log_moments(ab,k,weights)
   logQ <- attr(log.moments,"mean",exact=TRUE)
   fq <- .np_udens_u5_fitmom(logQ,ab)
-  z <- list(k=k,a=ab[1],b=ab[2],aQ=fq$ab[1],bQ=fq$ab[2],h=h,bb.log.moments=log.moments)
+  z <- list(k=k,a=ab[1],b=ab[2],aQ=fq$ab[1],bQ=fq$ab[2],h=h,kernel.order=kernel.order,bb.log.moments=log.moments)
   original <- .np_udens_bb_curve(plan,x,fit=fit)
   reference.center <- se <- numeric(length(targets));checks <- list()
   for(first in seq.int(1L,length(targets),by=8L)) {
@@ -68,12 +68,14 @@
   identical(state[["construction",exact=TRUE]],"density-beta-binomial-symmetric-v1")
 
 .np_udens_bb_spec <- function(bws) {
+  order <- bws[["ckerorder",exact=TRUE]]
   if(!inherits(bws,"bandwidth") || !identical(bws[["type",exact=TRUE]],"fixed") ||
      !identical(bws[["ckerbound",exact=TRUE]],"fixed") ||
      !identical(bws[["ckertype",exact=TRUE]],"epanechnikov") ||
-     !isTRUE(bws[["ckerorder",exact=TRUE]]==4L) ||
+     !is.numeric(order) || is.object(order) || !is.null(dim(order)) ||
+     length(order)!=1L || !isTRUE(order %in% c(4L,6L,8L)) ||
      !isTRUE(bws[["ndim",exact=TRUE]]==1L) || !isTRUE(bws[["ncon",exact=TRUE]]==1L))
-    stop("smoothed-beta-binomial requires q=1 continuous fixed-bandwidth order-four Epanechnikov density with finite known fixed bounds",call.=FALSE)
+    stop("smoothed-beta-binomial requires q=1 continuous fixed-bandwidth order 4, 6 or 8 Epanechnikov density with finite known fixed bounds",call.=FALSE)
   lower <- bws[["ckerlb",exact=TRUE]];upper <- bws[["ckerub",exact=TRUE]]
   if(!is.numeric(lower) || !is.numeric(upper) || length(lower)!=1L || length(upper)!=1L ||
      any(!is.finite(c(lower,upper))) || upper<=lower)
@@ -118,13 +120,14 @@
   target <- (grid[[1L]]-state$lower)/state$width
   if(any(!is.finite(target)) || any(target<=0|target>=1))
     stop("beta-binomial targets must be strictly interior; support endpoints are excluded",call.=FALSE)
+  kernel.order <- .np_udens_bb_order(state[["kernel.order",exact=TRUE]])
   B <- .np_plot_gaussian_integer(B,"beta-binomial B",.Machine$integer.max)
   workspace <- .np_udens_bb_budget(state$n,length(unique(target)),B)
   progress <- function(stage,done,total) .np_plot_progress_notify(
     stage=paste("Beta-binomial density:",stage),done=done,total=total,unit="work")
   inference <- .np_plot_corrected_activity_run("Constructing beta-binomial density intervals",
     .np_with_seed(state$plot.random.seed,{
-      reference <- .np_udens_bb_reference(state$normalized,state$h,target,progress)
+      reference <- .np_udens_bb_reference(state$normalized,state$h,target,progress,kernel.order)
       tasks <- .np_udens_bb_plan(get(".Random.seed",.GlobalEnv,inherits=FALSE),reference,B)
       draws <- .np_udens_bb_dispatch(tasks,reference)
       z <- .np_udens_bb_reduce(reference,draws,alpha,band)
@@ -147,14 +150,15 @@
         reference=list(original.guide=reference$original.guide,variance.guide=reference$reference.guide,
           degree=reference$degree,weights=reference$weights),
         settings=list(construction=state$construction,law="smoothed-beta-binomial",calibration="symmetric-sd",
-          kernel="epanechnikov",kernel.order=4L,n=state$n,q=1L,B=B,alpha=alpha,
+          kernel="epanechnikov",kernel.order=kernel.order,n=state$n,q=1L,B=B,alpha=alpha,
           bandwidth=state$h*state$width,bounds=c(state$lower,state$lower+state$width),
           grid.size=length(reference$grid),family.rows=ix,family="unique supplied interior targets",
           available.bands=requested,primary="absolute",quantile.type=7L,
           root.center="complete corrected functional of the positive beta-binomial law",
           scale="fixed original complete influence variance, including guide and cross terms",
           bonferroni.construction="type-7 marginal absolute quantile at alpha/m with simultaneous hull; raw endpoints retained",
-          correction="degree-five support-reproducing operator with refitted beta guide"))
+          correction=paste0("degree-",c(`4`="five",`6`="seven",`8`="nine")[[as.character(kernel.order)]],
+            " support-reproducing operator with refitted beta guide")))
     }))
   .np_band_resolution_warn(inference$resolution)
   widths <- lapply(inference$bands,function(b)cbind(inference$center-b[,1L,1L],b[,2L,1L]-inference$center))
