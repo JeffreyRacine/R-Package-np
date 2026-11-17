@@ -1,11 +1,12 @@
-test_that("M4 admission is explicit q1 unbounded Epanechnikov simultaneous only", {
+test_that("M4 admission preserves q1 unbounded Epanechnikov normal and maximum owners", {
   b <- structure(list(type="fixed",ckertype="epanechnikov",ckerorder=2L,
     ckerbound="none",ndim=1L,ncon=1L),class="bandwidth")
   request <- function(z=b,control=NULL,center="bias-corrected",method="asymptotic",
                        band="simultaneous",calibration=NULL)
     .np_udens_m4_request(z,control,center,method,band,calibration)
   expect_true(request())
-  for (band in c("pointwise","bonferroni","all","pmzsd")) expect_false(request(band=band))
+  for (band in c("pointwise","bonferroni","all")) expect_true(request(band=band))
+  expect_false(request(band="pmzsd"))
   for (method in c("none","bootstrap")) expect_false(request(method=method))
   for (cal in c("legacy","symmetric-sd","asymmetric-sd","pmzsd"))
     expect_false(request(calibration=cal))
@@ -46,3 +47,20 @@ test_that("M4 input and workspace failures precede numerical allocation", {
 
 # Saved-original coverage, complete covariance, installed MPI and lifecycle
 # qualification are retained externally, not repeated in the default test lane.
+
+
+test_that("compact normal companions use marginal and raw Bonferroni quantiles", {
+  z <- list(center=c(.1,.3,.1),se=c(.2,.1,.2),bands=list(),
+    settings=list(grid.size=2L,family.rows=c(1L,2L,1L)))
+  p <- .np_udens_whole_normal_assemble(z,.05,"pointwise")
+  b <- .np_udens_whole_normal_assemble(z,.05,"bonferroni")
+  expect_equal(p$inference$bands$pointwise[,1L,1L],z$center-qnorm(.025,lower.tail=FALSE)*z$se)
+  expect_equal(b$inference$bands$bonferroni[,2L,1L],z$center+qnorm(.05/4,lower.tail=FALSE)*z$se)
+  expect_identical(b$inference$settings$family.rows,c(1L,2L,1L))
+  z$bands$simultaneous <- array(c(z$center-2,z$center+2),c(3L,2L,1L))
+  all <- .np_udens_whole_normal_assemble(z,.05,"all")
+  expect_identical(all$inference$bands$pointwise,p$inference$bands$pointwise)
+  expect_identical(all$inference$bands$bonferroni,b$inference$bands$bonferroni)
+  expect_identical(all$inference$bands$simultaneous,z$bands$simultaneous)
+  expect_lt(max(all$boot.all.err$bonferroni),min(all$boot.all.err$simultaneous))
+})
