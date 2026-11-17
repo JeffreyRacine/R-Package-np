@@ -78,6 +78,10 @@ test_that("canonical rgl controls retain every legend condition contract", {
 test_that("rgl all-band legends use the canonical construction labels", {
   skip_if_not(suppressWarnings(requireNamespace("rgl", quietly = TRUE)))
 
+  # Exercise scene ownership on an owned headless device; drawing is mocked below.
+  device <- rgl::open3d(useNULL = TRUE)
+  on.exit(rgl::close3d(dev = device), add = TRUE)
+
   draw <- getFromNamespace(".np_plot_error_surfaces_rgl", .rgl_test_package)
   z <- matrix(c(0.2, 0.3, 0.4, 0.5), 2L, 2L)
 
