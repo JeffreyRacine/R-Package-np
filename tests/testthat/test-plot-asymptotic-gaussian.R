@@ -125,7 +125,7 @@ test_that("retired plot aliases fail before any computation", {
   x <- data.frame(x = seq(-1, 1, length.out = 12L))
   b <- npregbw(xdat=x, ydat=x$x, bws=.5, bandwidth.compute=FALSE)
   for (args in list(list(plot.errors.method="asy"), list(plot.errors.type="a"),
-                   list(gaussian.draws=99L)))
+                   list(gaussian_draws=99L)))
     expect_error(do.call(plot, c(list(x=b, output="data"), args)), "retired plot argument")
   expect_error(plot(b, errors="asy", output="data"), "errors")
   expect_error(plot(b, errors="asymptotic", band="a", output="data"), "band")
