@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Share unchanged ordinary training and evaluation columns when complete-case filtering retains every row, preserving row names, class methods and copy-on-modify ownership.
+
 * Restore fitting, standard errors, prediction and plot-data without error bands for the bundled OECD bandwidth object by adding its missing local-linear engine metadata. Preserve the old bandwidths and dataset; add no training-data copy. Validate these bundled-object routes during release checks.
 
 * Reuse exactly unchanged ordinary formula columns after NA processing, preserving callback effects, row metadata and copy-on-modify ownership.
