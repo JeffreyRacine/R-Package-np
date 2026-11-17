@@ -713,6 +713,9 @@ np_render_control <- function(style = c("band", "bar"),
         .np_udens_u5_request(bws, dots$bias.control,
         dots$plot.errors.center, dots$plot.errors.method, dots$plot.errors.type,
         dots$plot.errors.boot.calibration) ||
+        .np_udens_uniform_normal_request(bws, dots$bias.control,
+        dots$plot.errors.center, dots$plot.errors.method, dots$plot.errors.type,
+        dots$plot.errors.boot.calibration) ||
         .np_udens_m4_request(bws, dots$bias.control,
         dots$plot.errors.center, dots$plot.errors.method, dots$plot.errors.type,
         dots$plot.errors.boot.calibration) ||

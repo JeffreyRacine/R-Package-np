@@ -761,6 +761,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   retained study, but local undercoverage remains possible. This does not select
   M4 for \code{pmzsd} or bootstrap bands; see
   \code{\link{np_udens_bias_control}}. Core estimators are unchanged.
+  Under the same one-continuous-variable, fixed-bandwidth, unbounded order-two
+  specification, uniform density plots support corrected asymptotic pointwise
+  and raw Bonferroni normal intervals using the complete positive-reference Q6
+  covariance. Its reference is the empirical mixture plus bandwidth-scaled
+  Student-six noise. This asymptotic normal calculation does not draw smoothed
+  bootstrap samples and does not admit uniform asymptotic simultaneous or
+  \code{all} bands. Explicit \code{bootstrap="smoothed-q6"}, existing
+  \code{pmzsd} and other methods retain their contracts. Neither reference
+  guarantees nominal coverage at every location, especially in sparse tails.
+
 
   For a univariate order-four, order-six or order-eight Epanechnikov density with known finite
   \code{ckerbound="fixed"} bounds, \code{errors="asymptotic"},
