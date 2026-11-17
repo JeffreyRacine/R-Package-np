@@ -579,7 +579,8 @@ np_render_control <- function(style = c("band", "bar"),
        (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth") ||
         inherits(bws, "dbandwidth"))))
   if (identical(dots[["plot.errors.boot.method", exact=TRUE]], "smoothed-q6"))
-    .np_udens_q6_public_spec(bws, dots[["plot.errors.boot.calibration", exact=TRUE]])
+    .np_udens_q6_public_spec(bws, dots[["plot.errors.boot.calibration", exact=TRUE]],
+      dots[["plot.errors.type", exact=TRUE]])
   if (identical(dots[["plot.errors.boot.method",exact=TRUE]],"smoothed-beta-binomial"))
     .np_udens_bb_spec(bws)
   if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&

@@ -51,6 +51,9 @@
   low <- .np_udens_q6_q2_curve(Y,reference$grid,reference$h,reference$kernel,24L)
   high <- .np_udens_q6_q2_curve(Y,reference$grid,reference$h,reference$kernel,32L)
   error <- .np_udens_q6_check(low,high,"q=2 conditional curve")
+  if (isTRUE(reference[["directional", exact=TRUE]]))
+    return(cbind(t(sweep(high,1L,reference$reference.center)),
+      refinement=rep(error,task$bsz)))
   roots <- abs(sweep(sweep(high,1L,reference$reference.center),1L,reference$se,"/"))
   cbind(t(roots),refinement=rep(error,task$bsz))
 }

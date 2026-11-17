@@ -1,5 +1,7 @@
 
 .np_udens_q6_q2_subset <- function(raw,rows) {
+  if (.np_udens_q6_q2_asymmetric_active(raw$inference$settings))
+    return(.np_udens_q6_q2_asymmetric_subset(raw,rows))
   raw$boot.err <- raw$boot.err[rows,,drop=FALSE]
   if (!is.null(raw$boot.all.err))
     raw$boot.all.err <- lapply(raw$boot.all.err,function(z) z[rows,,drop=FALSE])
@@ -43,6 +45,8 @@
 }
 
 .np_udens_q6_q2_public <- function(state,grid,alpha,B,band) {
+  if (.np_udens_q6_q2_asymmetric_active(state))
+    return(.np_udens_q6_q2_asymmetric_public(state,grid,alpha,B,band))
   if (!.np_udens_q6_q2_active(state) || !isTRUE(band %in% c("pointwise","simultaneous","bonferroni","all")) ||
       !is.data.frame(grid) || !identical(names(grid),names(state$x)) ||
       !all(vapply(grid,function(z) is.numeric(z) && !is.object(z),TRUE)) ||

@@ -841,6 +841,21 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   retained; nonnegative intersections may be reported separately. This is a
   different law and calibration from \code{smoothed-percentile}.
 
+  For two variables, \code{calibration="asymmetric-sd"} also supports
+  pointwise and simultaneous bands under the same explicit Q6 law. Both
+  directional scales are estimated from centered conditional corrected roots,
+  while calibration retains the uncentered roots relative to the complete Q6
+  functional. Positive root deviations use the positive scale for the lower
+  endpoint, and negative deviations use the negative scale for the upper endpoint.
+  A single directional maximum over the unique supplied targets calibrates
+  simultaneous bands. Constant conditional rows are rejected without a variance
+  floor. Bonferroni and all bands are not admitted for this q=2 asymmetric route.
+  A 256-original empirical-grid confirmation gave conservative 95-percent
+  pointwise cell means of 95.08--97.70 percent and simultaneous coverage of
+  98.44--100 percent; this is not a guarantee for arbitrary distributions or grids.
+  The inference record separates the two directional scales and their pooled
+  conditional standard deviation from the original reference standard errors.
+
   For two variables, the symmetric construction resamples a common observation
   donor for both coordinates and adds independent coordinate smoothing noise.
   It uses the product corrected operator, refits the full bivariate normal guide,
