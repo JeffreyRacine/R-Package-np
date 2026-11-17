@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Preserve captured regression plot inference when MPI reuse supplies a bandwidth before its diagnostic timing profile is attached; retain exact computational and data ownership checks.
+
 * Share unchanged ordinary training and evaluation columns when complete-case filtering retains every row, preserving row names, class methods and copy-on-modify ownership.
 
 * Preserve the coordinator's exact native variable labels when publishing reusable worker bandwidths, even when rank formatting options differ. Compact long literal labels with a standard size-selected encoding without changing public names or worker ownership.
