@@ -29,7 +29,7 @@
 
 * Avoid retransmitting native MPI name metadata already supplied by the same call's identity metadata, preserving existing labels and ownership.
 
-* Restore fitting, standard errors, prediction and plot-data without error bands for the bundled OECD bandwidth object by adding its missing local-linear engine metadata. Preserve the old bandwidths and dataset; add no training-data copy. Validate these bundled-object routes during release checks.
+* Restore fitting, standard errors, prediction and plot-data without error bands for the bundled OECD bandwidth object by restoring its local-linear metadata consistently with newly constructed bandwidth objects. Preserve the old bandwidths and dataset; add no training-data copy. Validate these bundled-object routes during release checks.
 
 * Reuse exactly unchanged ordinary formula columns after NA processing, preserving callback effects, row metadata and copy-on-modify ownership.
 

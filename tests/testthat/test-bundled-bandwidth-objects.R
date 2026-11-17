@@ -16,9 +16,10 @@ test_that("bundled bandwidth objects retain reusable canonical metadata", {
   }
   wage <- load.example("wage1")
   oecd <- load.example("oecdpanel")
-  expected <- list(basis = "glp", degree = rep(1L, 4L),
+  expected <- list(basis = "glp", degree = NULL,
     bernstein.basis = FALSE, regtype.engine = "lp", basis.engine = "glp",
     degree.engine = rep(1L, 4L), bernstein.basis.engine = FALSE)
+  expect_true(all(names(expected) %in% names(oecd$bw)))
   for (name in names(expected))
     expect_identical(oecd$bw[[name, exact = TRUE]], expected[[name]], info = name)
   # Replay the existing wage example's explicit training-subset recipe.
@@ -33,6 +34,7 @@ test_that("bundled bandwidth objects retain reusable canonical metadata", {
     bandwidth.compute = FALSE, regtype = b$regtype, bwmethod = b$method,
     bwtype = b$type, ckertype = b$ckertype, ckerorder = b$ckerorder,
     ukertype = b$ukertype, okertype = b$okertype)
+  expect_identical(oecd$bw[names(expected)], reference.bw[names(expected)])
   reference <- npreg(reference.bw, data = oecd$oecdpanel, se = TRUE)
   local_mocked_bindings(npregbw = function(...) stop("unexpected bandwidth selection"),
                        .package = pkg)
