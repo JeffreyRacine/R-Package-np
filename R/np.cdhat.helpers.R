@@ -1096,8 +1096,8 @@
   if (!any(keep.rows))
     stop("Training data has no rows without NAs")
 
-  txdat <- txdat[keep.rows, , drop = FALSE]
-  tydat <- tydat[keep.rows, , drop = FALSE]
+  txdat <- .np_data_rows(txdat, keep.rows)
+  tydat <- .np_data_rows(tydat, keep.rows)
   if (!is.null(y))
     y <- y[keep.rows, , drop = FALSE]
 
@@ -1110,8 +1110,8 @@
     if (!any(keep.eval))
       stop("Evaluation data has no rows without NAs")
 
-    exdat <- exdat[keep.eval, , drop = FALSE]
-    eydat <- eydat[keep.eval, , drop = FALSE]
+    exdat <- .np_data_rows(exdat, keep.eval)
+    eydat <- .np_data_rows(eydat, keep.eval)
   } else {
     exdat <- txdat
     eydat <- tydat

@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Share unchanged ordinary training and evaluation columns when complete-case filtering retains every row, preserving row names, class methods and copy-on-modify ownership.
+
 * Preserve the coordinator's exact native variable labels when publishing reusable worker bandwidths, even when rank formatting options differ. Compact long literal labels with a standard size-selected encoding without changing public names or worker ownership.
 
 * Avoid unnecessary data copies when removing absent internal MPI dispatch tags; preserve actual tag removal and retained training values.

@@ -2111,8 +2111,8 @@ npindexbw.NULL <-
   rows.omit <- attr(na.omit(data.frame(xdat, ydat)), "na.action")
   if (length(rows.omit) > 0L)
     keep.rows[as.integer(rows.omit)] <- FALSE
-  x.clean <- toMatrix(xdat[keep.rows, , drop = FALSE])
-  y.clean <- ydat[keep.rows]
+  x.clean <- toMatrix(.np_data_rows(xdat, keep.rows))
+  y.clean <- .np_data_rows(ydat, keep.rows, frame = FALSE)
   if (is.factor(y.clean))
     y.clean <- dlev(y.clean)[as.integer(y.clean)]
   else
@@ -3300,8 +3300,8 @@ npindexbw.sibandwidth <-
     if (!any(keep.rows))
       stop("Data has no rows without NAs")
 
-    xdat <- xdat[keep.rows,,drop = FALSE]
-    ydat <- ydat[keep.rows]
+    xdat <- .np_data_rows(xdat, keep.rows)
+    ydat <- .np_data_rows(ydat, keep.rows, frame = FALSE)
     if (bws$method == "kleinspady")
       .npindex_check_binary_response(ydat, "npindexbw()", require.both = TRUE)
 
