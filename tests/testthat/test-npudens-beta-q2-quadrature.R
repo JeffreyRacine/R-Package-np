@@ -17,9 +17,9 @@ test_that("beta q2 prepared axes bind their complete family and measure", {
   concentrated <- .np_udens_beta_q2_axes(c(99,99,0,0,0),h,grid,32L)
   expect_true(any(concentrated$axes[[1L]]$prob==0))
   expect_true(all(is.finite(concentrated$axes[[1L]]$T)))
-  # Normal and calibrated public admissions remain their original contracts.
+  # Higher calibrated q2 admission is separate from the retained normal refusal.
   bws <- list(ckerorder=4L,ndim=2L,ncon=2L,ckertype="beta",type="fixed",ckerbound="fixed")
-  expect_false(.np_udens_beta_order_request(bws,"all"))
+  expect_true(.np_udens_beta_order_request(bws,"all"))
   expect_false(.np_udens_beta_normal_q2_request(bws))
 })
 

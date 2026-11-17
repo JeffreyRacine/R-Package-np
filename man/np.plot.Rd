@@ -626,8 +626,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   gradient targets and conditioning assumptions.
 
   Known-fixed-bound beta density plots support a separate corrected
-  guide-region plus residual construction: orders 2, 4, 6 and 8 for one
-  continuous dimension, and order 2 for two continuous dimensions.
+  guide-region plus residual construction: orders 2, 4, 6 and 8 for one or
+  two continuous dimensions. Higher-order two-dimensional coverage was strongly
+  conservative in the retained saved-sample study; this is not an efficiency
+  or universal coverage guarantee.
   With omitted \code{bias.control}, request asymptotic errors or independent
   bootstrap \code{calibration="symmetric-sd"}/\code{"asymmetric-sd"}, and
   explicitly choose pointwise, simultaneous, Bonferroni or all three bands
@@ -1346,9 +1348,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   estimate-centered joint variability bands in one or two continuous
   dimensions with finite known fixed bounds. Their signed observation
   contributions are retained; native marginal standard errors are unchanged.
-  The separate univariate beta corrected construction described above accepts
-  these orders for calibrated bands and marginal asymptotic \code{pmzsd};
-  two-dimensional higher-order corrected bands remain unsupported.
+  The separate beta corrected construction described above accepts these orders
+  for calibrated bands in one or two dimensions, and marginal asymptotic
+  \code{pmzsd} in one dimension only.
   This higher-order addition does not admit CDFs, conditional estimators,
   nearest-neighbour bandwidths, range bounds or bias-corrected requests.
 
