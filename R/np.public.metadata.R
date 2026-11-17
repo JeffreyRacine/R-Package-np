@@ -394,7 +394,35 @@
   metadata
 }
 
+.npRmpi_bw_subset_owner_wire <- function(metadata) {
+  if (!is.list(metadata) || is.object(metadata)) return(metadata)
+  plan <- .subset2(metadata, "formula", exact = TRUE)
+  if (!is.list(plan) || is.object(plan)) return(metadata)
+  producer <- .subset2(plan, "producer", exact = TRUE)
+  if (!is.character(producer) || is.object(producer) || length(producer) != 1L ||
+      !producer %in% c("npregbw", "npplregbw", "npindexbw", "npscoefbw",
+                       "npcdensbw", "npcdistbw")) return(metadata)
+  frame <- .subset2(plan, "frame", exact = TRUE)
+  subset <- attr(frame, ".np.subset", exact = TRUE)
+  if (typeof(frame) != "list" ||
+      !identical(attr(frame, "class", exact = TRUE), "data.frame") ||
+      !is.list(subset) || is.object(subset) ||
+      !identical(names(subset), c("expression", "envir"))) return(metadata)
+  owner <- .subset2(subset, "envir", exact = TRUE)
+  if (!is.language(.subset2(subset, "expression", exact = TRUE)) ||
+      !is.environment(owner) || !identical(environmentName(owner), "") ||
+      !is.null(attributes(owner))) return(metadata)
+  # Only the coordinator evaluates this retained subset. Its public owner is
+  # unchanged; native workers consume the already-prepared training roles.
+  subset[["envir"]] <- new.env(parent = emptyenv())
+  attr(frame, ".np.subset") <- subset
+  plan[["frame"]] <- frame
+  metadata[["formula"]] <- plan
+  metadata
+}
+
 .npRmpi_bw_metadata_wire <- function(metadata, plain.language = FALSE) {
+  metadata <- .npRmpi_bw_subset_owner_wire(metadata)
   # The coordinator has already used this local owner decision; it is not
   # descriptive metadata and does not belong in the worker payload.
   if (is.list(metadata$formula)) metadata$formula$temporary <- NULL
