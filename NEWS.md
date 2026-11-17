@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Preserve the coordinator's exact native variable labels when publishing reusable worker bandwidths, even when rank formatting options differ. Compact long literal labels with a standard size-selected encoding without changing public names or worker ownership.
+
 * Avoid unnecessary data copies when removing absent internal MPI dispatch tags; preserve actual tag removal and retained training values.
 
 * Fingerprint supported retained training values in bounded chunks for MPI

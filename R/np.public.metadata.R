@@ -149,6 +149,31 @@
   native.plan
 }
 
+.npRmpi_native_label_pack <- function(label) {
+  # Literal vector arguments can have long public names. Preserve the exact
+  # coordinator text without sending a larger representation unnecessarily.
+  bytes <- serialize(label, NULL)
+  if (length(bytes) < 512L || length(bytes) > .Machine$integer.max)
+    return(label)
+  payload <- tryCatch(memCompress(bytes, type = "bzip2"), error = function(e) NULL)
+  if (is.null(payload)) return(label)
+  packed <- list(codec = "bzip2", payload = payload)
+  if (length(serialize(packed, NULL)) < length(bytes)) packed else label
+}
+
+.npRmpi_native_label_unpack <- function(label) {
+  if (!is.character(label)) {
+    if (!is.list(label) || !identical(names(label), c("codec", "payload")) ||
+        !identical(label[["codec", exact = TRUE]], "bzip2") || !is.raw(label[["payload", exact = TRUE]]))
+      stop("invalid native label metadata", call. = FALSE)
+    label <- unserialize(memDecompress(label[["payload", exact = TRUE]], type = "bzip2"))
+  }
+  if (!is.character(label) || !length(label) ||
+      !is.null(attributes(label)) || anyNA(label))
+    stop("invalid native label text", call. = FALSE)
+  label
+}
+
 .npRmpi_native_name_plan <- function(definition, owner, caller, values,
                                     identity.roles = character()) {
   if (!is.function(definition)) return(list())
@@ -161,7 +186,12 @@
         role[[1L]] %in% names(values) &&
         is.atomic(values[[role[[1L]]]]) && is.null(dim(values[[role[[1L]]]]))) {
       expr <- eval(substitute(substitute(ARG), list(ARG = as.name(role[[1L]]))), owner)
-      out[name] <- list(.np_formula_dot_expression(expr, caller))
+      expr <- .np_formula_dot_expression(expr, caller)
+      # Public names belong to the original caller. Worker formatting options
+      # must not affect the object that the publication certificate compares.
+      label <- if (name == "ynames") deparse(expr) else
+        paste(deparse(expr), collapse = "")
+      out[name] <- list(.npRmpi_native_label_pack(label))
     }
   }
   out
@@ -174,8 +204,7 @@
     label <- bandwidth[[name, exact = TRUE]]
     if (!is.character(label) || length(label) != 1L ||
         !startsWith(label, ".__npRmpi_autod_")) next
-    label <- if (name == "ynames") deparse(plan[[name]]) else
-      paste(deparse(plan[[name]]), collapse = "")
+    label <- .npRmpi_native_label_unpack(plan[[name]])
     bandwidth <- updateBwNameMetadata(setNames(list(label), name), bandwidth)
     if (inherits(bandwidth, "plbandwidth")) {
       if (name == "ynames")
