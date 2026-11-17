@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Compare captured regression model identity independently of diagnostic timing profiles, consistently with npRmpi; retain exact computational and data ownership checks.
+
 * Share unchanged ordinary training and evaluation columns when complete-case filtering retains every row, preserving row names, class methods and copy-on-modify ownership.
 
 * Restore fitting, standard errors, prediction and plot-data without error bands for the bundled OECD bandwidth object by restoring its local-linear metadata consistently with newly constructed bandwidth objects. Preserve the old bandwidths and dataset; add no training-data copy. Validate these bundled-object routes during release checks.

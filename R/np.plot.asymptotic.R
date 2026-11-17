@@ -243,12 +243,15 @@
     isTRUE(bws[["ncon", exact=TRUE]] > 0L)
 }
 
-# Calls retain historical formula/evaluation environments. MPI transport may
-# remove that provenance, while the complete computational bandwidth state and
-# retained training/evaluation data remain identical. Never evaluate a call to
-# validate a compact fitted operator, or omit any other bandwidth field.
+# Calls and post-publication timing profiles are provenance, not fitted
+# geometry. MPI reuse may retain the bandwidth before its coordinator profile
+# is attached. Compare every other bandwidth field and attribute exactly;
+# training/evaluation ownership is checked separately by each consumer.
+# Never evaluate a call to validate a compact fitted operator.
 .np_plot_regression_capture_same_bws <- function(left, right) {
   if (!is.list(left) || !is.list(right)) return(FALSE)
+  left[["timing.profile"]] <- NULL
+  right[["timing.profile"]] <- NULL
   left[["call"]] <- NULL
   right[["call"]] <- NULL
   identical(left, right)
