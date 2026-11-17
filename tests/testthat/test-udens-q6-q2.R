@@ -2,7 +2,7 @@ test_that("q2 Q6 admission is separate from q1 and asymmetric ownership", {
   b <- structure(list(type="fixed",ckerbound="none",ckertype="uniform",
     ckerorder=2L,ndim=2L,ncon=2L),class="bandwidth")
   expect_silent(.np_udens_q6_public_spec(b,"symmetric-sd"))
-  expect_error(.np_udens_q6_public_spec(b,"asymmetric-sd"),"q=1")
+  expect_error(.np_udens_q6_public_spec(b,"asymmetric-sd"),"pointwise or simultaneous")
   for (field in c("type","ckerbound","ckertype","ckerorder","ndim","ncon")) {
     z <- b; z[[field]] <- switch(field,type="adaptive_nn",ckerbound="fixed",
       ckertype="gaussian",ckerorder=4L,ndim=3L,ncon=1L)

@@ -136,6 +136,8 @@
       .np_udens_bb_prepare(bws,xdat,if (missing(random.seed)) 42L else random.seed)
     } else NULL
     q6.state <- if (identical(plot.errors.boot.method, "smoothed-q6")) {
+      if (identical(plot.errors.boot.calibration, "asymmetric-sd") && isTRUE(bws$ndim == 2L))
+        .np_udens_q6_q2_asymmetric_prepare(bws,xdat,if (missing(random.seed)) 42L else random.seed) else
       if (identical(plot.errors.boot.calibration, "asymmetric-sd"))
         .np_udens_q6_asymmetric_prepare(bws,xdat,if (missing(random.seed)) 42L else random.seed,
           list(vary=1L,xtrim=xtrim,xq=xq)) else

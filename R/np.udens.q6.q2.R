@@ -12,10 +12,14 @@
   invisible(NULL)
 }
 
-.np_udens_q6_public_spec <- function(bws, calibration) {
+.np_udens_q6_public_spec <- function(bws, calibration, band=NULL) {
   if (isTRUE(bws[["ndim", exact=TRUE]] == 2L) &&
-      identical(calibration, "symmetric-sd")) .np_udens_q6_q2_spec(bws)
-  else .np_udens_q6_spec(bws)
+      isTRUE(calibration %in% c("symmetric-sd", "asymmetric-sd"))) {
+    .np_udens_q6_q2_spec(bws)
+    if (identical(calibration, "asymmetric-sd") &&
+        !isTRUE(band %in% c("pointwise", "simultaneous")))
+      stop("q=2 asymmetric smoothed-q6 requires pointwise or simultaneous bands", call.=FALSE)
+  } else .np_udens_q6_spec(bws)
 }
 
 .np_udens_q6_q2_geometry <- function(x, h, grid, kernel) {
@@ -46,7 +50,8 @@
 }
 
 .np_udens_q6_q2_active <- function(state)
-  identical(state[["construction", exact=TRUE]], "density-compact-q6-q2-symmetric-v1")
+  isTRUE(state[["construction", exact=TRUE]] %in%
+    c("density-compact-q6-q2-symmetric-v1", "density-compact-q6-q2-asymmetric-v1"))
 
 .np_udens_q6_q2_budget <- function(n, m, axes, B, chunk=32L) {
   # Account for paired axis caches, task seeds, samples, working target blocks,
