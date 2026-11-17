@@ -1,5 +1,10 @@
 # np 0.80-3
 
+* Whole-line q=1 order-two Epanechnikov corrected density plots add asymptotic
+  normal pointwise and raw Bonferroni companions to the unchanged M4 simultaneous
+  band; `all` returns these exact components. Local coverage limitations remain.
+  Existing `pmzsd`, bootstrap methods and core estimators are unchanged.
+
 * Plot-only, fixed-bound univariate beta bias correction now admits kernel orders
   4, 6 and 8 for asymptotic `band="pmzsd"`, retaining the existing corrected center
   and complete ratio-pilot normal variance. Calibrated bands are unchanged.

@@ -736,11 +736,15 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   without changing \code{B}; defined finite limits are retained.
 
   Fixed unbounded second-order Epanechnikov density plots with one continuous
-  variable also support corrected asymptotic explicit \code{band="simultaneous"}
-  requests through the M4 complete-covariance construction. This experimental
-  addition does not select M4 for pointwise, Bonferroni, \code{all}, normal or
-  bootstrap bands; see \code{\link{np_udens_bias_control}}. Core estimators and
-  existing plotting constructions are unchanged.
+  variable support corrected asymptotic pointwise and raw Bonferroni normal
+  intervals through the M4 complete-covariance construction. The existing
+  Gaussian-maximum simultaneous band is unchanged; \code{band="all"} returns
+  those same three components. Bonferroni uses the number of unique supplied
+  targets, without enlarging its limits to contain the simultaneous band.
+  These experimental normal companions have useful average coverage in the
+  retained study, but local undercoverage remains possible. This does not select
+  M4 for \code{pmzsd} or bootstrap bands; see
+  \code{\link{np_udens_bias_control}}. Core estimators are unchanged.
 
   For a univariate order-four, order-six or order-eight Epanechnikov density with known finite
   \code{ckerbound="fixed"} bounds, \code{errors="asymptotic"},
