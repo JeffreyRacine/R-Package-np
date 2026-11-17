@@ -18,9 +18,15 @@ test_that("continuous regression panels forward xlim without changing inference"
     args <- list(x=fit,errors="asymptotic",band="all",center="bias-corrected",
                  bias.control=np_bias_control(degree=2),gaussian.draws=31L,
                  neval=3L,common.scale=common,gradients=grad)
-    reference <- do.call(plot,c(args,list(output="data")))
+    expect_warning(
+      reference <- do.call(plot,c(args,list(output="data"))),
+      "Empirical band quantiles have limited draw resolution (bonferroni)",
+      fixed = TRUE)
     seed <- .Random.seed
-    value <- do.call(plot,c(args,list(output="plot-data",xlim=c(.8,.2))))
+    expect_warning(
+      value <- do.call(plot,c(args,list(output="plot-data",xlim=c(.8,.2)))),
+      "Empirical band quantiles have limited draw resolution (bonferroni)",
+      fixed = TRUE)
     expect_identical(received,c(.8,.2))
     expect_identical(value$inference, reference$inference)
     expect_identical(value$targets, reference$targets)
