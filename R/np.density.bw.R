@@ -51,15 +51,11 @@ npudensbw.formula <-
     dots <- list(...)
     .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], mf)
     dots$.np.formula.state <- NULL
+    .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
+      "npudensbw", match.call(expand.dots = FALSE), parent.frame(),
+      formula, mf, capture$na.action, ynames = character())
     tbw <- do.call(npudensbw, c(list(dat = dat), .np_formula_options(dots, "npudensbw.formula")))
-    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npudensbw")
-    environment(tbw$call) <- parent.frame()
-    tbw$formula <- formula
-    tbw$terms <- attr(mf,"terms")
-    tbw <- .np_bws_retain_formula_training(tbw, mf, capture$na.action)
-    tbw$rows.omit <- as.vector(attr(mf,"na.action"))
-    tbw$nobs.omit <- length(tbw$rows.omit)
-    tbw
+    .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
 
 

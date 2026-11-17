@@ -46,6 +46,15 @@
 # an executable method. The original formula wrapper reapplies this pure finish.
 .npRmpi_bw_formula_apply <- function(value, plan) {
   if (is.null(plan)) return(value)
+  if (plan$producer %in% c("npudensbw", "npudistbw")) {
+    value$call <- plan$call
+    value$formula <- plan$formula
+    value$terms <- plan$terms
+    value <- .np_bws_retain_formula_training(value, plan$frame, plan$na.action)
+    value$rows.omit <- as.vector(attr(plan$frame, "na.action"))
+    value$nobs.omit <- length(value$rows.omit)
+    return(value)
+  }
   if (plan$producer %in% c("npcdensbw", "npcdistbw")) {
     value$call <- plan$call
     if (is.null(plan[["formula", exact = TRUE]])) return(value)
@@ -176,7 +185,9 @@
 
 .npRmpi_native_name_plan <- function(definition, owner, caller, values,
                                     identity.roles = character()) {
-  if (!is.function(definition)) return(list())
+  if (!is.function(definition) ||
+      inherits(values[["bws", exact = TRUE]], c("bandwidth", "dbandwidth")))
+    return(list())
   out <- list()
   for (name in c("ynames", "xnames", "znames")) {
     roles <- switch(name, ynames = c("ydat", "tydat"),
@@ -199,6 +210,9 @@
 
 .npRmpi_native_names_apply <- function(result, plan) {
   if (!is.list(result) || !length(plan)) return(result)
+  if (inherits(result, c("bandwidth", "dbandwidth")) && "xnames" %in% names(plan))
+    return(.npRmpi_unconditional_names_apply(result,
+      list(dat = .npRmpi_native_label_unpack(plan[["xnames"]]))))
   bandwidth <- if (is.list(result[["bws", exact = TRUE]])) result[["bws"]] else result
   for (name in names(plan)) {
     label <- bandwidth[[name, exact = TRUE]]
@@ -380,7 +394,7 @@
   metadata
 }
 
-.npRmpi_bw_metadata_wire <- function(metadata) {
+.npRmpi_bw_metadata_wire <- function(metadata, plain.language = FALSE) {
   # The coordinator has already used this local owner decision; it is not
   # descriptive metadata and does not belong in the worker payload.
   if (is.list(metadata$formula)) metadata$formula$temporary <- NULL
@@ -391,14 +405,14 @@
   project <- function(x) {
     if (is.call(x)) {
       attrs <- attributes(x)
-      parts <- as.list(x)
+      parts <- as.list(if (plain.language && is.object(x)) unclass(x) else x)
       for (i in seq_along(parts))
         if (!.npRmpi_is_missing_call_arg(parts[[i]]))
           parts[i] <- list(project(parts[[i]]))
       x <- as.call(parts)
     } else if (is.pairlist(x)) {
       attrs <- attributes(x)
-      parts <- as.list(x)
+      parts <- as.list(if (plain.language && is.object(x)) unclass(x) else x)
       for (i in seq_along(parts))
         if (!.npRmpi_is_missing_call_arg(parts[[i]]))
           parts[i] <- list(project(parts[[i]]))
@@ -437,7 +451,8 @@
     if (is.null(original[["formula", exact = TRUE]])) next
     if (!inherits(original, c("rbandwidth", "sibandwidth", "scbandwidth",
                              "plbandwidth", "lsqregressionbandwidth",
-                             "conbandwidth", "condbandwidth"))) next
+                             "conbandwidth", "condbandwidth",
+                             "bandwidth", "dbandwidth"))) next
     restore <- function(value, reference) {
       fields <- c("call", "formula", "terms", "xterms", ".np.formula.training")
       metadata <- function(x) {
@@ -647,4 +662,276 @@
   if (!is.null(expected) && identical(attr(x, "terms", exact = TRUE), expected))
     attr(x, "terms") <- attr(original, "terms", exact = TRUE)
   x
+}
+
+
+# Unconditional formula publication can share columns already sent as dat.
+# The descriptor is private to one invocation and carries only a closed header.
+# Other metadata keeps the incumbent materialized route. This does not replace
+# the existing publication certificate or change user NA/callback semantics.
+.npRmpi_bw_frame_exact <- function(x, y) identical(x, y, num.eq = FALSE, single.NA = FALSE, attrib.as.set = FALSE)
+.npRmpi_bw_frame_plain <- function(x) typeof(x) == "list" && !isS4(x) &&
+  identical(attr(x, "class", exact = TRUE), "data.frame")
+# Environments that serialize as a reference rather than by value. The same test
+# the bandwidth.v1 fingerprint already uses (baseline np.autodispatch.R:619-620).
+.npRmpi_bw_frame_reference_environment <- function(e) is.environment(e) &&
+  (identical(e, globalenv()) || identical(e, baseenv()) || identical(e, emptyenv()) || isNamespace(e))
+.npRmpi_bw_frame_producers <- c("npudensbw", "npudistbw")
+.npRmpi_bw_frame_required_attributes <- c("names", "row.names", "class", "terms")
+.npRmpi_bw_frame_optional_attributes <- c("na.action", ".np.subset")
+.npRmpi_bw_frame_fields <- c("role", "token", "n", "columns", "order", "rows", "subset")
+
+
+# A work budget prevents traversing or projecting an unbounded user expression.
+# The exact projected-byte limit is checked separately after this plain grammar.
+.npRmpi_bw_frame_syntax_cap <- function(p) 4096 + 2048 * p
+.npRmpi_bw_frame_language <- function(x, budget = NULL, projected = TRUE, allow.formula = TRUE) {
+  spend <- function(k) is.null(budget) || isTRUE((budget$left <- budget$left - k) >= 0)
+  if (is.symbol(x)) return(spend(12 + nchar(as.character(x), type = "bytes")))
+  if (is.null(x)) return(spend(4))
+  if (is.atomic(x)) {
+    if (!is.null(attributes(x)) || length(x) > 1L) return(FALSE)
+    return(spend(if (is.character(x) && length(x))
+      16 + nchar(x, type = "bytes", keepNA = FALSE) else 24))
+  }
+  if (!is.call(x) && !is.pairlist(x)) return(FALSE)
+  cls <- attr(x, "class", exact = TRUE)
+  if (!is.null(cls)) {
+    if (!allow.formula || !is.call(x) || !identical(cls, "formula")) return(FALSE)
+    # Do not dispatch length/[[ methods or copy an arbitrarily wide fake formula.
+    wide <- tryCatch({ .subset2(x, 4L); TRUE },
+                     subscriptOutOfBoundsError = function(e) FALSE)
+    if (wide) return(FALSE)
+    x <- unclass(x)
+  }
+  n <- length(x)
+  if (!spend(8 + 4 * n)) return(FALSE)
+  a <- attributes(x)
+  if (!all(names(a) %in% c("names", "class", ".Environment"))) return(FALSE)
+  env <- a[[".Environment"]]
+  if (!is.null(env) && !(if (projected)
+      .npRmpi_bw_frame_reference_environment(env) else is.environment(env))) return(FALSE)
+  if ((!is.null(cls) || !is.null(env)) && !spend(96)) return(FALSE)
+  tags <- names(x)
+  if (!is.null(tags) && !spend(sum(12 + nchar(tags[nzchar(tags)],
+      type = "bytes", keepNA = FALSE)))) return(FALSE)
+  parts <- as.list(x)
+  for (i in seq_len(n)) {
+    if (.npRmpi_is_missing_call_arg(parts[[i]])) {
+      if (!spend(4)) return(FALSE)
+    } else if (!.npRmpi_bw_frame_language(parts[[i]], budget, projected, allow.formula)) return(FALSE)
+  }
+  TRUE
+}
+.npRmpi_bw_frame_preflight <- function(plan, frame, budget) {
+  subset <- attr(frame, ".np.subset", exact = TRUE)
+  .npRmpi_bw_frame_language(plan[["call", exact = TRUE]], budget, FALSE) &&
+    .npRmpi_bw_frame_language(plan[["formula", exact = TRUE]], budget, FALSE) &&
+    (!is.list(subset) || .npRmpi_bw_frame_language(subset[["expression"]], budget, FALSE, allow.formula = FALSE))
+}
+.npRmpi_bw_frame_bare <- function(v, type, n = NULL, attrs = character())
+  typeof(v) == type && all(names(attributes(v)) %in% attrs) && (is.null(n) || length(v) == n)
+.npRmpi_bw_frame_terms_attributes <- c("variables", "factors", "term.labels", "order", "intercept", "response",
+                    "class", ".Environment", "predvars", "dataClasses", "specials")
+.npRmpi_bw_frame_terms_plain <- function(tt) {
+  a <- attributes(tt)
+  if (!is.call(tt) || !identical(a[["class"]], c("terms", "formula")) ||
+      anyDuplicated(names(a)) || !all(names(a) %in% .npRmpi_bw_frame_terms_attributes) ||
+      !.npRmpi_bw_frame_reference_environment(a[[".Environment"]])) return(FALSE)
+  body <- tt; attributes(body) <- NULL
+  vars <- a[["variables"]]; labels <- a[["term.labels"]]
+  if (!.npRmpi_bw_frame_language(body) || !is.call(vars) || !.npRmpi_bw_frame_language(vars) || !.npRmpi_bw_frame_bare(labels, "character")) return(FALSE)
+  v <- length(vars) - 1L; t <- length(labels)
+  pv <- a[["predvars"]]; fac <- a[["factors"]]; dc <- a[["dataClasses"]]; sp <- a[["specials"]]
+  if (!(is.null(pv) || (is.call(pv) && .npRmpi_bw_frame_language(pv) && length(pv) == length(vars)))) return(FALSE)
+  if (!.npRmpi_bw_frame_bare(a[["order"]], "integer", t) || !.npRmpi_bw_frame_bare(a[["intercept"]], "integer", 1L) ||
+      !.npRmpi_bw_frame_bare(a[["response"]], "integer", 1L)) return(FALSE)
+  if (!(.npRmpi_bw_frame_bare(fac, "integer", 0L) ||
+        (.npRmpi_bw_frame_bare(fac, "integer", v * t, c("dim", "dimnames")) && identical(dim(fac), c(v, t)) &&
+         is.list(dimnames(fac)) && is.null(attributes(dimnames(fac))) &&
+         .npRmpi_bw_frame_bare(dimnames(fac)[[1L]], "character", v) && .npRmpi_bw_frame_bare(dimnames(fac)[[2L]], "character", t))))
+    return(FALSE)
+  if (!(is.null(dc) || (.npRmpi_bw_frame_bare(dc, "character", attrs = "names") && length(dc) <= v + 2L &&
+                        .npRmpi_bw_frame_bare(names(dc), "character")))) return(FALSE)
+  is.null(sp) || ((is.pairlist(sp) || (is.list(sp) && !is.object(sp))) && length(sp) <= v &&
+    all(vapply(as.list(sp), function(s) is.null(s) || (.npRmpi_bw_frame_bare(s, "integer") && length(s) <= v), logical(1L))))
+}
+# The four policies stats provides. A user closure ships its body, formals and
+# possibly its environment by value; this row does not need to carry user code.
+.npRmpi_bw_frame_policy_plain <- function(f) is.null(f) || identical(f, na.omit) ||
+  identical(f, na.exclude) || identical(f, na.pass) || identical(f, na.fail)
+.npRmpi_bw_frame_omit_plain <- function(o) is.null(o) ||
+  (.npRmpi_bw_frame_bare(o, "integer", attrs = c("names", "class")) &&
+   (identical(attr(o, "class"), "omit") || identical(attr(o, "class"), "exclude")) &&
+   (is.null(names(o)) || .npRmpi_bw_frame_bare(names(o), "character")))
+.npRmpi_bw_frame_plan_fields <- c("producer", "call", "formula", "frame", "na.action", "terms", "xterms",
+                    "chromoly", "ynames", "omit", "scalar.children")
+# TRUE when the PROJECTED metadata of an admitted unconditional formula producer
+# holds nothing but the reference and plain descriptive fields.
+.npRmpi_bw_frame_plan_plain <- function(wire) {
+  if (!is.list(wire) || is.object(wire) ||
+      anyDuplicated(names(wire)) ||
+      !all(names(wire) %in% c("names", "formula", "identity", "frame.reference")) ||
+      !identical(wire[["names", exact = TRUE]], list()) ||
+      (!is.null(wire[["identity", exact = TRUE]]) &&
+       !identical(wire[["identity", exact = TRUE]], character()))) return(FALSE)
+  p <- wire[["formula", exact = TRUE]]
+  if (!is.list(p) || is.object(p) || anyDuplicated(names(p)) || !all(names(p) %in% .npRmpi_bw_frame_plan_fields)) return(FALSE)
+  cl <- p[["call", exact = TRUE]]; fo <- p[["formula", exact = TRUE]]
+  is.call(cl) && is.null(attr(cl, "class")) && .npRmpi_bw_frame_language(cl) &&
+    is.call(fo) && identical(attr(fo, "class"), "formula") && .npRmpi_bw_frame_language(fo) &&
+    .npRmpi_bw_frame_terms_plain(p[["terms", exact = TRUE]]) &&
+    .npRmpi_bw_frame_policy_plain(p[["na.action", exact = TRUE]]) && .npRmpi_bw_frame_omit_plain(p[["omit", exact = TRUE]]) &&
+    is.null(p[["xterms", exact = TRUE]]) && is.null(p[["chromoly", exact = TRUE]]) &&
+    identical(p[["ynames", exact = TRUE]], character()) &&
+    identical(p[["scalar.children", exact = TRUE]], FALSE)
+}
+
+
+.npRmpi_bw_frame_decode <- function(metadata, call, values) {
+  ref <- metadata[["frame.reference", exact = TRUE]]
+  if (is.null(ref)) return(metadata)
+  bad <- function() stop("invalid prepared-frame reference", call. = FALSE)
+  if (!is.list(ref) || is.object(ref) || !identical(names(ref), .npRmpi_bw_frame_fields) ||
+      !identical(ref[["role"]], "dat") || !is.character(ref[["token"]]) ||
+      length(ref[["token"]]) != 1L || is.na(ref[["token"]]) ||
+      !is.null(attributes(ref[["token"]]))) bad()
+  p <- metadata[["formula", exact = TRUE]]
+  if (!is.list(p) || is.object(p) || !isTRUE(p[["producer", exact = TRUE]] %in% .npRmpi_bw_frame_producers) ||
+      !"frame" %in% names(p) || !is.null(p[["frame", exact = TRUE]]) ||
+      !is.symbol(call[["dat"]]) || !identical(as.character(call[["dat"]]), ref[["token"]]) ||
+      !ref[["token"]] %in% names(values)) bad()
+  d <- values[[ref[["token"]]]]
+  if (!.npRmpi_bw_frame_plain(d)) bad()
+  dn <- attr(d, "names", exact = TRUE)
+  n <- ref[["n"]]
+  if (!identical(sort(names(attributes(d))), c("class", "names", "row.names")) ||
+      !is.integer(n) || length(n) != 1L || is.na(n) || !identical(.row_names_info(d, 2L), n) ||
+      !.npRmpi_bw_frame_exact(dn, ref[["columns"]])) bad()
+  order <- ref[["order"]]; subset <- ref[["subset"]]
+  terms <- p[["terms", exact = TRUE]]; omit <- p[["omit", exact = TRUE]]
+  if (!is.character(order) || !is.null(attributes(order)) || anyNA(order) || anyDuplicated(order) ||
+      !all(.npRmpi_bw_frame_required_attributes %in% order) || !all(order %in% c(.npRmpi_bw_frame_required_attributes, .npRmpi_bw_frame_optional_attributes)) ||
+      !inherits(terms, "terms") ||
+      ("na.action" %in% order) != !is.null(omit) ||
+      (".np.subset" %in% order) != !is.null(subset)) bad()
+  rows <- ref[["rows"]]
+  rn <- if (identical(rows, "source")) .row_names_info(d, 0L) else
+    if (is.integer(rows) && is.null(attributes(rows)) && length(rows) == 2L &&
+        is.na(rows[1L]) && !is.na(rows[2L]) && abs(rows[2L]) == n) rows else bad()
+  if (!is.null(subset) &&
+      (!is.list(subset) || is.object(subset) || !identical(names(subset), c("expression", "envir")) ||
+       !is.language(subset[["expression"]]) || !.npRmpi_bw_frame_language(subset[["expression"]], allow.formula = FALSE) ||
+       !.npRmpi_bw_frame_reference_environment(subset[["envir"]]))) bad()
+  attrs <- setNames(vector("list", length(order)), order)
+  for (k in order) attrs[k] <- list(switch(k, names = dn, row.names = rn, class = "data.frame",
+    terms = terms, na.action = omit, .np.subset = subset))
+  out <- unclass(d)                                   # shares every column with the source
+  attributes(out) <- attrs
+  if (!identical(.row_names_info(out, 2L), n)) bad()
+  p["frame"] <- list(out)
+  metadata["formula"] <- list(p)
+  metadata[["frame.reference"]] <- NULL
+  metadata
+}
+
+.npRmpi_bw_frame_encode <- function(metadata, call, values) {
+  none <- list(status = "none", reason = "", metadata = metadata)
+  decline <- function(why) list(status = "decline", reason = why, metadata = NULL)
+  p <- if (is.list(metadata)) metadata[["formula", exact = TRUE]] else NULL
+  if (!is.list(p) || is.object(p)) return(none)
+  producer <- p[["producer", exact = TRUE]]
+  if (!is.character(producer) || length(producer) != 1L || is.na(producer) ||
+      !producer %in% .npRmpi_bw_frame_producers) return(none)
+  f <- p[["frame", exact = TRUE]]
+  if (is.null(f)) return(none)
+  token <- call[["dat"]]
+  if (!is.symbol(token) || !as.character(token) %in% names(values)) return(decline("no dat token"))
+  token <- as.character(token)
+  d <- values[[token]]
+  if (!.npRmpi_bw_frame_plain(f) || !.npRmpi_bw_frame_plain(d)) return(decline("not a plain data frame"))
+  fn <- attr(f, "names", exact = TRUE); dn <- attr(d, "names", exact = TRUE)
+  uf <- unclass(f); ud <- unclass(d)
+  if (!is.character(fn) || length(uf) != length(ud) || !.npRmpi_bw_frame_exact(fn, dn) ||
+      !.npRmpi_transport_same_encoding(fn, dn)) return(decline("column names"))
+  for (i in seq_along(uf)) {
+    x <- uf[[i]]; y <- ud[[i]]
+    if (!(.npRmpi_bw_frame_exact(x, y) && .npRmpi_transport_plain_value(x) &&
+          .npRmpi_transport_same_encoding(x, y))) return(decline("column values or attributes"))
+  }
+  fa <- attributes(f); fa[["row.names"]] <- .row_names_info(f, 0L)
+  da <- attributes(d); da[["row.names"]] <- .row_names_info(d, 0L)
+  if (anyDuplicated(names(fa)) || !all(.npRmpi_bw_frame_required_attributes %in% names(fa)) ||
+      !all(names(fa) %in% c(.npRmpi_bw_frame_required_attributes, .npRmpi_bw_frame_optional_attributes)))
+    return(decline("frame attribute outside the admitted set"))
+  if (!identical(sort(names(da)), c("class", "names", "row.names"))) return(decline("source attributes"))
+  terms <- p[["terms", exact = TRUE]]; omit <- p[["omit", exact = TRUE]]
+  if (!inherits(terms, "terms") || !.npRmpi_bw_frame_exact(fa[["terms"]], terms)) return(decline("terms are not the plan's"))
+  if ("na.action" %in% names(fa)) {
+    if (is.null(omit) || !.npRmpi_bw_frame_exact(fa[["na.action"]], omit)) return(decline("omission record is not the plan's"))
+  } else if (!is.null(omit)) return(decline("plan omission without a frame record"))
+  rows <- if (.npRmpi_bw_frame_exact(fa[["row.names"]], da[["row.names"]]) &&
+              .npRmpi_transport_same_encoding(fa[["row.names"]], da[["row.names"]])) "source" else {
+    r <- fa[["row.names"]]
+    if (!(is.integer(r) && length(r) == 2L && is.na(r[1L]) && !is.na(r[2L])))
+      return(decline("row names differ from the source"))
+    r
+  }
+  subset <- NULL
+  if (".np.subset" %in% names(fa)) {
+    subset <- fa[[".np.subset"]]
+    if (!is.list(subset) || is.object(subset) || !identical(names(subset), c("expression", "envir")) ||
+        !is.language(subset[["expression"]]) || !.npRmpi_bw_frame_language(subset[["expression"]], allow.formula = FALSE) ||
+        !.npRmpi_bw_frame_reference_environment(subset[["envir"]]))
+      return(decline("subset metadata would travel by value"))
+  }
+  p["frame"] <- list(NULL)
+  metadata["formula"] <- list(p)
+  metadata[["frame.reference"]] <- list(role = "dat", token = token, n = .row_names_info(d, 2L),
+    columns = dn, order = names(fa), rows = rows, subset = subset)
+  back <- tryCatch(.npRmpi_bw_frame_decode(metadata, call, values), error = function(e) NULL)
+  g <- if (is.null(back)) NULL else back[["formula", exact = TRUE]][["frame", exact = TRUE]]
+  if (is.null(g) || !.npRmpi_bw_frame_exact(g, f) || !.npRmpi_transport_same_encoding(g, f) ||
+      !.npRmpi_bw_frame_exact(.row_names_info(g, 0L), .row_names_info(f, 0L)))
+    return(decline("round trip is not exact"))
+  list(status = "admit", reason = "", metadata = metadata)
+}
+# The whole admission decision for the two new rows, in the order a dispatcher
+# would run it. "none" leaves the caller to project as it does today.
+.npRmpi_bw_frame_admit <- function(metadata, call, values) {
+  decline <- function(why) list(status = "decline", reason = why, metadata = NULL)
+  tryCatch({
+    plan <- if (is.list(metadata)) metadata[["formula", exact = TRUE]] else NULL
+    frame <- if (is.list(plan) && !is.object(plan)) plan[["frame", exact = TRUE]] else NULL
+    producer <- if (is.null(frame)) NULL else plan[["producer", exact = TRUE]]
+    cap <- NULL
+    if (typeof(frame) == "list" && is.character(producer) && length(producer) == 1L &&
+        !is.na(producer) && producer %in% .npRmpi_bw_frame_producers) {
+      # Older supported R versions lack the precise inspection error classes.
+      # Keep their incumbent formula transport; native admission is unaffected.
+      if (getRversion() < "4.2.0")
+        return(decline("prepared-frame reuse requires R 4.2.0 condition classes"))
+      cap <- .npRmpi_bw_frame_syntax_cap(length(attr(frame, "names", exact = TRUE)))
+      budget <- new.env(parent = emptyenv())
+      budget$left <- cap
+      if (!.npRmpi_bw_frame_preflight(plan, frame, budget))
+        return(decline(if (isTRUE(budget$left < 0)) "call syntax exceeds the lease's metadata bound"
+                       else "call syntax is outside the plain grammar"))
+    }
+    r <- .npRmpi_bw_frame_encode(metadata, call, values)
+    if (!identical(r$status, "admit")) return(r)
+    omit <- r$metadata[["formula", exact = TRUE]][["omit", exact = TRUE]]
+    if (!is.null(omit) && length(unclass(omit)) > 0L)
+      return(decline("nonempty omission record exceeds new transport scope"))
+    wire <- .npRmpi_bw_metadata_wire(r$metadata, plain.language = TRUE)
+    if (!.npRmpi_bw_frame_plan_plain(wire))
+      return(decline("plan holds a value outside the plain grammar"))
+    # Only validated, projected syntax reaches the serializer: no caller frames
+    # or closures. Use this R's transport format, including its list overhead.
+    syntax <- list(call = wire$formula$call, formula = wire$formula$formula,
+                   subset = wire$frame.reference$subset[["expression"]])
+    if (length(serialize(syntax, NULL)) > cap)
+      return(decline("projected call syntax exceeds the lease's metadata bound"))
+    list(status = "admit", reason = "", metadata = wire)
+  }, stackOverflowError = function(e) decline("call syntax is too deeply nested to inspect"))
 }

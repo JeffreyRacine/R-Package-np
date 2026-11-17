@@ -92,7 +92,9 @@ test_that("only completed conditional default-method calls gain publication", {
   for (producer in c("npregbw", "nplsqregbw", "npplregbw", "npindexbw", "npscoefbw"))
     for (method in c("", ".default", ".rbandwidth"))
       expect_identical(producer_for(as.call(list(as.name(paste0(producer, method))))), producer)
-  for (producer in c("npudensbw", "npudistbw", "npconmode", "npqreg"))
+  for (producer in c("npudensbw", "npudistbw"))
+    expect_identical(plan(as.call(list(as.name(paste0(producer, ".default")))))$kind, "leased_public")
+  for (producer in c("npconmode", "npqreg"))
     expect_identical(plan(as.call(list(as.name(paste0(producer, ".default")))))$kind, "none")
 })
 

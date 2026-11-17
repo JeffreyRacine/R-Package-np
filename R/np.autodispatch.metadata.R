@@ -21,6 +21,14 @@
     expr <- .np_formula_dot_expression(expr, caller)
     labels[[role]] <- paste(deparse(expr), collapse = "")
   }
+  .npRmpi_unconditional_names_apply(result, labels)
+}
+
+# Finalize the same schema before immutable publication on every rank and
+# after an unleased call. Label capture and admission remain with the caller.
+.npRmpi_unconditional_names_apply <- function(result, labels) {
+  fit <- inherits(result, c("npdensity", "npdistribution"))
+  bandwidth <- if (fit) result[["bws", exact = TRUE]] else result
   training <- intersect(c("dat", "tdat"), names(labels))
   if (!length(training)) return(result)
   old <- bandwidth[["xnames", exact = TRUE]]

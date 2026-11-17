@@ -110,15 +110,11 @@ npudistbw.formula <-
     .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], mf)
     dots$.np.formula.state <- NULL
     seed.args <- c(list(dat = dat), if (has.gval) list(gdat = gdat) else list(), dots)
+    .npRmpi.bw.metadata <- .npRmpi_bw_formula_plan(
+      "npudistbw", match.call(expand.dots = FALSE), parent.frame(),
+      formula, mf, capture$na.action, ynames = character())
     tbw <- do.call(npudistbw, .np_formula_options(seed.args, "npudistbw.formula"))
-    tbw$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npudistbw")
-    environment(tbw$call) <- parent.frame()
-    tbw$formula <- formula
-    tbw$terms <- attr(mf,"terms")
-    tbw <- .np_bws_retain_formula_training(tbw, mf, capture$na.action)
-    tbw$rows.omit <- as.vector(attr(mf,"na.action"))
-    tbw$nobs.omit <- length(tbw$rows.omit)
-    tbw
+    .npRmpi_bw_formula_finish(tbw, .npRmpi.bw.metadata)
   }
 
 

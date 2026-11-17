@@ -241,18 +241,18 @@
   data.frame(
     producer = c("npregbw", "nplsqregbw", "npplregbw", "npindexbw", "npscoefbw",
                  ".npscoefbw_nomad_context_prepare",
-                 "npcdensbw", "npcdistbw"),
-    kind = c(rep("leased_public", 5L), "scoped_internal", rep("leased_public", 2L)),
+                 "npcdensbw", "npcdistbw", "npudensbw", "npudistbw"),
+    kind = c(rep("leased_public", 5L), "scoped_internal", rep("leased_public", 4L)),
     capability = c("bw.npreg", "bw.nplsqreg", "bw.npplreg", "bw.npindex", "bw.npscoef",
                    "internal.npscoef.nomad_context",
-                   "bw.npcdens", "bw.npcdist"),
+                   "bw.npcdens", "bw.npcdist", "bw.npudens", "bw.npudist"),
     consumer = c("npreg", "nplsqreg", "npplreg", "npindex", "npscoef",
-                 ".npscoefbw_nomad_pool_start", "npcdens", "npcdist"),
-    argument = c(rep("bws", 5L), "ctx", rep("bws", 2L)),
+                 ".npscoefbw_nomad_pool_start", "npcdens", "npcdist", "npudens", "npudist"),
+    argument = c(rep("bws", 5L), "ctx", rep("bws", 4L)),
     expected_class = c("rbandwidth", "lsqregressionbandwidth", "plbandwidth",
                        "sibandwidth", "scbandwidth", "list",
-                       "conbandwidth", "condbandwidth"),
-    fingerprint_policy = c(rep("bandwidth.v1", 5L), "context.v1", rep("bandwidth.v1", 2L)),
+                       "conbandwidth", "condbandwidth", "bandwidth", "dbandwidth"),
+    fingerprint_policy = c(rep("bandwidth.v1", 5L), "context.v1", rep("bandwidth.v1", 4L)),
     stringsAsFactors = FALSE
   )
 }
@@ -1284,6 +1284,15 @@
   if (length(required) && !all(vapply(required, exists, logical(1),
                                      envir = eval.env, inherits = FALSE)))
     stop("autodispatch invocation is missing a private argument", call. = FALSE)
+  metadata <- payload[["public.metadata", exact = TRUE]]
+  if (!is.null(metadata[["frame.reference", exact = TRUE]])) {
+    # Only original inline/prepublished dat may own a frame reference. Resolve
+    # before evaluation; never read a later mutation or ambient/leased binding.
+    frame.values <- tmpvals
+    for (nm in prepublish.names)
+      frame.values[nm] <- list(get(nm, envir = eval.env, inherits = FALSE))
+    metadata <- .npRmpi_bw_frame_decode(metadata, call.obj, frame.values)
+  }
   res <- .npRmpi_eval_scmd(call.obj, envir = eval.env)
   tmpreplace <- tmpvals
   if (!is.null(prepublish.names) && length(prepublish.names)) {
@@ -1298,7 +1307,6 @@
       tmpreplace[nm] <- list(get(nm, envir = eval.env, inherits = FALSE))
   if (!is.null(tmpreplace) && length(tmpreplace))
     res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpreplace)
-  metadata <- payload[["public.metadata", exact = TRUE]]
   if (!is.null(metadata[["literal", exact = TRUE]]))
     metadata <- .npRmpi_bw_literals_decode(metadata, payload$call, tmpreplace)
   if (!is.null(metadata)) {
@@ -3342,8 +3350,22 @@
   if (!is.null(public.metadata))
     public.metadata$identity <- .npRmpi_native_identity_bind(
       public.metadata$identity, prepared$call, prepared$tmpnames)
-  wire.metadata <- if (is.null(public.metadata)) NULL else
-    .npRmpi_bw_metadata_wire(public.metadata)
+  frame.plan <- if (publication$producer %in% c("npudensbw", "npudistbw"))
+    .npRmpi_bw_frame_admit(public.metadata, prepared$call,
+      c(prepared$tmpvals, prepared$prepublish)) else NULL
+  if (!is.null(frame.plan) && identical(frame.plan$status, "admit")) {
+    wire.metadata <- frame.plan$metadata
+  } else {
+    metadata <- public.metadata
+    if (!is.null(frame.plan) && identical(frame.plan$status, "decline")) {
+      # Only the newly admitted lease requires the complete compact formula
+      # plan. Preserve the old numerical call and coordinator finalization.
+      publication$kind <- "none"
+      metadata <- metadata[intersect(names(metadata), c("identity", "names"))]
+    }
+    wire.metadata <- if (is.null(metadata)) NULL else
+      .npRmpi_bw_metadata_wire(metadata)
+  }
   if (publication$producer %in% c("npcdensbw", "npcdistbw")) {
     wire.metadata <- .npRmpi_bw_literals_encode(wire.metadata, public.metadata,
       prepared$call, c(prepared$tmpvals, prepared$prepublish,
@@ -3621,7 +3643,7 @@
     caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
   producer <- .npRmpi_lease_producer(mc)
   metadata <- if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw",
-                         "npcdensbw", "npcdistbw"))
+                         "npcdensbw", "npcdistbw", "npudensbw", "npudistbw"))
     list(names = list(), formula = .npRmpi_bw_formula_owner_plan(producer)) else NULL
   if (producer %in% c("npcdensbw", "npcdistbw") &&
       (if (!is.null(metadata$formula))
@@ -3650,7 +3672,7 @@
     }
   }
   if (producer %in% c("npregbw", "npindexbw", "npscoefbw", "npplregbw", "nplsqregbw",
-                         "npcdensbw", "npcdistbw"))
+                         "npcdensbw", "npcdistbw", "npudensbw", "npudistbw"))
     metadata$names <- .npRmpi_native_name_plan(definition, sys.frame(method),
       if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv(),
       values = mc, identity.roles = names(metadata$identity))
