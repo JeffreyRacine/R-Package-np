@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Avoid unnecessary data copies when removing absent internal MPI dispatch tags; preserve actual tag removal and retained training values.
+
 * Fingerprint supported retained training values in bounded chunks for MPI
   bandwidth reuse, preserving compact data storage and detecting mutations.
   Other metadata and callback ownership retain their existing checks.
