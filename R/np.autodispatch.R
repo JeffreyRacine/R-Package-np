@@ -687,6 +687,14 @@
     z
   }
   y <- x
+  if (identical(policy, "bandwidth.v1")) {
+    projection <- tryCatch(.npRmpi_training_value_projection(x),
+                           error = function(e) NULL)
+    if (is.null(projection)) return(NA_character_)
+    if (projection$changed)
+      y <- list(domain = "npRmpi.bandwidth.training.value.v1",
+                value = projection$value)
+  }
   attr(y, "npRmpi.dispatch.mode") <- NULL
   attr(y, "npRmpi.autodispatch.remote") <- NULL
   attr(y, "npRmpi.autodispatch.fingerprint") <- NULL

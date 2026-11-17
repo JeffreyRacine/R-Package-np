@@ -1,5 +1,9 @@
 # npRmpi 0.80-3
 
+* Fingerprint supported retained training values in bounded chunks for MPI
+  bandwidth reuse, preserving compact data storage and detecting mutations.
+  Other metadata and callback ownership retain their existing checks.
+
 * Preserve certified MPI bandwidth reuse when an installation retains R source
   annotations, without relaxing expression or caller-ownership checks.
 
