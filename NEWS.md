@@ -1,5 +1,11 @@
 # npRmpi 0.80-3
 
+- Private plot support: known-fixed-bound beta density kernels of orders 4,
+  6 and 8 now admit calibrated asymptotic and symmetric/asymmetric SD bands
+  for two continuous coordinates. The existing correction and numerical
+  limits are unchanged; retained coverage is strongly conservative. Higher-order
+  two-dimensional normal pmzsd and other previously excluded routes stay excluded.
+
 * Whole-line q=1 order-two uniform corrected density plots add asymptotic normal
   pointwise and raw Bonferroni intervals using complete Q6 reference covariance.
   This does not admit uniform asymptotic simultaneous/all bands or replace any

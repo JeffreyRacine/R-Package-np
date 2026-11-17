@@ -11,13 +11,14 @@
 }
 
 # The existing R9 plot operator is independent of the fitted native order.
-# Higher-order q1 admission includes calibrated bands and marginal normal pmzsd.
-# The normal request validator still requires asymptotic inference.
+# Higher orders share calibrated bands in q1/q2. Marginal normal pmzsd
+# remains a separate q1-only higher-order contract and requires asymptotic inference.
 .np_udens_beta_order_request <- function(bws, band) {
   isTRUE(bws[['ckerorder', exact=TRUE]] == 2L) ||
-    (isTRUE(bws[['ndim', exact=TRUE]] == 1L) &&
-     isTRUE(bws[['ckerorder', exact=TRUE]] %in% c(4L, 6L, 8L)) &&
-     isTRUE(band %in% c('pmzsd', 'pointwise', 'simultaneous', 'bonferroni', 'all')))
+    (isTRUE(bws[['ckerorder', exact=TRUE]] %in% c(4L, 6L, 8L)) &&
+     ((isTRUE(bws[['ndim', exact=TRUE]] %in% 1:2) &&
+       isTRUE(band %in% c('pointwise', 'simultaneous', 'bonferroni', 'all'))) ||
+      (isTRUE(bws[['ndim', exact=TRUE]] == 1L) && identical(band, 'pmzsd'))))
 }
 
 .np_udens_beta_public_prepare <- function(bws,x,method,bootstrap,band,calibration,alpha,seed) {
@@ -26,7 +27,7 @@
   if(!identical(bws[['type',exact=TRUE]],'fixed') || !.np_udens_beta_order_request(bws,band) ||
      !isTRUE(bws[['ndim',exact=TRUE]]%in%1:2) ||
      !isTRUE(bws[['ncon',exact=TRUE]]==bws[['ndim',exact=TRUE]]))
-    stop('beta corrected bands require fixed bandwidths: order 2 for one or two continuous coordinates, or orders 4/6/8 for one coordinate with a calibrated band or asymptotic pmzsd',call.=FALSE)
+    stop('beta corrected bands require fixed bandwidths: orders 2/4/6/8 for one or two continuous coordinates with a calibrated band; higher-order asymptotic pmzsd requires one coordinate',call.=FALSE)
   normal <- .np_udens_bounded_normal_request(bws,method,band,calibration,alpha)
   if(!normal && !band%in%c('pointwise','simultaneous','bonferroni','all'))
     stop("beta corrected bands require explicit band='pointwise', 'simultaneous', 'bonferroni' or 'all'",call.=FALSE)
