@@ -1,5 +1,10 @@
 # np 0.80-3
 
+* Whole-line q=1 order-two uniform corrected density plots add asymptotic normal
+  pointwise and raw Bonferroni intervals using complete Q6 reference covariance.
+  This does not admit uniform asymptotic simultaneous/all bands or replace any
+  explicit bootstrap law; sparse-tail coverage limitations remain.
+
 * Whole-line q=1 order-two Epanechnikov corrected density plots add asymptotic
   normal pointwise and raw Bonferroni companions to the unchanged M4 simultaneous
   band; `all` returns these exact components. Local coverage limitations remain.
