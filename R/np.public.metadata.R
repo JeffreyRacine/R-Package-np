@@ -453,21 +453,23 @@
                              "plbandwidth", "lsqregressionbandwidth",
                              "conbandwidth", "condbandwidth",
                              "bandwidth", "dbandwidth"))) next
-    restore <- function(value, reference) {
-      fields <- c("call", "formula", "terms", "xterms", ".np.formula.training")
-      metadata <- function(x) {
-        out <- x[intersect(names(x), fields)]
-        training <- out[[".np.formula.training", exact = TRUE]]
-        # Native fitting may replace the effective sample. Keep its presence
-        # and all retained policies in the guard, but not the sample values.
-        if (is.list(training) && "frame" %in% names(training)) {
-          training["frame"] <- list(NULL)
-          out[".np.formula.training"] <- list(training)
-        }
-        out
+    fields <- c("call", "formula", "terms", "xterms", ".np.formula.training")
+    metadata <- function(x) {
+      out <- x[intersect(names(x), fields)]
+      training <- out[[".np.formula.training", exact = TRUE]]
+      # Native fitting may replace the effective sample. Keep its presence
+      # and all retained policies in the guard, but not the sample values.
+      if (is.list(training) && "frame" %in% names(training)) {
+        training["frame"] <- list(NULL)
+        out[".np.formula.training"] <- list(training)
       }
-      if (!identical(.npRmpi_autodispatch_fingerprint(metadata(value)),
-                     .npRmpi_autodispatch_fingerprint(metadata(reference))))
+      out
+    }
+    restore <- function(value, reference,
+                        value.key = .npRmpi_autodispatch_fingerprint(metadata(value)),
+                        reference.key = .npRmpi_autodispatch_fingerprint(metadata(reference))) {
+      fields <- c("call", "formula", "terms", "xterms", ".np.formula.training")
+      if (!identical(value.key, reference.key))
         stop("retained formula metadata changed before public owner restoration",
              call. = FALSE)
       restored <- reference[intersect(names(reference), fields)]
@@ -490,7 +492,16 @@
           value$tau.bws[[i]] <- restore(value$tau.bws[[i]], reference$tau.bws[[i]])
       value
     }
-    result[["bws"]] <- restore(bws, original)
+    # Keep the guard order, and reuse only the reference's immutable digest.
+    value.key <- .npRmpi_autodispatch_fingerprint(metadata(bws))
+    reference.key <- .npRmpi_autodispatch_fingerprint(metadata(original))
+    result[["bws"]] <- restore(bws, original, value.key, reference.key)
+    # Partially linear fits expose a second bandwidth view. Validate it in its
+    # own right and preserve its effective sample and non-metadata fields.
+    alias <- result[["bw", exact = TRUE]]
+    if (inherits(result, "plregression") && inherits(alias, "plbandwidth") &&
+        inherits(original, "plbandwidth"))
+      result[["bw"]] <- restore(alias, original, reference.key = reference.key)
   }
   result
 }

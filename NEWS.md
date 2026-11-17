@@ -2,6 +2,8 @@
 
 * Reuse certified unconditional density and distribution bandwidth data on MPI workers. Preserve caller-owned metadata and existing execution for formula metadata that cannot be transported compactly. Formula-call reuse requires a coordinator running R 4.2.0 or later; earlier coordinators retain their existing formula transport. Programmatically embedded formula objects in subset expressions also retain their existing transport.
 
+* Restore original formula and subset ownership in both partially linear bandwidth fields after MPI fitting, preserving each field's effective training sample and numerical values.
+
 * Preserve captured regression plot inference when MPI reuse supplies a bandwidth before its diagnostic timing profile is attached; retain exact computational and data ownership checks.
 
 * Share unchanged ordinary training and evaluation columns when complete-case filtering retains every row, preserving row names, class methods and copy-on-modify ownership.
