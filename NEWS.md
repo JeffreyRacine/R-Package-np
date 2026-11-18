@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Terminate exhausted coordinate degree-restart requests with a clear error, complete feasible deterministic starts across the candidate grid, and ignore coordinate restarts during exhaustive degree search as documented.
+
 * Respect `degree.min` and `degree.max` for the initial baseline in exhaustive and coordinate polynomial-degree searches, including automatic selection.
 
 * Compare captured regression model identity independently of diagnostic timing profiles, consistently with npRmpi; retain exact computational and data ownership checks.

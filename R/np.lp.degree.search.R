@@ -781,14 +781,22 @@
     exists(.np_degree_eval_key(degree), envir = seen, inherits = FALSE)
   }
 
+  excluded <- 0L
   if (!is.null(exclude)) {
-    if (is.list(exclude)) {
-      for (deg in exclude)
-        remember(as.integer(deg))
-    } else {
-      remember(as.integer(exclude))
+    exclusions <- if (is.list(exclude)) exclude else list(exclude)
+    for (deg in exclusions) {
+      deg <- as.integer(deg)
+      if (length(deg) == ncon && !already_seen(deg) &&
+          all(vapply(seq_len(ncon), function(j) deg[j] %in% candidates[[j]], logical(1))))
+        excluded <- excluded + 1L
+      remember(deg)
     }
   }
+  available <- .np_degree_grid_size(candidates) - excluded
+  if (restarts > available)
+    stop(sprintf(
+      "degree.restarts=%d exceeds the %s available distinct degree starts; reduce degree.restarts or use exhaustive search",
+      restarts, format(available, scientific = FALSE, trim = TRUE)), call. = FALSE)
 
   add_start <- function(degree) {
     degree <- as.integer(degree)
@@ -806,17 +814,29 @@
       return(starts)
   }
 
-  k <- 1L
-  while (length(starts) < restarts) {
+  # Preserve the original modular proposal order without a growing k*j.
+  widths <- as.double(lengths(candidates, use.names = FALSE))
+  stride <- as.double(seq_len(ncon) %% widths)
+  indices <- first_indices <- stride + 1
+  repeat {
     degree <- vapply(seq_len(ncon), function(j) {
-      cand <- as.integer(candidates[[j]])
-      idx <- ((k * j) %% length(cand)) + 1L
-      cand[idx]
+      as.integer(candidates[[j]][indices[j]])
     }, integer(1))
     add_start(degree)
-    k <- k + 1L
+    if (length(starts) >= restarts)
+      return(starts)
+    indices <- ((indices - 1 + stride) %% widths) + 1
+    if (identical(indices, first_indices))
+      break
   }
 
+  # The modular cycle need not span the Cartesian grid. Complete it lazily.
+  .np_degree_iterate_grid(candidates, function(degree) {
+    add_start(degree)
+    length(starts) < restarts
+  })
+  if (length(starts) < restarts)
+    stop("internal degree restart enumeration did not fill the admissible request")
   starts
 }
 
@@ -1184,11 +1204,15 @@
 
   baseline_degree <- as.integer(baseline_degree)
   start_degree <- as.integer(start_degree)
-  restart_starts <- .np_degree_restart_starts(
-    candidates = candidates,
-    restarts = restarts,
-    exclude = list(start_degree, baseline_degree)
-  )
+  restart_starts <- if (identical(method, "coordinate")) {
+    .np_degree_restart_starts(
+      candidates = candidates,
+      restarts = restarts,
+      exclude = list(start_degree, baseline_degree)
+    )
+  } else {
+    list()
+  }
 
   search_started <- proc.time()[3]
 
