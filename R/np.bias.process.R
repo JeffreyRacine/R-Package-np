@@ -222,8 +222,8 @@
   if (pilot.block && !law %in% c("fixed","geom"))
     stop("pilot-block refinement requires fixed or geom",call.=FALSE)
   basic.envelope <- identical(calibration,"basic-envelope")
-  if(basic.envelope && (!law %in% c("inid","fixed","geom") || !identical(targets,"mean")))
-    stop("basic-envelope requires inid, fixed or geom regression means",call.=FALSE)
+  if(basic.envelope && !law %in% c("inid","fixed","geom"))
+    stop("basic-envelope requires inid, fixed or geom regression targets",call.=FALSE)
   if(basic.envelope && law %in% c("fixed","geom") && !pilot.block)
     stop("basic-envelope block inference requires refinement='pilot-block'",call.=FALSE)
   # Basic roots use the observed block scale, never a replicate studentizer.

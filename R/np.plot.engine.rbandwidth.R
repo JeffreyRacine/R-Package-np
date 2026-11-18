@@ -233,8 +233,8 @@
       stop("explicit bootstrap calibration requires iterated bias-corrected regression and empirical bands",call.=FALSE)
     if (identical(plot.errors.boot.calibration, "basic-envelope") &&
         (!as.character(plot.errors.boot.method)[1L] %in% c("inid", "fixed", "geom") ||
-         !identical(bws[["type", exact=TRUE]], "fixed") || isTRUE(gradients)))
-      stop("basic-envelope requires inid, fixed or geom resampling and fixed-bandwidth regression means", call.=FALSE)
+         !identical(bws[["type", exact=TRUE]], "fixed")))
+      stop("basic-envelope requires inid, fixed or geom resampling and fixed-bandwidth regression targets", call.=FALSE)
     if (bias.request && !new.bias && error.request$method=="asymptotic")
       stop("legacy bias correction requires errors='bootstrap'",call.=FALSE)
     if (new.bias && plot.bxp)

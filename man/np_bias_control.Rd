@@ -292,7 +292,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   Explicit block lengths are retained as overrides.
 
   The opt-in \code{np_boot_control(calibration="basic-envelope")} uses an
-  endpoint-unit basic envelope for inid/fixed/geometric fixed-bandwidth means. It retains the
+  endpoint-unit basic envelope for inid/fixed/geometric fixed-bandwidth means, derivatives and categorical contrasts. It retains the
   corrected center, variance owner and bounded corrected-row computation; see
   \code{\link{np_boot_control}} for its construction and restrictions.
 
