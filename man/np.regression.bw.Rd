@@ -337,8 +337,11 @@ These arguments control regression type, local-polynomial specification, and opt
 
   \item{degree.restarts}{
     non-negative integer giving the number of additional deterministic
-    restarts used by coordinate search. Ignored for
-    \code{degree.select="manual"} and \code{"exhaustive"}.
+    restarts used by coordinate search with \code{search.engine="cell"}.
+    For a non-singleton candidate grid, an error is reported if the requested
+    number exceeds the distinct admissible starts remaining after exclusions.
+    Ignored for \code{degree.select="manual"}, \code{"exhaustive"}, a singleton
+    candidate grid, and the NOMAD search engines.
   }
 
   \item{degree.max.cycles}{

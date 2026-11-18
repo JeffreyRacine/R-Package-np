@@ -238,8 +238,11 @@ These arguments control automatic local-polynomial degree search when \code{regt
 
   \item{degree.restarts}{
     non-negative integer giving the number of additional deterministic
-    coordinate-search restarts. Ignored for \code{"manual"} and
-    \code{"exhaustive"} degree selection.
+    restarts used by coordinate search with \code{search.engine="cell"}.
+    For a non-singleton candidate grid, an error is reported if the requested
+    number exceeds the distinct admissible starts remaining after exclusions.
+    Ignored for \code{degree.select="manual"}, \code{"exhaustive"}, a singleton
+    candidate grid, and the NOMAD search engines.
   }
 
   \item{degree.select}{

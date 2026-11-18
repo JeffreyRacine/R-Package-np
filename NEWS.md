@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Terminate exhausted coordinate degree-restart requests with a clear error, complete feasible deterministic starts across the candidate grid, and ignore coordinate restarts during exhaustive degree search as documented.
+
 * Respect `degree.min` and `degree.max` for the initial baseline in exhaustive and coordinate polynomial-degree searches, including automatic selection.
 
 * Avoid transferring unrelated local subset-environment bindings with certified regression and conditional density/distribution bandwidth metadata. Preserve the original public subset owner, callback behavior and explicit-data replay.
