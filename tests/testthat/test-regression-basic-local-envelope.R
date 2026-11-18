@@ -97,3 +97,22 @@ test_that("only explicit regression normalization admits the local envelope", {
   z<-.np_plot_normalize_public_dots(dots,allow_basic_local_envelope=TRUE)
   expect_identical(z$plot.errors.boot.calibration,"basic-local-envelope")
 })
+
+
+test_that("nearest-neighbour local envelopes retain fixed selected indices", {
+  opts<-options(np.messages=FALSE,np.plot.progress=FALSE)
+  on.exit(options(opts),add=TRUE)
+  set.seed(103071);x<-data.frame(x=seq(-1,1,length.out=80));y<-sin(3*x$x)+rnorm(80,sd=.3)
+  for(type in c("generalized_nn","adaptive_nn")) {
+    bw<-npregbw(xdat=x,ydat=y,bws=45,regtype="ll",bwtype=type,bandwidth.compute=FALSE)
+    fit<-npreg(bws=bw,txdat=x,tydat=y);held<-fit;seed<-.Random.seed
+    run<-function(cal,object=fit,...)suppressWarnings(plot(object,errors="bootstrap",
+      center="bias-corrected",bootstrap="inid",B=199L,neval=6L,band="all",output="data",
+      random.seed=103072L,boot.control=np_boot_control(calibration=cal),...))
+    z<-run("basic-local-envelope");zz<-run("basic-local-envelope",bw,xdat=x,ydat=y)
+    for(b in c("pointwise","simultaneous","bonferroni"))
+      expect_identical(as.data.frame(z,band=b),as.data.frame(zz,band=b))
+    expect_identical(fit,held);expect_identical(.Random.seed,seed)
+    expect_error(run("basic-envelope"),"fixed-bandwidth")
+  }
+})

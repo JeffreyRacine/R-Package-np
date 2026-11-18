@@ -105,7 +105,9 @@ block length one. This distinction is intentional. Block lengths and the
 existing automatic selector are retained; fixed blocks of length n have no
 resampling variation and are refused. At least two draws are required.
 The experimental \code{calibration="basic-local-envelope"} has the same
-admission rules and reuses exactly the same corrected centers, observed standard
+fixed-bandwidth admission rules and also supports generalized and adaptive
+nearest-neighbour bandwidths with the already-supported unbounded second-order
+Gaussian regression construction. It reuses exactly the same corrected centers, observed standard
 errors and signed draws. It also takes signed and absolute family extrema after
 standardizing each target by its observed standard error, then returns the hull
 of this local envelope and the existing \code{"basic-envelope"} simultaneous
@@ -114,7 +116,10 @@ across the grid; this is not replicate-studentized bootstrap-t. Zero standard
 error requires zero process draws. This option never narrows the existing
 basic envelope, but does not guarantee nominal coverage or correct remaining
 bias. Like all bias-corrected bounds it remains experimental, pre-beta and
-incomplete; no additional kernel or bandwidth types are admitted.
+incomplete. No additional kernels are admitted; zero nearest-neighbour radii
+and unqualified regularized main rows retain their existing refusals.
+The original \code{"basic-envelope"} public option remains restricted to fixed
+bandwidths.
 
 Dependent-data coverage evidence is limited; pooled and mixed layouts have
 structural qualification rather than a broad dependent-data coverage study.
