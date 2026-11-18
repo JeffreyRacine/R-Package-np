@@ -355,3 +355,65 @@ test_that("automatic degree search emits staged progress output", {
 
   expect_gt(length(coord_msgs), 0L)
 })
+
+test_that("cell-search baselines belong to the requested degree lattice", {
+  degree_search <- getFromNamespace(".np_degree_search", "npRmpi")
+  withr::local_options(list(np.messages = FALSE))
+  grids <- list(list(1:2), list(0:1, 2:3), list(c(1L, 3L)))
+  for (candidates in grids) {
+    for (method in c("exhaustive", "coordinate")) {
+      for (direction in c("min", "max")) {
+        seen <- new.env(parent = emptyenv())
+        seen$degrees <- list()
+        baseline <- integer(length(candidates))
+        result <- degree_search(
+          method = method, candidates = candidates,
+          baseline_degree = baseline,
+          start_degree = vapply(candidates, max, 1L),
+          restarts = 1L, verify = TRUE,
+          direction = direction,
+          eval_fun = function(degree) {
+            seen$degrees[[length(seen$degrees) + 1L]] <- degree
+            value <- sum(degree)
+            list(objective = if (direction == "min") value else -value,
+                 payload = list(degree = degree), num.feval = 1L)
+          }
+        )
+        legal <- function(degree) all(vapply(seq_along(candidates), function(j)
+          degree[j] %in% candidates[[j]], TRUE))
+        expect_true(all(vapply(seen$degrees, legal, TRUE)))
+        expect_identical(result$baseline$degree, vapply(candidates, min, 1L))
+        expect_identical(result$best$degree, vapply(candidates, min, 1L))
+        expect_true(result$completed)
+        expect_true(result$certified)
+      }
+    }
+  }
+})
+
+test_that("a positive-bound search cannot recover an excluded baseline", {
+  degree_search <- getFromNamespace(".np_degree_search", "npRmpi")
+  withr::local_options(list(np.messages = FALSE))
+  evaluate <- function(degree) {
+    if (degree > 0L)
+      stop(structure(list(message = "no admissible model", call = NULL),
+                     class = c("np_degree_candidate_invalid", "error", "condition")))
+    list(objective = 0, payload = list(degree = degree))
+  }
+  expect_error(degree_search(method = "exhaustive", candidates = list(1:2),
+    baseline_degree = 0L, start_degree = 1L, eval_fun = evaluate),
+    "no admissible model")
+
+  seen <- new.env(parent = emptyenv())
+  seen$count <- 0L
+  result <- degree_search(method = "exhaustive", candidates = list(1:2),
+    baseline_degree = 0L, start_degree = 1L, eval_fun = function(degree) {
+      seen$count <- seen$count + 1L
+      if (seen$count > 1L)
+        stop(structure(list(message = "interrupt"), class = c("interrupt", "condition")))
+      list(objective = degree, payload = list(degree = degree))
+    })
+  expect_true(result$interrupted)
+  expect_identical(result$best$degree, 1L)
+  expect_identical(result$baseline$degree, 1L)
+})

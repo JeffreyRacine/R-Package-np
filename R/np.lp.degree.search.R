@@ -1214,7 +1214,10 @@
   search_started <- proc.time()[3]
 
   tryCatch({
-    state$baseline_record <- state$evaluate(baseline_degree)
+    # The baseline competes with searched models and must obey the same grid.
+    state$baseline_record <- state$evaluate(
+      .np_degree_clip_to_grid(baseline_degree, candidates)
+    )
 
     if (identical(method, "exhaustive")) {
       state$progress_state <- .np_degree_progress_begin(

@@ -271,6 +271,8 @@ These arguments control automatic local-polynomial degree search when \code{regt
     optional starting degree vector for automatic coordinate search. If
     omitted, the search starts from the degree-zero local-constant
     baseline on the continuous \code{xdat} predictors.
+    For cell-based searches, the starting degree and initial baseline are
+    restricted to the requested \code{degree.min} and \code{degree.max} bounds.
   }
 
   \item{degree.verify}{

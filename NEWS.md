@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Respect `degree.min` and `degree.max` for the initial baseline in exhaustive and coordinate polynomial-degree searches, including automatic selection.
+
 * Avoid transferring unrelated local subset-environment bindings with certified regression and conditional density/distribution bandwidth metadata. Preserve the original public subset owner, callback behavior and explicit-data replay.
 
 * Reuse certified unconditional density and distribution bandwidth data on MPI workers. Preserve caller-owned metadata and existing execution for formula metadata that cannot be transported compactly. Formula-call reuse requires a coordinator running R 4.2.0 or later; earlier coordinators retain their existing formula transport. Programmatically embedded formula objects in subset expressions also retain their existing transport.
