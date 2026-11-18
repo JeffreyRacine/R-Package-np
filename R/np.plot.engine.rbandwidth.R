@@ -223,12 +223,12 @@
     new.bias <- bias.request && identical(bias.control[["construction"]],"iterated")
     if (!is.character(plot.errors.boot.calibration) || length(plot.errors.boot.calibration)!=1L ||
         is.na(plot.errors.boot.calibration) ||
-        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope","basic-envelope","symmetric-sd","asymmetric-sd","smoothed-percentile","legacy"))
+        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope","basic-envelope","basic-local-envelope","symmetric-sd","asymmetric-sd","smoothed-percentile","legacy"))
       stop("invalid bootstrap calibration control",call.=FALSE)
     if (!plot.errors.boot.calibration %in% c("default","legacy") &&
         (!new.bias || error.request$method!="bootstrap" || error.request$type=="pmzsd"))
       stop("explicit bootstrap calibration requires iterated bias-corrected regression and empirical bands",call.=FALSE)
-    if (identical(plot.errors.boot.calibration, "basic-envelope") &&
+    if (plot.errors.boot.calibration %in% c("basic-envelope", "basic-local-envelope") &&
         (!as.character(plot.errors.boot.method)[1L] %in% c("inid", "fixed", "geom") ||
          !identical(bws[["type", exact=TRUE]], "fixed")))
       stop("basic-envelope requires inid, fixed or geom resampling and fixed-bandwidth regression targets", call.=FALSE)
