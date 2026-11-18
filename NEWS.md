@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Extend the opt-in regression basic-local envelope to Gaussian generalized and adaptive nearest-neighbour bandwidths, retaining existing zero-radius and regularization refusals. Existing calibrations are unchanged.
+
 * Normalize bootstrap calibration labels consistently when plot controls are edited by hand.
 
 * Add an opt-in experimental `basic-local-envelope` regression calibration that encloses the existing basic and observed-SE local simultaneous/Bonferroni envelopes, retaining the same draws, centers, standard errors and pointwise bounds. Existing methods and admission limits are unchanged.
