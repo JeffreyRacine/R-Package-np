@@ -245,6 +245,8 @@ These arguments control automatic local-polynomial degree search when \code{regt
     below the training-sample limit. This avoids wasting starts on flat
     penalty or heavily ridged designs while leaving the full user
     requested degree search region unchanged.
+    For cell-based searches, the starting degree and initial baseline are
+    restricted to the requested \code{degree.min} and \code{degree.max} bounds.
   }
 
   \item{degree.verify}{

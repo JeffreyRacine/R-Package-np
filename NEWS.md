@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Respect `degree.min` and `degree.max` for the initial baseline in exhaustive and coordinate polynomial-degree searches, including automatic selection.
+
 * Compare captured regression model identity independently of diagnostic timing profiles, consistently with npRmpi; retain exact computational and data ownership checks.
 
 * Share unchanged ordinary training and evaluation columns when complete-case filtering retains every row, preserving row names, class methods and copy-on-modify ownership.
