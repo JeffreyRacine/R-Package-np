@@ -567,7 +567,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bootstrap laws retain their documented corrected-process calibration;
   see \code{\link{np_bias_control}} for law-specific definitions and support.
 
-  Regression additionally offers the experimental inid
+  Regression additionally offers the experimental inid/fixed/geometric
   \code{np_boot_control(calibration="basic-envelope")} for fixed-bandwidth
   means. It inverts endpoint-unit empirical roots and takes a containing
   absolute-root envelope, rather than using a replicate studentizer or

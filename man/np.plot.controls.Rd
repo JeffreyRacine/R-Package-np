@@ -72,10 +72,12 @@ hull with the absolute-root interval; it is distinct from the raw asymmetric
 choice. Omitted/default controls preserve their earlier behavior.
 
 The experimental \code{calibration="basic-envelope"} is available for
-fixed-bandwidth regression means with \code{bootstrap="inid"} and iterated
+fixed-bandwidth regression means with \code{bootstrap="inid"}, \code{"fixed"}
+or \code{"geom"} and iterated
 bias correction. It reuses the complete corrected observation rows and
-multinomial observation counts; it does not refit resampled pairs. Signed
-residual-score draws are aligned to the observed corrected standard error,
+the selected row/block multiplicities; it does not refit resampled pairs.
+For inid, signed residual-score draws are aligned to the observed corrected
+standard error,
 then expressed in endpoint units before taking marginal quantiles or
 finite-grid extrema. Basic inversion maps root limits \eqn{[L,U]} to
 \eqn{[\widehat m_{bc}-U,\widehat m_{bc}-L]}{[m_bc-U,m_bc-L]}.
@@ -85,14 +87,25 @@ are nested. The simultaneous envelope has constant lower and upper offsets
 across each nondegenerate plotted family; a high-variance target can widen
 it substantially elsewhere. Relative to standardized SD bands it can be
 narrower at the most variable targets; it is conservative only relative to
-its raw separate-tail construction. Pointwise results equal the existing
+its raw separate-tail construction. For inid and non-pooled block rows,
+pointwise results equal the existing
 \code{"tail-envelope"} pointwise results. Its behavior depends on the full
 displayed grid.
 Bandwidths and polynomial degrees remain fixed. No Gaussian critical value
-or replicate-specific studentizer is used by this option. The score-SD
-alignment is estimated from \code{B} draws, so it has Monte Carlo error.
+or replicate-specific studentizer is used by this option. For inid and
+non-pooled block rows, the score-SD alignment is estimated from
+\code{B} draws, so it has Monte Carlo error.
+For fixed and geometric blocks, ordinary and categorical-only rows retain
+pilot-anchored block scaling. Pooled multi-level/multiple-factor profiles retain
+the existing exact conditional block-score variance and raw centered score
+sums; they are not aligned to the pilot SE and can differ from inid even at
+block length one. This distinction is intentional. Block lengths and the
+existing automatic selector are retained; fixed blocks of length n have no
+resampling variation and are refused. At least two draws are required.
+Dependent-data coverage evidence is limited; pooled and mixed layouts have
+structural qualification rather than a broad dependent-data coverage study.
 Existing regularization and pilot-admission restrictions remain in force.
-Wild/block resampling, nearest-neighbour bandwidths, derivatives and
+Wild resampling, nearest-neighbour bandwidths, derivatives and
 \code{band="pmzsd"} are not supported by this option. Existing methods and
 defaults are unchanged. Like all corrected bounds, this option is pre-beta
 research, with limited coverage evidence rather than a general guarantee.

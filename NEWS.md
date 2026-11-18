@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Extend opt-in regression basic envelopes to fixed/geometric block counts, retaining existing block-scale policies and bounded corrected-row reuse. Pooled profiles use raw conditional block scores; existing methods are unchanged.
+
 * Added an experimental `basic-envelope` plot calibration for bias-corrected
   fixed-bandwidth regression means with inid resampling. It reuses bounded
   corrected observation rows and count draws, preserves existing methods,
