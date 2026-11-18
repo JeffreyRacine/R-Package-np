@@ -221,7 +221,10 @@
   pilot.block <- identical(refinement,"pilot-block")
   if (pilot.block && !law %in% c("fixed","geom"))
     stop("pilot-block refinement requires fixed or geom",call.=FALSE)
-  tail.calibration <- calibration %in% c("tail-envelope","separate-tails")
+  basic.envelope <- identical(calibration,"basic-envelope")
+  if(basic.envelope && (!identical(law,"inid") || !identical(targets,"mean")))
+    stop("basic-envelope requires inid regression means",call.=FALSE)
+  tail.calibration <- calibration %in% c("tail-envelope","separate-tails","basic-envelope")
   if(tail.calibration && !law %in% c("mammen","rademacher","inid","fixed","geom"))
     stop("private separate-tail regression requires a supported bootstrap law",call.=FALSE)
   rank.calibration <- identical(calibration,"rank") || tail.calibration
@@ -358,6 +361,9 @@
       # A zero target may share nonzero family cutoffs, but never nonzero draws.
       for(zero in which(se[rr]==0)) if(any(part$value[zero,]!=0))
         stop("zero target scale with nonzero signed process draws",call.=FALSE)
+      # Align in endpoint units before taking family extrema.  Complete rows
+      # and count draws have already been reused across all B replicates.
+      if(basic.envelope) part$value <- part$value*se[rr]
       if(retain.tile)signed.tile[match(rr,family.rows),] <- part$value
       for(g in seq_along(family)) {
         local <- which(map$target[rr]==targets[family[g]])
@@ -392,11 +398,12 @@
     root.limits <- calibrated$limits
     for(g in seq_along(targets))for(band in names(root.limits))
       root.limits[[band]][map$target==targets[g],,] <- rank.results[[g]]$limits[[band]]
-    calibrated <- if(identical(calibration,"tail-envelope"))
+    calibrated <- if(identical(calibration,"tail-envelope") || basic.envelope)
       c(.np_band_tail_protect(root.limits,absolute.reference$limits),list(families=rank.results)) else
       list(limits=root.limits,families=rank.results)
   }
-  bands <- if(rank.calibration).np_band_rank_invert(center,se,calibrated$limits,deterministic=se==0) else lapply(calibrated$limits,function(x) {
+  bands <- if(rank.calibration).np_band_rank_invert(center,
+    if(basic.envelope)ifelse(se==0,0,1) else se,calibrated$limits,deterministic=se==0) else lapply(calibrated$limits,function(x) {
     for(k in seq_along(alpha))for(side in 1:2)x[,side,k] <- center+se*x[,side,k]
     x
   })
@@ -451,6 +458,7 @@
   if(rank.calibration) {
     result$absolute.reference <- absolute.reference
     result$calibration.method <- calibration
+    if(basic.envelope) result$root.units <- "endpoint units; observed-SE aligned residual scores"
     if(any(se==0)) result$deterministic.targets <- which(se==0)
   }
   result
@@ -475,7 +483,7 @@
       resolution.warn=is.null(resolution.context),calibration=effective,refinement=refinement))
   inference$calibration.requested <- calibration
   inference$calibration.method <- effective
-  if (effective %in% c("separate-tails","tail-envelope")) {
+  if (effective %in% c("separate-tails","tail-envelope","basic-envelope")) {
     inference$root.orientation <- "estimate minus truth; root-inverted endpoints"
     inference$resolution$calibration <- effective
   }

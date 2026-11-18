@@ -551,6 +551,12 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bootstrap laws retain their documented corrected-process calibration;
   see \code{\link{np_bias_control}} for law-specific definitions and support.
 
+  Regression additionally offers the experimental inid
+  \code{np_boot_control(calibration="basic-envelope")} for fixed-bandwidth
+  means. It inverts endpoint-unit empirical roots and takes a containing
+  absolute-root envelope, rather than using a replicate studentizer or
+  ordinary percentile endpoints. See \code{\link{np_boot_control}}.
+
   In the default and legacy constructions in the table,
   \code{errors="bootstrap", band="pmzsd"} summarizes each
   bootstrap distribution by its standard deviation and imposes a symmetric

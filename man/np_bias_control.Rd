@@ -291,6 +291,11 @@ np_bias_control(construction = c("iterated", "legacy"),
   The legacy \code{nonfixed="frozen"} resampling switch is not applicable.
   Explicit block lengths are retained as overrides.
 
+  The opt-in \code{np_boot_control(calibration="basic-envelope")} uses an
+  endpoint-unit basic envelope for inid fixed-bandwidth means. It retains the
+  corrected center, variance owner and bounded corrected-row computation; see
+  \code{\link{np_boot_control}} for its construction and restrictions.
+
   \code{band="pointwise"}, \code{"simultaneous"}, \code{"bonferroni"}
   and \code{"all"} share the corrected center and scale. Simultaneous
   coverage refers to the finite displayed grid within each scalar target
