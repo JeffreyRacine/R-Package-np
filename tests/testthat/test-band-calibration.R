@@ -54,3 +54,24 @@ test_that("certified zero targets can share active family cutoffs", {
   expect_error(.np_band_rank_invert(c(0,4),c(0,1),limits,c(TRUE,TRUE)),"certificate")
   expect_error(.np_band_rank_invert(c(0,4),c(0,1),limits,TRUE),"certificate")
 })
+
+
+test_that("calibration attributes do not change the selected construction", {
+  choices <- eval(formals(np_boot_control)$calibration)
+  for (cal in choices) {
+    for (value in list(cal, setNames(cal, "label"),
+                       structure(cal, class="calibration_label"),
+                       matrix(cal, 1L, 1L))) {
+      control <- np_boot_control(calibration=cal)
+      control$calibration <- value
+      before <- control
+      expect_identical(.np_plot_boot_calibration(control), cal)
+      expect_identical(control, before)
+    }
+  }
+  for (value in list(NA_character_, "unknown", c("default", "absolute"), 1)) {
+    control <- np_boot_control()
+    control$calibration <- value
+    expect_error(.np_plot_boot_calibration(control), "calibration")
+  }
+})

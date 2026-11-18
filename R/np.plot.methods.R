@@ -61,6 +61,8 @@ np_boot_control <- function(nonfixed = c("exact", "frozen"),
     stop("invalid np_boot_control object", call. = FALSE)
   if (!"calibration" %in% names(control)) return("default")
   value <- control[["calibration", exact = TRUE]]
+  # Downstream exact comparisons must see the same scalar as the constructor.
+  if (is.character(value)) attributes(value) <- NULL
   if (!is.character(value) || length(value) != 1L || is.na(value) ||
       !value %in% c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "basic-local-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"))
     stop("invalid bootstrap calibration control", call. = FALSE)
