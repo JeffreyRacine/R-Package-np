@@ -1,5 +1,11 @@
 # npRmpi 0.80-3
 
+* Added an experimental `basic-envelope` plot calibration for bias-corrected
+  fixed-bandwidth regression means with inid resampling. It reuses bounded
+  corrected observation rows and count draws, preserves existing methods,
+  and reports basic empirical-root envelopes containing their raw
+  separate-tail intervals.
+
 * Terminate exhausted coordinate degree-restart requests with a clear error, complete feasible deterministic starts across the candidate grid, and ignore coordinate restarts during exhaustive degree search as documented.
 
 * Respect `degree.min` and `degree.max` for the initial baseline in exhaustive and coordinate polynomial-degree searches, including automatic selection.

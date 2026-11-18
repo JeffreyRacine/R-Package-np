@@ -41,10 +41,10 @@
 np_boot_control <- function(nonfixed = c("exact", "frozen"),
                             wild = c("mammen", "rademacher"),
                             blocklen = NULL,
-                            calibration = c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy")) {
+                            calibration = c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy")) {
   calibration <- if (missing(calibration)) "default" else
     .np_plot_scalar_match(calibration,
-      c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"), "calibration")
+      c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"), "calibration")
   if (is.null(calibration)) stop("calibration must be a single supported name", call. = FALSE)
   nonfixed <- match.arg(nonfixed)
   wild <- match.arg(wild)
@@ -62,7 +62,7 @@ np_boot_control <- function(nonfixed = c("exact", "frozen"),
   if (!"calibration" %in% names(control)) return("default")
   value <- control[["calibration", exact = TRUE]]
   if (!is.character(value) || length(value) != 1L || is.na(value) ||
-      !value %in% c("default", "absolute", "separate-tails", "tail-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"))
+      !value %in% c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"))
     stop("invalid bootstrap calibration control", call. = FALSE)
   value
 }
@@ -598,6 +598,9 @@ np_render_control <- function(style = c("band", "bar"),
   if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&
       !inherits(bws, c("rbandwidth", "bandwidth", "dbandwidth")) && !conditional.optin)
     stop("explicit bootstrap calibration currently requires bias-corrected regression or supported density/distribution inference", call. = FALSE)
+  if (identical(dots[["plot.errors.boot.calibration", exact = TRUE]], "basic-envelope") &&
+      !inherits(bws, "rbandwidth"))
+    stop("basic-envelope calibration requires bias-corrected regression", call. = FALSE)
   if (isTRUE(dots[["plot.errors.boot.calibration", exact = TRUE]] %in% "percentile-tails") &&
       !inherits(bws, "bandwidth"))
     stop("percentile density calibration requires supported density inference", call. = FALSE)

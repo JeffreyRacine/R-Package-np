@@ -223,11 +223,15 @@
     new.bias <- bias.request && identical(bias.control[["construction"]],"iterated")
     if (!is.character(plot.errors.boot.calibration) || length(plot.errors.boot.calibration)!=1L ||
         is.na(plot.errors.boot.calibration) ||
-        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope","symmetric-sd","asymmetric-sd","smoothed-percentile","legacy"))
+        !plot.errors.boot.calibration %in% c("default","absolute","separate-tails","tail-envelope","basic-envelope","symmetric-sd","asymmetric-sd","smoothed-percentile","legacy"))
       stop("invalid bootstrap calibration control",call.=FALSE)
     if (!plot.errors.boot.calibration %in% c("default","legacy") &&
         (!new.bias || error.request$method!="bootstrap" || error.request$type=="pmzsd"))
       stop("explicit bootstrap calibration requires iterated bias-corrected regression and empirical bands",call.=FALSE)
+    if (identical(plot.errors.boot.calibration, "basic-envelope") &&
+        (!identical(as.character(plot.errors.boot.method)[1L], "inid") ||
+         !identical(bws[["type", exact=TRUE]], "fixed") || isTRUE(gradients)))
+      stop("basic-envelope requires inid resampling and fixed-bandwidth regression means", call.=FALSE)
     if (bias.request && !new.bias && error.request$method=="asymptotic")
       stop("legacy bias correction requires errors='bootstrap'",call.=FALSE)
     if (new.bias && isTRUE(.npRmpi_autodispatch_called_from_bcast()))
