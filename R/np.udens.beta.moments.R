@@ -1,8 +1,10 @@
 # Invocation-owned preparation is shared by target blocks and all required laws.
 .np_udens_beta_q2_moment_prepare <- function(x,h,grid,theta,inner,outer,state=NULL,
-                                             axis.cache=.np_udens_beta_axis_cache) {
+                                             axis.cache=.np_udens_beta_axis_cache,prepared.axes=NULL) {
   n<-nrow(x);st<-if(is.null(state)).np_udens_beta_joint_rule(theta,32L) else state
-  axes<-list(.np_udens_beta_marginal_rule(theta[1:2],outer),.np_udens_beta_marginal_rule(theta[3:4],outer))
+  axes<-if(is.null(prepared.axes))
+    list(.np_udens_beta_marginal_rule(theta[1:2],outer),.np_udens_beta_marginal_rule(theta[3:4],outer)) else
+    .np_udens_beta_q2_axes_check(prepared.axes,theta,h,grid,outer)
   nodes<-vapply(axes,`[[`,integer(1),'nodes')
   if(max(nodes)>1600L||prod(nodes)>2560000L)stop("beta plot joint refinement node cap",call.=FALSE)
   cache<-axis.cache(grid,axes,h,n^(-13/54),inner)

@@ -4,7 +4,7 @@
                                 calibration = NULL) {
   inherits(bws, "bandwidth") && is.null(control) && is.null(calibration) &&
     identical(center, "bias-corrected") && identical(method, "asymptotic") &&
-    identical(band, "simultaneous") &&
+    isTRUE(band %in% c("pointwise", "simultaneous", "bonferroni", "all")) &&
     identical(bws[["ckertype", exact = TRUE]], "epanechnikov") &&
     identical(bws[["type", exact = TRUE]], "fixed") &&
     identical(bws[["ckerbound", exact = TRUE]], "none") &&
@@ -153,6 +153,8 @@
 }
 
 .np_udens_m4_public_errors <- function(state, grid, alpha, B, band) {
+  if (isTRUE(band %in% c("pointwise","bonferroni","all")))
+    return(.np_udens_m4_normal_public(state,grid,alpha,B,band))
   if (!.np_udens_m4_active(state) || !identical(band,"simultaneous") ||
       !is.data.frame(grid) || ncol(grid) != 1L || !nrow(grid) ||
       !identical(names(grid),names(state$x)) || !is.numeric(grid[[1L]]) ||

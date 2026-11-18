@@ -65,6 +65,39 @@
 
 * `npsigtest()` consumes an NA policy after preparing fresh or replacement formula data, preserving once-only evaluation and retained-data refusal semantics.
 
+* Experimental plot support: known-fixed-bound beta density kernels of orders 4,
+  6 and 8 now admit calibrated asymptotic and symmetric/asymmetric SD bands
+  for two continuous coordinates. The existing correction and numerical
+  limits are unchanged; retained coverage is strongly conservative. Higher-order
+  two-dimensional normal pmzsd and other previously excluded routes stay excluded.
+
+* Whole-line q=1 order-two uniform corrected density plots add asymptotic normal
+  pointwise and raw Bonferroni intervals using complete Q6 reference covariance.
+  This does not admit uniform asymptotic simultaneous/all bands or replace any
+  explicit bootstrap law; sparse-tail coverage limitations remain.
+
+* Whole-line q=1 order-two Epanechnikov corrected density plots add asymptotic
+  normal pointwise and raw Bonferroni companions to the unchanged M4 simultaneous
+  band; `all` returns these exact components. Local coverage limitations remain.
+  Existing `pmzsd`, bootstrap methods and core estimators are unchanged.
+
+* Plot-only, fixed-bound univariate beta bias correction now admits kernel orders
+  4, 6 and 8 for asymptotic `band="pmzsd"`, retaining the existing corrected center
+  and complete ratio-pilot normal variance. Calibrated bands are unchanged.
+  Sparse-boundary and small-bandwidth multimodal pointwise limitations remain;
+  this does not add higher-order two-dimensional or bootstrap normal bands.
+
+* Plot-only `smoothed-beta-binomial` symmetric-SD density bands now also support
+  fixed-bound, univariate Epanechnikov orders six and eight, retaining the complete
+  guide correction and original-scale uncertainty. All other restrictions remain.
+
+* Plot-only smoothed-beta-binomial bands now compute their analytic log moments
+  with compensated precision, retaining the existing covariance tolerances.
+
+* Refine fixed-bound bivariate beta plot quadrature using the complete target
+  family and bounded preparation storage, preserving the corrected estimator,
+  numerical tolerances and currently supported band methods.
+
 * Stabilize signed higher-order Epanechnikov generalized nearest-neighbor conditional-density CVLS arithmetic on clustered explanatory data, preserving the existing rank and ridge decisions.
 
 * Correct conditional-distribution generalized nearest-neighbor cross-validation on the full training response grid: each fold now removes only its held-out observation from response bandwidth selection, both response and explanatory counts are decoded on the deleted sample, and automatic recovery uses matching count limits.
@@ -149,7 +182,16 @@
 
 ## Density plot additions
 
-* Fixed-bound univariate beta plots admit native orders four, six and eight for explicit asymptotic and symmetric/asymmetric SD pointwise, simultaneous, Bonferroni and all bands, using the unchanged guide-region/residual construction. Native fits, normal pmzsd and higher-order q2 support are unchanged.
+* Experimental asymmetric Q6 density plot bands now support two continuous
+  coordinates with fixed whole-line order-two uniform/Epanechnikov kernels,
+  for pointwise and simultaneous scopes only. Bonferroni/all remain unavailable
+  for this q=2 construction; retained coverage limitations remain explicit.
+
+* Add an explicit experimental smoothed-beta-binomial bootstrap law for fixed-bound, univariate order-four Epanechnikov corrected plot bands with symmetric-SD calibration. Existing methods and estimator standard errors are unchanged.
+
+* Explicit symmetric Q6 density plot bands now support two continuous coordinates with fixed whole-line order-two uniform/Epanechnikov kernels. Paired smoothed resamples and the complete bivariate guide preserve dependence; pointwise, simultaneous, Bonferroni and all bands remain experimental and conservative in the bounded q=2 confirmation. Existing methods and native estimators are unchanged.
+
+* Fixed-bound univariate beta plots admit native orders four, six and eight for explicit asymptotic and symmetric/asymmetric SD pointwise, simultaneous, Bonferroni and all bands, using the unchanged guide-region/residual construction. Native fits are unchanged; normal and higher-order q2 additions are described separately above.
 
 * Explicit asymmetric Q6 adds signed pointwise and Bonferroni/all companions on the same full empirical-range family. Raw Bonferroni limits, simultaneous hull and finite-draw warnings remain distinct; existing simultaneous and symmetric results are preserved.
 

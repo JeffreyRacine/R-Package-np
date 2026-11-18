@@ -23,9 +23,18 @@
 }
 
 # Complete covariance arithmetic copied exactly from the qualified U5 control.
-.np_udens_u5_covariance<-function(z,x,kn,grid,order,kernel.order=4L,gram=FALSE) {
+.np_udens_u5_covariance<-function(z,x,kn,grid,order,kernel.order=4L,gram=FALSE,log.moments=NULL) {
  h<-as.double(z$h);n<-length(x);j<-0:z$k;A<-z$a+j;BB<-z$b+z$k-j;weights<-rowMeans(vapply(x,function(t)dbinom(j,z$k,t),numeric(length(j))));abq<-c(z$aQ,z$bQ)
- logmeans<-cbind(digamma(A)-digamma(A+BB),digamma(BB)-digamma(A+BB));m<-drop(crossprod(weights,logmeans));I<-diag(trigamma(abq))-trigamma(sum(abq));TT<-matrix(0,2,2)
+ if(is.null(log.moments)) {
+  logmeans<-cbind(digamma(A)-digamma(A+BB),digamma(BB)-digamma(A+BB));m<-drop(crossprod(weights,logmeans))
+ } else {
+  logmeans<-log.moments;m<-attr(logmeans,"mean",exact=TRUE)
+  if(!is.matrix(logmeans)||!identical(dim(logmeans),c(length(weights),2L))||
+     !is.numeric(logmeans)||!is.numeric(m)||length(m)!=2L||
+     any(!is.finite(c(logmeans,m)))||any(c(logmeans,m)>=0))
+   stop("invalid prepared analytic log moments",call.=FALSE)
+ }
+ I<-diag(trigamma(abq))-trigamma(sum(abq));TT<-matrix(0,2,2)
  for(k in seq_along(weights))TT<-TT+weights[k]*(diag(trigamma(c(A[k],BB[k])))-trigamma(A[k]+BB[k])+tcrossprod(logmeans[k,]));TT<-TT-tcrossprod(m)
  span<-.np_udens_u5_kernel(kn)$span;ops<-lapply(grid,function(t).np_udens_u5_boundary(kn,max(-span,-t/h),min(span,(1-t)/h),kernel.order=kernel.order))
  limits<-c(-(100+max(abs(lbeta(A,BB))))/min(c(A,abq[1])),(100+max(abs(lbeta(A,BB))))/min(c(BB,abq[2])))
