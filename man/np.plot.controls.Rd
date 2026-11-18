@@ -18,7 +18,8 @@ np_boot_control(nonfixed = c("exact", "frozen"),
                 wild = c("mammen", "rademacher"),
                 blocklen = NULL,
                 calibration = c("default", "absolute", "separate-tails",
-                                "tail-envelope", "basic-envelope", "percentile-tails",
+                                "tail-envelope", "basic-envelope", "basic-local-envelope",
+                                "percentile-tails",
                                 "symmetric-sd", "asymmetric-sd",
                                      "smoothed-percentile", "legacy"))
 
@@ -103,6 +104,18 @@ sums; they are not aligned to the pilot SE and can differ from inid even at
 block length one. This distinction is intentional. Block lengths and the
 existing automatic selector are retained; fixed blocks of length n have no
 resampling variation and are refused. At least two draws are required.
+The experimental \code{calibration="basic-local-envelope"} has the same
+admission rules and reuses exactly the same corrected centers, observed standard
+errors and signed draws. It also takes signed and absolute family extrema after
+standardizing each target by its observed standard error, then returns the hull
+of this local envelope and the existing \code{"basic-envelope"} simultaneous
+and Bonferroni bounds. Pointwise bounds are unchanged. Local offsets can vary
+across the grid; this is not replicate-studentized bootstrap-t. Zero standard
+error requires zero process draws. This option never narrows the existing
+basic envelope, but does not guarantee nominal coverage or correct remaining
+bias. Like all bias-corrected bounds it remains experimental, pre-beta and
+incomplete; no additional kernel or bandwidth types are admitted.
+
 Dependent-data coverage evidence is limited; pooled and mixed layouts have
 structural qualification rather than a broad dependent-data coverage study.
 Existing regularization and pilot-admission restrictions remain in force.

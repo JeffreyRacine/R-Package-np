@@ -41,10 +41,10 @@
 np_boot_control <- function(nonfixed = c("exact", "frozen"),
                             wild = c("mammen", "rademacher"),
                             blocklen = NULL,
-                            calibration = c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy")) {
+                            calibration = c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "basic-local-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy")) {
   calibration <- if (missing(calibration)) "default" else
     .np_plot_scalar_match(calibration,
-      c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"), "calibration")
+      c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "basic-local-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"), "calibration")
   if (is.null(calibration)) stop("calibration must be a single supported name", call. = FALSE)
   nonfixed <- match.arg(nonfixed)
   wild <- match.arg(wild)
@@ -62,7 +62,7 @@ np_boot_control <- function(nonfixed = c("exact", "frozen"),
   if (!"calibration" %in% names(control)) return("default")
   value <- control[["calibration", exact = TRUE]]
   if (!is.character(value) || length(value) != 1L || is.na(value) ||
-      !value %in% c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"))
+      !value %in% c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "basic-local-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"))
     stop("invalid bootstrap calibration control", call. = FALSE)
   value
 }
@@ -314,7 +314,8 @@ np_render_control <- function(style = c("band", "bar"),
 }
 
 .np_plot_normalize_public_dots <- function(dots, context = "plot", allow_asymptotic_bias = FALSE,
-                                            allow_smoothed_q6 = FALSE, allow_smoothed_beta_binomial = FALSE) {
+                                            allow_smoothed_q6 = FALSE, allow_smoothed_beta_binomial = FALSE,
+                                            allow_basic_local_envelope = FALSE) {
   dots <- .np_plot_unique_args(dots)
   if (identical(dots[["bootstrap", exact=TRUE]], "smoothed-q6") ||
       identical(dots[["plot.errors.boot.method", exact=TRUE]], "smoothed-q6"))
@@ -527,6 +528,9 @@ np_render_control <- function(style = c("band", "bar"),
   error.only <- c("plot.errors.type", "plot.errors.alpha",
                   "plot.errors.style", "plot.errors.bar",
                   "plot.errors.bar.num")
+  if (identical(dots[["plot.errors.boot.calibration", exact=TRUE]], "basic-local-envelope") &&
+      !isTRUE(allow_basic_local_envelope))
+    stop("basic-local-envelope calibration requires bias-corrected regression", call.=FALSE)
   error.supplied <- any(c("band", "alpha", "render.control",
                           error.only) %in% supplied)
   if (identical(method, "none") && error.supplied)
@@ -570,6 +574,7 @@ np_render_control <- function(style = c("band", "bar"),
   if (conditional.optin && !inherits(bws,c("conbandwidth","condbandwidth")))
     stop("np_conditional_bias_control requires conditional density/distribution plots",call.=FALSE)
   dots <- .np_plot_normalize_public_dots(dots, context = .plot_context,
+    allow_basic_local_envelope = inherits(bws, "rbandwidth"),
     allow_smoothed_q6 = inherits(bws, "bandwidth"),
     allow_smoothed_beta_binomial = inherits(bws, "bandwidth"),
     allow_asymptotic_bias = conditional.optin || identical(method, .np_plot_rbandwidth_engine) ||
@@ -586,7 +591,8 @@ np_render_control <- function(style = c("band", "bar"),
   if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&
       !inherits(bws, c("rbandwidth", "bandwidth", "dbandwidth")) && !conditional.optin)
     stop("explicit bootstrap calibration currently requires bias-corrected regression or supported density/distribution inference", call. = FALSE)
-  if (identical(dots[["plot.errors.boot.calibration", exact = TRUE]], "basic-envelope") &&
+  if (isTRUE(dots[["plot.errors.boot.calibration", exact = TRUE]] %in%
+             c("basic-envelope", "basic-local-envelope")) &&
       !inherits(bws, "rbandwidth"))
     stop("basic-envelope calibration requires bias-corrected regression", call. = FALSE)
   if (isTRUE(dots[["plot.errors.boot.calibration", exact = TRUE]] %in% "percentile-tails") &&
@@ -856,7 +862,8 @@ np_render_control <- function(style = c("band", "bar"),
     context = "plot.npregression"
   )
   dots <- list(...)
-  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npregression", allow_asymptotic_bias = TRUE)
+  dots <- .np_plot_normalize_public_dots(dots, context = "plot.npregression",
+    allow_asymptotic_bias = TRUE, allow_basic_local_envelope = TRUE)
   if (is.null(dots$xdat) && is.null(dots$ydat))
     object$bws <- .np_plot_restore_bandwidth_from_call(
       object, object$bws, caller_env = parent.frame(2L)

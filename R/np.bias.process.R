@@ -221,14 +221,15 @@
   pilot.block <- identical(refinement,"pilot-block")
   if (pilot.block && !law %in% c("fixed","geom"))
     stop("pilot-block refinement requires fixed or geom",call.=FALSE)
-  basic.envelope <- identical(calibration,"basic-envelope")
+  local.envelope <- identical(calibration,"basic-local-envelope")
+  basic.envelope <- calibration %in% c("basic-envelope","basic-local-envelope")
   if(basic.envelope && !law %in% c("inid","fixed","geom"))
     stop("basic-envelope requires inid, fixed or geom regression targets",call.=FALSE)
   if(basic.envelope && law %in% c("fixed","geom") && !pilot.block)
     stop("basic-envelope block inference requires refinement='pilot-block'",call.=FALSE)
   # Basic roots use the observed block scale, never a replicate studentizer.
   if(basic.envelope) studentize <- FALSE
-  tail.calibration <- calibration %in% c("tail-envelope","separate-tails","basic-envelope")
+  tail.calibration <- calibration %in% c("tail-envelope","separate-tails","basic-envelope","basic-local-envelope")
   if(tail.calibration && !law %in% c("mammen","rademacher","inid","fixed","geom"))
     stop("private separate-tail regression requires a supported bootstrap law",call.=FALSE)
   rank.calibration <- identical(calibration,"rank") || tail.calibration
@@ -266,7 +267,7 @@
   if(!is.character(targets)||!length(targets)||anyNA(targets)||anyDuplicated(targets))
     stop("invalid or duplicate bias target family",call.=FALSE)
   if(rank.calibration &&
-     8*as.double(B)*(length(targets)+10*min(8L,length(targets)))>128*1024^2)
+     8*as.double(B)*(length(targets)+(if(local.envelope)22 else 10)*min(8L,length(targets)))>128*1024^2)
     stop("rank workspace exceeds declared byte budget before allocation",call.=FALSE)
   blocks <- .np_bias_target_blocks(nrow(grid),length(targets))
   map <- expand.grid(row=seq_len(nrow(grid)),target=targets,stringsAsFactors=FALSE)
@@ -287,12 +288,16 @@
   rng <- get(".Random.seed",.GlobalEnv,inherits=FALSE);rng.kind <- RNGkind();end <- rng
   innovations <- .np_bias_gaussian_cache(nrow(state$x),B,law,rng.kind)
   rank.results <- if(rank.calibration)vector("list",length(targets)) else NULL
+  local.results <- if(local.envelope)vector("list",length(targets)) else NULL
   families <- if(rank.calibration)split(seq_along(targets),ceiling(seq_along(targets)/8L)) else list(1L)
   for(family in families) {
    if(rank.calibration) {
     rank.states <- lapply(family,function(g)
       (if(tail.calibration).np_band_tail_prepare else .np_band_rank_prepare)(B,map[map$target==targets[g],,drop=FALSE],alpha,
         byte.limit=128*1024^2/length(family)))
+    local.states <- if(local.envelope)lapply(family,function(g)
+      .np_band_local_prepare(B,map[map$target==targets[g],,drop=FALSE],alpha,
+        byte.limit=128*1024^2/length(family))) else NULL
     family.rows <- which(map$target %in% targets[family])
     # One capped signed tile can span several existing 25-anchor row blocks.
     # If it fits, retain this tile only and avoid recomputing the process.
@@ -300,8 +305,8 @@
     retain.tile <- !tail.calibration && length(family.rows)<=128L &&
       16*as.double(length(family.rows))*B+80*as.double(B)*length(family)<=128*1024^2
     signed.tile <- if(retain.tile)matrix(0,length(family.rows),B) else NULL
-    tile.rows <- floor((128*1024^2-(if(tail.calibration)96 else 72)*as.double(B)*length(family)-
-      if(tail.calibration)48*M*length(alpha) else 0)/(8*B))
+    tile.rows <- floor((128*1024^2-(if(local.envelope)192 else if(tail.calibration)96 else 72)*as.double(B)*length(family)-
+      if(tail.calibration)(if(local.envelope)80 else 48)*M*length(alpha) else 0)/(8*B))
     if(tile.rows<length(family))stop("rank workspace exceeds declared byte budget before allocation",call.=FALSE)
     family.blocks <- .np_bias_target_blocks(nrow(grid),length(family),
       anchors=min(25L,tile.rows %/% length(family)),rows=min(500L,tile.rows))
@@ -373,6 +378,9 @@
       if(retain.tile)signed.tile[match(rr,family.rows),] <- part$value
       for(g in seq_along(family)) {
         local <- which(map$target[rr]==targets[family[g]])
+        if(local.envelope && length(local)) local.states[[g]] <-
+          .np_band_local_update(local.states[[g]],part$value[local,,drop=FALSE],
+            se[rr[local]],map[rr[local],,drop=FALSE],seq_len(B))
         if(length(local)) rank.states[[g]] <- if(tail.calibration)
           .np_band_tail_update(rank.states[[g]],part$value[local,,drop=FALSE],
             map[rr[local],,drop=FALSE],seq_len(B)) else
@@ -393,6 +401,8 @@
     }
     signed.tile <- NULL
    }
+   if(local.envelope)for(g in seq_along(family))local.results[[family[g]]] <-
+     .np_band_local_finish(local.states[[g]])
    if(rank.calibration)for(g in seq_along(family))rank.results[[family[g]]] <-
       (if(tail.calibration).np_band_tail_finish else .np_band_rank_finish)(rank.states[[g]])
   }
@@ -407,6 +417,13 @@
     calibrated <- if(identical(calibration,"tail-envelope") || basic.envelope)
       c(.np_band_tail_protect(root.limits,absolute.reference$limits),list(families=rank.results)) else
       list(limits=root.limits,families=rank.results)
+  }
+  if(local.envelope) {
+    # expanded retains its absolute-versus-raw meaning; local.reference records the added envelope.
+    calibrated$limits <- .np_band_local_protect(calibrated$limits,local.results,map,se)
+    calibrated$local.reference <- local.results
+    calibrated$protection <- paste(calibrated$protection,
+      "and the observed-SE local signed/absolute family envelope")
   }
   bands <- if(rank.calibration).np_band_rank_invert(center,
     if(basic.envelope)ifelse(se==0,0,1) else se,calibrated$limits,deterministic=se==0) else lapply(calibrated$limits,function(x) {
@@ -494,7 +511,7 @@
       resolution.warn=is.null(resolution.context),calibration=effective,refinement=refinement))
   inference$calibration.requested <- calibration
   inference$calibration.method <- effective
-  if (effective %in% c("separate-tails","tail-envelope","basic-envelope")) {
+  if (effective %in% c("separate-tails","tail-envelope","basic-envelope","basic-local-envelope")) {
     inference$root.orientation <- "estimate minus truth; root-inverted endpoints"
     inference$resolution$calibration <- effective
   }
