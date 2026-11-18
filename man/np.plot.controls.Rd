@@ -55,6 +55,11 @@ np_render_control(style = c("band", "bar"),
   \item{bar.num}{Optional number of bars.}
 }
 \details{
+The explicit density plot law \code{bootstrap="smoothed-beta-binomial"}
+requires \code{calibration="symmetric-sd"}; it does not select a law implicitly.
+Its fixed-bound, univariate, order-four/six/eight Epanechnikov restrictions and complete
+corrected-root construction are described in \code{\link{plot.np}}.
+
 The descriptive bootstrap choices require \code{errors="bootstrap"},
 \code{center="bias-corrected"} and \code{band="pointwise"},
 \code{"simultaneous"}, \code{"bonferroni"}, or \code{"all"}.

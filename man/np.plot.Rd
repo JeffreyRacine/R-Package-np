@@ -217,7 +217,9 @@ Named options passed via \code{\dots} include:
         \code{"geom"}; density/distribution-family plots support
         \code{"inid"}, \code{"fixed"}, and \code{"geom"}.
         The explicit density-only \code{"smoothed-q6"} law has the narrow
-        corrected simultaneous-band scope described in Details.
+        corrected-band scope described in Details. The separate density-only
+        \code{"smoothed-beta-binomial"} law supports fixed-bound order-four, -six and -eight
+        Epanechnikov symmetric-SD construction, also described in Details.
         Experimental regression \code{calibration="smoothed-percentile"}
         additionally uses \code{bootstrap="residual"}; see
         \code{\link{np_boot_control}} for its scope and defaults.
@@ -624,8 +626,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   gradient targets and conditioning assumptions.
 
   Known-fixed-bound beta density plots support a separate corrected
-  guide-region plus residual construction: orders 2, 4, 6 and 8 for one
-  continuous dimension, and order 2 for two continuous dimensions.
+  guide-region plus residual construction: orders 2, 4, 6 and 8 for one or
+  two continuous dimensions. Higher-order two-dimensional coverage was strongly
+  conservative in the retained saved-sample study; this is not an efficiency
+  or universal coverage guarantee.
   With omitted \code{bias.control}, request asymptotic errors or independent
   bootstrap \code{calibration="symmetric-sd"}/\code{"asymmetric-sd"}, and
   explicitly choose pointwise, simultaneous, Bonferroni or all three bands
@@ -647,8 +651,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   rejected. All slices form one finite calibration family. See
   \code{\link{np_udens_bias_control}} for assumptions and endpoint rules.
 
-  For one continuous variable, these known-fixed-bound order-2 beta and Gaussian
-  density plots additionally support asymptotic normal intervals with omitted
+  For one continuous variable, known-fixed-bound beta kernels of orders 2, 4, 6
+  and 8 and order-2 Gaussian density plots additionally support asymptotic normal intervals with omitted
   \code{band} or \code{band="pmzsd"} and omitted \code{bias.control}.
   The corrected center is unchanged. The complete influence variance is
   integrated under the normalized positive ratio pilot, including guide and
@@ -665,7 +669,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   that limit still stop. This is distinct from full-covariance calibrated bands
   and does not bound the memory used by the entire R process.
   This normal approximation can be
-  less accurate at sparse boundary targets in small samples. Two-dimensional
+  less accurate at sparse boundary targets in small samples. Higher-order beta
+  marginal coverage can also be low at individual targets in multimodal
+  distributions, especially with small selected bandwidths; favorable average
+  coverage is not a uniform pointwise guarantee. This admission does not provide
+  normal Bonferroni or simultaneous bands. Two-dimensional
   Gaussian normal intervals, bootstrap pmzsd, estimated bounds and literal
   support endpoints are not admitted by this additional construction. See
   \code{\link{np_udens_bias_control}} for its assumptions and limitations.
@@ -730,11 +738,25 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   without changing \code{B}; defined finite limits are retained.
 
   Fixed unbounded second-order Epanechnikov density plots with one continuous
-  variable also support corrected asymptotic explicit \code{band="simultaneous"}
-  requests through the M4 complete-covariance construction. This experimental
-  addition does not select M4 for pointwise, Bonferroni, \code{all}, normal or
-  bootstrap bands; see \code{\link{np_udens_bias_control}}. Core estimators and
-  existing plotting constructions are unchanged.
+  variable support corrected asymptotic pointwise and raw Bonferroni normal
+  intervals through the M4 complete-covariance construction. The existing
+  Gaussian-maximum simultaneous band is unchanged; \code{band="all"} returns
+  those same three components. Bonferroni uses the number of unique supplied
+  targets, without enlarging its limits to contain the simultaneous band.
+  These experimental normal companions have useful average coverage in the
+  retained study, but local undercoverage remains possible. This does not select
+  M4 for \code{pmzsd} or bootstrap bands; see
+  \code{\link{np_udens_bias_control}}. Core estimators are unchanged.
+  Under the same one-continuous-variable, fixed-bandwidth, unbounded order-two
+  specification, uniform density plots support corrected asymptotic pointwise
+  and raw Bonferroni normal intervals using the complete positive-reference Q6
+  covariance. Its reference is the empirical mixture plus bandwidth-scaled
+  Student-six noise. This asymptotic normal calculation does not draw smoothed
+  bootstrap samples and does not admit uniform asymptotic simultaneous or
+  \code{all} bands. Explicit \code{bootstrap="smoothed-q6"}, existing
+  \code{pmzsd} and other methods retain their contracts. Neither reference
+  guarantees nominal coverage at every location, especially in sparse tails.
+
 
   For a univariate order-four, order-six or order-eight Epanechnikov density with known finite
   \code{ckerbound="fixed"} bounds, \code{errors="asymptotic"},
@@ -756,14 +778,48 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   90.42/95.16/98.97 percent at nominal 90/95/99 percent. Local mixture deficits
   remain; these averages do not imply uniform coverage over all locations.
 
+
+  The explicit experimental \code{bootstrap="smoothed-beta-binomial"} law
+  supports only one continuous numeric variable, a retained fixed bandwidth,
+  an order-four, -six or -eight Epanechnikov kernel and supplied finite
+  \code{ckerbound="fixed"} bounds. It requires \code{errors="bootstrap"},
+  \code{center="bias-corrected"}, an explicit \code{band="pointwise"},
+  \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}, and
+  \code{boot.control=np_boot_control(calibration="symmetric-sd")}. Observations
+  and targets must be strictly inside the bounds. Range or one-sided bounds,
+  nearest-neighbor bandwidths, mixed data, other kernel orders, two-dimensional
+  data, asymmetric calibration and \code{pmzsd} are not supported by this law.
+  The beta distribution describes its resampling guide, not the density kernel.
+
+  On the unit support, fit the positive beta guide with shapes \eqn{a,b}, set
+  \eqn{k=\lceil 2n^{2/5}\rceil}, and assign mixture weight
+  \eqn{w_j=n^{-1}\sum_i {k\choose j}x_i^j(1-x_i)^{k-j}} for \eqn{j=0,\ldots,k}.
+  Draw a component with these weights and then a \eqn{\mathrm{Beta}(a+j,b+k-j)}
+  observation. Each replicate refits the guide for the same complete
+  degree-five, -seven or -nine support-reproducing correction for kernel orders
+  four, six or eight respectively; bandwidth and target coordinates
+  are held fixed. Roots subtract the complete corrected functional under this
+  resampling law and use the original complete-influence scale, including guide
+  and cross terms. Pointwise bands use marginal absolute-root quantiles;
+  simultaneous bands use a maximum over the unique supplied finite grid.
+  Bonferroni uses the marginal quantile at alpha divided by the family size
+  with the explicit simultaneous hull; raw Bonferroni endpoints remain in the
+  inference record. Type-7 quantiles and finite-draw resolution warnings apply.
+  All component bands reuse one draw plan. Signed corrected curves and raw
+  endpoints remain available without truncation. This explicit law does not
+  change the meaning of \code{"inid"}, \code{"smoothed-q6"}, existing beta-kernel
+  bands or estimator standard errors. Coverage remains experimental and is not
+  guaranteed uniformly over distributions or boundary shapes.
+
   The explicit experimental \code{bootstrap="smoothed-q6"} law supports
   \code{errors="bootstrap"}, \code{center="bias-corrected"},
   \code{band="pointwise"}, \code{band="simultaneous"},
   \code{band="bonferroni"} or \code{band="all"}, and
   \code{boot.control=np_boot_control(calibration="symmetric-sd")} together.
-  It is restricted to one continuous numeric variable, a positive retained
+  It is restricted to one or two continuous numeric variables, positive retained
   fixed bandwidth, whole-line second-order uniform or Epanechnikov kernels,
-  at least ten finite observations and positive guide variance. It leaves the
+  at least ten finite observations and positive guide variance (positive definite
+  full guide covariance for two variables). It leaves the
   fitted estimator and all existing inference choices unchanged. Normal-scale \code{pmzsd},
   asymptotic errors, bounds, nearest-neighbor bandwidths,
   custom bias controls and dependent-data controls are not admitted by this law.
@@ -785,7 +841,32 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   retained; nonnegative intersections may be reported separately. This is a
   different law and calibration from \code{smoothed-percentile}.
 
-  Explicit \code{calibration="asymmetric-sd"} with this law instead supports
+  For two variables, \code{calibration="asymmetric-sd"} also supports
+  pointwise and simultaneous bands under the same explicit Q6 law. Both
+  directional scales are estimated from centered conditional corrected roots,
+  while calibration retains the uncentered roots relative to the complete Q6
+  functional. Positive root deviations use the positive scale for the lower
+  endpoint, and negative deviations use the negative scale for the upper endpoint.
+  A single directional maximum over the unique supplied targets calibrates
+  simultaneous bands. Constant conditional rows are rejected without a variance
+  floor. Bonferroni and all bands are not admitted for this q=2 asymmetric route.
+  A 256-original empirical-grid confirmation gave conservative 95-percent
+  pointwise cell means of 95.08--97.70 percent and simultaneous coverage of
+  98.44--100 percent; this is not a guarantee for arbitrary distributions or grids.
+  The inference record separates the two directional scales and their pooled
+  conditional standard deviation from the original reference standard errors.
+
+  For two variables, the symmetric construction resamples a common observation
+  donor for both coordinates and adds independent coordinate smoothing noise.
+  It uses the product corrected operator, refits the full bivariate normal guide,
+  and retains all five guide influence directions and their cross terms. The
+  shared paired draws preserve joint dependence without storing a dense target
+  covariance matrix. A bounded 512-original, 100-target confirmation found
+  conservative 95-percent simultaneous coverage (99.61/100 percent for uniform/
+  Epanechnikov); this is not a general near-nominal coverage guarantee.
+
+  Explicit \code{calibration="asymmetric-sd"} with this law remains restricted
+  to one continuous variable and instead supports
   pointwise, simultaneous, Bonferroni and all bands on the full empirical-range grid only (the default
   \code{xtrim=0}, or \code{grid.control=np_grid_control(xtrim=c(0,1))}). Its center and original fixed-coordinate influence
   scale are unchanged. In each complete resample the same equally spaced grid
@@ -1282,9 +1363,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   estimate-centered joint variability bands in one or two continuous
   dimensions with finite known fixed bounds. Their signed observation
   contributions are retained; native marginal standard errors are unchanged.
-  The separate univariate beta corrected construction described above accepts
-  these orders only for explicit calibrated bands; higher-order normal intervals
-  and two-dimensional corrected bands remain unsupported.
+  The separate beta corrected construction described above accepts these orders
+  for calibrated bands in one or two dimensions, and marginal asymptotic
+  \code{pmzsd} in one dimension only.
   This higher-order addition does not admit CDFs, conditional estimators,
   nearest-neighbour bandwidths, range bounds or bias-corrected requests.
 

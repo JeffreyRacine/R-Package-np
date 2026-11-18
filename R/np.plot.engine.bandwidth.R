@@ -126,7 +126,17 @@
     compact.sd.explicit <- !missing(plot.errors.boot.method) && !missing(plot.errors.type) &&
       identical(as.character(plot.errors.boot.method)[1L], "inid") &&
       error.request$type %in% c("pointwise", "simultaneous", "bonferroni", "all")
+    bb.state <- if (identical(plot.errors.boot.method,"smoothed-beta-binomial")) {
+      .np_udens_bb_options(list(bootstrap=plot.errors.boot.method,errors=error.request$method,
+        center=plot.errors.center,band=error.request$type,
+        plot.errors.boot.calibration=plot.errors.boot.calibration,bias.control=bias.control,
+        plot.errors.boot.nonfixed=plot.errors.boot.nonfixed,
+        plot.errors.boot.blocklen=plot.errors.boot.blocklen),TRUE)
+      .np_udens_bb_prepare(bws,xdat,if (missing(random.seed)) 42L else random.seed)
+    } else NULL
     q6.state <- if (identical(plot.errors.boot.method, "smoothed-q6")) {
+      if (identical(plot.errors.boot.calibration, "asymmetric-sd") && isTRUE(bws$ndim == 2L))
+        .np_udens_q6_q2_asymmetric_prepare(bws,xdat,if (missing(random.seed)) 42L else random.seed) else
       if (identical(plot.errors.boot.calibration, "asymmetric-sd"))
         .np_udens_q6_asymmetric_prepare(bws,xdat,if (missing(random.seed)) 42L else random.seed,
           list(vary=1L,xtrim=xtrim,xq=xq)) else
@@ -189,6 +199,7 @@
       # Preserve the request for the density-specific admission check below.
       allow_asymptotic_bias = TRUE,
       allow_smoothed_q6 = !is.null(q6.state),
+      allow_smoothed_beta_binomial = !is.null(bb.state),
       error.request = error.request
     )
 
@@ -207,7 +218,7 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
-    bias.state <- if (!is.null(q6.state)) q6.state else if (!is.null(compact.state)) compact.state else if (!is.null(fgd.state)) fgd.state else if (!is.null(beta.state)) beta.state else .np_udens_plot_prepare(bias.control, bws, xdat,
+    bias.state <- if (!is.null(bb.state)) bb.state else if (!is.null(q6.state)) q6.state else if (!is.null(compact.state)) compact.state else if (!is.null(fgd.state)) fgd.state else if (!is.null(beta.state)) beta.state else .np_udens_plot_prepare(bias.control, bws, xdat,
       plot.errors.center, plot.errors.method, plot.errors.boot.method, plot.errors.type,
       plot.errors.boot.calibration, blocklen = plot.errors.boot.blocklen,
       block.automatic = density.block.automatic, alpha = plot.errors.alpha,
@@ -216,7 +227,9 @@
     new.bias <- !is.null(bias.state)
     # Presentation only: percentile endpoints are not a maximum-root band.
     annotation.construction <- if (new.bias) {
-      if (.np_udens_q6_active(bias.state) || .np_udens_q6_asymmetric_active(bias.state)) "smoothed-q6"
+      if (.np_udens_bb_active(bias.state)) "smoothed-beta-binomial"
+      else if (.np_udens_q6_active(bias.state) || .np_udens_q6_asymmetric_active(bias.state) ||
+          .np_udens_q6_q2_active(bias.state)) "smoothed-q6"
       else if (identical(bias.state[["normal.pmzsd", exact = TRUE]], TRUE)) NULL
       else if (.np_udens_compact_active(bias.state) || .np_udens_beta_active(bias.state) || .np_udens_fgd_active(bias.state)) "guide-region"
       else if (identical(bias.state[["plot.calibration", exact = TRUE]],
@@ -297,7 +310,7 @@
         exdat = x.eval,
         bws = bws,
         cdf = FALSE,
-        need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state) && !.np_udens_m4_active(bias.state)
+        need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state) && !.np_udens_m4_active(bias.state) && !.np_udens_uniform_normal_active(bias.state)
       )
 
       plot.se <- tobj$derr
@@ -385,7 +398,7 @@
 
       if (plot.behavior != "plot"){
         d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens,
-                        derr = if (new.bias && (.np_udens_compact_active(bias.state) || .np_udens_fgd_active(bias.state) || .np_udens_beta_active(bias.state) || .np_udens_d8_active(bias.state) || bias.state$plot.control.version %in% c(2L, 3L)))
+                        derr = if (new.bias && (.np_udens_bb_active(bias.state) || .np_udens_q6_q2_active(bias.state) || .np_udens_compact_active(bias.state) || .np_udens_fgd_active(bias.state) || .np_udens_beta_active(bias.state) || .np_udens_d8_active(bias.state) || bias.state$plot.control.version %in% c(2L, 3L)))
                           cbind(-terr[,1L], terr[,2L]) else terr[,1:2],
                         ntrain = nrow(xdat), se = plot.errors)
         if (joint.eligible)
@@ -605,6 +618,16 @@
       plot.bootstrap <- plot.errors.method == "bootstrap"
       plotOnEstimate <- (plot.errors.center == "estimate")
 
+      q6.q2.slices <- NULL
+      if (new.bias && .np_udens_q6_q2_active(bias.state)) {
+        grids <- lapply(seq_len(bws$ndim), function(j) {
+          limits <- trim.quantiles(xdat[,j], xtrim[j])
+          subcol(exdat, seq(limits[1L], limits[2L], length.out = neval), j)[
+            seq_len(neval), , drop = FALSE]
+        })
+        q6.q2.slices <- .np_udens_plot_errors(bias.state, do.call(rbind, grids),
+          plot.errors.alpha, plot.errors.boot.num, plot.errors.type)
+      }
       beta.slices <- NULL
       if (new.bias && (.np_udens_compact_active(bias.state) || .np_udens_beta_active(bias.state) || .np_udens_fgd_active(bias.state))) {
         grids <- lapply(seq_len(bws$ndim), function(j) {
@@ -656,7 +679,7 @@
           exdat = eval.slice,
           bws = bws,
           cdf = FALSE,
-          need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state) && !.np_udens_m4_active(bias.state)
+          need.asymptotic = identical(plot.errors.method, "asymptotic") && is.null(compact.state) && is.null(beta.state) && is.null(fgd.state) && !.np_udens_m4_active(bias.state) && !.np_udens_uniform_normal_active(bias.state)
         )
         plot.se <- tobj$derr
         if (!new.bias && identical(plot.errors.method, "asymptotic"))
@@ -664,7 +687,8 @@
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){
-          bias.raw <- if (!is.null(beta.slices)) .np_udens_beta_plot_subset(beta.slices,
+          bias.raw <- if (!is.null(q6.q2.slices)) .np_udens_q6_q2_subset(q6.q2.slices,
+            seq.int((i-1L)*neval+1L, i*neval)) else if (!is.null(beta.slices)) .np_udens_beta_plot_subset(beta.slices,
             seq.int((i-1L)*neval+1L, i*neval)) else if (!is.null(d8.slices)) .np_udens_d8_plot_subset(d8.slices,
             seq.int((i-1L)*neval+1L, i*neval)) else if (new.bias) .np_udens_plot_errors(bias.state, eval.slice,
             plot.errors.alpha, if (identical(plot.errors.method, "asymptotic"))

@@ -314,11 +314,14 @@ np_render_control <- function(style = c("band", "bar"),
 }
 
 .np_plot_normalize_public_dots <- function(dots, context = "plot", allow_asymptotic_bias = FALSE,
-                                            allow_smoothed_q6 = FALSE) {
+                                            allow_smoothed_q6 = FALSE, allow_smoothed_beta_binomial = FALSE) {
   dots <- .np_plot_unique_args(dots)
   if (identical(dots[["bootstrap", exact=TRUE]], "smoothed-q6") ||
       identical(dots[["plot.errors.boot.method", exact=TRUE]], "smoothed-q6"))
     .np_udens_q6_options(dots, allow_smoothed_q6)
+  if (identical(dots[["bootstrap",exact=TRUE]],"smoothed-beta-binomial") ||
+      identical(dots[["plot.errors.boot.method",exact=TRUE]],"smoothed-beta-binomial"))
+    .np_udens_bb_options(dots,allow_smoothed_beta_binomial)
   supplied <- names(dots)
   has <- function(x) x %in% supplied
 
@@ -360,7 +363,7 @@ np_render_control <- function(style = c("band", "bar"),
       stop("unused plot argument: bootstrap list; use scalar bootstrap, B, and boot.control",
            call. = FALSE)
     bootstrap <- .np_plot_scalar_match(dots$bootstrap,
-                                       c("wild", "inid", "fixed", "geom", "residual", "conditional-pilot", "smoothed-q6"),
+                                       c("wild", "inid", "fixed", "geom", "residual", "conditional-pilot", "smoothed-q6", "smoothed-beta-binomial"),
                                        "bootstrap")
     dots$bootstrap <- NULL
     dots <- .np_plot_set_normalized_arg(dots, "bootstrap",
@@ -368,6 +371,8 @@ np_render_control <- function(style = c("band", "bar"),
     # Scalar normalization can remove names/classes; recheck the explicit Q6 tuple.
     if (identical(bootstrap, "smoothed-q6"))
       .np_udens_q6_options(dots, allow_smoothed_q6)
+    if (identical(bootstrap,"smoothed-beta-binomial"))
+      .np_udens_bb_options(dots,allow_smoothed_beta_binomial)
   }
   if (has("B")) {
     B <- dots$B
@@ -566,6 +571,7 @@ np_render_control <- function(style = c("band", "bar"),
     stop("np_conditional_bias_control requires conditional density/distribution plots",call.=FALSE)
   dots <- .np_plot_normalize_public_dots(dots, context = .plot_context,
     allow_smoothed_q6 = inherits(bws, "bandwidth"),
+    allow_smoothed_beta_binomial = inherits(bws, "bandwidth"),
     allow_asymptotic_bias = conditional.optin || identical(method, .np_plot_rbandwidth_engine) ||
       identical(method, .np_plot_bandwidth_engine) ||
       identical(method, .np_plot_dbandwidth_engine) ||
@@ -573,7 +579,10 @@ np_render_control <- function(style = c("band", "bar"),
        (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth") ||
         inherits(bws, "dbandwidth"))))
   if (identical(dots[["plot.errors.boot.method", exact=TRUE]], "smoothed-q6"))
-    .np_udens_q6_spec(bws)
+    .np_udens_q6_public_spec(bws, dots[["plot.errors.boot.calibration", exact=TRUE]],
+      dots[["plot.errors.type", exact=TRUE]])
+  if (identical(dots[["plot.errors.boot.method",exact=TRUE]],"smoothed-beta-binomial"))
+    .np_udens_bb_spec(bws)
   if (!is.null(dots[["plot.errors.boot.calibration", exact = TRUE]]) &&
       !inherits(bws, c("rbandwidth", "bandwidth", "dbandwidth")) && !conditional.optin)
     stop("explicit bootstrap calibration currently requires bias-corrected regression or supported density/distribution inference", call. = FALSE)
@@ -677,8 +686,12 @@ np_render_control <- function(style = c("band", "bar"),
   if (!owns.empty.rows && inherits(bws, c("bandwidth", "dbandwidth"))) {
     # Compact inference owns a child seed in addition to this outer scope.
     # Forward the request without bypassing either existing RNG admission guard.
-    if (identical(dots$plot.errors.boot.method, "smoothed-q6") ||
+    if (identical(dots$plot.errors.boot.method, "smoothed-beta-binomial") ||
+        identical(dots$plot.errors.boot.method, "smoothed-q6") ||
         .np_udens_u5_request(bws, dots$bias.control,
+        dots$plot.errors.center, dots$plot.errors.method, dots$plot.errors.type,
+        dots$plot.errors.boot.calibration) ||
+        .np_udens_uniform_normal_request(bws, dots$bias.control,
         dots$plot.errors.center, dots$plot.errors.method, dots$plot.errors.type,
         dots$plot.errors.boot.calibration) ||
         .np_udens_m4_request(bws, dots$bias.control,
@@ -875,7 +888,7 @@ np_render_control <- function(style = c("band", "bar"),
          call. = FALSE)
   dots <- list(...)
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.npdensity",
-    allow_asymptotic_bias = TRUE, allow_smoothed_q6 = TRUE)
+    allow_asymptotic_bias = TRUE, allow_smoothed_q6 = TRUE, allow_smoothed_beta_binomial = TRUE)
   do.call(.np_plot_from_slot, .np_plot_literal_labels(c(list(object = object, slot = "bws"), dots)))
 }
 .np_plot_condensity <- function(object, ..., .plot_dots_call = NULL) {

@@ -47,11 +47,12 @@ are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"}, 
 
 
 
-\subsection{Whole-line Epanechnikov simultaneous bands}{
+\subsection{Whole-line compact normal and simultaneous bands}{
 With omitted or \code{NULL} \code{bias.control}, fixed unbounded second-order
 Epanechnikov density plots support \code{errors="asymptotic"},
-\code{center="bias-corrected"} and explicit \code{band="simultaneous"}
-for one continuous variable and at least ten finite observations.
+\code{center="bias-corrected"} and explicit pointwise, Bonferroni, simultaneous
+or \code{all} bands for one continuous variable and at least ten finite
+observations.
 The M4 plot correction uses an order-six compact operator with a fitted normal
 guide. Its covariance includes the complete guide influence and cross terms
 under a positive, equally weighted Gaussian-mixture reference distribution at
@@ -59,10 +60,28 @@ the original fitted bandwidth. A full, unstudentized absolute Gaussian maximum
 calibrates the supplied finite grid at \eqn{1-\alpha}, using type-7 quantiles.
 Negative corrected values and interval endpoints are retained.
 
-This is an experimental, simultaneous-only addition. It does not qualify M4
-pointwise, Bonferroni, \code{all}, normal \code{pmzsd} or bootstrap bands.
-Uniform kernels, higher requested orders, bounds, nearest-neighbour bandwidths,
-mixed data and multiple coordinates do not select it. Existing constructions,
+Pointwise intervals use the corrected center plus or minus
+\eqn{z_{1-\alpha/2}} times the complete M4 standard error. Raw Bonferroni
+intervals replace that quantile with \eqn{z_{1-\alpha/(2m)}}, where \eqn{m}
+is the number of unique supplied targets; no simultaneous containing hull is
+applied. \code{all} returns those same normal components and the unchanged
+Gaussian-maximum simultaneous component.
+
+Under the same q=1, fixed-bandwidth, whole-line order-two specification, uniform
+kernels support asymptotic pointwise and raw Bonferroni normal intervals through
+the complete Q6 covariance, including fitted-guide influence and cross terms.
+Its positive reference is the empirical mixture plus
+\eqn{h\sqrt{2/3}} times Student-six noise. The normal calculation draws no
+bootstrap samples and does not admit uniform asymptotic simultaneous or
+\code{all} bands. Explicit \code{bootstrap="smoothed-q6"} remains a distinct
+conditional bootstrap procedure.
+
+These additions remain experimental. The retained comparison gives useful
+average marginal coverage, but local sparse-tail undercoverage persists; good
+average coverage does not guarantee coverage at every target. Neither addition
+selects normal \code{pmzsd} or changes bootstrap bands. Higher requested orders,
+bounds, nearest-neighbour bandwidths, mixed data and multiple coordinates do
+not select these q=1 constructions. Existing constructions,
 explicit controls, original fitted values, estimator standard errors,
 bandwidth selection and \code{se=FALSE} remain unchanged. Its numerical
 refinement checks, bounded workspace and existing temporary-RNG safeguards
@@ -76,8 +95,7 @@ coverage guarantee. The experimental-status warning applies to this method.
 
 \subsection{Known-bound beta density inference}{
 With omitted or \code{NULL} \code{bias.control}, fixed beta
-kernels of orders 2, 4, 6 and 8 in one continuous dimension, and order 2
-in two continuous dimensions, support \code{errors="asymptotic"} and independent bootstrap
+kernels of orders 2, 4, 6 and 8 in one or two continuous dimensions support \code{errors="asymptotic"} and independent bootstrap
 \code{calibration="symmetric-sd"} or \code{"asymmetric-sd"}. Request
 \code{center="bias-corrected"} and explicitly select \code{band="pointwise"}
 or \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}. This plot-only construction supports one or two
@@ -90,10 +108,16 @@ estimator standard errors, bandwidth selection and \code{se=FALSE} are unchanged
 An object fitted with \code{se=FALSE} can receive explicitly requested plot bands.
 The same plot correction below is used at every admitted native order, with
 the fitted physical bandwidth retained. Higher-order native fits are not
-replaced or coerced to order 2. The higher-order extension does not admit
-normal \code{pmzsd} intervals or two-dimensional higher-order correction.
-Saved-sample coverage at each native order's own bandwidth was conservative;
-this is not a universal guarantee or untouched independent confirmation.
+replaced or coerced to order 2. Higher-order normal \code{pmzsd} remains
+restricted to the separate one-dimensional asymptotic construction below.
+Saved-sample coverage at each native order's own bandwidth was conservative.
+For higher-order two-dimensional calibrated bands, the retained study used
+192 originals and 576 own-order requests: at nominal 95\%, average marginal
+coverage was 99.67--99.94\%, with every supplied grid covered by simultaneous
+bands. There were only 32 originals per distribution/sample-size cell; this
+is evidence of strong conservatism, not nominal efficiency, a universal
+guarantee or untouched independent confirmation. No additional tail draws,
+variance floor or target trimming is used to obtain these intervals.
 
 On normalized support, write \eqn{L_r=4K_r-6K_{2r}+4K_{3r}-K_{4r}}.
 Here \eqn{r} is the dimensionless Chen kernel scale, not a distance
