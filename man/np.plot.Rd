@@ -569,7 +569,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   Regression additionally offers the experimental inid/fixed/geometric
   \code{np_boot_control(calibration="basic-envelope")} for fixed-bandwidth
-  means. It inverts endpoint-unit empirical roots and takes a containing
+  means, derivatives and categorical contrasts. It inverts endpoint-unit empirical roots and takes a containing
   absolute-root envelope, rather than using a replicate studentizer or
   ordinary percentile endpoints. See \code{\link{np_boot_control}}.
 

@@ -72,15 +72,16 @@ hull with the absolute-root interval; it is distinct from the raw asymmetric
 choice. Omitted/default controls preserve their earlier behavior.
 
 The experimental \code{calibration="basic-envelope"} is available for
-fixed-bandwidth regression means with \code{bootstrap="inid"}, \code{"fixed"}
+fixed-bandwidth regression means, derivatives and categorical contrasts with \code{bootstrap="inid"}, \code{"fixed"}
 or \code{"geom"} and iterated
 bias correction. It reuses the complete corrected observation rows and
 the selected row/block multiplicities; it does not refit resampled pairs.
 For inid, signed residual-score draws are aligned to the observed corrected
 standard error,
 then expressed in endpoint units before taking marginal quantiles or
-finite-grid extrema. Basic inversion maps root limits \eqn{[L,U]} to
-\eqn{[\widehat m_{bc}-U,\widehat m_{bc}-L]}{[m_bc-U,m_bc-L]}.
+finite-grid extrema. For the corrected target estimate \eqn{\widehat\theta_{bc}}{theta_bc},
+basic inversion maps root limits \eqn{[L,U]} to
+\eqn{[\widehat\theta_{bc}-U,\widehat\theta_{bc}-L]}{[theta_bc-U,theta_bc-L]}.
 Each interval is expanded to contain the empirical absolute-root interval
 from the same draws. Thus pointwise, simultaneous and Bonferroni envelopes
 are nested. The simultaneous envelope has constant lower and upper offsets
@@ -105,7 +106,18 @@ resampling variation and are refused. At least two draws are required.
 Dependent-data coverage evidence is limited; pooled and mixed layouts have
 structural qualification rather than a broad dependent-data coverage study.
 Existing regularization and pilot-admission restrictions remain in force.
-Wild resampling, nearest-neighbour bandwidths, derivatives and
+Existing derivative-order restrictions also remain in force. Each derivative
+or categorical contrast has its own finite-grid simultaneous family; there is
+no joint coverage assertion over all panels. The reference-level unordered
+contrast has deterministic zero bounds. Derivative bands can be much wider
+in low-variance regions while still being narrower than standardized SD bands
+at the most variable target, often a sparse boundary. Trimming the displayed
+grid changes the family and does not guarantee better protection at the new
+endpoints.
+Derivative coverage, especially for higher orders and dependent observations,
+is incompletely characterized; structural qualification is not a coverage
+guarantee. The existing asymptotic and SD constructions remain available.
+Wild resampling, nearest-neighbour bandwidths and
 \code{band="pmzsd"} are not supported by this option. Existing methods and
 defaults are unchanged. Like all corrected bounds, this option is pre-beta
 research, with limited coverage evidence rather than a general guarantee.

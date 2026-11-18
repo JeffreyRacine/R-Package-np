@@ -42,16 +42,18 @@ test_that("basic block envelopes preserve selected scale and literal counts", {
     y<-y+rnorm(n,sd=.4)
     bw<-npregbw(xdat=x,ydat=y,bws=rep(.3,ncol(x)),regtype=if(kind=="categorical")"lc"else"ll",bandwidth.compute=FALSE)
     grid<-x[seq_len(if(kind=='ordinary')26L else 7L),,drop=FALSE]
-    for(law in c('fixed','geom'))for(L in c(1L,5L)) {
+    targets <- c('mean', if(length(nc))paste0('d',seq_along(nc)),
+      if(length(nc)<ncol(x))paste0('c',which(!vapply(x,is.numeric,logical(1)))))
+    for(target in targets)for(law in c('fixed','geom'))for(L in c(1L,5L)) {
       state<-.np_bias_regression_prepare(bw,x,y,np_bias_control(),adapt=FALSE,law=law)
       C<-do.call(rbind,lapply(split(seq_len(nrow(grid)),ceiling(seq_len(nrow(grid))/25)),function(ii)
-        .np_bias_regression_rows(state,grid[ii,,drop=FALSE],data.frame(row=seq_along(ii),target='mean'))$W))
-      v<-.np_bias_regression_rows(state,grid[1:min(25,nrow(grid)),,drop=FALSE],data.frame(row=1:min(25,nrow(grid)),target='mean'))
+        .np_bias_regression_rows(state,grid[ii,,drop=FALSE],data.frame(row=seq_along(ii),target=target))$W))
+      v<-.np_bias_regression_rows(state,grid[1:min(25,nrow(grid)),,drop=FALSE],data.frame(row=1:min(25,nrow(grid)),target=target))
       se0<-v$se
-      if(nrow(grid)>25)se0<-c(se0,.np_bias_regression_rows(state,grid[26,,drop=FALSE],data.frame(row=1L,target='mean'))$se)
+      if(nrow(grid)>25)se0<-c(se0,.np_bias_regression_rows(state,grid[26,,drop=FALSE],data.frame(row=1L,target=target))$se)
       F<-sweep(C,2,state$residual,'*');F<-F-rowMeans(F)
       B<-199L;alpha<-c(.05,.2)
-      z<-.np_with_seed(98122,.np_bias_inference(state,grid,B=B,law=law,blocklen=L,calibration='basic-envelope',refinement='pilot-block',alpha=alpha,resolution.warn=FALSE))
+      z<-.np_with_seed(98122,.np_bias_inference(state,grid,targets=target,B=B,law=law,blocklen=L,calibration='basic-envelope',refinement='pilot-block',alpha=alpha,resolution.warn=FALSE))
       d<-.np_bias_stream(z$rng$start,.np_block_counts_drawer(n,B,L,law)(1L,B)-1)
       R<-F%*%d$value
       if(isTRUE(state$pooled)) {
@@ -59,15 +61,19 @@ test_that("basic block envelopes preserve selected scale and literal counts", {
         expect_null(z$studentization)
         expect_match(z$covariance$studentization,'observed')
       } else {
-        anchored<-se0*sqrt(variance(F,L,law)/variance(F,1L,law))
+        v1 <- variance(F,1L,law)
+        expect_true(all(se0[v1==0]==0))
+        anchored<-se0*sqrt(variance(F,L,law)/ifelse(v1==0,1,v1))
         expect_equal(z$se,anchored,tolerance=1e-10)
-        R<-anchored*(R/apply(R,1,sd))
+        denominator <- apply(R,1,sd)
+        expect_true(all(se0[denominator==0]==0))
+        R<-anchored*(R/ifelse(denominator==0,1,denominator))
       }
       if(isTRUE(state$pooled)) {
         expect_identical(z$root.units,"endpoint units; raw centered pooled block scores")
         expect_identical(z$provider.refinement$owner,"exact conditional pooled block score variance")
         if(L==1L) {
-          retained<-.np_with_seed(98122,.np_bias_inference(state,grid,B=B,law=law,blocklen=L,
+          retained<-.np_with_seed(98122,.np_bias_inference(state,grid,targets=target,B=B,law=law,blocklen=L,
             calibration='tail-envelope',refinement='pilot-block',resolution.warn=FALSE))
           expect_identical(retained$studentization$construction,"conditional-block-score-v1")
         }
@@ -77,7 +83,9 @@ test_that("basic block envelopes preserve selected scale and literal counts", {
       }
       expect_identical(z$rng$end,d$end)
       expected<-bands(R,z$center,alpha)
-      for(b in names(expected))expect_equal(unname(z$bands[[b]]),unname(expected[[b]]),tolerance=1e-10,info=paste(kind,law,L,b))
+      for(b in names(expected))for(k in seq_along(alpha))
+        expected[[b]][z$se==0,,k] <- z$center[z$se==0]
+      for(b in names(expected))expect_equal(unname(z$bands[[b]]),unname(expected[[b]]),tolerance=1e-10,info=paste(kind,target,law,L,b))
       expect_true(all(z$bands$simultaneous[,1,]<=z$bands$pointwise[,1,]))
       expect_true(all(z$bands$simultaneous[,2,]>=z$bands$pointwise[,2,]))
     }

@@ -44,8 +44,7 @@ test_that("basic envelopes invert independently sorted endpoint-unit roots", {
   for(band in names(z$bands))
     expect_equal(unname(mz$bands[[band]]),unname(-z$bands[[band]][,2:1,,drop=FALSE]),tolerance=1e-12)
   expect_match(z$root.units,"endpoint units")
-  expect_error(.np_bias_inference(state,grid,law="mammen",calibration="basic-envelope"),"inid, fixed or geom regression means")
-  expect_error(.np_bias_inference(state,grid,law="inid",targets="d1",calibration="basic-envelope"),"inid, fixed or geom regression means")
+  expect_error(.np_bias_inference(state,grid,law="mammen",calibration="basic-envelope"),"inid, fixed or geom regression targets")
 })
 
 test_that("public basic envelopes preserve objects, state and explicit admission", {
@@ -62,10 +61,11 @@ test_that("public basic envelopes preserve objects, state and explicit admission
   expect_identical(fit,saved);expect_identical(.Random.seed,rng)
   for(law in "wild") {
     bad <- args;bad$bootstrap <- law
-    expect_error(do.call(plot,bad),"inid, fixed or geom resampling and fixed-bandwidth regression means")
+    expect_error(do.call(plot,bad),"inid, fixed or geom resampling and fixed-bandwidth regression targets")
   }
   bad <- args;bad$gradients <- TRUE
-  expect_error(do.call(plot,bad),"regression means")
+  derivative <- suppressWarnings(do.call(plot,bad))
+  expect_true(all(is.finite(as.data.frame(derivative,band="simultaneous")$lower)))
   bad <- args;bad$band <- "pmzsd"
   expect_error(do.call(plot,bad),"empirical bands")
   bad <- args;bad$center <- "estimate"
