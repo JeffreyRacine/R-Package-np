@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Normalize bootstrap calibration labels consistently when plot controls are edited by hand.
+
 * Add an opt-in experimental `basic-local-envelope` regression calibration that encloses the existing basic and observed-SE local simultaneous/Bonferroni envelopes, retaining the same draws, centers, standard errors and pointwise bounds. Existing methods and admission limits are unchanged.
 
 * Extend the experimental regression basic-envelope bands to already-supported derivatives and categorical contrasts, retaining the complete corrected rows, resampling laws and per-target grid families. Document sparse-boundary and higher-order coverage limitations.
