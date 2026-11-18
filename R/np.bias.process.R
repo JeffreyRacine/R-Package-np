@@ -222,8 +222,12 @@
   if (pilot.block && !law %in% c("fixed","geom"))
     stop("pilot-block refinement requires fixed or geom",call.=FALSE)
   basic.envelope <- identical(calibration,"basic-envelope")
-  if(basic.envelope && (!identical(law,"inid") || !identical(targets,"mean")))
-    stop("basic-envelope requires inid regression means",call.=FALSE)
+  if(basic.envelope && (!law %in% c("inid","fixed","geom") || !identical(targets,"mean")))
+    stop("basic-envelope requires inid, fixed or geom regression means",call.=FALSE)
+  if(basic.envelope && law %in% c("fixed","geom") && !pilot.block)
+    stop("basic-envelope block inference requires refinement='pilot-block'",call.=FALSE)
+  # Basic roots use the observed block scale, never a replicate studentizer.
+  if(basic.envelope) studentize <- FALSE
   tail.calibration <- calibration %in% c("tail-envelope","separate-tails","basic-envelope")
   if(tail.calibration && !law %in% c("mammen","rademacher","inid","fixed","geom"))
     stop("private separate-tail regression requires a supported bootstrap law",call.=FALSE)
@@ -250,6 +254,8 @@
     stop("pooled mixed-data bias correction currently supports Gaussian, Mammen, Rademacher, fixed, geom or inid calibration only",call.=FALSE)
   if(!is.numeric(B)||length(B)!=1L||!is.finite(B)||B<1||B!=floor(B)||B>.Machine$integer.max)
     stop("bias calibration draws must be a positive integer",call.=FALSE)
+  if(basic.envelope && B<2)
+    stop("basic-envelope requires at least two draws",call.=FALSE)
   if(B<2 && law %in% c("inid","fixed","geom") &&
      !(isTRUE(state$pooled) && law %in% c("fixed","geom")))
     stop("score-bootstrap variance requires at least two draws",call.=FALSE)
@@ -451,14 +457,19 @@
     scope="finite grid within each scalar-target family",owner="bounded corrected observation factors")
   if (pilot.block) {
     result$provider.refinement <- list(method=refinement,
-      owner=if(score.calibration)"unchanged pooled score studentizer" else "pilot times selected-block to iid covariance ratio",
+      owner=if(score.calibration) {
+        if(basic.envelope)"exact conditional pooled block score variance" else "unchanged pooled score studentizer"
+      } else "pilot times selected-block to iid covariance ratio",
       blocks=block.refinement)
     if (!score.calibration) result$covariance$variance <- "pilot-anchored exact selected-block relative covariance"
   }
   if(rank.calibration) {
     result$absolute.reference <- absolute.reference
     result$calibration.method <- calibration
-    if(basic.envelope) result$root.units <- "endpoint units; observed-SE aligned residual scores"
+    if(basic.envelope) result$root.units <- if(score.calibration)
+      "endpoint units; raw centered pooled block scores" else if(pilot.block)
+      "endpoint units; pilot-anchored block residual scores" else
+      "endpoint units; observed-SE aligned residual scores"
     if(any(se==0)) result$deterministic.targets <- which(se==0)
   }
   result
