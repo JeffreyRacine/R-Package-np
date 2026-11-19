@@ -6,9 +6,9 @@ test_that("guide-region annotations describe their operator and common family", 
         z <- descriptor(method, band, .05, "bias-corrected", shared=shared,
                         construction="guide-region")$candidates
         expect_true(all(grepl("guide", z, fixed=TRUE)))
-        expect_true(all(grepl("residual envelope", z, fixed=TRUE)))
+        expect_true(all(grepl("residual", z, fixed=TRUE)))
         expect_false(any(grepl("SE|within panel|within each panel|normal quantile|rank-based", z)))
-        expect_identical(all(grepl("supplied finite family", z, fixed=TRUE)),
+        expect_identical(all(grepl("supplied (finite )?family", z)),
                          identical(band, "simultaneous"))
       }
 })

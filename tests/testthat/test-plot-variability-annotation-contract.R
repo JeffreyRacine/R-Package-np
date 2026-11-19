@@ -17,7 +17,7 @@ test_that("corrected Gaussian subtitles fit ordinary devices without geometry ch
     labels <- descriptor("asymptotic", band, .05, "bias-corrected",
                          construction = "iterated")$candidates
     expect_true(all(grepl("Gaussian", labels, fixed = TRUE)))
-    expect_true(all(grepl("bias-corrected", labels, fixed = TRUE)))
+    expect_true(any(grepl("bias-corrected", labels, fixed = TRUE)))
     if (band == "simultaneous")
       expect_true(all(grepl("grid", labels, fixed = TRUE)))
     expect_null(spec("asymptotic", band, .05, "bias-corrected", TRUE,
@@ -116,9 +116,9 @@ test_that("individual pages retain subtitles including categorical intervals", {
   expect_match(categorical$candidates[[1L]], "variability interval", fixed = TRUE)
   shared <- descriptor("bootstrap", "simultaneous", 0.05,
                         "bias-corrected", shared = TRUE)
-  expect_true(all(grepl("within each panel", shared$candidates, fixed = TRUE)))
-  expect_true(all(grepl("rank-based", shared$candidates, fixed = TRUE)))
-  expect_true(all(grepl("bias-corrected", shared$candidates, fixed = TRUE)))
+  expect_true(all(grepl("within each panel", head(shared$candidates, -1L), fixed = TRUE)))
+  expect_true(all(grepl("rank-based", head(shared$candidates, -1L), fixed = TRUE)))
+  expect_true(all(grepl("bias-corrected", head(shared$candidates, -1L), fixed = TRUE)))
 })
 
 test_that("shared annotations respect title clearance and no-fit typography", {
@@ -196,12 +196,12 @@ test_that("bias-corrected bootstrap descriptors identify centering without chang
   descriptor <- getFromNamespace(".np_plot_variability_descriptor",
                                  .plot_annotation_package)
   pointwise <- descriptor("bootstrap", "pointwise", 0.05, "bias-corrected")
-  expect_true(all(grepl("bias-corrected", pointwise$candidates, fixed = TRUE)))
+  expect_true(all(grepl("bias-corrected", head(pointwise$candidates, -1L), fixed = TRUE)))
   expect_match(pointwise$candidates[[1L]], "quantiles", fixed = TRUE)
 
   all.bands <- descriptor("bootstrap", "all", 0.05, "bias-corrected")
-  expect_length(all.bands$candidates, 2L)
-  expect_true(all(grepl("bias-corrected center", all.bands$candidates,
+  expect_gte(length(all.bands$candidates), 2L)
+  expect_true(all(grepl("bias-corrected center", head(all.bands$candidates, -1L),
                         fixed = TRUE)))
 })
 
@@ -342,10 +342,81 @@ test_that("smoothed-percentile annotations describe curves without a center clai
       text <- descriptor("bootstrap", band, 0.05, "bias-corrected",
                          shared = shared, construction = "smoothed-percentile")$candidates
       expect_true(all(grepl("smoothed-percentile", text, fixed = TRUE)))
-      expect_true(all(grepl("corrected.*curves", text)))
+      expect_true(all(grepl("corrected.*curves", head(text, -1L))))
       expect_false(any(grepl("maximum|bias-corrected center", text)))
     }
   }
   expect_match(labels("bootstrap", "smoothed-percentile")[["simultaneous"]],
                "calibrated percentile ranks", fixed = TRUE)
+})
+
+
+test_that("corrected inference wording survives scope and construction fallbacks", {
+  descriptor <- getFromNamespace(".np_plot_variability_descriptor", .plot_annotation_package)
+  constructions <- c("iterated", "positive-covariance", "smoothed-percentile",
+                     "guide-region", "smoothed-q6", "smoothed-beta-binomial",
+                     "conditional-pilot")
+  for (construction in c(list(NULL), as.list(constructions))) {
+    for (band in c("pmzsd", "pointwise", "bonferroni", "simultaneous", "all")) {
+      # Smoothed-percentile has no pmzsd construction.
+      if (identical(construction, "smoothed-percentile") && band == "pmzsd") next
+      for (shared in c(FALSE, TRUE)) {
+        labels <- descriptor("bootstrap", band, .05, "bias-corrected",
+                             shared = shared, construction = construction)$candidates
+        expect_true(length(labels) > 0L)
+        expect_true(all(grepl("confidence", labels, fixed = TRUE)))
+        expect_false(any(grepl("variability", labels, fixed = TRUE)))
+        if (band != "all") {
+          scope <- switch(band, pmzsd = "pointwise", bonferroni = "Bonferroni", band)
+          expect_true(all(grepl(scope, labels, fixed = TRUE)))
+        }
+      }
+    }
+  }
+  labels <- descriptor("asymptotic", "simultaneous", .05, "bias-corrected",
+                       continuous = FALSE)$candidates
+  expect_true(all(grepl("confidence interval", labels, fixed = TRUE)))
+  labels <- descriptor("bootstrap", "pointwise", .05, "estimate")$candidates
+  expect_match(labels[[1L]], "variability", fixed = TRUE)
+  expect_false(any(grepl("confidence", labels, fixed = TRUE)))
+})
+
+test_that("corrected construction labels have unambiguous requested scopes", {
+  descriptor <- getFromNamespace(".np_plot_variability_descriptor", .plot_annotation_package)
+  for (construction in c("smoothed-q6", "guide-region", "smoothed-beta-binomial", "conditional-pilot"))
+    for (band in c("pointwise", "bonferroni", "simultaneous", "all")) {
+      labels <- descriptor("bootstrap", band, .05, "bias-corrected",
+                           construction=construction)$candidates
+      expect_false(any(grepl("Bonferroni bonferroni|Bonferroni Bonferroni| all ", labels)))
+      if (band != "all") {
+        wanted <- if (band == "bonferroni") "Bonferroni" else band
+        scopes <- c("pointwise", "Bonferroni", "simultaneous")
+        expect_true(all(grepl(wanted, labels, fixed=TRUE)))
+        expect_false(any(vapply(setdiff(scopes,wanted),function(other)
+          any(grepl(other,labels,fixed=TRUE)),logical(1))))
+      } else expect_true(all(grepl("confidence bands", labels, fixed=TRUE)))
+      intervals <- descriptor("bootstrap", band, .05, "bias-corrected",
+                              continuous=FALSE, construction=construction)$candidates
+      expect_true(all(grepl("confidence intervals", intervals, fixed=TRUE)))
+      expect_false(any(grepl("confidence band", intervals, fixed=TRUE)))
+    }
+})
+
+test_that("corrected public constructions retain a visible ordinary-device subtitle", {
+  draw <- getFromNamespace(".np_plot_draw_variability_annotation", .plot_annotation_package)
+  spec <- getFromNamespace(".np_plot_variability_annotation_spec", .plot_annotation_package)
+  path <- tempfile(fileext=".pdf"); grDevices::pdf(path,width=7,height=7)
+  on.exit({grDevices::dev.off();unlink(path)},add=TRUE)
+  cases <- list(c("bootstrap","iterated"),c("asymptotic","iterated"),
+    c("bootstrap","smoothed-percentile"),c("bootstrap","positive-covariance"),
+    c("bootstrap","smoothed-q6"),c("bootstrap","smoothed-beta-binomial"),
+    c("asymptotic","guide-region"),c("bootstrap","conditional-pilot"),
+    c("asymptotic","conditional-pilot"))
+  for (case in cases) for (band in c("pointwise","bonferroni","simultaneous","all")) {
+    graphics::plot(1:5,xlab="x",ylab="estimate")
+    before <- graphics::par(c("mar","oma","fig","fin","pin","plt","usr","cex.sub"))
+    annotation <- spec(case[1L],band,.05,"bias-corrected",FALSE,list(xlab="x"),construction=case[2L])
+    expect_true(draw(annotation),info=paste(case,band,collapse=" / "))
+    expect_identical(graphics::par(names(before)),before)
+  }
 })

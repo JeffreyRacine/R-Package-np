@@ -384,6 +384,13 @@ and estimator-specific qualifications.
 }
 
 \section{Experimental status of bias-corrected inference}{
+Plot annotations call estimate-centered bounds variability intervals or bands
+and bias-corrected bounds confidence intervals or bands. Pointwise, Bonferroni
+and simultaneous refer to coverage scope, independently of asymptotic or
+bootstrap construction. Simultaneous scope is the method's documented finite
+family; \code{band="pmzsd"} is pointwise. Confidence
+wording does not establish nominal coverage for experimental methods.
+
 \strong{All bias-corrected confidence intervals and bands are experimental
 (pre-beta research), incomplete, and not recommended for general-purpose
 inference.} This status remains in effect unless the documentation explicitly

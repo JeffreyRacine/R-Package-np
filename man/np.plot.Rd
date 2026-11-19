@@ -1194,7 +1194,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   On an eligible single-panel plot rendered by base graphics,
   a missing \code{sub} argument allows the plot method to add a concise
-  variability subtitle after finite bounds have actually been drawn. This
+  inference subtitle after finite bounds have actually been drawn. This
   includes individual figures in a sequence with
   \code{options(plot.par.mfrow=FALSE)} when the active graphics layout is
   a full-frame single panel. Levels and supported gradients/effects follow
@@ -1206,7 +1206,19 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \code{"95\% symmetric variability band (normal quantile × asymptotic SE)"}
   and
   \code{"95\% pointwise bootstrap variability band (quantiles)"}.
-  Bias-corrected bootstrap labels also identify their center.
+  With \code{center="estimate"}, these are labelled variability bands:
+  smoothing bias is not removed. With \code{center="bias-corrected"},
+  the labels instead say confidence bands or intervals, and identify
+  pointwise, Bonferroni-adjusted or simultaneous scope. With \code{band="all"},
+  the subtitle describes confidence bands and the legend distinguishes their
+  scopes. Detailed labels identify the corrected center; compact fallbacks
+  retain construction and family instead of repeating that explanation.
+  Simultaneous coverage concerns the method's documented finite family,
+  usually the evaluation grid within a panel. \code{band="pmzsd"}
+  is pointwise, not simultaneous. Confidence terminology describes the
+  inferential target; all bias-corrected methods remain experimental
+  alpha/pre-beta, incomplete, and without a general nominal-coverage guarantee.
+  Their construction-specific and finite-family qualifications still apply.
 
   The automatic subtitle uses the effective subtitle typography (including
   \code{cex.sub}) and only appears when an approved one-line wording fits

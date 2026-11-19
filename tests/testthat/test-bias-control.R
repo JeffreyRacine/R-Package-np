@@ -73,7 +73,7 @@ test_that("iterated intervals describe maximum calibration without relabeling le
   expect_false(any(grepl("rank", text, fixed=TRUE)))
   text <- descriptor("asymptotic", "pointwise", .05, "bias-corrected",
                      construction="iterated")$candidates
-  expect_true(all(grepl("bias-corrected", text, fixed=TRUE)))
+  expect_true(any(grepl("bias-corrected", text, fixed=TRUE)))
   expect_true(all(grepl("studentized|Gaussian t", text)))
   expect_false(any(grepl("normal quantile", text, fixed=TRUE)))
   expect_match(label("asymptotic", "iterated")[["pointwise"]], "quantiles", fixed=TRUE)
