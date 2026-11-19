@@ -72,6 +72,14 @@
   args
 }
 
+.np_semihat_kernel_choice <- function(value, choices, where = "regression preparation") {
+  kernel <- if (is.null(value) || !length(value)) "gaussian" else as.character(value)[1L]
+  if (!kernel %in% choices)
+    stop(sprintf("kernel '%s' is not supported by this %s", kernel, where),
+         call. = FALSE)
+  kernel
+}
+
 .np_semihat_make_regbw_state <- function(source, xdat, ydat, bw,
                                           kernel.choices = c("gaussian", "epanechnikov", "uniform")) {
   resolve_choice <- function(value, choices, default = choices[1L]) {
@@ -100,10 +108,7 @@
                            c("fixed", "generalized_nn", "adaptive_nn"))
   # Kernel support belongs to the caller; never substitute another kernel.
   kernel <- if (!is.null(args$ckertype)) args$ckertype else source$ckertype
-  ckertype <- if (is.null(kernel) || !length(kernel)) "gaussian" else as.character(kernel)[1L]
-  if (!ckertype %in% kernel.choices)
-    stop(sprintf("kernel '%s' is not supported by this regression preparation", ckertype),
-         call. = FALSE)
+  ckertype <- .np_semihat_kernel_choice(kernel, kernel.choices)
   ckerorder <- if (!is.null(args$ckerorder)) args$ckerorder else source$ckerorder
   ckerbound <- resolve_choice(if (!is.null(args$ckerbound)) args$ckerbound else source$ckerbound,
                               c("none", "range", "fixed"))
@@ -262,7 +267,8 @@
   }
 
   bwtype <- resolve_choice(bws$type, c("fixed", "generalized_nn", "adaptive_nn"))
-  ckertype <- resolve_choice(bws$ckertype, c("gaussian", "epanechnikov", "uniform"))
+  ckertype <- .np_semihat_kernel_choice(bws[["ckertype", exact = TRUE]],
+    c("gaussian", "epanechnikov", "uniform"), "single-index preparation")
   ckerbound <- resolve_choice(bws$ckerbound, c("none", "range", "fixed"))
   ukertype <- resolve_choice(bws$ukertype, c("aitchisonaitken", "liracine"))
   okertype <- resolve_choice(bws$okertype, c("liracine", "wangvanryzin", "racineliyan", "nliracine"))
