@@ -89,3 +89,34 @@ test_that("semiparametric constructors retain beta refusals", {
   expect_error(npscoefbw(xdat=x, zdat=z, ydat=y, bws=.25,
     bandwidth.compute=FALSE, ckertype="beta"), "arg.*should be one of")
 })
+
+test_that("single-index preparation refuses explicit invalid kernel metadata", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  x <- data.frame(index = seq(.05, .95, length.out = 40L))
+  y <- sin(4 * x$index)
+  bw <- npindexbw(xdat=x, ydat=y, bws=c(1, .25), regtype="ll",
+                  bandwidth.compute=FALSE)
+  make <- getFromNamespace(".np_indexhat_kbw", "npRmpi")
+  baseline <- make(bw, x)
+  for (kernel in c("gaussian", "epanechnikov", "uniform")) {
+    current <- bw
+    current[["ckertype"]] <- kernel
+    expect_identical(make(current, x)[["ckertype"]], kernel)
+  }
+  for (kernel in list(NULL, character())) {
+    current <- bw
+    current[["ckertype"]] <- kernel
+    expect_equal(make(current, x), baseline)
+  }
+  for (kernel in list("not-a-kernel", "beta", NA_character_, FALSE)) {
+    current <- bw
+    current[["ckertype"]] <- kernel
+    expect_error(make(current, x), "kernel.*not supported.*single-index preparation")
+  }
+  # An unrelated prefix must not shadow a missing exact kernel field.
+  current <- bw
+  current[["ckertype"]] <- NULL
+  current[["ckertype.annotation"]] <- "not-a-kernel"
+  expect_equal(make(current, x), baseline)
+})
