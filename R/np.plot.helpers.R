@@ -9268,7 +9268,7 @@ plotFactor <- function(f, y, ...){
         exdat = data.frame(index = index.eval),
         bws = bws$bw,
         bwtype = bws$type,
-        ckertype = bws$ckertype,
+        ckertype = .np_index_kernel(bws),
         ckerorder = bws$ckerorder,
         regtype = regtype,
         gradients = gradients,

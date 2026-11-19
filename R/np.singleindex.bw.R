@@ -671,7 +671,7 @@ npindexbw.NULL <-
   if (!identical(ckerbound, "none"))
     return(FALSE)
 
-  ckertype <- as.character(bws$ckertype)[1L]
+  ckertype <- .np_index_kernel(bws)
   ckerorder <- as.integer(bws$ckerorder)[1L]
   if (!identical(ckertype, "uniform") &&
       (!is.finite(ckerorder) || ckerorder != 2L))

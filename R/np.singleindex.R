@@ -251,10 +251,15 @@ npindex.call <-
       bws, c(txdat = "xdat", tydat = "ydat"), .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment(), omit.subset = FALSE), npindex.sibandwidth))
   }
 
+.np_index_kernel <- function(bws) {
+  .np_semihat_kernel_choice(bws[["ckertype", exact = TRUE]],
+    c("gaussian", "epanechnikov", "uniform"), "single-index preparation")
+}
+
 .np_index_kernel_args <- function(bws) {
   args <- list(
     bwtype = bws$type,
-    ckertype = bws$ckertype,
+    ckertype = .np_index_kernel(bws),
     ckerorder = bws$ckerorder
   )
   if (!is.null(bws$ckerbound))
@@ -817,7 +822,7 @@ npindex.sibandwidth <-
             exdat = index.eval.df[1L, , drop = FALSE],
             bws = bws$bw,
             bwtype = bws$type,
-            ckertype = bws$ckertype,
+            ckertype = .np_index_kernel(bws),
             ckerorder = bws$ckerorder,
             ckerbound = bws$ckerbound,
             ckerlb = kernel.args$ckerlb,
@@ -836,7 +841,7 @@ npindex.sibandwidth <-
               exdat = index.df[1L, , drop = FALSE],
               bws = bws$bw,
               bwtype = bws$type,
-              ckertype = bws$ckertype,
+              ckertype = .np_index_kernel(bws),
               ckerorder = bws$ckerorder,
               ckerbound = bws$ckerbound,
               ckerlb = kernel.args$ckerlb,
@@ -884,7 +889,7 @@ npindex.sibandwidth <-
                         exdat=index.eval.df,
                         bws=bws$bw,
                         bwtype = bws$type,
-                        ckertype = bws$ckertype,
+                        ckertype = .np_index_kernel(bws),
                         ckerorder = bws$ckerorder,
                         ckerbound = bws$ckerbound,
                         ckerlb = kernel.args$ckerlb,
@@ -909,7 +914,7 @@ npindex.sibandwidth <-
                           exdat=index.df,
                           bws=bws$bw,
                           bwtype = bws$type,
-                          ckertype = bws$ckertype,
+                          ckertype = .np_index_kernel(bws),
                           ckerorder = bws$ckerorder,
                           ckerbound = bws$ckerbound,
                           ckerlb = kernel.args$ckerlb,
@@ -1013,7 +1018,7 @@ npindex.sibandwidth <-
       moments <- .np_retained_uniform_constructor(.np_index_kernel_moments,y = W, txdat = index.df,
                         bws = bws$bw,
                         bwtype = bws$type,
-                        ckertype = bws$ckertype,
+                        ckertype = .np_index_kernel(bws),
                         ckerorder = bws$ckerorder,
                         ckerbound = bws$ckerbound,
                         ckerlb = kernel.args$ckerlb,
@@ -1062,7 +1067,7 @@ npindex.sibandwidth <-
       W <- txdat[, -1L, drop = FALSE]
       moments <- .np_retained_uniform_constructor(.np_index_kernel_moments,
         y = W, txdat = index.df, bws = bws$bw, bwtype = bws$type,
-        ckertype = bws$ckertype, ckerorder = bws$ckerorder,
+        ckertype = .np_index_kernel(bws), ckerorder = bws$ckerorder,
         ckerbound = bws$ckerbound, ckerlb = kernel.args$ckerlb,
         ckerub = kernel.args$ckerub)
       centered <- W - t(sweep(moments$numerator, 2L,
@@ -1092,7 +1097,7 @@ npindex.sibandwidth <-
           exdat = index.eval.df,
           bws = bws$bw,
           bwtype = bws$type,
-          ckertype = bws$ckertype,
+          ckertype = .np_index_kernel(bws),
           ckerorder = bws$ckerorder,
           ckerbound = bws$ckerbound,
           ckerlb = kernel.args$ckerlb,
@@ -1124,7 +1129,7 @@ npindex.sibandwidth <-
                         exdat = index.eval.df,
                         bws = bws$bw,
                         bwtype = bws$type,
-                        ckertype = bws$ckertype,
+                        ckertype = .np_index_kernel(bws),
                         ckerorder = bws$ckerorder,
                         ckerbound = bws$ckerbound,
                         ckerlb = kernel.args$ckerlb,
@@ -1141,7 +1146,7 @@ npindex.sibandwidth <-
             exdat = index.eval.df,
             bws = bws$bw,
             bwtype = bws$type,
-            ckertype = bws$ckertype,
+            ckertype = .np_index_kernel(bws),
             ckerorder = bws$ckerorder,
             ckerbound = bws$ckerbound,
             regtype = regtype,
