@@ -98,7 +98,7 @@ test_that("basic envelopes retain nearest-neighbour refusals for means and deriv
       expect_error(plot(fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",
         gradients=gradient,band="simultaneous",neval=5L,B=199L,output="data",
         boot.control=np_boot_control(calibration="basic-envelope")),
-        "inid, fixed or geom resampling and fixed-bandwidth regression targets",fixed=TRUE)
+        "basic-envelope requires inid, fixed or geom and fixed-bandwidth regression",fixed=TRUE)
       expect_identical(fit,before);expect_identical(.Random.seed,rng)
     }
   }
