@@ -1,7 +1,7 @@
 test_that("Mammen local envelopes preserve the observed SE and use generation SD", {
   old.options <- options(np.messages=FALSE,np.plot.progress=FALSE)
   on.exit(options(old.options),add=TRUE)
-  spawn_mpi_slaves(1L)
+  if (!spawn_mpi_slaves(1L)) skip("MPI pool unavailable in this context")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   set.seed(103141)
   x <- data.frame(x=seq(-1,1,length.out=80))
@@ -54,6 +54,8 @@ test_that("wild local envelope symmetry covers every target and alpha", {
 })
 
 test_that("wild local endpoints match an independent complete-array oracle", {
+  if (!spawn_mpi_slaves(1L)) skip("MPI pool unavailable in this context")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
 # Independent full-array empirical-root oracle; no production tail/local helper used.
 oracle <- function(root,center,scale,map,alpha,symmetric=FALSE){
  stopifnot(is.matrix(root),all(is.finite(root)),all(is.finite(scale)),all(scale>=0),nrow(root)==nrow(map));B<-ncol(root);M<-nrow(root)
@@ -148,6 +150,8 @@ oracle <- function(root,center,scale,map,alpha,symmetric=FALSE){
 
 
 test_that("public wild local admission keeps its law and categorical exclusions", {
+  if (!spawn_mpi_slaves(1L)) skip("MPI pool unavailable in this context")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old.options <- options(np.messages=FALSE,np.plot.progress=FALSE)
   on.exit(options(old.options),add=TRUE)
   set.seed(103163L)
