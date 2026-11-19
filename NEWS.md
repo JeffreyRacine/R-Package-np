@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Apply exact single-index kernel validation consistently to fitting, gradients and hat/plot preparation; missing legacy metadata keeps its Gaussian default and unrelated prefix fields cannot replace it.
+
 * The single-index kernel-bandwidth preparation helper now refuses explicit
   unsupported kernel metadata
   instead of silently substituting Gaussian; missing legacy metadata retains its default.

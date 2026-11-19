@@ -227,6 +227,7 @@
 
 .np_indexhat_scalar_source <- function(bws) {
   source <- bws
+  source[["ckertype"]] <- .np_index_kernel(bws)
   if (identical(as.character(source$ckerbound)[1L], "range")) {
     # The scalar index has its own range; original predictor-space bounds do not collapse.
     source$ckerlb <- NULL
@@ -277,8 +278,7 @@
   }
 
   bwtype <- resolve_choice(bws$type, c("fixed", "generalized_nn", "adaptive_nn"))
-  ckertype <- .np_semihat_kernel_choice(bws[["ckertype", exact = TRUE]],
-    c("gaussian", "epanechnikov", "uniform"), "single-index preparation")
+  ckertype <- .np_index_kernel(bws)
   ckerbound <- resolve_choice(bws$ckerbound, c("none", "range", "fixed"))
   ukertype <- resolve_choice(bws$ukertype, c("aitchisonaitken", "liracine"))
   okertype <- resolve_choice(bws$okertype, c("liracine", "wangvanryzin", "racineliyan", "nliracine"))
@@ -446,7 +446,7 @@
     bws = if (!is.null(kernel.bws)) kernel.bws else if (identical(bws$type, "adaptive_nn"))
       .np_indexhat_kbw(bws, idx.train) else bws$bw,
     bwtype = bws$type,
-    ckertype = bws$ckertype,
+    ckertype = .np_index_kernel(bws),
     ckerorder = bws$ckerorder,
     ckerbound = bws$ckerbound,
     ckerlb = if (identical(bws$ckerbound, "fixed"))

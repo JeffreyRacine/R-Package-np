@@ -120,3 +120,58 @@ test_that("single-index preparation refuses explicit invalid kernel metadata", {
   current[["ckertype.annotation"]] <- "not-a-kernel"
   expect_equal(make(current, x), baseline)
 })
+
+
+test_that("single-index public owners share exact kernel validation", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  x <- data.frame(index = seq(.05, .95, length.out = 32L))
+  y <- sin(4 * x$index)
+  ev <- x[c(3L, 16L, 29L), , drop = FALSE]
+  for (regtype in c("lc", "ll")) {
+    bw <- npindexbw(xdat=x, ydat=y, bws=c(1, .25), regtype=regtype,
+                   bandwidth.compute=FALSE)
+    run <- function(bws) {
+      fit <- npindex(bws, txdat=x, tydat=y, exdat=ev,
+                     se=FALSE, gradients=TRUE)
+      list(mean=fitted(fit), gradient=gradients(fit),
+           hat=npindexhat(bws, txdat=x, exdat=ev, output="matrix"),
+           derivative=npindexhat(bws, txdat=x, exdat=ev, y=y,
+                                 s=1L, output="apply"))
+    }
+    expected <- run(bw)
+    for (value in list(NULL, character(), c("gaussian", "epanechnikov"))) {
+      current <- bw
+      current[["ckertype"]] <- value
+      current[["ckertype.annotation"]] <- "epanechnikov"
+      expect_identical(run(current), expected)
+    }
+    # The selector and plot evaluator must use the same missing-field default.
+    current <- bw
+    current[["ckertype"]] <- NULL
+    current[["ckertype.annotation"]] <- "uniform"
+    fast <- getFromNamespace(".npindexbw_fast_eligible", "npRmpi")
+    expect_false(fast(2, current, x$index))
+    expect_identical(fast(2, current, x$index), fast(2, bw, x$index))
+    if (regtype == "ll") {
+      for (scope in c("pointwise", "simultaneous")) {
+        run.plot <- function(obj) suppressWarnings(plot(obj, xdat=x, ydat=y,
+          errors="asymptotic", band=scope, neval=3L, output="data",
+          random.seed=108014L))
+        expect_identical(as.data.frame(run.plot(current), band=scope),
+                         as.data.frame(run.plot(bw), band=scope))
+      }
+    }
+    for (value in c("beta", "not-a-kernel")) {
+      current <- bw
+      current[["ckertype"]] <- value
+      expect_error(npindex(current, txdat=x, tydat=y, exdat=ev, se=FALSE),
+                   "kernel.*not supported.*single-index preparation")
+      expect_error(npindexhat(current, txdat=x, exdat=ev, output="matrix"),
+                   "kernel.*not supported.*single-index preparation")
+      expect_error(npindexhat(current, txdat=x, exdat=ev, y=y,
+                              s=1L, output="apply"),
+                   "kernel.*not supported.*single-index preparation")
+    }
+  }
+})

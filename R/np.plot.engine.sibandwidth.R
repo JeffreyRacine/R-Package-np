@@ -106,7 +106,7 @@
              call. = FALSE)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
       joint.eligible <- bws[["type", exact = TRUE]] %in% c("fixed", "generalized_nn", "adaptive_nn") &&
-        bws$ckertype %in% c("gaussian", "epanechnikov") &&
+        .np_index_kernel(bws) %in% c("gaussian", "epanechnikov") &&
         identical(as.integer(bws$ckerorder), 2L)
     }
 
