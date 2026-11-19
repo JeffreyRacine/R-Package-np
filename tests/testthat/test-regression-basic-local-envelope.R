@@ -84,7 +84,7 @@ test_that("public local envelopes enclose both constituents without changing poi
     }
     expect_identical(fit,held);expect_identical(.Random.seed,seed)
   }
-  expect_error(run("basic-local-envelope","wild"),"requires inid")
+  expect_error(run("basic-envelope","wild"),"requires inid")
   expect_identical(.Random.seed,seed)
 })
 
@@ -118,5 +118,11 @@ test_that("nearest-neighbour local envelopes retain fixed selected indices", {
       expect_identical(as.data.frame(z,band=b),as.data.frame(zz,band=b))
     expect_identical(fit,held);expect_identical(.Random.seed,seed)
     expect_error(run("basic-envelope"),"fixed-bandwidth")
+    for(wild in c("mammen","rademacher"))
+      expect_error(plot(fit,errors="bootstrap",center="bias-corrected",
+        bootstrap="wild",B=199L,neval=6L,band="all",output="data",
+        boot.control=np_boot_control(calibration="basic-local-envelope",wild=wild)),
+        "fixed-bandwidth")
+    expect_identical(.Random.seed,seed)
   }
 })

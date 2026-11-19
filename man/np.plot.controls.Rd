@@ -104,7 +104,7 @@ sums; they are not aligned to the pilot SE and can differ from inid even at
 block length one. This distinction is intentional. Block lengths and the
 existing automatic selector are retained; fixed blocks of length n have no
 resampling variation and are refused. At least two draws are required.
-The experimental \code{calibration="basic-local-envelope"} has the same
+For pairs resampling, experimental \code{calibration="basic-local-envelope"} has the same
 fixed-bandwidth admission rules and also supports generalized and adaptive
 nearest-neighbour bandwidths with the already-supported unbounded second-order
 Gaussian regression construction. It reuses exactly the same corrected centers, observed standard
@@ -120,6 +120,24 @@ incomplete. No additional kernels are admitted; zero nearest-neighbour radii
 and unqualified regularized main rows retain their existing refusals.
 The original \code{"basic-envelope"} public option remains restricted to fixed
 bandwidths.
+
+For fixed-bandwidth unbounded second-order Gaussian regression with at least
+one continuous predictor, \code{basic-local-envelope} also supports
+\code{bootstrap="wild"} with \code{wild="mammen"} in
+\code{np_boot_control()}. This is a fixed-factor multiplier
+construction, not a refitted or replicate-studentized bootstrap. It uses
+complete corrected rows times the positive generation standard deviation;
+for the univariate captured local owner this is the neighbourhood generation
+variance, and otherwise the existing smoothed residual variance. Raw and
+locally generation-SD-standardized signed-tail limits are protected by their
+absolute-root references, enveloped, and symmetrized. The returned observed
+standard error is preserved and can differ from the scale driving these bands.
+Pointwise wild bounds are also symmetric. Categorical-only designs,
+Rademacher multipliers and nearest-neighbour wild envelopes are not qualified
+for this option; existing methods remain available. The row construction
+supports the existing derivative and mixed-design targets, but empirical
+coverage evidence for this experimental wild variant is limited to
+univariate mean targets. No general coverage guarantee is implied.
 
 Dependent-data coverage evidence is limited; pooled and mixed layouts have
 structural qualification rather than a broad dependent-data coverage study.

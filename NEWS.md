@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Add an experimental fixed-bandwidth Mammen raw/local envelope for bias-corrected regression, preserving observed standard errors and all existing methods.
+
 * Extend the opt-in regression basic-local envelope to Gaussian generalized and adaptive nearest-neighbour bandwidths, retaining existing zero-radius and regularization refusals. Existing calibrations are unchanged.
 
 * Normalize bootstrap calibration labels consistently when plot controls are edited by hand.

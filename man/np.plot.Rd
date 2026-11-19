@@ -569,9 +569,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   Regression additionally offers the experimental inid/fixed/geometric
   \code{np_boot_control(calibration="basic-envelope")} for fixed-bandwidth
-  means, derivatives and categorical contrasts. The containing
+  means, derivatives and categorical contrasts. For pairs resampling, the
   \code{np_boot_control(calibration="basic-local-envelope")} option also supports
-  Gaussian generalized/adaptive nearest-neighbour bandwidths. It inverts endpoint-unit empirical roots and takes a containing
+  Gaussian generalized/adaptive nearest-neighbour bandwidths. For fixed
+  Gaussian bandwidths it additionally offers a symmetric Mammen raw/local
+  envelope, using positive generation variance while retaining the observed
+  standard error separately. Categorical-only wild envelopes are not qualified.
+  These options invert endpoint-unit empirical roots and take a containing
   absolute-root envelope, rather than using a replicate studentizer or
   ordinary percentile endpoints. See \code{\link{np_boot_control}}.
 
