@@ -13,7 +13,12 @@
     source[["ckerbound"]] <- "none"
     source[["ckerlb"]] <- source[["ckerub"]] <- NULL
   }
-  out <- .np_semihat_make_regbw_state(source, x, numeric(nrow(x)), bandwidth)
+  out <- .np_semihat_make_regbw_state(source, x, numeric(nrow(x)), bandwidth,
+    kernel.choices = c("gaussian", "epanechnikov", "uniform", "beta"))
+  if (!identical(out[["ckertype"]], source[["ckertype"]]) ||
+      !isTRUE(out[["ckerorder"]] == source[["ckerorder"]]) ||
+      !identical(out[["ckerbound"]], source[["ckerbound"]]))
+    stop("regression bias preparation changed the requested kernel identity", call. = FALSE)
   out[["call"]] <- NULL
   out
 }

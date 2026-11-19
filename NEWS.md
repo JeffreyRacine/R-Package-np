@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Reject unsupported kernel metadata during regression preparation instead of silently substituting a Gaussian kernel. Existing public kernel support is unchanged.
+
 * Extend the experimental regression basic-local envelope to fixed-bandwidth second-order Epanechnikov kernels, retaining Gaussian auxiliary fits, declared support validation, existing methods and both RNG guards.
 
 * Add an experimental fixed-bandwidth Mammen raw/local envelope for bias-corrected regression, preserving observed standard errors and all existing methods.

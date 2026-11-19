@@ -82,7 +82,8 @@
   args
 }
 
-.np_semihat_make_regbw_state <- function(source, xdat, ydat, bw) {
+.np_semihat_make_regbw_state <- function(source, xdat, ydat, bw,
+                                          kernel.choices = c("gaussian", "epanechnikov", "uniform")) {
   resolve_choice <- function(value, choices, default = choices[1L]) {
     if (is.null(value) || !length(value))
       return(default)
@@ -107,8 +108,12 @@
                            c("cv.ls", "cv.aic"))
   bwtype <- resolve_choice(if (!is.null(args$bwtype)) args$bwtype else source$type,
                            c("fixed", "generalized_nn", "adaptive_nn"))
-  ckertype <- resolve_choice(if (!is.null(args$ckertype)) args$ckertype else source$ckertype,
-                             c("gaussian", "epanechnikov", "uniform"))
+  # Kernel support belongs to the caller; never substitute another kernel.
+  kernel <- if (!is.null(args$ckertype)) args$ckertype else source$ckertype
+  ckertype <- if (is.null(kernel) || !length(kernel)) "gaussian" else as.character(kernel)[1L]
+  if (!ckertype %in% kernel.choices)
+    stop(sprintf("kernel '%s' is not supported by this regression preparation", ckertype),
+         call. = FALSE)
   ckerorder <- if (!is.null(args$ckerorder)) args$ckerorder else source$ckerorder
   ckerbound <- resolve_choice(if (!is.null(args$ckerbound)) args$ckerbound else source$ckerbound,
                               c("none", "range", "fixed"))
