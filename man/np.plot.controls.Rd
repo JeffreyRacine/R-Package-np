@@ -167,8 +167,8 @@ endpoints.
 Derivative coverage, especially for higher orders and dependent observations,
 is incompletely characterized; structural qualification is not a coverage
 guarantee. The existing asymptotic and SD constructions remain available.
-Wild resampling, nearest-neighbour bandwidths and
-\code{band="pmzsd"} are not supported by this option. Existing methods and
+The original \code{"basic-envelope"} does not support wild resampling or
+nearest-neighbour bandwidths. Neither envelope supports \code{band="pmzsd"}. Existing methods and
 defaults are unchanged. Like all corrected bounds, this option is pre-beta
 research, with limited coverage evidence rather than a general guarantee.
 
