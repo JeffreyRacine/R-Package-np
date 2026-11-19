@@ -52,8 +52,10 @@ test_that("basic block envelopes preserve selected scale and literal counts", {
       se0<-v$se
       if(nrow(grid)>25)se0<-c(se0,.np_bias_regression_rows(state,grid[26,,drop=FALSE],data.frame(row=1L,target=target))$se)
       F<-sweep(C,2,state$residual,'*');F<-F-rowMeans(F)
+      fit<-if(!is.null(state$main.capture) || !is.null(state$local.inference))
+        .np_plot_regression_eval(bw,x,y,grid,gradients=target!="mean",need.bias.capture=TRUE) else NULL
       B<-199L;alpha<-c(.05,.2)
-      z<-.np_with_seed(98122,.np_bias_inference(state,grid,targets=target,B=B,law=law,blocklen=L,calibration='basic-envelope',refinement='pilot-block',alpha=alpha,resolution.warn=FALSE))
+      z<-.np_with_seed(98122,.np_bias_inference(state,grid,targets=target,B=B,law=law,fit=fit,blocklen=L,calibration='basic-envelope',refinement='pilot-block',alpha=alpha,resolution.warn=FALSE))
       d<-.np_bias_stream(z$rng$start,.np_block_counts_drawer(n,B,L,law)(1L,B)-1)
       R<-F%*%d$value
       if(isTRUE(state$pooled)) {
@@ -73,7 +75,7 @@ test_that("basic block envelopes preserve selected scale and literal counts", {
         expect_identical(z$root.units,"endpoint units; raw centered pooled block scores")
         expect_identical(z$provider.refinement$owner,"exact conditional pooled block score variance")
         if(L==1L) {
-          retained<-.np_with_seed(98122,.np_bias_inference(state,grid,targets=target,B=B,law=law,blocklen=L,
+          retained<-.np_with_seed(98122,.np_bias_inference(state,grid,targets=target,B=B,law=law,fit=fit,blocklen=L,
             calibration='tail-envelope',refinement='pilot-block',resolution.warn=FALSE))
           expect_identical(retained$studentization$construction,"conditional-block-score-v1")
         }
@@ -89,9 +91,10 @@ test_that("basic block envelopes preserve selected scale and literal counts", {
       expect_true(all(z$bands$simultaneous[,1,]<=z$bands$pointwise[,1,]))
       expect_true(all(z$bands$simultaneous[,2,]>=z$bands$pointwise[,2,]))
     }
-    expect_error(.np_with_seed(98122,.np_bias_inference(state,grid,B=99L,law='fixed',blocklen=5L,calibration='basic-envelope',resolution.warn=FALSE)), "requires refinement='pilot-block'")
-    expect_error(.np_with_seed(98122,.np_bias_inference(state,grid,B=1L,law='geom',blocklen=5L,calibration='basic-envelope',refinement='pilot-block',resolution.warn=FALSE)), "at least two draws")
-    expect_error(.np_with_seed(98122,.np_bias_inference(state,grid,B=99L,law='fixed',blocklen=n,calibration='basic-envelope',refinement='pilot-block',resolution.warn=FALSE)), 'nonpositive|undefined')
+    fixed.state<-.np_bias_regression_prepare(bw,x,y,np_bias_control(),adapt=FALSE,law='fixed')
+    expect_error(.np_with_seed(98122,.np_bias_inference(fixed.state,grid,B=99L,law='fixed',fit=fit,blocklen=5L,calibration='basic-envelope',resolution.warn=FALSE)), "requires refinement='pilot-block'")
+    expect_error(.np_with_seed(98122,.np_bias_inference(state,grid,B=1L,law='geom',fit=fit,blocklen=5L,calibration='basic-envelope',refinement='pilot-block',resolution.warn=FALSE)), "at least two draws")
+    expect_error(.np_with_seed(98122,.np_bias_inference(fixed.state,grid,B=99L,law='fixed',fit=fit,blocklen=n,calibration='basic-envelope',refinement='pilot-block',resolution.warn=FALSE)), 'nonpositive|undefined')
   }
 })
 

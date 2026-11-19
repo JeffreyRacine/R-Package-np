@@ -5,7 +5,7 @@ test_that("basic envelopes invert independently sorted endpoint-unit roots", {
   set.seed(98031);x <- data.frame(x=runif(90));y <- sin(3*x$x)+rnorm(90,sd=.3)
   bw <- npregbw(xdat=x,ydat=y,bws=.25,regtype="ll",bandwidth.compute=FALSE)
   state <- .np_bias_regression_prepare(bw,x,y,np_bias_control(),adapt=TRUE,law="inid")
-  grid <- data.frame(x=seq(.15,.85,length.out=26L));fit <- .np_plot_regression_eval(bws=bw,xdat=x,ydat=y,exdat=grid)
+  grid <- data.frame(x=seq(.15,.85,length.out=26L));fit <- .np_plot_regression_eval(bws=bw,xdat=x,ydat=y,exdat=grid,need.bias.capture=TRUE)
   B <- 199L;alpha <- c(.03,.13,.24)
   z <- .np_with_seed(1901,.np_bias_inference(state,grid,B=B,law="inid",fit=fit,
     alpha=alpha,calibration="basic-envelope",resolution.warn=FALSE))
@@ -38,7 +38,7 @@ test_that("basic envelopes invert independently sorted endpoint-unit roots", {
   expect_true(all(z$bands$bonferroni[,2,]>=z$bands$simultaneous[,2,]))
   # Mirroring the response must mirror basic endpoints using the same counts.
   mirror <- .np_bias_regression_prepare(bw,x,-y,np_bias_control(),adapt=TRUE,law="inid")
-  mfit <- .np_plot_regression_eval(bws=bw,xdat=x,ydat=-y,exdat=grid)
+  mfit <- .np_plot_regression_eval(bws=bw,xdat=x,ydat=-y,exdat=grid,need.bias.capture=TRUE)
   mz <- .np_with_seed(1901,.np_bias_inference(mirror,grid,B=B,law="inid",fit=mfit,
     alpha=alpha,calibration="basic-envelope",resolution.warn=FALSE))
   for(band in names(z$bands))
@@ -82,6 +82,7 @@ test_that("basic envelopes keep zero certificates ahead of scale alignment", {
   bw <- npregbw(xdat=x,ydat=y,bws=.3,regtype="ll",bandwidth.compute=FALSE)
   state <- .np_bias_regression_prepare(bw,x,y,np_bias_control(),adapt=FALSE,law="inid")
   grid <- data.frame(x=seq(.1,.9,length.out=26L))
+  fit <- .np_plot_regression_eval(bws=bw,xdat=x,ydat=y,exdat=grid,need.bias.capture=TRUE)
   owner <- .np_bias_regression_rows;inconsistent <- FALSE
   fake <- function(spec,grid,map,...) {
     z <- owner(spec,grid,map,...)
@@ -92,11 +93,11 @@ test_that("basic envelopes keep zero certificates ahead of scale alignment", {
   }
   local_mocked_bindings(.np_bias_regression_rows=fake,
     .package=getNamespaceName(environment(.np_bias_inference)))
-  z <- .np_with_seed(1981,.np_bias_inference(state,grid,B=99,law="inid",
+  z <- .np_with_seed(1981,.np_bias_inference(state,grid,B=99,law="inid",fit=fit,
     calibration="basic-envelope",resolution.warn=FALSE))
   for(band in names(z$bands))for(side in 1:2)
     expect_equal(unname(z$bands[[band]][c(1,26),side,1]),z$center[c(1,26)])
   inconsistent <- TRUE
-  expect_error(.np_with_seed(1981,.np_bias_inference(state,grid,B=99,law="inid",
+  expect_error(.np_with_seed(1981,.np_bias_inference(state,grid,B=99,law="inid",fit=fit,
     calibration="basic-envelope",resolution.warn=FALSE)),"zero target scale with nonzero signed process draws")
 })
