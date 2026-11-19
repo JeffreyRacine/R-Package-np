@@ -574,9 +574,15 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Gaussian generalized/adaptive nearest-neighbour bandwidths. For fixed
   Gaussian bandwidths it additionally offers a symmetric Mammen raw/local
   envelope. This explicit calibration also admits fixed-bandwidth second-order
-  Epanechnikov kernels with unbounded or declared fixed support for pairs and
-  Mammen laws, retaining Gaussian auxiliary fits and inactive automatic
-  adaptation. Other calibrations and kernel-by-nearest-neighbour combinations
+  Epanechnikov kernels with unbounded or declared fixed support, and second-order
+  beta kernels with declared finite fixed support, for pairs and Mammen laws.
+  Both retain Gaussian auxiliary fits and inactive automatic adaptation.
+  Beta support limits, data and metric bandwidths are transformed together;
+  derivative results retain the numerical sensitivity of the native beta fit.
+  Undefined canonical beta derivative rows, including some exact support
+  endpoints, retain the existing refusal.
+  These experimental extensions are not a general coverage guarantee.
+  Other calibrations and kernel-by-nearest-neighbour combinations
   are unchanged. The experimental Mammen envelope uses positive generation variance while retaining the observed
   standard error separately. Categorical-only wild envelopes are not qualified.
   These options invert endpoint-unit empirical roots and take a containing

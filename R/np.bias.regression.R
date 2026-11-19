@@ -29,8 +29,11 @@
     return("incumbent")
   if (identical(calibration, "basic-local-envelope") &&
       identical(bws[["type"]], "fixed") &&
-      identical(bws[["ckertype"]], "epanechnikov") &&
-      bws[["ckerorder"]] == 2L && bws[["ckerbound"]] %in% c("none", "fixed"))
+      bws[["ckerorder"]] == 2L &&
+      ((identical(bws[["ckertype"]], "epanechnikov") &&
+        bws[["ckerbound"]] %in% c("none", "fixed")) ||
+       (identical(bws[["ckertype"]], "beta") &&
+        identical(bws[["ckerbound"]], "fixed"))))
     return("local-envelope")
   "unsupported"
 }
