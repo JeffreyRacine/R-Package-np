@@ -239,7 +239,10 @@
   identical(bws[["type", exact=TRUE]], "fixed") &&
     identical(bws[["ckertype", exact=TRUE]], "gaussian") &&
     isTRUE(bws[["ckerorder", exact=TRUE]] == 2L) &&
-    identical(bws[["ckerbound", exact=TRUE]], "none") &&
+    (identical(bws[["ckerbound", exact=TRUE]], "none") ||
+     (identical(bws[["ckerbound", exact=TRUE]], "fixed") &&
+      isTRUE(bws[["nuno", exact=TRUE]] == 0L) &&
+      isTRUE(bws[["nord", exact=TRUE]] == 0L))) &&
     isTRUE(bws[["ncon", exact=TRUE]] > 0L)
 }
 

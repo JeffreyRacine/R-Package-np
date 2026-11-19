@@ -10,7 +10,7 @@ test_that("kernel envelope admission is explicit, fixed and second order", {
     q<-b;q[["ckerorder"]]<-order
     expect_identical(.np_bias_regression_kernel_class(q,"basic-local-envelope"),"unsupported")
   }
-  for(kernel in c("gaussian","uniform")) {
+  for(kernel in "uniform") {
     q<-b;q[["ckertype"]]<-kernel;q[["ckerbound"]]<-"fixed"
     expect_identical(.np_bias_regression_kernel_class(q,"basic-local-envelope"),"unsupported")
   }
@@ -58,7 +58,7 @@ test_that("kernel support transport preserves tight bounds and continuous positi
     blocklen=5L,refinement="pilot-block",B=19L),"admitted basic-local-envelope")
   expect_error(.np_bias_inference(state,g,calibration="separate-tails",law="inid",B=19L),"admitted basic-local-envelope")
   expect_identical(.Random.seed,seed)
-  expect_error(.np_bias_regression_prepare(bw,x,y),"unbounded second-order Gaussian")
+  expect_error(.np_bias_regression_prepare(bw,x,y),"requires a supported second-order kernel")
 })
 
 test_that("public Epanechnikov local envelopes preserve state and target grids", {
@@ -77,7 +77,7 @@ test_that("public Epanechnikov local envelopes preserve state and target grids",
   }
   expect_identical(fit,held);expect_identical(.Random.seed,seed)
   expect_error(plot(fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",
-    B=19L,neval=5L,band="all",output="data",boot.control=np_boot_control(calibration="basic-envelope")),"unbounded second-order Gaussian")
+    B=19L,neval=5L,band="all",output="data",boot.control=np_boot_control(calibration="basic-envelope")),"requires a supported second-order kernel")
   expect_identical(.Random.seed,seed)
 })
 
@@ -154,7 +154,7 @@ test_that("beta support, derivative plots and state ownership survive admission"
     expect_identical(z,as.data.frame(c,band=band))
   }
   expect_identical(fit,heldfit);expect_identical(bw,held);expect_identical(.Random.seed,seed)
-  expect_error(.np_bias_regression_prepare(bw,x,y),"unbounded second-order Gaussian")
+  expect_error(.np_bias_regression_prepare(bw,x,y),"requires a supported second-order kernel")
   expect_error(.np_bias_inference(state,x[c(1,40,80),,drop=FALSE],calibration="absolute",B=19L),"admitted basic-local-envelope")
   expect_identical(.Random.seed,seed)
 })

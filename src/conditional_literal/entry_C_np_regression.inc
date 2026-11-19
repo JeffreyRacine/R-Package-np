@@ -233,8 +233,9 @@ SEXP C_np_regression(SEXP tuno,
        descriptor.order != 2)
       error("invalid compact regression inference request");
     for(int d=0;d<ncon;++d)
-      if(ckerlb_p[d] > -DBL_MAX || ckerub_p[d] < DBL_MAX)
-        error("compact regression inference requires unbounded kernels");
+      if((ckerlb_p[d] > -DBL_MAX || ckerub_p[d] < DBL_MAX) &&
+         (nunordered || nordered))
+        error("bounded compact regression inference requires continuous predictors only");
     const int width = INTEGER(inference_request)[0];
     if((double)width * ncon > INT_MAX ||
        (double)width * (num_train + (double)en * (1 + ncon)) > R_XLEN_T_MAX)

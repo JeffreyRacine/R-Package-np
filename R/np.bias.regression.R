@@ -25,7 +25,11 @@
 
 .np_bias_regression_kernel_class <- function(bws, calibration) {
   if (identical(bws[["ckertype"]], "gaussian") &&
-      bws[["ckerorder"]] == 2L && identical(bws[["ckerbound"]], "none"))
+      bws[["ckerorder"]] == 2L &&
+      (identical(bws[["ckerbound"]], "none") ||
+       (identical(bws[["type"]], "fixed") &&
+        identical(bws[["ckerbound"]], "fixed") &&
+        isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L))))
     return("incumbent")
   if (identical(calibration, "basic-local-envelope") &&
       identical(bws[["type"]], "fixed") &&
@@ -58,7 +62,7 @@
     "; explicit bootstrap bias.control=np_bias_control(construction='legacy') retains the previous construction for supported bootstrap methods" else ""
   kernel.class <- .np_bias_regression_kernel_class(bws, calibration)
   if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
-    stop(paste0("iterated regression bias correction currently supports unbounded second-order Gaussian kernels, at least one continuous predictor and GLP main models",legacy.hint), call. = FALSE)
+    stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths and continuous predictors only",legacy.hint), call. = FALSE)
   if (length(fc) && !all(vapply(x[fc],is.factor,logical(1))))
     stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
   admission <- if (kernel.class == "local-envelope") list(
@@ -86,8 +90,7 @@
   for (j in seq_len(d)) standardized[[nc[j]]] <- (x[[nc[j]]]-offset[j])/scale[j]
   h <- unname(bws[["bandwidth"]][["x"]])
   if (bws[["type"]] == "fixed") h[nc] <- h[nc]/scale
-  main.source <- if (is.null(admission)) bws else
-    .np_bias_regression_support(bws,nc,offset,scale)
+  main.source <- .np_bias_regression_support(bws,nc,offset,scale)
   main <- .np_bias_regbw(main.source,standardized,h)
   spec <- list(x=standardized,xcon=standardized[nc],numeric.cols=nc,factor.cols=fc,
     d=d,q=q,bernstein=settings[["bernstein.basis"]],keys=keys,groups=groups,bws=main,
