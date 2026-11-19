@@ -311,6 +311,7 @@
         law=if(percentile.request)"mammen" else if(plot.errors.method=="asymptotic")"gaussian" else
           if(plot.errors.boot.method=="wild")plot.errors.boot.wild else plot.errors.boot.method)) else NULL
     bias.capture <- !is.null(bias.state$adaptation) || !is.null(bias.state$local.inference) || !is.null(bias.state$main.capture)
+    pairs.capture <- !is.null(bias.state$main.capture) && .np_bias_pairs_capture(bias.state)
     resolution.context <- if(new.bias) new.env(parent=emptyenv()) else NULL
     if(new.bias) {
       resolution.context$rows <- list();resolution.context$success <- FALSE
@@ -427,6 +428,12 @@
         tobj <- .np_plot_activity_run("Computing regression plot fit",
           .npreg_publish_plot_rows(.np_bias_mixed_eval(bias.state,bws,xdat,ydat,
             setNames(x.eval,names(xdat)),FALSE,gradient.order,"mean"),report=.np.empty.report))
+      } else if (pairs.capture) {
+        engine.trace("direct.fit.start", list(slice=0L, gradients=gradients, n_eval=nrow(x.eval)))
+        tobj <- .np_plot_regression_eval(bws,xdat,ydat,setNames(x.eval,names(xdat)),
+          gradients=percentile.request,gradient.order=gradient.order,
+          .np.empty.report=.np.empty.report,need.bias.capture=TRUE)
+        engine.trace("direct.fit.done", list(slice=0L, gradients=gradients, n_eval=length(tobj$mean)))
       } else if ((plot.errors.method == "asymptotic" && !new.bias) || bias.capture) {
         tobj <- .np_plot_activity_run(
           if (bias.capture) "Computing regression plot fit" else "Computing regression plot asymptotic fit",
@@ -894,6 +901,12 @@
           tr <- .np_plot_activity_run("Computing regression plot fit",
             .npreg_publish_plot_rows(.np_bias_mixed_eval(bias.state,bws,xdat,ydat,
               eval.slice,gradients,gradient.order,target),report=.np.empty.report))
+        } else if (pairs.capture) {
+          engine.trace("direct.fit.start", list(slice=i, gradients=gradients, n_eval=xi.neval))
+          tr <- .np_plot_regression_eval(bws,xdat,ydat,eval.slice,
+            gradients=gradients || percentile.request,gradient.order=gradient.order,
+            .np.empty.report=.np.empty.report,need.bias.capture=TRUE)
+          engine.trace("direct.fit.done", list(slice=i, gradients=gradients, n_eval=length(tr$mean)))
         } else if (!gradients && !bias.capture &&
             (plot.errors.method != "asymptotic" || new.bias) &&
             identical(bws$type, "fixed")) {

@@ -1,7 +1,8 @@
 # Acquisition policy only; multivariate variance/studentization is unchanged.
 .np_bias_main_capture_supported <- function(state, law) {
   if (!is.character(law) || length(law)!=1L ||
-      !law %in% c("gaussian","mammen") || state$d<2L ||
+      !law %in% c("gaussian","mammen","inid","fixed","geom") ||
+      state$d < (if (law %in% c("inid","fixed","geom")) 1L else 2L) ||
       length(state$factor.cols) || isTRUE(state$pooled) ||
       isTRUE(state$categorical.only) || !is.null(state$adaptation) ||
       !is.null(state$mixed) ||
@@ -11,6 +12,16 @@
   reg <- npValidatedConditionalRegSpec(state$bws,
     where="captured main bias rows",ncon.field="ncon")
   identical(reg[["basis.engine"]],"glp")
+}
+
+.np_bias_pairs_capture <- function(state) {
+  record <- state[["main.capture"]]
+  if (is.null(record[["law"]])) return(FALSE)
+  if (!identical(record[["version"]],"fixed-pairs-fitted-v1") ||
+      !record[["law"]] %in% c("inid","fixed","geom") ||
+      !.np_bias_main_capture_supported(state,record[["law"]]))
+    stop("invalid prepared pairs capture law or eligibility",call.=FALSE)
+  TRUE
 }
 
 # Private, explicit integration seam for an already captured original fit.
@@ -44,11 +55,18 @@
     if(t=="mean")0L else as.integer(substring(t,2L)),integer(1)),targets)
   if (any(vapply(axes,function(j)j>0L && .np_bias_derivative_order(spec,j)!=1L,logical(1))))
     stop("captured local bias prototype admits first derivatives only",call.=FALSE)
+  max.bytes <- 64*1024^2
+  if (.np_bias_pairs_capture(spec)) {
+    # Match the incumbent adapted-pairs ceiling; allocation stays tile-bounded.
+    width <- ncol(spec$Q); n <- nrow(spec$x); m <- nrow(grid)
+    max.bytes <- 256*(as.double(n)*min(500L,m) +
+      (as.double(n)+m)*(spec$d+width+1) + as.double(width)^2)
+  }
   operators <- setNames(lapply(axes,function(j) {
     nu <- NULL
     if(j) {nu <- integer(spec$d);nu[j] <- 1L}
     .np_plot_regression_capture_operator(fit,request$bws,request$xdat,
-      request$ydat,grid,nu,NULL,64*1024^2)$operator
+      request$ydat,grid,nu,NULL,max.bytes)$operator
   }),targets)
   ridge <- fit[["fit.inference",exact=TRUE]][[3L]]
   reg <- npValidatedConditionalRegSpec(spec$bws,where="bias main operator",ncon.field="ncon")
