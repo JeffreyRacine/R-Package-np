@@ -306,6 +306,7 @@
     plot.errors <- normalized.opts$plot.errors
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
       .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE,
+        calibration=plot.errors.boot.calibration,
         gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
         law=if(percentile.request)"mammen" else if(plot.errors.method=="asymptotic")"gaussian" else
           if(plot.errors.boot.method=="wild")plot.errors.boot.wild else plot.errors.boot.method)) else NULL

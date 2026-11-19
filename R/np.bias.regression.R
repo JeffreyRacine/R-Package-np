@@ -18,7 +18,28 @@
   out
 }
 
-.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE, gradient.order = NULL, law = NULL) {
+.np_bias_regression_kernel_class <- function(bws, calibration) {
+  if (identical(bws[["ckertype"]], "gaussian") &&
+      bws[["ckerorder"]] == 2L && identical(bws[["ckerbound"]], "none"))
+    return("incumbent")
+  if (identical(calibration, "basic-local-envelope") &&
+      identical(bws[["type"]], "fixed") &&
+      identical(bws[["ckertype"]], "epanechnikov") &&
+      bws[["ckerorder"]] == 2L && bws[["ckerbound"]] %in% c("none", "fixed"))
+    return("local-envelope")
+  "unsupported"
+}
+
+# Bounds and data must use the same arithmetic at exact support endpoints.
+.np_bias_regression_support <- function(bws, continuous, offset, scale) {
+  if (identical(bws[["ckerbound"]], "fixed")) {
+    bws[["ckerlb"]][continuous] <- (bws[["ckerlb"]][continuous] - offset) / scale
+    bws[["ckerub"]][continuous] <- (bws[["ckerub"]][continuous] - offset) / scale
+  }
+  bws
+}
+
+.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE, gradient.order = NULL, law = NULL, calibration = NULL) {
   x <- toFrame(x)
   if (!is.numeric(y) || length(y) != nrow(x) || any(!is.finite(y)) || anyNA(x))
     stop("bias correction requires finite retained training data", call. = FALSE)
@@ -27,14 +48,20 @@
   if (!d) return(.np_bias_categorical_prepare(bws,x,y,control,reg))
   legacy.hint <- if (bws[["type"]]=="fixed" && d>0L)
     "; explicit bootstrap bias.control=np_bias_control(construction='legacy') retains the previous construction for supported bootstrap methods" else ""
-  if (!d || bws[["ckertype"]] != "gaussian" || bws[["ckerorder"]] != 2L ||
-      bws[["ckerbound"]] != "none" || reg[["basis.engine"]] != "glp")
+  kernel.class <- .np_bias_regression_kernel_class(bws, calibration)
+  if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
     stop(paste0("iterated regression bias correction currently supports unbounded second-order Gaussian kernels, at least one continuous predictor and GLP main models",legacy.hint), call. = FALSE)
   if (length(fc) && !all(vapply(x[fc],is.factor,logical(1))))
     stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
+  admission <- if (kernel.class == "local-envelope") list(
+    version="regression-kernel-envelope-v1", calibration="basic-local-envelope",
+    kernel=bws[["ckertype"]], order=bws[["ckerorder"]], type=bws[["type"]],
+    bound=bws[["ckerbound"]], lower=bws[["ckerlb"]], upper=bws[["ckerub"]]) else NULL
   orders <- .np_bias_derivative_request(reg,d,gradient.order)
   if (.np_bias_profile_layout(bws,x)) {
-    return(.np_bias_profile_prepare(bws,x,y,control,reg,orders,adapt,law))
+    spec <- .np_bias_profile_prepare(bws,x,y,control,reg,orders,adapt,law)
+    if (!is.null(admission)) spec$settings$kernel.admission <- admission
+    return(spec)
   }
   keys <- if (length(fc)) do.call(paste,c(lapply(x[fc],as.integer),sep=":")) else rep("all",nrow(x))
   groups <- split(seq_len(nrow(x)),keys)
@@ -51,13 +78,16 @@
   for (j in seq_len(d)) standardized[[nc[j]]] <- (x[[nc[j]]]-offset[j])/scale[j]
   h <- unname(bws[["bandwidth"]][["x"]])
   if (bws[["type"]] == "fixed") h[nc] <- h[nc]/scale
-  main <- .np_bias_regbw(bws,standardized,h)
+  main.source <- if (is.null(admission)) bws else
+    .np_bias_regression_support(bws,nc,offset,scale)
+  main <- .np_bias_regbw(main.source,standardized,h)
   spec <- list(x=standardized,xcon=standardized[nc],numeric.cols=nc,factor.cols=fc,
     d=d,q=q,bernstein=settings[["bernstein.basis"]],keys=keys,groups=groups,bws=main,
     b=unname(settings[["bandwidth"]][["p0"]]/scale),
     h=unname(settings[["bandwidth"]][["operator"]]/scale),
     variance_h=unname(settings[["bandwidth"]][["variance"]]/scale),
     offset=offset,scale=scale,y=as.double(y),settings=settings)
+  if (!is.null(admission)) spec$settings$kernel.admission <- admission
   spec$pilot.bws <- .np_bias_regbw(bws,spec$xcon,spec$b,q,spec$bernstein)
   spec$Q <- W.lp(spec$xcon,degree=q,basis="glp",bernstein.basis=spec$bernstein)
   spec$p1 <- list(b=unname(settings[["bandwidth"]][["p1"]]/scale))

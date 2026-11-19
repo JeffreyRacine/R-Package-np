@@ -116,13 +116,22 @@ across the grid; this is not replicate-studentized bootstrap-t. Zero standard
 error requires zero process draws. This option never narrows the existing
 basic envelope, but does not guarantee nominal coverage or correct remaining
 bias. Like all bias-corrected bounds it remains experimental, pre-beta and
-incomplete. No additional kernels are admitted; zero nearest-neighbour radii
-and unqualified regularized main rows retain their existing refusals.
+incomplete. With fixed bandwidths, this explicit option also admits second-order
+Epanechnikov kernels with \code{ckerbound="none"} or \code{"fixed"} for
+means, supported derivatives and categorical contrasts. The existing Gaussian
+auxiliary fits are retained; automatic adaptation is inactive for Epanechnikov
+and explicit unsupported adaptation remains an error. Declared fixed support
+validates the data and targets; it does not define a different regression
+weight formula. Other calibrations, higher-order kernels, and Epanechnikov
+nearest-neighbour bandwidths are not admitted by this extension. Bounded
+Gaussian admission remains separate. Zero nearest-neighbour radii and
+unqualified regularized main rows retain their existing refusals.
 The original \code{"basic-envelope"} public option remains restricted to fixed
 bandwidths.
 
-For fixed-bandwidth unbounded second-order Gaussian regression with at least
-one continuous predictor, \code{basic-local-envelope} also supports
+For fixed-bandwidth second-order Gaussian (unbounded) or Epanechnikov
+(unbounded or fixed support) regression with at least one continuous predictor,
+\code{basic-local-envelope} also supports
 \code{bootstrap="wild"} with \code{wild="mammen"} in
 \code{np_boot_control()}. This is a fixed-factor multiplier
 construction, not a refitted or replicate-studentized bootstrap. It uses

@@ -573,7 +573,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \code{np_boot_control(calibration="basic-local-envelope")} option also supports
   Gaussian generalized/adaptive nearest-neighbour bandwidths. For fixed
   Gaussian bandwidths it additionally offers a symmetric Mammen raw/local
-  envelope, using positive generation variance while retaining the observed
+  envelope. This explicit calibration also admits fixed-bandwidth second-order
+  Epanechnikov kernels with unbounded or declared fixed support for pairs and
+  Mammen laws, retaining Gaussian auxiliary fits and inactive automatic
+  adaptation. Other calibrations and kernel-by-nearest-neighbour combinations
+  are unchanged. The experimental Mammen envelope uses positive generation variance while retaining the observed
   standard error separately. Categorical-only wild envelopes are not qualified.
   These options invert endpoint-unit empirical roots and take a containing
   absolute-root envelope, rather than using a replicate studentizer or

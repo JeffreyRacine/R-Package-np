@@ -249,6 +249,9 @@
   if (is.character(calibration)) attributes(calibration) <- NULL
   if (!is.character(calibration) || length(calibration)!=1L || is.na(calibration))
     stop("invalid private regression calibration",call.=FALSE)
+  admission <- state[["settings"]][["kernel.admission"]]
+  if (!is.null(admission) && !identical(calibration, admission[["calibration"]]))
+    stop("prepared regression kernel state requires its admitted basic-local-envelope calibration",call.=FALSE)
   local.envelope <- identical(calibration,"basic-local-envelope")
   wild.local <- local.envelope && identical(law,"mammen")
   basic.envelope <- calibration %in% c("basic-envelope","basic-local-envelope")

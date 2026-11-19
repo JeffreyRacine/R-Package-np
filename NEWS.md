@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Extend the experimental regression basic-local envelope to fixed-bandwidth second-order Epanechnikov kernels, retaining Gaussian auxiliary fits, declared support validation, existing methods and both RNG guards.
+
 * Add an experimental fixed-bandwidth Mammen raw/local envelope for bias-corrected regression, preserving observed standard errors and all existing methods.
 
 * Extend the opt-in regression basic-local envelope to Gaussian generalized and adaptive nearest-neighbour bandwidths, retaining existing zero-radius and regularization refusals. Existing calibrations are unchanged.
