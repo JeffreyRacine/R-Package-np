@@ -747,6 +747,72 @@
       if(band %in% c("simultaneous","all")) "; finite grid within panel" else ""),
       sprintf("%s %s conditional-pilot; corrected center, score safeguard",level,band))
   }
+  if (identical(center, "bias-corrected")) {
+    # Scope is supplied by the caller, including for construction overrides.
+    scope <- switch(band, pmzsd = "pointwise", pointwise = "pointwise",
+                    bonferroni = "Bonferroni", simultaneous = "simultaneous")
+    display.scope <- if (is.null(scope))
+      "pointwise, Bonferroni and simultaneous" else scope
+    if (identical(construction, "smoothed-q6")) {
+      candidates <- sub(" simultaneous ", paste0(" ", display.scope, " "),
+                        candidates, fixed = TRUE)
+    } else if (isTRUE(construction %in% c("guide-region", "smoothed-beta-binomial",
+                                          "conditional-pilot"))) {
+      candidates <- sub(paste0(" ", band, " "), paste0(" ", display.scope, " "),
+                        candidates, fixed = TRUE)
+    }
+    # Apply after construction overrides so categorical/shared nouns survive.
+    entity <- if (isTRUE(shared) || !isTRUE(continuous)) "intervals" else
+      if (identical(band, "all")) "bands" else "band"
+    if (entity == "intervals")
+      candidates <- gsub("\\bbands?\\b", "intervals", candidates)
+    else if (entity == "bands")
+      candidates <- gsub("\\bband\\b", "bands", candidates)
+    candidates <- gsub("variability", "confidence", candidates, fixed = TRUE)
+    missing.kind <- !grepl("confidence", candidates, fixed = TRUE)
+    candidates[missing.kind] <- sub("\\b(bands?|intervals?)\\b", "confidence \\1",
+                                    candidates[missing.kind])
+    missing.kind <- !grepl("confidence", candidates, fixed = TRUE)
+    candidates[missing.kind] <- sub("(;|$)", paste0(" confidence ", entity, "\\1"),
+                                    candidates[missing.kind])
+    candidates <- gsub("bonferroni", "Bonferroni", candidates, fixed = TRUE)
+    if (!is.null(scope)) {
+      missing.scope <- !grepl(scope, candidates, fixed = TRUE)
+      candidates[missing.scope] <- sub("^([^ ]+) ", paste0("\\1 ", scope, " "),
+                                       candidates[missing.scope])
+    }
+    # A final compact label keeps target, construction and family visible on
+    # ordinary devices. Detailed candidates retain the centering explanation.
+    compact.method <- if (method == "bootstrap") {
+      if (band == "pmzsd") "bootstrap z x SD" else
+        if (band == "simultaneous") "bootstrap rank" else
+          if (band == "all") "bootstrap" else "bootstrap quantile"
+    } else {
+      if (band %in% c("pmzsd", "pointwise", "bonferroni"))
+        "asymptotic z x SE" else "Gaussian"
+    }
+    if (isTRUE(construction %in% c("iterated", "positive-covariance"))) {
+      if (method == "bootstrap" && band == "simultaneous")
+        compact.method <- "bootstrap maximum"
+      if (method == "bootstrap" && band == "pmzsd")
+        compact.method <- "bootstrap z x SE"
+      if (method == "asymptotic" && identical(construction, "iterated") && band != "pmzsd")
+        compact.method <- if (band == "simultaneous") "Gaussian max-t" else "Gaussian t"
+    }
+    if (!is.null(construction)) compact.method <- switch(construction,
+      "guide-region" = "guide/residual", "smoothed-percentile" = "smoothed-percentile",
+      "smoothed-q6" = "Q6 bootstrap", "smoothed-beta-binomial" = "beta-binomial bootstrap",
+      "conditional-pilot" = "conditional-pilot", compact.method)
+    family <- if (band %in% c("simultaneous", "bonferroni", "all") && isTRUE(per.quantile))
+      "; within each quantile curve" else
+      if (band %in% c("simultaneous", "all") && identical(construction, "guide-region"))
+        "; supplied family" else
+        if (band %in% c("simultaneous", "all")) "; panel grid" else
+          if (band == "bonferroni" && isTRUE(shared)) "; within each panel" else ""
+    compact <- paste0(level, " ", if (!is.null(scope)) paste0(scope, " ") else "",
+                      compact.method, " confidence ", entity, family)
+    candidates <- c(candidates, compact)
+  }
   list(
     method = method,
     band = band,
