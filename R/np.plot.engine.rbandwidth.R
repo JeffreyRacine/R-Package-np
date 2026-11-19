@@ -231,12 +231,16 @@
     if (!plot.errors.boot.calibration %in% c("default","legacy") &&
         (!new.bias || error.request$method!="bootstrap" || error.request$type=="pmzsd"))
       stop("explicit bootstrap calibration requires iterated bias-corrected regression and empirical bands",call.=FALSE)
+    wild.local.envelope <- identical(plot.errors.boot.calibration,"basic-local-envelope") &&
+      as.character(plot.errors.boot.method)[1L]=="wild" &&
+      as.character(plot.errors.boot.wild)[1L]=="mammen"
     if (plot.errors.boot.calibration %in% c("basic-envelope", "basic-local-envelope") &&
-        (!as.character(plot.errors.boot.method)[1L] %in% c("inid", "fixed", "geom") ||
-         !(identical(bws[["type", exact=TRUE]], "fixed") ||
-           (identical(plot.errors.boot.calibration, "basic-local-envelope") &&
-            bws[["type", exact=TRUE]] %in% c("generalized_nn", "adaptive_nn")))))
-      stop("basic-envelope requires inid, fixed or geom resampling and fixed-bandwidth regression targets", call.=FALSE)
+        !((as.character(plot.errors.boot.method)[1L] %in% c("inid", "fixed", "geom") &&
+           (identical(bws[["type", exact=TRUE]], "fixed") ||
+            (identical(plot.errors.boot.calibration, "basic-local-envelope") &&
+             bws[["type", exact=TRUE]] %in% c("generalized_nn", "adaptive_nn")))) ||
+          (wild.local.envelope && identical(bws[["type", exact=TRUE]], "fixed"))))
+      stop("basic-envelope requires inid, fixed or geom and fixed-bandwidth regression; basic-local-envelope also supports Gaussian NN pairs or fixed-bandwidth Mammen", call.=FALSE)
     if (bias.request && !new.bias && error.request$method=="asymptotic")
       stop("legacy bias correction requires errors='bootstrap'",call.=FALSE)
     if (new.bias && plot.bxp)

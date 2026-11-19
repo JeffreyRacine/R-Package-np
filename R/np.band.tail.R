@@ -71,3 +71,17 @@
   list(limits=limits,raw.limits=signed,expanded=expanded,
     protection="interval hull with unchanged empirical absolute-root rectangle")
 }
+
+# Smallest symmetric interval enclosing each protected root interval.
+.np_band_tail_symmetrize <- function(limits) {
+  lapply(limits,function(x) {
+    if(length(dim(x))!=3L || dim(x)[2L]!=2L || any(!is.finite(x)))
+      stop("invalid root limits for symmetric envelope",call.=FALSE)
+    for(a in seq_len(dim(x)[3L])) {
+      radius <- pmax(-x[,1L,a],x[,2L,a])
+      x[,1L,a] <- -radius
+      x[,2L,a] <- radius
+    }
+    x
+  })
+}

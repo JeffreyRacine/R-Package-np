@@ -210,6 +210,16 @@
   out
 }
 
+# Positive generation variance used by the saved fixed-factor wild process.
+.np_bias_generation_scale <- function(state) {
+  variance <- if (!is.null(state$local.inference))
+    state$local.inference$generation else state$variance
+  if (!is.numeric(variance) || length(variance) != nrow(state$x) ||
+      any(!is.finite(variance)) || any(variance < 0))
+    stop("invalid wild-envelope generation variance", call.=FALSE)
+  sqrt(variance)
+}
+
 .np_bias_inference <- function(state, grid, targets="mean", alpha=.05,
                                B=9999L, law="gaussian", blocklen=NULL, fit=NULL,
                                studentize=TRUE, main.capture=NULL,
@@ -221,13 +231,20 @@
   pilot.block <- identical(refinement,"pilot-block")
   if (pilot.block && !law %in% c("fixed","geom"))
     stop("pilot-block refinement requires fixed or geom",call.=FALSE)
+  if (is.character(calibration)) attributes(calibration) <- NULL
+  if (!is.character(calibration) || length(calibration)!=1L || is.na(calibration))
+    stop("invalid private regression calibration",call.=FALSE)
   local.envelope <- identical(calibration,"basic-local-envelope")
+  wild.local <- local.envelope && identical(law,"mammen")
   basic.envelope <- calibration %in% c("basic-envelope","basic-local-envelope")
-  if(basic.envelope && !law %in% c("inid","fixed","geom"))
-    stop("basic-envelope requires inid, fixed or geom regression targets",call.=FALSE)
+  if(basic.envelope && !law %in% c("inid","fixed","geom") && !wild.local)
+    stop("basic-envelope requires inid, fixed or geom; basic-local-envelope also supports Mammen",call.=FALSE)
+  if(wild.local && isTRUE(state$categorical.only))
+    stop("Mammen basic-local-envelope is not qualified for categorical-only regression",call.=FALSE)
+  generation.scale <- if(wild.local) .np_bias_generation_scale(state) else NULL
   if(basic.envelope && law %in% c("fixed","geom") && !pilot.block)
     stop("basic-envelope block inference requires refinement='pilot-block'",call.=FALSE)
-  # Basic roots use the observed block scale, never a replicate studentizer.
+  # Pairs basic roots use the observed block scale; neither basic branch re-studentizes.
   if(basic.envelope) studentize <- FALSE
   tail.calibration <- calibration %in% c("tail-envelope","separate-tails","basic-envelope","basic-local-envelope")
   if(tail.calibration && !law %in% c("mammen","rademacher","inid","fixed","geom"))
@@ -273,6 +290,7 @@
   map <- expand.grid(row=seq_len(nrow(grid)),target=targets,stringsAsFactors=FALSE)
   M <- nrow(map);B <- as.integer(B)
   center <- original <- se <- score.se <- numeric(M)
+  generation.se <- if(wild.local) numeric(M) else NULL
   student <- isTRUE(studentize) && (law %in% c("gaussian","mammen") ||
     (isTRUE(state$pooled) && law=="rademacher"))
   score.calibration <- isTRUE(state$pooled) && law %in% c("fixed","geom")
@@ -347,7 +365,14 @@
       se[rr] <- score.se[rr] <- part$value$se
       part$value <- if(rank.calibration) part$value$signed else part$value$absolute
     } else {
-      F <- if(score)sweep(value$W,2L,state$residual,"*") else value$factor
+      F <- if(wild.local) sweep(value$W,2L,generation.scale,"*") else
+        if(score)sweep(value$W,2L,state$residual,"*") else value$factor
+      if(wild.local) {
+        generation.se[rr] <- sqrt(rowSums(F^2))
+        if(any(!is.finite(generation.se[rr])) ||
+           any((generation.se[rr]==0)!=(value$se==0)))
+          stop("wild-envelope generation and observed scales have incompatible zero targets",call.=FALSE)
+      }
       if(score)F <- F-rowMeans(F)
       part <- .np_bias_stream(rng,
         .np_bias_process_draws(F,B,law,if(is.null(selection))NULL else selection$length,innovations=innovations))
@@ -368,19 +393,20 @@
       }
     }
     if(rank.calibration) {
-      if(!student && !score.calibration) part$value <- part$value/divisor
+      if(!student && !score.calibration && !wild.local) part$value <- part$value/divisor
       # A zero target may share nonzero family cutoffs, but never nonzero draws.
       for(zero in which(se[rr]==0)) if(any(part$value[zero,]!=0))
         stop("zero target scale with nonzero signed process draws",call.=FALSE)
       # Align in endpoint units before taking family extrema.  Complete rows
       # and count draws have already been reused across all B replicates.
-      if(basic.envelope) part$value <- part$value*se[rr]
+      if(basic.envelope && !wild.local) part$value <- part$value*se[rr]
       if(retain.tile)signed.tile[match(rr,family.rows),] <- part$value
       for(g in seq_along(family)) {
         local <- which(map$target[rr]==targets[family[g]])
         if(local.envelope && length(local)) local.states[[g]] <-
           .np_band_local_update(local.states[[g]],part$value[local,,drop=FALSE],
-            se[rr[local]],map[rr[local],,drop=FALSE],seq_len(B))
+            if(wild.local)generation.se[rr[local]] else se[rr[local]],
+            map[rr[local],,drop=FALSE],seq_len(B))
         if(length(local)) rank.states[[g]] <- if(tail.calibration)
           .np_band_tail_update(rank.states[[g]],part$value[local,,drop=FALSE],
             map[rr[local],,drop=FALSE],seq_len(B)) else
@@ -420,10 +446,20 @@
   }
   if(local.envelope) {
     # expanded retains its absolute-versus-raw meaning; local.reference records the added envelope.
-    calibrated$limits <- .np_band_local_protect(calibrated$limits,local.results,map,se)
+    calibrated$limits <- .np_band_local_protect(calibrated$limits,local.results,map,
+      if(wild.local)generation.se else se)
+    if(wild.local) {
+      local.results <- lapply(local.results,function(x) {
+        x$units <- "generation-SD standardized signed roots"
+        x
+      })
+      calibrated$limits <- .np_band_tail_symmetrize(calibrated$limits)
+      calibrated$symmetry <- "symmetric hull of protected raw and generation-SD local limits"
+    }
     calibrated$local.reference <- local.results
     calibrated$protection <- paste(calibrated$protection,
-      "and the observed-SE local signed/absolute family envelope")
+      if(wild.local) "and the generation-SD local signed/absolute family envelope; symmetrized" else
+        "and the observed-SE local signed/absolute family envelope")
   }
   bands <- if(rank.calibration).np_band_rank_invert(center,
     if(basic.envelope)ifelse(se==0,0,1) else se,calibrated$limits,deterministic=se==0) else lapply(calibrated$limits,function(x) {
@@ -483,7 +519,17 @@
   if(rank.calibration) {
     result$absolute.reference <- absolute.reference
     result$calibration.method <- calibration
-    if(basic.envelope) result$root.units <- if(score.calibration)
+    if(wild.local) {
+      result$generation.se <- generation.se
+      result$covariance$variance <- if(!is.null(state$local.inference))
+        "positive neighbourhood generation variance" else "positive smoothed P0 residual variance"
+      result$covariance$studentization <- "none; fixed generation-SD local envelope"
+      result$endpoint.construction <- calibrated$symmetry
+      result$marginal.scale <- "generation SD for bands; observed SE retained separately"
+      result$covariance.provenance <- result$covariance$variance
+    }
+    if(basic.envelope) result$root.units <- if(wild.local)
+      "endpoint units; positive-variance Mammen generation roots" else if(score.calibration)
       "endpoint units; raw centered pooled block scores" else if(pilot.block)
       "endpoint units; pilot-anchored block residual scores" else
       "endpoint units; observed-SE aligned residual scores"
