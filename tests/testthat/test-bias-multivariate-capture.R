@@ -33,8 +33,10 @@ test_that("multivariate capture preserves fitted rows and variance policy", {
     expect_identical(one$calibration$limits$pointwise,one$calibration$limits$bonferroni)
     expect_identical(one$covariance$variance,"smoothed P0 residual variance")
   }
-  for(law in c("rademacher","inid","fixed","geom"))
+  for(law in "rademacher")
     expect_false(np:::.np_bias_main_capture_supported(state,law))
+  for(law in c("inid","fixed","geom"))
+    expect_true(np:::.np_bias_main_capture_supported(state,law))
   single <- state;single$d <- 1L
   expect_false(np:::.np_bias_main_capture_supported(single,"gaussian"))
   for(field in c("ckertype","ckerorder","ckerbound")) {

@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Experimental fixed Gaussian regression pairs bands now reuse the accepted fitted observation rows for means and first derivatives, including regularized main rows; the fitted model and auxiliary variance policy are unchanged. Sparse-target coverage remains unqualified.
+
 * Plot subtitles now distinguish bias-corrected confidence bands from
   estimate-centered variability bands, including compact labels and their
   pointwise, Bonferroni or simultaneous scope. Experimental status is unchanged.

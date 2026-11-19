@@ -143,10 +143,18 @@
   }
   if (!is.null(policy)) spec$settings$adaptation <- policy
   if (.np_bias_main_capture_supported(spec,law)) {
+    if (law %in% c("inid","fixed","geom")) {
+      spec$main.capture <- list(version="fixed-pairs-fitted-v1",law=law)
+      spec$settings$main.capture <- list(version="fixed-pairs-fitted-v1",law=law,
+        main="complete original fitted capture",variance="unchanged smoothed P0 residual variance",
+        qualification="continuous fixed Gaussian2, inactive adaptation, mean/first derivative, inid/fixed/geom",
+        storage="no fixed capture ceiling; bounded tiles")
+    } else {
     spec$main.capture <- list(version="fixed-multivariate-fitted-v1")
     spec$settings$main.capture <- list(version="fixed-multivariate-fitted-v1",
       main="complete original fitted capture",variance="unchanged smoothed P0 residual variance",
       qualification="continuous fixed Gaussian2, inactive adaptation, mean/first derivative, Gaussian/Mammen")
+    }
   }
   spec
 }

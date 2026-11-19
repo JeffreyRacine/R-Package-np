@@ -253,6 +253,16 @@ Useful population coverage for this CDF prototype has not been established;
 it is exposed for experimentation. Fresh outer CV may select slightly different
 bandwidths across serial and MPI fits, as with the existing estimator.
 
+For continuous regression with fixed unbounded second-order Gaussian kernels
+and inactive adaptation, the experimental \code{inid}, \code{fixed} and
+\code{geom} corrected-row methods use the original accepted fitted observation
+rows for means and first derivatives, including regularized main rows. The fitted
+model and its rank/ridge policy are unchanged; auxiliary pilots retain their
+identification requirements. Capture uses bounded row tiles without introducing
+a fixed capture-memory ceiling for these pairs methods. Matching the fitted
+operator does not establish nominal coverage at sparse or extreme-leverage
+targets. These methods remain experimental and incomplete.
+
 For regression, the common \code{"smoothed-percentile"} label selects the
 E1 mean / E6 first-derivative calibrated percentile construction. This is a
 fixed-design standardized empirical-residual bootstrap: residual innovations

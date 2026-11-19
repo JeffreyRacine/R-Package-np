@@ -257,7 +257,12 @@
     stop("unknown private regression calibration",call.=FALSE)
   if(identical(calibration,"rank") && (!identical(law,"mammen") || !isTRUE(studentize)))
     stop("private signed-rank regression requires studentized Mammen",call.=FALSE)
-  if ((!is.null(state$local.inference) || !is.null(state$main.capture) || !is.null(main.capture)) && !law %in% c("gaussian","mammen"))
+  pairs.capture <- .np_bias_pairs_capture(state)
+  if (pairs.capture && !identical(law,state[["main.capture"]][["law"]]))
+    stop("captured pairs calibration must match its prepared law",call.=FALSE)
+  if ((!is.null(state$local.inference) ||
+       (!pairs.capture && (!is.null(state$main.capture) || !is.null(main.capture)))) &&
+      !law %in% c("gaussian","mammen"))
     stop("captured local calibration requires Gaussian or Mammen; prepare the state for the selected law",call.=FALSE)
   if ((!is.null(state$local.inference) || !is.null(state$main.capture)) && is.null(main.capture))
     main.capture <- .np_bias_capture_prepare(state,fit,grid,targets)
