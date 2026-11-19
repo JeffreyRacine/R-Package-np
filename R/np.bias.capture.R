@@ -43,7 +43,8 @@
     x[[spec$numeric.cols[j]]] <- (x[[spec$numeric.cols[j]]]-spec$offset[j])/spec$scale[j]
   h <- unname(request$bws[["bandwidth"]][["x"]])
   h[spec$numeric.cols] <- h[spec$numeric.cols]/spec$scale
-  expected <- .np_bias_regbw(request$bws,x,h)
+  expected <- .np_bias_regbw(.np_bias_regression_support(
+    request$bws,spec$numeric.cols,spec$offset,spec$scale),x,h)
   if (!identical(x,spec$x) ||
       !.np_plot_regression_capture_same_bws(expected,spec$bws))
     stop("captured local bias request does not match the fixed model",call.=FALSE)

@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Apply the existing accepted-precision rule consistently to bounded continuous Gaussian regression fits and hat operators, correcting potentially material derivative errors in ill-conditioned rows. Extend experimental fixed-support corrected bands without changing rank, ridge or RNG policies.
+
 * Apply exact single-index kernel validation consistently to fitting, gradients and hat/plot preparation; missing legacy metadata keeps its Gaussian default and unrelated prefix fields cannot replace it.
 
 * The single-index kernel-bandwidth preparation helper now refuses explicit

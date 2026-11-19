@@ -127,13 +127,17 @@ define a different regression weight formula. Beta data, metric bandwidths
 and bounds are transformed together. Native beta derivative precision
 limitations and refusals for undefined canonical rows (including some exact
 support endpoints) remain. Other calibrations, higher-order kernels, and
-Epanechnikov/beta nearest-neighbour bandwidths are not admitted by this extension. Bounded
-Gaussian admission remains separate. Zero nearest-neighbour radii and
+Epanechnikov/beta nearest-neighbour bandwidths are not admitted by this extension.
+Fixed-bandwidth second-order Gaussian correction also supports known fixed
+support when every predictor is continuous; range bounds and bounded mixed-data
+correction remain unsupported. The existing adaptation and accepted fitted-row
+precision rules are retained. Zero nearest-neighbour radii and
 unqualified regularized main rows retain their existing refusals.
 The original \code{"basic-envelope"} public option remains restricted to fixed
 bandwidths.
 
-For fixed-bandwidth second-order Gaussian (unbounded), Epanechnikov
+For fixed-bandwidth second-order Gaussian (unbounded, or known fixed support
+with continuous predictors only), Epanechnikov
 (unbounded or fixed support), or beta (known finite fixed support) regression
 with at least one continuous predictor,
 \code{basic-local-envelope} also supports
@@ -258,8 +262,8 @@ Useful population coverage for this CDF prototype has not been established;
 it is exposed for experimentation. Fresh outer CV may select slightly different
 bandwidths across serial and MPI fits, as with the existing estimator.
 
-For continuous regression with fixed unbounded second-order Gaussian kernels
-and inactive adaptation, the experimental \code{inid}, \code{fixed} and
+For continuous regression with fixed second-order Gaussian kernels, unbounded
+or with known fixed support, and inactive adaptation, the experimental \code{inid}, \code{fixed} and
 \code{geom} corrected-row methods use the original accepted fitted observation
 rows for means and first derivatives, including regularized main rows. The fitted
 model and its rank/ridge policy are unchanged; auxiliary pilots retain their

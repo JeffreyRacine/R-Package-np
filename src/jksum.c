@@ -27121,7 +27121,7 @@ static void np_regression_general_lp_fit_owner_cleanup(
 static int np_regression_precision_eligible(const NPRegressionGeneralLPFitCall *call)
 {
   if(!call->ordinary_response || call->bandwidth_mode != BW_FIXED ||
-     call->kernel_route != NULL || int_cker_bound_extern ||
+     call->kernel_route != NULL ||
      call->num_reg_unordered || call->num_reg_ordered || call->all_large_kernel_rows)
     return 0;
   for(int d=0;d<call->num_reg_continuous;++d)

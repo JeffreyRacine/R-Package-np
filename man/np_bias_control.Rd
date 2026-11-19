@@ -117,7 +117,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   fixtures. This does not establish uniform finite-sample coverage or qualify
   near-singular auxiliary or main-fit geometry.
 
-  The implementation admits an unbounded second-order Gaussian kernel,
+  The original regression construction admits an unbounded second-order Gaussian kernel,
   LC, LL and package-admissible GLP main degree vectors, including mixed
   degrees, with any positive number of continuous predictors. Fixed,
   adaptive-neighbour and generalized-neighbour bandwidths are supported.
@@ -132,8 +132,9 @@ np_bias_control(construction = c("iterated", "legacy"),
   It supports means, pure partial derivatives and categorical first
   differences, with the higher-order qualifications described below.
   Categorical differences have numerical operator validation; coverage evidence
-  must be interpreted for the configurations actually studied. Other kernels,
-  additive and tensor main bases remain outside this construction.
+  must be interpreted for the configurations actually studied. Additional kernel and support combinations are available only for the
+  constructions described in \code{\link{np_boot_control}}. Additive and
+  tensor main bases remain outside this construction.
 
   Other categorical layouts use a partially pooled auxiliary for fixed,
   adaptive-neighbour or generalized-neighbour bandwidths, supporting means,

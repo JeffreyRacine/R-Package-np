@@ -1287,6 +1287,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \code{\link{np_bias_control}}. The plot result records the corrected values, requested endpoints and
   compact construction metadata; internal process workspaces are not returned.
   Pointwise, simultaneous and Bonferroni bands share this construction.
+  Fixed-bandwidth second-order Gaussian correction supports known fixed
+  bounds for continuous predictors, including one-sided and partially bounded
+  support. Existing adaptation and fitted-row precision rules are preserved;
+  range bounds and bounded mixed-data correction remain unsupported.
   The following legacy centering discussion applies to the other supported
   families and to explicit regression \code{construction="legacy"}.
 

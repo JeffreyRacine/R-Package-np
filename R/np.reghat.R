@@ -2,9 +2,7 @@
   identical(bws[["type",exact=TRUE]],"fixed") &&
     identical(bws[["ckertype",exact=TRUE]],"gaussian") &&
     identical(as.integer(bws[["ckerorder",exact=TRUE]]),2L) &&
-    bws[["ncon",exact=TRUE]]>0L && bws[["nuno",exact=TRUE]]==0L && bws[["nord",exact=TRUE]]==0L &&
-    all(is.infinite(bws[["ckerlb",exact=TRUE]]) & bws[["ckerlb",exact=TRUE]]<0) &&
-    all(is.infinite(bws[["ckerub",exact=TRUE]]) & bws[["ckerub",exact=TRUE]]>0)
+    bws[["ncon",exact=TRUE]]>0L && bws[["nuno",exact=TRUE]]==0L && bws[["nord",exact=TRUE]]==0L
 }
 
 npreghat <-
@@ -1653,8 +1651,9 @@ npreghat <-
                                               se, no.ex, projection = FALSE,
                                               coordinate = NULL) {
   if (!se || no.ex || isTRUE(projection) || !is.null(coordinate) ||
-      !.np_plot_regression_capture_supported(bws))
-    stop("compact regression inference requires an external fixed unbounded second-order Gaussian SE fit",
+      !(.np_plot_regression_capture_supported(bws) ||
+        .np_regression_precision_scope(bws)))
+    stop("compact regression inference requires an external fixed second-order Gaussian SE fit; bounded kernels require continuous predictors only",
          call. = FALSE)
   attr(request, ".np.inference.width") <- as.integer(
     if (npIsCanonicalLp0Spec(spec, bws$ncon)) 1L else

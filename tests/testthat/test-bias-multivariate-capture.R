@@ -43,7 +43,7 @@ test_that("multivariate capture preserves fitted rows and variance policy", {
   expect_false(npRmpi:::.np_bias_main_capture_supported(single,"gaussian"))
   for(field in c("ckertype","ckerorder","ckerbound")) {
     unsupported <- state
-    unsupported$bws[[field]] <- switch(field,ckertype="epanechnikov",ckerorder=4L,ckerbound="fixed")
+    unsupported$bws[[field]] <- switch(field,ckertype="epanechnikov",ckerorder=4L,ckerbound="range")
     expect_false(npRmpi:::.np_bias_main_capture_supported(unsupported,"gaussian"))
   }
   higher <- state;higher$gradient.order <- c(1L,2L)

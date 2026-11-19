@@ -56,7 +56,7 @@
 .np_bias_adaptation_prepare <- function(spec) {
   if (length(spec$factor.cols) || spec$bws[["type"]]!="fixed" ||
       spec$bws[["ckertype"]]!="gaussian" || spec$bws[["ckerorder"]]!=2L ||
-      spec$bws[["ckerbound"]]!="none" || !isTRUE(spec$bernstein))
+      !spec$bws[["ckerbound"]] %in% c("none","fixed") || !isTRUE(spec$bernstein))
     stop("private adaptation seam requires continuous fixed Gaussian GLP pilots with a stable basis",call.=FALSE)
   reg <- npValidatedConditionalRegSpec(spec$bws,where="private adaptation",ncon.field="ncon")
   if (reg[["basis.engine"]]!="glp") stop("private adaptation requires GLP",call.=FALSE)
@@ -183,7 +183,7 @@
   },logical(1)))
   eligible <- !length(spec$factor.cols) && spec$bws[["type"]]=="fixed" &&
     spec$bws[["ckertype"]]=="gaussian" && spec$bws[["ckerorder"]]==2L &&
-    spec$bws[["ckerbound"]]=="none" && isTRUE(spec$bernstein)
+    spec$bws[["ckerbound"]] %in% c("none","fixed") && isTRUE(spec$bernstein)
   reason <- if(mode=="none") "disabled" else if(!eligible) "incumbent model class" else
     if(mode=="auto" && override) "explicit auxiliary geometry override" else "eligible"
   if(mode=="local-to-global" && !eligible)
