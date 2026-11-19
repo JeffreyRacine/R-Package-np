@@ -6,6 +6,8 @@
   estimate-centered variability bands, including compact labels and their
   pointwise, Bonferroni or simultaneous scope. Experimental status is unchanged.
 
+* Extend the experimental regression basic-local envelope to fixed-bandwidth second-order beta kernels with known finite support, preserving auxiliary fits, existing methods and both RNG guards. Native derivative precision limitations remain.
+
 * Reject unsupported kernel metadata during regression preparation instead of silently substituting a Gaussian kernel. Existing public kernel support is unchanged.
 
 * Extend the experimental regression basic-local envelope to fixed-bandwidth second-order Epanechnikov kernels, retaining Gaussian auxiliary fits, declared support validation, existing methods and both RNG guards.
