@@ -46,7 +46,9 @@ np_render_control(style = c("band", "bar"),
     existing scale treatment. These names apply to regression, unconditional
     density and unconditional distribution estimation. The experimental option
     \code{"smoothed-percentile"} selects calibrated unshifted corrected
-    bootstrap curves, with family-specific resampling described below. Existing defaults and older names retain their
+    bootstrap curves, with family-specific resampling described below. The
+    regression default selects an already qualified construction from the fitted
+    kernel and requested law as described below; explicit choices retain their
     meanings. See Details for supported configurations.}
   \item{xtrim}{Optional two-element trim range for evaluation grids.}
   \item{xq}{Optional evaluation quantiles.}
@@ -104,6 +106,20 @@ sums; they are not aligned to the pilot SE and can differ from inid even at
 block length one. This distinction is intentional. Block lengths and the
 existing automatic selector are retained; fixed blocks of length n have no
 resampling variation and are refused. At least two draws are required.
+For iterated bias-corrected regression with fixed bandwidths and at least one
+continuous predictor, omitted control, \code{np_boot_control()} and
+\code{calibration="default"} select \code{"basic-local-envelope"} for
+second-order Epanechnikov kernels with none/fixed support and second-order beta
+kernels with declared finite fixed support, when empirical bands use
+inid/fixed/geom resampling or wild Mammen. This is the same construction as its
+explicit selection, resolved once before the target families are evaluated.
+Gaussian defaults, asymptotic and \code{pmzsd} routes, nearest-neighbour
+defaults and all explicit nondefault choices retain their existing meaning
+and admission rules. Returned inference distinguishes requested and effective
+calibration. This default does not broaden the construction's coverage evidence
+or its numerical admission rules. A supplied control must still be an
+\code{np_boot_control} object; \code{boot.control=NULL} is not a control object.
+
 For pairs resampling, experimental \code{calibration="basic-local-envelope"} has the same
 fixed-bandwidth admission rules and also supports generalized and adaptive
 nearest-neighbour bandwidths with the already-supported unbounded second-order

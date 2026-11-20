@@ -557,7 +557,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \code{np_bias_control(construction="iterated")}, \code{"pmzsd"}
   retains the symmetric normal-quantile rule around the corrected center.
   The other three band types use empirical quantiles of the corrected process.
-  Gaussian and Mammen calibration use replicate-specific studentization:
+  The incumbent absolute-root Gaussian and Mammen constructions use replicate-specific studentization:
   pointwise limits use marginal absolute studentized statistics, simultaneous
   limits use their within-target maxima, and Bonferroni limits use marginal
   tail probabilities adjusted by the number of grid points. An outward
@@ -576,6 +576,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   envelope. This explicit calibration also admits fixed-bandwidth second-order
   Epanechnikov kernels with unbounded or declared fixed support, and second-order
   beta kernels with declared finite fixed support, for pairs and Mammen laws.
+  For those fixed Epanechnikov and beta empirical-band combinations, omitted
+  \code{boot.control} also selects this qualified local-envelope construction;
+  Gaussian defaults and explicit calibration choices are unchanged.
   Both retain Gaussian auxiliary fits and inactive automatic adaptation.
   Beta support limits, data and metric bandwidths are transformed together;
   derivative results retain the numerical sensitivity of the native beta fit.

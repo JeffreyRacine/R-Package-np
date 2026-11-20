@@ -228,13 +228,17 @@
     if (!plot.errors.boot.calibration %in% c("default","legacy") &&
         (!new.bias || error.request$method!="bootstrap" || error.request$type=="pmzsd"))
       stop("explicit bootstrap calibration requires iterated bias-corrected regression and empirical bands",call.=FALSE)
-    wild.local.envelope <- identical(plot.errors.boot.calibration,"basic-local-envelope") &&
+    effective.calibration <- if (new.bias) .np_bias_regression_calibration(bws,
+      plot.errors.boot.calibration, error.request$method, error.request$type,
+      as.character(plot.errors.boot.method)[1L], as.character(plot.errors.boot.wild)[1L]) else
+      plot.errors.boot.calibration
+    wild.local.envelope <- identical(effective.calibration,"basic-local-envelope") &&
       as.character(plot.errors.boot.method)[1L]=="wild" &&
       as.character(plot.errors.boot.wild)[1L]=="mammen"
-    if (plot.errors.boot.calibration %in% c("basic-envelope", "basic-local-envelope") &&
+    if (effective.calibration %in% c("basic-envelope", "basic-local-envelope") &&
         !((as.character(plot.errors.boot.method)[1L] %in% c("inid", "fixed", "geom") &&
            (identical(bws[["type", exact=TRUE]], "fixed") ||
-            (identical(plot.errors.boot.calibration, "basic-local-envelope") &&
+            (identical(effective.calibration, "basic-local-envelope") &&
              bws[["type", exact=TRUE]] %in% c("generalized_nn", "adaptive_nn")))) ||
           (wild.local.envelope && identical(bws[["type", exact=TRUE]], "fixed"))))
       stop("basic-envelope requires inid, fixed or geom and fixed-bandwidth regression; basic-local-envelope also supports qualified NN pairs or fixed-bandwidth Mammen", call.=FALSE)
@@ -306,7 +310,7 @@
     plot.errors <- normalized.opts$plot.errors
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
       .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE,
-        calibration=plot.errors.boot.calibration,
+        calibration=effective.calibration,
         gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
         law=if(percentile.request)"mammen" else if(plot.errors.method=="asymptotic")"gaussian" else
           if(plot.errors.boot.method=="wild")plot.errors.boot.wild else plot.errors.boot.method)) else NULL
@@ -511,7 +515,8 @@
       if (new.bias || plot.errors.method == "bootstrap"){
         terr.obj <- if(new.bias).np_bias_plot_errors(bias.state,setNames(x.eval,names(xdat)),"mean",plot.errors.method,
           plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tobj,resolution.context=resolution.context,calibration=plot.errors.boot.calibration) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+          gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tobj,resolution.context=resolution.context,calibration=plot.errors.boot.calibration,
+          effective.calibration=effective.calibration) else compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = x.eval,
           fit.mean.train = fit.mean.train,
           gradients = FALSE,
@@ -994,7 +999,8 @@
             corrected <- .np_bias_plot_errors(bias.state,
               subcol(exdat,ei,i)[seq_len(xi.neval),,drop=FALSE],target,plot.errors.method,
               plot.errors.boot.method,plot.errors.boot.wild,plot.errors.alpha,plot.errors.boot.num,
-              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tr,resolution.context=resolution.context,calibration=plot.errors.boot.calibration)
+              gaussian.draws,plot.errors.boot.blocklen,plot.errors.type,fit=tr,resolution.context=resolution.context,calibration=plot.errors.boot.calibration,
+              effective.calibration=effective.calibration)
             temp.err[seq_len(xi.neval),] <- corrected[["boot.err"]]
             temp.all.err <- corrected[["boot.all.err"]]
             bias.inference <- corrected[["inference"]]
