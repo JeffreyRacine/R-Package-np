@@ -198,9 +198,16 @@ support endpoints) remain. For inid, fixed and geometric pairs resampling,
 this option also admits unbounded second-order Epanechnikov nearest-neighbour
 bandwidths. Adaptive NN retains the existing derivative construction; generalized
 NN is restricted to main polynomial degrees at most one in every continuous
-predictor. Neighbour counts remain fixed during inference. Higher-degree
-Epanechnikov generalized-NN rows, beta NN, bounded Epanechnikov NN, NN wild,
-other calibrations and higher-order kernels are not admitted by this extension.
+predictor. Neighbour counts remain fixed during inference. Unbounded
+second-order Epanechnikov LC and GLP fits with degree zero in every continuous
+predictor also admit explicit \code{"basic-envelope"}, \code{"separate-tails"}
+(including \code{"asymmetric-sd"}) and \code{"tail-envelope"} pairs bands
+for either NN type. Their omitted/default pairs calibration is the unchanged,
+more protective local envelope. Means, frozen-radius first derivatives and
+categorical contrasts retain their existing corrected rows. The comparisons
+use only two saved original samples and do not establish nominal coverage.
+Higher-degree admissions are unchanged. Beta NN, bounded Epanechnikov NN,
+NN wild and higher-order kernels are not admitted by this extension.
 Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
 Fixed-bandwidth second-order Gaussian correction also supports known fixed

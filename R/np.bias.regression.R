@@ -23,6 +23,18 @@
   out
 }
 
+.np_bias_regression_nn_zero <- function(bws) {
+  isTRUE(bws[["type"]] %in% c("generalized_nn", "adaptive_nn")) &&
+    identical(bws[["ckertype"]], "epanechnikov") &&
+    isTRUE(bws[["ckerorder"]] == 2L) &&
+    identical(bws[["ckerbound"]], "none") &&
+    (identical(bws[["regtype"]], "lc") ||
+     (identical(bws[["regtype"]], "lp") &&
+      identical(bws[["basis"]], "glp") &&
+      is.numeric(bws[["degree"]]) && length(bws[["degree"]]) > 0L &&
+      all(!is.na(bws[["degree"]]) & bws[["degree"]] == 0L)))
+}
+
 .np_bias_regression_kernel_class <- function(bws, calibration) {
   if (identical(bws[["ckertype"]], "gaussian") &&
       bws[["ckerorder"]] == 2L &&
@@ -32,11 +44,14 @@
         isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L))))
     return("incumbent")
   # Fixed constructions share the qualified complete non-Gaussian rows.
-  # NN admission remains restricted to the local envelope.
+  # Degree-zero Epanechnikov NN also shares the existing pairs reducers.
   if ((identical(calibration, "basic-local-envelope") ||
        (identical(bws[["type"]], "fixed") &&
         isTRUE(calibration %in% c("basic-envelope", "separate-tails",
-                                 "tail-envelope", "absolute")))) &&
+                                 "tail-envelope", "absolute"))) ||
+       (.np_bias_regression_nn_zero(bws) &&
+        isTRUE(calibration %in% c("basic-envelope", "separate-tails",
+                                 "tail-envelope")))) &&
       isTRUE(bws[["type"]] %in% c("fixed", "generalized_nn", "adaptive_nn")) &&
       bws[["ckerorder"]] == 2L &&
       ((identical(bws[["ckertype"]], "epanechnikov") &&
@@ -61,6 +76,10 @@
   # the complete family. Explicit controls never delegate this decision.
   pairs <- bootstrap %in% c("inid", "fixed", "geom")
   mammen <- identical(bootstrap, "wild") && identical(wild, "mammen")
+  if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
+      pairs && isTRUE(bws[["ncon"]] > 0L) &&
+      .np_bias_regression_nn_zero(bws))
+    return("basic-local-envelope")
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
       identical(bws[["type", exact=TRUE]], "fixed") &&
       isTRUE(bws[["ncon", exact=TRUE]] > 0L) && (pairs || mammen) &&

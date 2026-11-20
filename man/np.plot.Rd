@@ -636,6 +636,16 @@ to eight reused original samples and do not establish general nominal coverage.
   The local envelope also admits unbounded second-order Epanechnikov
   pairs resampling with adaptive NN, and generalized NN with main degrees
   at most one in every continuous predictor. Neighbour counts remain fixed.
+  For unbounded second-order Epanechnikov LC or GLP fits with degree zero in
+  every continuous predictor, either NN type also admits explicit
+  \code{basic-envelope}, \code{separate-tails} and \code{tail-envelope}
+  pairs bands. Omitted/default calibration selects the unchanged, more
+  protective local envelope for these degree-zero pairs fits. Means, first
+  continuous derivatives and categorical contrasts use the same corrected
+  rows; NN radii remain frozen for continuous derivatives. Higher-degree
+  admissions are unchanged. The degree-zero comparisons reuse only two saved
+  samples and do not establish nominal coverage; narrower explicit alternatives
+  must not be interpreted as coverage improvements.
   Higher-degree Epanechnikov generalized-NN rows, bounded Epanechnikov NN,
   beta NN and NN wild resampling remain unqualified. Other calibrations
   are unchanged. The experimental Mammen envelope uses positive generation variance while retaining the observed
