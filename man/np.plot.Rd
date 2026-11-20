@@ -620,7 +620,8 @@ to eight reused original samples and do not establish general nominal coverage.
   The local envelope also admits unbounded second-order Epanechnikov
   pairs resampling with adaptive NN, and generalized NN with main degrees
   at most one in every continuous predictor. Neighbour counts remain fixed.
-  For unbounded second-order Epanechnikov LC or GLP fits with degree zero in
+  For second-order Epanechnikov LC or GLP fits with unbounded or declared
+  fixed support and degree zero in
   every continuous predictor, either NN type also admits explicit
   \code{basic-envelope}, \code{separate-tails} and \code{tail-envelope}
   pairs bands. Omitted/default calibration selects the unchanged, more
@@ -630,14 +631,16 @@ to eight reused original samples and do not establish general nominal coverage.
   admissions are unchanged. The degree-zero comparisons reuse only two saved
   samples and do not establish nominal coverage; narrower explicit alternatives
   must not be interpreted as coverage improvements.
-  Higher-degree Epanechnikov generalized-NN rows, bounded Epanechnikov NN,
+  Higher-degree Epanechnikov generalized-NN rows, bounded nonzero-degree Epanechnikov NN,
   beta NN and nonzero-degree Epanechnikov NN wild resampling remain unqualified.
   The degree-zero Epanechnikov NN class also supports ordinary asymptotic and
   \code{pmzsd} calls, explicit absolute/symmetric-SD pairs and wild bands,
   and Mammen/Rademacher separate-tail and tail-envelope bands. Its empirical
   Mammen default is the local envelope; its Rademacher default is the containing
   tail envelope. The fitted NN counts and Gaussian auxiliary operators are
-  unchanged. The limited saved comparisons are not nominal-coverage
+  unchanged. For bounded ANN, the existing donor-specific support normalizers
+  are retained; known bounds transform with the data and derivative units.
+  The limited saved comparisons are not nominal-coverage
   certification, and \code{pmzsd} remains a descriptive SD interval.
   Other calibration boundaries are unchanged. The experimental Mammen envelope uses positive generation variance while retaining the observed
   standard error separately. Categorical-only wild envelopes are not qualified.

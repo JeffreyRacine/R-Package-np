@@ -27,7 +27,7 @@
   isTRUE(bws[["type"]] %in% c("generalized_nn", "adaptive_nn")) &&
     identical(bws[["ckertype"]], "epanechnikov") &&
     isTRUE(bws[["ckerorder"]] == 2L) &&
-    identical(bws[["ckerbound"]], "none") &&
+    isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")) &&
     (identical(bws[["regtype"]], "lc") ||
      (identical(bws[["regtype"]], "lp") &&
       identical(bws[["basis"]], "glp") &&
@@ -56,7 +56,8 @@
       bws[["ckerorder"]] == 2L &&
       ((identical(bws[["ckertype"]], "epanechnikov") &&
         (identical(bws[["ckerbound"]], "none") ||
-         (identical(bws[["type"]], "fixed") &&
+         ((identical(bws[["type"]], "fixed") ||
+           .np_bias_regression_nn_zero(bws)) &&
           identical(bws[["ckerbound"]], "fixed")))) ||
        (identical(bws[["ckertype"]], "beta") &&
         identical(bws[["type"]], "fixed") &&
