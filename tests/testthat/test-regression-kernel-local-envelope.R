@@ -1,9 +1,11 @@
-test_that("kernel envelope admission is explicit, fixed and second order", {
+test_that("kernel envelope admission is explicit and second order", {
   b <- list(type="fixed",ckertype="epanechnikov",ckerorder=2L,ckerbound="none")
   expect_identical(.np_bias_regression_kernel_class(b,NULL),"unsupported")
   expect_identical(.np_bias_regression_kernel_class(b,"basic-local-envelope"),"local-envelope")
   for(type in c("generalized_nn","adaptive_nn")) {
     q<-b;q[["type"]]<-type
+    expect_identical(.np_bias_regression_kernel_class(q,"basic-local-envelope"),"local-envelope")
+    q[["ckerbound"]]<-"fixed"
     expect_identical(.np_bias_regression_kernel_class(q,"basic-local-envelope"),"unsupported")
   }
   for(order in c(4L,6L,8L)) {
@@ -157,4 +159,35 @@ test_that("beta support, derivative plots and state ownership survive admission"
   expect_error(.np_bias_regression_prepare(bw,x,y),"requires a supported second-order kernel")
   expect_error(.np_bias_inference(state,x[c(1,40,80),,drop=FALSE],calibration="absolute",B=19L),"admitted basic-local-envelope")
   expect_identical(.Random.seed,seed)
+})
+
+
+test_that("second-order NN certificates enforce pairs laws and qualified row owners", {
+  old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
+  x<-data.frame(x=seq(.02,.98,length.out=80L));y<-sin(4*x$x)+.1*cos(seq_len(80L))
+  for(kernel in "epanechnikov")for(type in c("generalized_nn","adaptive_nn")) {
+    args<-list(xdat=x,ydat=y,bws=15,regtype="ll",ckertype=kernel,bwtype=type,bandwidth.compute=FALSE)
+    bw<-do.call(npregbw,args);set.seed(108511L);seed<-.Random.seed
+    make<-function(bws=bw,law="inid") .np_bias_regression_prepare(bws,x,y,law=law,calibration="basic-local-envelope")
+    state<-make();held<-state
+    for(law in list("mammen","gaussian","rademacher",NULL,NA_character_,c("inid","geom"))) {
+      expect_error(make(law=law),"NN envelopes require inid, fixed or geom")
+      expect_error(.np_bias_inference(state,x[20:22,,drop=FALSE],law=law,
+        calibration="basic-local-envelope",B=19L),"NN envelopes require inid, fixed or geom")
+    }
+    expect_identical(state,held);expect_identical(.Random.seed,seed)
+    args$regtype<-"lp";args$degree<-2L
+    if(type=="generalized_nn")
+      expect_error(make(do.call(npregbw,args)),"qualified only for main degrees at most one")
+    else
+      expect_type(make(do.call(npregbw,args)),"list")
+  }
+  x2<-data.frame(x=x$x,z=x$x[(seq_len(nrow(x))*7L)%%nrow(x)+1L])
+  for(kernel in "epanechnikov") {
+    args<-list(xdat=x2,ydat=y,bws=c(15,15),regtype="lp",degree=c(1L,2L),
+      ckertype=kernel,bwtype="generalized_nn",bandwidth.compute=FALSE)
+    expect_error(.np_bias_regression_prepare(do.call(npregbw,args),x2,y,
+      law="inid",calibration="basic-local-envelope"),
+      "qualified only for main degrees at most one")
+  }
 })

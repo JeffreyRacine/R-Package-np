@@ -566,7 +566,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Undefined canonical beta derivative rows, including some exact support
   endpoints, retain the existing refusal.
   These experimental extensions are not a general coverage guarantee.
-  Other calibrations and kernel-by-nearest-neighbour combinations
+  The local envelope also admits unbounded second-order Epanechnikov
+  pairs resampling with adaptive NN, and generalized NN with main degrees
+  at most one in every continuous predictor. Neighbour counts remain fixed.
+  Higher-degree Epanechnikov generalized-NN rows, bounded Epanechnikov NN,
+  beta NN and NN wild resampling remain unqualified. Other calibrations
   are unchanged. The experimental Mammen envelope uses positive generation variance while retaining the observed
   standard error separately. Categorical-only wild envelopes are not qualified.
   These options invert endpoint-unit empirical roots and take a containing
