@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Admit existing corrected SD/asymptotic, absolute pairs, and Mammen/Rademacher wild constructions for unbounded second-order Epanechnikov degree-zero GNN/ANN fits. The empirical defaults retain the local envelope for Mammen/pairs and the containing tail envelope for Rademacher. Main rows, fitted NN counts, Gaussian auxiliary fits, numerical policies and both RNG guards retain their owners; higher-degree and support boundaries are unchanged.
+
 * Make degree-zero unbounded second-order Epanechnikov GNN/ANN pairs bands use the existing protective local envelope by default, and admit explicit basic/separate-tail/tail-envelope alternatives. Means, first derivatives and categorical contrasts keep their numerical owners and fitted neighbour counts. Higher-degree, wild and support boundaries are unchanged; limited saved-sample comparisons are not nominal-coverage certification.
 
 * Preserve requested-default provenance in exported plot data when a Rademacher default resolves to the protective tail envelope. Interval computation and explicit-control metadata are unchanged.

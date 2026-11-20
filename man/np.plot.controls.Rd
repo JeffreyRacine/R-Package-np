@@ -206,8 +206,18 @@ for either NN type. Their omitted/default pairs calibration is the unchanged,
 more protective local envelope. Means, frozen-radius first derivatives and
 categorical contrasts retain their existing corrected rows. The comparisons
 use only two saved original samples and do not establish nominal coverage.
+For that degree-zero NN class, ordinary asymptotic and \code{"pmzsd"} calls
+also use the established corrected-process SD construction. Explicit
+\code{"absolute"} or \code{"symmetric-sd"} admits pairs, Mammen and Rademacher;
+separate tails and the tail envelope additionally admit both wild laws.
+The Mammen empirical default uses the local envelope and the Rademacher default
+uses its containing tail envelope. Gaussian auxiliary fits and all fitted
+neighbour counts remain fixed. As elsewhere, \code{"pmzsd"} is a normal
+critical value times the observed corrected SD, not a simultaneous band.
+The two saved-sample comparisons do not establish nominal coverage or remove
+finite-sample uncertainty. Explicit narrower methods retain their definitions.
 Higher-degree admissions are unchanged. Beta NN, bounded Epanechnikov NN,
-NN wild and higher-order kernels are not admitted by this extension.
+nonzero-degree Epanechnikov NN wild and higher-order kernels remain unqualified.
 Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
 Fixed-bandwidth second-order Gaussian correction also supports known fixed

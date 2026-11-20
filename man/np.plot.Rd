@@ -647,8 +647,15 @@ to eight reused original samples and do not establish general nominal coverage.
   samples and do not establish nominal coverage; narrower explicit alternatives
   must not be interpreted as coverage improvements.
   Higher-degree Epanechnikov generalized-NN rows, bounded Epanechnikov NN,
-  beta NN and NN wild resampling remain unqualified. Other calibrations
-  are unchanged. The experimental Mammen envelope uses positive generation variance while retaining the observed
+  beta NN and nonzero-degree Epanechnikov NN wild resampling remain unqualified.
+  The degree-zero Epanechnikov NN class also supports ordinary asymptotic and
+  \code{pmzsd} calls, explicit absolute/symmetric-SD pairs and wild bands,
+  and Mammen/Rademacher separate-tail and tail-envelope bands. Its empirical
+  Mammen default is the local envelope; its Rademacher default is the containing
+  tail envelope. The fitted NN counts and Gaussian auxiliary operators are
+  unchanged. The limited saved comparisons are not nominal-coverage
+  certification, and \code{pmzsd} remains a descriptive SD interval.
+  Other calibration boundaries are unchanged. The experimental Mammen envelope uses positive generation variance while retaining the observed
   standard error separately. Categorical-only wild envelopes are not qualified.
   These options invert endpoint-unit empirical roots and take a containing
   absolute-root envelope, rather than using a replicate studentizer or

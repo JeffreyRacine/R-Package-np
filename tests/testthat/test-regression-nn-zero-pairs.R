@@ -1,4 +1,7 @@
 test_that("degree-zero Epanechnikov NN exposes pairs without changing its rows", {
+  skip_on_cran()
+  if(!spawn_mpi_slaves(n=1L)) skip("MPI workers unavailable")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   opts <- options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
   on.exit(options(opts),add=TRUE)
   x <- data.frame(x=seq(-.97,.96,length.out=120L))
@@ -26,8 +29,10 @@ test_that("degree-zero Epanechnikov NN exposes pairs without changing its rows",
       expect_true(all(vapply(value$inference,function(z)
         identical(z$calibration,cal)&&identical(z$resampling_law,law),TRUE)))
       expect_identical(fit,held);expect_identical(.Random.seed,seed)
-      expect_error(.np_bias_regression_prepare(bw,x,y,law="mammen",calibration=cal),
-        "require inid, fixed or geom")
+      if(cal=="basic-envelope")
+        expect_error(plot(fit,errors="bootstrap",center="bias-corrected",
+          bootstrap="wild",band="all",output="data",boot.control=np_boot_control(calibration=cal)),
+          "basic-envelope requires inid, fixed or geom")
     }
     run <- function(control=NULL) {
       a <- list(x=fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",
@@ -42,7 +47,7 @@ test_that("degree-zero Epanechnikov NN exposes pairs without changing its rows",
     a$calibration.requested <- e$calibration.requested;expect_identical(a,e)
     expect_identical(automatic$result$panels,explicit$result$panels)
     expect_identical(.Random.seed,seed);expect_identical(fit,held)
-    expect_identical(.np_bias_regression_kernel_class(bw,"absolute"),"unsupported")
+    expect_identical(.np_bias_regression_kernel_class(bw,"absolute"),"local-envelope")
     bounded <- bw;bounded$ckerbound <- "fixed"
     expect_identical(.np_bias_regression_kernel_class(bounded,"tail-envelope"),"unsupported")
     for(d in 1:3) {

@@ -253,7 +253,8 @@
   if (!is.null(admission) && !identical(calibration, admission[["calibration"]]))
     stop(paste0("prepared regression kernel state requires its admitted ",
       admission[["calibration"]], " calibration"),call.=FALSE)
-  .np_bias_regression_kernel_law(admission, law)
+  .np_bias_regression_kernel_law(admission, law,
+    if (isTRUE(state[["pooled"]])) state[["bw"]] else state[["bws"]])
   local.envelope <- identical(calibration,"basic-local-envelope")
   wild.local <- local.envelope && identical(law,"mammen")
   basic.envelope <- calibration %in% c("basic-envelope","basic-local-envelope")
