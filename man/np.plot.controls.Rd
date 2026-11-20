@@ -133,6 +133,7 @@ NN is restricted to main polynomial degrees at most one in every continuous
 predictor. Neighbour counts remain fixed during inference. Higher-degree
 Epanechnikov generalized-NN rows, beta NN, bounded Epanechnikov NN, NN wild,
 other calibrations and higher-order kernels are not admitted by this extension.
+Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
 Fixed-bandwidth second-order Gaussian correction also supports known fixed
 support when every predictor is continuous; range bounds and bounded mixed-data
