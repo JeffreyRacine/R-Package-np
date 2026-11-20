@@ -131,7 +131,7 @@
   detail$selection <- select_values(.np_plot_data_field(calibrated, "selection", list()),
     c("q", "k", "status"))
   if (identical(get("calibration.requested"), "default") &&
-      identical(get("calibration.method"), "basic-local-envelope"))
+      isTRUE(get("calibration.method") %in% c("basic-local-envelope", "tail-envelope")))
     detail$requested <- "default"
   selection <- select_values(.np_plot_data_field(settings, "bandwidth.procedure", list()),
     c("status", "rule", "objective", "bandwidth.units", "original.rule.replayed", "descriptor.version"))
