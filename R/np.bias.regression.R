@@ -32,14 +32,25 @@
         isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L))))
     return("incumbent")
   if (identical(calibration, "basic-local-envelope") &&
-      identical(bws[["type"]], "fixed") &&
+      isTRUE(bws[["type"]] %in% c("fixed", "generalized_nn", "adaptive_nn")) &&
       bws[["ckerorder"]] == 2L &&
       ((identical(bws[["ckertype"]], "epanechnikov") &&
-        bws[["ckerbound"]] %in% c("none", "fixed")) ||
+        (identical(bws[["ckerbound"]], "none") ||
+         (identical(bws[["type"]], "fixed") &&
+          identical(bws[["ckerbound"]], "fixed")))) ||
        (identical(bws[["ckertype"]], "beta") &&
+        identical(bws[["type"]], "fixed") &&
         identical(bws[["ckerbound"]], "fixed"))))
     return("local-envelope")
   "unsupported"
+}
+
+.np_bias_regression_kernel_law <- function(admission, law) {
+  if (!is.null(admission) && !identical(admission[["type"]], "fixed") &&
+      (!is.character(law) || length(law) != 1L || is.na(law) ||
+       !law %in% c("inid", "fixed", "geom")))
+    stop("second-order kernel NN envelopes require inid, fixed or geom resampling", call.=FALSE)
+  invisible(NULL)
 }
 
 # Bounds and data must use the same arithmetic at exact support endpoints.
@@ -69,6 +80,10 @@
     version="regression-kernel-envelope-v1", calibration="basic-local-envelope",
     kernel=bws[["ckertype"]], order=bws[["ckerorder"]], type=bws[["type"]],
     bound=bws[["ckerbound"]], lower=bws[["ckerlb"]], upper=bws[["ckerub"]]) else NULL
+  .np_bias_regression_kernel_law(admission, law)
+  if (!is.null(admission) && identical(bws[["type"]], "generalized_nn") &&
+      any(reg[["degree.engine"]] > 1L))
+    stop("second-order kernel generalized-NN envelopes are currently qualified only for main degrees at most one", call.=FALSE)
   orders <- .np_bias_derivative_request(reg,d,gradient.order)
   if (.np_bias_profile_layout(bws,x)) {
     spec <- .np_bias_profile_prepare(bws,x,y,control,reg,orders,adapt,law)

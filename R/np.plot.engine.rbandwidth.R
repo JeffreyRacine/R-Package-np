@@ -237,7 +237,7 @@
             (identical(plot.errors.boot.calibration, "basic-local-envelope") &&
              bws[["type", exact=TRUE]] %in% c("generalized_nn", "adaptive_nn")))) ||
           (wild.local.envelope && identical(bws[["type", exact=TRUE]], "fixed"))))
-      stop("basic-envelope requires inid, fixed or geom and fixed-bandwidth regression; basic-local-envelope also supports Gaussian NN pairs or fixed-bandwidth Mammen", call.=FALSE)
+      stop("basic-envelope requires inid, fixed or geom and fixed-bandwidth regression; basic-local-envelope also supports qualified NN pairs or fixed-bandwidth Mammen", call.=FALSE)
     if (bias.request && !new.bias && error.request$method=="asymptotic")
       stop("legacy bias correction requires errors='bootstrap'",call.=FALSE)
     if (new.bias && isTRUE(.npRmpi_autodispatch_called_from_bcast()))

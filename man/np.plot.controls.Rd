@@ -126,8 +126,14 @@ fixed support validates the data and targets; for Epanechnikov it does not
 define a different regression weight formula. Beta data, metric bandwidths
 and bounds are transformed together. Native beta derivative precision
 limitations and refusals for undefined canonical rows (including some exact
-support endpoints) remain. Other calibrations, higher-order kernels, and
-Epanechnikov/beta nearest-neighbour bandwidths are not admitted by this extension.
+support endpoints) remain. For inid, fixed and geometric pairs resampling,
+this option also admits unbounded second-order Epanechnikov nearest-neighbour
+bandwidths. Adaptive NN retains the existing derivative construction; generalized
+NN is restricted to main polynomial degrees at most one in every continuous
+predictor. Neighbour counts remain fixed during inference. Higher-degree
+Epanechnikov generalized-NN rows, beta NN, bounded Epanechnikov NN, NN wild,
+other calibrations and higher-order kernels are not admitted by this extension.
+These experimental extensions do not guarantee nominal coverage.
 Fixed-bandwidth second-order Gaussian correction also supports known fixed
 support when every predictor is continuous; range bounds and bounded mixed-data
 correction remain unsupported. The existing adaptation and accepted fitted-row
