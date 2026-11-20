@@ -553,7 +553,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   Regression additionally offers the experimental inid/fixed/geometric
   \code{np_boot_control(calibration="basic-envelope")} for fixed-bandwidth
-  means, derivatives and categorical contrasts. For pairs resampling, the
+  means, derivatives and categorical contrasts with the admitted second-order
+  Gaussian, Epanechnikov and fixed-support beta kernels. The basic envelope
+  retains its own explicit construction; the more protective local envelope
+  remains the default for the admitted Epanechnikov/beta empirical bands.
+  For pairs resampling, the
   \code{np_boot_control(calibration="basic-local-envelope")} option also supports
   Gaussian generalized/adaptive nearest-neighbour bandwidths. For fixed
   Gaussian bandwidths it additionally offers a symmetric Mammen raw/local

@@ -78,8 +78,8 @@ test_that("public Epanechnikov local envelopes preserve state and target grids",
     expect_identical(z,as.data.frame(b,band=band))
   }
   expect_identical(fit,held);expect_identical(.Random.seed,seed)
-  expect_error(plot(fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",
-    B=19L,neval=5L,band="all",output="data",boot.control=np_boot_control(calibration="basic-envelope")),"requires a supported second-order kernel")
+  expect_s3_class(suppressWarnings(plot(fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",
+    B=19L,neval=5L,band="all",output="data",boot.control=np_boot_control(calibration="basic-envelope"))),"np_plot_data")
   expect_identical(.Random.seed,seed)
 })
 
@@ -109,8 +109,9 @@ test_that("pooled kernel states retain their complete admission certificate", {
 
 test_that("beta envelope admission is restricted to fixed second-order known support", {
   b<-list(type="fixed",ckertype="beta",ckerorder=2L,ckerbound="fixed")
-  for(cal in list(NULL,"absolute","symmetric-sd","asymmetric-sd","basic-envelope","tail-envelope"))
+  for(cal in list(NULL,"absolute","symmetric-sd","asymmetric-sd","tail-envelope"))
     expect_identical(.np_bias_regression_kernel_class(b,cal),"unsupported")
+  expect_identical(.np_bias_regression_kernel_class(b,"basic-envelope"),"local-envelope")
   expect_identical(.np_bias_regression_kernel_class(b,"basic-local-envelope"),"local-envelope")
   for(field in c("type","ckerorder","ckerbound")) {
     values<-switch(field,type=c("generalized_nn","adaptive_nn"),ckerorder=c(4L,6L,8L),ckerbound=c("none","range"))

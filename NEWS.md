@@ -1,6 +1,8 @@
 # np 0.80-3
 
-* Make ordinary bias-corrected fixed Epanechnikov and beta empirical bootstrap bands use the qualified local envelope by default for pairs or Mammen resampling. Explicit calibrations and Gaussian defaults retain their existing meaning.
+* Admit the existing experimental basic pairs envelope for fixed-bandwidth second-order Epanechnikov kernels with none/fixed support and beta kernels with finite fixed support. The more protective local-envelope default and the basic-envelope wild refusal remain unchanged.
+
+* Make ordinary bias-corrected fixed second-order Epanechnikov (none/fixed support) and beta (finite fixed support) empirical bootstrap bands use the qualified local envelope by default for pairs or Mammen resampling. Explicit calibrations and Gaussian defaults retain their existing meaning.
 
 * Admit experimental Epanechnikov order-2 NN regression pairs envelopes, retaining beta NN and higher-degree generalized-NN refusals.
 

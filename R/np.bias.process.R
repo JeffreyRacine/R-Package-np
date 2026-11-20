@@ -236,7 +236,8 @@
     stop("invalid private regression calibration",call.=FALSE)
   admission <- state[["settings"]][["kernel.admission"]]
   if (!is.null(admission) && !identical(calibration, admission[["calibration"]]))
-    stop("prepared regression kernel state requires its admitted basic-local-envelope calibration",call.=FALSE)
+    stop(paste0("prepared regression kernel state requires its admitted ",
+      admission[["calibration"]], " calibration"),call.=FALSE)
   .np_bias_regression_kernel_law(admission, law)
   local.envelope <- identical(calibration,"basic-local-envelope")
   wild.local <- local.envelope && identical(law,"mammen")

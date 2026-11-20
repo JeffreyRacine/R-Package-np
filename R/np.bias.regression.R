@@ -31,7 +31,11 @@
         identical(bws[["ckerbound"]], "fixed") &&
         isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L))))
     return("incumbent")
-  if (identical(calibration, "basic-local-envelope") &&
+  # Fixed pairs envelopes share the qualified complete non-Gaussian rows.
+  # NN admission remains restricted to the local envelope.
+  if ((identical(calibration, "basic-local-envelope") ||
+       (identical(bws[["type"]], "fixed") &&
+        identical(calibration, "basic-envelope"))) &&
       isTRUE(bws[["type"]] %in% c("fixed", "generalized_nn", "adaptive_nn")) &&
       bws[["ckerorder"]] == 2L &&
       ((identical(bws[["ckertype"]], "epanechnikov") &&
@@ -94,7 +98,7 @@
   if (length(fc) && !all(vapply(x[fc],is.factor,logical(1))))
     stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
   admission <- if (kernel.class == "local-envelope") list(
-    version="regression-kernel-envelope-v1", calibration="basic-local-envelope",
+    version="regression-kernel-envelope-v1", calibration=calibration,
     kernel=bws[["ckertype"]], order=bws[["ckerorder"]], type=bws[["type"]],
     bound=bws[["ckerbound"]], lower=bws[["ckerlb"]], upper=bws[["ckerub"]]) else NULL
   .np_bias_regression_kernel_law(admission, law)

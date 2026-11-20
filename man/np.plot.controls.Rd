@@ -77,7 +77,13 @@ choice. Omitted/default controls preserve their earlier behavior.
 The experimental \code{calibration="basic-envelope"} is available for
 fixed-bandwidth regression means, derivatives and categorical contrasts with \code{bootstrap="inid"}, \code{"fixed"}
 or \code{"geom"} and iterated
-bias correction. It reuses the complete corrected observation rows and
+bias correction. Applicable main kernels are second-order Gaussian under its
+existing support restrictions, second-order Epanechnikov with none/fixed
+support, and second-order beta with declared finite fixed support.
+The more protective local envelope remains the default for the admitted
+Epanechnikov and beta empirical-band combinations; requesting
+\code{"basic-envelope"} explicitly retains its own construction and can give
+narrower intervals. It reuses the complete corrected observation rows and
 the selected row/block multiplicities; it does not refit resampled pairs.
 For inid, signed residual-score draws are aligned to the observed corrected
 standard error,
