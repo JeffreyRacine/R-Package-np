@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Make ordinary bias-corrected fixed Epanechnikov and beta empirical bootstrap bands use the qualified local envelope by default for pairs or Mammen resampling. Explicit calibrations and Gaussian defaults retain their existing meaning.
+
 * Admit experimental Epanechnikov order-2 NN regression pairs envelopes, retaining beta NN and higher-degree generalized-NN refusals.
 
 * Improve continuous second-order Gaussian and Epanechnikov generalized nearest-neighbour regression precision using the original weighted design, preserving accepted rank/ridge policy and existing corrected-band admission limits.

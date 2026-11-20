@@ -549,9 +549,11 @@
 
 .np_bias_plot_errors <- function(state, grid, target, method, bootstrap, wild,
                                  alpha, B, gaussian.draws, blocklen, band, fit=NULL,
-                                 resolution.context=NULL, calibration="default") {
+                                 resolution.context=NULL, calibration="default",
+                                 effective.calibration=NULL) {
   law <- if(method=="asymptotic")"gaussian" else if(bootstrap=="wild")wild else bootstrap
-  effective <- if(calibration=="default")"absolute" else
+  effective <- if(!is.null(effective.calibration))effective.calibration else
+    if(calibration=="default")"absolute" else
     .np_plot_calibration_method(calibration, "regression")
   refinement <- if(law %in% c("fixed","geom") && band!="pmzsd")"pilot-block" else "none"
   inference <- .np_plot_corrected_activity_run("Constructing bias-corrected intervals",

@@ -45,6 +45,23 @@
   "unsupported"
 }
 
+.np_bias_regression_calibration <- function(bws, calibration, method, band,
+                                             bootstrap, wild) {
+  if (!identical(calibration, "default"))
+    return(.np_plot_calibration_method(calibration, "regression"))
+  # Resolve once from the fitted model and requested law, before preparing
+  # the complete family. Explicit controls never delegate this decision.
+  pairs <- bootstrap %in% c("inid", "fixed", "geom")
+  mammen <- identical(bootstrap, "wild") && identical(wild, "mammen")
+  if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
+      identical(bws[["type", exact=TRUE]], "fixed") &&
+      isTRUE(bws[["ncon", exact=TRUE]] > 0L) && (pairs || mammen) &&
+      identical(.np_bias_regression_kernel_class(bws, "basic-local-envelope"),
+                "local-envelope"))
+    return("basic-local-envelope")
+  "absolute"
+}
+
 .np_bias_regression_kernel_law <- function(admission, law) {
   if (!is.null(admission) && !identical(admission[["type"]], "fixed") &&
       (!is.character(law) || length(law) != 1L || is.na(law) ||
