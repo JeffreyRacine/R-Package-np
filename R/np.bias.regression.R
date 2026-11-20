@@ -23,9 +23,9 @@
   out
 }
 
-.np_bias_regression_nn_zero <- function(bws) {
+.np_bias_regression_nn_zero <- function(bws, kernel = "epanechnikov") {
   isTRUE(bws[["type"]] %in% c("generalized_nn", "adaptive_nn")) &&
-    identical(bws[["ckertype"]], "epanechnikov") &&
+    isTRUE(bws[["ckertype"]] %in% kernel) &&
     isTRUE(bws[["ckerorder"]] == 2L) &&
     isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")) &&
     (identical(bws[["regtype"]], "lc") ||
@@ -44,12 +44,12 @@
         isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L))))
     return("incumbent")
   # Fixed constructions share the qualified complete non-Gaussian rows.
-  # Degree-zero Epanechnikov NN also shares the qualified SD/wild and pairs reducers.
+  # Degree-zero Epanechnikov NN and uniform NN means share the qualified reducers.
   if ((identical(calibration, "basic-local-envelope") ||
        (identical(bws[["type"]], "fixed") &&
         isTRUE(calibration %in% c("basic-envelope", "separate-tails",
                                  "tail-envelope", "absolute"))) ||
-       (.np_bias_regression_nn_zero(bws) &&
+       (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) &&
         isTRUE(calibration %in% c("basic-envelope", "separate-tails",
                                  "tail-envelope", "absolute")))) &&
       isTRUE(bws[["type"]] %in% c("fixed", "generalized_nn", "adaptive_nn")) &&
@@ -63,7 +63,8 @@
         identical(bws[["type"]], "fixed") &&
         identical(bws[["ckerbound"]], "fixed")) ||
        (identical(bws[["ckertype"]], "uniform") &&
-        identical(bws[["type"]], "fixed") &&
+        (identical(bws[["type"]], "fixed") ||
+         .np_bias_regression_nn_zero(bws, "uniform")) &&
         isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")))))
     return("local-envelope")
   "unsupported"
@@ -79,7 +80,7 @@
   mammen <- identical(bootstrap, "wild") && identical(wild, "mammen")
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
       (pairs || mammen) && isTRUE(bws[["ncon"]] > 0L) &&
-      .np_bias_regression_nn_zero(bws))
+      .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")))
     return("basic-local-envelope")
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
       identical(bws[["type", exact=TRUE]], "fixed") &&
@@ -91,7 +92,7 @@
   # intervals. Resolve this declared-law choice once for the complete family.
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
       (identical(bws[["type", exact=TRUE]], "fixed") ||
-       .np_bias_regression_nn_zero(bws)) &&
+       .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform"))) &&
       isTRUE(bws[["ncon", exact=TRUE]] > 0L) &&
       identical(bootstrap, "wild") && identical(wild, "rademacher") &&
       identical(.np_bias_regression_kernel_class(bws, "tail-envelope"),
@@ -103,7 +104,7 @@
 .np_bias_regression_kernel_law <- function(admission, law, bws = NULL) {
   fixed <- !is.null(admission) && identical(admission[["type"]], "fixed")
   nn.zero <- !is.null(admission) && !fixed &&
-    .np_bias_regression_nn_zero(bws)
+    .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform"))
   if (!is.null(admission) && !fixed) {
     allowed <- if (nn.zero) c("gaussian", "mammen", "rademacher", "inid", "fixed", "geom") else
       c("inid", "fixed", "geom")
@@ -185,6 +186,11 @@
     variance_h=unname(settings[["bandwidth"]][["variance"]]/scale),
     offset=offset,scale=scale,y=as.double(y),settings=settings)
   if (!is.null(admission)) spec$settings$kernel.admission <- admission
+  # Uniform NN support ties must use the fitted physical coordinates.
+  # Auxiliary Gaussian projections retain their standardized coordinates.
+  if (.np_bias_regression_nn_zero(bws, "uniform"))
+    spec[["main.physical"]] <- list(x=x,
+      bws=.np_bias_regbw(bws,x,unname(bws[["bandwidth"]][["x"]])))
   spec$pilot.bws <- .np_bias_regbw(bws,spec$xcon,spec$b,q,spec$bernstein)
   spec$Q <- W.lp(spec$xcon,degree=q,basis="glp",bernstein.basis=spec$bernstein)
   spec$p1 <- list(b=unname(settings[["bandwidth"]][["p1"]]/scale))
@@ -374,8 +380,18 @@
   if (isTRUE(spec$pooled)) return(.np_bias_profile_rows(spec,grid,map))
   if (nrow(map)>500L || nrow(unique(grid[spec$numeric.cols]))>25L)
     stop("internal bias target block exceeded",call.=FALSE)
+  physical <- spec[["main.physical"]]
+  main.grid <- if (!is.null(physical)) grid else NULL
   for(j in seq_len(spec$d))grid[[spec$numeric.cols[j]]] <- (grid[[spec$numeric.cols[j]]]-spec$offset[j])/spec$scale[j]
-  L <- if (is.null(original)) .np_bias_original(spec,grid,map) else {
+  L <- if (is.null(original)) {
+    if (is.null(physical)) .np_bias_original(spec,grid,map) else {
+      main <- spec
+      main$x <- physical[["x"]]
+      main$xcon <- main$x[spec$numeric.cols]
+      main$bws <- physical[["bws"]]
+      .np_bias_original(main,main.grid,map)
+    }
+  } else {
     diagnostic <- attr(original,"main.regularization",exact=TRUE)
     if (!is.matrix(original) || !is.numeric(original) ||
         !identical(dim(original),c(nrow(map),nrow(spec$x))) ||

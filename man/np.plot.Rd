@@ -610,6 +610,15 @@ explicit \code{bias.control=np_bias_control(construction="legacy")} routes
 retain their previous supported behavior. The main kernel remains uniform
 and the auxiliary pilots remain Gaussian. Saved mean comparisons are limited
 to eight reused original samples and do not establish general nominal coverage.
+Uniform LC and GLP fits with degree zero in every continuous predictor also
+support these mean constructions with generalized or adaptive nearest-neighbour
+bandwidths and unbounded or declared fixed support. Their defaults follow the
+same declared-law mapping; explicit methods remain available. Neighbour counts
+and Gaussian auxiliary fits remain fixed, and bounded ANN retains donor-specific
+support normalization. The additional NN comparison uses only two saved
+original samples and does not establish nominal coverage. Higher-degree uniform
+NN correction and continuous uniform derivatives remain unqualified.
+
 
   Regression additionally offers the experimental inid/fixed/geometric
   \code{np_boot_control(calibration="basic-envelope")} for fixed-bandwidth

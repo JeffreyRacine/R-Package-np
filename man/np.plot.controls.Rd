@@ -117,6 +117,15 @@ explicit \code{bias.control=np_bias_control(construction="legacy")} routes
 retain their previous supported behavior. The main kernel remains uniform
 and the auxiliary pilots remain Gaussian. Saved mean comparisons are limited
 to eight reused original samples and do not establish general nominal coverage.
+Uniform LC and GLP fits with degree zero in every continuous predictor also
+support these mean constructions with generalized or adaptive nearest-neighbour
+bandwidths and unbounded or declared fixed support. Their defaults follow the
+same declared-law mapping; explicit methods remain available. Neighbour counts
+and Gaussian auxiliary fits remain fixed, and bounded ANN retains donor-specific
+support normalization. The additional NN comparison uses only two saved
+original samples and does not establish nominal coverage. Higher-degree uniform
+NN correction and continuous uniform derivatives remain unqualified.
+
 
 The experimental \code{calibration="basic-envelope"} is available for
 fixed-bandwidth regression means, derivatives and categorical contrasts with \code{bootstrap="inid"}, \code{"fixed"}
@@ -228,8 +237,8 @@ support when every predictor is continuous; range bounds and bounded mixed-data
 correction remain unsupported. The existing adaptation and accepted fitted-row
 precision rules are retained. Zero nearest-neighbour radii and
 unqualified regularized main rows retain their existing refusals.
-The original \code{"basic-envelope"} public option remains restricted to fixed
-bandwidths.
+The original \code{"basic-envelope"} public option supports fixed bandwidths
+and qualified degree-zero Epanechnikov or uniform NN models; it remains pairs-only.
 
 For fixed-bandwidth second-order Gaussian (unbounded, or known fixed support
 with continuous predictors only), Epanechnikov
@@ -246,8 +255,8 @@ locally generation-SD-standardized signed-tail limits are protected by their
 absolute-root references, enveloped, and symmetrized. The returned observed
 standard error is preserved and can differ from the scale driving these bands.
 Pointwise wild bounds are also symmetric. Categorical-only designs,
-Rademacher multipliers and nearest-neighbour wild envelopes are not qualified
-for this option; existing methods remain available. The row construction
+Rademacher multipliers and other unqualified nearest-neighbour wild models
+remain outside this option; existing methods remain available. The row construction
 supports the existing derivative and mixed-design targets, but empirical
 coverage evidence for this experimental wild variant is limited to
 univariate mean targets. No general coverage guarantee is implied.
