@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Make degree-zero unbounded second-order Epanechnikov GNN/ANN pairs bands use the existing protective local envelope by default, and admit explicit basic/separate-tail/tail-envelope alternatives. Means, first derivatives and categorical contrasts keep their numerical owners and fitted neighbour counts. Higher-degree, wild and support boundaries are unchanged; limited saved-sample comparisons are not nominal-coverage certification.
+
 * Preserve requested-default provenance in exported plot data when a Rademacher default resolves to the protective tail envelope. Interval computation and explicit-control metadata are unchanged.
 
 * Admit fixed uniform-kernel iterated correction for means, including mixed-predictor mean panels, with the existing law-specific protective defaults and explicit calibrations. Continuous uniform derivatives remain unqualified, so mixed gradient plots that also request categorical contrasts remain unavailable under iterated correction. Legacy routes retain their prior behavior. Gaussian auxiliary pilots and the fitted uniform main kernel are preserved.
