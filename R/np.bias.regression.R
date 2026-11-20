@@ -41,7 +41,8 @@
       (identical(bws[["ckerbound"]], "none") ||
        (identical(bws[["type"]], "fixed") &&
         identical(bws[["ckerbound"]], "fixed") &&
-        isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L))))
+        isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L)) ||
+       .np_bias_regression_nn_zero(bws, "gaussian")))
     return("incumbent")
   # Fixed constructions share the qualified complete non-Gaussian rows.
   # Degree-zero Epanechnikov NN and uniform NN means share the qualified reducers.
@@ -145,7 +146,7 @@
     "; explicit bootstrap bias.control=np_bias_control(construction='legacy') retains the previous construction for supported bootstrap methods" else ""
   kernel.class <- .np_bias_regression_kernel_class(bws, calibration)
   if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
-    stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths and continuous predictors only",legacy.hint), call. = FALSE)
+    stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths with continuous predictors only, or qualified degree-zero nearest-neighbour models",legacy.hint), call. = FALSE)
   if (length(fc) && !all(vapply(x[fc],is.factor,logical(1))))
     stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
   admission <- if (kernel.class == "local-envelope") list(

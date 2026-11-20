@@ -1373,8 +1373,13 @@ NN correction and continuous uniform derivatives remain unqualified.
   Pointwise, simultaneous and Bonferroni bands share this construction.
   Fixed-bandwidth second-order Gaussian correction supports known fixed
   bounds for continuous predictors, including one-sided and partially bounded
-  support. Existing adaptation and fitted-row precision rules are preserved;
-  range bounds and bounded mixed-data correction remain unsupported.
+  support. Degree-zero Gaussian generalized/adaptive NN fits also support known
+  fixed bounds, including supported mixed predictors. Existing Gaussian defaults
+  and explicit methods are unchanged. NN radii remain frozen for derivatives;
+  bounded ANN retains donor-specific support normalization. Other bounded mixed
+  Gaussian cases and range bounds remain unqualified. Existing adaptation and
+  fitted-row precision rules are preserved. The two saved NN samples do not
+  establish nominal coverage.
   The following legacy centering discussion applies to the other supported
   families and to explicit regression \code{construction="legacy"}.
 
