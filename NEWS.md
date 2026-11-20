@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Admit fixed second-order Epanechnikov and finite-support beta corrected asymptotic/normal-SD bands and explicit symmetric-SD pairs or Mammen bands, plus Mammen asymmetric-SD/tail-envelope bands. The qualified empirical local-envelope default remains unchanged; explicit SD alternatives retain finite-sample derivative coverage limitations.
+
 * Extend explicit experimental separate-tails and tail-envelope pairs calibration to fixed second-order Epanechnikov (none/fixed support) and beta (finite fixed support) regression. The local-envelope default remains unchanged; standardized-tail alternatives retain their finite-sample coverage limitations, including saved beta derivative misses.
 
 * Admit the existing experimental basic pairs envelope for fixed-bandwidth second-order Epanechnikov kernels with none/fixed support and beta kernels with finite fixed support. The more protective local-envelope default and the basic-envelope wild refusal remain unchanged.
