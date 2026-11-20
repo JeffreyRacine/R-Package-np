@@ -1,6 +1,6 @@
 # npRmpi 0.80-3
 
-* Admit fixed uniform-kernel iterated correction for means and categorical mean contrasts, with the existing law-specific protective defaults and explicit calibrations. Continuous uniform derivatives remain unqualified under iterated correction; legacy routes retain their prior behavior. Gaussian auxiliary pilots and the fitted uniform main kernel are preserved.
+* Admit fixed uniform-kernel iterated correction for means, including mixed-predictor mean panels, with the existing law-specific protective defaults and explicit calibrations. Continuous uniform derivatives remain unqualified, so mixed gradient plots that also request categorical contrasts remain unavailable under iterated correction. Legacy routes retain their prior behavior. Gaussian auxiliary pilots and the fitted uniform main kernel are preserved.
 
 * Admit existing fixed second-order Epanechnikov/beta Rademacher SD and tail constructions. Its empirical default uses the protective tail envelope; explicit controls and other laws retain their definitions. Nonpooled targets retain fixed observed scaling, while pooled mixed targets retain their existing replicate residual-pilot studentization.
 

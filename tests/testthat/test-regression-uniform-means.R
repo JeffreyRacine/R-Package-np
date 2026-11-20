@@ -61,6 +61,7 @@ test_that("public uniform means retain defaults and reject unqualified derivativ
     rad<-run(np_boot_control(wild="rademacher"));tail<-run(np_boot_control(wild="rademacher",calibration="tail-envelope"));expect_identical(rad$result$panels,tail$result$panels)
     expect_identical(rad$result$inference[[1L]]$calibration,"tail-envelope");expect_identical(rad$result$inference[[1L]]$resampling_law,"rademacher")
     expect_error(run(derivatives=TRUE),"continuous derivatives remain unqualified")
+    expect_error(run(derivatives=TRUE),"construction='legacy'",fixed=TRUE)
     expect_identical(bw,held);expect_identical(.Random.seed,seed)
   }
 })

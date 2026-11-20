@@ -567,7 +567,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bootstrap laws retain their documented corrected-process calibration;
   see \code{\link{np_bias_control}} for law-specific definitions and support.
 
-  The same fixed Epanechnikov and beta configurations also admit explicit
+  Fixed-bandwidth second-order Epanechnikov kernels with none/fixed support
+  and second-order beta kernels with declared finite fixed support admit explicit
   \code{"separate-tails"} (including its \code{"asymmetric-sd"} alias) and
   \code{"tail-envelope"} with \code{"inid"}, \code{"fixed"}, \code{"geom"} or Mammen/Rademacher wild resampling.
   These existing standardized-root constructions are experimental alternatives.
@@ -595,13 +596,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   alter Gaussian defaults; the saved derivative limitations still apply.
 
 Fixed uniform-kernel models with \code{ckerbound="none"} or \code{"fixed"}
-are also qualified for iterated correction of means and categorical mean
-contrasts. Their empirical default is \code{"basic-local-envelope"} for
+are also qualified for iterated correction of means, including mean panels
+for mixed continuous/categorical predictors. Their empirical default is \code{"basic-local-envelope"} for
 Mammen or pairs resampling and \code{"tail-envelope"} for Rademacher;
 asymptotic and \code{"pmzsd"} calls retain absolute calibration. The same
 explicit fixed-kernel calibration/law combinations above apply to these mean
 targets. Continuous uniform derivatives remain unqualified under iterated
-correction, including local-constant auxiliary-only derivatives. The existing
+correction, including local-constant auxiliary-only derivatives. For mixed
+uniform models, \code{gradients=TRUE} requests continuous derivatives along
+with categorical contrasts and is therefore refused as a whole; the public
+plot interface does not offer a contrast-only iterated route. The existing
 explicit \code{bias.control=np_bias_control(construction="legacy")} routes
 retain their previous supported behavior. The main kernel remains uniform
 and the auxiliary pilots remain Gaussian. Saved mean comparisons are limited
@@ -612,7 +616,7 @@ to eight reused original samples and do not establish general nominal coverage.
   means, derivatives and categorical contrasts with the admitted second-order
   Gaussian, Epanechnikov and fixed-support beta kernels. The basic envelope
   retains its own explicit construction; the more protective local envelope
-  remains the default for the admitted Epanechnikov/beta empirical bands.
+  remains the default for the admitted Epanechnikov/beta pairs/Mammen empirical bands.
   For pairs resampling, the
   \code{np_boot_control(calibration="basic-local-envelope")} option also supports
   Gaussian generalized/adaptive nearest-neighbour bandwidths. For fixed
