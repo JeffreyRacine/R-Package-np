@@ -123,6 +123,9 @@
     kernel=bws[["ckertype"]], order=bws[["ckerorder"]], type=bws[["type"]],
     bound=bws[["ckerbound"]], lower=bws[["ckerlb"]], upper=bws[["ckerub"]]) else NULL
   .np_bias_regression_kernel_law(admission, law)
+  if (!is.null(admission) && identical(bws[["type"]], "generalized_nn") &&
+      any(reg[["degree.engine"]] > 1L))
+    stop("second-order kernel generalized-NN envelopes are currently qualified only for main degrees at most one", call.=FALSE)
   orders <- .np_bias_derivative_request(reg,d,gradient.order)
   if (.np_bias_profile_layout(bws,x)) {
     spec <- .np_bias_profile_prepare(bws,x,y,control,reg,orders,adapt,law)
@@ -153,10 +156,6 @@
     variance_h=unname(settings[["bandwidth"]][["variance"]]/scale),
     offset=offset,scale=scale,y=as.double(y),settings=settings)
   if (!is.null(admission)) spec$settings$kernel.admission <- admission
-  # A numerical ridge is tied to the fitted coordinates. Preserve that main
-  # request while the auxiliary correction keeps its normalized coordinates.
-  if (.np_bias_epanechnikov_gnn(bws,reg[["degree.engine"]]))
-    spec$main.original <- list(bws=bws,x=x)
   spec$pilot.bws <- .np_bias_regbw(bws,spec$xcon,spec$b,q,spec$bernstein)
   spec$Q <- W.lp(spec$xcon,degree=q,basis="glp",bernstein.basis=spec$bernstein)
   spec$p1 <- list(b=unname(settings[["bandwidth"]][["p1"]]/scale))
@@ -257,35 +256,11 @@
   .np_bias_projector(spec,anchor)$blocks
 }
 
-.np_bias_epanechnikov_gnn <- function(bws,degree) {
-  identical(bws[["type"]],"generalized_nn") &&
-    identical(bws[["ckertype"]],"epanechnikov") &&
-    isTRUE(bws[["ckerorder"]]==2L) && any(degree>1L)
-}
-
-# Both existing native owners return their accepted ridge. The generic mixed
-# first-derivative hat fallback does not retain that certificate.
-.np_bias_epanechnikov_gnn_rows <- function(bws,x,evals,s) {
-  .npRmpi_with_local_regression({
-    reg <- npValidatedConditionalRegSpec(bws,where="bias fitted main rows",ncon.field="ncon")
-    if (bws[["nuno"]]+bws[["nord"]]==0L) {
-      .npreghat_fitted_capture(bws,x,evals,s)
-    } else {
-      .npreghat_exact_lp_matrix_from_regression_core(bws,txdat=x,exdat=evals,
-        basis=reg[["basis.engine"]],degree=reg[["degree.engine"]],
-        bernstein.basis=reg[["bernstein.basis.engine"]],s=s)
-    }
-  })
-}
-
 .np_bias_main_rows <- function(spec,evals,nu) {
   s <- integer(spec$d); if(nu)s[nu] <- .np_bias_derivative_order(spec,nu)
   reg <- npValidatedConditionalRegSpec(spec$bws,where="bias main operator",ncon.field="ncon")
-  if (.np_bias_epanechnikov_gnn(spec$bws,reg[["degree.engine"]])) {
-    H <- .np_bias_epanechnikov_gnn_rows(spec$bws,spec$x,evals,s)
-    ridge <- attr(H,"ridge.used",exact=TRUE)
-  } else if (spec$bws[["type"]]=="generalized_nn" && any(reg[["degree.engine"]]>1L)) {
-    # Preserve the incumbent Gaussian prepared-adjoint owner.
+  if (spec$bws[["type"]]=="generalized_nn" && any(reg[["degree.engine"]]>1L)) {
+    # Retain the qualified prepared-adjoint GNN owner used by the checkpoint.
     K <- .np_kernel_weights_direct(spec$bws,txdat=spec$x,exdat=evals,bandwidth.divide=TRUE)
     P <- W.lp(spec$xcon,degree=reg[["degree.engine"]],basis=reg[["basis.engine"]],bernstein.basis=reg[["bernstein.basis.engine"]])
     V <- W.lp(spec$xcon,exdat=evals[spec$numeric.cols],degree=reg[["degree.engine"]],
@@ -370,18 +345,8 @@
   if (isTRUE(spec$pooled)) return(.np_bias_profile_rows(spec,grid,map))
   if (nrow(map)>500L || nrow(unique(grid[spec$numeric.cols]))>25L)
     stop("internal bias target block exceeded",call.=FALSE)
-  fitted.original <- NULL
-  if (is.null(original) && !is.null(spec$main.original)) {
-    main <- spec
-    main$bws <- spec$main.original$bws
-    main$x <- spec$main.original$x
-    main$xcon <- main$x[spec$numeric.cols]
-    fitted.original <- .np_bias_original(main,grid,map)
-    main.units <- vapply(map$target,function(t)if(startsWith(t,"d"))spec$scale[as.integer(substring(t,2L))]^.np_bias_derivative_order(spec,as.integer(substring(t,2L))) else 1,numeric(1))
-    fitted.original <- sweep(fitted.original,1L,main.units,"*")
-  }
   for(j in seq_len(spec$d))grid[[spec$numeric.cols[j]]] <- (grid[[spec$numeric.cols[j]]]-spec$offset[j])/spec$scale[j]
-  L <- if (!is.null(fitted.original)) fitted.original else if (is.null(original)) .np_bias_original(spec,grid,map) else {
+  L <- if (is.null(original)) .np_bias_original(spec,grid,map) else {
     diagnostic <- attr(original,"main.regularization",exact=TRUE)
     if (!is.matrix(original) || !is.numeric(original) ||
         !identical(dim(original),c(nrow(map),nrow(spec$x))) ||

@@ -196,16 +196,11 @@ and bounds are transformed together. Native beta derivative precision
 limitations and refusals for undefined canonical rows (including some exact
 support endpoints) remain. For inid, fixed and geometric pairs resampling,
 this option also admits unbounded second-order Epanechnikov nearest-neighbour
-bandwidths. Adaptive NN retains the existing derivative construction. Higher-degree
-generalized-NN models use the accepted fitted/hat main rows, including supported
-pure derivatives and categorical mean contrasts. Neighbour counts and the
-fitted ridge/intercept anchor remain fixed during inference; positive-ridge
-bootstrap rows retain their existing refusal. Saved degree-two/three comparisons
-on three continuous-only original samples do not establish general coverage or availability
-for all CV-selected compact-kernel models. Mixed-data CV availability and coverage
-remain unproved; its main rows use original fitted coordinates and a native
-ridge record. Beta NN, bounded Epanechnikov NN,
-NN wild, other calibrations and higher-order kernels are not admitted by this extension.
+bandwidths. Adaptive NN retains the existing derivative construction; generalized
+NN is restricted to main polynomial degrees at most one in every continuous
+predictor. Neighbour counts remain fixed during inference. Higher-degree
+Epanechnikov generalized-NN rows, beta NN, bounded Epanechnikov NN, NN wild,
+other calibrations and higher-order kernels are not admitted by this extension.
 Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
 Fixed-bandwidth second-order Gaussian correction also supports known fixed
