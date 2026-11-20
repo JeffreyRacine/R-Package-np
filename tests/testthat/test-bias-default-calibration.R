@@ -61,5 +61,12 @@ test_that("ordinary fixed Epanechnikov default uses the explicit complete family
     expect_identical(run(control)$provider,automatic$provider)
   expect_identical(.Random.seed,seed);expect_identical(b,held)
   expect_error(run(np_boot_control(calibration="basic-envelope")),"requires inid")
-  expect_error(run(np_boot_control(calibration="absolute")),"supported second-order kernel")
+  symmetric <- run(np_boot_control(calibration="symmetric-sd"))
+  absolute <- run(np_boot_control(calibration="absolute"))
+  s <- symmetric$provider[[1L]]$inference
+  a <- absolute$provider[[1L]]$inference
+  expect_identical(s$calibration.method,"absolute")
+  s$calibration.requested <- a$calibration.requested
+  expect_identical(s,a)
+  expect_identical(symmetric$result$panels,absolute$result$panels)
 })
