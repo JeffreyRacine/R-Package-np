@@ -572,11 +572,24 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   Mammen and pairs empirical defaults continue to select the more protective
   local envelope. For Rademacher wild resampling, omitted/default calibration
   selects \code{"tail-envelope"} for these fixed configurations, preserving both
-  its signed and absolute intervals; explicit controls are unchanged. Continuous
+  its signed and absolute intervals; explicit controls are unchanged. Nonpooled
   Rademacher targets retain observed corrected-process scaling, while pooled
   mixed-predictor targets retain replicate residual-pilot studentization for
   empirical bands. This does not extend either basic envelope to Rademacher or
   alter Gaussian defaults; the saved derivative limitations still apply.
+
+Fixed uniform-kernel models with \code{ckerbound="none"} or \code{"fixed"}
+are also qualified for iterated correction of means and categorical mean
+contrasts. Their empirical default is \code{"basic-local-envelope"} for
+Mammen or pairs resampling and \code{"tail-envelope"} for Rademacher;
+asymptotic and \code{"pmzsd"} calls retain absolute calibration. The same
+explicit fixed-kernel calibration/law combinations above apply to these mean
+targets. Continuous uniform derivatives remain unqualified under iterated
+correction, including local-constant auxiliary-only derivatives. The existing
+explicit \code{bias.control=np_bias_control(construction="legacy")} routes
+retain their previous supported behavior. The main kernel remains uniform
+and the auxiliary pilots remain Gaussian. Saved mean comparisons are limited
+to eight reused original samples and do not establish general nominal coverage.
 
   Regression additionally offers the experimental inid/fixed/geometric
   \code{np_boot_control(calibration="basic-envelope")} for fixed-bandwidth

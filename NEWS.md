@@ -1,6 +1,8 @@
 # np 0.80-3
 
-* Admit existing fixed second-order Epanechnikov/beta Rademacher SD and tail constructions. Its empirical default uses the protective tail envelope; explicit controls and other laws retain their definitions. Continuous targets retain fixed observed scaling, while pooled mixed targets retain their existing replicate residual-pilot studentization.
+* Admit fixed uniform-kernel iterated correction for means and categorical mean contrasts, with the existing law-specific protective defaults and explicit calibrations. Continuous uniform derivatives remain unqualified under iterated correction; legacy routes retain their prior behavior. Gaussian auxiliary pilots and the fitted uniform main kernel are preserved.
+
+* Admit existing fixed second-order Epanechnikov/beta Rademacher SD and tail constructions. Its empirical default uses the protective tail envelope; explicit controls and other laws retain their definitions. Nonpooled targets retain fixed observed scaling, while pooled mixed targets retain their existing replicate residual-pilot studentization.
 
 * Admit fixed second-order Epanechnikov and finite-support beta corrected asymptotic/normal-SD bands and explicit symmetric-SD pairs or Mammen bands, plus Mammen asymmetric-SD/tail-envelope bands. The qualified empirical local-envelope default remains unchanged; explicit SD alternatives retain finite-sample derivative coverage limitations.
 

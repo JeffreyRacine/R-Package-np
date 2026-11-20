@@ -45,7 +45,10 @@
           identical(bws[["ckerbound"]], "fixed")))) ||
        (identical(bws[["ckertype"]], "beta") &&
         identical(bws[["type"]], "fixed") &&
-        identical(bws[["ckerbound"]], "fixed"))))
+        identical(bws[["ckerbound"]], "fixed")) ||
+       (identical(bws[["ckertype"]], "uniform") &&
+        identical(bws[["type"]], "fixed") &&
+        isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")))))
     return("local-envelope")
   "unsupported"
 }
@@ -331,6 +334,11 @@
 }
 
 .np_bias_regression_rows <- function(spec,grid,map,original=NULL,captured=FALSE) {
+  # This admission covers means and differences of means. Keep continuous
+  # uniform derivatives outside it, including the pooled dispatch below.
+  if (identical(spec[["settings"]][["main"]][["kernel"]], "uniform") &&
+      any(startsWith(map[["target"]], "d")))
+    stop("iterated uniform-kernel correction is qualified only for means and categorical mean contrasts; continuous derivatives remain unqualified", call.=FALSE)
   if (!is.null(original) && (isTRUE(spec$categorical.only) || isTRUE(spec$pooled)))
     stop("captured original rows are unavailable for this bias owner",call.=FALSE)
   if (isTRUE(spec$categorical.only)) return(.np_bias_categorical_rows(spec,grid,map))
