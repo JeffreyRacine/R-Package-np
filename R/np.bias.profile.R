@@ -178,15 +178,19 @@
     stop("pooled mixed-data correction requires a bounded functional block",call.=FALSE)
   grid <- grid[map$row,,drop=FALSE]
   if (all(axes==0L)) {
-    L <- npreghat(a$bw,txdat=a$original.x,exdat=grid,output="matrix",.np.require.finite=TRUE)
+    L <- if (.np_bias_epanechnikov_gnn(a$bw,a$main.degree))
+      .np_bias_epanechnikov_gnn_rows(a$bw,a$original.x,grid,integer(a$d)) else
+      npreghat(a$bw,txdat=a$original.x,exdat=grid,output="matrix",.np.require.finite=TRUE)
     ridge <- attr(L,"ridge.used",exact=TRUE)
   } else {
     L <- matrix(0,nrow(grid),nrow(a$x)); ridge <- numeric(nrow(grid))
     for (axis in unique(axes)) {
       ii <- which(axes==axis); nu <- integer(a$d)
       if (axis) nu[axis] <- .np_bias_derivative_order(a,axis)
-      H <- npreghat(a$bw,txdat=a$original.x,exdat=grid[ii,,drop=FALSE],
-        s=nu,output="matrix",.np.require.finite=TRUE)
+      H <- if (.np_bias_epanechnikov_gnn(a$bw,a$main.degree))
+        .np_bias_epanechnikov_gnn_rows(a$bw,a$original.x,grid[ii,,drop=FALSE],nu) else
+        npreghat(a$bw,txdat=a$original.x,exdat=grid[ii,,drop=FALSE],
+          s=nu,output="matrix",.np.require.finite=TRUE)
       L[ii,] <- H; ridge[ii] <- attr(H,"ridge.used",exact=TRUE)
     }
   }

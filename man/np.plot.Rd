@@ -634,10 +634,14 @@ to eight reused original samples and do not establish general nominal coverage.
   endpoints, retain the existing refusal.
   These experimental extensions are not a general coverage guarantee.
   The local envelope also admits unbounded second-order Epanechnikov
-  pairs resampling with adaptive NN, and generalized NN with main degrees
-  at most one in every continuous predictor. Neighbour counts remain fixed.
-  Higher-degree Epanechnikov generalized-NN rows, bounded Epanechnikov NN,
-  beta NN and NN wild resampling remain unqualified. Other calibrations
+  pairs resampling with adaptive and generalized NN. Higher-degree generalized-NN
+  models use accepted fitted/hat main rows for means, supported pure derivatives
+  and categorical mean contrasts. Neighbour counts and the fitted ridge/intercept
+  anchor remain fixed; positive-ridge bootstrap rows retain their refusal.
+  Main rows use the original fitted coordinates and native ridge record.
+  Saved degree-two/three coverage evidence uses only three continuous-only original
+  samples; mixed-data CV availability and coverage remain unproved.
+  Bounded Epanechnikov NN, beta NN and NN wild resampling remain unqualified. Other calibrations
   are unchanged. The experimental Mammen envelope uses positive generation variance while retaining the observed
   standard error separately. Categorical-only wild envelopes are not qualified.
   These options invert endpoint-unit empirical roots and take a containing
