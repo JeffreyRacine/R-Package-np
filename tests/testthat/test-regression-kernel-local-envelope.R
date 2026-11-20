@@ -171,6 +171,8 @@ test_that("beta support, derivative plots and state ownership survive admission"
 
 
 test_that("second-order NN certificates enforce pairs laws and qualified row owners", {
+  if (!spawn_mpi_slaves(1L)) skip("MPI pool unavailable in this context")
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
   x<-data.frame(x=seq(.02,.98,length.out=80L));y<-sin(4*x$x)+.1*cos(seq_len(80L))
   for(kernel in "epanechnikov")for(type in c("generalized_nn","adaptive_nn")) {
