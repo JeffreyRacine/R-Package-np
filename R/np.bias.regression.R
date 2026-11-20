@@ -186,9 +186,12 @@
     variance_h=unname(settings[["bandwidth"]][["variance"]]/scale),
     offset=offset,scale=scale,y=as.double(y),settings=settings)
   if (!is.null(admission)) spec$settings$kernel.admission <- admission
-  # Uniform NN support ties must use the fitted physical coordinates.
+  # Degree-zero uniform support ties use the fitted physical coordinates.
   # Auxiliary Gaussian projections retain their standardized coordinates.
-  if (.np_bias_regression_nn_zero(bws, "uniform"))
+  if (.np_bias_regression_nn_zero(bws, "uniform") ||
+      (identical(bws[["type"]], "fixed") &&
+       identical(bws[["ckertype"]], "uniform") &&
+       all(reg[["degree.engine"]] == 0L)))
     spec[["main.physical"]] <- list(x=x,
       bws=.np_bias_regbw(bws,x,unname(bws[["bandwidth"]][["x"]])))
   spec$pilot.bws <- .np_bias_regbw(bws,spec$xcon,spec$b,q,spec$bernstein)
