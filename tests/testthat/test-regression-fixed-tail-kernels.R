@@ -3,9 +3,9 @@ test_that("fixed non-Gaussian tails preserve calibration and admitted law bounda
     b<-list(type="fixed",ckertype=kernel,ckerorder=2L,ckerbound=if(kernel=="beta")"fixed"else"none",ncon=1L)
     expect_identical(.np_bias_regression_kernel_class(b,cal),"local-envelope")
     admission<-list(type="fixed",calibration=cal)
-    for(law in c("mammen","inid","fixed","geom"))expect_silent(.np_bias_regression_kernel_law(admission,law))
-    for(law in c("gaussian","rademacher"))
-      expect_error(.np_bias_regression_kernel_law(admission,law),"requires Mammen, inid, fixed or geom")
+    for(law in c("mammen","rademacher","inid","fixed","geom"))expect_silent(.np_bias_regression_kernel_law(admission,law))
+    for(law in "gaussian")
+      expect_error(.np_bias_regression_kernel_law(admission,law),"requires Mammen, Rademacher, inid, fixed or geom")
     for(type in c("generalized_nn","adaptive_nn")) {
       z<-b;z$type<-type;expect_identical(.np_bias_regression_kernel_class(z,cal),"unsupported")
     }

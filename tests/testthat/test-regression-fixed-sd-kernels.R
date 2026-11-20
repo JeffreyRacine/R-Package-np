@@ -3,9 +3,9 @@ test_that("fixed SD admission preserves laws and the local empirical default", {
     b<-list(type="fixed",ckertype=kernel,ckerorder=2L,ckerbound=if(kernel=="beta")"fixed"else"none",ncon=1L)
     expect_identical(.np_bias_regression_kernel_class(b,"absolute"),"local-envelope")
     a<-list(type="fixed",calibration="absolute")
-    for(law in c("gaussian","mammen","inid","fixed","geom"))
+    for(law in c("gaussian","mammen","rademacher","inid","fixed","geom"))
       expect_silent(.np_bias_regression_kernel_law(a,law))
-    expect_error(.np_bias_regression_kernel_law(a,"rademacher"),"requires Gaussian, Mammen")
+    expect_error(.np_bias_regression_kernel_law(a,"unknown"),"requires Gaussian, Mammen, Rademacher")
     for(type in c("generalized_nn","adaptive_nn")) {
       z<-b;z$type<-type;expect_identical(.np_bias_regression_kernel_class(z,"absolute"),"unsupported")
     }

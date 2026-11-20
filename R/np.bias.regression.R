@@ -64,6 +64,15 @@
       identical(.np_bias_regression_kernel_class(bws, "basic-local-envelope"),
                 "local-envelope"))
     return("basic-local-envelope")
+  # For the distinct Rademacher law, retain both its signed and absolute
+  # intervals. Resolve this declared-law choice once for the complete family.
+  if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
+      identical(bws[["type", exact=TRUE]], "fixed") &&
+      isTRUE(bws[["ncon", exact=TRUE]] > 0L) &&
+      identical(bootstrap, "wild") && identical(wild, "rademacher") &&
+      identical(.np_bias_regression_kernel_class(bws, "tail-envelope"),
+                "local-envelope"))
+    return("tail-envelope")
   "absolute"
 }
 
@@ -74,11 +83,11 @@
     stop("second-order kernel NN envelopes require inid, fixed or geom resampling", call.=FALSE)
   if (!is.null(admission) && identical(admission[["type"]], "fixed")) {
     if (identical(admission[["calibration"]], "absolute") &&
-        !isTRUE(law %in% c("gaussian", "mammen", "inid", "fixed", "geom")))
-      stop("fixed non-Gaussian absolute calibration requires Gaussian, Mammen, inid, fixed or geom resampling", call.=FALSE)
+        !isTRUE(law %in% c("gaussian", "mammen", "rademacher", "inid", "fixed", "geom")))
+      stop("fixed non-Gaussian absolute calibration requires Gaussian, Mammen, Rademacher, inid, fixed or geom resampling", call.=FALSE)
     if (isTRUE(admission[["calibration"]] %in% c("separate-tails", "tail-envelope")) &&
-        !isTRUE(law %in% c("mammen", "inid", "fixed", "geom")))
-      stop("fixed non-Gaussian tail calibration requires Mammen, inid, fixed or geom resampling", call.=FALSE)
+        !isTRUE(law %in% c("mammen", "rademacher", "inid", "fixed", "geom")))
+      stop("fixed non-Gaussian tail calibration requires Mammen, Rademacher, inid, fixed or geom resampling", call.=FALSE)
   }
   invisible(NULL)
 }

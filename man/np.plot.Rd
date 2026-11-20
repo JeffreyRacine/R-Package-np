@@ -553,7 +553,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   The same fixed Epanechnikov and beta configurations also admit explicit
   \code{"separate-tails"} (including its \code{"asymmetric-sd"} alias) and
-  \code{"tail-envelope"} with \code{"inid"}, \code{"fixed"}, \code{"geom"} or Mammen wild resampling.
+  \code{"tail-envelope"} with \code{"inid"}, \code{"fixed"}, \code{"geom"} or Mammen/Rademacher wild resampling.
   These existing standardized-root constructions are experimental alternatives.
   They can be substantially narrower than the default local envelope and need not
   retain its finite-sample coverage; saved degree-two beta derivative examples
@@ -566,12 +566,17 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bands use the existing Gaussian multiplier process with replicate residual-pilot
   studentization; \code{"pmzsd"} uses a normal critical value times the observed
   corrected-process SD and is not a simultaneous band. Explicit
-  \code{"absolute"} (or \code{"symmetric-sd"}) supports pairs and Mammen
+  \code{"absolute"} (or \code{"symmetric-sd"}) supports pairs, Mammen and Rademacher
   resampling. The auxiliary pilots remain Gaussian. These SD constructions retain
   finite-sample limitations, including saved degree-two derivative misses;
   Mammen and pairs empirical defaults continue to select the more protective
-  local envelope. Rademacher admission for these non-Gaussian configurations
-  requires separate qualification.
+  local envelope. For Rademacher wild resampling, omitted/default calibration
+  selects \code{"tail-envelope"} for these fixed configurations, preserving both
+  its signed and absolute intervals; explicit controls are unchanged. Continuous
+  Rademacher targets retain observed corrected-process scaling, while pooled
+  mixed-predictor targets retain replicate residual-pilot studentization for
+  empirical bands. This does not extend either basic envelope to Rademacher or
+  alter Gaussian defaults; the saved derivative limitations still apply.
 
   Regression additionally offers the experimental inid/fixed/geometric
   \code{np_boot_control(calibration="basic-envelope")} for fixed-bandwidth

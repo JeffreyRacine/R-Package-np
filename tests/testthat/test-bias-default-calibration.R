@@ -24,7 +24,7 @@ test_that("regression defaults resolve only qualified fixed kernel laws", {
   z <- b;z$ckerbound <- "range";expect_identical(resolve(z),"absolute")
   expect_identical(resolve(method="asymptotic"),"absolute")
   expect_identical(resolve(band="pmzsd"),"absolute")
-  expect_identical(resolve(wild="rademacher"),"absolute")
+  expect_identical(resolve(wild="rademacher"),"tail-envelope")
   for(cal in c("absolute","separate-tails","tail-envelope","basic-envelope",
                "basic-local-envelope","smoothed-percentile"))
     expect_identical(resolve(calibration=cal),cal)
