@@ -183,8 +183,9 @@ evidence or numerical admission rules. A supplied control must still be an
 
 For pairs resampling, experimental \code{calibration="basic-local-envelope"} has the same
 fixed-bandwidth admission rules and also supports generalized and adaptive
-nearest-neighbour bandwidths with the already-supported unbounded second-order
-Gaussian regression construction. It reuses exactly the same corrected centers, observed standard
+nearest-neighbour bandwidths with second-order Gaussian regression: unbounded
+support, or degree-zero fits with declared fixed support. It reuses exactly the
+same corrected centers, observed standard
 errors and signed draws. It also takes signed and absolute family extrema after
 standardizing each target by its observed standard error, then returns the hull
 of this local envelope and the existing \code{"basic-envelope"} simultaneous
@@ -232,9 +233,13 @@ Higher-degree admissions are unchanged. Beta NN, bounded nonzero-degree Epanechn
 nonzero-degree Epanechnikov NN wild and higher-order kernels remain unqualified.
 Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
-Fixed-bandwidth second-order Gaussian correction also supports known fixed
-support when every predictor is continuous; range bounds and bounded mixed-data
-correction remain unsupported. The existing adaptation and accepted fitted-row
+Second-order Gaussian correction supports known fixed support for continuous
+fixed-bandwidth fits and for degree-zero generalized/adaptive NN fits, including
+supported mixed predictors. Gaussian defaults and existing explicit calibrations
+are unchanged. NN radii stay frozen for derivatives; bounded ANN retains its
+donor-specific support normalization. Other bounded mixed Gaussian models and
+range bounds remain unqualified. The two saved degree-zero NN samples provide
+limited availability evidence and do not establish nominal coverage. The existing adaptation and accepted fitted-row
 precision rules are retained. Zero nearest-neighbour radii and
 unqualified regularized main rows retain their existing refusals.
 The original \code{"basic-envelope"} public option supports fixed bandwidths
