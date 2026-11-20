@@ -1,6 +1,6 @@
 # npRmpi 0.80-3
 
-- Admit experimental Epanechnikov order-2 NN regression pairs envelopes, retaining beta NN and higher-degree generalized-NN refusals.
+* Admit experimental Epanechnikov order-2 NN regression pairs envelopes, retaining beta NN and higher-degree generalized-NN refusals.
 
 * Improve continuous second-order Gaussian and Epanechnikov generalized nearest-neighbour regression precision using the original weighted design, preserving accepted rank/ridge policy and existing corrected-band admission limits.
 
