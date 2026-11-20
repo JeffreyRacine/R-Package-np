@@ -5,6 +5,16 @@
     bws[["ncon",exact=TRUE]]>0L && bws[["nuno",exact=TRUE]]==0L && bws[["nord",exact=TRUE]]==0L
 }
 
+# Capture scope is distinct from the kernel-weight precision capability.
+.npreghat_fitted_capture_scope <- function(bws) {
+  .np_regression_precision_scope(bws) ||
+    (identical(bws[["type",exact=TRUE]],"generalized_nn") &&
+     bws[["ckertype",exact=TRUE]] %in% c("gaussian","epanechnikov") &&
+     identical(as.integer(bws[["ckerorder",exact=TRUE]]),2L) &&
+     bws[["ncon",exact=TRUE]]>0L && bws[["nuno",exact=TRUE]]==0L &&
+     bws[["nord",exact=TRUE]]==0L)
+}
+
 npreghat <-
   function(bws, ...){
     args <- .np_formula_dispatch_args(
@@ -418,14 +428,15 @@ npreghat <-
 # Apply consumes tiles; only matrix/constraint requests retain the full hat.
 .npreghat_fitted_capture <- function(bws, txdat, exdat, s, y=NULL,
                                      apply=FALSE, allow.empty.rows=FALSE) {
-  evaluation <- if(is.null(exdat)) txdat else exdat
+  training <- is.null(exdat)
+  evaluation <- if(training) txdat else exdat
   n <- nrow(txdat); m <- nrow(evaluation)
   direction <- which(s>0L)
   order <- rep.int(1L,bws$ncon)
   if(length(direction)) order[direction] <- s[direction]
   captured <- .np_plot_lsq_gradient_projection(bws,txdat,numeric(n),evaluation,
     gradient.order=order,capture.gradient=TRUE,allow.empty.rows=allow.empty.rows,
-    capture.mean.only=!length(direction))
+    capture.mean.only=!length(direction),training=training)
   projection <- captured$fit.projection
   width <- ncol(projection[[1L]])
   constant <- isTRUE(projection[[3L]])
@@ -435,7 +446,8 @@ npreghat <-
   # checked by their owners; R handles output allocation and length overflow.
   budget <- .Machine$double.xmax
   geometry <- .np_plot_lsq_gate_geometry(bws,txdat,evaluation,max.bytes=budget)
-  attr(geometry,'.np.fit.gate') <- captured$gate
+  if(identical(bws[['type',exact=TRUE]],'fixed'))
+    attr(geometry,'.np.fit.gate') <- captured$gate
   rows <- max(1L,min(m,floor((4*1024^2)/(16*as.double(n)))))
   if(apply && is.null(y)) stop("argument 'y' is required when output='apply'")
   out <- matrix(NA_real_,m,if(apply)ncol(y) else n)
@@ -452,7 +464,7 @@ npreghat <-
     }
     if(!constant) attr(P,'.np.fit.accepted') <- TRUE
     weights <- if(constant) NULL else
-      .np_plot_lsq_gate_weights(bws,geometry,index,max.bytes=budget)
+      .np_plot_lsq_gate_weights(bws,geometry,index,training=training,max.bytes=budget)
     block <- .Call('C_np_plot_projection_apply',projection[[1L]],P,weights,PACKAGE='npRmpi')
     out[index,] <- if(apply)block%*%y else block
   }
@@ -2501,7 +2513,7 @@ npreghat.rbandwidth <-
       leave.one.out = leave.one.out
     )
 
-    fitted.capture.route <- .np_regression_precision_scope(bws) &&
+    fitted.capture.route <- .npreghat_fitted_capture_scope(bws) &&
       !isTRUE(leave.one.out) && ridge==0 &&
       identical(reg.spec$regtype.engine,"lp") && !constant.basis &&
       sum(s>0L)<=1L && !direct.apply

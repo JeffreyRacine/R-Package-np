@@ -27116,16 +27116,18 @@ static void np_regression_general_lp_fit_owner_cleanup(
 
 
 /* Scoped precision sibling. Accepted rank/ridge and all incumbent kernel/tree
- * selection remain upstream. NN, conditional, categorical and signed routes
- * are unchanged until their own representation and timing gates close. */
+ * selection remain upstream. Continuous second-order GNN rows use their own
+ * target radius; conditional, categorical, beta and signed owners are unchanged. */
 static int np_regression_precision_eligible(const NPRegressionGeneralLPFitCall *call)
 {
-  if(!call->ordinary_response || call->bandwidth_mode != BW_FIXED ||
+  if(!call->ordinary_response ||
+     (call->bandwidth_mode != BW_FIXED && call->bandwidth_mode != BW_GEN_NN) ||
      call->kernel_route != NULL ||
      call->num_reg_unordered || call->num_reg_ordered || call->all_large_kernel_rows)
     return 0;
   for(int d=0;d<call->num_reg_continuous;++d)
-    if(call->kernel_c[d]!=0)return 0;
+    if(call->kernel_c[d]!=0 &&
+       !(call->bandwidth_mode==BW_GEN_NN && call->kernel_c[d]==4))return 0;
   return 1;
 }
 static int np_regression_precision_prepare(
@@ -27146,7 +27148,8 @@ static int np_regression_precision_prepare(
       call->matrix_X_unordered_train,call->matrix_X_ordered_train,call->matrix_X_continuous_train,
       owner->eval_unordered,owner->eval_ordered,owner->eval_continuous,
       NULL,NULL,NULL,call->vector_scale_factor,1,call->matrix_bandwidth,
-      call->matrix_bandwidth,call->lambda,call->num_categories,
+      call->bandwidth_mode==BW_GEN_NN ? owner->matrix_bandwidth_eval :
+        call->matrix_bandwidth,call->lambda,call->num_categories,
       call->matrix_categorical_vals,NULL,NULL,NULL,owner->precision_kernel,
       call->gate_context,NULL,NULL,NULL,NULL,
 #ifdef MPI2
