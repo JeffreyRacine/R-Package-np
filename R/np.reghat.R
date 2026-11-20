@@ -414,6 +414,53 @@ npreghat <-
   list(v = v, ridge = ridge)
 }
 
+# Replay the fitted owner's accepted rows, without residual/SE preparation.
+# Apply consumes tiles; only matrix/constraint requests retain the full hat.
+.npreghat_fitted_capture <- function(bws, txdat, exdat, s, y=NULL,
+                                     apply=FALSE, allow.empty.rows=FALSE) {
+  evaluation <- if(is.null(exdat)) txdat else exdat
+  n <- nrow(txdat); m <- nrow(evaluation)
+  direction <- which(s>0L)
+  order <- rep.int(1L,bws$ncon)
+  if(length(direction)) order[direction] <- s[direction]
+  captured <- .np_plot_lsq_gradient_projection(bws,txdat,numeric(n),evaluation,
+    gradient.order=order,capture.gradient=TRUE,allow.empty.rows=allow.empty.rows,
+    capture.mean.only=!length(direction))
+  projection <- captured$fit.projection
+  width <- ncol(projection[[1L]])
+  constant <- isTRUE(projection[[3L]])
+  empty <- captured$empty.rows
+  valid <- if(is.null(empty)) seq_len(m) else which(empty==0L)
+  # The public hat has no plot allocation ceiling. Geometry and tile sizes are
+  # checked by their owners; R handles output allocation and length overflow.
+  budget <- .Machine$double.xmax
+  geometry <- .np_plot_lsq_gate_geometry(bws,txdat,evaluation,max.bytes=budget)
+  attr(geometry,'.np.fit.gate') <- captured$gate
+  rows <- max(1L,min(m,floor((4*1024^2)/(16*as.double(n)))))
+  if(apply && is.null(y)) stop("argument 'y' is required when output='apply'")
+  out <- matrix(NA_real_,m,if(apply)ncol(y) else n)
+  projected.y <- if(constant && apply) crossprod(projection[[1L]],y) else NULL
+  if(length(valid)) for(start in seq.int(1L,length(valid),by=rows)) {
+    index <- valid[start:min(length(valid),start+rows-1L)]
+    P <- if(length(direction))
+      .np_plot_projection_slice(captured$gradient.projection,index,
+        (direction-1L)*width+seq_len(width)) else
+      .np_plot_projection_slice(projection[[2L]],index)
+    if(constant && apply) {
+      out[index,] <- P %*% projected.y
+      next
+    }
+    if(!constant) attr(P,'.np.fit.accepted') <- TRUE
+    weights <- if(constant) NULL else
+      .np_plot_lsq_gate_weights(bws,geometry,index,max.bytes=budget)
+    block <- .Call('C_np_plot_projection_apply',projection[[1L]],P,weights,PACKAGE='npRmpi')
+    out[index,] <- if(apply)block%*%y else block
+  }
+  attr(out,'ridge.used') <- captured$ridge
+  if(!is.null(empty) && any(empty!=0L)) attr(out,'.np.empty.rows') <- empty
+  out
+}
+
 .npreghat_exact_matrix_from_core <- function(bws, txdat, exdat = NULL, s = NULL, allow.empty.rows = FALSE) {
   miss.ex <- is.null(exdat)
   neval <- if (miss.ex) nrow(txdat) else nrow(exdat)
@@ -2454,7 +2501,12 @@ npreghat.rbandwidth <-
       leave.one.out = leave.one.out
     )
 
-    exact.core.route <- native.loo.route ||
+    fitted.capture.route <- .np_regression_precision_scope(bws) &&
+      !isTRUE(leave.one.out) && ridge==0 &&
+      identical(reg.spec$regtype.engine,"lp") && !constant.basis &&
+      sum(s>0L)<=1L && !direct.apply
+
+    exact.core.route <- fitted.capture.route || native.loo.route ||
       (!isTRUE(leave.one.out) &&
        simple.operator.request &&
        (
@@ -2500,6 +2552,17 @@ npreghat.rbandwidth <-
           leave.one.out)))
       stop("npreghat: nonzero 'ridge' is not supported for this operator; use ridge = 0 for the existing automatic numerical ridging policy",
            call. = FALSE)
+
+    if(fitted.capture.route && identical(output,"apply")) {
+      out <- .npRmpi_with_local_regression(.npreghat_fitted_capture(bws,txdat,
+        if(no.ex)NULL else exdat,s,y=y,apply=TRUE,allow.empty.rows=allow.empty.rows))
+      empty.rows <- attr(out,".np.empty.rows",exact=TRUE)
+      attr(out,".np.empty.rows") <- NULL
+      attr(out,"ridge.used") <- NULL
+      colnames(out) <- .npreghat_apply_colnames(y)
+      if(ncol(out)==1L) out <- as.vector(out)
+      return(finish.empty.rows(out,empty.rows))
+    }
 
     if (native.loo.route && identical(output, "apply")) {
       out <- .npRmpi_with_local_regression(.npreghat_exact_lp_apply_from_regression_core(
@@ -2595,7 +2658,10 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- if (exact.beta.native.route || native.lp.mean.matrix.route ||
+      H <- if(fitted.capture.route) {
+        .npRmpi_with_local_regression(.npreghat_fitted_capture(bws,txdat,
+          if(no.ex)NULL else exdat,s,allow.empty.rows=allow.empty.rows))
+      } else if (exact.beta.native.route || native.lp.mean.matrix.route ||
                    native.loo.route ||
                    (lc.derivative.exact.route && !beta.kernel)) {
         .npRmpi_with_local_regression(.npreghat_exact_lp_matrix_from_regression_core(
@@ -2662,7 +2728,7 @@ npreghat.rbandwidth <-
         return(finish.empty.rows(
           .np_hat_constraint_from_matrix(H, y, "npreghat"), empty.rows))
 
-      ridge.used <- if (native.lp.mean.matrix.route || native.loo.route) {
+      ridge.used <- if (fitted.capture.route || native.lp.mean.matrix.route || native.loo.route) {
         .npreghat_native_ridge_used(
           H, nrow(H), "npreghat(..., output = 'matrix')", empty.rows
         )
