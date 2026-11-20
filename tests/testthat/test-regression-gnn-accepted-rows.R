@@ -17,6 +17,10 @@ test_that("GNN fitted precision follows the saved native policy and original des
     H<-npreghat(bw,txdat=z$x,exdat=z$ex,s=order)
     expect_identical(attr(H,'ridge.used'),z$native.ridge)
     expect_equal(drop(H%*%z$y),target,tolerance=2e-11)
+    spec<-list(bws=bw,x=z$x,xcon=z$x,numeric.cols=1L,d=1L,gradient.order=1L)
+    corrected.main<-.np_bias_main_rows(spec,z$ex,order)
+    expect_identical(attr(corrected.main,"ridge.used"),z$native.ridge)
+    expect_equal(drop(corrected.main%*%z$y),target,tolerance=2e-11)
   }
   with.se<-npreg(bw,txdat=z$x,tydat=z$y,exdat=z$ex,gradients=TRUE,se=TRUE)
   expect_identical(with.se$mean,fit$mean);expect_identical(with.se$grad,fit$grad)
