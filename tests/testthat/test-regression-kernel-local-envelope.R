@@ -179,43 +179,17 @@ test_that("second-order NN certificates enforce pairs laws and qualified row own
     }
     expect_identical(state,held);expect_identical(.Random.seed,seed)
     args$regtype<-"lp";args$degree<-2L
-    expect_type(make(do.call(npregbw,args)),"list")
+    if(type=="generalized_nn")
+      expect_error(make(do.call(npregbw,args)),"qualified only for main degrees at most one")
+    else
+      expect_type(make(do.call(npregbw,args)),"list")
   }
   x2<-data.frame(x=x$x,z=x$x[(seq_len(nrow(x))*7L)%%nrow(x)+1L])
   for(kernel in "epanechnikov") {
     args<-list(xdat=x2,ydat=y,bws=c(15,15),regtype="lp",degree=c(1L,2L),
       ckertype=kernel,bwtype="generalized_nn",bandwidth.compute=FALSE)
-    expect_type(.np_bias_regression_prepare(do.call(npregbw,args),x2,y,
-      law="inid",calibration="basic-local-envelope"),"list")
-  }
-})
-
-
-test_that("higher-degree Epanechnikov GNN preserves fitted ridge refusals with factors", {
-  old<-options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
-  on.exit(options(old),add=TRUE)
-  n<-110L;i<-seq_len(n);base<-rep(0:10,each=10L)
-  for(lev in 2:3)for(bern in c(TRUE,FALSE)) {
-    x<-data.frame(x=as.numeric(base),u=factor(rep(letters[seq_len(lev)],length.out=n)))
-    y<-sin(base/3)+.3*as.integer(x$u)+.1*cos(i*sqrt(2))
-    bw<-npregbw(xdat=x,ydat=y,bws=c(15,.2),regtype="lp",degree=2L,
-      bernstein.basis=bern,bwtype="generalized_nn",ckertype="epanechnikov",bandwidth.compute=FALSE)
-    fit<-npreg(bw,txdat=x,tydat=y);held<-fit;set.seed(1122101);seed<-.Random.seed
-    g<-data.frame(x=c(2.5,5,7.5),u=factor(rep("a",3),levels=levels(x$u)))
-    state<-.np_bias_regression_prepare(bw,x,y,law="inid",calibration="basic-local-envelope")
-    if(lev==2L && bern) {
-      rows<-.np_bias_regression_rows(state,g,data.frame(row=1:3,target="d1"))
-      ridge<-attr(npreghat(bw,txdat=x,exdat=g,output="matrix"),"ridge.used",exact=TRUE)
-      expect_identical(rows$main.regularization$ridge,ridge)
-      expect_true(all(ridge[c(1,3)]>0))
-      expected<-npreg(bw,txdat=x,tydat=y,exdat=g,gradients=TRUE)$grad[,1L]
-      expect_equal(rows$original_center,expected,tolerance=2e-11)
-    }
-    for(grad in c(FALSE,TRUE))
-      expect_error(plot(fit,errors="bootstrap",band="pointwise",neval=5L,B=19L,
-        center="bias-corrected",bootstrap="inid",gradients=grad,output="data",
-        boot.control=np_boot_control(calibration="basic-local-envelope")),
-        "regularized main rows|regularized generalized-NN main rows|unregularized main rows")
-    expect_identical(fit,held);expect_identical(.Random.seed,seed)
+    expect_error(.np_bias_regression_prepare(do.call(npregbw,args),x2,y,
+      law="inid",calibration="basic-local-envelope"),
+      "qualified only for main degrees at most one")
   }
 })
