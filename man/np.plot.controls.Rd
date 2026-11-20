@@ -198,8 +198,9 @@ support endpoints) remain. For inid, fixed and geometric pairs resampling,
 this option also admits unbounded second-order Epanechnikov nearest-neighbour
 bandwidths. Adaptive NN retains the existing derivative construction; generalized
 NN is restricted to main polynomial degrees at most one in every continuous
-predictor. Neighbour counts remain fixed during inference. Unbounded
-second-order Epanechnikov LC and GLP fits with degree zero in every continuous
+predictor. Neighbour counts remain fixed during inference. Second-order
+Epanechnikov LC and GLP fits with unbounded or declared fixed support and
+degree zero in every continuous
 predictor also admit explicit \code{"basic-envelope"}, \code{"separate-tails"}
 (including \code{"asymmetric-sd"}) and \code{"tail-envelope"} pairs bands
 for either NN type. Their omitted/default pairs calibration is the unchanged,
@@ -216,7 +217,9 @@ neighbour counts remain fixed. As elsewhere, \code{"pmzsd"} is a normal
 critical value times the observed corrected SD, not a simultaneous band.
 The two saved-sample comparisons do not establish nominal coverage or remove
 finite-sample uncertainty. Explicit narrower methods retain their definitions.
-Higher-degree admissions are unchanged. Beta NN, bounded Epanechnikov NN,
+Known bounds transform with the data; bounded ANN retains donor-specific
+support normalizers and the existing frozen-radius derivative convention.
+Higher-degree admissions are unchanged. Beta NN, bounded nonzero-degree Epanechnikov NN,
 nonzero-degree Epanechnikov NN wild and higher-order kernels remain unqualified.
 Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
