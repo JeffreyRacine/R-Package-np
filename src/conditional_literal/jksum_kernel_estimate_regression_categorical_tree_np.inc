@@ -979,8 +979,15 @@ NPRegressionFitProjection *fit_projection){
             /* An unavailable preparation remains INVALID. Allocation failure
              * does not change fast_ok, point ownership or the BLAS decision. */
           }
+          const double capture_initial_intercept = inverse_workspace.matrix_copy[0];
           fast_ok = np_lp_full_row_workspace_invert_retryable(
             &inverse_workspace, glp_nterms, ridge_eps, 64);
+          if(fast_ok && fit_projection != NULL &&
+             fit_projection->inference_ridge != NULL &&
+             fit_projection->inference_residual == NULL)
+            for(int row=0;row<num_obs_eval;++row)
+              fit_projection->inference_ridge[fit_projection->eval_map[row]] =
+                inverse_workspace.matrix_copy[0]-capture_initial_intercept;
           if(fast_ok && residual_gram != NULL) {
             residual_intercept_ridge = np_contrast_two_sum(
               inverse_workspace.matrix_copy[0], -residual_gram[0]);
@@ -1224,6 +1231,20 @@ NPRegressionFitProjection *fit_projection){
                       for(j = 0; j < glp_nterms; j++)
                         dg += eval_deriv[j]*beta[j];
                       gradient[l][i] = dg;
+                    }
+
+                    /* Optional compact replay reads this accepted inverse;
+                     * it never re-factors or changes the shortcut owner. */
+                    if(fit_projection != NULL &&
+                       fit_projection->inference_gradient != NULL &&
+                       fit_projection->inference_residual == NULL) {
+                      NPRegressionFitProjection *out=fit_projection;
+                      for(int k=0;k<glp_nterms;++k) {
+                        double value=0.0;
+                        for(int a=0;a<glp_nterms;++a)
+                          value+=eval_deriv[a]*inverse_workspace.gram[a+(size_t)k*glp_nterms];
+                        out->inference_gradient[out->eval_map[i]+(size_t)out->neval*(l*glp_nterms+k)]=value;
+                      }
                     }
 
                     if(shortcut_do_gerr){

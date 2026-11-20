@@ -977,6 +977,8 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       out->precision_policy[out->eval_map[j]+out->neval]=pristine_anchor;
     }
     if(call->fit_projection != NULL && call->fit_projection->inference_residual == NULL) {
+      if(call->fit_projection->inference_ridge != NULL)
+        call->fit_projection->inference_ridge[call->fit_projection->eval_map[j]]=solve_diagnostics.ridge_total;
       for(i = 0; i < owner->nterms; ++i)
         owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
       if(np_lp_solve_workspace_solve_adjoint_factored(
@@ -1128,6 +1130,22 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
             }
           } else if(!active)
             call->gradient[l][j] = NA_REAL;
+          /* Request-only lean replay uses this row's accepted factor; no
+           * moment, rank/ridge, residual or standard-error work is added. */
+          if(active && call->fit_projection != NULL &&
+             call->fit_projection->inference_gradient != NULL &&
+             call->fit_projection->inference_residual == NULL) {
+            NPRegressionFitProjection *out=call->fit_projection;
+            if(!precise) {
+              for(i=0;i<owner->nterms;++i)owner->solve_workspace.rhs_source[i]=direction[i];
+              if(np_lp_solve_workspace_solve_adjoint_factored(&owner->solve_workspace,
+                   owner->nterms,1,pristine_anchor,&solve_diagnostics)!=NP_LP_SOLVE_POLICY_OK)
+                error("accepted derivative projection solve failed");
+            }
+            for(i=0;i<owner->nterms;++i)
+              out->inference_gradient[out->eval_map[j]+(size_t)out->neval*(i+(size_t)l*out->width)]=
+                precise?direction[i]:owner->solve_workspace.rhs_work[i];
+          }
           if(call->do_gerr) {
             call->gradient_stderr[l][j] = active ? 0.0 : NA_REAL;
             if(active)

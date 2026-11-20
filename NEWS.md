@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Align supported regression hat and apply operators with the fitted model's accepted rank/ridge decisions, including pure derivatives; mixed-derivative policies are unchanged.
+
 * Apply the existing accepted-precision rule consistently to bounded continuous Gaussian regression fits and hat operators, correcting potentially material derivative errors in ill-conditioned rows. Extend experimental fixed-support corrected bands without changing rank, ridge or RNG policies.
 
 * Apply exact single-index kernel validation consistently to fitting, gradients and hat/plot preparation; missing legacy metadata keeps its Gaussian default and unrelated prefix fields cannot replace it.
