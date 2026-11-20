@@ -551,6 +551,16 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bootstrap laws retain their documented corrected-process calibration;
   see \code{\link{np_bias_control}} for law-specific definitions and support.
 
+  The same fixed Epanechnikov and beta configurations also admit explicit
+  \code{"separate-tails"} (including its \code{"asymmetric-sd"} alias) and
+  \code{"tail-envelope"} with \code{"inid"}, \code{"fixed"} or \code{"geom"}.
+  These existing standardized-root constructions are experimental alternatives.
+  They can be substantially narrower than the default local envelope and need not
+  retain its finite-sample coverage; saved degree-two beta derivative examples
+  miss features covered by the local envelope. The local-envelope default is
+  unchanged. This extension does not admit these non-Gaussian tail controls with
+  wild resampling, asymptotic errors or \code{"pmzsd"}.
+
   Regression additionally offers the experimental inid/fixed/geometric
   \code{np_boot_control(calibration="basic-envelope")} for fixed-bandwidth
   means, derivatives and categorical contrasts with the admitted second-order

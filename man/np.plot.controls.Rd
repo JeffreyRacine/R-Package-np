@@ -74,6 +74,16 @@ bootstrap calibration. Existing \code{"tail-envelope"} remains the conservative
 hull with the absolute-root interval; it is distinct from the raw asymmetric
 choice. Omitted/default controls preserve their earlier behavior.
 
+The same fixed Epanechnikov and beta configurations also admit explicit
+\code{"separate-tails"} (including its \code{"asymmetric-sd"} alias) and
+\code{"tail-envelope"} with \code{"inid"}, \code{"fixed"} or \code{"geom"}.
+These existing standardized-root constructions are experimental alternatives.
+They can be substantially narrower than the default local envelope and need not
+retain its finite-sample coverage; saved degree-two beta derivative examples
+miss features covered by the local envelope. The local-envelope default is
+unchanged. This extension does not admit these non-Gaussian tail controls with
+wild resampling, asymptotic errors or \code{"pmzsd"}.
+
 The experimental \code{calibration="basic-envelope"} is available for
 fixed-bandwidth regression means, derivatives and categorical contrasts with \code{bootstrap="inid"}, \code{"fixed"}
 or \code{"geom"} and iterated
