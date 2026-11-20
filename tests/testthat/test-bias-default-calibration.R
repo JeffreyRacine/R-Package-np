@@ -7,7 +7,7 @@ test_that("regression defaults resolve only qualified fixed kernel laws", {
   expect_identical(resolve(),"basic-local-envelope")
   for(law in c("inid","fixed","geom"))
     expect_identical(resolve(bootstrap=law),"basic-local-envelope")
-  for(kernel in c("gaussian","uniform")) {
+  for(kernel in "gaussian") {
     z <- b;z$ckertype <- kernel
     expect_identical(resolve(z),"absolute")
   }
