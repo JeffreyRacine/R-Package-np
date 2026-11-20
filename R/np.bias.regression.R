@@ -338,7 +338,7 @@
   # uniform derivatives outside it, including the pooled dispatch below.
   if (identical(spec[["settings"]][["main"]][["kernel"]], "uniform") &&
       any(startsWith(map[["target"]], "d")))
-    stop("iterated uniform-kernel correction is qualified only for means and categorical mean contrasts; continuous derivatives remain unqualified", call.=FALSE)
+    stop("iterated uniform-kernel correction is qualified only for means and categorical mean contrasts; continuous derivatives remain unqualified; explicit bias.control=np_bias_control(construction='legacy') retains previous supported bootstrap routes", call.=FALSE)
   if (!is.null(original) && (isTRUE(spec$categorical.only) || isTRUE(spec$pooled)))
     stop("captured original rows are unavailable for this bias owner",call.=FALSE)
   if (isTRUE(spec$categorical.only)) return(.np_bias_categorical_rows(spec,grid,map))

@@ -72,9 +72,10 @@ CDFs, and transported \code{"percentile-tails"} for density. The suffix
 \code{sd} does not imply normal critical values: these empirical bands use
 bootstrap calibration. Existing \code{"tail-envelope"} remains the conservative
 hull with the absolute-root interval; it is distinct from the raw asymmetric
-choice. Omitted/default controls preserve their earlier behavior.
+choice. Regression defaults follow the kernel/law policy below.
 
-The same fixed Epanechnikov and beta configurations also admit explicit
+Fixed-bandwidth second-order Epanechnikov kernels with none/fixed support
+and second-order beta kernels with declared finite fixed support admit explicit
 \code{"separate-tails"} (including its \code{"asymmetric-sd"} alias) and
 \code{"tail-envelope"} with \code{"inid"}, \code{"fixed"}, \code{"geom"} or Mammen/Rademacher wild resampling.
 These existing standardized-root constructions are experimental alternatives.
@@ -102,13 +103,16 @@ empirical bands. This does not extend either basic envelope to Rademacher or
 alter Gaussian defaults; the saved derivative limitations still apply.
 
 Fixed uniform-kernel models with \code{ckerbound="none"} or \code{"fixed"}
-are also qualified for iterated correction of means and categorical mean
-contrasts. Their empirical default is \code{"basic-local-envelope"} for
+are also qualified for iterated correction of means, including mean panels
+for mixed continuous/categorical predictors. Their empirical default is \code{"basic-local-envelope"} for
 Mammen or pairs resampling and \code{"tail-envelope"} for Rademacher;
 asymptotic and \code{"pmzsd"} calls retain absolute calibration. The same
 explicit fixed-kernel calibration/law combinations above apply to these mean
 targets. Continuous uniform derivatives remain unqualified under iterated
-correction, including local-constant auxiliary-only derivatives. The existing
+correction, including local-constant auxiliary-only derivatives. For mixed
+uniform models, \code{gradients=TRUE} requests continuous derivatives along
+with categorical contrasts and is therefore refused as a whole; the public
+plot interface does not offer a contrast-only iterated route. The existing
 explicit \code{bias.control=np_bias_control(construction="legacy")} routes
 retain their previous supported behavior. The main kernel remains uniform
 and the auxiliary pilots remain Gaussian. Saved mean comparisons are limited
@@ -121,7 +125,7 @@ bias correction. Applicable main kernels are second-order Gaussian under its
 existing support restrictions, second-order Epanechnikov with none/fixed
 support, and second-order beta with declared finite fixed support.
 The more protective local envelope remains the default for the admitted
-Epanechnikov and beta empirical-band combinations; requesting
+Epanechnikov and beta pairs/Mammen empirical-band combinations; requesting
 \code{"basic-envelope"} explicitly retains its own construction and can give
 narrower intervals. It reuses the complete corrected observation rows and
 the selected row/block multiplicities; it does not refit resampled pairs.
@@ -154,16 +158,18 @@ existing automatic selector are retained; fixed blocks of length n have no
 resampling variation and are refused. At least two draws are required.
 For iterated bias-corrected regression with fixed bandwidths and at least one
 continuous predictor, omitted control, \code{np_boot_control()} and
-\code{calibration="default"} select \code{"basic-local-envelope"} for
-second-order Epanechnikov kernels with none/fixed support and second-order beta
-kernels with declared finite fixed support, when empirical bands use
-inid/fixed/geom resampling or wild Mammen. This is the same construction as its
-explicit selection, resolved once before the target families are evaluated.
-Gaussian defaults, asymptotic and \code{pmzsd} routes, nearest-neighbour
-defaults and all explicit nondefault choices retain their existing meaning
-and admission rules. Returned inference distinguishes requested and effective
-calibration. This default does not broaden the construction's coverage evidence
-or its numerical admission rules. A supplied control must still be an
+\code{calibration="default"} follow the declared kernel and resampling law.
+For second-order Epanechnikov with none/fixed support, second-order beta with
+declared finite fixed support, and uniform mean targets with none/fixed support,
+empirical inid/fixed/geom or Mammen bands use \code{"basic-local-envelope"};
+Rademacher bands use \code{"tail-envelope"}. Asymptotic and \code{"pmzsd"}
+calls use absolute calibration. Each choice matches its explicit construction
+and is resolved once before the target families are evaluated. Gaussian and
+nearest-neighbour defaults retain their existing policy; explicit nondefault
+controls retain their own meanings and admission rules. Returned inference
+records the effective calibration and marks a default-resolved local or tail
+envelope as requested by default. This policy does not broaden coverage
+evidence or numerical admission rules. A supplied control must still be an
 \code{np_boot_control} object; \code{boot.control=NULL} is not a control object.
 
 For pairs resampling, experimental \code{calibration="basic-local-envelope"} has the same
