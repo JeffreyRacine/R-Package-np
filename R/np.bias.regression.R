@@ -31,11 +31,12 @@
         identical(bws[["ckerbound"]], "fixed") &&
         isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L))))
     return("incumbent")
-  # Fixed pairs envelopes share the qualified complete non-Gaussian rows.
+  # Fixed pairs constructions share the qualified complete non-Gaussian rows.
   # NN admission remains restricted to the local envelope.
   if ((identical(calibration, "basic-local-envelope") ||
        (identical(bws[["type"]], "fixed") &&
-        identical(calibration, "basic-envelope"))) &&
+        isTRUE(calibration %in% c("basic-envelope", "separate-tails",
+                                 "tail-envelope")))) &&
       isTRUE(bws[["type"]] %in% c("fixed", "generalized_nn", "adaptive_nn")) &&
       bws[["ckerorder"]] == 2L &&
       ((identical(bws[["ckertype"]], "epanechnikov") &&
@@ -71,6 +72,10 @@
       (!is.character(law) || length(law) != 1L || is.na(law) ||
        !law %in% c("inid", "fixed", "geom")))
     stop("second-order kernel NN envelopes require inid, fixed or geom resampling", call.=FALSE)
+  if (!is.null(admission) && identical(admission[["type"]], "fixed") &&
+      admission[["calibration"]] %in% c("separate-tails", "tail-envelope") &&
+      !isTRUE(law %in% c("inid", "fixed", "geom")))
+    stop("fixed non-Gaussian tail calibration requires inid, fixed or geom resampling", call.=FALSE)
   invisible(NULL)
 }
 

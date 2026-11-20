@@ -115,9 +115,10 @@ test_that("pooled kernel states retain their complete admission certificate", {
 
 test_that("beta envelope admission is restricted to fixed second-order known support", {
   b<-list(type="fixed",ckertype="beta",ckerorder=2L,ckerbound="fixed")
-  for(cal in list(NULL,"absolute","symmetric-sd","asymmetric-sd","tail-envelope"))
+  for(cal in list(NULL,"absolute","symmetric-sd","asymmetric-sd"))
     expect_identical(.np_bias_regression_kernel_class(b,cal),"unsupported")
-  expect_identical(.np_bias_regression_kernel_class(b,"basic-envelope"),"local-envelope")
+  for(cal in c("basic-envelope","separate-tails","tail-envelope"))
+    expect_identical(.np_bias_regression_kernel_class(b,cal),"local-envelope")
   expect_identical(.np_bias_regression_kernel_class(b,"basic-local-envelope"),"local-envelope")
   for(field in c("type","ckerorder","ckerbound")) {
     values<-switch(field,type=c("generalized_nn","adaptive_nn"),ckerorder=c(4L,6L,8L),ckerbound=c("none","range"))
