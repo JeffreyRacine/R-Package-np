@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Preserve fitted physical support ties in fixed uniform-kernel degree-zero corrected means and existing categorical contrasts. Gaussian auxiliary projections and established interval methods remain unchanged.
+
 * Extend iterated uniform-kernel mean correction to degree-zero GNN/ANN fits with unbounded or declared fixed support, using the established pairs/Mammen local envelope, Rademacher tail envelope and SD constructions. Preserve continuous-derivative refusal, explicit methods, fitted counts, RNG safeguards and computational owners; saved evidence is limited to two originals. Main observation rows retain the fitted physical coordinates so strict uniform NN support ties agree with the plotted fit; auxiliary Gaussian projections remain standardized.
 
 * Extend the established degree-zero Epanechnikov GNN/ANN corrected constructions and defaults to declared fixed support. Retain donor-specific ANN support normalization, frozen-radius derivatives, Gaussian auxiliary fits and numerical/compute owners; higher-degree and other-kernel boundaries are unchanged.
