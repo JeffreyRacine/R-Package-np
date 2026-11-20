@@ -44,14 +44,14 @@
         isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L))))
     return("incumbent")
   # Fixed constructions share the qualified complete non-Gaussian rows.
-  # Degree-zero Epanechnikov NN also shares the existing pairs reducers.
+  # Degree-zero Epanechnikov NN also shares the qualified SD/wild and pairs reducers.
   if ((identical(calibration, "basic-local-envelope") ||
        (identical(bws[["type"]], "fixed") &&
         isTRUE(calibration %in% c("basic-envelope", "separate-tails",
                                  "tail-envelope", "absolute"))) ||
        (.np_bias_regression_nn_zero(bws) &&
         isTRUE(calibration %in% c("basic-envelope", "separate-tails",
-                                 "tail-envelope")))) &&
+                                 "tail-envelope", "absolute")))) &&
       isTRUE(bws[["type"]] %in% c("fixed", "generalized_nn", "adaptive_nn")) &&
       bws[["ckerorder"]] == 2L &&
       ((identical(bws[["ckertype"]], "epanechnikov") &&
@@ -77,7 +77,7 @@
   pairs <- bootstrap %in% c("inid", "fixed", "geom")
   mammen <- identical(bootstrap, "wild") && identical(wild, "mammen")
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
-      pairs && isTRUE(bws[["ncon"]] > 0L) &&
+      (pairs || mammen) && isTRUE(bws[["ncon"]] > 0L) &&
       .np_bias_regression_nn_zero(bws))
     return("basic-local-envelope")
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
@@ -89,7 +89,8 @@
   # For the distinct Rademacher law, retain both its signed and absolute
   # intervals. Resolve this declared-law choice once for the complete family.
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
-      identical(bws[["type", exact=TRUE]], "fixed") &&
+      (identical(bws[["type", exact=TRUE]], "fixed") ||
+       .np_bias_regression_nn_zero(bws)) &&
       isTRUE(bws[["ncon", exact=TRUE]] > 0L) &&
       identical(bootstrap, "wild") && identical(wild, "rademacher") &&
       identical(.np_bias_regression_kernel_class(bws, "tail-envelope"),
@@ -98,18 +99,26 @@
   "absolute"
 }
 
-.np_bias_regression_kernel_law <- function(admission, law) {
-  if (!is.null(admission) && !identical(admission[["type"]], "fixed") &&
-      (!is.character(law) || length(law) != 1L || is.na(law) ||
-       !law %in% c("inid", "fixed", "geom")))
-    stop("second-order kernel NN envelopes require inid, fixed or geom resampling", call.=FALSE)
-  if (!is.null(admission) && identical(admission[["type"]], "fixed")) {
+.np_bias_regression_kernel_law <- function(admission, law, bws = NULL) {
+  fixed <- !is.null(admission) && identical(admission[["type"]], "fixed")
+  nn.zero <- !is.null(admission) && !fixed &&
+    .np_bias_regression_nn_zero(bws)
+  if (!is.null(admission) && !fixed) {
+    allowed <- if (nn.zero) c("gaussian", "mammen", "rademacher", "inid", "fixed", "geom") else
+      c("inid", "fixed", "geom")
+    if (!is.character(law) || length(law) != 1L || is.na(law) || !law %in% allowed)
+      stop(if (nn.zero)
+        "degree-zero kernel NN inference requires Gaussian, Mammen, Rademacher, inid, fixed or geom resampling" else
+        "second-order kernel NN envelopes require inid, fixed or geom resampling", call.=FALSE)
+  }
+  if (fixed || nn.zero) {
+    description <- if (fixed) "fixed non-Gaussian" else "degree-zero NN non-Gaussian"
     if (identical(admission[["calibration"]], "absolute") &&
         !isTRUE(law %in% c("gaussian", "mammen", "rademacher", "inid", "fixed", "geom")))
-      stop("fixed non-Gaussian absolute calibration requires Gaussian, Mammen, Rademacher, inid, fixed or geom resampling", call.=FALSE)
+      stop(paste(description, "absolute calibration requires Gaussian, Mammen, Rademacher, inid, fixed or geom resampling"), call.=FALSE)
     if (isTRUE(admission[["calibration"]] %in% c("separate-tails", "tail-envelope")) &&
         !isTRUE(law %in% c("mammen", "rademacher", "inid", "fixed", "geom")))
-      stop("fixed non-Gaussian tail calibration requires Mammen, Rademacher, inid, fixed or geom resampling", call.=FALSE)
+      stop(paste(description, "tail calibration requires Mammen, Rademacher, inid, fixed or geom resampling"), call.=FALSE)
   }
   invisible(NULL)
 }
@@ -141,7 +150,7 @@
     version="regression-kernel-envelope-v1", calibration=calibration,
     kernel=bws[["ckertype"]], order=bws[["ckerorder"]], type=bws[["type"]],
     bound=bws[["ckerbound"]], lower=bws[["ckerlb"]], upper=bws[["ckerub"]]) else NULL
-  .np_bias_regression_kernel_law(admission, law)
+  .np_bias_regression_kernel_law(admission, law, bws)
   if (!is.null(admission) && identical(bws[["type"]], "generalized_nn") &&
       any(reg[["degree.engine"]] > 1L))
     stop("second-order kernel generalized-NN envelopes are currently qualified only for main degrees at most one", call.=FALSE)
