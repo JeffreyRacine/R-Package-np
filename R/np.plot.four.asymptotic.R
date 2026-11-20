@@ -1218,7 +1218,7 @@
   # it merely to inspect ownership could change large-bandwidth eligibility.
   projection <- NULL
   captured <- NULL
-  lean <- !scalar && .np_regression_precision_scope(bws)
+  lean <- !scalar && .npreghat_fitted_capture_scope(bws)
   if(!scalar) {
     captured <- .np_plot_lsq_gradient_projection(bws,x,q,ex,
       gradient.order=derivative.order,capture.gradient=lean)
@@ -1236,7 +1236,8 @@
   # Retain whole evaluation geometry; its full map is explicitly budgeted.
   D <- if(lean) {
     geometry <- .np_plot_lsq_gate_geometry(bws,x,ex,max.bytes=max.bytes)
-    attr(geometry,".np.fit.gate") <- captured$gate
+    if(identical(bws[["type",exact=TRUE]],"fixed"))
+      attr(geometry,".np.fit.gate") <- captured$gate
     P <- .np_plot_projection_slice(captured$gradient.projection,seq_len(m),
       (match(coordinate,continuous)-1L)*width+seq_len(width))
     if(!isTRUE(projection[[3L]])) attr(P,".np.fit.accepted") <- TRUE
@@ -1373,12 +1374,15 @@
 .np_plot_lsq_gradient_projection <- function(bws,x,q,ex,gradient.order=1L,
                                                 package='np',return.args=FALSE,
                                                 capture.gradient=FALSE,allow.empty.rows=FALSE,
-                                                capture.mean.only=FALSE) {
+                                                capture.mean.only=FALSE,training=FALSE) {
   capture.gradient <- npValidateScalarLogical(capture.gradient, 'capture.gradient')
   capture.mean.only <- npValidateScalarLogical(capture.mean.only, 'capture.mean.only')
   if(capture.mean.only && !capture.gradient)
     stop('mean-only capture requires the lean capture request',call.=FALSE)
+  training <- npValidateScalarLogical(training, 'training')
   x<-toFrame(x);ex<-toFrame(ex)
+  if(training && !identical(x,ex))
+    stop('training capture requires identical training and evaluation frames',call.=FALSE)
   if(!(x %~% ex) || nrow(x)<2L || nrow(ex)<1L || length(q)!=nrow(x) ||
      !is.numeric(q) || any(!is.finite(q)) || anyNA(x) || anyNA(ex) ||
      length(bws[['bw',exact=TRUE]])!=ncol(x))
@@ -1399,6 +1403,7 @@
   x<-adjustLevels(x,bws$xdati);ex<-adjustLevels(ex,bws$xdati,allowNewCells=TRUE)
   npKernelBoundsCheckEval(ex,bws$icon,bws$ckerlb,bws$ckerub,argprefix='cker')
   xx<-toMatrix(x);ee<-toMatrix(ex)
+  if(training) ee<-ee[FALSE,,drop=FALSE]
   npCheckRegressionDesignCondition(reg.code=reg$code,xcon=xx[,bws$icon,drop=FALSE],
     basis=spec$basis.engine,degree=spec$degree.engine,
     bernstein.basis=spec$bernstein.basis.engine,where='plot gradient projection')
@@ -1410,7 +1415,7 @@
       epanechnikov=CKER_EPAN+bws$ckerorder/2-1,uniform=CKER_UNI,beta=CKER_COORDINATE),
     ukerneval=switch(bws$ukertype,aitchisonaitken=UKER_AIT,liracine=UKER_LR),
     okerneval=switch(bws$okertype,wangvanryzin=OKER_WANG,liracine=OKER_LR,racineliyan=OKER_RLY),
-    ey_is_ty=TRUE,do_grad=!capture.mean.only,regtype=reg$code,no.ex=FALSE,
+    ey_is_ty=TRUE,do_grad=!capture.mean.only,regtype=reg$code,no.ex=training,
     mcv.numRow=attr(bws$xmcv,'num.row'),
     int_do_tree=if(beta)DO_TREE_NO else .npreg_fit_tree_code(bws,bws$ncon,bws$nuno+bws$nord),
     categorical.compress=if(beta && bws$nuno+bws$nord>0L)

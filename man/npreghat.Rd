@@ -111,8 +111,8 @@ These arguments control local-polynomial basis, degree, derivatives, leave-one-o
   implement only that policy reject an explicit nonzero value rather than
   ignoring it; the generic mixed-derivative owner continues to support an
   explicit base ridge, with absolute increments \code{1/n.train} on that
-  explicit-ridge route. Default higher and mixed derivatives instead share
-  the canonical LP solve-admission and automatic ridge policy used by fitting.
+  explicit-ridge route. With \code{ridge = 0}, higher and mixed derivatives use their selected
+  computational owner's automatic numerical ridge policy, as described below.
   Wider systems restore the response intercept from the signed pristine
   Gram intercept.}
 
@@ -171,12 +171,19 @@ Further arguments are passed to methods.
   must already have the length of that intersection. Supply explicitly
   aligned rows when using native data arguments instead of a formula.
 
-Local-polynomial operators retain the fitted solve's numerical ridge
-adjustment; see Numerical Ridging in \code{\link{npreg}} and its
-Seifert--Gasser reference. A hat operator alone does not estimate residual
-variance or apply the residual normalization used by regression inference.
-Fewer nonzero-weight donor rows than basis coefficients trigger the same
-existing ridge policy as fitting, for levels and derivative operators.
+For continuous Gaussian order-2 fixed-bandwidth models and continuous
+Gaussian or Epanechnikov order-2 generalized-nearest-neighbour models
+with positive polynomial degree, level and pure-derivative operators with
+\code{leave.one.out = FALSE} and \code{ridge = 0} reuse the fitted solve's
+accepted numerical ridge adjustment. Mixed-derivative operators apply the
+automatic ridge policy to their own moment construction; their accepted
+ridge, and its scale, need not match those of a level or pure-derivative
+operator. See Numerical Ridging in \code{\link{npreg}}
+and its Seifert--Gasser reference. A hat operator alone does not estimate
+residual variance or apply the residual normalization used by regression
+inference.
+Fewer nonzero-weight donor rows than basis coefficients trigger automatic
+ridging under the selected computational owner's policy.
 This is a structural rank bound, not a new numerical conditioning threshold.
 
 For \code{output = "matrix"}, the return value is a matrix with class
