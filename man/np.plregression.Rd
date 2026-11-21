@@ -219,6 +219,8 @@ Further arguments are passed to \code{\link{npplregbw}} and its component \code{
   }
 }
 \details{
+  Use \code{\link{nppltest}} to test whether the designated parametric regressors enter linearly and additively given the nuisance covariates.
+
   The primary response must be a one-dimensional numeric (integer or double)
   vector. Factors and ordered factors are not accepted as primary responses,
   including retained responses used in a new fit or bandwidth search.
@@ -492,6 +494,7 @@ failures must be considered when experimenting with these bounds.
 }
 
 \seealso{
+  \code{\link{nppltest}},
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{

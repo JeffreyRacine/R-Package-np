@@ -17,27 +17,8 @@
   })
   V <- do.call(cbind, unname(columns))
   if (any(!is.finite(V))) stop("Non-finite projection coordinates; rescale the predictors.", call. = FALSE)
-  n <- nrow(V)
-  A <- matrix(0, n, n)
-  for (i in seq_len(n)) {
-    delta <- sweep(V, 2L, V[i, ], "-")
-    if (any(!is.finite(delta)))
-      stop("Numerically unrepresentable projection differences; rescale the predictors.", call. = FALSE)
-    # Normalize each direction before squaring to avoid overflow and underflow.
-    largest <- abs(delta[cbind(seq_len(n), max.col(abs(delta), ties.method = "first"))])
-    zero <- largest == 0
-    largest[zero] <- 1
-    direction <- delta/largest
-    radius <- sqrt(rowSums(direction^2))
-    radius[zero] <- 1
-    cosine <- tcrossprod(direction / radius)
-    mass <- acos(-pmax(pmin(cosine, 1), -1)) / (2 * pi)
-    mass[zero, ] <- mass[, zero] <- 0.5
-    mass[zero, zero] <- 1
-    diag(mass) <- ifelse(zero, 1, 0.5)
-    A <- A + mass
-  }
-  A / n^2
+  storage.mode(V) <- "double"
+  .Call(C_np_pltest_angles, V)
 }
 
 .pltest_sun_bandwidth <- function(X, y, Z, continuous, cells) {
@@ -127,14 +108,34 @@
 
 # The package hat route and public fits can use different categorical weights
 # near a bandwidth endpoint. Construct the actual public fixed-selector operator.
-.pltest_operator <- function(bw, X, y, Z) {
+.pltest_operator <- function(bw, X, y, Z, shared.sun = FALSE) {
   n <- length(y)
   fit <- function(v) .pltest_local({
     fitted.mean <- as.numeric(fitted(npplreg(bws = bw, txdat = X, tydat = v, tzdat = Z)))
     if (length(fitted.mean) != n) stop("Expected a fitted mean for every training row.", call. = FALSE)
     fitted.mean
   })
-  H <- vapply(seq_len(n), function(j) fit(as.numeric(seq_len(n) == j)), numeric(n))
+  # The continuous Sun construction gives every conditional mean the same
+  # fixed Gaussian smoother. Apply it also to the slope columns, then use
+  # the same residualized QR projection as the training fit.
+  if (shared.sun && all(vapply(Z, is.numeric, logical(1)))) {
+    S <- .npreghat_complete(bws = bw[["bw"]][[1L]], txdat = Z, output = "matrix")
+    .pltest_local({
+      linear <- vapply(seq_along(X), function(j)
+        .np_plreg_numeric_response(X[[j]], bw[["bw"]][[j+1L]][["ydati"]]), numeric(n))
+      smooth <- S %*% linear
+      D <- linear - smooth
+      factorization <- qr(D, tol = .Machine$double.eps)
+      formation <- vapply(seq_len(ncol(D)), function(j)
+        .np_plreg_residual_formation_error(linear[,j], smooth[,j]), numeric(1))
+      .np_plreg_check_residualized_rank(factorization, ncol(D), "nppltest", formation)
+      # Q Q' (I-S) avoids applying n Householder transforms to the identity.
+      Q <- qr.Q(factorization)
+      H <- S + Q %*% (t(Q) - crossprod(Q, S))
+    })
+  } else {
+    H <- vapply(seq_len(n), function(j) fit(as.numeric(seq_len(n) == j)), numeric(n))
+  }
   mu <- fit(y)
   .pltest_local({
     if (length(mu) != n || any(!is.finite(mu)) || any(!is.finite(H)))
@@ -276,7 +277,7 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
     # Check shared kernel, basis and bandwidth settings before collective fits.
     bw <- .pltest_selected_bw(bw)
   }
-  fitted.null <- .pltest_operator(bw, X, y, Z)
+  fitted.null <- .pltest_operator(bw, X, y, Z, shared.sun = bw.method == "sun")
   .pltest_local({
     H <- fitted.null$H
     mu <- fitted.null$mean
@@ -359,7 +360,7 @@ summary.pltest <- function(object, ...) {
 
 .pltest_rng_capture <- function() .np_rng_scope_capture()
 
-.pltest_preflight <- function(B) invisible(NULL)
+.pltest_preflight <- function(B, where = "nppltest") invisible(NULL)
 
 .pltest_bootstrap <- function(H, A, center, amplitude, B, boot.method) {
   progress <- .np_progress_begin("Bootstrapping partial linearity", total = B, surface = "bootstrap")
@@ -376,7 +377,7 @@ summary.pltest <- function(object, ...) {
   list(statistics = values, rank.counts = NULL)
 }
 
-.pltest_local <- function(expr) force(expr)
+.pltest_local <- function(expr, where = "nppltest") force(expr)
 .pltest_same <- function(value) invisible(NULL)
 .pltest_current_stream <- function() invisible(NULL)
 .pltest_angles <- function(predictors, standardize) .pltest_geometry(predictors, standardize)

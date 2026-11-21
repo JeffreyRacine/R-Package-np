@@ -540,6 +540,8 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+  Use \code{\link{npindextest}} to test whether the conditional mean (or binary success probability) depends on the covariates through a single linear index with unknown coefficients and link.
+
   The primary response must be a one-dimensional numeric (integer or double)
   vector. Factors and ordered factors are not accepted as primary responses,
   including retained responses used in a new fit or bandwidth search.
@@ -881,6 +883,7 @@ or standard-deviation factors.
   clustered computing environment to facilitate computation involving
   large datasets.  }
 
+\seealso{\code{\link{npindextest}}, \code{\link{npindex}}}
 \examples{
 \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): Generate a simple linear model then

@@ -43,6 +43,7 @@ export(b.star
        ,npqreg
        ,npquantile
        ,npcmstest
+       ,npindextest
        ,nppltest
        ,npconmode
        ,npdeneqtest
@@ -85,6 +86,7 @@ S3method(print,condistribution)
 S3method(print,npkernelsum)
 S3method(print,qregression)
 S3method(print, cmstest)
+S3method(print, indextest)
 S3method(print, pltest)
 S3method(print, npregiv)
 S3method(print, npregivderiv)
@@ -203,6 +205,7 @@ S3method(summary, lsqregression)
 S3method(summary, npregiv)
 S3method(summary, npregivderiv)
 S3method(summary, cmstest)
+S3method(summary, indextest)
 S3method(summary, pltest)
 S3method(summary, conmode)
 S3method(summary,npcopula)

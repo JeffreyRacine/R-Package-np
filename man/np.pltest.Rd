@@ -66,7 +66,8 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   estimates the null conditional means. A bootstrap response is its chosen
   center plus a residual amplitude times an independent multiplier. Each
   draw is refitted with the test bandwidths. The test forms the training
-  operator from public unit-response fits, which preserves the fitted
+  operator from shared fitted smoother weights for continuous Sun nuisance variables
+  or from public unit-response fits for other configurations, preserving the fitted
   estimator's categorical kernel conventions.
 
   For a single continuous nuisance variable the default Gaussian bandwidth
@@ -87,8 +88,9 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   choice based on dimension or a preliminary test.
 
   Computation stores dense training matrices and takes cubic time for the
-  angular calculation at fixed predictor dimension. The test operator needs
-  one public fit per training observation plus a fit on the observed response.
+  angular calculation at fixed predictor dimension. The continuous Sun test reuses
+  one training smoother and the residualized linear projection across all draws.
+  Other configurations construct the operator using public unit-response fits.
   The CV-pilot HC2 option constructs a second such operator.
 }
 \value{
