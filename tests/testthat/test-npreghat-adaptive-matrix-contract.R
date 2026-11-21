@@ -222,3 +222,22 @@ test_that("fixed lp matrix hat matches apply and npreg across higher degrees", {
     expect_equal(as.vector(grad.eval.apply), as.vector(fit.eval$grad[, 1L]), tolerance = 1e-8)
   }
 })
+
+test_that("adaptive beta LC derivative hats retain the single-query matrix dimension", {
+  n <- 36L
+  tx <- data.frame(x = seq(0.03, 0.97, length.out = n),
+                   z = ((seq_len(n) * 13L) %% 37L) / 37)
+  y <- sin(tx$x + tx$z)
+  query <- tx[c(8L, 19L, 30L), , drop = FALSE]
+  bws <- npregbw(xdat = tx, ydat = y, bws = c(9, 9),
+                 bandwidth.compute = FALSE, regtype = "lc", bwtype = "adaptive_nn",
+                 ckertype = "beta", ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1))
+  for (s in list(c(1L, 0L), c(0L, 1L))) {
+    batch <- npreghat(bws, txdat = tx, exdat = query, s = s)
+    for (i in seq_len(nrow(query))) {
+      H <- npreghat(bws, txdat = tx, exdat = query[i, , drop = FALSE], s = s)
+      expect_identical(dim(H), c(1L, n))
+      expect_equal(as.numeric(H), as.numeric(batch[i, ]), tolerance = 1e-12)
+    }
+  }
+})
