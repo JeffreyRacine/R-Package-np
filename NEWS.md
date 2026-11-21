@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Add `nppltest()` for testing a partially linear conditional mean against an unrestricted alternative. The projection test accepts a fit or bandwidth object and includes experimental mixed-data calibration.
+
 * Improve frozen-radius first-derivative accuracy for univariate second-order beta nearest-neighbour local-constant and degree-zero GLP regression fits and hat rows.
 
 * Improve the numerical accuracy of bounded univariate quadratic adaptive-nearest-neighbour Gaussian and beta regression fits and hat rows. The weighted-design calculation uses the rank and ridge accepted by the existing solver.
