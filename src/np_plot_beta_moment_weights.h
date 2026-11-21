@@ -1,4 +1,5 @@
 #include "np_plot_lp_precision_certificate.h"
+#include "np_plot_beta_original_certificate.h"
 /* Scratch request-only ordinary-regression beta moment-scale replay.
  * Include at end of jksum.c. No existing caller or numerical owner is edited.
  * The accepted B and P must come from the same ordinary LSQ response fit.
@@ -13,6 +14,8 @@ typedef struct {
   NPGLPBasisCtx *basis_context;
   NPLPSolveWorkspace solve;
   NPLPDesignSupport design;
+  NPRegressionPrecision precision;
+  NPBetaOriginalCertificate original;
 } NPPlotBetaMomentCall;
 
 static void np_plot_beta_moment_cleanup(void *data, Rboolean jump)
@@ -21,6 +24,8 @@ static void np_plot_beta_moment_cleanup(void *data, Rboolean jump)
   (void)jump;
   if(c->scale_installed) int_LARGE_SF=c->previous_scale;
   np_lp_solve_workspace_clear(&c->solve);
+  np_regression_precision_clear(&c->precision);
+  np_beta_original_clear(&c->original);
   if(c->basis_context)for(int d=0;d<c->context_count;++d)
     np_glp_basis_ctx_free(c->basis_context+d);
   free(c->basis_context);free(c->terms);
@@ -140,6 +145,9 @@ static SEXP np_plot_beta_moment_body(void *data)
   int which=0,derivative_order=0,bernstein=0,basis_mode=0;
   double *eval_basis=NULL,*eval_derivative=NULL,*coefficient=NULL,*adjoint=NULL,*adjoint_error=NULL;
   NPPlotLPCertificate certificate = {0};
+  const int original_scope=c->derivative && mode==BW_GEN_NN && order==2 && nu==0 && no==0;
+  SEXP fit_policy=R_NilValue;
+  int original_init=0;
   if(c->derivative){
     int np,wp;np_plot_beta_moment_dims(A(11),&np,&wp);
     if(np!=m||wp!=w||TYPEOF(A(12))!=INTSXP||XLENGTH(A(12))!=pc)
@@ -147,6 +155,15 @@ static SEXP np_plot_beta_moment_body(void *data)
     for(int z=13;z<=16;++z)
       if(TYPEOF(A(z))!=INTSXP||XLENGTH(A(z))!=1||INTEGER(A(z))[0]==NA_INTEGER)
         error("beta derivative replay needs integer basis/direction metadata");
+    fit_policy=getAttrib(A(11),install(".np.fit.precision"));
+    if(fit_policy!=R_NilValue) {
+      int rows,columns;np_plot_beta_moment_dims(fit_policy,&rows,&columns);
+      if(!original_scope || rows!=m || columns!=2)
+        error("beta derivative replay precision metadata differs");
+      for(int j=0;j<m;++j)
+        if(REAL(fit_policy)[j]<0.0 || REAL(fit_policy)[m+j]<0.0)
+          error("beta derivative replay precision metadata is invalid");
+    }
     basis_mode=INTEGER(A(13))[0];bernstein=INTEGER(A(14))[0];
     which=INTEGER(A(15))[0];derivative_order=INTEGER(A(16))[0];
     if((bernstein!=0&&bernstein!=1)||which<0||which>=pc||derivative_order<0||
@@ -179,6 +196,7 @@ static SEXP np_plot_beta_moment_body(void *data)
     coefficient=(double *)R_alloc(w,sizeof(double));
     adjoint=(double *)R_alloc(w,sizeof(double));adjoint_error=(double *)R_alloc(w,sizeof(double));
     np_plot_lp_certificate_init(&certificate,w);
+    if(original_scope)original_init=np_beta_original_init(&c->original,n,w,budget-forecast);
   }
   double *y2=(double *)R_alloc(n,sizeof(double));
   double **outer=(double **)R_alloc(w+2,sizeof(double *));
@@ -215,12 +233,18 @@ static SEXP np_plot_beta_moment_body(void *data)
   int nprotect=1;
   SEXP result=PROTECT(allocMatrix(REALSXP,n,m));
   SEXP D=R_NilValue,P=R_NilValue,point=R_NilValue,gradient=R_NilValue,ridge=R_NilValue,map_error=R_NilValue,relative_error=R_NilValue,defect=R_NilValue,certified=R_NilValue;
+  SEXP certificate_status=R_NilValue;
   if(c->derivative){
     D=PROTECT(allocMatrix(REALSXP,n,m));P=PROTECT(allocMatrix(REALSXP,m,w));
     point=PROTECT(allocVector(REALSXP,m));gradient=PROTECT(allocVector(REALSXP,m));
     ridge=PROTECT(allocVector(REALSXP,m));map_error=PROTECT(allocMatrix(REALSXP,n,m));
     relative_error=PROTECT(allocVector(REALSXP,m));defect=PROTECT(allocVector(REALSXP,m));
     certified=PROTECT(allocVector(LGLSXP,m));nprotect+=9;
+    if(original_scope) {
+      certificate_status=PROTECT(allocVector(INTSXP,m));++nprotect;
+      setAttrib(certified,install(".np.certificate.status"),certificate_status);
+    }
+    if(fit_policy!=R_NilValue)setAttrib(P,install(".np.fit.precision"),fit_policy);
   }
   for(int j=0;j<m;++j){
     R_CheckUserInterrupt();
@@ -261,24 +285,56 @@ static SEXP np_plot_beta_moment_body(void *data)
       }
       if(np_lp_solve_workspace_solve_adjoint_factored(&c->solve,w,1,anchor,&policy)!=NP_LP_SOLVE_POLICY_OK)
         error("beta derivative replay level adjoint failed");
+      const int precise=fit_policy!=R_NilValue && REAL(fit_policy)[m+j]>0.0;
+      if(precise && (REAL(fit_policy)[j]!=policy.ridge_total || REAL(fit_policy)[m+j]!=anchor))
+        error("beta derivative replay accepted ridge/anchor differs");
       for(int i=0;i<w;++i){
         const double v=c->solve.rhs_work[i],accepted=REAL(A(11))[(size_t)i*m+j];
-        if(!R_FINITE(v)||fabs(v-accepted)>2e-11*(1.0+fabs(accepted)))
+        if(!R_FINITE(v) || (original_scope ?
+           (precise ? eval_basis[i]!=accepted : v!=accepted) :
+           fabs(v-accepted)>2e-11*(1.0+fabs(accepted))))
           error("beta derivative replay level adjoint differs from accepted fit");
-        REAL(P)[(size_t)i*m+j]=v;
+        REAL(P)[(size_t)i*m+j]=precise?eval_basis[i]:v;
         c->solve.rhs_source[i]=eval_derivative[i];
       }
       if(np_lp_solve_workspace_solve_adjoint_factored(&c->solve,w,1,anchor,&policy)!=NP_LP_SOLVE_POLICY_OK)
         error("beta derivative replay derivative adjoint failed");
-      for(int k=0;k<w;++k)adjoint[k]=derivative_order==0 ?
+      for(int k=0;k<w;++k)adjoint[k]=derivative_order==0 && !precise ?
         REAL(A(11))[j+(size_t)k*m] : c->solve.rhs_work[k];
-      for(int i=0;i<n;++i){
+      if(precise) {
+        if(!np_regression_precision_factor(&c->precision,basis,REAL(result)+(size_t)n*j,
+             n,w,REAL(fit_policy)[j],REAL(fit_policy)[m+j]) ||
+           !np_regression_precision_row(&c->precision,eval_basis))
+          error("beta derivative replay accepted precision factor failed");
+        REAL(point)[j]=np_regression_precision_apply(&c->precision,REAL(Y));
+        if(!np_regression_precision_row(&c->precision,eval_derivative))
+          error("beta derivative replay accepted precision row failed");
+        REAL(gradient)[j]=np_regression_precision_apply(&c->precision,REAL(Y));
+        memcpy(REAL(D)+(size_t)n*j,c->precision.row,(size_t)n*sizeof(double));
+      } else for(int i=0;i<n;++i){
         double v=0.0;for(int k=0;k<w;++k)v+=basis[k][i]*adjoint[k];
         v*=REAL(result)[(size_t)n*j+i];
         if(!R_FINITE(v))error("beta derivative replay derivative map is not representable");
         REAL(D)[(size_t)n*j+i]=v;
       }
       REAL(ridge)[j]=policy.ridge_total;
+      if(original_scope) {
+        double ratio=R_PosInf;int steps=0,status=original_init;
+        for(int i=0;i<n;++i)REAL(map_error)[(size_t)n*j+i]=R_PosInf;
+        if(!status && !np_plot_lp_certificate_factor_view(&certificate,&c->solve,eval_derivative,1))
+          status=NP_BETA_CERT_ARITHMETIC;
+        if(!status)status=np_beta_original_prepare(&c->original,basis,
+          REAL(result)+(size_t)n*j,policy.ridge_total,certificate.inverse);
+        if(!status)status=np_beta_original_evaluate(&c->original,basis,
+          REAL(result)+(size_t)n*j,policy.ridge_total,anchor,certificate.inverse,
+          eval_derivative,certificate.raw,REAL(D)+(size_t)n*j,
+          REAL(map_error)+(size_t)n*j,&ratio,&steps);
+        REAL(defect)[j]=original_init?R_PosInf:c->original.q;
+        REAL(relative_error)[j]=ratio;
+        INTEGER(certificate_status)[j]=status;
+        LOGICAL(certified)[j]=status==NP_BETA_CERT_OK;
+        continue;
+      }
       double defect_value=R_PosInf;
       int precision=np_plot_lp_certificate_adjoint(&certificate,&c->solve,eval_derivative,
         adjoint,anchor,&policy,adjoint_error,&defect_value);
@@ -328,5 +384,6 @@ SEXP np_plot_beta_moment_weights_native(SEXP args,int support_columns,
   NPPlotBetaMomentCall c={.args=args,.support_columns=support_columns,
     .counts=counts,.values=values,.scale_installed=0,.derivative=TYPEOF(args)==VECSXP&&XLENGTH(args)==17};
   np_lp_solve_workspace_init(&c.solve);
+  np_regression_precision_init(&c.precision);
   return R_UnwindProtect(np_plot_beta_moment_body,&c,np_plot_beta_moment_cleanup,&c,NULL);
 }

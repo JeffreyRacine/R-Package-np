@@ -1218,7 +1218,9 @@
   # it merely to inspect ownership could change large-bandwidth eligibility.
   projection <- NULL
   captured <- NULL
-  lean <- !scalar && .npreghat_fitted_capture_scope(bws)
+  # Beta retains its certificate-bearing branch even when hats use fitted capture.
+  lean <- !scalar && .npreghat_fitted_capture_scope(bws) &&
+    !identical(bws[["ckertype",exact=TRUE]],"beta")
   if(!scalar) {
     captured <- .np_plot_lsq_gradient_projection(bws,x,q,ex,
       gradient.order=derivative.order,capture.gradient=lean)
@@ -1613,7 +1615,7 @@
        !is.matrix(accepted.projection)||!is.double(accepted.projection)||
        !identical(dim(accepted.projection),c(nrow(ex),w)))
       stop('invalid beta derivative replay certificate')
-    args<-c(args,list(accepted.projection=accepted.projection[index,,drop=FALSE],
+    args<-c(args,list(accepted.projection=.np_plot_projection_slice(accepted.projection,index),
       degree=as.integer(spec$degree.engine),basis.code=as.integer(npLpBasisCode(spec$basis.engine)),
       bernstein=as.integer(isTRUE(spec$bernstein.basis.engine)),
       coordinate=derivative[1]-1L,order=derivative[2]))
