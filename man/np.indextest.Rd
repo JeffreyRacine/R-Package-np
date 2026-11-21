@@ -89,19 +89,34 @@ models. \emph{Annals of Statistics}, 21, 255--285.
 \code{\link{nppltest}}, \code{\link{npcmstest}}}
 \examples{
 \dontrun{
-set.seed(73)
-n <- 100L
+# set.seed() controls the simulated data. The test's random.seed argument
+# controls the bootstrap draws and defaults to 42 in both calls below.
+set.seed(42)
+n <- 160L
 d <- data.frame(x1 = rnorm(n), x2 = rnorm(n))
 z <- with(d, x1 + 0.6*x2)
 w <- with(d, x2 - 0.6*x1)
+
+# Under the Ichimura null, the conditional mean depends only on z.
+# The conditional variance may depend on the orthogonal direction w.
 d$y <- z + 0.45*sin(z) + (0.6 + 0.2*abs(w))*rnorm(n)
+
+# Under this Klein-Spady alternative, the log odds include an interaction
+# between z and w. No single linear index determines the success probability.
+d$choice <- rbinom(n, 1, plogis(z + 1.8*z*w))
+
 bw <- npindexbw(y ~ x1 + x2, data = d, method = "ichimura", nmulti = 1)
 summary(npindextest(npindex(bw), B = 99))
+# p = 0.69 at seed 42. Do not reject the single-index null at level 0.05.
 
-d$choice <- rbinom(n, 1, plogis(z + 1.8*z*w))
 binary <- npindexbw(choice ~ x1 + x2, data = d, method = "kleinspady",
                     nmulti = 1)
-summary(npindextest(binary, bw.method = "maximum", B = 99))
+summary(npindextest(binary, B = 99))
+# p = 0.01 at seed 42. Reject the single-index null at level 0.05.
+
+# With another data seed, even a true null can be rejected, and a sample
+# drawn under the alternative can fail to reject. With the data held fixed,
+# changing random.seed can change the p-value through bootstrap variation.
 }
 }
 \keyword{htest}

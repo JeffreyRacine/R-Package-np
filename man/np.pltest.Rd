@@ -141,18 +141,30 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
 \seealso{\code{\link{npplreg}}, \code{\link{npplregbw}}, \code{\link{npcmstest}}}
 \examples{
 \dontrun{
-# Two linear regressors, one continuous nuisance and heteroskedastic noise.
-set.seed(41)
+# set.seed() controls the simulated data. The test's random.seed argument
+# controls the bootstrap draws and defaults to 42 in both calls below.
+set.seed(42)
 n <- 120L
 d <- data.frame(x1 = rnorm(n), x2 = rnorm(n), z = runif(n, -1, 1))
-d$y <- with(d, 0.8*x1 - 0.6*x2 + sin(pi*z) + (0.45 + 0.30*z^2)*rnorm(n))
+noise <- with(d, (0.45 + 0.30*z^2)*rnorm(n))
 
-bw <- npplregbw(y ~ x1 + x2 | z, data = d, regtype = "ll", nmulti = 1)
-fit <- npplreg(bw)
-summary(nppltest(fit, B = 199))
-# The bandwidth object supplies the same training data. In this DGP both
-# slopes are independent of z, so a pilot may select a very large bandwidth.
-summary(nppltest(bw, B = 199, boot.correction = "cv-raw", boot.method = "wild"))
+# Under the null, x1 and x2 have constant slopes and z enters smoothly.
+d$y0 <- with(d, 0.8*x1 - 0.6*x2 + sin(pi*z) + noise)
+bw0 <- npplregbw(y0 ~ x1 + x2 | z, data = d, regtype = "ll", nmulti = 1)
+fit0 <- npplreg(bw0)
+summary(nppltest(fit0, B = 199))
+# p = 0.48 at seed 42. Do not reject partial linearity at level 0.05.
+
+# For the alternative, keep the predictors and noise and add curvature in x1.
+# The nuisance function of z cannot absorb this term.
+d$y1 <- with(d, y0 + 1.5*(x1^2 - 1))
+bw1 <- npplregbw(y1 ~ x1 + x2 | z, data = d, regtype = "ll", nmulti = 1)
+summary(nppltest(bw1, B = 199))
+# p = 0.005 at seed 42. Reject partial linearity at level 0.05.
+
+# With another data seed, even a true null can be rejected, and a sample
+# drawn under the alternative can fail to reject. With the data held fixed,
+# changing random.seed can change the p-value through bootstrap variation.
 } % enddontrun
 }
 \keyword{htest}
