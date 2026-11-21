@@ -9,7 +9,11 @@
 #include "continuous_kernel_row.h"
 
 typedef struct {
-  double near_unit, log_unit, log_complement, concentration;
+  double near_unit, log_unit, log_complement;
+  union {
+    double concentration; /* donor-owned ANN bandwidth */
+    double log_odds;      /* shared-bandwidth GNN score coordinate */
+  } geometry;
   int upper;
 } NPBetaLCNNDonor;
 
@@ -18,7 +22,7 @@ typedef struct NPBetaLCNNRows {
   int evaluation, shared_radius;
   double lower, upper, span, log_span;
   double query, u, v, lower_gap, upper_gap, log_u, log_v;
-  double a1, b1, mode_log;
+  double a1, b1, mode_log, score_scale;
   np_beta_pdf_derivative_component score;
 } NPBetaLCNNRows;
 
@@ -53,7 +57,10 @@ static np_beta_status prepare_donors(const NPContinuousKernelRowPlan *p,
     d->near_unit = d->upper ? s.observation_complement_unit : s.observation_unit;
     d->log_unit = s.log_observation_unit;
     d->log_complement = s.log_observation_complement_unit;
-    d->concentration = s.concentration;
+    if(r->shared_radius)
+      d->geometry.log_odds = d->log_unit - d->log_complement;
+    else
+      d->geometry.concentration = s.concentration;
   }
   *out = r;
   return NP_BETA_OK;
@@ -77,6 +84,7 @@ static np_beta_status prepare_query(const NPContinuousKernelRowPlan *p,
     r->a1 = s.target_unit * s.concentration;
     r->b1 = s.target_complement_unit * s.concentration;
     r->score.concentration = s.concentration;
+    r->score_scale = s.concentration / r->span;
     r->score.support_length = r->span;
     r->score.digamma_alpha = digamma(1.0 + r->a1);
     r->score.digamma_beta = digamma(1.0 + r->b1);
@@ -122,7 +130,7 @@ np_beta_status np_beta_lc_nn_terms(const NPContinuousKernelRowPlan *plan,
   }
   const double x = plan->train[0][observation];
   const NPBetaLCNNDonor *d = &r->donors[observation];
-  const double tau = r->shared_radius ? r->score.concentration : d->concentration;
+  const double tau = r->shared_radius ? r->score.concentration : d->geometry.concentration;
   if(x == r->lower || x == r->upper || r->query < r->lower ||
      r->query > r->upper || tau == 0.0) {
     const double h = r->shared_radius ? plan->bandwidth_eval[0][evaluation_index] :
@@ -143,6 +151,28 @@ np_beta_status np_beta_lc_nn_terms(const NPContinuousKernelRowPlan *plan,
       r->log_span;
   }
   if(ISNAN(*level) || *level == INFINITY) return NP_BETA_ERR_NUMERIC;
+  if(derivative != NULL && r->shared_radius) {
+    /* A second-order beta kernel has one positive density component.
+     * Interior donors have only a regular derivative. Keep the same
+     * score and signed-log representation without assembling empty
+     * positive, negative and jump accumulators for each donor. */
+    derivative->regular_log_absolute = -INFINITY;
+    derivative->jump_log_absolute = -INFINITY;
+    derivative->regular_sign = 0;
+    derivative->jump_sign = 0;
+    if(*level == -INFINITY) return NP_BETA_OK;
+    const double score = r->score_scale *
+      (d->geometry.log_odds - r->score.digamma_alpha + r->score.digamma_beta);
+    if(ISNAN(score)) return NP_BETA_ERR_NUMERIC;
+    if(score == 0.0) return NP_BETA_OK;
+    if(!R_FINITE(score)) return NP_BETA_ERR_RANGE;
+    const double term = *level + log(fabs(score));
+    if(term == -INFINITY) return NP_BETA_OK;
+    if(!R_FINITE(term)) return NP_BETA_ERR_RANGE;
+    derivative->regular_log_absolute = term;
+    derivative->regular_sign = score > 0.0 ? 1 : -1;
+    return NP_BETA_OK;
+  }
   if(derivative != NULL) {
     np_beta_shape s = {.lower=r->lower, .upper=r->upper, .support_length=r->span,
       .target_unit=r->u, .target_complement_unit=r->v, .concentration=tau,
