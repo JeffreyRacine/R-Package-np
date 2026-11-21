@@ -47,6 +47,8 @@
     stop("The test requires a fixed, unbounded, second-order Gaussian local-constant fit.", call. = FALSE)
   if (length(bw[["fval"]]) != 1L || !is.finite(bw[["fval"]]))
     stop("The test requires a joint index and bandwidth search.", call. = FALSE)
+  if (!is.null(bw[["index.design"]]))
+    stop("The test requires continuous numeric covariates.", call. = FALSE)
   recipe <- .indextest_recipe(bw)
   training <- bw[[".np.native.training"]]
   if (is.null(training)) {
@@ -69,6 +71,15 @@
     stop("The joint search must have a matching, finite, nonconstant complete training sample.", call. = FALSE)
   if (recipe$method == "kleinspady" && !all(y %in% c(0, 1)))
     stop("Klein-Spady requires a numeric 0/1 response.", call. = FALSE)
+  # A held-bandwidth npindex fit can replace its training data. Check the
+  # original search criterion once before using that direction for inference.
+  if (inherits(object, "singleindex")) {
+    checked <- .np_plot_with_local_compiled_eval(.npindexbw_certify_selected_candidate(c(bw[["beta"]][-1L], bw[["bw"]]),
+      as.matrix(x), y, bw, .npindex_resolve_spec(bw)))
+    if (!isTRUE(all.equal(as.double(checked$objective), as.double(bw[["fval"]]),
+                          tolerance = 1e-8)))
+      stop("The stored index search does not match the fit's training sample. Refit npindexbw on these data.", call. = FALSE)
+  }
   centered <- sweep(as.matrix(x), 2L, colMeans(x))
   scales <- sqrt(colMeans(centered^2))
   if (any(!is.finite(scales)) || any(scales <= 0))

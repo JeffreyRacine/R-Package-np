@@ -18,7 +18,8 @@ npindextest(object, bw.method = c("published", "maximum", "separate"),
 \arguments{
   \item{object}{An \code{\link{npindex}} fit or \code{\link{npindexbw}}
     object obtained by joint estimation of the direction and link bandwidth
-    on the retained training data. For \code{summary}, an \code{indextest}
+    on the retained training data. A fitted object with replacement training
+    data must reproduce the stored search criterion. For \code{summary}, an \code{indextest}
     result.}
   \item{bw.method}{Test bandwidth choice. \code{"published"} uses the
     authors' empirical factor one. \code{"maximum"} jointly calibrates three
@@ -89,22 +90,31 @@ models. \emph{Annals of Statistics}, 21, 255--285.
 \code{\link{nppltest}}, \code{\link{npcmstest}}}
 \examples{
 \dontrun{
-npRmpi.init(nslaves = 1L)
-tryCatch({
-  set.seed(73)
-  n <- 100L
-  d <- data.frame(x1 = rnorm(n), x2 = rnorm(n))
-  z <- with(d, x1 + 0.6*x2)
-  w <- with(d, x2 - 0.6*x1)
-  d$y <- z + 0.45*sin(z) + (0.6 + 0.2*abs(w))*rnorm(n)
-  bw <- npindexbw(y ~ x1 + x2, data = d, method = "ichimura", nmulti = 1)
-  summary(npindextest(npindex(bw), B = 99))
+in.check <- !force.run && (
+            nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
+            nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
+            nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
+            nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
+          )
 
-  d$choice <- rbinom(n, 1, plogis(z + 1.8*z*w))
-  binary <- npindexbw(choice ~ x1 + x2, data = d, method = "kleinspady",
-                      nmulti = 1)
-  summary(npindextest(binary, bw.method = "maximum", B = 99))
-}, finally = npRmpi.quit())
+if (!in.check) {
+  npRmpi.init(nslaves = 1L)
+  tryCatch({
+    set.seed(73)
+    n <- 100L
+    d <- data.frame(x1 = rnorm(n), x2 = rnorm(n))
+    z <- with(d, x1 + 0.6*x2)
+    w <- with(d, x2 - 0.6*x1)
+    d$y <- z + 0.45*sin(z) + (0.6 + 0.2*abs(w))*rnorm(n)
+    bw <- npindexbw(y ~ x1 + x2, data = d, method = "ichimura", nmulti = 1)
+    summary(npindextest(npindex(bw), B = 99))
+
+    d$choice <- rbinom(n, 1, plogis(z + 1.8*z*w))
+    binary <- npindexbw(choice ~ x1 + x2, data = d, method = "kleinspady",
+                        nmulti = 1)
+    summary(npindextest(binary, bw.method = "maximum", B = 99))
+  }, finally = npRmpi.quit())
+}
 }
 }
 \keyword{htest}
