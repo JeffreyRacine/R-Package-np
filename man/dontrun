@@ -9,6 +9,7 @@ sed -i bak -f sed_dontrun.scr data-wage1.Rd
 sed -i bak -f sed_dontrun.scr gradients.Rd
 sed -i bak -f sed_dontrun.scr mpi.comm.Rd
 sed -i bak -f sed_dontrun.scr np.cmstest.Rd
+sed -i bak -f sed_dontrun.scr np.pltest.Rd
 sed -i bak -f sed_dontrun.scr np.condensity.Rd
 # kept in \dontrun by default
 # sed -i bak -f sed_dontrun.scr np.condistribution.Rd
