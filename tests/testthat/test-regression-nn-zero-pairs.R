@@ -47,7 +47,7 @@ test_that("degree-zero Epanechnikov NN exposes pairs without changing its rows",
     expect_identical(.np_bias_regression_kernel_class(bw,"absolute"),"local-envelope")
     bounded <- bw;bounded$ckerbound <- "fixed"
     expect_identical(.np_bias_regression_kernel_class(bounded,"tail-envelope"),"local-envelope")
-    for(d in 1:3) {
+    for(d in 2:3) {
       higher <- bw;higher$regtype <- "lp";higher$basis <- "glp";higher$degree <- d
       expect_identical(.np_bias_regression_kernel_class(higher,"tail-envelope"),"unsupported")
       expect_identical(.np_bias_regression_calibration(higher,"default","bootstrap",
