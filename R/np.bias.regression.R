@@ -64,7 +64,7 @@
        (identical(bws[["type"]], "fixed") &&
         isTRUE(calibration %in% c("basic-envelope", "separate-tails",
                                  "tail-envelope", "absolute"))) ||
-       ((.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) ||
+       ((.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform", "beta")) ||
         .np_bias_regression_nn_first_order(bws, "epanechnikov")) &&
         isTRUE(calibration %in% c("basic-envelope", "separate-tails",
                                  "tail-envelope", "absolute")))) &&
@@ -77,7 +77,8 @@
            .np_bias_regression_nn_first_order(bws, "epanechnikov")) &&
           identical(bws[["ckerbound"]], "fixed")))) ||
        (identical(bws[["ckertype"]], "beta") &&
-        identical(bws[["type"]], "fixed") &&
+        (identical(bws[["type"]], "fixed") ||
+         .np_bias_regression_nn_zero(bws, "beta")) &&
         identical(bws[["ckerbound"]], "fixed")) ||
        (identical(bws[["ckertype"]], "uniform") &&
         (identical(bws[["type"]], "fixed") ||
@@ -97,7 +98,7 @@
   mammen <- identical(bootstrap, "wild") && identical(wild, "mammen")
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
       (pairs || mammen) && isTRUE(bws[["ncon"]] > 0L) &&
-      (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) ||
+      (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform", "beta")) ||
         .np_bias_regression_nn_first_order(bws, "epanechnikov")))
     return("basic-local-envelope")
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
@@ -110,7 +111,7 @@
   # intervals. Resolve this declared-law choice once for the complete family.
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
       (identical(bws[["type", exact=TRUE]], "fixed") ||
-       (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) ||
+       (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform", "beta")) ||
         .np_bias_regression_nn_first_order(bws, "epanechnikov"))) &&
       isTRUE(bws[["ncon", exact=TRUE]] > 0L) &&
       identical(bootstrap, "wild") && identical(wild, "rademacher") &&
@@ -123,7 +124,7 @@
 .np_bias_regression_kernel_law <- function(admission, law, bws = NULL) {
   fixed <- !is.null(admission) && identical(admission[["type"]], "fixed")
   nn.zero <- !is.null(admission) && !fixed &&
-    .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform"))
+    .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform", "beta"))
   nn.first <- !is.null(admission) && !fixed &&
     .np_bias_regression_nn_first_order(bws, "epanechnikov")
   if (!is.null(admission) && !fixed) {
@@ -400,6 +401,11 @@
   if (identical(spec[["settings"]][["main"]][["kernel"]], "uniform") &&
       any(startsWith(map[["target"]], "d")))
     stop("iterated uniform-kernel correction is qualified only for means and categorical mean contrasts; continuous derivatives remain unqualified; explicit bias.control=np_bias_control(construction='legacy') retains previous supported bootstrap routes", call.=FALSE)
+  if (identical(spec[["settings"]][["main"]][["kernel"]], "beta") &&
+      isTRUE(spec[["settings"]][["main"]][["type"]] %in%
+             c("generalized_nn", "adaptive_nn")) &&
+      any(startsWith(map[["target"]], "d")))
+    stop("iterated degree-zero beta-kernel NN correction is qualified only for means and categorical mean contrasts; continuous derivatives remain unqualified", call.=FALSE)
   if (!is.null(original) && (isTRUE(spec$categorical.only) || isTRUE(spec$pooled)))
     stop("captured original rows are unavailable for this bias owner",call.=FALSE)
   if (isTRUE(spec$categorical.only)) return(.np_bias_categorical_rows(spec,grid,map))

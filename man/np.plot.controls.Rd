@@ -230,8 +230,14 @@ finite-sample uncertainty. Explicit narrower methods retain their definitions.
 Known bounds transform with the data; bounded ANN retains donor-specific
 support normalizers and the existing frozen-radius derivative convention.
 The qualified extension is limited to main degree components zero or one.
-Higher-degree Epanechnikov NN admissions are unchanged; beta NN, higher-degree
-bounded/wild Epanechnikov NN and higher-order kernels remain unqualified.
+Higher-degree Epanechnikov NN admissions are unchanged. Second-order beta
+GNN/ANN LC or GLP degree-zero means with known finite fixed support, including
+supported mixed mean panels and categorical mean contrasts, use these same
+established SD, pairs and wild constructions and defaults. Continuous derivative
+requests and positive-degree beta NN correction remain unqualified; requested
+panels are never silently omitted. The beta comparison reuses two saved original
+samples and does not establish nominal coverage. Higher-degree bounded/wild
+Epanechnikov NN and higher-order kernels remain unqualified.
 Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
 Second-order Gaussian correction supports known fixed support for continuous
@@ -247,7 +253,7 @@ precision rules are retained. Zero nearest-neighbour radii and
 unqualified regularized main rows retain their existing refusals.
 The original \code{"basic-envelope"} public option supports fixed bandwidths
 and qualified degree-zero or first-order Epanechnikov NN models, or degree-zero
-uniform NN models; it remains pairs-only.
+uniform or known-fixed-support beta NN mean models; it remains pairs-only.
 
 For fixed-bandwidth second-order Gaussian (unbounded, or known fixed support
 with continuous predictors only), Epanechnikov
