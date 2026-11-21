@@ -101,34 +101,47 @@ in.check <- !force.run && (
 if (!in.check) {
   npRmpi.init(nslaves = 1L)
   tryCatch({
-    # set.seed() controls the simulated data. The test's random.seed argument
-    # controls the bootstrap draws and defaults to 42 in both calls below.
+    # set.seed() controls the simulated sample. Each test uses the published bandwidth
+    # choice and the default bootstrap seed, random.seed = 42.
     set.seed(42)
     n <- 160L
     d <- data.frame(x1 = rnorm(n), x2 = rnorm(n))
     z <- with(d, x1 + 0.6*x2)
     w <- with(d, x2 - 0.6*x1)
 
-    # Under the Ichimura null, the conditional mean depends only on z.
-    # The conditional variance may depend on the orthogonal direction w.
-    d$y <- z + 0.45*sin(z) + (0.6 + 0.2*abs(w))*rnorm(n)
+    # Ichimura null. The mean depends only on z. The variance may depend on w.
+    d$y0 <- z + 0.45*sin(z) + (0.6 + 0.2*abs(w))*rnorm(n)
+    # Ichimura alternative. Keep the same noise and add an off-index interaction.
+    d$y1 <- d$y0 + 1.8*z*w
 
-    # Under this Klein-Spady alternative, the log odds include an interaction
-    # between z and w. No single linear index determines the success probability.
-    d$choice <- rbinom(n, 1, plogis(z + 1.8*z*w))
+    # Klein-Spady alternative. The interaction in the log odds makes the
+    # success probability depend on both z and its orthogonal direction w.
+    d$choice1 <- rbinom(n, 1, plogis(z + 1.8*z*w))
+    # Klein-Spady null. The success probability depends only on z.
+    d$choice0 <- rbinom(n, 1, plogis(z))
 
-    bw <- npindexbw(y ~ x1 + x2, data = d, method = "ichimura", nmulti = 1)
-    summary(npindextest(npindex(bw), B = 99))
+    bw0 <- npindexbw(y0 ~ x1 + x2, data = d, method = "ichimura", nmulti = 1)
+    summary(npindextest(npindex(bw0), B = 99))
     # p = 0.69 at seed 42. Do not reject the single-index null at level 0.05.
 
-    binary <- npindexbw(choice ~ x1 + x2, data = d, method = "kleinspady",
-                        nmulti = 1)
-    summary(npindextest(binary, B = 99))
+    bw1 <- npindexbw(y1 ~ x1 + x2, data = d, method = "ichimura", nmulti = 1)
+    summary(npindextest(npindex(bw1), B = 99))
     # p = 0.01 at seed 42. Reject the single-index null at level 0.05.
 
-    # With another data seed, even a true null can be rejected, and a sample
-    # drawn under the alternative can fail to reject. With the data held fixed,
-    # changing random.seed can change the p-value through bootstrap variation.
+    binary0 <- npindexbw(choice0 ~ x1 + x2, data = d, method = "kleinspady",
+                         nmulti = 1)
+    summary(npindextest(binary0, B = 99))
+    # p = 0.06 at seed 42. Do not reject the single-index null at level 0.05.
+
+    binary1 <- npindexbw(choice1 ~ x1 + x2, data = d, method = "kleinspady",
+                         nmulti = 1)
+    summary(npindextest(binary1, B = 99))
+    # p = 0.01 at seed 42. Reject the single-index null at level 0.05.
+
+    # With 99 bootstrap draws the smallest possible p-value is 0.01.
+    # A different data seed gives another sample. At level 0.05 a true null
+    # can be rejected, and a departure can go undetected. Changing only
+    # random.seed varies the bootstrap p-value for the same observations.
   }, finally = npRmpi.quit())
 }
 }
