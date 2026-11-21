@@ -35,6 +35,19 @@
       all(!is.na(bws[["degree"]]) & bws[["degree"]] == 0L)))
 }
 
+.np_bias_regression_nn_first_order <- function(bws, kernel) {
+  isTRUE(bws[["type"]] %in% c("generalized_nn", "adaptive_nn")) &&
+    isTRUE(bws[["ckertype"]] %in% kernel) &&
+    isTRUE(bws[["ckerorder"]] == 2L) &&
+    isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")) &&
+    (identical(bws[["regtype"]], "ll") ||
+     (identical(bws[["regtype"]], "lp") &&
+      identical(bws[["basis"]], "glp") &&
+      is.numeric(bws[["degree"]]) && length(bws[["degree"]]) > 0L &&
+      all(!is.na(bws[["degree"]]) & bws[["degree"]] %in% c(0L, 1L)) &&
+      any(bws[["degree"]] == 1L)))
+}
+
 .np_bias_regression_kernel_class <- function(bws, calibration) {
   if (identical(bws[["ckertype"]], "gaussian") &&
       bws[["ckerorder"]] == 2L &&
@@ -42,7 +55,8 @@
        (identical(bws[["type"]], "fixed") &&
         identical(bws[["ckerbound"]], "fixed") &&
         isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L)) ||
-       .np_bias_regression_nn_zero(bws, "gaussian")))
+       .np_bias_regression_nn_zero(bws, "gaussian") ||
+       .np_bias_regression_nn_first_order(bws, "gaussian")))
     return("incumbent")
   # Fixed constructions share the qualified complete non-Gaussian rows.
   # Degree-zero Epanechnikov NN and uniform NN means share the qualified reducers.
@@ -146,7 +160,7 @@
     "; explicit bootstrap bias.control=np_bias_control(construction='legacy') retains the previous construction for supported bootstrap methods" else ""
   kernel.class <- .np_bias_regression_kernel_class(bws, calibration)
   if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
-    stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths with continuous predictors only, or qualified degree-zero nearest-neighbour models",legacy.hint), call. = FALSE)
+    stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths with continuous predictors only, or qualified nearest-neighbour models with main degrees at most one",legacy.hint), call. = FALSE)
   if (length(fc) && !all(vapply(x[fc],is.factor,logical(1))))
     stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
   admission <- if (kernel.class == "local-envelope") list(

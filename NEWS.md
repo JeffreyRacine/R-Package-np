@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Extend known-fixed-support Gaussian nearest-neighbour corrected inference to local-linear and GLP models with main degrees at most one, including supported mixed predictors. Derivatives above an individual coordinate's degree retain their existing unavailable behavior.
+
 * Preserve unavailable derivative panels when exporting regression plots with bias correction or all interval bands, alongside the available derivative results.
 
 * Admit known-fixed-support second-order Gaussian degree-zero GNN/ANN corrected inference, including supported mixed predictors. Preserve Gaussian defaults, explicit methods, frozen-radius derivatives and donor-specific ANN support normalization; higher-degree bounded Gaussian and fixed mixed-support boundaries are unchanged.

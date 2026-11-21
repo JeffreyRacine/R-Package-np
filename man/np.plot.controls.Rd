@@ -184,7 +184,8 @@ evidence or numerical admission rules. A supplied control must still be an
 For pairs resampling, experimental \code{calibration="basic-local-envelope"} has the same
 fixed-bandwidth admission rules and also supports generalized and adaptive
 nearest-neighbour bandwidths with second-order Gaussian regression: unbounded
-support, or degree-zero fits with declared fixed support. It reuses exactly the
+support, or local-constant, local-linear or GLP fits with main degrees at most one and declared
+fixed support. It reuses exactly the
 same corrected centers, observed standard
 errors and signed draws. It also takes signed and absolute family extrema after
 standardizing each target by its observed standard error, then returns the hull
@@ -234,10 +235,12 @@ nonzero-degree Epanechnikov NN wild and higher-order kernels remain unqualified.
 Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
 Second-order Gaussian correction supports known fixed support for continuous
-fixed-bandwidth fits and for degree-zero generalized/adaptive NN fits, including
-supported mixed predictors. Gaussian defaults and existing explicit calibrations
+fixed-bandwidth fits and for generalized/adaptive NN local-constant, local-linear or GLP fits
+with main degrees at most one, including supported mixed predictors. Gaussian defaults and existing explicit calibrations
 are unchanged. NN radii stay frozen for derivatives; bounded ANN retains its
-donor-specific support normalization. Other bounded mixed Gaussian models and
+donor-specific support normalization. Partial-degree models retain the existing
+refusal or unavailable-panel behavior for derivatives above a coordinate's degree.
+Higher-degree bounded Gaussian NN, fixed-bandwidth mixed Gaussian models and
 range bounds remain unqualified. The two saved degree-zero NN samples provide
 limited availability evidence and do not establish nominal coverage. The existing adaptation and accepted fitted-row
 precision rules are retained. Zero nearest-neighbour radii and
