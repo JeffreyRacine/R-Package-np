@@ -90,6 +90,7 @@ models. \emph{Annals of Statistics}, 21, 255--285.
 \code{\link{nppltest}}, \code{\link{npcmstest}}}
 \examples{
 \dontrun{
+force.run <- nzchar(Sys.getenv("NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK"))
 in.check <- !force.run && (
             nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
             nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
