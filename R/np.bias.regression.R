@@ -23,19 +23,16 @@
   out
 }
 
-.np_bias_regression_zero_degree <- function(bws) {
-  if (identical(bws[["regtype"]], "lc")) return(TRUE)
-  degree <- bws[["degree"]]
-  identical(bws[["regtype"]], "lp") && identical(bws[["basis"]], "glp") &&
-    is.numeric(degree) && length(degree) > 0L && all(!is.na(degree) & degree == 0L)
-}
-
 .np_bias_regression_nn_zero <- function(bws, kernel = "epanechnikov") {
   isTRUE(bws[["type"]] %in% c("generalized_nn", "adaptive_nn")) &&
     isTRUE(bws[["ckertype"]] %in% kernel) &&
     isTRUE(bws[["ckerorder"]] == 2L) &&
     isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")) &&
-    .np_bias_regression_zero_degree(bws)
+    (identical(bws[["regtype"]], "lc") ||
+     (identical(bws[["regtype"]], "lp") &&
+      identical(bws[["basis"]], "glp") &&
+      is.numeric(bws[["degree"]]) && length(bws[["degree"]]) > 0L &&
+      all(!is.na(bws[["degree"]]) & bws[["degree"]] == 0L)))
 }
 
 .np_bias_regression_nn_first_order <- function(bws, kernel) {
@@ -84,8 +81,7 @@
          .np_bias_regression_nn_zero(bws, "beta")) &&
         identical(bws[["ckerbound"]], "fixed")) ||
        (identical(bws[["ckertype"]], "uniform") &&
-        ((identical(bws[["type"]], "fixed") && .np_bias_regression_zero_degree(bws)) ||
-         .np_bias_regression_nn_zero(bws, "uniform")) &&
+        .np_bias_regression_nn_zero(bws, "uniform") &&
         isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")))))
     return("local-envelope")
   "unsupported"
@@ -183,10 +179,6 @@
   if (!d) return(.np_bias_categorical_prepare(bws,x,y,control,reg))
   legacy.hint <- if (bws[["type"]]=="fixed" && d>0L)
     "; explicit bootstrap bias.control=np_bias_control(construction='legacy') retains the previous construction for supported bootstrap methods" else ""
-  if (identical(bws[["type"]], "fixed") && identical(bws[["ckertype"]], "uniform") &&
-      !.np_bias_regression_zero_degree(bws))
-    stop(paste0("iterated fixed uniform correction requires a local-constant or all-degree-zero GLP fit",
-                legacy.hint), call. = FALSE)
   kernel.class <- .np_bias_regression_kernel_class(bws, calibration)
   if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
     stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths with continuous predictors only, or qualified nearest-neighbour models with main degrees at most one",legacy.hint), call. = FALSE)
@@ -232,10 +224,7 @@
   if (!is.null(admission)) spec$settings$kernel.admission <- admission
   # Degree-zero uniform support ties use the fitted physical coordinates.
   # Auxiliary Gaussian projections retain their standardized coordinates.
-  if (.np_bias_regression_nn_zero(bws, "uniform") ||
-      (identical(bws[["type"]], "fixed") &&
-       identical(bws[["ckertype"]], "uniform") &&
-       all(reg[["degree.engine"]] == 0L)))
+  if (.np_bias_regression_nn_zero(bws, "uniform"))
     spec[["main.physical"]] <- list(x=x,
       bws=.np_bias_regbw(bws,x,unname(bws[["bandwidth"]][["x"]])))
   spec$pilot.bws <- .np_bias_regbw(bws,spec$xcon,spec$b,q,spec$bernstein)
