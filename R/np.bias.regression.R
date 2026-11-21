@@ -59,12 +59,13 @@
        .np_bias_regression_nn_first_order(bws, "gaussian")))
     return("incumbent")
   # Fixed constructions share the qualified complete non-Gaussian rows.
-  # Degree-zero Epanechnikov NN and uniform NN means share the qualified reducers.
+  # Degree-zero NN and first-order Epanechnikov NN share the qualified reducers.
   if ((identical(calibration, "basic-local-envelope") ||
        (identical(bws[["type"]], "fixed") &&
         isTRUE(calibration %in% c("basic-envelope", "separate-tails",
                                  "tail-envelope", "absolute"))) ||
-       (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) &&
+       ((.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) ||
+        .np_bias_regression_nn_first_order(bws, "epanechnikov")) &&
         isTRUE(calibration %in% c("basic-envelope", "separate-tails",
                                  "tail-envelope", "absolute")))) &&
       isTRUE(bws[["type"]] %in% c("fixed", "generalized_nn", "adaptive_nn")) &&
@@ -72,7 +73,8 @@
       ((identical(bws[["ckertype"]], "epanechnikov") &&
         (identical(bws[["ckerbound"]], "none") ||
          ((identical(bws[["type"]], "fixed") ||
-           .np_bias_regression_nn_zero(bws)) &&
+           .np_bias_regression_nn_zero(bws) ||
+           .np_bias_regression_nn_first_order(bws, "epanechnikov")) &&
           identical(bws[["ckerbound"]], "fixed")))) ||
        (identical(bws[["ckertype"]], "beta") &&
         identical(bws[["type"]], "fixed") &&
@@ -95,7 +97,8 @@
   mammen <- identical(bootstrap, "wild") && identical(wild, "mammen")
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
       (pairs || mammen) && isTRUE(bws[["ncon"]] > 0L) &&
-      .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")))
+      (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) ||
+        .np_bias_regression_nn_first_order(bws, "epanechnikov")))
     return("basic-local-envelope")
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
       identical(bws[["type", exact=TRUE]], "fixed") &&
@@ -107,7 +110,8 @@
   # intervals. Resolve this declared-law choice once for the complete family.
   if (identical(method, "bootstrap") && !identical(band, "pmzsd") &&
       (identical(bws[["type", exact=TRUE]], "fixed") ||
-       .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform"))) &&
+       (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) ||
+        .np_bias_regression_nn_first_order(bws, "epanechnikov"))) &&
       isTRUE(bws[["ncon", exact=TRUE]] > 0L) &&
       identical(bootstrap, "wild") && identical(wild, "rademacher") &&
       identical(.np_bias_regression_kernel_class(bws, "tail-envelope"),
@@ -120,16 +124,20 @@
   fixed <- !is.null(admission) && identical(admission[["type"]], "fixed")
   nn.zero <- !is.null(admission) && !fixed &&
     .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform"))
+  nn.first <- !is.null(admission) && !fixed &&
+    .np_bias_regression_nn_first_order(bws, "epanechnikov")
   if (!is.null(admission) && !fixed) {
-    allowed <- if (nn.zero) c("gaussian", "mammen", "rademacher", "inid", "fixed", "geom") else
+    allowed <- if (nn.zero || nn.first) c("gaussian", "mammen", "rademacher", "inid", "fixed", "geom") else
       c("inid", "fixed", "geom")
     if (!is.character(law) || length(law) != 1L || is.na(law) || !law %in% allowed)
       stop(if (nn.zero)
-        "degree-zero kernel NN inference requires Gaussian, Mammen, Rademacher, inid, fixed or geom resampling" else
+        "degree-zero kernel NN inference requires Gaussian, Mammen, Rademacher, inid, fixed or geom resampling" else if (nn.first)
+        "first-order Epanechnikov NN inference requires Gaussian, Mammen, Rademacher, inid, fixed or geom resampling" else
         "second-order kernel NN envelopes require inid, fixed or geom resampling", call.=FALSE)
   }
-  if (fixed || nn.zero) {
-    description <- if (fixed) "fixed non-Gaussian" else "degree-zero NN non-Gaussian"
+  if (fixed || nn.zero || nn.first) {
+    description <- if (fixed) "fixed non-Gaussian" else if (nn.zero) "degree-zero NN non-Gaussian" else
+      "first-order Epanechnikov NN"
     if (identical(admission[["calibration"]], "absolute") &&
         !isTRUE(law %in% c("gaussian", "mammen", "rademacher", "inid", "fixed", "geom")))
       stop(paste(description, "absolute calibration requires Gaussian, Mammen, Rademacher, inid, fixed or geom resampling"), call.=FALSE)

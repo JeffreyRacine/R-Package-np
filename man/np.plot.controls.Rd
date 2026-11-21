@@ -210,15 +210,14 @@ this option also admits unbounded second-order Epanechnikov nearest-neighbour
 bandwidths. Adaptive NN retains the existing derivative construction; generalized
 NN is restricted to main polynomial degrees at most one in every continuous
 predictor. Neighbour counts remain fixed during inference. Second-order
-Epanechnikov LC and GLP fits with unbounded or declared fixed support and
-degree zero in every continuous
-predictor also admit explicit \code{"basic-envelope"}, \code{"separate-tails"}
+Epanechnikov LC, local-linear and GLP fits with unbounded or declared fixed support
+and main degrees at most one in every continuous predictor also admit explicit \code{"basic-envelope"}, \code{"separate-tails"}
 (including \code{"asymmetric-sd"}) and \code{"tail-envelope"} pairs bands
 for either NN type. Their omitted/default pairs calibration is the unchanged,
 more protective local envelope. Means, frozen-radius first derivatives and
 categorical contrasts retain their existing corrected rows. The comparisons
 use only two saved original samples and do not establish nominal coverage.
-For that degree-zero NN class, ordinary asymptotic and \code{"pmzsd"} calls
+For that degree-zero or first-order Epanechnikov NN class, ordinary asymptotic and \code{"pmzsd"} calls
 also use the established corrected-process SD construction. Explicit
 \code{"absolute"} or \code{"symmetric-sd"} admits pairs, Mammen and Rademacher;
 separate tails and the tail envelope additionally admit both wild laws.
@@ -230,8 +229,9 @@ The two saved-sample comparisons do not establish nominal coverage or remove
 finite-sample uncertainty. Explicit narrower methods retain their definitions.
 Known bounds transform with the data; bounded ANN retains donor-specific
 support normalizers and the existing frozen-radius derivative convention.
-Higher-degree admissions are unchanged. Beta NN, bounded nonzero-degree Epanechnikov NN,
-nonzero-degree Epanechnikov NN wild and higher-order kernels remain unqualified.
+The qualified extension is limited to main degree components zero or one.
+Higher-degree Epanechnikov NN admissions are unchanged; beta NN, higher-degree
+bounded/wild Epanechnikov NN and higher-order kernels remain unqualified.
 Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
 Second-order Gaussian correction supports known fixed support for continuous
@@ -241,12 +241,13 @@ are unchanged. NN radii stay frozen for derivatives; bounded ANN retains its
 donor-specific support normalization. Partial-degree models retain the existing
 refusal or unavailable-panel behavior for derivatives above a coordinate's degree.
 Higher-degree bounded Gaussian NN, fixed-bandwidth mixed Gaussian models and
-range bounds remain unqualified. The two saved degree-zero NN samples provide
+range bounds remain unqualified. The two saved NN samples provide
 limited availability evidence and do not establish nominal coverage. The existing adaptation and accepted fitted-row
 precision rules are retained. Zero nearest-neighbour radii and
 unqualified regularized main rows retain their existing refusals.
 The original \code{"basic-envelope"} public option supports fixed bandwidths
-and qualified degree-zero Epanechnikov or uniform NN models; it remains pairs-only.
+and qualified degree-zero or first-order Epanechnikov NN models, or degree-zero
+uniform NN models; it remains pairs-only.
 
 For fixed-bandwidth second-order Gaussian (unbounded, or known fixed support
 with continuous predictors only), Epanechnikov

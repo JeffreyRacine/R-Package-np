@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Extend established Epanechnikov GNN/ANN corrected constructions and defaults to local-linear and GLP main degrees at most one, with unbounded or known fixed support. Preserve explicit calibrations, NN radii, Gaussian auxiliaries, partial derivative availability and numerical/computational owners. Higher-degree limitations remain.
+
 * Extend known-fixed-support Gaussian nearest-neighbour corrected inference to local-linear and GLP models with main degrees at most one, including supported mixed predictors. Derivatives above an individual coordinate's degree retain their existing unavailable behavior.
 
 * Preserve unavailable derivative panels when exporting regression plots with bias correction or all interval bands, alongside the available derivative results.

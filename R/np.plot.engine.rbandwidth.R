@@ -238,13 +238,15 @@
     if (effective.calibration %in% c("basic-envelope", "basic-local-envelope") &&
         !((as.character(plot.errors.boot.method)[1L] %in% c("inid", "fixed", "geom") &&
            (identical(bws[["type", exact=TRUE]], "fixed") ||
-            .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) ||
+            (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) ||
+             .np_bias_regression_nn_first_order(bws, "epanechnikov")) ||
             (identical(effective.calibration, "basic-local-envelope") &&
              bws[["type", exact=TRUE]] %in% c("generalized_nn", "adaptive_nn")))) ||
           (wild.local.envelope &&
            (identical(bws[["type", exact=TRUE]], "fixed") ||
-            .np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform"))))))
-      stop("basic-envelope requires inid, fixed or geom and fixed-bandwidth regression or degree-zero Epanechnikov/uniform NN; basic-local-envelope also supports other qualified NN pairs or qualified fixed/degree-zero NN Mammen", call.=FALSE)
+            (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform")) ||
+             .np_bias_regression_nn_first_order(bws, "epanechnikov"))))))
+      stop("basic-envelope requires inid, fixed or geom and fixed-bandwidth regression, degree-zero Epanechnikov/uniform NN or first-order Epanechnikov NN; basic-local-envelope also supports other qualified NN pairs or qualified fixed/NN Mammen", call.=FALSE)
     if (bias.request && !new.bias && error.request$method=="asymptotic")
       stop("legacy bias correction requires errors='bootstrap'",call.=FALSE)
     if (new.bias && isTRUE(.npRmpi_autodispatch_called_from_bcast()))
