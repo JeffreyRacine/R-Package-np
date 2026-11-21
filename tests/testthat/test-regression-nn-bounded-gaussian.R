@@ -37,7 +37,7 @@ test_that("bounded Gaussian degree-zero NN keeps Gaussian defaults and fitted st
     expect_s3_class(run(errors="asymptotic")$result,"np_plot_data")
     expect_s3_class(run(band="pmzsd")$result,"np_plot_data")
     expect_error(run(cal="basic-envelope"),"basic-envelope requires inid, fixed or geom")
-    higher.args <- args;higher.args$regtype <- "lp";higher.args$degree <- 1L
+    higher.args <- args;higher.args$regtype <- "lp";higher.args$degree <- 2L
     higher <- do.call(npregbw,higher.args)
     expect_identical(.np_bias_regression_kernel_class(higher,"absolute"),"unsupported")
     expect_error(.np_bias_regression_prepare(higher,x,y,law="mammen",calibration="absolute"),"requires a supported second-order kernel")
