@@ -1,5 +1,6 @@
 
 test_that("fixed uniform degree-zero main rows preserve physical support ties", {
+  skip_on_cran()
   opt <- options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
   on.exit(options(opt),add=TRUE)
   set.seed(4202)

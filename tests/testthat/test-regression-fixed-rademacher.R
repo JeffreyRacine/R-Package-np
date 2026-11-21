@@ -1,4 +1,5 @@
 test_that("Rademacher fixed and pooled scales match independent literal pivots", {
+  skip_on_cran()
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
 tail_bands<-function(R,center,se,map,alpha,calibration) {
  B<-ncol(R);ans<-setNames(lapply(1:3,function(i)array(0,c(nrow(R),2L,length(alpha)))),c('pointwise','simultaneous','bonferroni'))
@@ -74,6 +75,7 @@ full_smoother<-function(st) {
 
 
 test_that("Rademacher defaults preserve the declared law and resolve once", {
+  skip_on_cran()
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
   hits<-new.env(parent=emptyenv());hits$n<-0L
   old.trace<-options(np.test.rademacher.resolution=hits);on.exit(options(old.trace),add=TRUE)

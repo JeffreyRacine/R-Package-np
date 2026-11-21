@@ -1,4 +1,5 @@
 test_that("bounded Gaussian degree-zero NN keeps Gaussian defaults and fitted state", {
+  skip_on_cran()
   opt <- options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
   on.exit(options(opt),add=TRUE)
   set.seed(1126801);seed <- .Random.seed

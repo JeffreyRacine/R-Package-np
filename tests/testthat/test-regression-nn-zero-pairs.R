@@ -1,4 +1,5 @@
 test_that("degree-zero Epanechnikov NN exposes pairs without changing its rows", {
+  skip_on_cran()
   opts <- options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
   on.exit(options(opts),add=TRUE)
   x <- data.frame(x=seq(-.97,.96,length.out=120L))

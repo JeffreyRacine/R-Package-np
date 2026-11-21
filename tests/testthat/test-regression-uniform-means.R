@@ -14,6 +14,7 @@ test_that("uniform iterated mean admission keeps support and law boundaries", {
 })
 
 test_that("uniform main mean rows match an independent weighted SVD", {
+  skip_on_cran()
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
   for(pooled in c(FALSE,TRUE))for(degree in c(0L,2L))for(bound in c("none","fixed")) {
     x<-data.frame(x=if(pooled)rep(seq(-.9,.9,length.out=30L),3L)else seq(-.9,.9,length.out=90L))
@@ -42,6 +43,7 @@ test_that("uniform main mean rows match an independent weighted SVD", {
 })
 
 test_that("public uniform means retain defaults and reject unqualified derivatives", {
+  skip_on_cran()
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
   for(pooled in c(FALSE,TRUE)) {
     x<-data.frame(x=if(pooled)rep(seq(-.9,.9,length.out=20L),3L)else seq(-.9,.9,length.out=60L))

@@ -1,4 +1,5 @@
 test_that("degree-zero NN SD and wild laws preserve defaults and state", {
+  skip_on_cran()
   opt <- options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
   on.exit(options(opt),add=TRUE)
   set.seed(1126201);seed <- .Random.seed

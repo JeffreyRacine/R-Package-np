@@ -10,6 +10,7 @@ test_that("plot metadata distinguishes protective defaults from explicit calibra
 })
 
 test_that("public Rademacher defaults retain requested metadata and identical intervals", {
+  skip_on_cran()
 
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
   x<-data.frame(x=seq(-.9,.9,length.out=60L));y<-sin(3*x$x)+.15*cos(seq_len(60L))

@@ -17,6 +17,7 @@ test_that("basic kernel admission is fixed and keeps explicit method certificate
 })
 
 test_that("fixed non-Gaussian basic envelopes match literal pairs roots", {
+  skip_on_cran()
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
   x<-data.frame(x=seq(-.95,.95,length.out=60L));y<-sin(3*x$x)+.15*cos(seq_len(60L))
   grid<-x[c(7L,30L,54L),,drop=FALSE];B<-99L;alpha<-.2

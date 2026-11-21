@@ -14,6 +14,7 @@ test_that("fixed non-Gaussian tails preserve calibration and admitted law bounda
 })
 
 test_that("fixed tails match literal pooled replicate scales and family inversion", {
+  skip_on_cran()
 variance<-function(F,L,law){F<-F-rowMeans(F);n<-ncol(F)
  if(L==1L)return(rowSums(F^2))
  if(law=='fixed'){

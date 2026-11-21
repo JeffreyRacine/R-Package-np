@@ -16,6 +16,7 @@ test_that("fixed SD admission preserves laws and the local empirical default", {
 })
 
 test_that("fixed SD pivots match independent full residual-pilot matrices", {
+  skip_on_cran()
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
 tail_bands<-function(R,center,se,map,alpha,calibration) {
  B<-ncol(R);ans<-setNames(lapply(1:3,function(i)array(0,c(nrow(R),2L,length(alpha)))),c('pointwise','simultaneous','bonferroni'))
