@@ -18,7 +18,8 @@ npindextest(object, bw.method = c("published", "maximum", "separate"),
 \arguments{
   \item{object}{An \code{\link{npindex}} fit or \code{\link{npindexbw}}
     object obtained by joint estimation of the direction and link bandwidth
-    on the retained training data. For \code{summary}, an \code{indextest}
+    on the retained training data. A fitted object with replacement training
+    data must reproduce the stored search criterion. For \code{summary}, an \code{indextest}
     result.}
   \item{bw.method}{Test bandwidth choice. \code{"published"} uses the
     authors' empirical factor one. \code{"maximum"} jointly calibrates three
