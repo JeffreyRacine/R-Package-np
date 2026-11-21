@@ -108,12 +108,26 @@ supported iterated empirical bands require explicit
 \code{np_boot_control(calibration="basic-local-envelope")} with pairs or
 Mammen resampling. Saved cases show numerical sensitivity in the fitted rows.
 
-Fixed-bandwidth uniform iterated correction is unavailable. The documented
-explicit \code{bias.control=np_bias_control(construction="legacy")} bootstrap route
-remains available for its supported targets.
-Uniform LC and GLP fits with degree zero in every continuous predictor
-support iterated mean correction with generalized or adaptive nearest-neighbour
-bandwidths and unbounded or declared fixed support. Mammen and pairs default to the basic local envelope, and Rademacher defaults to the tail envelope. Explicit supported methods remain available. Neighbour counts
+Fixed uniform-kernel models with \code{ckerbound="none"} or \code{"fixed"}
+support iterated mean correction for local-constant fits and GLP fits with
+degree zero in every continuous predictor, including mean panels
+for mixed continuous/categorical predictors. Their empirical default is \code{"basic-local-envelope"} for
+Mammen or pairs resampling and \code{"tail-envelope"} for Rademacher;
+asymptotic and \code{"pmzsd"} calls retain absolute calibration. The same
+explicit fixed-kernel calibration/law combinations above apply to these mean
+targets. Continuous uniform derivatives remain unqualified under iterated
+correction, including local-constant auxiliary-only derivatives. For mixed
+uniform models, \code{gradients=TRUE} requests continuous derivatives along
+with categorical contrasts and is therefore refused as a whole; the public
+plot interface does not offer a contrast-only iterated route. The existing
+explicit \code{bias.control=np_bias_control(construction="legacy")} routes
+retain their previous supported behavior. The main kernel remains uniform
+and the auxiliary pilots remain Gaussian. Saved mean comparisons are limited
+to eight reused original samples and do not establish general nominal coverage.
+Uniform LC and GLP fits with degree zero in every continuous predictor also
+support these mean constructions with generalized or adaptive nearest-neighbour
+bandwidths and unbounded or declared fixed support. Their defaults follow the
+same declared-law mapping; explicit methods remain available. Neighbour counts
 and Gaussian auxiliary fits remain fixed, and bounded ANN retains donor-specific
 support normalization. The additional NN comparison uses only two saved
 original samples and does not establish nominal coverage. Higher-degree uniform
@@ -161,8 +175,8 @@ resampling variation and are refused. At least two draws are required.
 For iterated bias-corrected regression with fixed bandwidths and at least one
 continuous predictor, omitted control, \code{np_boot_control()} and
 \code{calibration="default"} follow the declared kernel and resampling law.
-For the admitted second-order Epanechnikov and fixed-support beta targets described above,
-empirical inid/fixed/geom or Mammen bands use \code{"basic-local-envelope"};
+For the admitted Epanechnikov, fixed-support beta and degree-zero uniform
+targets described above, empirical inid/fixed/geom or Mammen bands use \code{"basic-local-envelope"};
 Rademacher bands use \code{"tail-envelope"}. Asymptotic and \code{"pmzsd"}
 calls use absolute calibration. Each choice matches its explicit construction
 and is resolved once before the target families are evaluated. Gaussian and
