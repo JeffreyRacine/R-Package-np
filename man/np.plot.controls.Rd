@@ -161,8 +161,7 @@ resampling variation and are refused. At least two draws are required.
 For iterated bias-corrected regression with fixed bandwidths and at least one
 continuous predictor, omitted control, \code{np_boot_control()} and
 \code{calibration="default"} follow the declared kernel and resampling law.
-For second-order Epanechnikov with none/fixed support, second-order beta with
-declared finite fixed support, and uniform mean targets with none/fixed support,
+For the admitted second-order Epanechnikov and fixed-support beta targets described above,
 empirical inid/fixed/geom or Mammen bands use \code{"basic-local-envelope"};
 Rademacher bands use \code{"tail-envelope"}. Asymptotic and \code{"pmzsd"}
 calls use absolute calibration. Each choice matches its explicit construction
