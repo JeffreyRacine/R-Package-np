@@ -868,7 +868,7 @@
 
       plot.out = list()
 
-      temp.err = matrix(data = NA, nrow = maxneval, ncol = 3)
+      temp.err = matrix(data = NA_real_, nrow = maxneval, ncol = 3)
       temp.mean = replicate(maxneval, NA)
 
       ## plotting expressions
@@ -1363,6 +1363,9 @@
             widths = temp.err[seq_len(xi.neval), 1:2, drop = FALSE])
           if (identical(plot.errors.method, "asymptotic"))
             plot.out[[i]][[".plot_std_error"]] <- if (gradients) tr$gerr[, i] else tr$merr
+          if (plot.errors && !component.available && identical(plot.errors.type, "all"))
+            temp.all.err <- setNames(rep(list(matrix(NA_real_, xi.neval, 2L)), 3L),
+              c("pointwise", "simultaneous", "bonferroni"))
           if (identical(plot.errors.type, "all"))
             plot.out[[i]][[".plot_band_widths"]] <- temp.all.err
           if (!is.null(bias.inference)) {

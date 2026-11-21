@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Preserve unavailable derivative panels when exporting regression plots with bias correction or all interval bands, alongside the available derivative results.
+
 * Admit known-fixed-support second-order Gaussian degree-zero GNN/ANN corrected inference, including supported mixed predictors. Preserve Gaussian defaults, explicit methods, frozen-radius derivatives and donor-specific ANN support normalization; higher-degree bounded Gaussian and fixed mixed-support boundaries are unchanged.
 
 * Preserve fitted physical support ties in fixed uniform-kernel degree-zero corrected means and existing categorical contrasts. Gaussian auxiliary projections and established interval methods remain unchanged.
