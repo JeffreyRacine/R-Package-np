@@ -24071,6 +24071,17 @@ static void np_regression_general_lp_fit_owner_cleanup(
  * target radius; conditional, categorical and signed owners are unchanged. */
 static int np_regression_precision_eligible(const NPRegressionGeneralLPFitCall *call)
 {
+  /* Bounded univariate adaptive rows have donor-specific radii. The fit
+   * retains the weights produced by its own moment traversal. */
+  if(call->bandwidth_mode == BW_ADAP_NN)
+    return call->ordinary_response && !call->all_large_kernel_rows &&
+      call->num_reg_continuous == 1 && !call->num_reg_unordered &&
+      !call->num_reg_ordered && vector_glp_degree_extern != NULL &&
+      vector_glp_degree_extern[0] == 2 &&
+      ((call->kernel_route == NULL && int_cker_bound_extern && call->kernel_c[0] == 0) ||
+       (call->kernel_route != NULL && call->kernel_route->segment_count == 1 &&
+        call->kernel_route->segment[0].descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+        call->kernel_route->segment[0].descriptor.order == 2));
   if(!call->ordinary_response ||
      (call->bandwidth_mode != BW_FIXED && call->bandwidth_mode != BW_GEN_NN) ||
      call->num_reg_unordered || call->num_reg_ordered || call->all_large_kernel_rows)
@@ -24093,6 +24104,10 @@ static int np_regression_precision_prepare(
   const double *retained, double divisor, double ridge, double anchor)
 {
   const int n=call->num_obs_train;
+  if(call->bandwidth_mode == BW_ADAP_NN)
+    return retained != NULL && divisor == 1.0 &&
+      np_regression_precision_factor(&owner->precision,owner->basis,retained,
+                                     n,owner->nterms,ridge,anchor);
   if(owner->precision_kernel==NULL)
     owner->precision_kernel=(double *)malloc((size_t)n*sizeof(double));
   if(owner->precision_kernel==NULL)return 0;

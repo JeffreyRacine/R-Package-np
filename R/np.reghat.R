@@ -998,7 +998,11 @@ npreghat <-
     bernstein.basis = bernstein.basis
   )
 
-  precision.eligible <- .np_regression_precision_scope(bws)
+  precision.eligible <- .np_regression_precision_scope(bws) ||
+    (identical(bws[["type"]], "adaptive_nn") && identical(degree, 2L) &&
+     identical(bws[["ckertype"]], "gaussian") && identical(bws[["ckerbound"]], "fixed") &&
+     identical(as.integer(bws[["ckerorder"]]), 2L) && bws$ncon == 1L &&
+     bws$nuno == 0L && bws$nord == 0L)
   if(precision.eligible) attr(kw,".np.precision.eligible") <- TRUE
   matprod.mode <- getOption("matprod")
   H.fast <- if (ncol(W.train) == 1L ||

@@ -13,6 +13,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   const int num_reg_continuous = call->num_reg_continuous;
   const int use_bernstein = (int_glp_bernstein_extern != 0);
   const int precision_eligible = np_regression_precision_eligible(call);
+  const int retain_ann_weights = precision_eligible && BANDWIDTH_reg == BW_ADAP_NN;
   const double epsilon = 1.0/(double)MAX(1, num_obs_train);
   const int hc0_residual_preparing = call->hc0_context != NULL &&
     call->hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
@@ -145,7 +146,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   if(moment_errors)
     owner->power2_moments = (double *)malloc(
       (size_t)owner->nterms*(size_t)owner->nterms*sizeof(double));
-  if((moment_errors && reuse_fit_kernel_row) ||
+  if(retain_ann_weights || (moment_errors && reuse_fit_kernel_row) ||
      (hc0_information_row && !categorical_pair))
     owner->retained_kernel_row = (double *)malloc(
       (size_t)num_obs_train*sizeof(double));
@@ -188,7 +189,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
      (include_response_square && owner->squared_response == NULL) ||
      owner->moments == NULL ||
      (moment_errors && owner->power2_moments == NULL) ||
-     (((moment_errors && reuse_fit_kernel_row) ||
+     ((retain_ann_weights || (moment_errors && reuse_fit_kernel_row) ||
        (hc0_information_row && !categorical_pair)) &&
       owner->retained_kernel_row == NULL) ||
      owner->coefficient == NULL ||
@@ -291,8 +292,8 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     double sk, ey, ey2, sigma2hat;
     double * const hc0_kernel_row = categorical_pair ?
       owner->categorical_base_kernel_row :
-      (hc0_information_row ? owner->retained_kernel_row : NULL);
-    const int divide_retained_weights = categorical_pair ||
+      ((hc0_information_row || retain_ann_weights) ? owner->retained_kernel_row : NULL);
+    const int divide_retained_weights = retain_ann_weights || categorical_pair ||
       (hc0_information_row && !reuse_fit_kernel_row);
     const double hc0_kernel_divisor =
       reuse_fit_kernel_row && !categorical_pair ? call->bandwidth_product : 1.0;

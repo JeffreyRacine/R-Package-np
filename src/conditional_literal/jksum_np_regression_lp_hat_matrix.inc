@@ -27,6 +27,11 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   NPLPSolveWorkspace solve_workspace;
   NPLPDesignSupport design_support = {0};
   NPReghatLPWorkspace reghat_workspace;
+  NPRegressionPrecision precision = {0};
+  const int precise_beta_ann = kernel_route != NULL && BANDWIDTH_den_extern == BW_ADAP_NN &&
+    num_reg_continuous_extern == 1 && !num_reg_unordered_extern && !num_reg_ordered_extern &&
+    vector_glp_degree_extern != NULL && vector_glp_degree_extern[0] == 2 &&
+    kernel_route->segment_count == 1 && kernel_route->segment[0].descriptor.order == 2;
   NPBetaScaledRowContext beta_row_context;
   double *eval_basis = NULL;
   NPConditionalBoundState bounds_state;
@@ -419,11 +424,12 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
       if(np_beta_scaled_row_context_fill(
            &beta_row_context, i, NULL, NULL) != NP_CONTINUOUS_ROW_OK)
         goto cleanup_lp_hat;
-      if(np_reghat_lp_workspace_influence_row_ranked(
+      if(np_reghat_lp_workspace_influence_row_ranked_precision(
            &reghat_workspace, kw, eval_basis, weights_out + i,
            (size_t)num_eval,
            np_lp_rank_upper_bound_from_design(
-             kw, num_train, np_glp_cv_cache.nterms, &design_support)) != NP_REGHAT_LP_ROW_OK) {
+             kw, num_train, np_glp_cv_cache.nterms, &design_support),
+           precise_beta_ann ? &precision : NULL, np_glp_cv_cache.basis) != NP_REGHAT_LP_ROW_OK) {
         if(np_lp_failed_system_is_finite(&reghat_workspace.solve_workspace,
              np_glp_cv_cache.nterms, 1) &&
            np_lp_record_empty_row(kw, num_train, i, num_eval, num_train,
@@ -565,6 +571,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   status = NP_REGRESSION_LP_MATRIX_OK;
 
 cleanup_lp_hat:
+  np_regression_precision_clear(&precision);
   np_lp_solve_workspace_clear(&solve_workspace);
   np_reghat_lp_workspace_clear(&reghat_workspace);
   np_beta_scaled_row_context_clear(&beta_row_context);

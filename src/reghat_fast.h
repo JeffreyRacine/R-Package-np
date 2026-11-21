@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "jksum_lp_solve.h"
+#include "regression_precision.h"
 
 typedef enum {
   NP_REGHAT_LP_ROW_OK = 0,
@@ -53,6 +54,14 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked(
   double *row_out,
   size_t output_stride,
   int support_rank);
+
+NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked_precision(
+  NPReghatLPWorkspace *workspace,
+  const double *weights,
+  const double *basis_eval,
+  double *row_out,
+  size_t output_stride,
+  int support_rank, NPRegressionPrecision *precision, double **columns);
 
 NPReghatLPRowStatus np_reghat_lp_workspace_influence_row(
   NPReghatLPWorkspace *workspace,
