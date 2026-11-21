@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Improve frozen-radius first-derivative accuracy for univariate second-order beta nearest-neighbour local-constant and degree-zero GLP regression fits and hat rows.
+
 * Improve the numerical accuracy of bounded univariate quadratic adaptive-nearest-neighbour Gaussian and beta regression fits and hat rows. The weighted-design calculation uses the rank and ridge accepted by the existing solver.
 
 * Preserve the single evaluation row of adaptive nearest-neighbour local-constant derivative hat matrices, including bivariate beta fits.

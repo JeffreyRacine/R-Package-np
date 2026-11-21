@@ -70,5 +70,5 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
     matrix_bw_eval, lambda_pre, num_categories, matrix_categorical_vals,
     matrix_ordered_indices, weighted_sum, weighted_permutation_sum, kw,
     pkw, categorical_compress, kernel_route, kernel_route_diagnostics,
-    NULL);
+    NULL, 0);
 }

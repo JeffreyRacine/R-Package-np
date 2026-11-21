@@ -116,7 +116,7 @@ double * const pkw,
 const int categorical_compress,
 const NPContinuousKernelRoute * const kernel_route,
 NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
-const NPNNKernelFold * const fold);
+const NPNNKernelFold * const fold, int lc_nn_derivative);
 
 int kernel_weighted_sum_np_route_conditional_literal(
 int * KERNEL_reg,

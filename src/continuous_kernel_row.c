@@ -52,6 +52,8 @@ void np_continuous_kernel_beta_prepared_context_init(
 {
   if(context == NULL)
     return;
+  context->lc_nn_derivative = 0;
+  context->lc_nn_rows = NULL;
   context->pdf_active = 0;
   context->pdf_row_component_active = 0;
   context->cdf_active = 0;
@@ -948,6 +950,11 @@ np_continuous_kernel_beta_derivative_value(
   if(status != NP_CONTINUOUS_ROW_OK)
     return status;
   (void)observation_bandwidth;
+  if(plan->beta_prepared != NULL && plan->beta_prepared->lc_nn_derivative) {
+    double level;
+    *beta_status = np_beta_lc_nn_terms(plan, evaluation_index, observation, &level, derivative);
+    return *beta_status == NP_BETA_OK ? NP_CONTINUOUS_ROW_OK : NP_CONTINUOUS_ROW_ERR_KERNEL;
+  }
   *beta_status = np_beta_pdf_derivative_order(
     evaluation, observed, evaluation_bandwidth,
     segment->lower[local_coordinate], segment->upper[local_coordinate],
@@ -1158,6 +1165,20 @@ np_continuous_kernel_beta_segment_log_fill(
     NPContinuousKernelBetaPreparedContext * const prepared =
       plan->beta_prepared;
 
+    if(prepared != NULL && prepared->lc_nn_derivative) {
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        result->beta_status = np_beta_lc_nn_terms(plan, evaluation_index, observation,
+          &log_absolute[observation], NULL);
+        if(result->beta_status != NP_BETA_OK) {
+          result->bad_coordinate = 0;
+          result->bad_observation = observation;
+          return NP_CONTINUOUS_ROW_ERR_KERNEL;
+        }
+        sign[observation] = log_absolute[observation] == -INFINITY ? 0 : 1;
+        *maximum = fmax(*maximum, log_absolute[observation]);
+      }
+      return NP_CONTINUOUS_ROW_OK;
+    }
     if(prepared != NULL && prepared->pdf_active &&
        prepared->pdf_row_component_active) {
       const int prepared_component_count =

@@ -866,6 +866,23 @@ static np_beta_status np_beta_derivative_component_accumulate(
     log_term, term_sign, regular_positive_log, regular_negative_log);
 }
 
+np_beta_status np_beta_single_component_derivative(
+  const np_beta_shape *shape, const np_beta_pdf_derivative_component *prepared,
+  double evaluation, double observation, double log_pdf, np_beta_derivative *derivative)
+{
+  double pos = -INFINITY, neg = -INFINITY, jp = -INFINITY, jn = -INFINITY;
+  np_beta_status status = np_beta_derivative_component_accumulate(shape, prepared,
+    evaluation, observation, log_pdf, 0.0, 1, &pos, &neg, &jp, &jn);
+  if(status != NP_BETA_OK)
+    return status;
+  status = np_beta_signed_log_absolute(pos, neg, &derivative->regular_log_absolute,
+                                       &derivative->regular_sign);
+  if(status != NP_BETA_OK)
+    return status;
+  return np_beta_signed_log_absolute(jp, jn, &derivative->jump_log_absolute,
+                                     &derivative->jump_sign);
+}
+
 np_beta_status np_beta_pdf_derivative_order(double evaluation,
                                             double observation,
                                             double bandwidth,

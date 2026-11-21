@@ -683,7 +683,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       p_ksum,
                                       kw,
                                       pkw, 0, NULL, NULL,
-                                      fold_requested ? &fold : NULL);
+                                      fold_requested ? &fold : NULL, 0);
   }
   if(query_bandwidth != NULL && !fold_requested)
     free_tmat(query_bandwidth);

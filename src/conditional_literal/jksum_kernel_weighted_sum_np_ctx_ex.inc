@@ -229,6 +229,7 @@ NPPermutationWeightOutput * const pkw_output,
         .categorical_lambda = lambda_pre,
         .num_categories = num_categories,
         .matrix_categorical_vals = matrix_categorical_vals,
+        .lc_nn_derivative = kernel_execution_context->lc_nn_derivative,
         .categorical_compress =
           kernel_execution_context->categorical_compress,
         .vector_bandwidth = vector_scale_factor,

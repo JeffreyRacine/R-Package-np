@@ -30,6 +30,8 @@ typedef struct {
    * bandwidth topology.  cdf_concentration_active additionally owns one
    * coordinate/component concentration table for fixed bandwidths only; it
    * never owns an observation or evaluation plane. */
+  int lc_nn_derivative;
+  struct NPBetaLCNNRows *lc_nn_rows;
   int pdf_active;
   int pdf_row_component_active;
   int cdf_active;
@@ -81,6 +83,9 @@ typedef struct {
   const int *operator;
   NPContinuousKernelBetaPreparedContext *beta_prepared;
 } NPContinuousKernelRowPlan;
+
+np_beta_status np_beta_lc_nn_terms(const NPContinuousKernelRowPlan *plan,
+  int evaluation_index, int observation, double *level, np_beta_derivative *derivative);
 
 typedef struct {
   double *row;

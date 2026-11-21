@@ -263,6 +263,8 @@ npksum.default <-
     internal.entry.guard <- dots$.np.internal.entry.guard
     dots$.np.internal.entry.guard <- NULL
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
+    lc.nn.derivative <- return.derivative.kernel.weights &&
+      isTRUE(attr(bws, "np.lc.nn.derivative", exact = TRUE))
 
     bandwidth.divide <- npValidateScalarLogical(bandwidth.divide, "bandwidth.divide")
     compute.ocg <- npValidateScalarLogical(compute.ocg, "compute.ocg")
@@ -674,6 +676,7 @@ npksum.default <-
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     if (fold.geometry) myopti$leave.one.out <- FALSE
     myopti <- as.integer(myopti)
+    if (lc.nn.derivative) attr(myopti, "np.lc.nn.derivative") <- TRUE
     if (fold.geometry) {
       # Private estimator contract: delete the occurrence before constructing
       # its NN geometry. Public leave.one.out keeps its zero-diagonal meaning.

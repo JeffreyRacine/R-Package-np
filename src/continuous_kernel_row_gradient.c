@@ -584,6 +584,32 @@ np_continuous_kernel_beta_level_derivative_log_row_validated(
   }
 
   segment = &plan->route->segment[0];
+  if(plan->beta_prepared != NULL && plan->beta_prepared->lc_nn_derivative) {
+    *common_log_scale = -INFINITY;
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      double level;
+      np_beta_derivative d;
+      const np_beta_status status = np_beta_lc_nn_terms(plan, evaluation_index,
+        observation, &level, &d);
+      if(status != NP_BETA_OK) {
+        if(diagnostics != NULL) {
+          diagnostics->bad_coordinate = 0;
+          diagnostics->bad_observation = observation;
+          diagnostics->beta_status = status;
+        }
+        return NP_CONTINUOUS_ROW_ERR_KERNEL;
+      }
+      workspace->level_log_absolute[observation] = level;
+      workspace->level_sign[observation] = level == -INFINITY ? 0 : 1;
+      workspace->regular_log_absolute[observation] = d.regular_log_absolute;
+      workspace->regular_sign[observation] = d.regular_sign;
+      workspace->jump_log_absolute[observation] = d.jump_log_absolute;
+      workspace->jump_sign[observation] = d.jump_sign;
+      *common_log_scale = fmax(*common_log_scale,
+        fmax(level, fmax(d.regular_log_absolute, d.jump_log_absolute)));
+    }
+    return NP_CONTINUOUS_ROW_OK;
+  }
   if(plan->beta_prepared != NULL &&
      plan->beta_prepared->pdf_active &&
      plan->beta_prepared->pdf_row_component_active) {

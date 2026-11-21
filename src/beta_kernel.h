@@ -301,6 +301,10 @@ double np_beta_log_abs_pdf_order(double evaluation,
                                  int *sign,
                                  np_beta_status *status);
 
+np_beta_status np_beta_single_component_derivative(
+  const np_beta_shape *shape, const np_beta_pdf_derivative_component *prepared,
+  double evaluation, double observation, double log_pdf, np_beta_derivative *derivative);
+
 np_beta_status np_beta_pdf_derivative_order(double evaluation,
                                             double observation,
                                             double bandwidth,
