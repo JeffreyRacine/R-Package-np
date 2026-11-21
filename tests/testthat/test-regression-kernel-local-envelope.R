@@ -182,11 +182,17 @@ test_that("second-order NN certificates enforce pairs laws and qualified row own
     bw<-do.call(npregbw,args);set.seed(108511L);seed<-.Random.seed
     make<-function(bws=bw,law="inid") .np_bias_regression_prepare(bws,x,y,law=law,calibration="basic-local-envelope")
     state<-make();held<-state
-    for(law in list("mammen","gaussian","rademacher",NULL,NA_character_,c("inid","geom"))) {
-      expect_error(make(law=law),"NN envelopes require inid, fixed or geom")
+    # First-order admission now includes Mammen; higher-degree restrictions
+    # below retain their separate pairs-only contract.
+    expect_type(make(law="mammen"),"list")
+    for(law in list(NULL,NA_character_,c("inid","geom"),"unknown")) {
+      expect_error(make(law=law),"first-order Epanechnikov NN inference requires")
       expect_error(.np_bias_inference(state,x[20:22,,drop=FALSE],law=law,
-        calibration="basic-local-envelope",B=19L),"NN envelopes require inid, fixed or geom")
+        calibration="basic-local-envelope",B=19L),"first-order Epanechnikov NN inference requires")
     }
+    for(law in c("gaussian","rademacher"))
+      expect_error(.np_bias_inference(state,x[20:22,,drop=FALSE],law=law,
+        calibration="basic-local-envelope",B=19L),"basic-envelope requires inid, fixed or geom")
     expect_identical(state,held);expect_identical(.Random.seed,seed)
     args$regtype<-"lp";args$degree<-2L
     if(type=="generalized_nn")
