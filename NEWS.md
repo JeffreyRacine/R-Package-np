@@ -14,6 +14,7 @@
 
 * Admit known-fixed-support second-order Gaussian degree-zero GNN/ANN corrected inference, including supported mixed predictors. Preserve Gaussian defaults, explicit methods, frozen-radius derivatives and donor-specific ANN support normalization; higher-degree bounded Gaussian and fixed mixed-support boundaries are unchanged.
 
+* Preserve fitted physical support ties in fixed uniform-kernel degree-zero corrected means and existing categorical contrasts. Gaussian auxiliary projections and established interval methods remain unchanged.
 
 * Extend iterated uniform-kernel mean correction to degree-zero GNN/ANN fits with unbounded or declared fixed support, using the established pairs/Mammen local envelope, Rademacher tail envelope and SD constructions. Preserve continuous-derivative refusal, explicit methods, fitted counts, RNG safeguards and computational owners; saved evidence is limited to two originals. Main observation rows retain the fitted physical coordinates so strict uniform NN support ties agree with the plotted fit; auxiliary Gaussian projections remain standardized.
 
@@ -25,6 +26,7 @@
 
 * Preserve requested-default provenance in exported plot data when a Rademacher default resolves to the protective tail envelope. Interval computation and explicit-control metadata are unchanged.
 
+* Admit fixed uniform-kernel iterated correction for local-constant and all-degree-zero GLP means, including mixed-predictor mean panels, with the existing law-specific protective defaults and explicit calibrations. Continuous uniform derivatives remain unqualified, so mixed gradient plots that also request categorical contrasts remain unavailable under iterated correction. Legacy routes retain their prior behavior. Gaussian auxiliary pilots and the fitted uniform main kernel are preserved.
 
 * Admit existing fixed second-order Epanechnikov/beta Rademacher SD and tail constructions. Its empirical default uses the protective tail envelope; explicit controls and other laws retain their definitions. Nonpooled targets retain fixed observed scaling, while pooled mixed targets retain their existing replicate residual-pilot studentization.
 
