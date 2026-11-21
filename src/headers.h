@@ -733,7 +733,7 @@ int kernel_weighted_sum_np_fold_route(
   const int categorical_compress,
   const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-  const NPNNKernelFold *fold);
+  const NPNNKernelFold *fold, int lc_nn_derivative);
 
 int kernel_weighted_sum_np_route_power12(
   int *KERNEL_reg, int *KERNEL_unordered_reg, int *KERNEL_ordered_reg,

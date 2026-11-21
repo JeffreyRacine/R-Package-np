@@ -300,6 +300,13 @@ SEXP C_np_kernelsum(SEXP tuno,
       int route_status;
       NPNNKernelFold fold = {0};
 
+      SEXP lc_request = getAttrib(myopti, install("np.lc.nn.derivative"));
+      const int lc_nn_derivative = TYPEOF(lc_request) == LGLSXP &&
+        XLENGTH(lc_request) == 1 && LOGICAL(lc_request)[0] == TRUE;
+      if(lc_nn_derivative && (descriptor.order != 2 || ncon != 1 || ncat != 0 ||
+         beta_bandwidth_code == BW_FIXED || p_operator != OP_DERIVATIVE ||
+         !return_kernel_weights || fold_requested || leave_one_out))
+        error("invalid internal beta LC derivative request");
       route.segment_count = 1;
       route.segment[0].descriptor = descriptor;
       route.segment[0].coordinate_offset = 0;
@@ -380,7 +387,7 @@ SEXP C_np_kernelsum(SEXP tuno,
         REAL(out_ksum), REAL(out_pksum),
         return_kernel_weights ? REAL(out_kw) : NULL, NULL,
         categorical_compress, &route,
-        &route_diagnostics, fold_requested ? &fold : NULL);
+        &route_diagnostics, fold_requested ? &fold : NULL, lc_nn_derivative);
       undefined_count = route_diagnostics.undefined_count;
       if(route_status != 0 &&
          route_diagnostics.beta_status != NP_BETA_OK)
@@ -400,7 +407,7 @@ SEXP C_np_kernelsum(SEXP tuno,
           if(i > 0)
             direct_operators[i - 1] = INTEGER(op_i)[i - 1];
           direct_operators[i] = OP_DERIVATIVE;
-          route_status = kernel_weighted_sum_np_route(
+          route_status = kernel_weighted_sum_np_fold_route(
             NULL, categorical_ingress.kernel_unordered,
             categorical_ingress.kernel_ordered,
             beta_bandwidth_code, num_train, num_eval,
@@ -424,7 +431,7 @@ SEXP C_np_kernelsum(SEXP tuno,
             REAL(out_pksum) + (R_xlen_t)i * expected_sum, NULL,
             return_kernel_weights ?
               REAL(out_pkw) + (R_xlen_t)i * expected_weights : NULL,
-            NULL, categorical_compress, &route, &route_diagnostics);
+            NULL, categorical_compress, &route, &route_diagnostics, NULL, lc_nn_derivative);
           undefined_count += route_diagnostics.undefined_count;
           if(route_status != 0 &&
              route_diagnostics.beta_status != NP_BETA_OK)

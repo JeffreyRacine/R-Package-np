@@ -55,7 +55,7 @@ double * const pkw,
 const int categorical_compress,
 const NPContinuousKernelRoute * const kernel_route,
 NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
-const NPNNKernelFold * const fold){
+const NPNNKernelFold * const fold, int lc_nn_derivative){
   int status = 0;
   const int pkw_blocks = pkw == NULL ? 0 : np_pkw_block_count(
     num_reg_continuous, num_reg_unordered, num_reg_ordered,
@@ -65,7 +65,7 @@ const NPNNKernelFold * const fold){
   NPPermutationWeightOutput * const pkw_output =
     pkw == NULL ? NULL : &pkw_storage;
   const NPContinuousKernelExecutionContext kernel_execution_context = {
-    kernel_route, kernel_route_diagnostics, categorical_compress, fold
+    kernel_route, kernel_route_diagnostics, categorical_compress, fold, lc_nn_derivative
   };
   const NP_OuterPackCtx route_outer_pack_ctx = {
     .tree_outer_blas = int_TREE_OUTER_BLAS

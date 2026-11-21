@@ -8599,6 +8599,7 @@ typedef struct {
   NPContinuousKernelDerivativeDiagnostics *diagnostics;
   int categorical_compress;
   const NPNNKernelFold *fold;
+  int lc_nn_derivative;
 } NPContinuousKernelExecutionContext;
 
 typedef struct {
@@ -9458,6 +9459,7 @@ typedef struct {
   int retain_common_scale;
   double *centered_m2;
   double *kw;
+  int lc_nn_derivative;
   const NPBetaRegressionMomentCtx *regression_moment_context;
   NPContinuousKernelDerivativeDiagnostics *route_diagnostics;
   NPContinuousKernelProgressFunction progress;
@@ -11064,7 +11066,7 @@ double * const pkw,
 const int categorical_compress,
 const NPContinuousKernelRoute * const kernel_route,
 NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
-const NPNNKernelFold * const fold);
+const NPNNKernelFold * const fold, int lc_nn_derivative);
 
 #include "conditional_literal/jksum_kernel_weighted_sum_np_route.inc"
 
@@ -15082,7 +15084,7 @@ static int np_regression_cv_ann_tree_moments(
     xu, xo, xc, xu, xo, xc, design, design, NULL, scale_factor,
     1, primary, primary, lambda, num_categories,
     matrix_categorical_vals_extern, NULL, moments, NULL, NULL, NULL,
-    0, NULL, NULL, deleted ? &fold : NULL);
+    0, NULL, NULL, deleted ? &fold : NULL, 0);
   vmaxset(marker);
   return status;
 }
@@ -23640,7 +23642,7 @@ static SEXP np_ann_fit_batch_execute(void *raw)
     NP_TREE_TRUE,0,b->tree,NULL,NULL,NULL,
     NULL,NULL,b->train,NULL,NULL,b->tile,NULL,NULL,NULL,NULL,1,
     b->radius,b->radius,NULL,NULL,NULL,NULL,NULL,NULL,b->weights,
-    NULL,0,NULL,NULL,NULL);
+    NULL,0,NULL,NULL,NULL, 0);
   return R_NilValue;
 }
 
@@ -34980,7 +34982,7 @@ static SEXP np_conditional_ann_tree_block_body(void *raw)
        NULL, NULL, NULL, x->vsfx, 1,
        x->matrix_bandwidth_x, x->matrix_bandwidth_x,
        x->lambdax, num_categories_extern_X, matrix_categorical_vals_extern_X,
-       NULL, NULL, NULL, b->weights, NULL, 0, NULL, NULL, &fold) != 0)
+       NULL, NULL, NULL, b->weights, NULL, 0, NULL, NULL, &fold, 0) != 0)
     return R_NilValue;
 
   /* The conditional fold uses radius one on its self placeholder before

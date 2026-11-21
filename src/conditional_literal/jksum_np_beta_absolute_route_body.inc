@@ -241,6 +241,7 @@ static int np_beta_absolute_route_body(
   if(np_continuous_kernel_beta_prepared_context_prepare(
        beta_prepared, &plan) != NP_CONTINUOUS_ROW_OK)
     goto cleanup;
+  beta_prepared->lc_nn_derivative = call->lc_nn_derivative;
   row_result.row = row;
 
   if(has_categories) {
@@ -309,6 +310,9 @@ static int np_beta_absolute_route_body(
         regression_moment_context->gradient_stderr != NULL ?
         regression_moment_context->hc0_scaled_residual : NULL;
 
+      beta_prepared->lc_nn_derivative = regression_moment_context->ordinary_response &&
+        !has_categories && num_reg_continuous == 1 && bandwidth_mode != BW_FIXED &&
+        route->segment[0].descriptor.order == 2;
       row_status = np_beta_regression_gradient_rows_validated(
         &plan, has_categories ? &categorical_provider : NULL,
         regression_moment_context->response,
@@ -321,6 +325,7 @@ static int np_beta_absolute_route_body(
         regression_moment_context->gradient,
         regression_moment_context->gradient_stderr,
         route_diagnostics, &infinite_count, &undefined_count);
+      beta_prepared->lc_nn_derivative = 0;
       *regression_moment_context->status = row_status;
       if(row_status != NP_CONTINUOUS_ROW_OK)
         goto cleanup;

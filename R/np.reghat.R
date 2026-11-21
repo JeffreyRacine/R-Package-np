@@ -478,6 +478,9 @@ npreghat <-
   ntrain <- nrow(txdat)
   neval <- nrow(eval.data)
   beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
+  if (beta.kernel && bws$ckerorder == 2L && ncol(txdat) == 1L &&
+      bws$type %in% c("generalized_nn", "adaptive_nn"))
+    attr(bws, "np.lc.nn.derivative") <- TRUE
 
   if (identical(bws$type, "adaptive_nn")) {
     call <- quote(npksum.default(
