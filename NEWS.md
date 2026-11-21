@@ -2,6 +2,8 @@
 
 * Improve the numerical accuracy of bounded univariate quadratic adaptive-nearest-neighbour Gaussian and beta regression fits and hat rows. The weighted-design calculation uses the rank and ridge accepted by the existing solver.
 
+* Preserve the single evaluation row of adaptive nearest-neighbour local-constant derivative hat matrices, including bivariate beta fits.
+
 * Retain the existing explicit local-envelope scope for fixed raw Epanechnikov GLP fits with a quadratic component and positive-degree fixed beta derivative bands, where saved comparisons identified sensitivity to the calculation coordinates.
 
 * Enable bias-corrected mean panels for second-order beta nearest-neighbour local-constant and degree-zero GLP regression with known finite support. Ordinary calls use the established law-specific defaults; positive-degree and continuous-derivative beta NN correction remain unqualified.

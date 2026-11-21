@@ -614,12 +614,18 @@ npreghat <-
       pkw <- as.matrix(pkw)
     }
 
+    # The derivative slice is training rows by evaluation points, even for one query.
+    if (!is.matrix(pkw))
+      pkw <- matrix(pkw, nrow = ntrain, ncol = neval)
+
     sk <- as.vector(out$ksum)
     dsk <- out$p.ksum
     if (length(dim(dsk)) == 3L) {
       dsk <- dsk[, 1L, target.cont, drop = TRUE]
     } else if (is.matrix(dsk)) {
       dsk <- dsk[, target.cont, drop = TRUE]
+    } else if (neval == 1L && length(dsk) == bws$ncon) {
+      dsk <- dsk[[target.cont]]
     }
     dsk <- as.vector(dsk)
 
