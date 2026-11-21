@@ -279,7 +279,16 @@
     policy$geometry$transition <- NULL
     policy$residual_policy <- "adapted P0 row-variance normalized"
   } else {
-    training <- .np_bias_p0_residuals(spec,matrix(y,ncol=1L))
+    centered <- NULL
+    # The extrapolated covariance correction is qualified for the degree-five pilot.
+    if (identical(q, 5L) && d == 1L && !length(fc) && .np_bias_regression_nn_zero(bws, "gaussian") &&
+        identical(bws[["ckerbound"]], "fixed") &&
+        xor(is.finite(bws[["ckerlb"]][nc]), is.finite(bws[["ckerub"]][nc]))) {
+      spec$gaussian.pilot.range <- range(spec$xcon[[1L]])
+      if (any(y != y[1L]))
+        centered <- .np_bias_gaussian_center(spec$xcon[[1L]], as.double(y), q, spec$gaussian.pilot.range)
+    }
+    training <- .np_bias_p0_residuals(spec,matrix(y,ncol=1L), centered = centered)
     spec$residual <- drop(training$residual)
     spec$residual_raw <- drop(training$raw)
     spec$residual_row_variance <- training$row_variance

@@ -69,6 +69,7 @@ np.o: conditional_literal.h $(NP_CONDITIONAL_ENTRY_DEPS)
 jksum.o categorical_profile_tile.o: conditional_literal.h $(NP_CONDITIONAL_JKSUM_DEPS)
 
 # Shared accepted-policy precision workspace and replay consumers.
+np_bias_gaussian_pilot.o: regression_contrast.h regression_residual.h
 regression_precision.o: regression_precision.h regression_contrast.h jksum_lp_solve.h
 jksum.o reghat_fast.o np_plot_projection.o: regression_precision.h
 
