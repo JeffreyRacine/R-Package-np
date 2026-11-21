@@ -6,6 +6,8 @@
 
 * Add `nppltest()` for testing a partially linear conditional mean against an unrestricted alternative. The projection test accepts a fit or bandwidth object and includes experimental mixed-data calibration.
 
+* Add experimental simultaneous and pointwise first-derivative bands for degree-zero regression with one fixed-support second-order beta predictor and generalized or adaptive nearest-neighbour bandwidths. See the plot help for the four assessed constructions and their coverage limitations.
+
 * Improve frozen-radius first-derivative accuracy for univariate second-order beta nearest-neighbour local-constant and degree-zero GLP regression fits and hat rows.
 
 * Improve the numerical accuracy of bounded univariate quadratic adaptive-nearest-neighbour Gaussian and beta regression fits and hat rows. The weighted-design calculation uses the rank and ridge accepted by the existing solver.
@@ -14,7 +16,7 @@
 
 * Retain the existing explicit local-envelope scope for fixed raw Epanechnikov GLP fits with a quadratic component and positive-degree fixed beta derivative bands, where saved comparisons identified sensitivity to the calculation coordinates.
 
-* Enable bias-corrected mean panels for second-order beta nearest-neighbour local-constant and degree-zero GLP regression with known finite support. Ordinary calls use the established law-specific defaults; positive-degree and continuous-derivative beta NN correction remain unqualified.
+* Enable bias-corrected mean panels for second-order beta nearest-neighbour local-constant and degree-zero GLP regression with known finite support. Ordinary calls use the established law-specific defaults. Positive-degree beta NN correction remains unqualified.
 
 * Improve continuous second-order beta generalized nearest-neighbour regression fits and their hat/plot consumers using the original weighted design. HC0 standard errors follow the repaired training fits and may also change at other evaluation points. Accepted rank/ridge decisions and corrected-band admission limits are unchanged; uncertifiable uncertainty calculations continue to refuse.
 

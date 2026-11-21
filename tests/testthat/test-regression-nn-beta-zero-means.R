@@ -41,7 +41,13 @@ test_that("beta NN degree-zero mean inference preserves support, law and default
     expect_s3_class(run(errors="asymptotic")$result,"np_plot_data")
     expect_s3_class(run(band="pmzsd")$result,"np_plot_data")
     expect_s3_class(run(law="inid",cal="absolute")$result,"np_plot_data")
-    expect_error(run(grad=TRUE),"continuous derivatives remain unqualified")
+    expect_error(run(grad=TRUE), "experimental beta NN first-derivative")
+    if (kind == "pooled") {
+      expect_error(run(grad=TRUE, band="pointwise"), "experimental beta NN first-derivative")
+    } else {
+      expect_s3_class(run(grad=TRUE, band="pointwise")$result, "np_plot_data")
+      expect_error(run(law="fixed", grad=TRUE, band="simultaneous"), "experimental beta NN first-derivative")
+    }
     expect_error(run(cal="basic-envelope"),"basic-envelope requires inid, fixed or geom")
     higher.args <- args;higher.args$regtype <- "lp";higher.args$degree <- 1L
     higher <- do.call(npregbw,higher.args)
