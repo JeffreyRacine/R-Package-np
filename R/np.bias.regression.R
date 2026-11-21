@@ -433,8 +433,9 @@
   if (identical(spec[["settings"]][["main"]][["kernel"]], "beta") &&
       isTRUE(spec[["settings"]][["main"]][["type"]] %in%
              c("generalized_nn", "adaptive_nn")) &&
-      any(startsWith(map[["target"]], "d")))
-    stop("iterated degree-zero beta-kernel NN correction is qualified only for means and categorical mean contrasts; continuous derivatives remain unqualified", call.=FALSE)
+      any(startsWith(map[["target"]], "d")) &&
+      !(isTRUE(spec[["beta.nn.first.derivative"]]) && all(map[["target"]] == "d1")))
+    stop("beta NN derivative rows require a qualified experimental first-derivative band", call.=FALSE)
   if (!is.null(original) && (isTRUE(spec$categorical.only) || isTRUE(spec$pooled)))
     stop("captured original rows are unavailable for this bias owner",call.=FALSE)
   if (isTRUE(spec$categorical.only)) return(.np_bias_categorical_rows(spec,grid,map))

@@ -670,10 +670,28 @@ NN correction and continuous uniform derivatives remain unqualified.
   mixed predictors and categorical mean contrasts. The same established SD,
   pairs and wild constructions apply: Mammen and pairs default to the local
   envelope, and Rademacher defaults to the containing tail envelope. Explicit
-  calibrations retain their definitions. Continuous derivative requests and
-  positive-degree beta NN correction remain unqualified; no requested panel is
-  omitted. The ordinary-use comparison reuses two saved samples and does not
+  calibrations retain their definitions. Positive-degree beta NN correction remains
+  unqualified. The ordinary-use mean comparison reuses two saved samples and does not
   establish nominal coverage. Fitted NN counts and support bounds stay fixed.
+
+Experimental bias-corrected first-derivative bands are available for a single
+continuous predictor with known finite bounds, a second-order beta kernel,
+local-constant or degree-zero GLP regression and generalized or adaptive
+nearest-neighbour bandwidths. Request \code{gradients=TRUE},
+\code{center="bias-corrected"} and \code{band="simultaneous"} or
+\code{band="pointwise"}. With \code{errors="bootstrap"}, independent pairs
+(\code{bootstrap="inid"}) and Mammen wild use \code{"basic-local-envelope"}.
+Rademacher wild uses \code{"tail-envelope"}. With \code{errors="asymptotic"},
+the studentized Gaussian construction uses absolute calibration.
+The fitted neighbour count and degree stay fixed during inference.
+In the saved assessment, the independent-pairs simultaneous bands covered
+all 50 grid points on each of 114 independent datasets for both bandwidth types.
+Their median ratio of simultaneous to pointwise width was 6.80 for generalized
+and 7.14 for adaptive bandwidths. On the saved heteroskedastic exponential
+design, upper-region adaptive pointwise coverage averaged 90.63 percent at
+95 percent nominal. Fixed and geometric block pairs and Bonferroni intervals
+are outside this experimental derivative scope.
+
   The degree-zero and first-order Epanechnikov NN classes support ordinary asymptotic and
   \code{pmzsd} calls, explicit absolute/symmetric-SD pairs and wild bands,
   and Mammen/Rademacher separate-tail and tail-envelope bands. Its empirical

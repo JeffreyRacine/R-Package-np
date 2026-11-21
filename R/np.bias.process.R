@@ -289,7 +289,7 @@
     stop("categorical-only bias correction does not support this calibration law",call.=FALSE)
   if (!is.null(state$mixed) && !law %in% c("gaussian","mammen"))
     stop("mixed local-to-global adaptation supports Gaussian or Mammen calibration; use adaptation='none' for incumbent laws",call.=FALSE)
-  higher <- !is.null(state$gradient.order) && any(vapply(targets,function(t)
+  higher <- !is.null(state[["gradient.order"]]) && any(vapply(targets,function(t)
     startsWith(t,"d") && .np_bias_derivative_order(state,as.integer(substring(t,2L)))>1L,logical(1)))
   if (higher && !law %in% c("gaussian","mammen","inid","rademacher","fixed","geom"))
     stop("higher-order bias correction does not support this calibration law",call.=FALSE)
@@ -572,6 +572,19 @@
   effective <- if(!is.null(effective.calibration))effective.calibration else
     if(calibration=="default")"absolute" else
     .np_plot_calibration_method(calibration, "regression")
+  main <- state[["settings"]][["main"]]
+  if (startsWith(target, "d") && identical(main[["kernel"]], "beta") &&
+      main[["type"]] %in% c("generalized_nn", "adaptive_nn")) {
+    qualified <- switch(law, inid = "basic-local-envelope", gaussian = "absolute",
+                        mammen = "basic-local-envelope", rademacher = "tail-envelope", NULL)
+    if (!identical(target, "d1") || !identical(state$d, 1L) ||
+        length(state$factor.cols) || !is.null(state[["gradient.order"]]) ||
+        !.np_bias_regression_nn_zero(state$bws, "beta") ||
+        !identical(state$bws[["ckerbound"]], "fixed") ||
+        !band %in% c("pointwise", "simultaneous") || !identical(effective, qualified))
+      stop("experimental beta NN first-derivative bands require one bounded continuous predictor, degree zero, a pointwise or simultaneous band and a qualified law and calibration", call. = FALSE)
+    state[["beta.nn.first.derivative"]] <- TRUE
+  }
   refinement <- if(law %in% c("fixed","geom") && band!="pmzsd")"pilot-block" else "none"
   inference <- .np_plot_corrected_activity_run("Constructing bias-corrected intervals",
     if (identical(effective, "smoothed-percentile"))

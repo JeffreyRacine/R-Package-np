@@ -228,6 +228,10 @@ np_bias_control(construction = c("iterated", "legacy"),
   neighborhoods remain edge stresses rather than primary qualification cases.
   Pooled main rows requiring a positive numerical ridge remain unsupported.
 
+  Experimental first-derivative bands for degree-zero beta nearest-neighbour
+  regression with one bounded continuous predictor use the four law-specific
+  pointwise and simultaneous constructions described in \code{\link{plot.np}}.
+
   Fixed-bandwidth local-constant models with categorical predictors only use an exact
   finite-profile reduction: the corrected means are observed joint-profile
   sample means, and contrasts subtract those complete profile-average rows.
