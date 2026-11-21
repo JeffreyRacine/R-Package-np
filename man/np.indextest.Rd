@@ -1,0 +1,110 @@
+\name{npindextest}
+\alias{npindextest}
+\alias{indextest}
+\alias{print.indextest}
+\alias{summary.indextest}
+\title{Bootstrap Specification Test for a Single-Index Model}
+\description{
+Tests whether the conditional mean of a continuous response, or the success
+probability of a binary response, depends on the covariates through one
+unknown linear index with an unrestricted link (Maistre and Patilea, 2019).
+}
+\usage{
+npindextest(object, bw.method = c("published", "maximum", "separate"),
+            B = 199L, random.seed = 42L)
+\method{print}{indextest}(x, ...)
+\method{summary}{indextest}(object, ...)
+}
+\arguments{
+  \item{object}{An \code{\link{npindex}} fit or \code{\link{npindexbw}}
+    object obtained by joint estimation of the direction and link bandwidth
+    on the retained training data. For \code{summary}, an \code{indextest}
+    result.}
+  \item{bw.method}{Test bandwidth choice. \code{"published"} uses the
+    authors' empirical factor one. \code{"maximum"} jointly calibrates three
+    factors. \code{"separate"} sets a separate residual bandwidth and a
+    narrower pairwise bandwidth. Choose one procedure before inspecting its
+    p-value.}
+  \item{B}{Number of bootstrap draws, an integer of at least 9.}
+  \item{random.seed}{A nonnegative integer for temporary seeding. The
+    caller's RNG state is restored on exit. \code{NULL} advances the current
+    stream. See \code{\link{np_rng_scope}}.}
+  \item{x}{An \code{indextest} result.}
+  \item{...}{Further arguments to the print or summary method.}
+}
+\details{
+Use independent observations, at least two continuous numeric covariates of
+full centered rank, and a fixed, unbounded second-order Gaussian
+local-constant fit. Klein--Spady requires both numeric response values 0
+and 1. The hypothesis concerns existence of a single-index representation.
+Off-index curvature and interactions are examples of departures. No link
+function is specified under the null.
+
+The statistic combines off-diagonal products of density-weighted,
+leave-one-out residuals with Gaussian weights in the estimated index and
+its orthogonal complement. All test bandwidths are on the standardized,
+unit-direction index. The published convention sets \eqn{h=n^{-2/9}} and
+uses the fitted CV link bandwidth for the residuals. The joint maximum uses
+the largest studentized statistic over factors 0.5, 1 and 2 and recomputes
+that maximum on every bootstrap draw. The experimental separate-bandwidth
+version uses \eqn{g=n^{-2/9}} for residuals and \eqn{h=n^{-17/36}} for pairs.
+These last two choices extend the paper's empirical procedure. The separate
+pair was conservative and had lower power in small two-covariate simulations.
+
+Every draw refits the direction and CV bandwidth using the original model's
+search settings. Ichimura uses leave-one-out CV fitted means and Mammen wild
+weights. The Klein--Spady adaptation draws Bernoulli responses from inclusive
+CV fitted probabilities. The one-sided p-value includes the observed draw
+in its numerator and denominator. Predictor geometry is reusable, while the
+estimated direction and its kernel weights depend on each bootstrap response.
+Memory for the pairwise geometry is quadratic in the sample size.
+
+The fit and test should use the same package defaults. Some explicit
+optimizer controls or starting values survive only as expressions in the
+original call. If their values cannot be recovered, fit with literal values
+or use \code{do.call(npindexbw, args)} with evaluated controls.
+}
+\value{
+An object of class \code{indextest}. \code{statistic}, \code{P},
+\code{exceedances}, \code{critical.values} and \code{bootstrap} report the
+observed statistic, p-value, exceedance count, upper critical values and
+ordered bootstrap statistics. \code{components} gives the observed values
+for \code{h} in the same order. \code{g.cv} and \code{g.test} are the
+observed link and residual bandwidths. \code{beta}, \code{method},
+\code{bw.method}, \code{n}, \code{refit.controls}, \code{boot.num} and
+\code{random.seed} describe the fit and calibration. \code{call} and
+\code{model.call} retain the calls. \code{rank.counts} is NULL in serial
+execution and records the number of refits performed on each participating MPI rank
+in distributed execution. Print and summary return the result invisibly.
+}
+\references{
+Maistre, S. and Patilea, V. (2019). Nonparametric model checks of
+single-index assumptions. \emph{Statistica Sinica}, 29, 113--138.
+\url{https://www3.stat.sinica.edu.tw/statistica/oldpdf/A29n17.pdf}.
+
+Mammen, E. (1993). Bootstrap and wild bootstrap for high dimensional linear
+models. \emph{Annals of Statistics}, 21, 255--285.
+}
+\seealso{\code{\link{npindex}}, \code{\link{npindexbw}},
+\code{\link{nppltest}}, \code{\link{npcmstest}}}
+\examples{
+\dontrun{
+npRmpi.init(nslaves = 1L)
+tryCatch({
+  set.seed(73)
+  n <- 100L
+  d <- data.frame(x1 = rnorm(n), x2 = rnorm(n))
+  z <- with(d, x1 + 0.6*x2)
+  w <- with(d, x2 - 0.6*x1)
+  d$y <- z + 0.45*sin(z) + (0.6 + 0.2*abs(w))*rnorm(n)
+  bw <- npindexbw(y ~ x1 + x2, data = d, method = "ichimura", nmulti = 1)
+  summary(npindextest(npindex(bw), B = 99))
+
+  d$choice <- rbinom(n, 1, plogis(z + 1.8*z*w))
+  binary <- npindexbw(choice ~ x1 + x2, data = d, method = "kleinspady",
+                      nmulti = 1)
+  summary(npindextest(binary, bw.method = "maximum", B = 99))
+}, finally = npRmpi.quit())
+}
+}
+\keyword{htest}

@@ -220,6 +220,8 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   }
 }
 \details{
+  Use \code{\link{npindextest}} to test whether the conditional mean (or binary success probability) depends on the covariates through a single linear index with unknown coefficients and link.
+
   The primary response must be a one-dimensional numeric (integer or double)
   vector. Factors and ordered factors are not accepted as primary responses,
   including retained responses used in a new fit or bandwidth search.
@@ -559,6 +561,7 @@ failures must be considered when experimenting with these bounds.
 }
 
 \seealso{
+  \code{\link{npindextest}},
   \code{\link{npRmpi.init}} for MPI startup and workflow guidance.
   \code{\link{np.kernels}}, \code{\link{np.options}},
   \code{\link{plot}}, \code{\link{plot.np}}, \code{\link{npindexbw}}

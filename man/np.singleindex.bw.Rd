@@ -551,6 +551,8 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+  Use \code{\link{npindextest}} to test whether the conditional mean (or binary success probability) depends on the covariates through a single linear index with unknown coefficients and link.
+
   The primary response must be a one-dimensional numeric (integer or double)
   vector. Factors and ordered factors are not accepted as primary responses,
   including retained responses used in a new fit or bandwidth search.
@@ -892,7 +894,8 @@ or standard-deviation factors.
   clustered computing environment to facilitate computation involving
   large datasets.  }
 
-\seealso{\code{\link{npRmpi.init}} for MPI startup and workflow guidance.}
+\seealso{
+  \code{\link{npindextest}},\code{\link{npRmpi.init}} for MPI startup and workflow guidance.}
 \examples{
 \dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.

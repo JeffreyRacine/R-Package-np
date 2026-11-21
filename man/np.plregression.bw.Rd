@@ -378,6 +378,8 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+  Use \code{\link{nppltest}} to test whether the designated parametric regressors enter linearly and additively given the nuisance covariates.
+
   The primary response must be a one-dimensional numeric (integer or double)
   vector. Factors and ordered factors are not accepted as primary responses,
   including retained responses used in a new fit or bandwidth search.
@@ -640,6 +642,7 @@ or standard-deviation factors.
 }
 
 \seealso{
+  \code{\link{nppltest}},
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
