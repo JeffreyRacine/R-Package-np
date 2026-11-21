@@ -68,6 +68,14 @@ np_bias_control(construction = c("iterated", "legacy"),
     exclusive. Raw bandwidths must be transformed when predictor units change.}
 }
 \details{
+  For one-sided Gaussian degree-zero nearest-neighbour regression with one
+  continuous predictor, inactive adaptation and auxiliary degree five, the P0
+  residual removes a
+  polynomial trend before applying an identified full-support hat row.
+  That row reproduces the polynomial exactly in exact arithmetic. At an
+  extrapolated target, full-support P1 means and first derivatives use a
+  compensated Gaussian calculation after the ordinary zero-ridge check.
+
   Supply \code{bias.control=np_bias_control(...)} to the regression plot.
   Omitting this argument with \code{center="bias-corrected"} uses the iterated
   defaults. \code{center="estimate"} remains the ordinary plot default.

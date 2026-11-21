@@ -341,6 +341,17 @@ function (spec, at, derivatives = TRUE, orders = NULL, .training = FALSE)
                 dh[[d]] <- coefficient + w - .np_bias_solve(Q, k, drop(crossprod(Q, w)), "P1 auxiliary derivative pilot")
             }
         }
+    if (!.training && univariate && !is.null(spec[["gaussian.pilot.range"]]) &&
+        (!derivatives || is.null(orders) || orders[1L] == 1L)) {
+        limits <- spec[["gaussian.pilot.range"]]
+        e <- at[[spec$numeric.cols[1L]]]
+        if ((e < limits[1L] || e > limits[2L]) && all(k > 0)) {
+            row <- .Call("C_np_bias_gaussian_extrapolate", x[[1L]], e, spec$b[1L],
+                         as.integer(spec$q), k, PACKAGE = "np")
+            h <- row[, 1L]
+            if (derivatives) dh[[1L]] <- row[, 2L]
+        }
+    }
     if (any(!is.finite(h)) || any(!is.finite(unlist(dh))))
         stop("P1 auxiliary pilot produced non-finite rows")
     list(indices = ii, mean = h, derivatives = dh)
@@ -387,7 +398,7 @@ function (spec)
 }
 
 .np_bias_residual_apply <-
-function (owner, responses, block = 16L)
+function (owner, responses, block = 16L, centered = NULL)
 {
     if (!is.function(owner) || !is.matrix(responses) || !is.numeric(responses) || nrow(responses) < 2L ||
         ncol(responses) < 1L || ncol(responses) > 9999L || any(!is.finite(responses)) || length(block) !=
@@ -401,9 +412,15 @@ function (owner, responses, block = 16L)
         H <- owner(ii)
         if (!is.matrix(H) || !identical(dim(H), c(length(ii), n)) || any(!is.finite(H)))
             stop("invalid residual row owner")
-        raw[ii, ] <- responses[ii, , drop = FALSE] - H %*% responses
+        # A nonzero hat entry certifies participation of that donor. Leave
+        # partial-support rows with the incumbent residual arithmetic.
+        if (!is.null(centered)) complete <- rowSums(H == 0) == 0L
+        if (is.null(centered) || !all(complete))
+            raw[ii, ] <- responses[ii, , drop = FALSE] - H %*% responses
         leverage[ii] <- H[cbind(seq_along(ii), ii)]
         H[cbind(seq_along(ii), ii)] <- H[cbind(seq_along(ii), ii)] - 1
+        if (!is.null(centered) && any(complete))
+            raw[ii[complete], ] <- -(H[complete, , drop = FALSE] %*% centered)
         row_variance[ii] <- rowSums(H^2)
     }
     if (any(!is.finite(row_variance)) || any(row_variance <= 0))
@@ -411,8 +428,25 @@ function (owner, responses, block = 16L)
     list(raw = raw, residual = raw/sqrt(row_variance), leverage = leverage, row_variance = row_variance)
 }
 
+# The zero-ridge P0 residual eliminates every polynomial of degree <= q.
+# Remove a bounded interpolating polynomial before applying the same hat row.
+# Chebyshev nodes require no second fit or rank decision. Evaluate in two
+# doubles so rounding the subtracted trend does not enter the residual.
+.np_bias_gaussian_center <- function(x, y, degree, limits) {
+    theta <- pi * (seq_len(degree + 1L) - 0.5) / (degree + 1L)
+    nodes <- limits[1L] + (cos(theta) + 1) * (diff(limits) / 2)
+    cosine <- cos(outer(theta, 0:degree))
+    magnitude <- max(abs(y))
+    values <- stats::approx(x, y / magnitude, xout = nodes, rule = 2L,
+                            ties = mean)$y
+    co <- drop(crossprod(cosine, values)) * (2 / (degree + 1L))
+    co[1L] <- co[1L] / 2
+    .Call("C_np_bias_gaussian_center", x, y, co,
+          limits, magnitude, PACKAGE = "np")
+}
+
 .np_bias_p0_residuals <-
-function (spec, responses, block = 16L)
+function (spec, responses, block = 16L, centered = NULL)
 {
     if (!is.matrix(responses) || !is.numeric(responses) || nrow(responses) != nrow(spec$x) || ncol(responses) <
         1L || ncol(responses) > 9999L || any(!is.finite(responses)))
@@ -430,7 +464,8 @@ function (spec, responses, block = 16L)
                 stop("P0 residual fit requires regularization at a training observation; trimming the evaluation grid cannot repair it. Inspect training tails and p0.bandwidth/p0.scale or the auxiliary degree", call. = FALSE)
             H
         }
-        v <- .np_bias_residual_apply(owner, responses[ii, , drop = FALSE], block)
+        v <- .np_bias_residual_apply(owner, responses[ii, , drop = FALSE], block,
+                                    if (!is.null(centered)) centered[ii])
         out[ii, ] <- v$residual
         raw[ii, ] <- v$raw
         leverage[ii] <- v$leverage

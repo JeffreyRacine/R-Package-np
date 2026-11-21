@@ -100,6 +100,8 @@ extern SEXP C_np_release_static_buffers(void);
 
 extern SEXP C_np_plot_alllarge_derivative(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_gate_dispatch(SEXP, SEXP, SEXP);
+extern SEXP C_np_bias_gaussian_extrapolate(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_bias_gaussian_center(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_plot_projection_apply(SEXP, SEXP, SEXP);
 
 extern SEXP C_np_plot_regression_gradient_projection(SEXP);
@@ -156,6 +158,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_plot_nn_response_jet", (DL_FUNC) &C_np_plot_nn_response_jet, 7},
     {"C_np_plot_alllarge_derivative", (DL_FUNC) &C_np_plot_alllarge_derivative, 10},
     {"C_np_plot_gate_dispatch", (DL_FUNC) &C_np_plot_gate_dispatch, 3},
+    {"C_np_bias_gaussian_extrapolate", (DL_FUNC) &C_np_bias_gaussian_extrapolate, 5},
+    {"C_np_bias_gaussian_center", (DL_FUNC) &C_np_bias_gaussian_center, 5},
     {"C_np_plot_projection_apply", (DL_FUNC) &C_np_plot_projection_apply, 3},
     {"C_np_nomad_condition_raise", (DL_FUNC) &C_np_nomad_condition_raise, 1},
     {"C_np_ordered_rly_matrix", (DL_FUNC) &C_np_ordered_rly_matrix, 4},
