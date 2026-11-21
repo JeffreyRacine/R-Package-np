@@ -657,7 +657,16 @@ NN correction and continuous uniform derivatives remain unqualified.
   samples and do not establish nominal coverage; narrower explicit alternatives
   must not be interpreted as coverage improvements.
   Epanechnikov NN classes with a main degree greater than one retain their
-  existing limitations; beta NN remains unqualified.
+  existing limitations.
+  Second-order beta regression with known finite fixed support also supports
+  generalized/adaptive NN LC or GLP degree-zero mean panels, including supported
+  mixed predictors and categorical mean contrasts. The same established SD,
+  pairs and wild constructions apply: Mammen and pairs default to the local
+  envelope, and Rademacher defaults to the containing tail envelope. Explicit
+  calibrations retain their definitions. Continuous derivative requests and
+  positive-degree beta NN correction remain unqualified; no requested panel is
+  omitted. The ordinary-use comparison reuses two saved samples and does not
+  establish nominal coverage. Fitted NN counts and support bounds stay fixed.
   The degree-zero and first-order Epanechnikov NN classes support ordinary asymptotic and
   \code{pmzsd} calls, explicit absolute/symmetric-SD pairs and wild bands,
   and Mammen/Rademacher separate-tail and tail-envelope bands. Its empirical

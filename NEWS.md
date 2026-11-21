@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Enable bias-corrected mean panels for second-order beta nearest-neighbour local-constant and degree-zero GLP regression with known finite support. Ordinary calls use the established law-specific defaults; positive-degree and continuous-derivative beta NN correction remain unqualified.
+
 * Improve continuous second-order beta generalized nearest-neighbour regression fits and their hat/plot consumers using the original weighted design. HC0 standard errors follow the repaired training fits and may also change at other evaluation points. Accepted rank/ridge decisions and corrected-band admission limits are unchanged; uncertifiable uncertainty calculations continue to refuse.
 
 * Extend established Epanechnikov GNN/ANN corrected constructions and defaults to local-linear and GLP main degrees at most one, with unbounded or known fixed support. Preserve explicit calibrations, NN radii, Gaussian auxiliaries, partial derivative availability and numerical/computational owners. Higher-degree limitations remain.
