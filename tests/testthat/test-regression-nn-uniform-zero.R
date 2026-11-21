@@ -56,6 +56,7 @@ test_that("uniform degree-zero NN means preserve explicit methods and derivative
 })
 
 test_that("uniform NN main rows preserve physical support ties", {
+  skip_on_cran()
   opt <- options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
   on.exit(options(opt),add=TRUE)
   set.seed(4202)

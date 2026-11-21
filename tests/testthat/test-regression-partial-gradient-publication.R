@@ -1,4 +1,5 @@
 test_that("partial regression gradients retain undefined panels for every requested band", {
+  skip_on_cran()
   opt <- options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
   on.exit(options(opt),add=TRUE)
   local.fit <- function(expr) {

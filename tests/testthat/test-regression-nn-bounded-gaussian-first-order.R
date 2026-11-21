@@ -1,4 +1,5 @@
 test_that("bounded Gaussian first-order NN preserves defaults and partial derivatives", {
+  skip_on_cran()
   opt <- options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
   on.exit(options(opt),add=TRUE)
   set.seed(1127601);seed <- .Random.seed
@@ -48,6 +49,7 @@ test_that("bounded Gaussian first-order NN preserves defaults and partial deriva
 })
 
 test_that("bounded Gaussian local linear agrees with its raw GLP model", {
+  skip_on_cran()
   opt <- options(np.messages=FALSE,np.plot.progress=FALSE,np.tree=FALSE)
   on.exit(options(opt),add=TRUE)
   x0 <- data.frame(x=seq(-.97,.96,length.out=96L));y <- sin(3*x0$x)+.1*cos(seq_len(96L))
