@@ -23,16 +23,19 @@
   out
 }
 
+.np_bias_regression_zero_degree <- function(bws) {
+  if (identical(bws[["regtype"]], "lc")) return(TRUE)
+  degree <- bws[["degree"]]
+  identical(bws[["regtype"]], "lp") && identical(bws[["basis"]], "glp") &&
+    is.numeric(degree) && length(degree) > 0L && all(!is.na(degree) & degree == 0L)
+}
+
 .np_bias_regression_nn_zero <- function(bws, kernel = "epanechnikov") {
   isTRUE(bws[["type"]] %in% c("generalized_nn", "adaptive_nn")) &&
     isTRUE(bws[["ckertype"]] %in% kernel) &&
     isTRUE(bws[["ckerorder"]] == 2L) &&
     isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")) &&
-    (identical(bws[["regtype"]], "lc") ||
-     (identical(bws[["regtype"]], "lp") &&
-      identical(bws[["basis"]], "glp") &&
-      is.numeric(bws[["degree"]]) && length(bws[["degree"]]) > 0L &&
-      all(!is.na(bws[["degree"]]) & bws[["degree"]] == 0L)))
+    .np_bias_regression_zero_degree(bws)
 }
 
 .np_bias_regression_nn_first_order <- function(bws, kernel) {
@@ -81,7 +84,7 @@
          .np_bias_regression_nn_zero(bws, "beta")) &&
         identical(bws[["ckerbound"]], "fixed")) ||
        (identical(bws[["ckertype"]], "uniform") &&
-        (identical(bws[["type"]], "fixed") ||
+        ((identical(bws[["type"]], "fixed") && .np_bias_regression_zero_degree(bws)) ||
          .np_bias_regression_nn_zero(bws, "uniform")) &&
         isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")))))
     return("local-envelope")
@@ -89,7 +92,20 @@
 }
 
 .np_bias_regression_calibration <- function(bws, calibration, method, band,
-                                             bootstrap, wild) {
+                                             bootstrap, wild, gradients = FALSE) {
+  # These fixed fitted rows retain the scope of the previously supported
+  # explicit local envelope until the physical-coordinate discrepancies are resolved.
+  if (identical(bws[["type"]], "fixed") &&
+      !identical(calibration, "basic-local-envelope")) {
+    degree <- bws[["degree"]]
+    raw.quadratic <- identical(bws[["ckertype"]], "epanechnikov") &&
+      identical(bws[["regtype"]], "lp") &&
+      identical(bws[["bernstein.basis"]], FALSE) && any(degree == 2L)
+    beta.derivative <- identical(bws[["ckertype"]], "beta") && isTRUE(gradients) &&
+      (identical(bws[["regtype"]], "ll") || any(degree > 0L))
+    if (raw.quadratic || beta.derivative)
+      stop("this fixed-bandwidth iterated regression target requires the explicit basic-local-envelope calibration for supported pairs or Mammen bands", call. = FALSE)
+  }
   if (!identical(calibration, "default"))
     return(.np_plot_calibration_method(calibration, "regression"))
   # Resolve once from the fitted model and requested law, before preparing
@@ -167,6 +183,10 @@
   if (!d) return(.np_bias_categorical_prepare(bws,x,y,control,reg))
   legacy.hint <- if (bws[["type"]]=="fixed" && d>0L)
     "; explicit bootstrap bias.control=np_bias_control(construction='legacy') retains the previous construction for supported bootstrap methods" else ""
+  if (identical(bws[["type"]], "fixed") && identical(bws[["ckertype"]], "uniform") &&
+      !.np_bias_regression_zero_degree(bws))
+    stop(paste0("iterated fixed uniform correction requires a local-constant or all-degree-zero GLP fit",
+                legacy.hint), call. = FALSE)
   kernel.class <- .np_bias_regression_kernel_class(bws, calibration)
   if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
     stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths with continuous predictors only, or qualified nearest-neighbour models with main degrees at most one",legacy.hint), call. = FALSE)

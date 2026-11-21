@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Retain the existing explicit local-envelope scope for fixed raw Epanechnikov GLP fits with a quadratic component and positive-degree fixed beta derivative bands, where saved comparisons identified sensitivity to the calculation coordinates.
+
 * Enable bias-corrected mean panels for second-order beta nearest-neighbour local-constant and degree-zero GLP regression with known finite support. Ordinary calls use the established law-specific defaults; positive-degree and continuous-derivative beta NN correction remain unqualified.
 
 * Improve continuous second-order beta generalized nearest-neighbour regression fits and their hat/plot consumers using the original weighted design. HC0 standard errors follow the repaired training fits and may also change at other evaluation points. Accepted rank/ridge decisions and corrected-band admission limits are unchanged; uncertifiable uncertainty calculations continue to refuse.
@@ -24,7 +26,7 @@
 
 * Preserve requested-default provenance in exported plot data when a Rademacher default resolves to the protective tail envelope. Interval computation and explicit-control metadata are unchanged.
 
-* Admit fixed uniform-kernel iterated correction for means, including mixed-predictor mean panels, with the existing law-specific protective defaults and explicit calibrations. Continuous uniform derivatives remain unqualified, so mixed gradient plots that also request categorical contrasts remain unavailable under iterated correction. Legacy routes retain their prior behavior. Gaussian auxiliary pilots and the fitted uniform main kernel are preserved.
+* Admit fixed uniform-kernel iterated correction for local-constant and all-degree-zero GLP means, including mixed-predictor mean panels, with the existing law-specific protective defaults and explicit calibrations. Continuous uniform derivatives remain unqualified, so mixed gradient plots that also request categorical contrasts remain unavailable under iterated correction. Legacy routes retain their prior behavior. Gaussian auxiliary pilots and the fitted uniform main kernel are preserved.
 
 * Admit existing fixed second-order Epanechnikov/beta Rademacher SD and tail constructions. Its empirical default uses the protective tail envelope; explicit controls and other laws retain their definitions. Nonpooled targets retain fixed observed scaling, while pooled mixed targets retain their existing replicate residual-pilot studentization.
 

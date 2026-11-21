@@ -1,10 +1,18 @@
 test_that("uniform iterated mean admission keeps support and law boundaries", {
-  b<-list(type="fixed",ckertype="uniform",ckerorder=2L,ckerbound="none",ncon=1L)
+  b<-list(type="fixed",ckertype="uniform",ckerorder=2L,ckerbound="none",ncon=1L,regtype="lc")
   for(bound in c("none","fixed"))for(cal in c("absolute","separate-tails","tail-envelope","basic-envelope","basic-local-envelope")) {
     b$ckerbound<-bound;expect_identical(.np_bias_regression_kernel_class(b,cal),"local-envelope")
   }
-  for(type in c("generalized_nn","adaptive_nn")){z<-b;z$type<-type;expect_identical(.np_bias_regression_kernel_class(z,"basic-local-envelope"),"unsupported")}
+  for(type in c("generalized_nn","adaptive_nn")){z<-b;z$type<-type;expect_identical(.np_bias_regression_kernel_class(z,"basic-local-envelope"),"local-envelope")}
   for(bound in c("range","lbound","ubound")){z<-b;z$ckerbound<-bound;expect_identical(.np_bias_regression_kernel_class(z,"absolute"),"unsupported")}
+  for (degree in list(1L, 2L, 3L, c(0L,1L))) {
+    z <- b
+    z$regtype <- "lp"
+    z$basis <- "glp"
+    z$degree <- degree
+    for (cal in c("absolute","separate-tails","tail-envelope","basic-envelope","basic-local-envelope"))
+      expect_identical(.np_bias_regression_kernel_class(z,cal), "unsupported")
+  }
   z<-b;z$ckerorder<-4L;expect_identical(.np_bias_regression_kernel_class(z,"absolute"),"unsupported")
   for(law in c("wild","inid","fixed","geom"))expect_identical(.np_bias_regression_calibration(b,"default","bootstrap","all",law,"mammen"),"basic-local-envelope")
   expect_identical(.np_bias_regression_calibration(b,"default","bootstrap","all","wild","rademacher"),"tail-envelope")
@@ -18,7 +26,8 @@ test_that("uniform main mean rows match an independent weighted SVD", {
   if(!spawn_mpi_slaves(n=1L))skip("MPI workers unavailable")
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
-  for(pooled in c(FALSE,TRUE))for(degree in c(0L,2L))for(bound in c("none","fixed")) {
+  degree <- 0L
+  for(pooled in c(FALSE,TRUE))for(bound in c("none","fixed")) {
     x<-data.frame(x=if(pooled)rep(seq(-.9,.9,length.out=30L),3L)else seq(-.9,.9,length.out=90L))
     if(pooled)x$group<-factor(rep(letters[1:3],each=30L))
     y<-sin(3*x$x)+.15*cos(seq_len(90L))+if(pooled).2*as.integer(x$group)else 0
@@ -53,7 +62,7 @@ test_that("public uniform means retain defaults and reject unqualified derivativ
     x<-data.frame(x=if(pooled)rep(seq(-.9,.9,length.out=20L),3L)else seq(-.9,.9,length.out=60L))
     if(pooled)x$group<-factor(rep(letters[1:3],each=20L))
     y<-sin(3*x$x)+.15*cos(seq_len(60L))+if(pooled).2*as.integer(x$group)else 0
-    bw<-npregbw(xdat=x,ydat=y,bws=c(1.1,if(pooled).2),regtype="ll",ckertype="uniform",bandwidth.compute=FALSE)
+    bw<-npregbw(xdat=x,ydat=y,bws=c(1.1,if(pooled).2),regtype="lc",ckertype="uniform",bandwidth.compute=FALSE)
     held<-bw;set.seed(112921L);seed<-.Random.seed
     run<-function(control=NULL,derivatives=FALSE){args<-list(x=bw,xdat=x,ydat=y,center="bias-corrected",errors="bootstrap",B=199L,neval=3L,alpha=.1,band="all",gradients=derivatives,output="data");if(!missing(control))args<-c(args,list(boot.control=control));capture_plot_provider(do.call(plot,args))}
     automatic<-run();expect_error(run(NULL),"boot.control must be created by np_boot_control",fixed=TRUE);explicit<-run(np_boot_control(calibration="basic-local-envelope"));expect_identical(automatic$result$panels,explicit$result$panels)
@@ -64,4 +73,26 @@ test_that("public uniform means retain defaults and reject unqualified derivativ
     expect_error(run(derivatives=TRUE),"construction='legacy'",fixed=TRUE)
     expect_identical(bw,held);expect_identical(.Random.seed,seed)
   }
+})
+
+test_that("fixed rows with saved precision failures preserve live explicit scope", {
+  b <- list(type="fixed", regtype="lp", basis="glp", degree=2L, ncon=1L,
+            ckertype="epanechnikov", ckerorder=2L, ckerbound="none",
+            bernstein.basis=FALSE)
+  resolve <- function(b, calibration, gradients=FALSE)
+    .np_bias_regression_calibration(b, calibration, "bootstrap", "simultaneous",
+                                    "inid", "mammen", gradients)
+  for (g in c(FALSE, TRUE)) {
+    expect_error(resolve(b, "default", g), "explicit basic-local-envelope")
+    expect_identical(resolve(b, "basic-local-envelope", g), "basic-local-envelope")
+  }
+  b$bernstein.basis <- TRUE
+  expect_identical(resolve(b, "default"), "basic-local-envelope")
+  b$ckertype <- "beta"
+  b$ckerbound <- "fixed"
+  expect_identical(resolve(b, "default"), "basic-local-envelope")
+  expect_error(resolve(b, "absolute", TRUE), "explicit basic-local-envelope")
+  expect_identical(resolve(b, "basic-local-envelope", TRUE), "basic-local-envelope")
+  b$degree <- 0L
+  expect_identical(resolve(b, "default", TRUE), "basic-local-envelope")
 })
