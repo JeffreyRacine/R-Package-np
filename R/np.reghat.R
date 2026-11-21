@@ -9,7 +9,7 @@
 .npreghat_fitted_capture_scope <- function(bws) {
   .np_regression_precision_scope(bws) ||
     (identical(bws[["type",exact=TRUE]],"generalized_nn") &&
-     bws[["ckertype",exact=TRUE]] %in% c("gaussian","epanechnikov") &&
+     bws[["ckertype",exact=TRUE]] %in% c("gaussian","epanechnikov","beta") &&
      identical(as.integer(bws[["ckerorder",exact=TRUE]]),2L) &&
      bws[["ncon",exact=TRUE]]>0L && bws[["nuno",exact=TRUE]]==0L &&
      bws[["nord",exact=TRUE]]==0L)
@@ -463,7 +463,9 @@ npreghat <-
       next
     }
     if(!constant) attr(P,'.np.fit.accepted') <- TRUE
-    weights <- if(constant) NULL else
+    weights <- if(constant) NULL else if(identical(bws[["ckertype",exact=TRUE]],"beta"))
+      .np_plot_lsq_beta_moment_weights(bws,txdat,numeric(n),projection[[1L]],
+        ex=if(training)NULL else evaluation,index=index,max.bytes=budget) else
       .np_plot_lsq_gate_weights(bws,geometry,index,training=training,max.bytes=budget)
     block <- .Call('C_np_plot_projection_apply',projection[[1L]],P,weights,PACKAGE='npRmpi')
     out[index,] <- if(apply)block%*%y else block

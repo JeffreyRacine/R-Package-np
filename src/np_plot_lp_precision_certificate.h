@@ -168,9 +168,10 @@ static int np_plot_lp_certificate_arithmetic(NPPlotLPCertificate *c,
  * accepted is the already returned canonical CORRECTED adjoint; bound gets
  * absolute component errors relative to the exact frozen-geometry operator.
  * This mutates only RHS scratch. gram_source and the retained LU are kept. */
-static int np_plot_lp_certificate_adjoint(NPPlotLPCertificate *c,
-  NPLPSolveWorkspace *w,const double *d,const double *accepted,double anchor,
-  const NPLPSolvePolicyDiagnostics *policy,double *bound,double *defect_norm)
+/* Recover the same accepted raw adjoint and inverse for either certificate.
+ * Only RHS scratch is changed; the retained factor and policy remain intact. */
+static int np_plot_lp_certificate_factor_view(NPPlotLPCertificate *c,
+  NPLPSolveWorkspace *w,const double *d,int transposed_inverse)
 {
   const int p=c->p;
   for(int i=0;i<p;++i)w->rhs_source[i]=d[i];
@@ -178,9 +179,20 @@ static int np_plot_lp_certificate_adjoint(NPPlotLPCertificate *c,
   for(int i=0;i<p;++i)c->raw[i]=w->rhs_work[i];
   for(int k=0;k<p;++k){
     for(int i=0;i<p;++i)w->rhs_source[i]=i==k?1.0:0.0;
-    if(!np_lp_solve_workspace_solve_factored(w,p,1))return 0;
-    for(int i=0;i<p;++i){double v=w->rhs_work[i];if(!R_FINITE(v))return 0;c->inverse[i+(size_t)k*p]=v;}
+    if(!(transposed_inverse ? np_lp_solve_workspace_solve_transpose_factored(w,p,1) :
+         np_lp_solve_workspace_solve_factored(w,p,1)))return 0;
+    for(int i=0;i<p;++i){double v=w->rhs_work[i];if(!R_FINITE(v))return 0;
+      c->inverse[transposed_inverse?k+(size_t)i*p:i+(size_t)k*p]=v;}
   }
+  return 1;
+}
+
+static int np_plot_lp_certificate_adjoint(NPPlotLPCertificate *c,
+  NPLPSolveWorkspace *w,const double *d,const double *accepted,double anchor,
+  const NPLPSolvePolicyDiagnostics *policy,double *bound,double *defect_norm)
+{
+  const int p=c->p;
+  if(!np_plot_lp_certificate_factor_view(c,w,d,0))return 0;
   if(!np_plot_lp_certificate_arithmetic(c,w->gram_source,d,defect_norm))return 0;
   NPPlotInterval correction=np_plot_iv(1.0);
   if(policy->ridge_total!=0.0){

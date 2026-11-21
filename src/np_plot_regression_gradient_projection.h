@@ -56,12 +56,13 @@ SEXP C_np_plot_regression_gradient_projection(SEXP args)
     error("plot gradient projection: expected gradient-only compact projection request");
   const int width=INTEGER(v[21])[2];
   const int capture_kernel_scope =
-    (op[REG_BWI]==BW_FIXED && op[REG_CKRNEVI]==0) ||
-    (op[REG_BWI]==BW_GEN_NN && (op[REG_CKRNEVI]==0 || op[REG_CKRNEVI]==4));
+    (op[REG_CKFAMILYI]==NP_CKERNEL_FAMILY_LEGACY &&
+      ((op[REG_BWI]==BW_FIXED && op[REG_CKRNEVI]==0) ||
+       (op[REG_BWI]==BW_GEN_NN && (op[REG_CKRNEVI]==0 || op[REG_CKRNEVI]==4)))) ||
+    (op[REG_CKFAMILYI]==NP_CKERNEL_FAMILY_BETA && op[REG_BWI]==BW_GEN_NN);
   if(capture_gradient && (nu || no || !capture_kernel_scope ||
-     op[REG_CKFAMILYI]!=NP_CKERNEL_FAMILY_LEGACY ||
      op[REG_CKORDERI]!=2 || (double)width*pc>INT_MAX))
-    error("lean gradient capture requires continuous fixed Gaussian2 or generalized-NN Gaussian2/Epanechnikov2 regression");
+    error("lean gradient capture requires continuous fixed Gaussian2 or generalized-NN Gaussian2/Epanechnikov2/beta2 regression");
   const double resident=(capture_gradient ? (op[REG_GRAD]?(double)m*width*pc:0.0)+m+3.0*pc : 0.0)+
     (double)width*(n+(double)m)+
     2.0*(n+(double)m)*nc+2.0*n+2.0*m+(double)m*nc+256.0*width*width;

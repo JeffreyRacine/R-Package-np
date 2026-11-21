@@ -27117,14 +27117,21 @@ static void np_regression_general_lp_fit_owner_cleanup(
 
 /* Scoped precision sibling. Accepted rank/ridge and all incumbent kernel/tree
  * selection remain upstream. Continuous second-order GNN rows use their own
- * target radius; conditional, categorical, beta and signed owners are unchanged. */
+ * target radius; conditional, categorical and signed owners are unchanged. */
 static int np_regression_precision_eligible(const NPRegressionGeneralLPFitCall *call)
 {
   if(!call->ordinary_response ||
      (call->bandwidth_mode != BW_FIXED && call->bandwidth_mode != BW_GEN_NN) ||
-     call->kernel_route != NULL ||
      call->num_reg_unordered || call->num_reg_ordered || call->all_large_kernel_rows)
     return 0;
+  if(call->kernel_route != NULL) {
+    const NPContinuousKernelRoute *route=call->kernel_route;
+    return call->bandwidth_mode==BW_GEN_NN && call->num_reg_continuous>0 &&
+      route->segment_count==1 && route->segment[0].coordinate_offset==0 &&
+      route->segment[0].coordinate_count==call->num_reg_continuous &&
+      route->segment[0].descriptor.family==NP_CKERNEL_FAMILY_BETA &&
+      route->segment[0].descriptor.order==2;
+  }
   for(int d=0;d<call->num_reg_continuous;++d)
     if(call->kernel_c[d]!=0 &&
        !(call->bandwidth_mode==BW_GEN_NN && call->kernel_c[d]==4))return 0;
@@ -27140,6 +27147,25 @@ static int np_regression_precision_prepare(
   if(owner->precision_kernel==NULL)return 0;
   if(retained!=NULL) {
     for(int i=0;i<n;++i)owner->precision_kernel[i]=retained[i]/divisor;
+  } else if(call->kernel_route != NULL) {
+    /* The owned moments are scratch only when no conditional-SE reader follows.
+     * Current ordinary beta SE requests retain canonical weights above; keep
+     * this invariant checked if a future entry adds another consumer. */
+    if(call->do_merr && (call->hc0_context==NULL ||
+       call->hc0_context->status==NP_REGRESSION_HC0_RESIDUAL_PREPARING))return 0;
+    /* Recreate only the missing canonical row after the unchanged trigger.
+     * The beta route always includes the response-square anchor, hence the
+     * ordinary response/basis stride is nterms+2, even without SE. */
+    if(np_beta_regression_lp_moment_row_canonical(call->bandwidth_mode,n,
+      call->num_reg_unordered,call->num_reg_ordered,call->num_reg_continuous,
+      owner->nterms,owner->nterms+2,call->operator,call->kernel_u,call->kernel_o,
+      call->matrix_X_unordered_train,call->matrix_X_ordered_train,call->matrix_X_continuous_train,
+      owner->eval_unordered,owner->eval_ordered,owner->eval_continuous,
+      owner->response_columns,owner->basis,call->vector_scale_factor,
+      call->matrix_bandwidth,owner->matrix_bandwidth_eval,call->lambda,
+      call->num_categories,call->matrix_categorical_vals,call->categorical_compress,
+      owner->moments,NULL,NULL,owner->precision_kernel,call->kernel_route,
+      call->kernel_route_diagnostics,NULL))return 0;
   } else {
     if(kernel_weighted_sum_np_ctx_ex(call->kernel_c,call->kernel_u,call->kernel_o,
       call->bandwidth_mode,n,1,0,0,call->num_reg_continuous,

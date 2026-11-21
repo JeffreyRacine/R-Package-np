@@ -1,5 +1,7 @@
 # npRmpi 0.80-3
 
+* Improve continuous second-order beta generalized nearest-neighbour regression fits and their hat/plot consumers using the original weighted design. HC0 standard errors follow the repaired training fits and may also change at other evaluation points. Accepted rank/ridge decisions and corrected-band admission limits are unchanged; uncertifiable uncertainty calculations continue to refuse.
+
 * Extend established Epanechnikov GNN/ANN corrected constructions and defaults to local-linear and GLP main degrees at most one, with unbounded or known fixed support. Preserve explicit calibrations, NN radii, Gaussian auxiliaries, partial derivative availability and numerical/computational owners. Higher-degree limitations remain.
 
 * Extend known-fixed-support Gaussian nearest-neighbour corrected inference to local-linear and GLP models with main degrees at most one, including supported mixed predictors. Derivatives above an individual coordinate's degree retain their existing unavailable behavior.
