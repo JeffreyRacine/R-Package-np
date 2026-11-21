@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Improve numerical precision of univariate auxiliary pilot training means and first derivatives in iterated regression bias correction.
+
 * Add `nppltest()` for testing a partially linear conditional mean against an unrestricted alternative. The projection test accepts a fit or bandwidth object and includes experimental mixed-data calibration.
 
 * Improve frozen-radius first-derivative accuracy for univariate second-order beta nearest-neighbour local-constant and degree-zero GLP regression fits and hat rows.

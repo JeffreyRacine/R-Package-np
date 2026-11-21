@@ -185,14 +185,37 @@ function (spec, grid, map, op)
     out
 }
 
-.np_bias_pilot_qr <- function(Q, k, v) {
+.np_bias_pilot_qr <- function(Q, k, v, coordinate = NULL) {
     # Keep the established auxiliary identification/ridge policy. QR changes
     # arithmetic only; it must not admit a system rejected by the fitted policy.
     .np_bias_solve(Q, k, v, "P1 auxiliary pilot")
     if (any(!is.finite(k)) || any(k < 0))
         stop("P1 auxiliary pilot requires finite nonnegative weights")
     root.weight <- sqrt(k)
-    A <- Q * root.weight
+    derivative <- NULL
+    if (is.null(coordinate)) {
+        A <- Q * root.weight
+    } else {
+        # Weighted Leja nodes give a Newton basis for the same univariate
+        # polynomial space. Scale each product before extending it so the
+        # weighted columns stay resolved even for concentrated kernels.
+        width <- max(abs(coordinate))
+        p <- ncol(Q)
+        A <- matrix(0, length(coordinate), p)
+        A[, 1L] <- root.weight
+        v <- derivative <- numeric(p)
+        v[1L] <- 1
+        for (j in seq_len(p - 1L)) {
+            col <- A[, j]
+            pivot <- which.max(abs(col))
+            size <- abs(col[pivot])
+            node <- coordinate[pivot]
+            A[, j + 1L] <- (col / size) * ((coordinate - node) / width)
+            difference <- -node / width
+            v[j + 1L] <- (v[j] / size) * difference
+            derivative[j + 1L] <- (v[j] / width + difference * derivative[j]) / size
+        }
+    }
     scale <- sqrt(colSums(A * A))
     if (any(!is.finite(scale)) || any(scale <= 0) || nrow(A) < ncol(A))
         stop("P1 auxiliary pilot requires an identified weighted design")
@@ -209,11 +232,11 @@ function (spec, grid, map, op)
         if (length(z) > p) z[seq.int(p + 1L, length(z))] <- 0
         drop(qr.qy(factor, z))
     }
-    list(root.weight = root.weight, value = apply.value, project = project)
+    list(root.weight = root.weight, mean = apply.value(v), value = apply.value,
+         derivative = derivative, project = project)
 }
 
 # P1-specific same-system recurrence in fixed orthonormal QR coordinates.
-# Generic derivative owners, first derivatives and training rows are retained.
 # Differentiate in fixed orthonormal coordinates at the evaluation point.
 # The zeroth augmented Gram matrix is identity; only observation rows enter
 # its derivatives. This avoids repeatedly applying an ill-conditioned Gram
@@ -260,21 +283,31 @@ function (spec, at, derivatives = TRUE, orders = NULL, .training = FALSE)
     x <- spec$xcon[ii, , drop = FALSE]
     u <- x
     for (d in seq_len(spec$d)) u[[d]] <- (x[[d]] - at[[spec$numeric.cols[d]]])/spec$b[d]
-    zero <- u[1, , drop = FALSE]
-    zero[, ] <- 0
+    if (.training && derivatives) stop("training P1 owner requests mean rows only")
     basis <- W.lp
     Q <- basis(u, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein)
-    v <- drop(basis(u, exdat = zero, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein))
+    # A univariate training target already occurs at zero in this local design.
+    index <- if (.training && spec$d == 1L) match(0, u[[1L]], nomatch = 0L) else 0L
+    if (index > 0L) {
+        v <- Q[index, ]
+    } else {
+        zero <- u[1, , drop = FALSE]
+        zero[, ] <- 0
+        v <- drop(basis(u, exdat = zero, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein))
+    }
     k <- drop(.np_kernel_weights_direct(spec$pilot.bws, txdat = x, exdat = at[spec$numeric.cols], bandwidth.divide = TRUE))
-    # Retain training and univariate arithmetic. This bounded precision path
-    # is qualified for multivariate evaluation targets, including sparse tails.
-    precise <- !.training && spec$d > 1L
-    if (.training && derivatives) stop("training P1 owner requests mean rows only")
+    # The QR uses the same weighted design after the canonical zero-ridge check.
+    # It supplies univariate training means as well as derivative targets.
+    # A singular support has no equivalent full-rank polynomial basis. Keep
+    # its original solve, including the incumbent rank and ridge decision.
+    univariate <- spec$d == 1L && ncol(Q) > 1L &&
+        length(unique(u[[1L]][k > 0])) >= ncol(Q)
+    precise <- univariate || (!.training && spec$d > 1L)
     if (!precise) {
         h <- .np_bias_solve(Q, k, v, "P1 auxiliary pilot")
     } else {
-        factor <- .np_bias_pilot_qr(Q, k, v)
-        value <- factor$value(v)
+        factor <- .np_bias_pilot_qr(Q, k, v, if (univariate) u[[1L]])
+        value <- factor$mean
         h <- factor$root.weight * value
     }
     dh <- list()
@@ -293,8 +326,12 @@ function (spec, at, derivatives = TRUE, orders = NULL, .training = FALSE)
             }
             nu <- integer(spec$d)
             nu[d] <- 1L
-            dv <- drop(basis(u, exdat = zero, degree = spec$q, gradient.vec = nu, basis = "glp",
-                bernstein.basis = spec$bernstein))/spec$b[d]
+            if (univariate) {
+                dv <- factor$derivative / spec$b[d]
+            } else {
+                dv <- drop(basis(u, exdat = zero, degree = spec$q, gradient.vec = nu, basis = "glp",
+                    bernstein.basis = spec$bernstein))/spec$b[d]
+            }
             if (precise) {
                 w <- value * u[[d]]/spec$b[d]
                 dh[[d]] <- factor$root.weight * (factor$value(dv) + w - factor$project(w))
@@ -332,6 +369,10 @@ function (W, row_owner, block = 16L)
 .np_bias_pilot_owner <-
 function (spec)
 {
+    # All streamed P1 rows use the same fixed kernel bandwidth descriptor.
+    if (spec$d == 1L && identical(spec$pilot.bws[["type"]], "fixed") &&
+        !inherits(spec$pilot.bws, "kbandwidth"))
+        spec$pilot.bws <- kbandwidth(spec$pilot.bws)
     force(spec)
     function(ii) {
         if (length(ii) > 16L || anyNA(ii) || any(ii < 1L | ii > nrow(spec$x)) || any(ii != floor(ii)))

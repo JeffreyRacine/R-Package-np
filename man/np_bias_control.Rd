@@ -54,7 +54,9 @@ np_bias_control(construction = c("iterated", "legacy"),
     Actual local rank checks also apply.}
   \item{bernstein.basis}{Logical. Must be \code{TRUE} for auxiliary degree
     greater than one. The canonical stable GLP representation (degree-graded shifted Legendre)
-    is used for the auxiliary polynomial space, including derivative rows.
+    defines the auxiliary polynomial space and its local rank check. For an
+    identified univariate profile-specific P1 fit, weighted QR evaluates the
+    training mean and first derivative in an equivalent polynomial basis.
     This control never changes the fitted main model basis.}
   \item{p0.scale, p1.scale, operator.scale, variance.scale}{Positive auxiliary
     bandwidth scale factors. Each may be a scalar, an unnamed vector in
