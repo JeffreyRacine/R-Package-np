@@ -233,7 +233,8 @@
       stop("explicit bootstrap calibration requires iterated bias-corrected regression and empirical bands",call.=FALSE)
     effective.calibration <- if (new.bias) .np_bias_regression_calibration(bws,
       plot.errors.boot.calibration, error.request$method, error.request$type,
-      as.character(plot.errors.boot.method)[1L], as.character(plot.errors.boot.wild)[1L]) else
+      as.character(plot.errors.boot.method)[1L], as.character(plot.errors.boot.wild)[1L],
+      gradients = gradients) else
       plot.errors.boot.calibration
     wild.local.envelope <- identical(effective.calibration,"basic-local-envelope") &&
       as.character(plot.errors.boot.method)[1L]=="wild" &&

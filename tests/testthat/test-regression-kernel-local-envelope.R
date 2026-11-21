@@ -13,7 +13,7 @@ test_that("kernel envelope admission is explicit and second order", {
     expect_identical(.np_bias_regression_kernel_class(q,"basic-local-envelope"),"unsupported")
   }
   for(kernel in "uniform") {
-    q<-b;q[["ckertype"]]<-kernel;q[["ckerbound"]]<-"fixed"
+    q<-b;q[["ckertype"]]<-kernel;q[["ckerbound"]]<-"fixed";q[["regtype"]]<-"lc"
     expect_identical(.np_bias_regression_kernel_class(q,"basic-local-envelope"),"local-envelope")
   }
   q<-b;q[["ckerbound"]]<-"range"

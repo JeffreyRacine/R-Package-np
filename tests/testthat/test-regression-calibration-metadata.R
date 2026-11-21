@@ -15,7 +15,7 @@ test_that("public Rademacher defaults retain requested metadata and identical in
   old<-options(np.messages=FALSE,np.plot.progress=FALSE);on.exit(options(old),add=TRUE)
   x<-data.frame(x=seq(-.9,.9,length.out=60L));y<-sin(3*x$x)+.15*cos(seq_len(60L))
   for(kernel in c("epanechnikov","beta","uniform","gaussian")) {
-    args<-list(xdat=x,ydat=y,bws=if(kernel=="beta").3 else .5,regtype="ll",ckertype=kernel,bandwidth.compute=FALSE)
+    args<-list(xdat=x,ydat=y,bws=if(kernel=="beta").3 else .5,regtype=if(kernel=="uniform")"lc"else"ll",ckertype=kernel,bandwidth.compute=FALSE)
     if(kernel=="beta")args<-c(args,list(ckerbound="fixed",ckerlb=-1,ckerub=1));bw<-do.call(npregbw,args);held.bw<-bw
     set.seed(112871L);held<-.Random.seed
     run<-function(control)capture_plot_provider(plot(bw,xdat=x,ydat=y,errors="bootstrap",center="bias-corrected",band="all",B=199L,neval=3L,alpha=.1,output="data",boot.control=control))

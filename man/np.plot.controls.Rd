@@ -102,8 +102,15 @@ mixed-predictor targets retain replicate residual-pilot studentization for
 empirical bands. This does not extend either basic envelope to Rademacher or
 alter Gaussian defaults; the saved derivative limitations still apply.
 
+For fixed-bandwidth raw Epanechnikov GLP fits with a quadratic component,
+and fixed-bandwidth beta derivatives with a positive main degree, the
+supported iterated empirical bands require explicit
+\code{np_boot_control(calibration="basic-local-envelope")} with pairs or
+Mammen resampling. Saved cases show numerical sensitivity in the fitted rows.
+
 Fixed uniform-kernel models with \code{ckerbound="none"} or \code{"fixed"}
-are also qualified for iterated correction of means, including mean panels
+support iterated mean correction for local-constant fits and GLP fits with
+degree zero in every continuous predictor, including mean panels
 for mixed continuous/categorical predictors. Their empirical default is \code{"basic-local-envelope"} for
 Mammen or pairs resampling and \code{"tail-envelope"} for Rademacher;
 asymptotic and \code{"pmzsd"} calls retain absolute calibration. The same
