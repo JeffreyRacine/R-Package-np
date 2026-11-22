@@ -24104,7 +24104,7 @@ static int np_pooled_beta_linear_precision(const NPContinuousKernelRoute *route,
 /* Scoped precision sibling. Accepted rank/ridge and all incumbent kernel/tree
  * selection remain upstream. Continuous second-order GNN rows use their own
  * target radius; conditional, categorical and signed owners are unchanged. */
-/* At a bounded edge, a linear beta ANN row outside the donor range can
+/* At a bounded edge, a linear beta ANN row at or outside the donor range can
  * concentrate on very few observations. Preserve its weights for the
  * existing condition and ridge check. Infinite edges disable that side. */
 typedef struct { double lower, upper; } NPLinearBetaANNRange;
@@ -24136,9 +24136,16 @@ static NPLinearBetaANNRange np_linear_beta_ann_training_range(const NPContinuous
   return range;
 }
 
-static inline int np_linear_beta_ann_extrapolates(NPLinearBetaANNRange range, double x)
+static inline int np_linear_beta_ann_edge(NPLinearBetaANNRange range, double x)
 {
-  return x < range.lower || x > range.upper;
+  return x <= range.lower || x >= range.upper;
+}
+
+/* At the first or last donor the slope row can amplify a small Gram error
+ * in the corrected variance even when the general condition screen passes. */
+static inline int np_linear_beta_ann_at_training_limit(NPLinearBetaANNRange range, double x)
+{
+  return x == range.lower || x == range.upper;
 }
 
 static int np_regression_precision_eligible(const NPRegressionGeneralLPFitCall *call)

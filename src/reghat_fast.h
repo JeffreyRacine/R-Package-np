@@ -61,7 +61,7 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked_precision(
   const double *basis_eval,
   double *row_out,
   size_t output_stride,
-  int support_rank, NPRegressionPrecision *precision, double **columns, int zero_ridge_only);
+  int support_rank, NPRegressionPrecision *precision, double **columns, int zero_ridge_only, int require_factor);
 
 NPReghatLPRowStatus np_reghat_lp_workspace_influence_row(
   NPReghatLPWorkspace *workspace,
