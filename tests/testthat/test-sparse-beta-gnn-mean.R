@@ -16,3 +16,24 @@ test_that("fully pooled first-degree beta GNN means reproduce the weighted-desig
     expect_lt(abs(fit$mean - sum(v$pooled_row * v$y)), 1e-8)
   }
 })
+
+test_that("the quadratic beta GNN prepared mean retains the accepted row", {
+  if (!spawn_mpi_slaves(n = 1L)) skip("MPI workers unavailable")
+  old <- options(np.messages=FALSE)
+  on.exit(options(old), add=TRUE)
+  v <- readRDS(test_path("fixtures", "sparse-beta-gnn.rds"))
+  q <- v$quadratic
+  x <- data.frame(x=(v$x$x-q$offset)/q$scale)
+  at <- data.frame(x=(v$query$x-q$offset)/q$scale)
+  bounds <- (v$bounds-q$offset)/q$scale
+  for (bernstein in c(FALSE, TRUE)) {
+    bw <- npregbw(xdat=x, ydat=v$y, bws=12, bandwidth.compute=FALSE,
+                  regtype="lp", degree=2L, basis="glp", bernstein.basis=bernstein,
+                  bwtype="generalized_nn", ckertype="beta", ckerorder=2L,
+                  ckerbound="fixed", ckerlb=bounds[1], ckerub=bounds[2])
+    spec <- list(d=1L, x=x, xcon=x, numeric.cols=1L, factor.cols=integer(), bws=bw)
+    row <- suppressWarnings(.np_bias_main_rows(spec,at,0L))
+    expect_identical(as.numeric(attr(row,"ridge.used")),0)
+    expect_lt(max(abs(row-q$row)),1e-8)
+  }
+})

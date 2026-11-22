@@ -108,7 +108,9 @@ static SEXP np_lp_adjoint_prepared(SEXP gram, SEXP rhs, SEXP ntrain_arg,
     memcpy(REAL(out), workspace.rhs_work, (size_t)p*sizeof(double));
   SEXP admission=getAttrib(gram,install(".np.precision.eligible"));
   if(status==NP_LP_SOLVE_POLICY_OK && admission!=R_NilValue && TYPEOF(admission)==LGLSXP &&
-     XLENGTH(admission)==1 && LOGICAL(admission)[0]==TRUE && np_regression_precision_needed(&workspace,p)) {
+     XLENGTH(admission)==1 && LOGICAL(admission)[0]==TRUE &&
+     (diagnostics.ridge_total == 0.0 || getAttrib(gram,install(".np.precision.zero.only")) == R_NilValue) &&
+     np_regression_precision_needed(&workspace,p)) {
     memcpy(REAL(out),REAL(rhs),(size_t)p*sizeof(double));
     SEXP policy=PROTECT(allocMatrix(REALSXP,1,2));
     REAL(policy)[0]=diagnostics.ridge_total;REAL(policy)[1]=anchor;
