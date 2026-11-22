@@ -62,13 +62,18 @@
         main = main, sub = sub, xlim = xlim, ylim = ylim, col = col,
         lty = lty, lwd = lwd, type = type,
         theta = theta, phi = phi, zlab = zlab, zlim = zlim)
-    publish.plot <- function(value) .np_plot_data_publish_display(value,
+    publish.plot <- function(value) {
+      attr(value,"np.reg.recipe") <- list(method=plot.errors.method, band=plot.errors.type,
+        iterated=new.bias, calibration=effective.calibration,
+        bootstrap=plot.errors.boot.method, wild=plot.errors.boot.wild)
+      .np_plot_data_publish_display(value,
       coordinates = xdat, roles = rep("X", ncol(xdat)), response = ydat,
       overlay = isTRUE(plot.data.overlay) && !gradients, rug = plot.rug,
       style = utils::modifyList(plot.user.args, saved.plot.style),
       points_args = points.user.args, boxplot = plot.bxp,
       interval_style = list(style = plot.errors.style, bar = plot.errors.bar,
         bar_num = plot.errors.bar.num, boxplot_outliers = plot.bxp.out))
+    }
 
     sub.supplied <- !missing(sub)
 
