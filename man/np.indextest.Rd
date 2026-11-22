@@ -67,6 +67,12 @@ original call. If their values cannot be recovered, fit with literal values
 or use \code{do.call(npindexbw, args)} with evaluated controls.
 }
 \value{
+  \code{total.time} gives wall-clock seconds for this test call, including
+  preparation and bootstrap calibration. The summary reports this time.
+  With \code{getOption("show.signif.stars")} enabled, the printed bootstrap
+  p-value carries the significance codes used by \code{\link{npsigtest}}.
+  Each symbol requires a p-value strictly below its threshold.
+
 An object of class \code{indextest}. \code{statistic}, \code{P},
 \code{exceedances}, \code{critical.values} and \code{bootstrap} report the
 observed statistic, p-value, exceedance count, upper critical values and

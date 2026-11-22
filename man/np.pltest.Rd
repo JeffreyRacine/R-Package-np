@@ -106,6 +106,12 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   can produce small numerical differences between package runs.
 }
 \value{
+  \code{total.time} gives wall-clock seconds for this test call, including
+  preparation and bootstrap calibration. The summary reports this time.
+  With \code{getOption("show.signif.stars")} enabled, the printed bootstrap
+  p-value carries the significance codes used by \code{\link{npsigtest}}.
+  Each symbol requires a p-value strictly below its threshold.
+
   A \code{pltest} list. \code{statistic} is the observed quadratic form.
   \code{P} is one plus the number of bootstrap statistics greater than or
   equal to the observed statistic, divided by \eqn{B+1}.

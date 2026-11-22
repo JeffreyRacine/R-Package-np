@@ -18,7 +18,8 @@
   V <- do.call(cbind, unname(columns))
   if (any(!is.finite(V))) stop("Non-finite projection coordinates; rescale the predictors.", call. = FALSE)
   storage.mode(V) <- "double"
-  .Call(C_np_pltest_angles, V)
+  .np_with_compiled_fit_progress("Computing projection weights", nrow(V),
+    expr = .Call(C_np_pltest_angles, V))
 }
 
 .pltest_sun_bandwidth <- function(X, y, Z, continuous, cells) {
@@ -44,6 +45,7 @@
         if (length(idx) < q + 1L || qr(design)$rank < q + 1L)
           stop("The continuous local-linear design is rank deficient in factor cell ", cells[idx[1L]], ".", call. = FALSE)
         for (j in seq_along(idx)) {
+          if (j %% 64L == 1L) .np_fit_progress_step()
           delta <- sweep(cell, 2L, cell[j, ], "-")
           weighted <- cbind(1, delta) * exp(-rowSums(delta^2) / 4)
           if (qr(weighted)$rank < q + 1L)
@@ -111,6 +113,7 @@
 .pltest_operator <- function(bw, X, y, Z, shared.sun = FALSE) {
   n <- length(y)
   fit <- function(v) .pltest_local({
+    .np_fit_progress_step()
     fitted.mean <- as.numeric(fitted(npplreg(bws = bw, txdat = X, tydat = v, tzdat = Z)))
     if (length(fitted.mean) != n) stop("Expected a fitted mean for every training row.", call. = FALSE)
     fitted.mean
@@ -190,6 +193,7 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
                      boot.method = c("wild-rademacher", "wild"), B = 399L,
                      random.seed = 42L, projection.scale = c("original", "standardized"), ...,
                      boot.correction = c("none", "cv-pilot", "pilot-hc2", "cv-raw")) {
+  started <- proc.time()[["elapsed"]]
   call <- match.call()
   dot.names <- names(match.call(expand.dots = FALSE)$...)
   no.object <- missing(object)
@@ -268,7 +272,8 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
   })
   .pltest_same(list(lapply(X, identity), lapply(Z, identity), y))
   bw <- switch(bw.method,
-               sun = .pltest_sun_bandwidth(X, y, Z, continuous, cells),
+               sun = .np_progress_activity_run("Preparing Sun bandwidths",
+                 .pltest_sun_bandwidth(X, y, Z, continuous, cells)),
                cv = do.call(npplregbw, c(list(xdat = X, ydat = y, zdat = Z,
                                       regtype = if (any(continuous)) "ll" else "lc",
                                       bwmethod = "cv.ls"), dots)),
@@ -277,7 +282,8 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
     # Check shared kernel, basis and bandwidth settings before collective fits.
     bw <- .pltest_selected_bw(bw)
   }
-  fitted.null <- .pltest_operator(bw, X, y, Z, shared.sun = bw.method == "sun")
+  fitted.null <- .np_progress_activity_run("Fitting the partially linear null",
+    .pltest_operator(bw, X, y, Z, shared.sun = bw.method == "sun"))
   .pltest_local({
     H <- fitted.null$H
     mu <- fitted.null$mean
@@ -287,7 +293,8 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
         max(abs(e)) <= 64 * .Machine$double.eps * max(abs(y)))
       stop("The fitted null leaves no numerical residual variation to test.", call. = FALSE)
   })
-  A <- .pltest_angles(predictors, projection.scale == "standardized")
+  A <- .np_progress_activity_run("Computing projection weights",
+    .pltest_angles(predictors, projection.scale == "standardized"))
   .pltest_local({
     statistic <- function(E) colSums(E * (A %*% E))
     observed <- unname(statistic(as.matrix(e)))
@@ -298,9 +305,10 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
   })
   pilot <- NULL
   if (boot.correction != "none") {
-    pilot <- if (boot.correction %in% c("cv-pilot","cv-raw"))
+    pilot <- .np_progress_activity_run("Fitting the bootstrap pilot",
+      if (boot.correction %in% c("cv-pilot","cv-raw"))
       .pltest_local(.pltest_cv_pilot(X, y, Z, adjust = boot.correction == "cv-pilot")) else
-       .pltest_local(.pltest_pilot(X, y, Z, continuous, cells, bw))
+       .pltest_local(.pltest_pilot(X, y, Z, continuous, cells, bw)))
   }
   .pltest_local({
     center <- if (is.null(pilot)) mu else pilot$center
@@ -321,12 +329,13 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
                  bws = bw, bandwidths = bandwidths, bw.method = bw.method,
                  projection.scale = projection.scale, n = n, x.names = names(X), z.names = names(Z),
                  continuous.z = sum(continuous), cell.counts = table(cells),
-                 factor.levels = lapply(categories, levels)), class = "pltest")
+                 factor.levels = lapply(categories, levels),
+                 total.time = proc.time()[["elapsed"]] - started), class = "pltest")
 }
 
 print.pltest <- function(x, ...) {
   cat("Projection test of partial linearity\n")
-  cat(sprintf("T = %.6g    bootstrap p = %.5g    n = %d\n", x$statistic, x$P, x$n))
+  .np_spec_test_print_result(x)
   invisible(x)
 }
 
@@ -355,6 +364,8 @@ summary.pltest <- function(object, ...) {
     cat("Observed nuisance cells (indices in declared level order):\n")
     print(object$cell.counts)
   }
+  if (!is.null(object[["total.time"]]))
+    cat("Computation Time: ", format(object[["total.time"]]), " seconds\n", sep = "")
   invisible(object)
 }
 
@@ -434,7 +445,7 @@ summary.pltest <- function(object, ...) {
     v <- .pltest_draw_block(task$bsz, H, A, center, amplitude, boot.method)
     cbind(statistic = v, rank = mpi.comm.rank(1L))
   }
-  out <- .npRmpi_bootstrap_run_fanout(tasks, worker, ncol.out = 2L,
+  out <- .np_spec_test_fanout(B, tasks, worker, ncol.out = 2L,
     what = "partial linearity", progress.label = "Bootstrapping partial linearity",
     profile.where = "mpi.applyLB:nppltest",
     required.bindings = list(.pltest_draw_block = .pltest_draw_block),
@@ -452,9 +463,9 @@ summary.pltest <- function(object, ...) {
   values <- numeric(B)
   counts <- integer(size)
   progress <- .pltest_local(if (rank == 0L)
-    .np_progress_begin("Bootstrapping partial linearity", total = B, surface = "bootstrap"))
+    .np_progress_activity_begin(B, "Bootstrapping partial linearity", detail = NULL))
   complete <- FALSE
-  on.exit(if (rank == 0L && !complete) .np_progress_abort(progress), add = TRUE)
+  on.exit(if (rank == 0L) .np_progress_activity_end(progress, complete), add = TRUE)
   for (first in seq.int(1, B, by = 64)) {
     cols <- seq.int(first, min(B, as.double(first) + 63))
     k <- length(cols)
@@ -476,9 +487,9 @@ summary.pltest <- function(object, ...) {
       counts[rank+1L] <- counts[rank+1L] + length(piece$ids)
     }
     values[cols] <- mpi.allreduce(local, type = 2L, op = "sum", comm = 1L)
-    .pltest_local(if (rank == 0L) progress <- .np_progress_step(progress, done = tail(cols, 1L)))
+    .pltest_local(if (rank == 0L) .np_progress_activity_step(progress, done = tail(cols, 1L)))
   }
-  .pltest_local(if (rank == 0L) .np_progress_end(progress))
+
   complete <- TRUE
   counts <- mpi.allreduce(counts, type = 1L, op = "sum", comm = 1L)
   names(counts) <- seq_len(size)-1L
@@ -495,4 +506,33 @@ summary.pltest <- function(object, ...) {
     .pltest_same(signature)
   }
   bw
+}
+
+# Use the same strict cutoffs as npsigtest, including attainable boundary p-values.
+.np_spec_test_print_result <- function(x) {
+  stars <- isTRUE(getOption("show.signif.stars", TRUE))
+  symbol <- if (stars)
+    c(" ***", " **", " *", " .", "")[1L + findInterval(x$P, c(.001, .01, .05, .1))]
+  else ""
+  cat(sprintf("T = %.6g    bootstrap p = %.5g%s    n = %d\n",
+              x$statistic, x$P, symbol, x$n))
+  if (stars)
+    cat("---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
+  invisible(NULL)
+}
+
+.np_spec_test_fanout <- function(B, ..., progress.label) {
+  context <- .np_progress_activity_begin(B, progress.label, detail = NULL)
+  complete <- FALSE
+  on.exit(.np_progress_activity_end(context, complete), add = TRUE)
+  if (!is.null(context)) {
+    context$use.bootstrap.done <- TRUE
+    # The master can still be fitting a local draw between MPI completions.
+    .np_progress_runtime$fit_forward <- function()
+      .np_progress_activity_step(context, context$state$last_done)
+  }
+  out <- .npRmpi_bootstrap_run_fanout(..., progress.label = progress.label,
+                                     progress.context = context)
+  complete <- TRUE
+  out
 }

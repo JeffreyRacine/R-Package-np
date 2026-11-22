@@ -1,6 +1,7 @@
 #include <R.h>
 #include <Rinternals.h>
 #include <math.h>
+#include "headers.h"
 
 /* Use the package's configured Accelerate linkage on Apple Silicon. The
    portable branch has identical clipping, tie and diagonal conventions. */
@@ -33,6 +34,7 @@ SEXP C_np_pltest_angles(SEXP coordinates) {
     double *angle = (double *)R_alloc(n, sizeof(double));
     for (int k = 0; k < n; ++k) {
         R_CheckUserInterrupt();
+        np_progress_fit_heartbeat();
         for (int i = 0; i < n; ++i) {
             double *v = u + (size_t)i*p;
             double largest = 0.0, norm = 0.0;
@@ -106,7 +108,10 @@ SEXP C_np_indextest_score(SEXP response, SEXP index, SEXP coordinates,
         score[l] = squares[l] = 0.0;
     }
     for (int i = 0; i < n; ++i) {
-        if ((i % 64) == 0) R_CheckUserInterrupt();
+        if ((i % 64) == 0) {
+            R_CheckUserInterrupt();
+            np_progress_fit_heartbeat();
+        }
         for (int j = i+1; j < n; ++j) {
             double t = (z[i]-z[j])/g;
             double delta = (y[i]-y[j])*exp(-0.5*t*t);
@@ -119,7 +124,10 @@ SEXP C_np_indextest_score(SEXP response, SEXP index, SEXP coordinates,
     enum { block = 256 };
     double d2[block];
     for (int i = 0; i < n; ++i) {
-        if ((i % 64) == 0) R_CheckUserInterrupt();
+        if ((i % 64) == 0) {
+            R_CheckUserInterrupt();
+            np_progress_fit_heartbeat();
+        }
         for (int first = i+1; first < n; ) {
             int count = n-first < block ? n-first : block;
             for (int k = 0; k < count; ++k) d2[k] = 0.0;
