@@ -16,7 +16,7 @@
   }
   if (is.character(band) && length(band) == 1L && !is.na(band) && band == "pmzsd")
     stop("for regression use interval='normal-sd', band='pointwise' in place of band='pmzsd'", call.=FALSE)
-  request <- list(interval=interval, supplied=intersect(supplied, c("interval","band","boot.control")),
+  request <- list(interval=interval, supplied=intersect(supplied, c("interval","band","boot.control","random.seed")),
                   band=band)
   dots$interval <- NULL
   if (is.null(interval)) return(list(dots=dots, request=request))

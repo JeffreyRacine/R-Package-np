@@ -13,7 +13,7 @@
 )
 
 .np_plot_family_interval_request <- function(dots, family) {
-  supplied <- as.character(intersect(names(dots), c("interval", "band", "boot.control")))
+  supplied <- as.character(intersect(names(dots), c("interval", "band", "boot.control", "random.seed")))
   interval <- dots[["interval", exact = TRUE]]
   band <- dots[["band", exact = TRUE]]
   control <- dots[["boot.control", exact = TRUE]]
@@ -165,6 +165,6 @@
 .np_plot_family_request_record <- function(request, selection) {
   if (identical(request$band, "pmzsd")) request$band <- "pointwise"
   request["interval"] <- list(selection$interval)
-  request$supplied <- union(setdiff(request$supplied, c("band", "interval", "boot.control")), selection$supplied)
+  request$supplied <- union(setdiff(request$supplied, c("band", "interval", "boot.control", "random.seed")), selection$supplied)
   request
 }
