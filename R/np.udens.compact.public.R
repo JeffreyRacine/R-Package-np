@@ -27,7 +27,7 @@
   variant<-'asymptotic'
   if(identical(method,'bootstrap')) {
     if(!identical(bootstrap,'inid')||!isTRUE(calibration%in%c('symmetric-sd','asymmetric-sd')))
-      stop("Compact corrected SD bands require explicit bootstrap='inid' and symmetric-sd or asymmetric-sd calibration",call.=FALSE)
+      stop("Compact corrected SD bands require explicit bootstrap='inid' and interval='symmetric-sd' or interval='asymmetric-sd'",call.=FALSE)
     variant<-calibration
   } else if(!identical(method,'asymptotic')||!is.null(calibration))
     stop('Compact corrected bands require asymptotic errors without bootstrap calibration',call.=FALSE)

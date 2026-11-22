@@ -23,7 +23,7 @@
   if(identical(method,'asymptotic')&&!is.null(calibration))
     stop('Gaussian asymptotic bands do not accept bootstrap calibration',call.=FALSE)
   if(identical(method,'bootstrap')&&(!identical(bootstrap,'inid')||is.null(variant)||!variant%in%c('symmetric-sd','asymmetric-sd')))
-    stop("Gaussian bootstrap bands require bootstrap='inid' and calibration='symmetric-sd' or 'asymmetric-sd'",call.=FALSE)
+    stop("Gaussian bootstrap bands require bootstrap='inid' and interval='symmetric-sd' or interval='asymmetric-sd'",call.=FALSE)
   if(!is.data.frame(x)||nrow(x)<10L||ncol(x)!=bws[['ndim',exact=TRUE]]||
      anyDuplicated(names(x))||any(!nzchar(names(x)))||!all(vapply(x,is.numeric,logical(1L)))||any(!is.finite(as.matrix(x))))
     stop('Gaussian corrected bands require at least ten finite numeric observations',call.=FALSE)
