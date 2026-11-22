@@ -177,9 +177,11 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   greater than or equal to the observed statistic. Ties count as at least as
   extreme, giving the conservative tie convention for discrete statistics.
   This is the ordinary bootstrap proportion, without an add-one correction;
-  a reported zero is possible with a finite number of replications.
+  a zero is displayed as \samp{0 (0 of B)}, with the actual number of draws.
 }
 \value{
+  The result includes \code{total.time}, the elapsed wall-clock time in
+  seconds for the test call, displayed by \code{summary}.
   \code{npcmstest} returns an object of type \code{cmstest} with the
   following components, components will contain information
   related to \code{Jn} or \code{In} depending on the value of \code{pivot}:

@@ -346,12 +346,15 @@ npdeneqtest <- function(x = NULL,
                         B = 399,
                         random.seed = 42,
                         ...) {
+  started <- proc.time()[["elapsed"]]
 
   if (...length())
     npRejectLegacyBootstrapCount(names(list(...)), "npdeneqtest")
   .npRmpi_require_active_slave_pool(where = "npdeneqtest()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npdeneqtest"))
+  if (.npRmpi_autodispatch_active()) {
+    result <- .npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npdeneqtest")
+    return(.np_test_timed_result(result, started))
+  }
 
   ## Some testing of input values
 
@@ -628,12 +631,12 @@ npdeneqtest <- function(x = NULL,
 
   .np_rng_scope_restore(seed.state)
   
-  deneqtest(Tn=output$Tn,
+  result <- deneqtest(Tn=output$Tn,
             In=output$In,
             Tn.bootstrap=Tn.vector,
             In.bootstrap=In.vector,                
             Tn.P=Tn.P,
             In.P=In.P,
             boot.num=B)
-  
+  .np_test_timed_result(result, started)
 }

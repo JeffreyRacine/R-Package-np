@@ -143,12 +143,15 @@ npunitest <- function(data.x = NULL,
                       bw.y = NULL,                         
                       random.seed = 42,
                       ...) {
+  started <- proc.time()[["elapsed"]]
 
   if (...length())
     npRejectLegacyBootstrapCount(names(list(...)), "npunitest")
   .npRmpi_require_active_slave_pool(where = "npunitest()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npunitest"))
+  if (.npRmpi_autodispatch_active()) {
+    result <- .npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npunitest")
+    return(.np_test_timed_result(result, started))
+  }
 
   if(is.null(data.x) || is.null(data.y)) stop(" you must enter data vectors for x and y")
   if(is.data.frame(data.x) || is.data.frame(data.y)) stop(" you must enter data vectors (not data frames)")
@@ -369,7 +372,7 @@ npunitest <- function(data.x = NULL,
 
   .np_rng_scope_restore(seed.state)
 
-  if(bootstrap) {
+  result <- if(bootstrap) {
     unitest(Srho = test.stat,
                Srho.bootstrap = resampled.stat,
                P = p.value,
@@ -386,5 +389,5 @@ npunitest <- function(data.x = NULL,
                bw.x = bw.x,
                bw.y = bw.y)
   }
-
+  .np_test_timed_result(result, started)
 }

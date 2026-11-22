@@ -247,6 +247,7 @@ npqcmstest <- function(formula,
                        density.weighted = TRUE,
                        random.seed = 42,
                        ...) {
+  started <- proc.time()[["elapsed"]]
   if (missing(formula) && !missing(xdat) && !missing(ydat)) {
     frame.args <- substitute(list(...))[-1L]
     if (!missing(subset)) frame.args <- c(list(subset = quote(subset)), frame.args)
@@ -267,7 +268,8 @@ npqcmstest <- function(formula,
     if (!missing(formula) && missing(xdat) && missing(ydat) && !missing(subset))
       dispatch.call[c("data", "subset")] <- .np_formula_subset_inputs(
         data, match.call()[["subset"]], parent.frame())
-    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npqcmstest"))
+    result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame(), owner.name = "npqcmstest")
+    return(.np_test_timed_result(result, started))
   }
 
   .np_cms_validate_model(model, quantile = TRUE)
@@ -659,7 +661,7 @@ npqcmstest <- function(formula,
 
   .np_rng_scope_restore(seed.state)
   
-  cmstest(Jn = tJn$Jn,
+  result <- cmstest(Jn = tJn$Jn,
           In = tJn$In,
           Omega.hat = tJn$Omega.hat,
           sd = s.d,
@@ -676,4 +678,5 @@ npqcmstest <- function(formula,
           boot.method = boot.method,
           boot.num = B,
           na.index = na.index)
+  .np_test_timed_result(result, started)
 }

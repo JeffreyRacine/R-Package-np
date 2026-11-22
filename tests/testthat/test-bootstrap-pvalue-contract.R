@@ -36,3 +36,12 @@ test_that("all public bootstrap-inference p-value owners use the shared policy",
                  info = file)
   }
 })
+
+test_that("bootstrap zero counts and asymptotic zero use the appropriate display", {
+  expect_identical(.np_test_format_pvalue(0, 399L), "0 (0 of 399)")
+  p <- c(0, 0.1, 1, NA_real_)
+  expected <- format.pval(p)
+  expected[1L] <- "0 (0 of 19)"
+  expect_identical(.np_test_format_pvalue(p, 19L), expected)
+  expect_identical(.np_test_format_pvalue(0), format.pval(0))
+})

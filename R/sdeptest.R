@@ -70,7 +70,7 @@ print.sdeptest <- function(x, ...){
               format(x$lag.num), " Lags\n",sep=""))
     for(k in seq_len(x$lag.num)) {
       cat(paste("\nTest Statistic ", sQuote(paste("Srho[", k , "]",sep="")), ": ",
-          format(x$Srho[k]), "\tP Value: ", format.pval(x$P[k])," ", x$reject[k],sep=""))
+          format(x$Srho[k]), "\tP Value: ", .np_test_format_pvalue(x$P[k], x$boot.num)," ", x$reject[k],sep=""))
     }
 
     cat("\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1")
@@ -96,4 +96,5 @@ print.sdeptest <- function(x, ...){
 
 summary.sdeptest <- function(object, ...){
   print(object)
+  .np_test_print_time(object)
 }

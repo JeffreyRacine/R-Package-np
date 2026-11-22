@@ -360,10 +360,10 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
   boot <- draws$statistics
   if (length(boot) != B || any(!is.finite(boot)))
     stop("Expected B finite bootstrap statistics. Check response and predictor scales.", call. = FALSE)
-  exceed <- sum(boot >= observed)
+  exceed <- .np_bootstrap_upper_tail_count(boot, observed)
   bandwidths <- do.call(rbind, lapply(bw[["bw"]], function(child) as.numeric(child[["bw"]])))
   dimnames(bandwidths) <- list(c("Y", names(X)), names(Z))
-  structure(list(call = call, model.call = object[["call"]], statistic = observed, P = (exceed + 1) / (as.double(B) + 1),
+  structure(list(call = call, model.call = object[["call"]], statistic = observed, P = exceed / B,
                  exceedances = exceed, critical.values = quantile(boot, c(.90,.95,.99), type = 1),
                  boot.correction = boot.correction, pilot = pilot,
                  bootstrap = boot, rank.counts = draws$rank.counts, boot.method = boot.method, boot.num = B, random.seed = random.seed,
@@ -405,8 +405,7 @@ summary.pltest <- function(object, ...) {
     cat("Observed nuisance cells (indices in declared level order):\n")
     print(object$cell.counts)
   }
-  if (!is.null(object[["total.time"]]))
-    cat("Computation Time: ", format(object[["total.time"]]), " seconds\n", sep = "")
+  .np_test_print_time(object)
   invisible(object)
 }
 
@@ -608,8 +607,8 @@ summary.pltest <- function(object, ...) {
   symbol <- if (stars)
     c(" ***", " **", " *", " .", "")[1L + findInterval(x$P, c(.001, .01, .05, .1))]
   else ""
-  cat(sprintf("T = %.6g    bootstrap p = %.5g%s    n = %d\n",
-              x$statistic, x$P, symbol, x$n))
+  cat(sprintf("T: %.6g    P Value: %s%s    n: %d\n",
+              x$statistic, .np_test_format_pvalue(x$P, x$boot.num), symbol, x$n))
   if (stars)
     cat("---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
   invisible(NULL)

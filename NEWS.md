@@ -1,5 +1,12 @@
 # npRmpi 0.80-3
 
+* All ten specification, significance and distribution tests default to 399
+  bootstrap draws. Bootstrap P values use the proportion at least as extreme
+  as the observed statistic (K/B). The partially linear and single-index
+  tests previously used (K+1)/(B+1). Summaries label P values consistently,
+  display zero bootstrap exceedances as `0 (0 of B)` with the draw count,
+  and report elapsed computation time.
+
 * Regression plots now provide experimental Mammen wild mean bands for univariate
   degree-one and degree-two zero-ridge Bernstein beta GNN fits on known support.
   Degree-zero beta NN slopes gain Mammen local-envelope Bonferroni and combined

@@ -11,7 +11,7 @@ unknown linear index with an unrestricted link (Maistre and Patilea, 2019).
 }
 \usage{
 npindextest(object, bw.method = c("published", "maximum", "separate"),
-            B = 199L, random.seed = 42L)
+            B = 399L, random.seed = 42L)
 \method{print}{indextest}(x, ...)
 \method{summary}{indextest}(object, ...)
 }
@@ -55,8 +55,8 @@ pair was conservative and had lower power in small two-covariate simulations.
 Every draw refits the direction and CV bandwidth using the original model's
 search settings. Ichimura uses leave-one-out CV fitted means and Mammen wild
 weights. The Klein--Spady adaptation draws Bernoulli responses from inclusive
-CV fitted probabilities. The one-sided p-value includes the observed draw
-in its numerator and denominator. Predictor geometry is reusable, while the
+CV fitted probabilities. The one-sided p-value is the proportion of bootstrap statistics
+greater than or equal to the observed statistic. Predictor geometry is reusable, while the
 estimated direction and its kernel weights depend on each bootstrap response.
 For Ichimura fits, a common change of response units cancels from the
 studentized score at a given direction and bandwidth. The calculation rescales
@@ -78,7 +78,7 @@ or use \code{do.call(npindexbw, args)} with evaluated controls.
   preparation and bootstrap calibration. The summary reports this time.
   With \code{getOption("show.signif.stars")} enabled, the printed bootstrap
   p-value carries the significance codes used by \code{\link{npsigtest}}.
-  Each symbol requires a p-value strictly below its threshold.
+  Each symbol requires a p-value strictly below its threshold. A zero is displayed as \samp{0 (0 of B)}, with the actual number of draws.
 
 An object of class \code{indextest}. \code{statistic}, \code{P},
 \code{exceedances}, \code{critical.values} and \code{bootstrap} report the
@@ -136,21 +136,21 @@ if (!in.check) {
 
     bw0 <- npindexbw(y0 ~ x1 + x2, data = d, method = "ichimura")
     summary(npindextest(npindex(bw0)))
-    # p = 0.74 at seed 42. Do not reject the single-index null at level 0.05.
+    # P Value: 0.7619048 (304 of 399) at seed 42. Do not reject the single-index null at level 0.05.
 
     bw1 <- npindexbw(y1 ~ x1 + x2, data = d, method = "ichimura")
     summary(npindextest(npindex(bw1)))
-    # p = 0.005 at seed 42. Reject the single-index null at level 0.05.
+    # P Value: 0 (0 of 399) at seed 42. Reject the single-index null at level 0.05.
 
     binary0 <- npindexbw(choice0 ~ x1 + x2, data = d, method = "kleinspady")
     summary(npindextest(binary0))
-    # p = 0.08 at seed 42. Do not reject the single-index null at level 0.05.
+    # P Value: 0.06766917 (27 of 399) at seed 42. Do not reject the single-index null at level 0.05.
 
     binary1 <- npindexbw(choice1 ~ x1 + x2, data = d, method = "kleinspady")
     summary(npindextest(binary1))
-    # p = 0.005 at seed 42. Reject the single-index null at level 0.05.
+    # P Value: 0 (0 of 399) at seed 42. Reject the single-index null at level 0.05.
 
-    # With the default 199 bootstrap draws the smallest possible p-value is 0.005.
+    # A reported zero means none of the 399 bootstrap draws reached the observed statistic.
     # A different data seed gives another sample. At level 0.05 a true null
     # can be rejected, and a departure can go undetected. Changing only
     # random.seed varies the bootstrap p-value for the same observations.

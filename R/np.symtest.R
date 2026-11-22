@@ -139,12 +139,15 @@ npsymtest <- function(data = NULL,
                       boot.method = c("iid", "geom"),
                       random.seed = 42,
                       ...) {
+  started <- proc.time()[["elapsed"]]
 
   if (...length())
     npRejectLegacyBootstrapCount(names(list(...)), "npsymtest")
   .npRmpi_require_active_slave_pool(where = "npsymtest()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npsymtest"))
+  if (.npRmpi_autodispatch_active()) {
+    result <- .npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npsymtest")
+    return(.np_test_timed_result(result, started))
+  }
 
   if(is.data.frame(data)) stop(" you must enter a data vector (not data frame)")
   if(is.null(data)) stop(" you must enter a data vector")
@@ -379,11 +382,11 @@ npsymtest <- function(data = NULL,
 
   .np_rng_scope_restore(seed.state)
   
-  symtest(Srho = test.stat,
+  result <- symtest(Srho = test.stat,
           Srho.bootstrap = resampled.stat,
           P = p.value,
           boot.num = B,
           data.rotate = data.rotate,
           bw = bw)
-
+  .np_test_timed_result(result, started)
 }

@@ -62,7 +62,7 @@ print.deptest <- function(x, ...){
     cat("\nConsistent Metric Entropy Test for Dependence",
         paste("\n", format(x$boot.num), " Bootstrap Replications",sep=""))
     cat(paste("\n\nTest Statistic ", sQuote("Srho"), ": ",
-              format(x$Srho), "\tP Value: ", format.pval(x$P)," ", x$reject,sep=""))
+              format(x$Srho), "\tP Value: ", .np_test_format_pvalue(x$P, x$boot.num)," ", x$reject,sep=""))
     cat("\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1")
     cat(reject.msg)
   } else {
@@ -74,4 +74,5 @@ print.deptest <- function(x, ...){
 
 summary.deptest <- function(object, ...){
   print(object)
+  .np_test_print_time(object)
 }

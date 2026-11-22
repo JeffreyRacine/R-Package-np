@@ -148,9 +148,12 @@ npsdeptest <- function(data = NULL,
                        bootstrap = TRUE,
                        B = 399,
                        random.seed = 42) {
+  started <- proc.time()[["elapsed"]]
   .npRmpi_require_active_slave_pool(where = "npsdeptest()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npsdeptest"))
+  if (.npRmpi_autodispatch_active()) {
+    result <- .npRmpi_autodispatch_call(match.call(), parent.frame(), owner.name = "npsdeptest")
+    return(.np_test_timed_result(result, started))
+  }
   
   ## Trap fatal errors
 
@@ -343,7 +346,7 @@ npsdeptest <- function(data = NULL,
   
   .np_rng_scope_restore(seed.state)
   
-  if(bootstrap) {
+  result <- if(bootstrap) {
     
     sdeptest(Srho = Srho.vec,
              Srho.cumulant = Srho.cumulant.vec,
@@ -374,5 +377,5 @@ npsdeptest <- function(data = NULL,
              bw.joint = cbind(bw.joint.y,bw.joint.y.lag))
     
   }
-
+  .np_test_timed_result(result, started)
 }
