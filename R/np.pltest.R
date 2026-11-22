@@ -309,7 +309,7 @@
   for (first in seq.int(1, B, by = width)) {
     ids <- seq.int(first, min(B, as.double(first) + width - 1))
     include.observed <- first == 1
-    E <- .pltest_local(if (.pltest_owns_residuals()) {
+    E <- .np_progress_activity_run("Preparing bootstrap residuals", .pltest_local(if (.pltest_owns_residuals()) {
       E <- matrix(0, n, length(ids) + include.observed)
       if (include.observed) E[, 1L] <- e
       for (start in seq.int(1L, length(ids), by = 64L)) {
@@ -319,7 +319,7 @@
         .np_fit_progress_step()
       }
       E
-    })
+    }))
     scored <- .pltest_score_bank(E, V, directions, length(ids) + include.observed)
     if (include.observed) observed <- scored[1L, 1L]
     rows <- seq_along(ids) + include.observed
@@ -365,7 +365,9 @@
     out <- matrix(0, count, 2L)
     if (!is.null(task)) {
       ids <- seq.int(task$start, length.out = task$bsz)
-      out[ids, ] <- .pltest_score_task(task, V, directions)
+      out[ids, ] <- if (mpi.comm.rank(1L) == 0L)
+        .np_progress_activity_run("Scoring Sobol projections", .pltest_score_task(task, V, directions))
+      else .pltest_score_task(task, V, directions)
     }
     out
   })
@@ -510,8 +512,7 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
   if (integration == "sobol") {
     V <- .pltest_local(.pltest_coordinates(predictors, projection.scale == "standardized", compact = TRUE))
     net <- .pltest_local(.pltest_sobol_directions(directions, ncol(V)))
-    draws <- .np_progress_activity_run("Scoring Sobol projections and bootstrap draws",
-      .pltest_sobol_bootstrap(V, net, H, e, center, amplitude, B, boot.method))
+    draws <- .pltest_sobol_bootstrap(V, net, H, e, center, amplitude, B, boot.method)
     observed <- draws$observed
     if (!is.finite(observed))
       stop("Non-finite projection statistic. Check the scales of the response and predictors.", call. = FALSE)

@@ -66,3 +66,31 @@ test_that("Sobol prefixes use a fixed shift and tied empirical thresholds", {
   expect_equal(.pltest_direction_scores(E * 1e-150, V, directions) / 1e-300,
                rowMeans(direct), tolerance = 1e-13)
 })
+
+test_that("the public test scores its observed residuals with the selected integration", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  n <- 32L
+  x <- data.frame(x = sin(seq_len(n)))
+  z <- data.frame(z = cos(seq_len(n) / 5))
+  y <- x$x^2 + sin(z$z) + cos(seq_len(n))
+  b <- npplregbw(xdat = x, ydat = y, zdat = z, regtype = "lc",
+                 bandwidth.compute = FALSE, bws = matrix(0.4, 2L, 1L))
+  fit <- npplreg(b)
+  e <- y - fitted(fit)
+  V <- cbind(x$x, z$z)
+  score <- function(direction) {
+    projected <- drop(V %*% direction)
+    sum((outer(projected, projected, ">=") %*% e / n)^2)
+  }
+  net <- .pltest_sobol_directions(2048L, 2L)
+  one <- nppltest(b, bw.method = "object", B = 9L, directions = 1L)
+  default <- nppltest(fit, bw.method = "object", B = 9L)
+  exact <- nppltest(b, bw.method = "object", B = 9L, integration = "exact")
+  expect_equal(one$statistic, score(net[1L, ]), tolerance = 1e-12)
+  expect_equal(default$statistic, mean(apply(net, 1L, score)), tolerance = 1e-12)
+  expect_identical(default$integration, "sobol")
+  expect_identical(default$directions, 2048L)
+  expect_null(exact$directions)
+  expect_equal(exact$statistic, sum(e * (.Call(C_np_pltest_angles, V) %*% e)), tolerance = 1e-12)
+})
