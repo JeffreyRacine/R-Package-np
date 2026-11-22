@@ -29,8 +29,7 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   \item{boot.method}{Wild multiplier law. \code{"wild-rademacher"} uses
     independent equiprobable signs. \code{"wild"} uses Mammen's asymmetric
     two-point law with mean zero and unit variance.}
-  \item{B}{Integer number of draws, at least 9. The smallest attainable
-    p-value is \eqn{1/(B+1)}.}
+  \item{B}{Integer number of draws, at least 9. Ties count as exceedances.}
   \item{random.seed}{An integer for temporary seeding. The caller's RNG
     state is restored on return or error. \code{NULL} uses the current stream
     and allows it to advance. A single seed covers bandwidth search and
@@ -97,11 +96,11 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   preparation and bootstrap calibration. The summary reports this time.
   With \code{getOption("show.signif.stars")} enabled, the printed bootstrap
   p-value carries the significance codes used by \code{\link{npsigtest}}.
-  Each symbol requires a p-value strictly below its threshold.
+  Each symbol requires a p-value strictly below its threshold. A zero is displayed as \samp{0 (0 of B)}, with the actual number of draws.
 
   A \code{pltest} list. \code{statistic} is the observed quadratic form.
-  \code{P} is one plus the number of bootstrap statistics greater than or
-  equal to the observed statistic, divided by \eqn{B+1}.
+  \code{P} is the proportion of bootstrap statistics greater than or
+  equal to the observed statistic.
   \code{exceedances}, \code{bootstrap} and \code{critical.values}
   retain the count, bootstrap statistics in replication order and empirical 90, 95 and 99 percent
   quantiles. \code{bw.method}, \code{bws}, \code{bandwidths},
@@ -158,14 +157,14 @@ d$y0 <- with(d, 0.8*x1 - 0.6*x2 + sin(pi*z) + noise)
 bw0 <- npplregbw(y0 ~ x1 + x2 | z, data = d, regtype = "ll")
 fit0 <- npplreg(bw0)
 summary(nppltest(fit0))
-# p = 0.4875 at seed 42. Do not reject partial linearity at level 0.05.
+# P Value: 0.4862155 (194 of 399) at seed 42. Do not reject partial linearity at level 0.05.
 
 # For the alternative, keep the predictors and noise and add curvature in x1.
 # The nuisance function of z cannot absorb this term.
 d$y1 <- with(d, y0 + 1.5*(x1^2 - 1))
 bw1 <- npplregbw(y1 ~ x1 + x2 | z, data = d, regtype = "ll")
 summary(nppltest(bw1))
-# p = 0.0025 at seed 42. Reject partial linearity at level 0.05.
+# P Value: 0 (0 of 399) at seed 42. Reject partial linearity at level 0.05.
 
 # With another data seed, even a true null can be rejected, and a sample
 # drawn under the alternative can fail to reject. With the data held fixed,

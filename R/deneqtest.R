@@ -50,7 +50,7 @@ print.deneqtest <- function(x, ...){
   cat("\nConsistent Density Equality Test",
       paste("\n", format(x$boot.num), " Bootstrap Replications",sep=""),
       "\n\nTest Statistic ", sQuote("Tn"), ": ",
-      format(x$Tn), "\tP Value: ", format.pval(x$Tn.P)," ", x$reject,
+      format(x$Tn), "\tP Value: ", .np_test_format_pvalue(x$Tn.P, x$boot.num)," ", x$reject,
       "\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1",
       reject.msg,
       "\n\n", sep="")
@@ -58,4 +58,5 @@ print.deneqtest <- function(x, ...){
 
 summary.deneqtest <- function(object, ...){
   print(object)
+  .np_test_print_time(object)
 }

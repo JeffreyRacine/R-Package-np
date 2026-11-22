@@ -37,6 +37,7 @@ npsigtest <-
 
 npsigtest.formula <-
   function(bws, data = NULL, ...){
+    started <- proc.time()[["elapsed"]]
     .np_reject_fit_subset(substitute(list(...))[-1L])
 
 
@@ -81,11 +82,12 @@ npsigtest.formula <-
     environment(ev$call) <- parent.frame()
     ev$rows.omit <- as.vector(attr(umf,"na.action"))
     ev$nobs.omit <- length(ev$rows.omit)
-    return(ev)
+    return(.np_test_timed_result(ev, started))
   }
 
 npsigtest.call <-
   function(bws, ...) {
+    started <- proc.time()[["elapsed"]]
     .np_reject_fit_subset(substitute(list(...))[-1L])
 
   .np_reject_native_data(substitute(list(...))[-1L])
@@ -95,17 +97,18 @@ npsigtest.call <-
                     bws = bws, ...)
     ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npsigtest")
     environment(ev$call) <- parent.frame()
-    return(ev)
+    return(.np_test_timed_result(ev, started))
   }
 
 npsigtest.npregression <-
   function(bws, ...){
+    started <- proc.time()[["elapsed"]]
     .np_reject_fit_subset(substitute(list(...))[-1L])
 
     ev <- npsigtest(bws$bws, ...)
     ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npsigtest")
     environment(ev$call) <- parent.frame()
-    return(ev)
+    return(.np_test_timed_result(ev, started))
   }
 
 .np_npsig_pivot_plan <- function(pivot, xdat, index, joint) {
@@ -550,6 +553,7 @@ npsigtest.rbandwidth <- function(bws,
                                  index = seq_len(ncol(xdat)),
                                  random.seed = 42,
                                  ...) {
+  started <- proc.time()[["elapsed"]]
     .np_reject_fit_subset(substitute(list(...))[-1L])
 
   .np_reject_native_data(substitute(list(...))[-1L])
@@ -715,12 +719,13 @@ npsigtest.rbandwidth <- function(bws,
       progress <- .np_npsig_progress_complete(progress, skipped = TRUE)
       progress <- .np_progress_end(progress)
       progress.active <- FALSE
-      return(sigtest(In = In, In.bootstrap = matrix(NA_real_, B, 1L),
+      result <- sigtest(In = In, In.bootstrap = matrix(NA_real_, B, 1L),
         P = 1, bws = bws, ixvar = index, boot.method = boot.method,
         pivot = pivot, pivot.effective = pivot.plan$effective,
         joint = joint, boot.type = boot.type, boot.num = B,
         bootstrap.executed = 0L,
-        bootstrap.reason = "all observed contrasts identically zero"))
+        bootstrap.reason = "all observed contrasts identically zero")
+      return(.np_test_timed_result(result, started))
     }
 
     if(boot.method != "pairwise") {
@@ -1272,7 +1277,7 @@ npsigtest.rbandwidth <- function(bws,
 
   .np_rng_scope_restore(seed.state)
 
-  sigtest(In = In,
+  result <- sigtest(In = In,
           In.bootstrap = In.mat,
           P = P,
           bws = bws,
@@ -1285,6 +1290,7 @@ npsigtest.rbandwidth <- function(bws,
           boot.num = B,
           bootstrap.executed = bootstrap.executed,
           bootstrap.reason = bootstrap.reason)
+  .np_test_timed_result(result, started)
   }, continuous.names = names(xdat)[bws[["icon", exact = TRUE]]], context = {
     if (identical(nn.stage, "bootstrap")) {
       if (streamed.iid)
@@ -1348,6 +1354,7 @@ npsigtest.rbandwidth <- function(bws,
 }
 
 npsigtest.default <- function(bws, xdat, ydat, ...){
+  started <- proc.time()[["elapsed"]]
   sc <- .np_formula_expand_call(sys.call(), parent.frame())
   selector <- .np_npsig_selector_promises(sc, environment(), parent.frame())
   sc <- selector$call
@@ -1427,5 +1434,5 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
 
   ev$call <- .np_public_replay_call(match.call(expand.dots = FALSE), "npsigtest")
   environment(ev$call) <- parent.frame()
-  return(ev)
+  return(.np_test_timed_result(ev, started))
 }

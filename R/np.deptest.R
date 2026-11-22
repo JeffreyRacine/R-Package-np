@@ -9,6 +9,7 @@ npdeptest <- function(data.x = NULL,
                       bootstrap = TRUE,
                       B = 399,
                       random.seed = 42) {
+  started <- proc.time()[["elapsed"]]
   
   ## Trap fatal errors
 
@@ -151,7 +152,7 @@ npdeptest <- function(data.x = NULL,
 
   .np_rng_scope_restore(seed.state)
 
-  if(bootstrap) {
+  result <- if(bootstrap) {
 
     deptest(Srho = Srho.vec,
             Srho.bootstrap.vec = Srho.vec.boot,
@@ -174,5 +175,5 @@ npdeptest <- function(data.x = NULL,
             bw.joint = bw.joint)
 
   }
-
+  .np_test_timed_result(result, started)
 }

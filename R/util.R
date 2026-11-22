@@ -4496,15 +4496,38 @@ genBwScaleStrs <- function(x){
   }))
 }
 
-.np_bootstrap_upper_tail_pvalue <- function(bootstrap, observed) {
-  # Ordinary bootstrap upper-tail p-value.  Ties are counted as at least as
-  # extreme so discrete/categorical tests remain conservative.
+.np_bootstrap_upper_tail_count <- function(bootstrap, observed) {
+  # Count ties as at least as extreme for discrete bootstrap statistics.
   if (length(observed) != 1L)
     stop("bootstrap p-value observed statistic must be scalar", call. = FALSE)
   B <- length(bootstrap)
   if (B < 1L)
     stop("bootstrap p-value requires at least one replication", call. = FALSE)
-  mean(bootstrap >= observed)
+  sum(bootstrap >= observed)
+}
+
+.np_bootstrap_upper_tail_pvalue <- function(bootstrap, observed) {
+  .np_bootstrap_upper_tail_count(bootstrap, observed) / length(bootstrap)
+}
+
+.np_test_format_pvalue <- function(p, B = NULL) {
+  formatted <- format.pval(p)
+  if (!is.null(B))
+    formatted[!is.na(p) & p == 0] <- paste0("0 (0 of ", B, ")")
+  formatted
+}
+
+.np_test_timed_result <- function(result, started) {
+  force(result)
+  result$total.time <- proc.time()[["elapsed"]] - started
+  result
+}
+
+.np_test_print_time <- function(object) {
+  elapsed <- object[["total.time", exact = TRUE]]
+  if (!is.null(elapsed))
+    cat("Computation Time: ", format(elapsed), " seconds\n", sep = "")
+  invisible(NULL)
 }
 
 npFormat <- function(x){

@@ -56,7 +56,7 @@ print.unitest <- function(x, ...){
     cat("\nConsistent Univariate Entropy Density Equality Test",
         paste("\n", format(x$boot.num), " Bootstrap Replications",sep=""),
         "\n\nTest Statistic ", sQuote("Srho"), ": ",
-        format(x$Srho), "\tP Value: ", format.pval(x$P)," ", x$reject,
+        format(x$Srho), "\tP Value: ", .np_test_format_pvalue(x$P, x$boot.num)," ", x$reject,
         "\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1",
         reject.msg,
         "\n\n", sep="")
@@ -69,4 +69,5 @@ print.unitest <- function(x, ...){
 
 summary.unitest <- function(object, ...){
   print(object)
+  .np_test_print_time(object)
 }

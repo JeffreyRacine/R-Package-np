@@ -62,6 +62,7 @@ cmstest <- function(Jn, In, Omega.hat, sd,
 }
 
 print.cmstest <- function(x, ...){
+  B <- if (identical(x$pdistribution, "Bootstrap")) x$boot.num
   stat.label <- if (x$pivot) "Jn" else "In"
   stat.value <- if (x$pivot) x$Jn else x$In
   reject.msg <- if (x$reject == ' ') {
@@ -77,7 +78,7 @@ print.cmstest <- function(x, ...){
               "(", x$boot.num, " replications)",sep="")
       } else paste(x$pdistribution, "Distribution"),
       "\n\nTest Statistic ", sQuote(stat.label), ": ",
-      format(stat.value), "\tP Value: ", format.pval(x$P)," ", x$reject,
+      format(stat.value), "\tP Value: ", .np_test_format_pvalue(x$P, B)," ", x$reject,
       "\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1",
       reject.msg,
       "\n\n", sep="")
@@ -85,4 +86,5 @@ print.cmstest <- function(x, ...){
 
 summary.cmstest <- function(object, ...){
   print(object)
+  .np_test_print_time(object)
 }

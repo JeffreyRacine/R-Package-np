@@ -110,15 +110,16 @@ print.sigtest <- function(x, ...){
 
   if(!x$joint) {
     cat("\nIndividual Significance Tests\n")
-    cat("P Value:", paste("\n", nm," ", blank(maxNameLen-nc), format.pval(x$P),
+    cat("P Value:", paste("\n", nm," ", blank(maxNameLen-nc), .np_test_format_pvalue(x$P, x$boot.num),
                           " ", x$reject, sep=''))
   } else {
     cat("\nJoint Significance Test\n")
-    cat("P Value:", paste(" ", format.pval(x$P)," ", x$reject, sep=''))
+    cat("P Value:", paste(" ", .np_test_format_pvalue(x$P, x$boot.num)," ", x$reject, sep=''))
   }
   cat("\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n\n")
 }
 
 summary.sigtest <- function(object, ...) {
   print(object)
+  .np_test_print_time(object)
 }

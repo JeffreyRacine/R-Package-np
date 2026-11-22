@@ -11,6 +11,7 @@ npsymtest <- function(data = NULL,
                       boot.method = c("iid", "geom"),
                       random.seed = 42,
                       ...) {
+  started <- proc.time()[["elapsed"]]
 
   if (...length())
     npRejectLegacyBootstrapCount(names(list(...)), "npsymtest")
@@ -222,11 +223,11 @@ npsymtest <- function(data = NULL,
 
   .np_rng_scope_restore(seed.state)
   
-  symtest(Srho = test.stat,
+  result <- symtest(Srho = test.stat,
           Srho.bootstrap = resampled.stat,
           P = p.value,
           boot.num = B,
           data.rotate = data.rotate,
           bw = bw)
-
+  .np_test_timed_result(result, started)
 }

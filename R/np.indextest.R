@@ -189,7 +189,7 @@
 }
 
 npindextest <- function(object, bw.method = c("published", "maximum", "separate"),
-                        B = 199L, random.seed = 42L) {
+                        B = 399L, random.seed = 42L) {
   started <- proc.time()[["elapsed"]]
   call <- match.call()
   absent <- missing(object)
@@ -230,9 +230,9 @@ npindextest <- function(object, bw.method = c("published", "maximum", "separate"
   values <- boot$statistics
   if (length(values)!=B || any(!is.finite(values)))
     stop("Expected B finite single-index bootstrap statistics.", call. = FALSE)
-  exceed <- sum(values >= observed)
+  exceed <- .np_bootstrap_upper_tail_count(values, observed)
   structure(list(call=call, model.call=object[["call"]], method=data$recipe$method,
-    bw.method=bw.method, statistic=observed, components=scores, P=(1+exceed)/(1+as.double(B)),
+    bw.method=bw.method, statistic=observed, components=scores, P=exceed / B,
     exceedances=exceed, critical.values=stats::quantile(values,c(.9,.95,.99),type=1),
     bootstrap=values, rank.counts=boot$rank.counts, boot.num=B, random.seed=random.seed,
     n=length(data$y), beta=data$beta, refit.controls=data$recipe,
@@ -254,8 +254,7 @@ summary.indextest <- function(object, ...) {
       "\nPairwise bandwidths:", format(object$h),
       "\nBootstrap draws:", object$boot.num, "   Search starts per refit:",
       object$refit.controls$nmulti, "\n")
-  if (!is.null(object[["total.time"]]))
-    cat("Computation Time: ", format(object[["total.time"]]), " seconds\n", sep = "")
+  .np_test_print_time(object)
   invisible(object)
 }
 

@@ -211,6 +211,7 @@ npdeneqtest <- function(x = NULL,
                         B = 399,
                         random.seed = 42,
                         ...) {
+  started <- proc.time()[["elapsed"]]
 
   if (...length())
     npRejectLegacyBootstrapCount(names(list(...)), "npdeneqtest")
@@ -465,12 +466,12 @@ npdeneqtest <- function(x = NULL,
 
   .np_rng_scope_restore(seed.state)
   
-  deneqtest(Tn=output$Tn,
+  result <- deneqtest(Tn=output$Tn,
             In=output$In,
             Tn.bootstrap=Tn.vector,
             In.bootstrap=In.vector,                
             Tn.P=Tn.P,
             In.P=In.P,
             boot.num=B)
-  
+  .np_test_timed_result(result, started)
 }
