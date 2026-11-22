@@ -229,6 +229,12 @@
     h=unname(settings[["bandwidth"]][["operator"]]/scale),
     variance_h=unname(settings[["bandwidth"]][["variance"]]/scale),
     offset=offset,scale=scale,y=as.double(y),settings=settings)
+  if (d == 2L && (identical(reg[["degree.engine"]], c(3L,1L)) ||
+                  identical(reg[["degree.engine"]], c(1L,3L))) &&
+      isTRUE(reg[["bernstein.basis.engine"]]) && identical(bws[["ckertype"]], "epanechnikov") &&
+      bws[["ckerorder"]] == 2L && identical(bws[["ckerbound"]], "none") &&
+      bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && anyDuplicated(x[[nc[which.max(reg[["degree.engine"]])]]]))
+    spec[["cubic.support"]] <- list(x=x, bws=bws, axis=which.max(reg[["degree.engine"]]))
   if (!is.null(admission)) spec$settings$kernel.admission <- admission
   # Degree-zero uniform support ties use the fitted physical coordinates.
   # Auxiliary Gaussian projections retain their standardized coordinates.
@@ -437,6 +443,75 @@
   W
 }
 
+.np_bias_cubic_targets <- function(spec, grid, map) {
+  source <- spec[["cubic.support"]]
+  # Standard full-rank rows keep the existing owner. Work in the original
+  # coordinates for the weights, the support test and the exceptional hat.
+  wanted <- which(map$target %in% c("mean", "d1", "d2"))
+  index <- unique(map$row[wanted])
+  if (!length(index)) return(NULL)
+  weights <- .np_kernel_weights_direct(source$bws, source$x, grid[index,,drop=FALSE],
+                                       bandwidth.divide=TRUE)
+  axis <- spec$numeric.cols[source$axis]
+  levels <- lapply(seq_along(index), function(k)
+    unique(source$x[[axis]][weights[,k] > 0]))
+  candidates <- wanted[lengths(levels)[match(map$row[wanted],index)] == 3L]
+  replacement <- list()
+  for (i in candidates) {
+    j <- map$row[i]
+    nodes <- levels[[match(j,index)]]
+    at <- grid[[axis]][j]
+    target <- map$target[i]
+    nu <- match(target,c("mean","d1","d2")) - 1L
+    order <- if (nu) .np_bias_derivative_order(spec,nu) else 0L
+    # At any simple root of the vanishing cubic its first derivative is
+    # nonzero. Between nodes check the derivative with a cancellation bound.
+    dx <- at - nodes
+    products <- c(dx[1L]*dx[2L],dx[1L]*dx[3L],dx[2L]*dx[3L])
+    ambiguous <- nu == source$axis && order == 1L &&
+      (at %in% nodes || abs(sum(products)) > 16*.Machine$double.eps*sum(abs(products)))
+    identified <- (nu == 0L && at %in% nodes) || (nu == 3L-source$axis && order == 1L)
+    if (!ambiguous && !identified) next
+    if (identified) {
+      # Two distinct second coordinates per level identify both the level
+      # and the second-coordinate slope at all three first-coordinate levels.
+      support <- weights[,match(j,index)] > 0
+      second <- source$x[[spec$numeric.cols[3L-source$axis]]]
+      if (!all(vapply(nodes,function(u)
+        length(unique(second[support & source$x[[axis]] == u])) >= 2L,logical(1L)))) next
+    }
+    derivative <- integer(spec$d)
+    if (nu) derivative[nu] <- order
+    H <- npreghat(source$bws,txdat=source$x,exdat=grid[j,,drop=FALSE],
+                  s=derivative,output="matrix",.np.require.finite=TRUE)
+    ridge <- attr(H,"ridge.used",exact=TRUE)
+    if (!identical(as.double(ridge),0)) next
+    if (ambiguous)
+      stop("bias-corrected band unavailable: the requested first derivative is not identifiable on the local Epanechnikov support",call.=FALSE)
+    # The subsequent bias operator expects standardized derivative units.
+    replacement[[as.character(i)]] <- as.double(H) * if(nu) spec$scale[nu]^order else 1
+  }
+  replacement
+}
+
+# Merge exceptional rows in map order. Ordinary categorical contrasts keep
+# both of their original regularization frames.
+.np_bias_cubic_original <- function(spec, grid, map, replacement) {
+  fixed <- as.integer(names(replacement))
+  rest <- setdiff(seq_len(nrow(map)),fixed)
+  L <- matrix(0,nrow(map),nrow(spec$x))
+  info <- NULL
+  if (length(rest)) {
+    regular <- .np_bias_original(spec,grid,map[rest,,drop=FALSE])
+    L[rest,] <- regular
+    info <- attr(regular,"main.regularization",exact=TRUE)
+  }
+  L[fixed,] <- do.call(rbind,replacement)
+  attr(L,"main.regularization") <- rbind(info,
+    data.frame(row=map$row[fixed],target=map$target[fixed],frame=1L,ridge=0))
+  L
+}
+
 .np_bias_regression_rows <- function(spec,grid,map,original=NULL,captured=FALSE) {
   # This admission covers means and differences of means. Keep continuous
   # uniform derivatives outside it, including the pooled dispatch below.
@@ -455,11 +530,13 @@
   if (isTRUE(spec$pooled)) return(.np_bias_profile_rows(spec,grid,map))
   if (nrow(map)>500L || nrow(unique(grid[spec$numeric.cols]))>25L)
     stop("internal bias target block exceeded",call.=FALSE)
+  cubic <- if (!is.null(spec[["cubic.support"]])) .np_bias_cubic_targets(spec,grid,map)
   physical <- spec[["main.physical"]]
   main.grid <- if (!is.null(physical)) grid else NULL
   for(j in seq_len(spec$d))grid[[spec$numeric.cols[j]]] <- (grid[[spec$numeric.cols[j]]]-spec$offset[j])/spec$scale[j]
   L <- if (is.null(original)) {
-    if (is.null(physical)) .np_bias_original(spec,grid,map) else {
+    if (length(cubic)) .np_bias_cubic_original(spec,grid,map,cubic) else
+      if (is.null(physical)) .np_bias_original(spec,grid,map) else {
       main <- spec
       main$x <- physical[["x"]]
       main$xcon <- main$x[spec$numeric.cols]
@@ -474,6 +551,12 @@
       stop("invalid bounded captured original rows",call.=FALSE)
     reg <- npValidatedConditionalRegSpec(spec$bws,where="bias main operator",ncon.field="ncon")
     .np_bias_main_admit(spec,original,diagnostic$ridge,reg,captured=captured)
+    if (length(cubic)) {
+      fixed <- as.integer(names(cubic))
+      if (any(diagnostic$ridge[fixed] != 0))
+        stop("captured fitted ridge disagrees with the cubic support row",call.=FALSE)
+      original[fixed,] <- do.call(rbind,cubic)
+    }
     original
   }
   regularization <- attr(L,"main.regularization",exact=TRUE)

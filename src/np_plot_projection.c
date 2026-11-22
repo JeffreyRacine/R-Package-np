@@ -13,6 +13,10 @@ static SEXP np_precision_replay(void *data)
 {
   NPPrecisionReplay *c=data;
   const int n=nrows(c->basis),p=ncols(c->basis),g=nrows(c->projection);
+  SEXP cubic = getAttrib(c->basis,install(".np.cubic.support"));
+  if(TYPEOF(cubic) == INTSXP && XLENGTH(cubic) == 1 &&
+     (INTEGER(cubic)[0] == 1 || INTEGER(cubic)[0] == 2))
+    c->q.check_cubic_support = INTEGER(cubic)[0];
   if(TYPEOF(c->policy)!=REALSXP||!isMatrix(c->policy)||nrows(c->policy)!=g||ncols(c->policy)!=2||c->kernel==R_NilValue)
     error("invalid precision replay policy");
   SEXP out=PROTECT(allocMatrix(REALSXP,g,n));

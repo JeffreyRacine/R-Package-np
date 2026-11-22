@@ -93,6 +93,19 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
     return R_NilValue;
   }
+  /* The existing continuous GNN precision owner already has the weighted
+   * QR when needed. Full-rank fits acquire no new support scan or factor. */
+  if(precision_eligible &&
+    BANDWIDTH_reg == BW_GEN_NN && num_reg_continuous == 2 &&
+    call->kernel_route == NULL && call->kernel_c[0] == 4 && call->kernel_c[1] == 4 &&
+    int_glp_basis_extern == 1 && use_bernstein) {
+    if(vector_glp_degree_extern[0] == 3 && vector_glp_degree_extern[1] == 1)
+      owner->precision.check_cubic_support = 1;
+    else if(vector_glp_degree_extern[0] == 1 && vector_glp_degree_extern[1] == 3)
+      owner->precision.check_cubic_support = 2;
+  }
+  if(call->fit_projection != NULL)
+    call->fit_projection->check_cubic_support = owner->precision.check_cubic_support;
   response_y_offset = include_response_square ? 1 : 0;
   response_basis_offset = include_response_square ? 2 : 1;
   moment_stride = owner->nterms + response_basis_offset;

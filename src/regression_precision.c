@@ -65,6 +65,54 @@ static int reserve_work(NPRegressionPrecision *q, double query)
   }
   return 1;
 }
+/* The four pure-cubic GLP columns depend on one predictor.
+ * Three distinct supported column tuples prove one exact dependency. The
+ * triangular checks only guard corroboration; they never select a fit rank. */
+static int cubic_support_alias(NPRegressionPrecision *q, double *const *basis)
+{
+  if(q->p != 7 || q->root_ridge != 0.0) return 0;
+  const int stride = q->m + 1;
+  const double guard = q->m * DBL_EPSILON * fabs(q->a[0]);
+  if(fabs(q->a[6 * stride]) > guard || fabs(q->a[5 * stride]) <= guard)
+    return 0;
+
+  /* The GLP lower set is enumerated by increasing second-coordinate degree. */
+  for(int k = 0; k < 4; ++k)
+    q->cubic_columns[k] = q->check_cubic_support == 1 ? k : 2*k;
+  int count = 0;
+  for(int i = 0; i < q->n; ++i) {
+    if(q->weights[i] == 0.0) continue;
+    int level = 0;
+    while(level < count && q->cubic_levels[level][1] != basis[q->cubic_columns[1]][i]) ++level;
+    if(level == count) {
+      if(count == 3) return 0;
+      for(int k = 0; k < 4; ++k) q->cubic_levels[count][k] = basis[q->cubic_columns[k]][i];
+      ++count;
+    } else {
+      for(int k = 0; k < 4; ++k)
+        if(q->cubic_levels[level][k] != basis[q->cubic_columns[k]][i]) return 0;
+    }
+  }
+  return count == 3;
+}
+
+/* A target with no pure-cubic component, or evaluation at a supported
+ * abscissa, annihilates the alias. A different functional retains the
+ * incumbent public fit convention. Corrected bands check it separately. */
+static int cubic_identified_direction(const NPRegressionPrecision *q,
+                                      const double *v)
+{
+  const int *col = q->cubic_columns;
+  if(v[col[0]] == 0.0 && v[col[1]] == 0.0 &&
+     v[col[2]] == 0.0 && v[col[3]] == 0.0) return 1;
+  for(int level = 0; level < 3; ++level) {
+    int k = 0;
+    while(k < 4 && q->cubic_levels[level][k] == v[col[k]]) ++k;
+    if(k == 4) return 1;
+  }
+  return 0;
+}
+
 int np_regression_precision_factor(NPRegressionPrecision *q,
   double *const *basis, const double *weights, int n, int p,
   double ridge, double anchor)
@@ -124,12 +172,15 @@ int np_regression_precision_factor(NPRegressionPrecision *q,
     q->work_m=m;q->work_p=p;
   }
   q->weights=weights;
+  q->cubic_alias = q->check_cubic_support && cubic_support_alias(q,basis);
   return 1;
 }
 int np_regression_precision_row(NPRegressionPrecision *q, const double *direction)
 {
   if(q->weights==NULL||direction==NULL)return 0;
-  const int m=q->m,p=q->p,n=q->n;
+  const int m=q->m,n=q->n;
+  const int p = q->cubic_alias && cubic_identified_direction(q,direction)
+    ? q->p - 1 : q->p;
   memset(q->u,0,(size_t)m*sizeof(double));
   for(int i=0;i<p;++i){
     int k=q->pivot[i]-1;
