@@ -335,8 +335,7 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
         max(abs(e)) <= 64 * .Machine$double.eps * max(abs(y)))
       stop("The fitted null leaves no numerical residual variation to test.", call. = FALSE)
   })
-  A <- .np_progress_activity_run("Computing projection weights",
-    .pltest_angles(predictors, projection.scale == "standardized"))
+  A <- .pltest_angles(predictors, projection.scale == "standardized")
   .pltest_local({
     statistic <- function(E) colSums(E * (A %*% E))
     observed <- unname(statistic(as.matrix(e)))
@@ -470,18 +469,20 @@ summary.pltest <- function(object, ...) {
   collective <- .npRmpi_cms_collective_context()
   ranks <- mpi.comm.size(1L)
   # A second dispatch and matrix transfer dominate short angular calculations.
-  if (n < 512L || ranks == 1L) {
+  if (n < 512L || ranks <= 1L) {
     A <- .pltest_local(if (!collective || mpi.comm.rank(1L) == 0L)
-      .np_with_compiled_fit_progress("Computing projection weights", n,
-        expr = .Call(C_np_pltest_angles, V)))
+      .np_progress_activity_run("Computing projection weights",
+        .np_with_compiled_fit_progress("Computing projection weights", n,
+          expr = .Call(C_np_pltest_angles, V))))
     return(if (collective) .pltest_root_value(A) else A)
   }
 
   if (collective) {
     # Strided columns balance the triangular work. Every rank already has V
     # and needs the completed matrix for its subsequent bootstrap draws.
-    own <- .npRmpi_bootstrap_collective_apply(n, n, function(ids, pos)
-      .pltest_angle_columns(V, ids))[[1L]]
+    own <- .np_progress_activity_run("Computing projection weights",
+      .npRmpi_bootstrap_collective_apply(n, n, function(ids, pos)
+        .pltest_angle_columns(V, ids)))[[1L]]
     rank <- mpi.comm.rank(1L)
     A <- .pltest_local(matrix(0, n, n))
     for (owner in seq_len(min(n, ranks)) - 1L) {
