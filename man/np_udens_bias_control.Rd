@@ -36,13 +36,13 @@ coverage guarantee.
 Regression iterations and residual/pilot assumptions do not apply.
 
 For the joint-scale construction, omitting \code{band}, or selecting
-\code{band="pmzsd"}, uses the existing
+\code{interval="normal-sd", band="pointwise"}, uses the existing
 normal-quantile convention: the corrected center plus or minus
 \eqn{z_{1-\alpha/2}} times the returned \code{std_error}. The family provider supplies
 the corrected scale; its pointwise calibration work and RNG contract are
 retained. These normal intervals do not apply the joint-scale uncertainty
 envelope and do not inherit its empirical coverage results. Their endpoints
-are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"}, \code{"simultaneous"},
+are in the interval rows with \code{interval="normal-sd", band="pointwise"}. Explicit \code{"pointwise"}, \code{"simultaneous"},
 \code{"bonferroni"} and \code{"all"} retain their calibrated constructions.
 
 
@@ -96,7 +96,7 @@ coverage guarantee. The experimental-status warning applies to this method.
 \subsection{Known-bound beta density inference}{
 With omitted or \code{NULL} \code{bias.control}, fixed beta
 kernels of orders 2, 4, 6 and 8 in one or two continuous dimensions support \code{errors="asymptotic"} and independent bootstrap
-\code{calibration="symmetric-sd"} or \code{"asymmetric-sd"}. Request
+\code{interval="symmetric-sd"} or \code{"asymmetric-sd"}. Request
 \code{center="bias-corrected"} and explicitly select \code{band="pointwise"}
 or \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}. This plot-only construction supports one or two
 continuous variables, at least ten observations and known finite coordinatewise
@@ -259,7 +259,7 @@ Explicit saved density controls keep their original construction and scope.
 \subsection{Known-bound univariate normal intervals}{
 With omitted or \code{NULL} \code{bias.control}, known-fixed-bound order-2 beta
 and Gaussian density plots support \code{errors="asymptotic"},
-\code{center="bias-corrected"} and omitted \code{band} or \code{band="pmzsd"}
+\code{center="bias-corrected"} and omitted \code{band} or \code{interval="normal-sd", band="pointwise"}
 for one continuous variable. Fixed bandwidths, at least ten observations,
 strictly interior data and targets, and \code{0 < alpha < 0.5} are required.
 The original corrected center, observation operator and fitted bandwidth are
@@ -295,7 +295,7 @@ deviation of iid bootstrap refits.
 \subsection{Known-bound compact normal intervals in two dimensions}{
 With omitted or \code{NULL} \code{bias.control}, fixed second-order uniform and
 Epanechnikov kernels support corrected asymptotic normal intervals for exactly
-two continuous coordinates. Request omitted \code{band} or \code{band="pmzsd"}.
+two continuous coordinates. Request omitted \code{band} or \code{interval="normal-sd", band="pointwise"}.
 The fixed bandwidth, finite coordinatewise bounds, strictly interior data and
 evaluation targets, at least ten observations and \code{0 < alpha < 0.5} are
 required. The product local-cubic observation operator and corrected center are
@@ -328,8 +328,7 @@ kernels support corrected asymptotic \code{band="pointwise"},
 \code{"simultaneous"}, \code{"bonferroni"} and \code{"all"}, and independent \code{"symmetric-sd"} or
 \code{"asymmetric-sd"} calibration with explicit \code{"pointwise"},
 \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"} bands.
-The SD route requires explicit \code{bootstrap="inid"} and calibration in
-\code{np_boot_control()}; an omitted or different bootstrap law is not remapped.
+The SD route requires explicit \code{bootstrap="inid"} and an explicit \code{interval}; an omitted or different bootstrap law is not remapped.
 Use two continuous variables, known finite coordinatewise fixed bounds,
 fixed bandwidths, at least ten strictly interior observations and interior
 evaluation points, and \code{0 < alpha < 0.5}. Range bounds, literal support
@@ -511,10 +510,10 @@ require an explicit \code{np_boot_control(blocklen=...)} while automatic mixed
 block-length selection remains unqualified. Dependent-data coverage has not been
 established by the independent-data evidence below.
 
-Select bootstrap calibration through \code{\link{np_boot_control}}:
+Select the bootstrap construction with \code{interval} in the plot call.
 \code{"symmetric-sd"} retains absolute-root bands;
 \code{"asymmetric-sd"} retains transported asymmetric tail bands;
-\code{"smoothed-percentile"} uses outer-calibrated percentiles of complete
+\code{"outer-calibrated-percentile"} uses outer-calibrated percentiles of complete
 unshifted corrected smoothed-bootstrap curves, with companion-band nesting and
 certified full-support completion. The last method is the refined OP1+SC1
 construction with multivariate/mixed-data and categorical-kernel extensions;

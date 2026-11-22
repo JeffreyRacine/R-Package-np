@@ -1,6 +1,6 @@
 test_that("asymmetric Q6 has an explicit selected-coordinate contract", {
   a <- list(errors="bootstrap",bootstrap="smoothed-q6",center="bias-corrected",
-    band="simultaneous",B=199L,boot.control=np_boot_control(calibration="asymmetric-sd"))
+    band="simultaneous",B=199L,plot.errors.boot.calibration="asymmetric-sd")
   expect_true(.np_udens_q6_options(a,TRUE))
   expect_error(.np_udens_q6_options(a),"only.*density")
   for (band in c("pmzsd","invalid")) {

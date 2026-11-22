@@ -56,7 +56,7 @@ npcopula(bws, \dots)
               "empirical", "all"),
      renderer = c("base", "rgl"),
      errors = c("none", "bootstrap", "asymptotic"),
-     band = c("pointwise", "pmzsd", "bonferroni",
+     band = c("pointwise", "bonferroni",
               "simultaneous", "all"),
      alpha = 0.05,
      bootstrap = c("inid", "fixed", "geom"),
@@ -76,7 +76,7 @@ npcopula(bws, \dots)
      zlim = NULL,
      gaussian.draws = 9999L,
      random.seed = 42L,
-     \dots)
+     \dots, interval = NULL)
 }
 
 \arguments{
@@ -290,9 +290,12 @@ surface plots.
     number of bootstrap replications when \code{errors="bootstrap"}.
   }
 
+  \item{interval}{Interval construction for a supported plot. Omission retains
+    the copula default. Use \code{"normal-sd"} for a marginal normal interval or
+    \code{"percentile"} for empirical bootstrap bands.}
   \item{band}{
     interval type for plotted surfaces. Supported values are
-    \code{"pointwise"}, \code{"pmzsd"}, \code{"bonferroni"},
+    \code{"pointwise"}, \code{"bonferroni"},
     \code{"simultaneous"}, and \code{"all"}. The \code{"all"} option
     overlays pointwise, simultaneous, and Bonferroni wireframes where
     available.

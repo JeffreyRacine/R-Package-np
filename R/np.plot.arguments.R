@@ -30,7 +30,7 @@
     plot.errors.boot.nonfixed = "boot.control = np_boot_control(nonfixed = ...)",
     plot.errors.boot.wild = "boot.control = np_boot_control(wild = ...)",
     plot.errors.boot.blocklen = "boot.control = np_boot_control(blocklen = ...)",
-    plot.errors.boot.calibration = "boot.control = np_boot_control(calibration = ...)",
+    plot.errors.boot.calibration = "interval = ...",
     plot.errors.style = "render.control = np_render_control(style = ...)",
     plot.errors.bar = "render.control = np_render_control(bar = ...)",
     plot.errors.bar.num = "render.control = np_render_control(bar.num = ...)")

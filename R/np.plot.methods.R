@@ -40,19 +40,14 @@
 
 np_boot_control <- function(nonfixed = c("exact", "frozen"),
                             wild = c("mammen", "rademacher"),
-                            blocklen = NULL,
-                            calibration = c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "basic-local-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy")) {
-  calibration.supplied <- !missing(calibration)
-  calibration <- if (!calibration.supplied) "default" else
-    .np_plot_scalar_match(calibration,
-      c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "basic-local-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"), "calibration")
-  if (is.null(calibration)) stop("calibration must be a single supported name", call. = FALSE)
+                            blocklen = NULL, ...) {
+  if (...length())
+    stop("np_boot_control() accepts nonfixed, wild and blocklen; move calibration to plot(interval=), or omit interval for the default", call. = FALSE)
   nonfixed <- match.arg(nonfixed)
   wild <- match.arg(wild)
   blocklen <- .np_plot_validate_count(blocklen, "blocklen")
   structure(
-    c(list(nonfixed = nonfixed, wild = wild, blocklen = blocklen),
-      if (calibration.supplied) list(calibration = calibration)),
+    list(nonfixed = nonfixed, wild = wild, blocklen = blocklen),
     class = "np_boot_control"
   )
 }
@@ -285,7 +280,7 @@ np_render_control <- function(style = c("band", "bar"),
     stop("unused plot argument: bands; did you mean band?",
          call. = FALSE)
   canonical <- .np_plot_canonical_arg_names()
-  if (regression) canonical <- c(canonical,"interval")
+  if (regression || context %in% names(.np_plot_interval_families)) canonical <- c(canonical, "interval")
   engine <- .np_plot_allowed_engine_args(method = method, bws = bws)
   engine <- setdiff(engine, .np_plot_legacy_arg_names())
   allowed <- unique(c(canonical, "random.seed", engine,
@@ -328,6 +323,8 @@ np_render_control <- function(style = c("band", "bar"),
                                             allow_smoothed_q6 = FALSE, allow_smoothed_beta_binomial = FALSE,
                                             allow_basic_local_envelope = FALSE) {
   dots <- .np_plot_unique_args(dots)
+  if (context %in% names(.np_plot_interval_families))
+    dots <- .np_plot_family_interval_request(dots, .np_plot_interval_families[[context]])
   if (identical(dots[["bootstrap", exact=TRUE]], "smoothed-q6") ||
       identical(dots[["plot.errors.boot.method", exact=TRUE]], "smoothed-q6"))
     .np_udens_q6_options(dots, allow_smoothed_q6)
@@ -588,7 +585,8 @@ np_render_control <- function(style = c("band", "bar"),
       "plot.errors.center", "plot.errors.boot.method", "plot.errors.boot.num",
       "plot.errors.boot.nonfixed", "plot.errors.boot.wild",
       "plot.errors.boot.blocklen", "plot.errors.boot.calibration")
-    coefficient.inference <- any(coefficient.inference.args %in% names(dots))
+    coefficient.inference <- !is.null(dots[["interval", exact = TRUE]]) ||
+      any(coefficient.inference.args %in% names(dots))
     if (inherits(bws, "scbandwidth") &&
         ((!is.null(coefficient.errors) && !identical(coefficient.errors, "none")) ||
          coefficient.inference))
@@ -611,6 +609,18 @@ np_render_control <- function(style = c("band", "bar"),
       (identical(method, .np_plot_compat_dispatch) &&
        (inherits(bws, "rbandwidth") || inherits(bws, "bandwidth") ||
         inherits(bws, "dbandwidth"))))
+  selection <- dots[[".np.interval.request", exact = TRUE]]
+  if (inherits(bws, "bandwidth") && isTRUE(selection$interval %in% c("symmetric-sd", "asymmetric-sd")) &&
+      !"band" %in% selection$supplied && identical(dots$plot.errors.method, "bootstrap")) {
+    control <- dots[["bias.control", exact = TRUE]]
+    center <- dots$plot.errors.center
+    calibration <- dots$plot.errors.boot.calibration
+    if (.np_udens_compact_request(bws, control, center, "bootstrap", calibration, TRUE) ||
+        .np_udens_compact_q2_request(bws, control, center, "bootstrap", "pointwise", calibration, TRUE) ||
+        .np_udens_fgd_request(bws, control, center, "bootstrap", calibration) ||
+        .np_udens_beta_request(bws, control, center, "bootstrap"))
+      stop("this bounded density bootstrap construction requires an explicit band scope", call. = FALSE)
+  }
   if (identical(dots[["plot.errors.boot.method", exact=TRUE]], "smoothed-q6"))
     .np_udens_q6_public_spec(bws, dots[["plot.errors.boot.calibration", exact=TRUE]],
       dots[["plot.errors.type", exact=TRUE]])
@@ -705,6 +715,9 @@ np_render_control <- function(style = c("band", "bar"),
     }
   }
 
+  family.request <- dots[[".np.interval.request", exact = TRUE]]
+  dots$.np.interval.request <- NULL
+  if (!is.null(family.request)) attr(dots, "np.family.interval") <- family.request
   if (!is.null(.np.reg.request)) attr(dots,"np.reg.interval") <- .np.reg.request
   .np_plot_rng_replay_preflight(method, bws, dots)
 
@@ -2295,7 +2308,7 @@ np_render_control <- function(style = c("band", "bar"),
   if (any(!nzchar(dot.names)))
     stop("unnamed plot arguments are not supported for plot.conmode",
          call. = FALSE)
-  interval.args <- c("errors", "band", "alpha", "gaussian.draws", "bootstrap", "B", "center",
+  interval.args <- c("errors", "interval", "band", "alpha", "gaussian.draws", "bootstrap", "B", "center",
                      "render.control",
                      "boot.control", "plot.errors.method", "plot.errors.type",
                      "plot.errors.alpha", "plot.errors.boot.method",
@@ -2320,6 +2333,8 @@ np_render_control <- function(style = c("band", "bar"),
   dots$perspective <- NULL
   dots$persp <- NULL
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.conmode")
+  family.request <- dots[[".np.interval.request", exact = TRUE]]
+  dots$.np.interval.request <- NULL
   if (!is.null(perspective.raw))
     dots$perspective <- perspective.raw
   if (!is.null(persp.raw))
@@ -2509,6 +2524,7 @@ np_render_control <- function(style = c("band", "bar"),
       list(errors = errors, band = band, alpha = alpha, center = center,
            bootstrap = bootstrap, B = B, gradients = gradients, view = view,
            gaussian_draws = gaussian.draws, random_seed = random.seed), gradients = gradients,
+      interval.request = family.request,
       style = dots[intersect(names(dots), c("xlim", "ylim", "zlim",
                                           "xlab", "ylab", "zlab", "main"))]) else NULL
 

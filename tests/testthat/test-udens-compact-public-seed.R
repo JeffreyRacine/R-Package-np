@@ -12,7 +12,7 @@ test_that("public compact bands use the recorded child seed", {
         neval = 3L, output = "data", random.seed = 19L, alpha = .1)
       if (variant == "asymptotic") args$gaussian.draws <- 9L else {
         args$bootstrap <- "inid"; args$B <- 9L
-        args$boot.control <- np_boot_control(calibration = variant)
+        args$interval <- variant
       }
       actual <- suppressWarnings(do.call(plot, args))
       panel <- actual$panels[[1L]]

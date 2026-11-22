@@ -78,9 +78,9 @@ test_that("single-index fixed wild bootstrap forced block path is finite", {
   ))
 
   expect_equal(length(plot_target(out)$estimate), 23L)
-  expect_equal(dim(plot_band(out, "pmzsd")), c(23L, 2L))
+  expect_equal(dim(plot_band(out, "pointwise")), c(23L, 2L))
   expect_true(all(is.finite(plot_target(out)$estimate)))
-  expect_true(all(is.finite(plot_band(out, "pmzsd"))))
+  expect_true(all(is.finite(plot_band(out, "pointwise"))))
 })
 
 test_that("single-index range-bounded wild bootstrap uses scalar-index bounds", {

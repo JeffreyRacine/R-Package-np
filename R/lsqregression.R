@@ -978,6 +978,9 @@ plot.lsqregression <- function(x, tau = NULL, gradients = FALSE,
     ),
     dots
   )
+  family.request <- args[[".np.interval.request", exact = TRUE]]
+  args$.np.interval.request <- NULL
+  attr(args, "np.family.interval") <- family.request
   publisher <- .npreg_plot_empty_publisher("plot.nplsqreg")
   args$.np.empty.report <- publisher$record
   value <- .npreg_finish_plot_call(

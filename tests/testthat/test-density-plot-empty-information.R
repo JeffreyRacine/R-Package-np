@@ -27,9 +27,11 @@ test_that("empty density windows retain their grid with undefined uncertainty", 
   b <- npudensbw(dat=x,bws=.08,ckertype="uniform",bandwidth.compute=FALSE)
   f <- npudens(bws=b,tdat=x); saved <- f
   for (alpha in c(.05,.1)) for (band in c("pointwise","pmzsd","bonferroni","simultaneous","all")) {
-    p <- suppressWarnings(plot(f,neval=21,errors="asymptotic",band=band,
+    interval <- if (band == "pmzsd") "normal-sd" else NULL
+    scope <- if (band == "pmzsd") "pointwise" else band
+    p <- suppressWarnings(plot(f,neval=21,errors="asymptotic",band=scope,interval=interval,
                                alpha=alpha,output="data"))
-    bands <- if(band=="all")c("pointwise","bonferroni","simultaneous") else band
+    bands <- if(band=="all")c("pointwise","bonferroni","simultaneous") else scope
     for (which in bands) {
       d <- as.data.frame(p,panel=1,band=which)
       empty <- vapply(d$eval_1,function(z) all(abs(x$x-z)>.08),logical(1))

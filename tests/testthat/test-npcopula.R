@@ -382,7 +382,7 @@ test_that("npcopula plot intervals work for grid surfaces", {
     expect_equal(nrow(as.data.frame(asym, band = band)), nrow(as.data.frame(fit)))
 
   boot <- plot(fit, output = "data", errors = "bootstrap",
-               bootstrap = "inid", B = 3, band = "pmzsd")
+               bootstrap = "inid", B = 3, band = "pointwise", interval = "normal-sd")
   boot <- as.data.frame(boot)
   expect_true(all(c("estimate", "lower", "upper") %in% names(boot)))
   expect_equal(nrow(boot), nrow(as.data.frame(fit)))
@@ -397,7 +397,7 @@ test_that("npcopula plot intervals work for grid surfaces", {
     n.quasi.inv = 40
   )
   dens <- plot(dens.fit, output = "data", errors = "bootstrap",
-               bootstrap = "inid", B = 3, band = "pmzsd")
+               bootstrap = "inid", B = 3, band = "pointwise", interval = "normal-sd")
   dens <- as.data.frame(dens)
   expect_true(all(c("estimate", "lower", "upper") %in% names(dens)))
   expect_equal(nrow(dens), nrow(as.data.frame(dens.fit)))
@@ -484,7 +484,7 @@ test_that("npcopula bootstrap plot uses MPI fanout", {
   )
 
   out <- plot(fit, output = "data", errors = "bootstrap",
-              bootstrap = "inid", B = 8, band = "pmzsd")
+              bootstrap = "inid", B = 8, band = "pointwise", interval = "normal-sd")
   expect_equal(nrow(as.data.frame(out)), nrow(as.data.frame(fit)))
   expect_true(file.exists(trace.file))
   trace <- readLines(trace.file, warn = FALSE)

@@ -65,10 +65,10 @@ test_that("transformed copula formula keeps grid SE and prediction geometry", {
     expect_identical(predict(named, newdata = u, se.fit = TRUE, n.quasi.inv = 30L),
       predict(control, newdata = u, se.fit = TRUE, n.quasi.inv = 30L))
     set.seed(100)
-    a <- plot(named, output = "data", errors = "bootstrap", band = "pmzsd", B = 5L)
+    a <- plot(named, output = "data", errors = "bootstrap", band = "pointwise", interval = "normal-sd", B = 5L)
     rng <- .Random.seed
     set.seed(100)
-    b <- plot(control, output = "data", errors = "bootstrap", band = "pmzsd", B = 5L)
+    b <- plot(control, output = "data", errors = "bootstrap", band = "pointwise", interval = "normal-sd", B = 5L)
     expect_identical(unname(as.matrix(as.data.frame(a)[c("estimate", "lower", "upper")])),
                      unname(as.matrix(as.data.frame(b)[c("estimate", "lower", "upper")])))
     expect_identical(.Random.seed, rng)

@@ -175,8 +175,8 @@
   if (!identical(law, "smoothed-beta-binomial")) return(invisible(FALSE))
   if (!isTRUE(allow)) stop("smoothed-beta-binomial is available only for supported unconditional density plots", call. = FALSE)
   ctrl <- dots[["boot.control", exact = TRUE]]
-  calibration <- if (!is.null(ctrl)) .np_plot_boot_calibration(ctrl) else
-    dots[["plot.errors.boot.calibration", exact = TRUE]]
+  calibration <- dots[["plot.errors.boot.calibration", exact = TRUE]]
+  if (is.null(calibration) && !is.null(ctrl)) calibration <- .np_plot_boot_calibration(ctrl)
   if (!identical(value("errors", "plot.errors.method"), "bootstrap") ||
       !identical(value("center", "plot.errors.center"), "bias-corrected") ||
       !isTRUE(value("band", "plot.errors.type") %in% c("pointwise", "simultaneous", "bonferroni", "all")) ||

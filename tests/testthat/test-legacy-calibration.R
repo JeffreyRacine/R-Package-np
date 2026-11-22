@@ -1,5 +1,5 @@
 test_that("legacy calibration resolves only the retained family controls", {
-  control <- np_boot_control(calibration="legacy")
+  control <- historical_boot_control(calibration="legacy")
   expect_identical(.np_plot_boot_calibration(control),"legacy")
   constructors <- list(regression=np_bias_control,density=np_udens_bias_control,
                        distribution=np_udist_bias_control)

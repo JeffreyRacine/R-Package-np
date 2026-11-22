@@ -4,7 +4,7 @@ test_that("bootstrap calibration validates names and preserves old controls", {
   old <- np_boot_control();old$calibration <- NULL
   expect_identical(.np_plot_boot_calibration(old),"default")
   for (cal in c("absolute","separate-tails","tail-envelope"))
-    expect_identical(np_boot_control(calibration=cal)$calibration,cal)
+    expect_identical(historical_boot_control(calibration=cal)$calibration,cal)
   expect_error(np_boot_control(calibration="rank"),"calibration")
   expect_error(np_boot_control(calibration=NULL),"calibration")
   old$calibration <- c("default","absolute")
@@ -57,12 +57,13 @@ test_that("certified zero targets can share active family cutoffs", {
 
 
 test_that("calibration attributes do not change the selected construction", {
-  choices <- eval(formals(np_boot_control)$calibration)
+  choices <- c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope",
+    "basic-local-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy")
   for (cal in choices) {
     for (value in list(cal, setNames(cal, "label"),
                        structure(cal, class="calibration_label"),
                        matrix(cal, 1L, 1L))) {
-      control <- np_boot_control(calibration=cal)
+      control <- historical_boot_control(calibration=cal)
       control$calibration <- value
       before <- control
       expect_identical(.np_plot_boot_calibration(control), cal)

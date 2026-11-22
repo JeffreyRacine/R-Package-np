@@ -47,15 +47,15 @@ test_that("paired-log guide adapter preserves the ordinary complete fit", {
 test_that("beta-binomial admission adds only its explicit statistical tuple", {
   dots <- list(errors="bootstrap",bootstrap="smoothed-beta-binomial",
     center="bias-corrected",band="all",B=39L,
-    boot.control=np_boot_control(calibration="symmetric-sd"))
+    plot.errors.boot.calibration="symmetric-sd")
   expect_true(.np_udens_bb_options(dots,TRUE))
   expect_error(.np_udens_bb_options(dots,FALSE),"unconditional density")
-  for(key in c("errors","center","band","boot.control")) {
+  for(key in c("errors","center","band","plot.errors.boot.calibration")) {
     bad <- dots;bad[[key]] <- NULL
     expect_error(.np_udens_bb_options(bad,TRUE),"requires explicit")
   }
   for(cal in c("asymmetric-sd","default","absolute","smoothed-percentile")) {
-    bad <- dots;bad$boot.control <- np_boot_control(calibration=cal)
+    bad <- dots;bad$plot.errors.boot.calibration <- cal
     expect_error(.np_udens_bb_options(bad,TRUE),"symmetric-sd")
   }
   for(band in c("pointwise","simultaneous","bonferroni","all")) {

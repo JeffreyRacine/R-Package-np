@@ -16,11 +16,12 @@ test_that("corrected density legacy rejects a deterministic full circular block"
   for(k in names(settings)) {
     a<-settings[[k]];bw<-npudensbw(dat=a$x,bws=a$b,bwtype=a$type,bandwidth.compute=FALSE);fit<-npudens(bw,tdat=a$x)
     before<-serialize(fit,NULL)
-    for(band in c("pointwise","bonferroni","simultaneous","all","pmzsd"))for(selector in 1:2) {
-      ctrl<-if(selector==1L)list(boot.control=np_boot_control(calibration="legacy",blocklen=n)) else list(bias.control=np_udens_bias_control("legacy"),boot.control=np_boot_control(blocklen=n))
+    for(band in c("pointwise","bonferroni","simultaneous","all","pmzsd")) {
+      ctrl<-list(bias.control=np_udens_bias_control("legacy"),boot.control=np_boot_control(blocklen=n))
       set.seed(7301);seed<-.Random.seed
       args<-c(list(x=fit,errors="bootstrap",bootstrap="fixed",center="bias-corrected",B=79L,neval=5L,perspective=FALSE,band=band,output="data"),ctrl)
-      expect_error(do.call(plot,args),"fixed block length equal to sample size has no resampling variation",fixed=TRUE,info=paste(k,band,selector))
+      if (band=="pmzsd") { args$band <- "pointwise"; args$interval <- "normal-sd" }
+      expect_error(do.call(plot,args),"fixed block length equal to sample size has no resampling variation",fixed=TRUE,info=paste(k,band))
       expect_identical(.Random.seed,seed);expect_identical(serialize(fit,NULL),before)
     }
   }

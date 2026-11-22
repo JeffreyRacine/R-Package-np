@@ -63,6 +63,6 @@ test_that("ordinary fixed Epanechnikov default uses the explicit complete family
   expect_error(run(interval="basic-envelope"),"requires inid")
   symmetric <- run(interval="symmetric-sd")
   expect_identical(symmetric$provider[[1L]]$inference$calibration.method,"absolute")
-  expect_error(run(np_boot_control(calibration="absolute")), "use interval='symmetric-sd'", fixed=TRUE)
-  expect_error(run(np_boot_control(calibration="default")), "omit interval", fixed=TRUE)
+  expect_error(run(historical_boot_control(calibration="absolute")), "use interval='symmetric-sd'", fixed=TRUE)
+  expect_error(run(historical_boot_control(calibration="default")), "omit interval", fixed=TRUE)
 })

@@ -234,6 +234,7 @@
 .np_plot_data_from_engine <- function(raw, bws, options, method = NULL) {
   request <- .np_plot_data_request(options, method)
   family <- .np_plot_data_engine_family(bws)
+  family.request <- attr(options, "np.family.interval", exact = TRUE)
   reg.request <- attr(options,"np.reg.interval",exact=TRUE)
   if (!is.null(reg.request)) {
     recipe <- attr(raw,"np.reg.recipe",exact=TRUE)
@@ -418,6 +419,9 @@
       if (!is.null(reg.request)) {
         meta <- .np_reg_interval_components(meta,recipe,names(bands),reg.request$interval,inf,interval,gradient,n)
         if (identical(recipe$band,"pmzsd")) interval$band[] <- "pointwise"
+      } else if (!is.null(family.request)) {
+        meta <- .np_plot_family_components(meta, interval, request)
+        interval$band[interval$band == "pmzsd"] <- "pointwise"
       }
       values <- rbind(values, value); intervals <- rbind(intervals, interval)
       inference[[owner]] <- meta
@@ -430,11 +434,8 @@
     panels[[panel_id]] <- .np_plot_data_panel(coordinates$grid, coordinates$roles,
       values, intervals, display)
   }
-  if (!is.null(reg.request)) {
-    if (identical(request$band,"pmzsd")) request$band <- "pointwise"
-    request["interval"] <- list(reg.request$interval)
-    request$supplied <- union(setdiff(request$supplied,c("band","interval","boot.control")),reg.request$supplied)
-  }
+  if (!is.null(family.request)) request <- .np_plot_family_request_record(request, family.request)
+  if (!is.null(reg.request)) request <- .np_plot_family_request_record(request, reg.request)
   .np_plot_data(family, request, panels, targets, inference, families)
 }
 
@@ -466,7 +467,7 @@
   out
 }
 
-.np_plot_data_from_conmode <- function(raw, request, gradients = FALSE, style = list()) {
+.np_plot_data_from_conmode <- function(raw, request, gradients = FALSE, style = list(), interval.request = NULL) {
   style <- style[!vapply(style, is.null, logical(1L))]
   panels <- list(); targets <- .np_plot_data_targets(); inference <- families <- list(); exclusions <- list()
   surface <- !is.null(raw$surface) && !is.null(raw$grid)
@@ -517,11 +518,11 @@
     }
     panels[[panel_id]] <- .np_plot_data_panel(grid, rep("X", ncol(grid)), values, intervals, display)
   }
-  .np_plot_data("npconmode", request, panels, targets, inference, families,
+  .np_plot_data_direct(interval.request, "npconmode", request, panels, targets, inference, families,
                 family_exclusions = exclusions)
 }
 
-.np_plot_data_from_copula <- function(raw, request, density = FALSE, view = "surface", style = list()) {
+.np_plot_data_from_copula <- function(raw, request, density = FALSE, view = "surface", style = list(), interval.request = NULL) {
   style <- style[!vapply(style, is.null, logical(1L))]
   frames <- if (is.data.frame(raw)) setNames(list(raw), view) else raw
   panels <- list(); targets <- .np_plot_data_targets(); inference <- families <- list()
@@ -553,7 +554,7 @@
     if (length(style)) display$style <- style
     panels[[panel_id]] <- .np_plot_data_panel(grid, rep("probability", 2L), values, intervals, display)
   }
-  .np_plot_data("npcopula", request, panels, targets, inference, families)
+  .np_plot_data_direct(interval.request, "npcopula", request, panels, targets, inference, families)
 }
 
 .np_plot_data_from_iv <- function(spec, variable) {
@@ -571,4 +572,23 @@
     .np_plot_data_empty_intervals(), display)
   .np_plot_data(spec$family, list(errors = "none", gradients = spec$gradients),
     list(panel_1 = panel), target)
+}
+
+.np_plot_data_direct <- function(interval.request, family, request, panels, targets,
+                                 inference, families, family_exclusions = list()) {
+  if (!is.null(interval.request)) {
+    for (pid in names(panels)) {
+      tab <- panels[[pid]]$intervals
+      for (tid in unique(tab$target_id)) {
+        owner <- targets$inference_id[match(tid, targets$target_id)]
+        inference[[owner]] <- .np_plot_family_components(inference[[owner]],
+          tab[tab$target_id == tid, , drop = FALSE], request)
+      }
+      tab$band[tab$band == "pmzsd"] <- "pointwise"
+      panels[[pid]]$intervals <- tab
+    }
+    request <- .np_plot_family_request_record(request, interval.request)
+  }
+  .np_plot_data(family, request, panels, targets, inference, families,
+                family_exclusions = family_exclusions)
 }

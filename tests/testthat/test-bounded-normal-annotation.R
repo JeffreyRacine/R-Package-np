@@ -15,7 +15,7 @@ test_that("bounded normal public bands are annotated as asymptotic SE intervals"
       ckertype=kernel,ckerbound="fixed",ckerlb=0,ckerub=1)
     seen <- list()
     z <- plot(bw,xdat=data.frame(x=x),errors="asymptotic",center="bias-corrected",
-      band="pmzsd",neval=3L,output="plot-data")
+      band = "pointwise", interval = "normal-sd",neval=3L,output="plot-data")
     expect_s3_class(z,"np_plot_data")
     expect_gt(length(seen),0L)
     labels <- unlist(lapply(seen,`[[`,"candidates"))

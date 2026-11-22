@@ -1,5 +1,5 @@
 test_that("selected asymmetric companions admit only their explicit public choices", {
-  a<-list(errors="bootstrap",bootstrap="smoothed-q6",center="bias-corrected",band="all",boot.control=np_boot_control(calibration="asymmetric-sd"))
+  a<-list(errors="bootstrap",bootstrap="smoothed-q6",center="bias-corrected",band="all",plot.errors.boot.calibration="asymmetric-sd")
   for(band in c("pointwise","simultaneous","bonferroni","all")){a$band<-band;expect_true(.np_udens_q6_options(a,TRUE))}
   for(band in c("pmzsd","none",NA_character_)){a$band<-band;expect_error(.np_udens_q6_options(a,TRUE),"requires explicit")}
   for(value in list(c(named="asymmetric-sd"),c(named="symmetric-sd"),factor("asymmetric-sd"),c("asymmetric-sd","asymmetric-sd"),NA_character_,list("asymmetric-sd"))){

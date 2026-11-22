@@ -93,7 +93,7 @@ test_that("Rademacher defaults preserve the declared law and resolve once", {
     if(kernel=="beta")args<-c(args,list(ckerbound="fixed",ckerlb=-1,ckerub=1));bw<-do.call(npregbw,args);held.bw<-bw
     set.seed(112871L);held<-.Random.seed
     run<-function(control,interval=NULL){hits$n<-0L;z<-capture_plot_provider(plot(bw,xdat=x,ydat=y,errors="bootstrap",center="bias-corrected",band="all",B=63L,neval=3L,alpha=.1,output="data",boot.control=control,interval=interval));expect_identical(hits$n,1L);z}
-    automatic<-run(np_boot_control(wild="rademacher"));expect_error(run(np_boot_control(wild="rademacher",calibration="default")),"rebuild boot.control");explicit<-run(np_boot_control(wild="rademacher"),interval="asymmetric-sd-envelope")
+    automatic<-run(np_boot_control(wild="rademacher"));expect_error(run(historical_boot_control(wild="rademacher",calibration="default")),"rebuild boot.control");explicit<-run(np_boot_control(wild="rademacher"),interval="asymmetric-sd-envelope")
     a<-automatic$provider[[1L]]$inference;e<-explicit$provider[[1L]]$inference
     expect_identical(a$calibration.requested,"default");expect_identical(a$calibration.method,"tail-envelope");a$calibration.requested<-e$calibration.requested;expect_identical(a,e)
     expect_identical(automatic$result$panels,explicit$result$panels)
