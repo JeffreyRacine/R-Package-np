@@ -42,7 +42,8 @@ np_boot_control <- function(nonfixed = c("exact", "frozen"),
                             wild = c("mammen", "rademacher"),
                             blocklen = NULL,
                             calibration = c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "basic-local-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy")) {
-  calibration <- if (missing(calibration)) "default" else
+  calibration.supplied <- !missing(calibration)
+  calibration <- if (!calibration.supplied) "default" else
     .np_plot_scalar_match(calibration,
       c("default", "absolute", "separate-tails", "tail-envelope", "basic-envelope", "basic-local-envelope", "percentile-tails", "symmetric-sd", "asymmetric-sd", "smoothed-percentile", "legacy"), "calibration")
   if (is.null(calibration)) stop("calibration must be a single supported name", call. = FALSE)
@@ -50,7 +51,8 @@ np_boot_control <- function(nonfixed = c("exact", "frozen"),
   wild <- match.arg(wild)
   blocklen <- .np_plot_validate_count(blocklen, "blocklen")
   structure(
-    list(nonfixed = nonfixed, wild = wild, blocklen = blocklen, calibration = calibration),
+    c(list(nonfixed = nonfixed, wild = wild, blocklen = blocklen),
+      if (calibration.supplied) list(calibration = calibration)),
     class = "np_boot_control"
   )
 }
@@ -267,6 +269,9 @@ np_render_control <- function(style = c("band", "bar"),
   if (any(!nzchar(dot.names)))
     stop(sprintf("unnamed plot arguments are not supported for %s", context),
          call. = FALSE)
+  regression <- context %in% c("plot.npregression", "plot.rbandwidth")
+  if (regression && "intervals" %in% dot.names)
+    stop("unused plot argument: intervals; did you mean interval?", call. = FALSE)
   if ("intervals" %in% dot.names)
     stop("unused plot argument: intervals; did you mean errors?",
          call. = FALSE)
@@ -277,6 +282,7 @@ np_render_control <- function(style = c("band", "bar"),
     stop("unused plot argument: bands; did you mean band?",
          call. = FALSE)
   canonical <- .np_plot_canonical_arg_names()
+  if (regression) canonical <- c(canonical,"interval")
   engine <- .np_plot_allowed_engine_args(method = method, bws = bws)
   engine <- setdiff(engine, .np_plot_legacy_arg_names())
   allowed <- unique(c(canonical, "random.seed", engine,
@@ -542,7 +548,7 @@ np_render_control <- function(style = c("band", "bar"),
   dots
 }
 
-.np_plot_call_method <- function(method, bws, ..., .plot_dots_call = NULL,
+.np_plot_call_method <- function(method, bws, ..., .plot_dots_call = NULL, .np.reg.request = NULL,
                                  .plot_context = "plot") {
   .np_plot_validate_public_dots(
     .plot_dots_call,
@@ -551,6 +557,11 @@ np_render_control <- function(style = c("band", "bar"),
     context = .plot_context
   )
   dots <- .np_plot_unique_args(list(...))
+  if (identical(.plot_context,"plot.rbandwidth")) {
+    resolved <- .np_reg_interval_request(dots)
+    dots <- resolved$dots
+    .np.reg.request <- resolved$request
+  }
   if (isTRUE(dots$coef)) {
     # Fitted wrappers have already normalized these request fields; bandwidth
     # wrappers have not. Apply the same display-only policy at this shared owner.
@@ -657,6 +668,7 @@ np_render_control <- function(style = c("band", "bar"),
       dots$view <- "fixed"
   }
 
+  if (!is.null(.np.reg.request)) attr(dots,"np.reg.interval") <- .np.reg.request
   .np_plot_rng_replay_preflight(method, bws, dots)
 
   owns.empty.rows <- identical(method, .np_plot_rbandwidth_engine) ||
@@ -863,7 +875,8 @@ np_render_control <- function(style = c("band", "bar"),
     bws = object$bws,
     context = "plot.npregression"
   )
-  dots <- list(...)
+  resolved <- .np_reg_interval_request(.np_plot_unique_args(list(...)))
+  dots <- resolved$dots
   dots <- .np_plot_normalize_public_dots(dots, context = "plot.npregression",
     allow_asymptotic_bias = TRUE, allow_basic_local_envelope = TRUE)
   if (is.null(dots$xdat) && is.null(dots$ydat))
@@ -886,7 +899,7 @@ np_render_control <- function(style = c("band", "bar"),
     dots$fit.mean.train <- object$mean
   }
 
-  do.call(.np_plot_from_slot, .np_plot_literal_labels(c(list(object = object, slot = "bws"), dots)))
+  do.call(.np_plot_from_slot, .np_plot_literal_labels(c(list(object = object, slot = "bws", .np.reg.request = resolved$request), dots)))
 }
 .np_plot_npdensity <- function(object, ..., .plot_dots_call = NULL) {
   .np_plot_validate_public_dots(
