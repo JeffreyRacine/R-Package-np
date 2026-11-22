@@ -352,7 +352,8 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked_precision(
   const double *basis_eval,
   double *row_out,
   size_t output_stride,
-  int support_rank, NPRegressionPrecision *precision, double **columns)
+  int support_rank, NPRegressionPrecision *precision, double **columns,
+  int zero_ridge_only)
 {
   NPReghatLPRowStatus status;
   int observation;
@@ -370,7 +371,7 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked_precision(
     precision ? &anchor : NULL, precision ? &ridge : NULL);
   if(status != NP_REGHAT_LP_ROW_OK)
     return status;
-  if(precision != NULL &&
+  if(precision != NULL && (!zero_ridge_only || ridge == 0.0) &&
      np_regression_precision_needed(&workspace->solve_workspace, workspace->nterms)) {
     if(!np_regression_precision_factor(precision, columns, weights, workspace->ntrain,
                                        workspace->nterms, ridge, anchor) ||
@@ -400,7 +401,7 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked(
   int support_rank)
 {
   return np_reghat_lp_workspace_influence_row_ranked_precision(workspace, weights,
-    basis_eval, row_out, output_stride, support_rank, NULL, NULL);
+    basis_eval, row_out, output_stride, support_rank, NULL, NULL, 0);
 }
 
 /* Search consumers deliberately retain their incumbent numerical admission.

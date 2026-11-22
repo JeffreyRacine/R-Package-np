@@ -24068,6 +24068,26 @@ static void np_regression_general_lp_fit_owner_cleanup(
 }
 
 
+/* Fully pooled Aitchison-Aitken factors give every donor the same
+ * categorical weight. The continuous GNN row still uses the fitted radius. */
+static int np_pooled_beta_linear_precision(const NPContinuousKernelRoute *route,
+  int bandwidth_mode, int ncon, int nuno, int nord, const int *kernels,
+  const double *lambda, const int *levels)
+{
+  if(route == NULL || bandwidth_mode != BW_GEN_NN || ncon != 1 ||
+     nuno < 2 || nord != 0 || kernels == NULL || lambda == NULL ||
+     levels == NULL || vector_glp_degree_extern == NULL ||
+     vector_glp_degree_extern[0] != 1 || route->segment_count != 1 ||
+     route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
+     route->segment[0].descriptor.order != 2)
+    return 0;
+  for(int j = 0; j < nuno; ++j)
+    if(kernels[j] != UKERNEL_UAA || levels[j] < 2 ||
+       np_uaa(1, lambda[j], levels[j]) != np_uaa(0, lambda[j], levels[j]))
+      return 0;
+  return 1;
+}
+
 /* Scoped precision sibling. Accepted rank/ridge and all incumbent kernel/tree
  * selection remain upstream. Continuous second-order GNN rows use their own
  * target radius; conditional, categorical and signed owners are unchanged. */

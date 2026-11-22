@@ -32,6 +32,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     num_reg_continuous_extern == 1 && !num_reg_unordered_extern && !num_reg_ordered_extern &&
     vector_glp_degree_extern != NULL && vector_glp_degree_extern[0] == 2 &&
     kernel_route->segment_count == 1 && kernel_route->segment[0].descriptor.order == 2;
+  int pooled_beta = 0;
   NPBetaScaledRowContext beta_row_context;
   double *eval_basis = NULL;
   NPConditionalBoundState bounds_state;
@@ -342,6 +343,9 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   np_lp_design_support_prepare(&design_support, np_glp_cv_cache.basis,
                                 num_train, np_glp_cv_cache.nterms);
   if(kernel_route != NULL) {
+    pooled_beta = deriv_order == 0 && np_pooled_beta_linear_precision(kernel_route,
+      BANDWIDTH_den_extern, num_reg_continuous_extern, num_reg_unordered_extern,
+      num_reg_ordered_extern, kernel_ux, lambdax, num_categories_extern_X);
     if(np_reghat_lp_workspace_prepare_columns(
          &reghat_workspace, np_glp_cv_cache.basis, num_train,
          np_glp_cv_cache.nterms) != NP_REGHAT_LP_ROW_OK)
@@ -429,7 +433,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
            (size_t)num_eval,
            np_lp_rank_upper_bound_from_design(
              kw, num_train, np_glp_cv_cache.nterms, &design_support),
-           precise_beta_ann ? &precision : NULL, np_glp_cv_cache.basis) != NP_REGHAT_LP_ROW_OK) {
+           (precise_beta_ann || pooled_beta) ? &precision : NULL, np_glp_cv_cache.basis,
+           pooled_beta) != NP_REGHAT_LP_ROW_OK) {
         if(np_lp_failed_system_is_finite(&reghat_workspace.solve_workspace,
              np_glp_cv_cache.nterms, 1) &&
            np_lp_record_empty_row(kw, num_train, i, num_eval, num_train,
