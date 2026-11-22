@@ -106,14 +106,12 @@ test_that("row-purpose dots preserve promise ownership and single evaluation", {
 })
 
 test_that("autodispatch remote references are reused only while value-current", {
-  reset <- getFromNamespace(".npRmpi_lease_reset_local", "npRmpi")
+  local_test_lease_state()
   plan <- getFromNamespace(".npRmpi_lease_publication_plan", "npRmpi")
   prepare <- getFromNamespace(".npRmpi_lease_prepare_local", "npRmpi")
   commit <- getFromNamespace(".npRmpi_lease_commit_local", "npRmpi")
   tag <- getFromNamespace(".npRmpi_autodispatch_tag_result", "npRmpi")
   current <- getFromNamespace(".npRmpi_autodispatch_ref_is_current", "npRmpi")
-  reset()
-  on.exit(reset(), add = TRUE)
 
   value <- structure(list(bws = c(1, 2), degree = c(1L, 1L)), class = "rbandwidth")
   publication <- plan(quote(npregbw(xdat = x, ydat = y)))

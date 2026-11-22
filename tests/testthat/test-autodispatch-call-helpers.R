@@ -122,12 +122,11 @@ test_that("autodispatch return rewriting covers all coordinator replacements", {
 })
 
 test_that("public lease commit is fused into payload execution while scoped commit remains collective", {
+  local_test_lease_state()
   reset <- getFromNamespace(".npRmpi_lease_reset_local", "npRmpi")
   plan <- getFromNamespace(".npRmpi_lease_publication_plan", "npRmpi")
   eval.payload <- getFromNamespace(".npRmpi_spmd_eval_payload", "npRmpi")
   state <- getFromNamespace(".npRmpi_lease_state", "npRmpi")
-  reset()
-  on.exit(reset(), add = TRUE)
 
   public.plan <- plan(quote(npregbw(xdat = x, ydat = y)))
   public.out <- eval.payload(
@@ -188,12 +187,10 @@ test_that("autodispatch prepublishes large implicit formula data", {
 test_that("autodispatch reuses semiparametric remote bandwidth references", {
   withr::local_options(npRmpi.autodispatch.arg.broadcast.threshold.regression = 1L)
 
-  reset <- getFromNamespace(".npRmpi_lease_reset_local", "npRmpi")
+  local_test_lease_state()
   plan <- getFromNamespace(".npRmpi_lease_publication_plan", "npRmpi")
   prepare <- getFromNamespace(".npRmpi_lease_prepare_local", "npRmpi")
   commit <- getFromNamespace(".npRmpi_lease_commit_local", "npRmpi")
-  reset()
-  on.exit(reset(), add = TRUE)
 
   env <- new.env(parent = .GlobalEnv)
   env$sibw <- structure(
