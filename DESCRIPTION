@@ -1,6 +1,6 @@
 Package: npRmpi
 Version: 0.80-3
-Date: 2026-11-17
+Date: 2026-11-22
 Depends: R (>= 3.5.0)
 Imports: compiler, boot, methods, quadprog, quantreg, matrixStats (>= 1.0.0), stats, parallel, tools, crs (>= 0.15-46)
 SystemRequirements: MPI
