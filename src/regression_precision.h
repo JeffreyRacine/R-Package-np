@@ -10,6 +10,11 @@ typedef struct {
   int pivot_capacity;
   double *tau, *scale, *sw, *u, *row;
   double max_weight, root_ridge, anchor;
+  /* The seven-column cubic-by-linear GLP may have one algebraic alias
+   * on three rounded abscissae. All other precision owners leave this off. */
+  int check_cubic_support, cubic_alias;
+  int cubic_columns[4];
+  double cubic_levels[3][4];
   const double *weights;
 } NPRegressionPrecision;
 void np_regression_precision_init(NPRegressionPrecision *q);
