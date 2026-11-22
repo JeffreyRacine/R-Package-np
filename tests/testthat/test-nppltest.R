@@ -41,3 +41,28 @@ test_that("selected angular columns reproduce every serial entry in anchor order
   }
   expect_error(.Call(C_np_pltest_angle_columns, V, c(0L, 1L)), "column index")
 })
+
+test_that("Sobol prefixes use a fixed shift and tied empirical thresholds", {
+  expect_identical(formals(nppltest)$directions, 2048L)
+  expect_error(nppltest(NULL, directions = 0), "directions must")
+  expect_error(nppltest(NULL, directions = 1.5), "directions must")
+  expect_error(nppltest(NULL, directions = 2, integration = "exact"), "only")
+  expect_error(.pltest_sobol_directions(1L, 1112L), "1111")
+
+  set.seed(65)
+  state <- .Random.seed
+  V <- cbind(c(0, 0, 1, 2), c(1, 1, 0, 0))
+  directions <- .pltest_sobol_directions(23L, 2L)
+  expect_identical(directions[1:5, ], .pltest_sobol_directions(5L, 2L))
+  expect_identical(state, .Random.seed)
+  E <- cbind(c(2, -1, 3, -2), c(-1, 4, 1, 0))
+  direct <- vapply(seq_len(nrow(directions)), function(j) {
+    z <- drop(V %*% directions[j, ])
+    colSums((outer(z, z, ">=") %*% E / nrow(E))^2)
+  }, numeric(ncol(E)))
+  expect_equal(.pltest_direction_scores(E, V, directions), rowMeans(direct), tolerance = 1e-13)
+  expect_equal(.pltest_direction_scores(E * 1e150, V, directions) / 1e300,
+               rowMeans(direct), tolerance = 1e-13)
+  expect_equal(.pltest_direction_scores(E * 1e-150, V, directions) / 1e-300,
+               rowMeans(direct), tolerance = 1e-13)
+})

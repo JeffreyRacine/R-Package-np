@@ -1,8 +1,18 @@
 # Statistic: Sun, Chen, Liang and Ruppert (2021), doi:10.5705/ss.202019.0238.
-.pltest_coordinates <- function(predictors, standardize) {
+.pltest_coordinates <- function(predictors, standardize, compact = FALSE) {
   columns <- lapply(predictors, function(x) {
     if (is.factor(x) && !is.ordered(x)) {
       code <- as.integer(droplevels(x))
+      if (compact) {
+        levels <- max(code)
+        if (levels == 1L) return(NULL)
+        if (levels == 2L) return(code - 1.5)
+        if (levels > 1112L)
+          stop("Too many unordered levels for Sobol integration; use integration = 'exact'.", call. = FALSE)
+        j <- seq_len(levels - 1L)
+        basis <- sweep(stats::contr.helmert(levels), 2L, sqrt(2 * j * (j + 1)), "/")
+        return(basis[code, , drop = FALSE])
+      }
       return(outer(code, seq_len(max(code)), "==") / sqrt(2))
     }
     v <- as.numeric(x)
@@ -224,21 +234,154 @@
 }
 
 .pltest_block_statistics <- function(u, H, A, center, amplitude, boot.method) {
+  e <- .pltest_residual_block(u, H, center, amplitude, boot.method)
+  colSums(e*(A %*% e))
+}
+
+# A fixed Cranley-Patterson shift preserves the bootstrap stream and makes
+# direction budgets nested. Generating numbers and shift provenance are in
+# data-raw/make-pltest-sobol.R.
+.pltest_sobol_directions <- function(m, d) {
+  table <- .pltest_sobol_table
+  if (d > ncol(table$words))
+    stop("Sobol integration supports up to 1111 projection coordinates; use integration = 'exact'.", call. = FALSE)
+  i <- seq_len(m)
+  gray <- bitwXor(i, bitwShiftR(i, 1L))
+  u <- matrix(0L, m, d)
+  for (k in seq_len(min(31L, floor(log2(m)) + 1L))) {
+    rows <- which(bitwAnd(gray, bitwShiftL(1L, k - 1L)) != 0L)
+    for (j in seq_len(d))
+      u[rows, j] <- bitwXor(u[rows, j], table$words[k, j])
+  }
+  u <- sweep(u / 2^31, 2L, table$shift[seq_len(d)], "+") %% 1
+  # A shifted binary fraction can land exactly on the left endpoint.
+  u[u == 0] <- .Machine$double.eps / 2
+  z <- stats::qnorm(u)
+  z / sqrt(rowSums(z^2))
+}
+
+# One rank owns all directions for each residual column it receives. Order
+# the observations once per direction and reuse that order across its draws.
+.pltest_direction_scores <- function(E, V, directions) {
+  n <- nrow(E)
+  magnitude <- matrixStats::colMaxs(abs(E), useNames = FALSE)
+  if (any(!is.finite(magnitude)))
+    stop("Non-finite bootstrap or observed residuals. Rescale the response.", call. = FALSE)
+  extreme <- magnitude > 1e100 | (magnitude > 0 & magnitude < 1e-100)
+  if (any(extreme)) {
+    scale <- 2^pmin(1023, floor(log2(magnitude[extreme])))
+    E[, extreme] <- sweep(E[, extreme, drop = FALSE], 2L, scale, "/")
+  }
+  ans <- numeric(ncol(E))
+  for (j in seq_len(nrow(directions))) {
+    if (j %% 16L == 1L) .np_fit_progress_step()
+    z <- drop(V %*% directions[j, ])
+    if (any(!is.finite(z))) stop("Non-finite projected coordinates; rescale the predictors.", call. = FALSE)
+    ord <- order(z, method = "radix")
+    sorted <- z[ord]
+    sums <- matrixStats::colCumsums(E, rows = ord, useNames = FALSE)
+    if (anyDuplicated(sorted)) {
+      ends <- c(which(sorted[-1L] != sorted[-n]), n)
+      ans <- ans + matrixStats::colSums2(sums[ends, , drop = FALSE]^2 * diff(c(0L, ends)), useNames = FALSE)
+    } else {
+      ans <- ans + matrixStats::colSums2(sums^2, useNames = FALSE)
+    }
+  }
+  ans <- ans / (as.double(n)^2 * nrow(directions))
+  if (any(extreme)) ans[extreme] <- (ans[extreme] * scale) * scale
+  ans
+}
+
+.pltest_residual_block <- function(u, H, center, amplitude, boot.method) {
   xi <- if (boot.method == "wild-rademacher") ifelse(u < 0.5, -1, 1) else
     ifelse(u < (sqrt(5)+1)/(2*sqrt(5)), (1-sqrt(5))/2, (1+sqrt(5))/2)
   ystar <- center + amplitude*xi
-  e <- ystar - H %*% ystar
-  colSums(e*(A %*% e))
+  ystar - H %*% ystar
+}
+
+.pltest_sobol_bootstrap <- function(V, directions, H, e, center, amplitude, B, boot.method) {
+  n <- length(e)
+  # Bound the residual bank independently of B. The dense null operator
+  # stays with its owner and is never a projection-scoring payload.
+  width <- max(1L, min(512L, floor(4e6 / n)))
+  values <- numeric(B)
+  owners <- integer(B)
+  for (first in seq.int(1, B, by = width)) {
+    ids <- seq.int(first, min(B, as.double(first) + width - 1))
+    include.observed <- first == 1
+    E <- .pltest_local(if (.pltest_owns_residuals()) {
+      E <- matrix(0, n, length(ids) + include.observed)
+      if (include.observed) E[, 1L] <- e
+      for (start in seq.int(1L, length(ids), by = 64L)) {
+        cols <- seq.int(start, min(start + 63L, length(ids)))
+        u <- matrix(stats::runif(as.double(n) * length(cols)), n)
+        E[, cols + include.observed] <- .pltest_residual_block(u, H, center, amplitude, boot.method)
+        .np_fit_progress_step()
+      }
+      E
+    })
+    scored <- .pltest_score_bank(E, V, directions, length(ids) + include.observed)
+    if (include.observed) observed <- scored[1L, 1L]
+    rows <- seq_along(ids) + include.observed
+    values[ids] <- scored[rows, 1L]
+    owners[ids] <- scored[rows, 2L]
+  }
+  ranks <- table(owners)
+  list(observed = observed, statistics = values,
+       rank.counts = if (all(owners == -1L)) NULL else setNames(as.integer(ranks), names(ranks)))
+}
+
+.pltest_owns_residuals <- function()
+  !.npRmpi_cms_collective_context() || mpi.comm.rank(1L) == 0L
+
+.pltest_score_task <- function(task, V, directions) {
+  cbind(.pltest_direction_scores(task$E, V, directions), mpi.comm.rank(1L))
+}
+
+.pltest_score_bank <- function(E, V, directions, count) {
+  size <- mpi.comm.size(1L)
+  tasks <- .pltest_local(if (.pltest_owns_residuals()) {
+    parts <- .npRmpi_bootstrap_chunk_tasks(count, ceiling(count / size), with.seeds = FALSE)
+    lapply(parts, function(task) {
+      ids <- seq.int(task$start, length.out = task$bsz)
+      task$E <- E[, ids, drop = FALSE]
+      task
+    })
+  })
+  if (!.npRmpi_cms_collective_context())
+    return(.np_spec_test_fanout(count, tasks, .pltest_score_task, ncol.out = 2L,
+      what = "Sobol projection scores", progress.label = "Scoring Sobol projections",
+      progress.total = NULL,
+      profile.where = "mpi.applyLB:nppltest.sobol", V = V, directions = directions))
+
+  # In a manual collective, scatter only each rank's marked residual columns.
+  # Agree any serialization error before starting the scatter.
+  prepared <- .pltest_local(if (mpi.comm.rank(1L) == 0L) {
+    length(tasks) <- size
+    .npRmpi_scatter_prepare(tasks, comm = 1L)
+  })
+  task <- .npRmpi_scatter_prepared(prepared, root = 0L, comm = 1L)
+  local <- .pltest_local({
+    out <- matrix(0, count, 2L)
+    if (!is.null(task)) {
+      ids <- seq.int(task$start, length.out = task$bsz)
+      out[ids, ] <- .pltest_score_task(task, V, directions)
+    }
+    out
+  })
+  matrix(mpi.allreduce(as.double(local), type = 2L, op = "sum", comm = 1L), count, 2L)
 }
 
 nppltest <- function(object, bw.method = c("sun", "cv", "object"),
                      boot.method = c("wild-rademacher", "wild"), B = 399L,
                      random.seed = 42L, projection.scale = c("original", "standardized"), ...,
-                     boot.correction = c("none", "cv-pilot", "pilot-hc2", "cv-raw")) {
+                     boot.correction = c("none", "cv-pilot", "pilot-hc2", "cv-raw"),
+                     integration = c("sobol", "exact"), directions = 2048L) {
   started <- proc.time()[["elapsed"]]
   call <- match.call()
   dot.names <- names(match.call(expand.dots = FALSE)$...)
   no.object <- missing(object)
+  supplied.count <- !missing(directions)
   .pltest_local({
     bw.method <- match.arg(bw.method, c("sun", "cv", "object"))
     boot.method <- match.arg(boot.method, c("wild-rademacher", "wild"))
@@ -248,6 +391,12 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
       is.numeric(x) && !is.object(x) && is.null(dim(x)) && length(x) == 1L &&
         is.finite(x) && abs(x) <= .Machine$integer.max && x == trunc(x)
     }
+    integration <- match.arg(integration, c("sobol", "exact"))
+    if (integration == "exact" && supplied.count)
+      stop("directions applies only to integration = 'sobol'.", call. = FALSE)
+    if (!scalar.integer(directions) || directions < 1L)
+      stop("directions must be a single positive representable integer.", call. = FALSE)
+    directions <- as.integer(directions)
     if (!scalar.integer(B) || B < 9L)
       stop("B must be a single integer from 9 through .Machine$integer.max.", call. = FALSE)
     B <- as.integer(B)
@@ -265,7 +414,7 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
     dots <- list(...)
     .pltest_preflight(B)
   })
-  .pltest_same(list(bw.method, boot.method, boot.correction, projection.scale, B, random.seed, dots))
+  .pltest_same(list(bw.method, boot.method, boot.correction, projection.scale, integration, directions, B, random.seed, dots))
   if (is.null(random.seed)) {
     .pltest_current_stream()
     on.exit(.pltest_current_stream(), add = TRUE)
@@ -335,15 +484,17 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
         max(abs(e)) <= 64 * .Machine$double.eps * max(abs(y)))
       stop("The fitted null leaves no numerical residual variation to test.", call. = FALSE)
   })
-  A <- .pltest_angles(predictors, projection.scale == "standardized")
-  .pltest_local({
-    statistic <- function(E) colSums(E * (A %*% E))
-    observed <- unname(statistic(as.matrix(e)))
-    if (any(!is.finite(A)) || !is.finite(observed))
-      stop("Non-finite projection statistic. Check the scales of the response and predictors.", call. = FALSE)
-    if (observed == 0 && max(abs(e)) < sqrt(.Machine$double.xmin))
-      stop("The observed quadratic form underflows in these response units. Rescale Y.", call. = FALSE)
-  })
+  if (integration == "exact") {
+    A <- .pltest_angles(predictors, projection.scale == "standardized")
+    .pltest_local({
+      statistic <- function(E) colSums(E * (A %*% E))
+      observed <- unname(statistic(as.matrix(e)))
+      if (any(!is.finite(A)) || !is.finite(observed))
+        stop("Non-finite projection statistic. Check the scales of the response and predictors.", call. = FALSE)
+      if (observed == 0 && max(abs(e)) < sqrt(.Machine$double.xmin))
+        stop("The observed quadratic form underflows in these response units. Rescale Y.", call. = FALSE)
+    })
+  }
   pilot <- NULL
   if (boot.correction != "none") {
     pilot <- .np_progress_activity_run("Fitting the bootstrap pilot",
@@ -356,7 +507,19 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
     amplitude <- if (is.null(pilot)) e else pilot$amplitude
     if (any(!is.finite(amplitude))) stop("Non-finite bootstrap residual amplitude.", call. = FALSE)
   })
-  draws <- .pltest_bootstrap(H, A, center, amplitude, B, boot.method)
+  if (integration == "sobol") {
+    V <- .pltest_local(.pltest_coordinates(predictors, projection.scale == "standardized", compact = TRUE))
+    net <- .pltest_local(.pltest_sobol_directions(directions, ncol(V)))
+    draws <- .np_progress_activity_run("Scoring Sobol projections and bootstrap draws",
+      .pltest_sobol_bootstrap(V, net, H, e, center, amplitude, B, boot.method))
+    observed <- draws$observed
+    if (!is.finite(observed))
+      stop("Non-finite projection statistic. Check the scales of the response and predictors.", call. = FALSE)
+    if (observed == 0 && max(abs(e)) < sqrt(.Machine$double.xmin))
+      stop("The observed quadratic form underflows in these response units. Rescale Y.", call. = FALSE)
+  } else {
+    draws <- .pltest_bootstrap(H, A, center, amplitude, B, boot.method)
+  }
   boot <- draws$statistics
   if (length(boot) != B || any(!is.finite(boot)))
     stop("Expected B finite bootstrap statistics. Check response and predictor scales.", call. = FALSE)
@@ -368,6 +531,7 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
                  boot.correction = boot.correction, pilot = pilot,
                  bootstrap = boot, rank.counts = draws$rank.counts, boot.method = boot.method, boot.num = B, random.seed = random.seed,
                  bws = bw, bandwidths = bandwidths, bw.method = bw.method,
+                 integration = integration, directions = if (integration == "sobol") directions else NULL,
                  projection.scale = projection.scale, n = n, x.names = names(X), z.names = names(Z),
                  continuous.z = sum(continuous), cell.counts = table(cells),
                  factor.levels = lapply(categories, levels),
@@ -385,6 +549,9 @@ summary.pltest <- function(object, ...) {
   cat("Linear predictors:", paste(object$x.names, collapse = ", "), "\n")
   cat("Nuisance predictors:", paste(object$z.names, collapse = ", "), "\n")
   cat("Bandwidth method:", object$bw.method, "   Projection scale:", object$projection.scale, "\n")
+  if (identical(object$integration, "sobol"))
+    cat("Projection integration: shifted Sobol (", object$directions, " directions)\n", sep = "")
+  else cat("Projection integration: exact\n")
   cat("Wild bootstrap:", object$boot.method, "  Draws:", object$boot.num, "\n")
   cat("Residual correction:", object$boot.correction, "\n")
   if (object$boot.correction %in% c("cv-pilot", "cv-raw")) {
@@ -614,15 +781,15 @@ summary.pltest <- function(object, ...) {
   invisible(NULL)
 }
 
-.np_spec_test_fanout <- function(B, ..., progress.label) {
-  context <- .np_progress_activity_begin(B, progress.label, detail = NULL)
+.np_spec_test_fanout <- function(B, ..., progress.label, progress.total = B) {
+  context <- .np_progress_activity_begin(progress.total, progress.label, detail = NULL)
   complete <- FALSE
   on.exit(.np_progress_activity_end(context, complete), add = TRUE)
   if (!is.null(context)) {
-    context$use.bootstrap.done <- TRUE
+    context$use.bootstrap.done <- !is.null(progress.total)
     # The master can still be fitting a local draw between MPI completions.
     .np_progress_runtime$fit_forward <- function()
-      .np_progress_activity_step(context, context$state$last_done)
+      .np_progress_activity_step(context, if (context$use.bootstrap.done) context$state$last_done)
   }
   out <- .npRmpi_bootstrap_run_fanout(..., progress.label = progress.label,
                                      progress.context = context)
