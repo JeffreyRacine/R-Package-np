@@ -79,19 +79,22 @@ for (i in seq_len(nrow(cases))) {
     fit,
     neval = 80,
     perspective = FALSE,
-    plot.behavior = 'data',
-    plot.errors.method = 'bootstrap',
-    plot.errors.boot.method = 'inid',
-    plot.errors.boot.num = 49,
-    plot.errors.type = 'pointwise'
+    output = 'data',
+    errors = 'bootstrap',
+    bootstrap = 'inid',
+    B = 49,
+    band = 'pointwise'
   ))
 
-  eval.df <- as.data.frame(pdata$r1$eval)
+  eval.df <- pdata$panels[[1L]]$grid
   names(eval.df) <- names(tx)
 
   pred <- as.numeric(predict(fit, newdata = eval.df))
   hat <- as.numeric(npreghat(bws = bw, txdat = tx, y = y, exdat = eval.df, s = 0L, output = 'apply'))
-  plot.mean <- as.numeric(pdata$r1$mean)
+  plot.mean <- pdata$panels[[1L]]$values$estimate
+
+  stopifnot(nrow(eval.df) == 80L, length(plot.mean) == nrow(eval.df),
+            length(pred) == nrow(eval.df), length(hat) == nrow(eval.df))
 
   d.plot.pred <- max(abs(plot.mean - pred))
   d.hat.pred <- max(abs(hat - pred))

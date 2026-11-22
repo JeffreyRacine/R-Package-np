@@ -188,10 +188,10 @@ tryCatch({
     bw,
     xdat = data.frame(x = x),
     ydat = y,
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "wild",
-    plot.errors.boot.num = 9
+    output = "data",
+    errors = "bootstrap",
+    bootstrap = "wild",
+    B = 9
   ))
   stopifnot(is.list(out), length(out) > 0)
   cat("ok\n")

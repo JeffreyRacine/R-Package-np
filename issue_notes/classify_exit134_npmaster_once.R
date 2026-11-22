@@ -77,15 +77,15 @@ res <- tryCatch(
       bws,
       xdat = xdat,
       ydat = ydat,
-      plot.behavior = "data",
+      output = "data",
       gradients = FALSE,
       neval = 100,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.wild = "rademacher",
-      plot.errors.boot.num = boot_num,
-      plot.errors.type = "pointwise",
-      plot.errors.center = "estimate"
+      errors = "bootstrap",
+      bootstrap = "wild",
+      boot.control = np_boot_control(wild = "rademacher"),
+      B = boot_num,
+      band = "pointwise",
+      center = "estimate"
     ),
     warning = function(w) {
       warn_log <<- c(warn_log, conditionMessage(w))

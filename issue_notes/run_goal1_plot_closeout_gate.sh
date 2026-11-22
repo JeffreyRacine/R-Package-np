@@ -81,7 +81,14 @@ SEEDS="$(seq 1 25 | paste -sd, -)"
 BASE_CSV="$OUT/perf/baseline_runs.csv"
 CAND_CSV="$OUT/perf/candidate_runs.csv"
 
-Rscript "$REPO/issue_notes/goal1_plot_closeout_perf_runs.R" \
+# The default March baseline predates the harness as well as the interval API.
+# When comparing another baseline, prefer the harness from that revision.
+BASE_SCRIPT="$WT/issue_notes/goal1_plot_closeout_perf_runs.R"
+if [[ ! -f "$BASE_SCRIPT" ]]; then
+  BASE_SCRIPT="$OUT/perf/historical_perf_runs.R"
+  git -C "$REPO" show d563d87fc:issue_notes/goal1_plot_closeout_perf_runs.R > "$BASE_SCRIPT"
+fi
+Rscript "$BASE_SCRIPT" \
   --repo "$WT" \
   --label baseline \
   --out-csv "$BASE_CSV" \

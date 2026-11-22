@@ -62,49 +62,49 @@ scenarios <- list(
   list(
     name = "regression_wild",
     fn = function() run_plot(plot(
-      reg_bw, xdat = x_reg, ydat = y, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "wild",
-      plot.errors.boot.wild = "rademacher", plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      reg_bw, xdat = x_reg, ydat = y, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "wild",
+      B = boot_num, boot.control = np_boot_control(wild = "rademacher", blocklen = blocklen)
     ))
   ),
   list(
     name = "regression_inid",
     fn = function() run_plot(plot(
-      reg_bw, xdat = x_reg, ydat = y, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "inid",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      reg_bw, xdat = x_reg, ydat = y, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "inid",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
     name = "regression_fixed",
     fn = function() run_plot(plot(
-      reg_bw, xdat = x_reg, ydat = y, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "fixed",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      reg_bw, xdat = x_reg, ydat = y, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "fixed",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
     name = "regression_geom",
     fn = function() run_plot(plot(
-      reg_bw, xdat = x_reg, ydat = y, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "geom",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      reg_bw, xdat = x_reg, ydat = y, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "geom",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
     name = "udens_inid",
     fn = function() run_plot(plot(
-      u_bw, plot.behavior = "data", perspective = FALSE,
-      plot.errors.method = "bootstrap", plot.errors.boot.method = "inid",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      u_bw, output = "data", perspective = FALSE,
+      errors = "bootstrap", bootstrap = "inid",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
     name = "udens_fixed",
     fn = function() run_plot(plot(
-      u_bw, plot.behavior = "data", perspective = FALSE,
-      plot.errors.method = "bootstrap", plot.errors.boot.method = "fixed",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      u_bw, output = "data", perspective = FALSE,
+      errors = "bootstrap", bootstrap = "fixed",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   )
 )
