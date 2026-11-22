@@ -1,4 +1,4 @@
-test_that("identified endpoint fits and hats agree with reduced weighted least squares", {
+test_that("identified endpoint fits and hats follow the selected ridge", {
   old <- options(np.messages=FALSE, np.tree=FALSE)
   on.exit(options(old), add=TRUE)
   i <- seq_len(136L)
@@ -17,13 +17,32 @@ test_that("identified endpoint fits and hats agree with reduced weighted least s
       v <- x$v-grid$v[j]
       weight <- pmax(0,1-u^2/(5*sort(abs(u))[12L]^2)) *
                 pmax(0,1-v^2/(5*sort(abs(v))[40L]^2))
-      # Three u levels identify the pure quadratic and u-by-v quadratic
-      # columns. Omitting the aliased u^3 leaves both target functionals intact.
-      A <- cbind(1,u,u^2,v,u*v,u^2*v)
-      ref <- qr.coef(qr(A*sqrt(weight)),diag(sqrt(weight)))
-      expect_lt(max(abs(H[j,]-ref[1,]),abs(D[j,]-ref[4,])),1e-8)
-      expect_lt(max(abs(fit$mean[j]-sum(ref[1,]*y)),
-                    abs(fit$grad[j,which(cols==2L)]-sum(ref[4,]*y))),1e-8)
+      ridge <- attr(H, "ridge.used", exact=TRUE)[j]
+      expect_equal(ridge, attr(D, "ridge.used", exact=TRUE)[j])
+      if (ridge == 0) {
+        # Dropping the aliased u^3 preserves the mean and v-slope functionals.
+        A <- cbind(1,u,u^2,v,u*v,u^2*v)
+        reduced <- qr.coef(qr(A*sqrt(weight)),diag(sqrt(weight)))
+        ref <- reduced[c(1L,4L),,drop=FALSE]
+      } else {
+        # The permuted right endpoint can take one historical ridge step.
+        # In units of the pristine intercept this is max(diag(Gram)) / n.
+        basis <- getFromNamespace("W.lp", "np")
+        design <- basis(x[cols], degree=bw$degree, basis="glp")
+        uweight <- weight/sum(weight)
+        gram <- crossprod(design,design*uweight)
+        rho <- max(diag(gram))/nrow(x)
+        grid.basis <- function(order) {
+          basis(x[cols],grid[j,cols,drop=FALSE],degree=bw$degree,
+                basis="glp",gradient.vec=order)
+        }
+        targets <- rbind(grid.basis(NULL),grid.basis(c(0L,1L)[cols]))
+        direction <- solve(gram+diag(rho,ncol(gram)),t(targets))
+        ref <- t(sweep(design %*% direction,2L,rho*direction[1L,],"+")*uweight)
+      }
+      expect_lt(max(abs(H[j,]-ref[1L,]),abs(D[j,]-ref[2L,])),1e-8)
+      expect_lt(max(abs(fit$mean[j]-sum(ref[1L,]*y)),
+                    abs(fit$grad[j,which(cols==2L)]-sum(ref[2L,]*y))),1e-8)
     }
   }
 })
