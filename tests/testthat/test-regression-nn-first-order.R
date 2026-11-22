@@ -57,7 +57,9 @@ test_that("Epanechnikov first-order NN preserves defaults and partial derivative
     outside <- bw;outside$ckertype <- "uniform"
     expect_identical(.np_bias_regression_kernel_class(outside,"absolute"),"unsupported")
     outside$ckertype <- "beta"
-    expect_identical(.np_bias_regression_kernel_class(outside,"absolute"),"unsupported")
+    beta.class <- if (kind == "q1" && bound == "fixed" && type == "generalized_nn")
+      "beta-gnn-mean" else "unsupported"
+    expect_identical(.np_bias_regression_kernel_class(outside,"absolute"), beta.class)
     outside <- bw;outside$degree <- rep(2L,length(nc))
     expect_identical(.np_bias_regression_kernel_class(outside,"absolute"),"unsupported")
     expect_identical(fit,held);expect_identical(.Random.seed,seed)
