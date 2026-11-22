@@ -23,7 +23,14 @@ test_that("the native index score agrees with the ordered-pair statistic", {
     a <- base*exp(-.5*(dz/width)^2)
     sqrt(5/4)*sum(a)/sqrt(2*sum(a*a))
   },numeric(1))
-  expect_equal(.Call(C_np_indextest_score,y,z,x,g,h),ref,tolerance=1e-12)
+  # The reference stays in ordinary units. These binary scalings are exact
+  # for this response, including the subnormal case.
+  for (units in c(1, 1e80, 1e-80, 2^1022, -2^1022, 2^-1073)) {
+    expect_equal(.Call(C_np_indextest_score, units*y, z, x, g, h),
+                 ref, tolerance = 1e-12)
+  }
+  expect_error(.Call(C_np_indextest_score, rep(1e300, length(y)), z, x, g, h),
+               "Degenerate single-index pairwise variance")
 })
 
 test_that("bootstrap refits match an independently refitted response stream", {
