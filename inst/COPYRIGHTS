@@ -36,3 +36,8 @@ Sobol generating numbers in R/sysdata.rda are derived from the original
  *      (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *      OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
+
+Package-level license record distributed in randtoolbox 2.0.5 (LICENSE):
+YEAR: 2015
+COPYRIGHT HOLDER: Yohan Chalabi, Christophe Dutang, Petr Savicky, Diethelm Wuertz, Donald Knuth, Makoto Matsumoto, Mutsuo Saito
+ORGANIZATION: Hiroshima University
