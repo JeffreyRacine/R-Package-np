@@ -237,7 +237,7 @@ n <- 100
 sample.A <- data.frame(x=rnorm(n))
 sample.B <- data.frame(x=rnorm(n))
 
-output <- npdeneqtest(sample.A,sample.B,B=29)
+output <- npdeneqtest(sample.A,sample.B)
 
 output
 

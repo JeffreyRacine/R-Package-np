@@ -226,7 +226,6 @@ yt <- ar.series(0.95,rnorm(n))
 
 output <- npsdeptest(yt,
                      lag.num=2,
-                     B=29,
                      method="summation")
 
 summary(output)

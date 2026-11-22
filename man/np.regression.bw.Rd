@@ -1011,8 +1011,7 @@ z2 <- factor(z2)
 
 bw <- npregbw(y~x+z1+z2,
               regtype="lc",
-              bwmethod="cv.ls",
-              nmulti=1)
+              bwmethod="cv.ls")
 
 summary(bw)
 

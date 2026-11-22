@@ -556,7 +556,6 @@ failures must be considered when experimenting with these bounds.
 plot(fit,
      errors = "bootstrap",
      bootstrap = "inid",
-     B = 9999,
      band = "pointwise",
      boot.control = np_boot_control(nonfixed = "exact"))
 }

@@ -224,7 +224,6 @@ y.fit <- fitted(model)
 
 output <- npdeptest(y,
                     y.fit,
-                    B=29,
                     method="summation")
 
 summary(output)

@@ -669,7 +669,7 @@ Italy2 <- within(Italy, {
 ## Plot only: make the plotted surface proper on the plot evaluation grid.
 
 fhat <- npcdens(gdp ~ year, data = Italy2,
-                regtype = "lp", degree = 3, nmulti = 1)
+                regtype = "lp", degree = 3)
 
 plot(fhat, proper = TRUE)
 
@@ -687,7 +687,6 @@ fhat_fit <- npcdens(
   data = Italy2,
   regtype = "lp",
   degree = 3,
-  nmulti = 1,
   proper = TRUE,
   proper.control = ctrl_fit
 )
@@ -747,7 +746,6 @@ fhat_both <- npcdens(
   data = Italy2,
   regtype = "lp",
   degree = 3,
-  nmulti = 1,
   proper = TRUE,
   proper.control = ctrl_both
 )

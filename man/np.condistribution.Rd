@@ -680,7 +680,7 @@ Italy2 <- within(Italy, {
 ## Plot only: make the plotted surface proper on the plot evaluation grid.
 
 Fhat <- npcdist(gdp ~ year, data = Italy2,
-                regtype = "lp", degree = 3, nmulti = 1)
+                regtype = "lp", degree = 3)
 
 plot(Fhat, proper = TRUE)
 
@@ -698,7 +698,6 @@ Fhat_fit <- npcdist(
   data = Italy2,
   regtype = "lp",
   degree = 3,
-  nmulti = 1,
   proper = TRUE,
   proper.control = ctrl_fit
 )
@@ -753,7 +752,6 @@ Fhat_both <- npcdist(
   data = Italy2,
   regtype = "lp",
   degree = 3,
-  nmulti = 1,
   proper = TRUE,
   proper.control = ctrl_both
 )

@@ -726,7 +726,6 @@ y <- factor(rbinom(n, 1, plogis(1.5*x)), levels=0:1)
 model.effects <- npconmode(y~x,
                            regtype="ll",
                            bwmethod="cv.ls",
-                           nmulti=1,
                            probabilities=TRUE,
                            gradients=TRUE)
 
@@ -744,7 +743,6 @@ y2 <- factor(rbinom(n, 1, plogis(1.5*x - z)), levels=0:1)
 model.surface <- npconmode(y2~x+z,
                            regtype="ll",
                            bwmethod="cv.ls",
-                           nmulti=1,
                            probabilities=TRUE)
 plot(model.surface, perspective=TRUE, neval=15)
 

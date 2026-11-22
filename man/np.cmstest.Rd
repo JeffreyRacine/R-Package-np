@@ -295,8 +295,7 @@ data(cps71)
 
 model <- lm(logwage~age+I(age^2), data=cps71, x=TRUE, y=TRUE)
 
-npcmstest(model = model, xdat = cps71$age, ydat = cps71$logwage,
-          B=9, nmulti = 1)
+npcmstest(model = model, xdat = cps71$age, ydat = cps71$logwage)
 
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.

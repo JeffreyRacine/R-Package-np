@@ -1938,7 +1938,7 @@ bw <- npregbw(xdat=cps71$age, ydat=cps71$logwage,
               regtype="ll", bwmethod="cv.aic")
 fit <- npreg(bws=bw)
 plot.out <- plot(fit, perspective=FALSE, errors="bootstrap",
-                 B=25, band="pointwise", output="plot-data")
+                 band="pointwise", output="plot-data")
 d <- as.data.frame(plot.out, panel=1, target=1)
 age.eval <- d$eval_1
 logwage.eval <- d$estimate
@@ -1947,14 +1947,14 @@ logwage.upper.ci <- d$upper
 
 # Corrected values are descriptive targets, not offsets to add to endpoints.
 p <- plot(fit, perspective=FALSE, errors="bootstrap",
-          center="bias-corrected", B=25, band="pointwise", output="data")
+          center="bias-corrected", band="pointwise", output="data")
 d <- as.data.frame(p, panel=1, target=1)
 logwage.bc <- d$bias_corrected
 logwage.bias <- d$estimate - d$bias_corrected
 
 # The same extraction works for derivatives. Inspect the target identity.
 g <- plot(fit, perspective=FALSE, gradients=TRUE, errors="bootstrap",
-          B=25, band="pointwise", output="data")
+          band="pointwise", output="data")
 g$targets
 grad <- as.data.frame(g, panel=1, target=1)
 plot(g)
@@ -1971,7 +1971,7 @@ Italy2 <- within(Italy, {
 # Plot only: make the plotted surface proper on the plot evaluation grid.
 
 fhat <- npcdens(gdp ~ year, data = Italy2,
-                regtype = "lp", degree = 3, nmulti = 1)
+                regtype = "lp", degree = 3)
 
 plot(fhat, proper = TRUE)
 
@@ -1989,7 +1989,6 @@ fhat_fit <- npcdens(
   data = Italy2,
   regtype = "lp",
   degree = 3,
-  nmulti = 1,
   proper = TRUE,
   proper.control = ctrl_fit
 )
@@ -2049,7 +2048,6 @@ fhat_both <- npcdens(
   data = Italy2,
   regtype = "lp",
   degree = 3,
-  nmulti = 1,
   proper = TRUE,
   proper.control = ctrl_both
 )

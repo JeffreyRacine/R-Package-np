@@ -810,8 +810,7 @@ if (!in.check) {
 
   bw <- npregbw(y~x+z1+z2,
                 regtype="lc",
-                bwmethod="cv.ls",
-                nmulti=1)
+                bwmethod="cv.ls")
 
   summary(bw)
 

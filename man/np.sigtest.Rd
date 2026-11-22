@@ -473,7 +473,7 @@ model <- npreg(y~z+x1+x2,
                regtype="ll",
                bwmethod="cv.aic")
 
-output <- npsigtest(model,B=29)
+output <- npsigtest(model)
 
 summary(output)
 

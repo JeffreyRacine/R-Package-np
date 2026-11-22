@@ -638,7 +638,7 @@ grid.dat <- data.frame(u1 = grid.seq, u2 = grid.seq)
 
 ## Estimate the copula distribution from an npudistbw() object.
 
-bw.cdf <- npudistbw(~ x + y, data = mydat, nmulti = 1)
+bw.cdf <- npudistbw(~ x + y, data = mydat)
 copula <- npcopula(bws = bw.cdf, data = mydat, u = grid.dat)
 summary(copula)
 
@@ -662,7 +662,7 @@ plot(copula, view = "all")
 
 ## Estimate and plot the copula density from an npudensbw() object.
 
-bw.pdf <- npudensbw(~ x + y, data = mydat, nmulti = 1)
+bw.pdf <- npudensbw(~ x + y, data = mydat)
 copula.dens <- npcopula(bws = bw.pdf, data = mydat, u = grid.dat)
 summary(copula.dens)
 plot(copula.dens, view = "fixed")
@@ -673,7 +673,7 @@ plot(copula.dens)
 ## Intervals are available for two-dimensional grid surfaces.
 
 plot(copula, errors = "asymptotic", band = "pointwise")
-plot(copula, errors = "bootstrap", bootstrap = "inid", B = 399,
+plot(copula, errors = "bootstrap", bootstrap = "inid",
      band = "pointwise")
 
 ## Prediction evaluates the retained bandwidth object on a supplied
@@ -698,7 +698,7 @@ mydat <- data.frame(x = xy[, 1], y = xy[, 2])
 grid.seq <- seq(0, 1, length.out = n.eval)
 grid.dat <- data.frame(u1 = grid.seq, u2 = grid.seq)
 
-bw.cdf <- npudistbw(~ x + y, data = mydat, nmulti = 1)
+bw.cdf <- npudistbw(~ x + y, data = mydat)
 copula <- npcopula(bws = bw.cdf, data = mydat, u = grid.dat)
 summary(copula)
 
@@ -711,7 +711,7 @@ plot(copula)
 plot(copula, view = "empirical")
 plot(copula, view = "all")
 
-bw.pdf <- npudensbw(~ x + y, data = mydat, nmulti = 1)
+bw.pdf <- npudensbw(~ x + y, data = mydat)
 copula.dens <- npcopula(bws = bw.pdf, data = mydat, u = grid.dat)
 summary(copula.dens)
 plot(copula.dens, view = "fixed", zlim = c(0, 40))
@@ -723,8 +723,7 @@ plot(copula.dens, zlim = c(0, 40))
 ## The formula interface is a shorter route when bandwidths do not need
 ## to be reused explicitly.
 
-copula.short <- npcopula(~ x + y, data = mydat, neval = n.eval,
-                         nmulti = 1)
+copula.short <- npcopula(~ x + y, data = mydat, neval = n.eval)
 plot(copula.short, view = "all")
 
 npRmpi.quit()

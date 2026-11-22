@@ -238,8 +238,7 @@ y <- rnorm(n)
 
 output <- npunitest(x,y,
                     method="summation",
-                    bootstrap=TRUE,
-                    B=29)
+                    bootstrap=TRUE)
 
 summary(output)
 

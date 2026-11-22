@@ -121,25 +121,23 @@ if (!in.check) {
     # Klein-Spady null. The success probability depends only on z.
     d$choice0 <- rbinom(n, 1, plogis(z))
 
-    bw0 <- npindexbw(y0 ~ x1 + x2, data = d, method = "ichimura", nmulti = 1)
-    summary(npindextest(npindex(bw0), B = 99))
-    # p = 0.69 at seed 42. Do not reject the single-index null at level 0.05.
+    bw0 <- npindexbw(y0 ~ x1 + x2, data = d, method = "ichimura")
+    summary(npindextest(npindex(bw0)))
+    # p = 0.74 at seed 42. Do not reject the single-index null at level 0.05.
 
-    bw1 <- npindexbw(y1 ~ x1 + x2, data = d, method = "ichimura", nmulti = 1)
-    summary(npindextest(npindex(bw1), B = 99))
-    # p = 0.01 at seed 42. Reject the single-index null at level 0.05.
+    bw1 <- npindexbw(y1 ~ x1 + x2, data = d, method = "ichimura")
+    summary(npindextest(npindex(bw1)))
+    # p = 0.005 at seed 42. Reject the single-index null at level 0.05.
 
-    binary0 <- npindexbw(choice0 ~ x1 + x2, data = d, method = "kleinspady",
-                         nmulti = 1)
-    summary(npindextest(binary0, B = 99))
-    # p = 0.06 at seed 42. Do not reject the single-index null at level 0.05.
+    binary0 <- npindexbw(choice0 ~ x1 + x2, data = d, method = "kleinspady")
+    summary(npindextest(binary0))
+    # p = 0.08 at seed 42. Do not reject the single-index null at level 0.05.
 
-    binary1 <- npindexbw(choice1 ~ x1 + x2, data = d, method = "kleinspady",
-                         nmulti = 1)
-    summary(npindextest(binary1, B = 99))
-    # p = 0.01 at seed 42. Reject the single-index null at level 0.05.
+    binary1 <- npindexbw(choice1 ~ x1 + x2, data = d, method = "kleinspady")
+    summary(npindextest(binary1))
+    # p = 0.005 at seed 42. Reject the single-index null at level 0.05.
 
-    # With 99 bootstrap draws the smallest possible p-value is 0.01.
+    # With the default 199 bootstrap draws the smallest possible p-value is 0.005.
     # A different data seed gives another sample. At level 0.05 a true null
     # can be rejected, and a departure can go undetected. Changing only
     # random.seed varies the bootstrap p-value for the same observations.

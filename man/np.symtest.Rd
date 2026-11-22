@@ -256,7 +256,6 @@ yt <- ar.series(0.5,rnorm(n))
 ## A simple example of the test for symmetry
 
 output <- npsymtest(yt,
-                    B=29,
                     boot.method="geom",
                     method="summation")
 

@@ -176,17 +176,17 @@ if (!in.check) {
 
     # Under the null, x1 and x2 have constant slopes and z enters smoothly.
     d$y0 <- with(d, 0.8*x1 - 0.6*x2 + sin(pi*z) + noise)
-    bw0 <- npplregbw(y0 ~ x1 + x2 | z, data = d, regtype = "ll", nmulti = 1)
+    bw0 <- npplregbw(y0 ~ x1 + x2 | z, data = d, regtype = "ll")
     fit0 <- npplreg(bw0)
-    summary(nppltest(fit0, B = 199))
-    # p = 0.48 at seed 42. Do not reject partial linearity at level 0.05.
+    summary(nppltest(fit0))
+    # p = 0.4875 at seed 42. Do not reject partial linearity at level 0.05.
 
     # For the alternative, keep the predictors and noise and add curvature in x1.
     # The nuisance function of z cannot absorb this term.
     d$y1 <- with(d, y0 + 1.5*(x1^2 - 1))
-    bw1 <- npplregbw(y1 ~ x1 + x2 | z, data = d, regtype = "ll", nmulti = 1)
-    summary(nppltest(bw1, B = 199))
-    # p = 0.005 at seed 42. Reject partial linearity at level 0.05.
+    bw1 <- npplregbw(y1 ~ x1 + x2 | z, data = d, regtype = "ll")
+    summary(nppltest(bw1))
+    # p = 0.0025 at seed 42. Reject partial linearity at level 0.05.
 
     # With another data seed, even a true null can be rejected, and a sample
     # drawn under the alternative can fail to reject. With the data held fixed,

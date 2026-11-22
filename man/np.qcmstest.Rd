@@ -317,8 +317,7 @@ X <- data.frame(age=cps71$age)
 # computer...
 
 output <- npqcmstest(model=model, xdat=X,
-                     ydat=cps71$logwage, tau=0.5,
-                     B=29)
+                     ydat=cps71$logwage, tau=0.5)
 
 summary(output)
 
