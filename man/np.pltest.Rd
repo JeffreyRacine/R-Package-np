@@ -68,9 +68,9 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   estimates the null conditional means. A bootstrap response is its chosen
   center plus a residual amplitude times an independent multiplier. Each
   draw is refitted with the test bandwidths. The test forms the training
-  operator from shared fitted smoother weights for continuous Sun nuisance variables
-  or from public unit-response fits for other configurations, preserving the fitted
-  estimator's categorical kernel conventions.
+  operator from the conditional smoother weights and a single factorization of
+  the residualized linear covariates. Factor nuisance variables retain the
+  categorical kernel conventions of the fitted regression.
 
   For a single continuous nuisance variable the default Gaussian bandwidth
   is \eqn{1.06\min(s,0.75\,IQR)n^{-1/3}}. For \eqn{q=2,3} the
@@ -90,10 +90,9 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   choice based on dimension or a preliminary test.
 
   Computation stores dense training matrices and takes cubic time for the
-  angular calculation at fixed predictor dimension. The continuous Sun test reuses
-  one training smoother and the residualized linear projection across all draws.
-  Other configurations construct the operator using public unit-response fits.
-  The CV-pilot HC2 option constructs a second such operator. In \pkg{npRmpi},
+  angular calculation at fixed predictor dimension. The null training operator is reused across
+  blocks of bootstrap responses. The CV-pilot HC2 option also computes the
+  squared row norms of the separate pilot residual operator. In \pkg{npRmpi},
   rank zero calculates the angular matrix. In a collective session it shares
   this matrix with the other ranks. To use MPI,
   initialize an \pkg{npRmpi} session or attach pool and call the test on

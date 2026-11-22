@@ -54,9 +54,9 @@
       }
     }
   })
-  npplregbw(xdat = X, ydat = y, zdat = Z, bwtype = "fixed",
+  .pltest_with_local_fit(npplregbw(xdat = X, ydat = y, zdat = Z, bwtype = "fixed",
                 bws = matrix(h, nrow = ncol(X) + 1L, ncol = ncol(Z), byrow = TRUE),
-                regtype = if (q) "ll" else "lc", bandwidth.compute = FALSE)
+                regtype = if (q) "ll" else "lc", bandwidth.compute = FALSE))
 }
 
 # Restricted pilot for the bootstrap only. Linear factors use np's slope coding.
@@ -108,48 +108,93 @@
   best
 }
 
-# The package hat route and public fits can use different categorical weights
-# near a bandwidth endpoint. Construct the actual public fixed-selector operator.
-.pltest_operator <- function(bw, X, y, Z, shared.sun = FALSE) {
+.pltest_with_local_fit <- function(expr) .npRmpi_with_local_bootstrap(.np_plot_with_local_compiled_eval(expr))
+
+# Reuse the regression fit's accepted categorical gates when constructing rows.
+# The ordinary hat and the fit can use different weights near a factor endpoint.
+.pltest_mean <- function(bw, Z, y) {
+  categorical <- .np_regression_cat_profile_mean(bw, Z, y)
+  if (!is.null(categorical)) return(as.numeric(categorical))
+  as.numeric(.np_regression_direct(bw, txdat = Z, tydat = y, local.mode = TRUE)$mean)
+}
+
+.pltest_response_operator <- function(bw, Z, y, shared.sun) {
   n <- length(y)
-  fit <- function(v) .pltest_local({
-    .np_fit_progress_step()
-    fitted.mean <- as.numeric(fitted(npplreg(bws = bw, txdat = X, tydat = v, tzdat = Z)))
-    if (length(fitted.mean) != n) stop("Expected a fitted mean for every training row.", call. = FALSE)
-    fitted.mean
-  })
-  # The continuous Sun construction gives every conditional mean the same
-  # fixed Gaussian smoother. Apply it also to the slope columns, then use
-  # the same residualized QR projection as the training fit.
-  if (shared.sun && all(vapply(Z, is.numeric, logical(1)))) {
-    S <- .npreghat_complete(bws = bw[["bw"]][[1L]], txdat = Z, output = "matrix")
-    .pltest_local({
-      linear <- vapply(seq_along(X), function(j)
-        .np_plreg_numeric_response(X[[j]], bw[["bw"]][[j+1L]][["ydati"]]), numeric(n))
-      smooth <- S %*% linear
-      D <- linear - smooth
-      factorization <- qr(D, tol = .Machine$double.eps)
-      formation <- vapply(seq_len(ncol(D)), function(j)
-        .np_plreg_residual_formation_error(linear[,j], smooth[,j]), numeric(1))
-      .np_plreg_check_residualized_rank(factorization, ncol(D), "nppltest", formation)
-      # Q Q' (I-S) avoids applying n Householder transforms to the identity.
-      Q <- qr.Q(factorization)
-      H <- S + Q %*% (t(Q) - crossprod(Q, S))
-    })
-  } else {
-    H <- vapply(seq_len(n), function(j) fit(as.numeric(seq_len(n) == j)), numeric(n))
+  if (shared.sun && all(vapply(Z, is.numeric, logical(1))))
+    return(.npreghat_complete(bws = bw, txdat = Z, output = "matrix"))
+
+  if (!bw$ncon && npUseCategoricalCompress(ncon = 0L, ncat = ncol(Z)) &&
+      identical(bw$type, "fixed")) {
+    z <- adjustLevels(Z, bw$xdati)
+    codes <- .np_cat_profile_code_matrix(z)
+    keys <- .np_cat_profile_keys(codes)
+    first <- which(!duplicated(keys))
+    id <- match(keys, keys[first])
+    profiles <- codes[first, , drop = FALSE]
+    K <- .np_regression_cat_profile_kernel_matrix(profiles, profiles,
+                                                    z[first, , drop = FALSE], bw)
+    den <- drop(K %*% tabulate(id, nbins = length(first)))
+    if (all(is.finite(den)) && all(abs(den) > .Machine$double.xmin))
+      return((K / den)[id, id, drop = FALSE])
   }
-  mu <- fit(y)
-  .pltest_local({
-    if (length(mu) != n || any(!is.finite(mu)) || any(!is.finite(H)))
-      stop("The partially linear fit returned a non-finite training mean or weight.", call. = FALSE)
+
+  # For non-Gaussian or NN fits, retain the training solve's projection and
+  # replay complete-design kernel gates. Slicing the training sample would
+  # change both near-constant decisions and implicit NN occurrence radii.
+  rows <- .np_plot_lsq_gate_level_operator(bw, Z, y, max.bytes = .Machine$double.xmax)
+  S <- matrix(NA_real_, n, n)
+  width <- .np_plot_plreg_apply_block_rows(n, n)
+  for (first in seq.int(1L, n, by = width)) {
+    ii <- seq.int(first, min(n, first + width - 1L))
+    S[ii, ] <- rows(ii)
+    .np_fit_progress_step()
+  }
+  S
+}
+
+.pltest_training_solve <- function(children, X, y, Z, shared = NULL) {
+  n <- length(y)
+  linear <- vapply(seq_along(X), function(j)
+    .np_plreg_numeric_response(X[[j]], children[[j + 1L]][["ydati"]]), numeric(n))
+  smooth <- if (!is.null(shared)) shared %*% linear else
+    vapply(seq_along(X), function(j)
+      .pltest_mean(children[[j + 1L]], Z, X[[j]]), numeric(n))
+  formation <- vapply(seq_along(X), function(j)
+    .np_plreg_residual_formation_error(linear[, j], smooth[, j]), numeric(1))
+  yhat <- .pltest_mean(children[[1L]], Z, y)
+  .np_plreg_linear_solve(y - yhat, linear - smooth, y, yhat, ncol(Z),
+                         where = "nppltest", se = FALSE, formation.error = formation)
+}
+
+.pltest_operator <- function(bw, X, y, Z, shared.sun = FALSE) {
+  .pltest_local(.pltest_with_local_fit({
+    children <- bw[["bw"]]
+    S <- .pltest_response_operator(children[[1L]], Z, y, shared.sun)
+    solved <- .pltest_training_solve(children, X, y, Z, if (shared.sun) S)
+    Q <- qr.Q(solved$qr)
+    H <- S + Q %*% (t(Q) - crossprod(Q, S))
+    mu <- solved$train.fit
     replay <- drop(H %*% y)
-    if (any(!is.finite(replay)) ||
+    if (any(!is.finite(H)) || any(!is.finite(mu)) || any(!is.finite(replay)) ||
         max(abs(replay - mu)) > 1e-7 * max(abs(y), .Machine$double.xmin))
       stop("The selected bandwidth object did not reproduce its public fixed-bandwidth fit.",
            call. = FALSE)
-  })
-  list(H = H, mean = mu)
+    list(H = H, mean = mu)
+  }))
+}
+
+.pltest_residual_norms <- function(H) {
+  n <- nrow(H)
+  width <- .np_plot_plreg_apply_block_rows(n, n)
+  norms <- numeric(n)
+  for (first in seq.int(1L, n, by = width)) {
+    rows <- seq.int(first, min(n, first + width - 1L))
+    residual <- -H[rows, , drop = FALSE]
+    diagonal <- cbind(seq_along(rows), rows)
+    residual[diagonal] <- 1 + residual[diagonal]
+    norms[rows] <- rowSums(residual^2)
+  }
+  norms
 }
 
 .pltest_cv_pilot <- function(X, y, Z, adjust) {
@@ -157,16 +202,14 @@
                   regtype = if (any(!vapply(Z, is.factor, logical(1)))) "ll" else "lc",
                   bwtype = "fixed", nmulti = 1L)
   if (!adjust) {
-    center <- as.numeric(fitted(npplreg(bws = bw, txdat = X, tydat = y, tzdat = Z)))
+    center <- .pltest_with_local_fit(.pltest_training_solve(bw[["bw"]], X, y, Z)$train.fit)
     if (length(center) != length(y) || any(!is.finite(center)))
       stop("The prediction-CV pilot returned an invalid training fit.", call. = FALSE)
     return(list(center = center, amplitude = y - center, bws = bw))
   }
   pilot <- .pltest_operator(bw, X, y, Z)
   .pltest_local({
-    residual.map <- -pilot$H
-    diag(residual.map) <- 1 + diag(residual.map)
-    variance.factor <- rowSums(residual.map^2)
+    variance.factor <- .pltest_residual_norms(pilot$H)
     if (any(!is.finite(variance.factor) | variance.factor <= .Machine$double.eps))
       stop("CV-pilot HC2 is undefined because a residual row has zero or non-finite squared norm.",
            call. = FALSE)
@@ -289,7 +332,7 @@ nppltest <- function(object, bw.method = c("sun", "cv", "object"),
     mu <- fitted.null$mean
     e <- y - mu
     n <- length(y)
-    if (sum((diag(n) - H)^2) <= n * .Machine$double.eps ||
+    if (sum(.pltest_residual_norms(H)) <= n * .Machine$double.eps ||
         max(abs(e)) <= 64 * .Machine$double.eps * max(abs(y)))
       stop("The fitted null leaves no numerical residual variation to test.", call. = FALSE)
   })
