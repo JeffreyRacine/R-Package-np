@@ -13,6 +13,19 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   const int num_reg_continuous = call->num_reg_continuous;
   const int use_bernstein = (int_glp_bernstein_extern != 0);
   const int precision_eligible = np_regression_precision_eligible(call);
+  const double linear_training_max = call->ordinary_response && !call->all_large_kernel_rows ?
+    np_linear_beta_ann_training_max(call->kernel_route, BANDWIDTH_reg, num_reg_continuous,
+                             num_reg_unordered, num_reg_ordered, call->matrix_X_continuous_train,
+                             num_obs_train) : R_PosInf;
+  int has_upper = 0;
+  if(R_FINITE(linear_training_max)) {
+    for(int q = 0; q < num_obs_eval; ++q) {
+      if(call->matrix_X_continuous_eval[0][q] > linear_training_max) {
+        has_upper = 1;
+        break;
+      }
+    }
+  }
   const int pooled_beta = call->kernel_route != NULL && call->ordinary_response &&
     !call->all_large_kernel_rows && call->fit_projection == NULL &&
     np_pooled_beta_linear_precision(call->kernel_route,
@@ -165,7 +178,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   if(moment_errors)
     owner->power2_moments = (double *)malloc(
       (size_t)owner->nterms*(size_t)owner->nterms*sizeof(double));
-  if(retain_precision_weights || (moment_errors && reuse_fit_kernel_row) ||
+  if(retain_precision_weights || has_upper || (moment_errors && reuse_fit_kernel_row) ||
      (hc0_information_row && !categorical_pair))
     owner->retained_kernel_row = (double *)malloc(
       (size_t)num_obs_train*sizeof(double));
@@ -208,7 +221,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
      (include_response_square && owner->squared_response == NULL) ||
      owner->moments == NULL ||
      (moment_errors && owner->power2_moments == NULL) ||
-     ((retain_precision_weights || (moment_errors && reuse_fit_kernel_row) ||
+     ((retain_precision_weights || has_upper || (moment_errors && reuse_fit_kernel_row) ||
        (hc0_information_row && !categorical_pair)) &&
       owner->retained_kernel_row == NULL) ||
      owner->coefficient == NULL ||
@@ -320,6 +333,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 #endif
 
   for(j = 0; j < num_obs_eval; ++j) {
+    const int upper_row = has_upper && call->matrix_X_continuous_eval[0][j] > linear_training_max;
     NPLPSupportRankContext support_rank = {0, owner->nterms, owner->active_design};
     double sk, ey, ey2, sigma2hat;
     double pristine_anchor = 0.0;
@@ -328,8 +342,8 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     int precise = 0;
     double * const hc0_kernel_row = categorical_pair ?
       owner->categorical_base_kernel_row :
-      ((hc0_information_row || retain_precision_weights) ? owner->retained_kernel_row : NULL);
-    const int divide_retained_weights = retain_precision_weights || categorical_pair ||
+      ((hc0_information_row || retain_precision_weights || upper_row) ? owner->retained_kernel_row : NULL);
+    const int divide_retained_weights = retain_precision_weights || upper_row || categorical_pair ||
       (hc0_information_row && !reuse_fit_kernel_row);
     const double hc0_kernel_divisor =
       reuse_fit_kernel_row && !categorical_pair ? call->bandwidth_product : 1.0;
@@ -364,10 +378,10 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	         * its ordinary power-two moments still come from the native provider. */
 	        const int need_mpi_kernel_row = !categorical_pair &&
 	          (retain_precision_weights || (call->do_merr && call->kernel_route == NULL) || hc0_information_row);
-	        if(need_mpi_kernel_row)
+	        if(need_mpi_kernel_row || has_upper)
 	          owner->mpi_kernel_row = (double *)malloc(
 	            (size_t)num_obs_train*sizeof(double));
-	        if(need_mpi_kernel_row && owner->mpi_kernel_row == NULL)
+	        if((need_mpi_kernel_row || has_upper) && owner->mpi_kernel_row == NULL)
 	          error("\n** Error: memory allocation failed.");
 
 	        local_pos = 0;
@@ -377,6 +391,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	          NPLPSolvePolicyDiagnostics solve_diagnostics_owner = {0, 0.0};
 	          int have_vcov_owner = 0;
               int precise_owner = 0;
+              const int upper_owner = has_upper && call->matrix_X_continuous_eval[0][jj] > linear_training_max;
 	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
           /* Append only this rank's accepted replay state to its existing row.
            * The last status cell and incumbent chunk/row ownership stay intact. */
@@ -384,7 +399,8 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
           for(int k = 0; k < capture_width; ++k)
             capture[k] = NA_REAL;
 	          double * const owner_kernel_row = categorical_pair ?
-	            owner->categorical_base_kernel_row : owner->mpi_kernel_row;
+	            owner->categorical_base_kernel_row :
+                    ((need_mpi_kernel_row || upper_owner) ? owner->mpi_kernel_row : NULL);
 
 	          for(l = 0; l < num_reg_continuous; l++){
 	            owner->eval_continuous[l][0] =
@@ -551,7 +567,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	            break;
 	          }
               precise_owner = (precision_eligible ||
-                (pooled_beta && solve_diagnostics_owner.ridge_total == 0.0)) &&
+                ((pooled_beta || upper_owner) && solve_diagnostics_owner.ridge_total == 0.0)) &&
                 np_regression_precision_needed(&owner->solve_workspace,owner->nterms);
               if(precise_owner && !np_regression_precision_prepare(call,owner,
                    owner_kernel_row,1.0,solve_diagnostics_owner.ridge_total,
@@ -1181,7 +1197,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
-    precise = (precision_eligible || (pooled_beta && solve_diagnostics.ridge_total == 0.0)) &&
+    precise = (precision_eligible || ((pooled_beta || upper_row) && solve_diagnostics.ridge_total == 0.0)) &&
       np_regression_precision_needed(&owner->solve_workspace,owner->nterms);
     if(precise && !np_regression_precision_prepare(call,owner,hc0_kernel_row,
          hc0_kernel_divisor,solve_diagnostics.ridge_total,pristine_anchor)) {

@@ -1,5 +1,10 @@
 # npRmpi 0.80-3
 
+* For univariate degree-one beta regression with adaptive nearest-neighbor
+  bandwidths, fitted means, first derivatives and hat rows use a more accurate
+  calculation for ill-conditioned zero-ridge extrapolation above the training
+  range. This applies to both raw and Bernstein polynomial bases.
+
 * All ten specification, significance and distribution tests default to 399
   bootstrap draws. Bootstrap P values use the proportion at least as extreme
   as the observed statistic (K/B). The partially linear and single-index
