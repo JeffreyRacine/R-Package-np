@@ -159,6 +159,6 @@ summary(npindextest(binary1))
 # A different data seed gives another sample. At level 0.05 a true null
 # can be rejected, and a departure can go undetected. Changing only
 # random.seed varies the bootstrap p-value for the same observations.
-}
+} % enddontrun
 }
 \keyword{htest}
