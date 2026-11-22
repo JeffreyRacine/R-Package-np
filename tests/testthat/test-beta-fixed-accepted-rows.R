@@ -1,4 +1,6 @@
 test_that("fixed beta fits and hats recover the accepted local polynomial near a boundary", {
+  if (!spawn_mpi_slaves(n = 1L)) skip("MPI workers unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
   opts <- options(np.messages = FALSE)
   on.exit(options(opts), add = TRUE)
   v <- readRDS(test_path("fixtures", "beta-fixed-r112.rds"))
@@ -14,7 +16,7 @@ test_that("fixed beta fits and hats recover the accepted local polynomial near a
       H <- npreghat(bw, txdat = x, exdat = grid, s = s)
       ref <- m$rows[[s + 1L]]
       expect_identical(dim(H), dim(ref))
-      expect_true(all(attr(H, "ridge.used", exact = TRUE) == 0))
+      expect_identical(as.double(attr(H, "ridge.used", exact = TRUE)), numeric(nrow(grid)))
       expect_lt(max(abs(H - ref)), 1e-8)
       estimate <- if (s == 0L) fit$mean else fit$grad[, 1L]
       expect_lt(max(abs(estimate - drop(ref %*% v$y))), 1e-8)

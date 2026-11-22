@@ -1,4 +1,6 @@
 test_that("the linear beta ANN slope retains precision at the last training point", {
+  if (!spawn_mpi_slaves(n = 1L)) skip("MPI workers unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
   opts <- options(np.messages = FALSE)
   on.exit(options(opts), add = TRUE)
   v <- readRDS(test_path("fixtures", "beta-ann-r112.rds"))
