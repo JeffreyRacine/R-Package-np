@@ -42,3 +42,5 @@ mknpkg.sh
 ^benchmarks/common
 
 ^research$
+
+^data-raw$

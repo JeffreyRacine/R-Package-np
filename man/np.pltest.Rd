@@ -13,7 +13,8 @@
 nppltest(object, bw.method = c("sun", "cv", "object"),
          boot.method = c("wild-rademacher", "wild"), B = 399L,
          random.seed = 42L, projection.scale = c("original", "standardized"),
-         ..., boot.correction = c("none", "cv-pilot", "pilot-hc2", "cv-raw"))
+         ..., boot.correction = c("none", "cv-pilot", "pilot-hc2", "cv-raw"),
+         integration = c("sobol", "exact"), directions = 2048L)
 }
 \arguments{
   \item{object}{A fitted \code{\link{npplreg}} or \code{\link{npplregbw}}
@@ -57,11 +58,27 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
     residuals. Select \code{boot.method = "wild"} as well to reproduce the
     raw CV/Mammen recipe. \code{"pilot-hc2"} uses a leave-one-out-selected
     restricted polynomial pilot of degree at most three and its HC2 residuals.}
+  \item{integration}{The default, \code{"sobol"}, averages over a fixed,
+    shifted Sobol sequence of projection directions. Select \code{"exact"}
+    for the analytical angular integration of Sun et al. (2021).}
+  \item{directions}{Positive integer number of Sobol directions. The default
+    is 2,048. Smaller counts reduce projection time. Larger counts extend
+    the same sequence. Omit this argument with \code{integration = "exact"}.}
 }
 \details{
   Sun, Chen, Liang and Ruppert (2021) integrate a squared marked residual
   process over directions of the joint predictors and empirical thresholds.
-  The angle calculation integrates directions analytically. Kernel smoothing
+  In Sobol mode, the package shifts each coordinate of the Sobol points
+  modulo one, applies the standard normal quantile function and normalizes
+  each vector to unit length. The fixed shift was generated independently
+  of the data and bootstrap (Mersenne--Twister seed 514907). The observed
+  and bootstrap statistics use identical directions and empirical thresholds.
+  Tied projected values enter the residual sum together. Unordered factors
+  use orthonormal contrasts scaled to unit distance between levels. Sobol
+  integration supports up to 1,111 projection coordinates, counting one per
+  numeric or ordered predictor and one fewer than the number of observed
+  levels per unordered factor. Exact integration uses the original angular
+  formula. Kernel smoothing
   estimates the null conditional means. A bootstrap response is its chosen
   center plus a residual amplitude times an independent multiplier. Each
   draw is refitted with the test bandwidths. The test forms the training
@@ -86,9 +103,22 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   those designs; nominal power also differed. The test returns no automatic
   choice based on dimension or a preliminary test.
 
-  Computation stores dense training matrices and takes cubic time for the
-  angular calculation at fixed predictor dimension. The null training operator is reused across
-  blocks of bootstrap responses. The CV-pilot HC2 option also computes the
+  Finite-direction integration is a computational approximation to the
+  published statistic. In two mixed continuous/binary designs at
+  \eqn{n=240} and \eqn{800}, with 1,000 samples per design and size and
+  399 draws, the largest observed differences from exact integration at
+  2,048 directions were 0.4 percentage points for size and 0.5 for power
+  against curvature or interactions, across fixed and freshly shifted
+  sequences. All paired 95 percent intervals were within two percentage
+  points. Exact rejection rates at nominal five percent were 8.1 to 12.7
+  percent on these designs. Other designs can give different calibration.
+
+  Sobol integration sorts the projected observations and scores the
+  bootstrap residuals in blocks. With a fixed number of directions and
+  draws, sorting for one block takes order \eqn{n\log n}. The null fit
+  still stores a dense training operator and reuses it across bootstrap
+  responses. Exact angular integration stores an additional dense matrix
+  and takes cubic time at fixed predictor dimension. The CV-pilot HC2 option also computes the
   squared row norms of the separate pilot residual operator.
 }
 \value{
@@ -106,7 +136,8 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   quantiles. \code{bw.method}, \code{bws}, \code{bandwidths},
   \code{boot.method}, \code{boot.correction} and \code{pilot} identify the
   calibration. \code{n}, \code{continuous.z}, \code{cell.counts},
-  \code{projection.scale}, \code{boot.num} and \code{random.seed}
+  \code{projection.scale}, \code{integration}, \code{directions} (\code{NULL} for exact integration),
+  \code{boot.num} and \code{random.seed}
   describe the sample and computation. \code{call} and \code{model.call}
   retain the test and input model calls. \code{x.names}, \code{z.names} and
   \code{factor.levels} identify the predictors and nuisance factor levels.
@@ -165,6 +196,9 @@ d$y1 <- with(d, y0 + 1.5*(x1^2 - 1))
 bw1 <- npplregbw(y1 ~ x1 + x2 | z, data = d, regtype = "ll")
 summary(nppltest(bw1))
 # P Value: 0 (0 of 399) at seed 42. Reject partial linearity at level 0.05.
+
+# To change the integration, use nppltest(fit0, directions = 512L)
+# or nppltest(fit0, integration = "exact").
 
 # With another data seed, even a true null can be rejected, and a sample
 # drawn under the alternative can fail to reject. With the data held fixed,
