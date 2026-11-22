@@ -92,7 +92,7 @@
 # readers operate on the original objects and never enter this construction path.
 # Use the emitted provider identity and the band actually returned. The literal
 # selector can have two different owners across density kernels.
-.np_plot_family_components <- function(meta, intervals, request) {
+.np_plot_family_components <- function(meta, intervals, request, family) {
   parts <- list()
   actual <- meta$calibration
   if (is.null(actual)) actual <- meta$primary
@@ -121,7 +121,8 @@
     } else if (isTRUE(actual %in% c("absolute", "symmetric-sd"))) {
       "symmetric-sd"
     } else if (isTRUE(actual %in% c("separate-tails", "percentile-tails", "asymmetric-sd"))) {
-      if (identical(actual, "percentile-tails")) actual else "asymmetric-sd"
+      if (identical(actual, "percentile-tails") ||
+          (family == "npudens" && identical(actual, "separate-tails"))) actual else "asymmetric-sd"
     } else if (construction %in% c("cdf-absolute-process-v1", "cdf-bc-v1")) {
       "symmetric-sd"
     } else if (construction == "density-bc-v2-signed") {
@@ -146,7 +147,7 @@
       endpoint <- switch(method,
         percentile = "empirical bootstrap curve quantiles",
         `symmetric-sd` = "symmetric absolute-process bounds",
-        `asymmetric-sd` = "signed process limits",
+        `separate-tails` =, `asymmetric-sd` = "signed process limits",
         `asymmetric-sd-envelope` = "hull of signed and absolute process bounds",
         `score-envelope` = "process bounds with marginal score protection",
         NULL)
