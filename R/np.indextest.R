@@ -205,7 +205,7 @@
     groups <- rowsum(cbind(weights, weights*ydat), base, reorder = FALSE)
     centers <- as.integer(rownames(groups))
     length.fft <- stats::nextn(2L*(max(centers)+4L))
-    mesh <- complex(length = length.fft)
+    mesh <- complex(length.out = length.fft)
     for (j in seq_along(offsets)) {
       pos <- centers + offsets[j]
       mesh[pos] <- mesh[pos] + complex(real = groups[, j], imaginary = groups[, 8L+j])
@@ -213,7 +213,7 @@
     delta <- seq_len(length.fft)-1
     kernel <- exp(-.5*(pmin(delta, length.fft-delta)/24)^2)
     field <- stats::fft(stats::fft(mesh)*stats::fft(kernel), inverse = TRUE)/length.fft
-    total <- complex(length = n)
+    total <- complex(length.out = n)
     for (j in seq_along(offsets))
       total <- total + weights[, j]*field[base+offsets[j]]
     # Remove self. In sparse tails, directly accumulate the remaining donors.
