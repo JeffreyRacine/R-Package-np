@@ -27,20 +27,30 @@ test_that("the native index score agrees with the ordered-pair statistic", {
 })
 
 test_that("bootstrap refits match an independently refitted response stream", {
-  set.seed(711)
-  x <- data.frame(a = rnorm(45), b = rnorm(45), c = rnorm(45))
-  y <- x$a + 0.4*x$b + rnorm(45)
-  bw <- npindexbw(xdat = x, ydat = y, method = "ichimura", nmulti = 1L)
+  set.seed(42)
+  x <- as.data.frame(matrix(rnorm(72L * 3L), 72L, 3L))
+  y <- x[[1L]] + 0.4*x[[3L]] + rnorm(72L)
+  fit.response <- function(v)
+    npindexbw(xdat = x, ydat = v, method = "ichimura", bws = c(1,.1,.3,.4),
+              optim.method = "CG", nmulti = 2L, random.seed = 32L,
+              optim.maxit = 30L, scale.factor.search.lower = .05)
+  bw <- fit.response(y)
   data <- .indextest_setup(bw, "published")
   index <- .indextest_index(data, data$beta, data$bw)
   data$pilot <- .indextest_pilot(data, index)
-  set.seed(412)
+  # The pre-streaming full-matrix pilot is an independent small-sample oracle.
+  logw <- -0.5*(outer(index$z, index$z, "-")/index$g)^2
+  diag(logw) <- -Inf
+  weights <- exp(logw - apply(logw, 1L, max))
+  oracle <- data
+  oracle$pilot <- drop(weights %*% y / rowSums(weights))
+  set.seed(42)
   reference <- vapply(seq_len(2L), function(i) {
-    response <- .indextest_response(data)
-    fit <- npindexbw(xdat = x, ydat = response, method = "ichimura", nmulti = 1L)
+    response <- .indextest_response(oracle)
+    fit <- fit.response(response)
     .indextest_score(response, .indextest_index(data, fit$beta, fit$bw), data)
   }, numeric(1))
-  set.seed(412)
+  set.seed(42)
   actual <- vapply(seq_len(2L), function(i)
     .indextest_refit(.indextest_response(data), data, i), numeric(1))
   expect_false(reference[1L] == reference[2L])

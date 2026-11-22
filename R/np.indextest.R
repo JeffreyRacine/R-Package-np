@@ -129,8 +129,8 @@
   binary <- data$recipe$method == "kleinspady"
   # Retain the original rowwise normalization and matrix product. Only a
   # fixed number of target rows is live at any point.
-  for (first in seq.int(1L, n, by = 32L)) {
-    rows <- seq.int(first, min(n, first + 31))
+  for (first in seq.int(1L, n, by = 64L)) {
+    rows <- seq.int(first, min(n, first + 63))
     logw <- -0.5*(outer(index$z[rows], index$z, "-")/index$g)^2
     if (binary) {
       weights <- exp(logw)
