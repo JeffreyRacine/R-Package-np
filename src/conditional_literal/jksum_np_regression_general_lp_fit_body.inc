@@ -31,8 +31,11 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     np_pooled_beta_linear_precision(call->kernel_route,
       BANDWIDTH_reg, num_reg_continuous, num_reg_unordered, num_reg_ordered,
       call->kernel_u, call->lambda, call->num_categories);
+  const int fixed_beta = call->ordinary_response && !call->all_large_kernel_rows &&
+    np_fixed_beta_precision(call->kernel_route, BANDWIDTH_reg, num_reg_continuous,
+                            num_reg_unordered, num_reg_ordered);
   const int retain_precision_weights = (precision_eligible && BANDWIDTH_reg == BW_ADAP_NN) ||
-    (pooled_beta && call->do_merr);
+    ((pooled_beta || fixed_beta) && call->do_merr);
   const double epsilon = 1.0/(double)MAX(1, num_obs_train);
   const int hc0_residual_preparing = call->hc0_context != NULL &&
     call->hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
@@ -973,7 +976,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
-    precise = (precision_eligible || ((pooled_beta || extrapolated_row) && solve_diagnostics.ridge_total == 0.0)) &&
+    precise = (precision_eligible || ((pooled_beta || fixed_beta || extrapolated_row) && solve_diagnostics.ridge_total == 0.0)) &&
       np_regression_precision_needed(&owner->solve_workspace,owner->nterms);
     if(precise && !np_regression_precision_prepare(call,owner,hc0_kernel_row,
          hc0_kernel_divisor,solve_diagnostics.ridge_total,pristine_anchor)) {
