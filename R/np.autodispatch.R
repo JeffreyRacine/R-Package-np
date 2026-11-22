@@ -3131,24 +3131,33 @@
 }
 
 .npRmpi_autodispatch_untag <- function(x) {
+  clean <- .npRmpi_autodispatch_untag_changes(x)
+  if (is.null(clean)) x else clean
+}
+
+# NULL marks a clean subtree. Replacing even an unchanged data-frame column
+# can reorder its attributes and invalidate a valid worker-data fingerprint.
+.npRmpi_autodispatch_untag_changes <- function(x) {
+  changed <- FALSE
   if (is.list(x) && !is.pairlist(x) && !is.call(x)) {
     for (i in seq_len(length(x))) {
       xi <- tryCatch(x[[i]], error = function(e) NULL)
-      if (!is.null(xi))
-        x[i] <- list(.npRmpi_autodispatch_untag(xi))
+      if (is.null(xi)) next
+      child <- .npRmpi_autodispatch_untag_changes(xi)
+      if (!is.null(child)) {
+        x[i] <- list(child)
+        changed <- TRUE
+      }
     }
   }
-  # Removing an absent attribute can wrap a shared vector; later serialization
-  # materializes that wrapper. Leave untagged values untouched.
-  if (!is.null(attr(x, "npRmpi.dispatch.mode", exact = TRUE)))
-    attr(x, "npRmpi.dispatch.mode") <- NULL
-  if (!is.null(attr(x, "npRmpi.autodispatch.remote", exact = TRUE)))
-    attr(x, "npRmpi.autodispatch.remote") <- NULL
-  if (!is.null(attr(x, "npRmpi.autodispatch.fingerprint", exact = TRUE)))
-    attr(x, "npRmpi.autodispatch.fingerprint") <- NULL
-  if (!is.null(attr(x, "npRmpi.autodispatch.lease", exact = TRUE)))
-    attr(x, "npRmpi.autodispatch.lease") <- NULL
-  x
+  for (name in c("npRmpi.dispatch.mode", "npRmpi.autodispatch.remote",
+                 "npRmpi.autodispatch.fingerprint", "npRmpi.autodispatch.lease")) {
+    if (!is.null(attr(x, name, exact = TRUE))) {
+      attr(x, name) <- NULL
+      changed <- TRUE
+    }
+  }
+  if (changed) x else NULL
 }
 
 .npRmpi_guard_no_auto_object_in_manual_bcast <- function(obj, where = "this call") {

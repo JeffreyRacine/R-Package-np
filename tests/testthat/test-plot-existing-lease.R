@@ -47,6 +47,10 @@ test_that('plot consumption uses the current lease and rejects changed ownership
   options(l1.test.plot.active=FALSE)
   expect_gt(getOption('l1.test.plot.hits'),0L)
   expect_s3_class(out,'np_plot_data')
+  joint <- suppressWarnings(plot(b, errors = "asymptotic", band = "simultaneous",
+                                 gaussian.draws = 199L, output = "data", neval = 5L))
+  expect_s3_class(joint, "np_plot_data")
+  expect_true(all(is.finite(joint$panels[[1L]]$intervals$lower)))
   expect_identical(get('.npRmpi_autodispatch_fingerprint',ns)(b),fp)
   bad <- b; bad$bw <- bad$bw*1.1
   options(l1.test.plot.active=TRUE,l1.test.plot.hits=0L)
@@ -56,4 +60,31 @@ test_that('plot consumption uses the current lease and rejects changed ownership
   expect_s3_class(changed,'np_plot_data')
   restored <- unserialize(serialize(b,NULL))
   expect_null(get('.npRmpi_lease_resolve',ns)(restored,'npreg','bws'))
+})
+
+test_that("dispatch cleanup preserves byte identity of clean formula frames", {
+  d <- data.frame(x = factor(c("b", "a")), y = 1:2, row.names = c("one", "two"))
+  frame <- model.frame(y ~ x, data = d)
+  nested <- list(clean = frame, tagged = structure(1:2, npRmpi.dispatch.mode = "auto"), empty = NULL)
+  cleaned <- .npRmpi_autodispatch_untag(nested)
+  expect_identical(serialize(cleaned$clean, NULL), serialize(frame, NULL))
+  expect_identical(cleaned$tagged, 1:2)
+  expect_identical(names(cleaned), names(nested))
+  expect_identical(attr(nested$tagged, "npRmpi.dispatch.mode"), "auto")
+})
+
+test_that("a captured regression bandwidth validates its own formula provenance", {
+  f <- y ~ x
+  owner <- new.env(parent = baseenv())
+  environment(f) <- owner
+  original <- structure(list(bw = .4, formula = f, call = quote(npregbw(y ~ x))), class = "rbandwidth")
+  remote <- .npRmpi_bw_metadata_wire(original)
+  captured <- remote
+  captured$bw <- .35
+  result <- structure(list(bws = remote, fit.request = list(bws = captured)), class = "npregression")
+  out <- .npRmpi_bw_restore_public_owner(result, list(original))
+  expect_identical(environment(out$fit.request$bws$formula), owner)
+  expect_identical(out$fit.request$bws$bw, .35)
+  result$fit.request$bws$formula <- y ~ z
+  expect_error(.npRmpi_bw_restore_public_owner(result, list(original)), "metadata changed")
 })
