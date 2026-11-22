@@ -58,6 +58,13 @@ weights. The Klein--Spady adaptation draws Bernoulli responses from inclusive
 CV fitted probabilities. The one-sided p-value includes the observed draw
 in its numerator and denominator. Predictor geometry is reusable, while the
 estimated direction and its kernel weights depend on each bootstrap response.
+For Ichimura fits, a common change of response units cancels from the
+studentized score at a given direction and bandwidth. The calculation rescales
+the response before forming pair differences. If refitting in different units,
+the starting direction and absolute stopping tolerance of \code{\link{npindexbw}}
+can affect the selected fit and hence the bootstrap results. For very small
+or large units, fit and test in numerically convenient response units.
+
 The pilot and statistic process pairs in blocks. For a fixed number of
 covariates their workspace grows linearly with the sample size.
 

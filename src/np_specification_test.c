@@ -97,6 +97,21 @@ SEXP C_np_indextest_score(SEXP response, SEXP index, SEXP coordinates,
     const int p = ncols(coordinates);
     double g = asReal(bandwidth);
     if (!R_FINITE(g) || g <= 0.0) error("Invalid residual bandwidth.");
+    /* A common response multiplier cancels from this studentized score.
+       Normalize before subtraction: even a difference of two finite values
+       can overflow. Binary exponent scaling also handles subnormal units
+       without forming a potentially unrepresentable reciprocal. */
+    double magnitude = 0.0;
+    for (int i = 0; i < n; ++i) {
+        if (!R_FINITE(y[i])) error("Non-finite single-index response.");
+        magnitude = fmax(magnitude, fabs(y[i]));
+    }
+    if (magnitude == 0.0) error("Degenerate single-index pairwise variance.");
+    int exponent;
+    (void)frexp(magnitude, &exponent);
+    double *scaled_y = (double *)R_alloc(n, sizeof(double));
+    for (int i = 0; i < n; ++i) scaled_y[i] = scalbn(y[i], -exponent);
+
     SEXP ans = PROTECT(allocVector(REALSXP,m));
     double *score = REAL(ans);
     const double *h = REAL(widths);
@@ -114,7 +129,7 @@ SEXP C_np_indextest_score(SEXP response, SEXP index, SEXP coordinates,
         }
         for (int j = i+1; j < n; ++j) {
             double t = (z[i]-z[j])/g;
-            double delta = (y[i]-y[j])*exp(-0.5*t*t);
+            double delta = (scaled_y[i]-scaled_y[j])*exp(-0.5*t*t);
             u[i] += delta;
             u[j] -= delta;
         }

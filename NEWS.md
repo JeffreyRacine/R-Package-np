@@ -1,5 +1,10 @@
 # npRmpi 0.80-3
 
+* `npindextest()` now forms its studentized score in scaled response units
+  to avoid overflow and underflow from large and small response units.
+  `npindextest()` and `nppltest()` display interactive progress, elapsed
+  time in summaries, and significance codes for the bootstrap p-value.
+
 * Improve the covariance of bias-corrected regression estimates at extrapolated targets for one-sided Gaussian degree-zero nearest-neighbour fits using a degree-five auxiliary polynomial. The correction retains the selected bandwidth, polynomial space and ridge decisions.
 
 * Improve numerical precision of univariate auxiliary pilot training means and first derivatives in iterated regression bias correction.
