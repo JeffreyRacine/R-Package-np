@@ -64,11 +64,12 @@ test_that("public uniform means retain defaults and reject unqualified derivativ
     y<-sin(3*x$x)+.15*cos(seq_len(60L))+if(pooled).2*as.integer(x$group)else 0
     bw<-npregbw(xdat=x,ydat=y,bws=c(1.1,if(pooled).2),regtype="lc",ckertype="uniform",bandwidth.compute=FALSE)
     held<-bw;set.seed(112921L);seed<-.Random.seed
-    run<-function(control=NULL,derivatives=FALSE){args<-list(x=bw,xdat=x,ydat=y,center="bias-corrected",errors="bootstrap",B=199L,neval=3L,alpha=.1,band="all",gradients=derivatives,output="data");if(!missing(control))args<-c(args,list(boot.control=control));capture_plot_provider(do.call(plot,args))}
-    automatic<-run();expect_error(run(NULL),"boot.control must be created by np_boot_control",fixed=TRUE);explicit<-run(np_boot_control(calibration="basic-local-envelope"));expect_identical(automatic$result$panels,explicit$result$panels)
-    for(control in list(np_boot_control(),np_boot_control(calibration="default")))expect_identical(run(control)$provider,automatic$provider)
-    rad<-run(np_boot_control(wild="rademacher"));tail<-run(np_boot_control(wild="rademacher",calibration="tail-envelope"));expect_identical(rad$result$panels,tail$result$panels)
-    expect_identical(rad$result$inference[[1L]]$calibration,"tail-envelope");expect_identical(rad$result$inference[[1L]]$resampling_law,"rademacher")
+    run<-function(control=NULL,derivatives=FALSE,interval=NULL){args<-list(x=bw,xdat=x,ydat=y,center="bias-corrected",errors="bootstrap",B=199L,neval=3L,alpha=.1,band="all",gradients=derivatives,output="data");args$interval<-interval;if(!missing(control))args<-c(args,list(boot.control=control));capture_plot_provider(do.call(plot,args))}
+    automatic<-run();expect_error(run(NULL),"boot.control must be created by np_boot_control",fixed=TRUE);explicit<-run(interval="basic-local-envelope");expect_identical(automatic$result$panels,explicit$result$panels)
+    expect_identical(run(np_boot_control())$provider,automatic$provider)
+    expect_error(run(np_boot_control(calibration="default")), "omit interval", fixed=TRUE)
+    rad<-run(np_boot_control(wild="rademacher"));tail<-run(np_boot_control(wild="rademacher"),interval="asymmetric-sd-envelope");expect_identical(rad$result$panels,tail$result$panels)
+    expect_identical(rad$result$inference[[1L]]$components$simultaneous$calibration,"tail-envelope");expect_identical(rad$result$inference[[1L]]$resampling_law,"rademacher")
     expect_error(run(derivatives=TRUE),"continuous derivatives remain unqualified")
     expect_error(run(derivatives=TRUE),"construction='legacy'",fixed=TRUE)
     expect_identical(bw,held);expect_identical(.Random.seed,seed)

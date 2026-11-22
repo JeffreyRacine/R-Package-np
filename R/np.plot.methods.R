@@ -253,6 +253,9 @@ np_render_control <- function(style = c("band", "bar"),
                                           bws = NULL,
                                           context = "plot") {
   dot.names <- .np_plot_dot_names(dots_call)
+  if (context %in% c("plot.npregression","plot.rbandwidth") &&
+      "plot.errors.boot.calibration" %in% dot.names)
+    stop("for regression replace plot.errors.boot.calibration with interval",call.=FALSE)
   .np_plot_check_public_names(dot.names)
   if ("data" %in% dot.names) {
     data.owner <- if (identical(method, .np_plot_compat_dispatch))

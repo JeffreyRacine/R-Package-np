@@ -53,7 +53,7 @@ test_that("public basic derivative plots preserve fitted objects and existing or
   for(law in c("inid","fixed","geom"))for(order in 1:2) {
     out<-withCallingHandlers(plot(fit,errors="bootstrap",center="bias-corrected",bootstrap=law,
       gradients=TRUE,gradient.order=order,band="all",neval=5L,B=199L,output="data",
-      boot.control=np_boot_control(calibration="basic-envelope",blocklen=if(law=="inid")NULL else 3L)),
+      interval="basic-envelope", boot.control=np_boot_control(blocklen=if(law=="inid")NULL else 3L)),
       warning=function(w) {
         if(startsWith(conditionMessage(w),"Empirical band quantiles have limited draw resolution"))
           invokeRestart("muffleWarning")
@@ -65,7 +65,7 @@ test_that("public basic derivative plots preserve fitted objects and existing or
       d<-as.data.frame(out,panel=panel,band="simultaneous")
       expect_true(all(is.finite(d$lower)));expect_true(all(d$lower<=d$upper))
       meta<-out$inference[[out$targets$inference_id[panel]]]
-      expect_identical(meta$calibration,"basic-envelope")
+      expect_identical(meta$components$simultaneous$calibration,"basic-envelope")
       expect_identical(meta$resampling_law,law)
       expect_identical(meta$scope,"finite grid within each scalar-target family")
       if(panel==2L) {
@@ -81,7 +81,7 @@ test_that("public basic derivative plots preserve fitted objects and existing or
   }
   expect_error(plot(fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",gradients=TRUE,
     gradient.order=3L,band="simultaneous",neval=5L,B=199L,output="data",
-    boot.control=np_boot_control(calibration="basic-envelope")),"degree - 1",fixed=TRUE)
+    interval="basic-envelope"),"degree - 1",fixed=TRUE)
   expect_identical(.Random.seed,rng)
 })
 
@@ -97,7 +97,7 @@ test_that("basic envelopes retain nearest-neighbour refusals for means and deriv
     for(gradient in c(FALSE,TRUE)) {
       expect_error(plot(fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",
         gradients=gradient,band="simultaneous",neval=5L,B=199L,output="data",
-        boot.control=np_boot_control(calibration="basic-envelope")),
+        interval="basic-envelope"),
         "basic-envelope requires inid, fixed or geom and fixed-bandwidth regression",fixed=TRUE)
       expect_identical(fit,before);expect_identical(.Random.seed,rng)
     }

@@ -298,7 +298,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   row resample. Inid uses the smoothed variance refinement; fixed and geom use
   their score-bootstrap scale. On pooled fixed and geom paths the scale is
   the exact conditional covariance and bootstrap-t uses a replicate-specific
-  selected-block scale. The \code{pmzsd} display uses a normal multiple of the
+  selected-block scale. The \code{interval="normal-sd"} display uses a normal multiple of the
   observed scale, with no bootstrap-t coverage claim. Degenerate resampling
   variance for an active target is an error, not a zero-width interval.
   Automatic block selection uses raw P0 residuals
@@ -306,7 +306,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   The legacy \code{nonfixed="frozen"} resampling switch is not applicable.
   Explicit block lengths are retained as overrides.
 
-  The opt-in \code{np_boot_control(calibration="basic-envelope")} uses an
+  The opt-in \code{interval="basic-envelope"} uses an
   endpoint-unit basic envelope for inid/fixed/geometric fixed-bandwidth means, derivatives and categorical contrasts. It retains the
   corrected center, variance owner and bounded corrected-row computation; see
   \code{\link{np_boot_control}} for its construction and restrictions.
@@ -316,7 +316,7 @@ np_bias_control(construction = c("iterated", "legacy"),
   coverage refers to the finite displayed grid within each scalar target
   family. Bands are nested and coincide for a singleton family. Gaussian
   and bootstrap marginal limits use absolute studentized draws and an outward
-  Bonferroni envelope. \code{band="pmzsd"} retains
+  Bonferroni envelope. \code{interval="normal-sd"} retains
   its normal-quantile times standard-error meaning. Use \code{gaussian.draws}
   or \code{B} to control calibration precision. Increasing the number of
   draws can be necessary for remote empirical Bonferroni tails on large grids.

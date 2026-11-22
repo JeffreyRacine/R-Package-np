@@ -40,16 +40,10 @@ np_render_control(style = c("band", "bar"),
   Corrected density providers reject fixed blocks whose length equals the
   training sample size: each resample then contains every observation exactly
   once and has no resampling variation. Geometric blocks are unaffected.}
-  \item{calibration}{For bias-corrected bootstrap empirical bands,
-    \code{"symmetric-sd"} selects the existing absolute-root construction and
-    \code{"asymmetric-sd"} selects separate empirical tails with the family's
-    existing scale treatment. These names apply to regression, unconditional
-    density and unconditional distribution estimation. The experimental option
-    \code{"smoothed-percentile"} selects calibrated unshifted corrected
-    bootstrap curves, with family-specific resampling described below. The
-    regression default selects an already qualified construction from the fitted
-    kernel and requested law as described below; explicit choices retain their
-    meanings. See Details for supported configurations.}
+  \item{calibration}{Construction selection for supported density and
+    distribution plots. Regression plots use the \code{interval} argument
+    to \code{\link{plot.np}}. For regression, omit this field in the bootstrap
+    control, including when retaining the default.}
   \item{xtrim}{Optional two-element trim range for evaluation grids.}
   \item{xq}{Optional evaluation quantiles.}
   \item{slices}{Optional slice specification for routes that support it.}
@@ -76,26 +70,26 @@ choice. Regression defaults follow the kernel/law policy below.
 
 Fixed-bandwidth second-order Epanechnikov kernels with none/fixed support
 and second-order beta kernels with declared finite fixed support admit explicit
-\code{"separate-tails"} (including its \code{"asymmetric-sd"} alias) and
-\code{"tail-envelope"} with \code{"inid"}, \code{"fixed"}, \code{"geom"} or Mammen/Rademacher wild resampling.
+\code{"asymmetric-sd"} and
+\code{"asymmetric-sd-envelope"} with \code{"inid"}, \code{"fixed"}, \code{"geom"} or Mammen/Rademacher wild resampling.
 These existing standardized-root constructions are experimental alternatives.
 They can be substantially narrower than the default local envelope and need not
 retain its finite-sample coverage; saved degree-two beta derivative examples
 miss features covered by the local envelope. The local-envelope default is
 unchanged. Explicit tail controls still require empirical bands; they do not
-select asymptotic errors or \code{"pmzsd"}.
+select asymptotic errors or \code{interval="normal-sd"}.
 
 The same fixed second-order kernel configurations support ordinary iterated
-bias-corrected asymptotic and \code{"pmzsd"} calls. Asymptotic finite-grid
+bias-corrected asymptotic and \code{interval="normal-sd"} calls. Asymptotic finite-grid
 bands use the existing Gaussian multiplier process with replicate residual-pilot
-studentization; \code{"pmzsd"} uses a normal critical value times the observed
+studentization; \code{interval="normal-sd"} uses a normal critical value times the observed
 corrected-process SD and is not a simultaneous band. Explicit
-\code{"absolute"} (or \code{"symmetric-sd"}) supports pairs, Mammen and Rademacher
+\code{"symmetric-sd"} supports pairs, Mammen and Rademacher
 resampling. The auxiliary pilots remain Gaussian. These SD constructions retain
 finite-sample limitations, including saved degree-two derivative misses;
 Mammen and pairs empirical defaults continue to select the more protective
 local envelope. For Rademacher wild resampling, omitted/default calibration
-selects \code{"tail-envelope"} for these fixed configurations, preserving both
+selects \code{"asymmetric-sd-envelope"} for these fixed configurations, preserving both
 its signed and absolute intervals; explicit controls are unchanged. Nonpooled
 Rademacher targets retain observed corrected-process scaling, while pooled
 mixed-predictor targets retain replicate residual-pilot studentization for
@@ -105,15 +99,15 @@ alter Gaussian defaults; the saved derivative limitations still apply.
 For fixed-bandwidth raw Epanechnikov GLP fits with a quadratic component,
 and fixed-bandwidth beta derivatives with a positive main degree, the
 supported iterated empirical bands require explicit
-\code{np_boot_control(calibration="basic-local-envelope")} with pairs or
+\code{interval="basic-local-envelope"} with pairs or
 Mammen resampling. Saved cases show numerical sensitivity in the fitted rows.
 
 Fixed uniform-kernel models with \code{ckerbound="none"} or \code{"fixed"}
 support iterated mean correction for local-constant fits and GLP fits with
 degree zero in every continuous predictor, including mean panels
 for mixed continuous/categorical predictors. Their empirical default is \code{"basic-local-envelope"} for
-Mammen or pairs resampling and \code{"tail-envelope"} for Rademacher;
-asymptotic and \code{"pmzsd"} calls retain absolute calibration. The same
+Mammen or pairs resampling and \code{"asymmetric-sd-envelope"} for Rademacher;
+asymptotic and \code{interval="normal-sd"} calls retain absolute calibration. The same
 explicit fixed-kernel calibration/law combinations above apply to these mean
 targets. Continuous uniform derivatives remain unqualified under iterated
 correction, including local-constant auxiliary-only derivatives. For mixed
@@ -134,7 +128,7 @@ original samples and does not establish nominal coverage. Higher-degree uniform
 NN correction and continuous uniform derivatives remain unqualified.
 
 
-The experimental \code{calibration="basic-envelope"} is available for
+The experimental \code{interval="basic-envelope"} is available for
 fixed-bandwidth regression means, derivatives and categorical contrasts with \code{bootstrap="inid"}, \code{"fixed"}
 or \code{"geom"} and iterated
 bias correction. Applicable main kernels are second-order Gaussian under its
@@ -159,7 +153,7 @@ it substantially elsewhere. Relative to standardized SD bands it can be
 narrower at the most variable targets; it is conservative only relative to
 its raw separate-tail construction. For inid and non-pooled block rows,
 pointwise results equal the existing
-\code{"tail-envelope"} pointwise results. Its behavior depends on the full
+\code{"asymmetric-sd-envelope"} pointwise results. Its behavior depends on the full
 displayed grid.
 Bandwidths and polynomial degrees remain fixed. No Gaussian critical value
 or replicate-specific studentizer is used by this option. For inid and
@@ -174,10 +168,10 @@ existing automatic selector are retained; fixed blocks of length n have no
 resampling variation and are refused. At least two draws are required.
 For iterated bias-corrected regression with fixed bandwidths and at least one
 continuous predictor, omitted control, \code{np_boot_control()} and
-\code{calibration="default"} follow the declared kernel and resampling law.
+\code{interval=NULL} follow the declared kernel and resampling law.
 For the admitted Epanechnikov, fixed-support beta and degree-zero uniform
 targets described above, empirical inid/fixed/geom or Mammen bands use \code{"basic-local-envelope"};
-Rademacher bands use \code{"tail-envelope"}. Asymptotic and \code{"pmzsd"}
+Rademacher bands use \code{"asymmetric-sd-envelope"}. Asymptotic and \code{interval="normal-sd"}
 calls use absolute calibration. Each choice matches its explicit construction
 and is resolved once before the target families are evaluated. Gaussian and
 nearest-neighbour defaults retain their existing policy; explicit nondefault
@@ -187,7 +181,7 @@ envelope as requested by default. This policy does not broaden coverage
 evidence or numerical admission rules. A supplied control must still be an
 \code{np_boot_control} object; \code{boot.control=NULL} is not a control object.
 
-For pairs resampling, experimental \code{calibration="basic-local-envelope"} has the same
+For pairs resampling, experimental \code{interval="basic-local-envelope"} has the same
 fixed-bandwidth admission rules and also supports generalized and adaptive
 nearest-neighbour bandwidths with second-order Gaussian regression: unbounded
 support, or local-constant, local-linear or GLP fits with main degrees at most one and declared
@@ -217,19 +211,19 @@ bandwidths. Adaptive NN retains the existing derivative construction; generalize
 NN is restricted to main polynomial degrees at most one in every continuous
 predictor. Neighbour counts remain fixed during inference. Second-order
 Epanechnikov LC, local-linear and GLP fits with unbounded or declared fixed support
-and main degrees at most one in every continuous predictor also admit explicit \code{"basic-envelope"}, \code{"separate-tails"}
-(including \code{"asymmetric-sd"}) and \code{"tail-envelope"} pairs bands
+and main degrees at most one in every continuous predictor also admit explicit \code{"basic-envelope"}, \code{"asymmetric-sd"}
+(including \code{"asymmetric-sd"}) and \code{"asymmetric-sd-envelope"} pairs bands
 for either NN type. Their omitted/default pairs calibration is the unchanged,
 more protective local envelope. Means, frozen-radius first derivatives and
 categorical contrasts retain their existing corrected rows. The comparisons
 use only two saved original samples and do not establish nominal coverage.
-For that degree-zero or first-order Epanechnikov NN class, ordinary asymptotic and \code{"pmzsd"} calls
+For that degree-zero or first-order Epanechnikov NN class, ordinary asymptotic and \code{interval="normal-sd"} calls
 also use the established corrected-process SD construction. Explicit
-\code{"absolute"} or \code{"symmetric-sd"} admits pairs, Mammen and Rademacher;
+\code{"symmetric-sd"} or \code{"symmetric-sd"} admits pairs, Mammen and Rademacher;
 separate tails and the tail envelope additionally admit both wild laws.
 The Mammen empirical default uses the local envelope and the Rademacher default
 uses its containing tail envelope. Gaussian auxiliary fits and all fitted
-neighbour counts remain fixed. As elsewhere, \code{"pmzsd"} is a normal
+neighbour counts remain fixed. As elsewhere, \code{interval="normal-sd"} is a normal
 critical value times the observed corrected SD, not a simultaneous band.
 The two saved-sample comparisons do not establish nominal coverage or remove
 finite-sample uncertainty. Explicit narrower methods retain their definitions.
@@ -297,11 +291,11 @@ Derivative coverage, especially for higher orders and dependent observations,
 is incompletely characterized; structural qualification is not a coverage
 guarantee. The existing asymptotic and SD constructions remain available.
 The original \code{"basic-envelope"} does not support wild resampling or
-nearest-neighbour bandwidths. Neither envelope supports \code{band="pmzsd"}. Existing methods and
+nearest-neighbour bandwidths. Neither envelope supports \code{interval="normal-sd"}. Existing methods and
 defaults are unchanged. Like all corrected bounds, this option is pre-beta
 research, with limited coverage evidence rather than a general guarantee.
 
-The \code{"legacy"} selection retains the pre-iterated regression and
+For regression set \code{bias.control=np_bias_control(construction="legacy")} to select the pre-iterated correction. For density and distribution the \code{"legacy"} calibration selects the
 pre-joint density/CDF bias-corrected bootstrap constructions. It is shorthand
 for the corresponding family \code{bias.control} with
 \code{construction="legacy"}; it is not a fourth new calibration algorithm.
@@ -397,7 +391,7 @@ a fixed capture-memory ceiling for these pairs methods. Matching the fitted
 operator does not establish nominal coverage at sparse or extreme-leverage
 targets. These methods remain experimental and incomplete.
 
-For regression, the common \code{"smoothed-percentile"} label selects the
+For regression, \code{interval="outer-calibrated-percentile"} selects the
 E1 mean / E6 first-derivative calibrated percentile construction. This is a
 fixed-design standardized empirical-residual bootstrap: residual innovations
 are centered and normalized, then resampled with replacement and multiplied by

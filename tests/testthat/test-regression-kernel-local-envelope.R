@@ -74,7 +74,7 @@ test_that("public Epanechnikov local envelopes preserve state and target grids",
   fit<-npreg(bws=bw,txdat=x,tydat=y);held<-fit;set.seed(104012);seed<-.Random.seed
   run<-function(obj,...)suppressWarnings(plot(obj,errors="bootstrap",center="bias-corrected",
     bootstrap="inid",B=99L,neval=5L,band="all",gradients=TRUE,output="data",
-    random.seed=104013L,boot.control=np_boot_control(calibration="basic-local-envelope"),...))
+    random.seed=104013L,interval="basic-local-envelope",...))
   a<-run(fit);b<-run(bw,xdat=x,ydat=y)
   for(band in c("pointwise","simultaneous","bonferroni")) {
     z<-as.data.frame(a,band=band)
@@ -83,7 +83,7 @@ test_that("public Epanechnikov local envelopes preserve state and target grids",
   }
   expect_identical(fit,held);expect_identical(.Random.seed,seed)
   expect_s3_class(suppressWarnings(plot(fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",
-    B=19L,neval=5L,band="all",output="data",boot.control=np_boot_control(calibration="basic-envelope"))),"np_plot_data")
+    B=19L,neval=5L,band="all",output="data",interval="basic-envelope")),"np_plot_data")
   expect_identical(.Random.seed,seed)
 })
 
@@ -155,7 +155,7 @@ test_that("beta support, derivative plots and state ownership survive admission"
   fit<-npreg(bws=bw,txdat=x,tydat=y);heldfit<-fit
   run<-function(obj,output,...)suppressWarnings(plot(obj,errors="bootstrap",center="bias-corrected",
     bootstrap="inid",B=99L,neval=5L,band="all",gradients=TRUE,output=output,
-    random.seed=104013L,boot.control=np_boot_control(calibration="basic-local-envelope"),...))
+    random.seed=104013L,interval="basic-local-envelope",...))
   a<-run(fit,"data");b<-run(bw,"data",xdat=x,ydat=y)
   target<-file.path(tempdir(),"beta-envelope.pdf");grDevices::pdf(target)
   c<-tryCatch(run(fit,"plot-data"),finally=grDevices::dev.off())

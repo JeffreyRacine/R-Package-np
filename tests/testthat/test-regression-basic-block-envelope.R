@@ -109,7 +109,7 @@ test_that("public basic block admission preserves state and panel endpoints", {
   for(law in c("fixed","geom")) {
     out<-suppressWarnings(plot(fit,center="bias-corrected",errors="bootstrap",bootstrap=law,
       B=199L,neval=4L,band="all",output="data",random.seed=98126L,
-      boot.control=np_boot_control(calibration="basic-envelope",blocklen=3L)))
+      interval="basic-envelope", boot.control=np_boot_control(blocklen=3L)))
     z<-as.data.frame(out,band="simultaneous")
     expect_equal(nrow(z),4L);expect_true(all(is.finite(z$lower)&is.finite(z$upper)))
     expect_true(all(z$lower<=z$upper));expect_identical(fit,held);expect_identical(.Random.seed,rng)

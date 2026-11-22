@@ -20,7 +20,7 @@ test_that("bounded Gaussian first-order NN preserves defaults and partial deriva
       a <- list(x=fit,errors=errors,center="bias-corrected",neval=3L,
         gradients=gradients,alpha=.2,random.seed=1127602L,output="data",band="all")
       if(errors=="bootstrap"){a$bootstrap <- if(law=="mammen")"wild"else law;a$B <- 63L}else a$gaussian.draws <- 63L
-      if(!is.null(cal))a$boot.control <- np_boot_control(calibration=cal)
+      if (!is.null(cal)) a$interval <- regression_test_interval(cal)
       suppressWarnings(capture_plot_provider(do.call(plot,a)))
     }
     for(law in c("mammen","inid")) {
@@ -39,6 +39,10 @@ test_that("bounded Gaussian first-order NN preserves defaults and partial deriva
     expect_s3_class(grad$result,"np_plot_data")
     if(kind=="partial") {
       expect_true(all(is.na(grad$provider[[1L]]$grad)))
+      unavailable <- grad$result$inference[[1L]]$components$simultaneous
+      expect_identical(unavailable$status,"undefined")
+      expect_identical(unavailable$interval,NA_character_)
+      expect_null(unavailable$calibration)
       expect_true(any(is.finite(grad$provider[[2L]]$grad)))
       expect_error(npreghat(bw,txdat=x,exdat=x[1:3,,drop=FALSE],s=c(1L,0L),output="matrix"),
         "exceeds local polynomial degree")
