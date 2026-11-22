@@ -4,20 +4,49 @@
   `band` for coverage scope. Omitting both preserves each method's default.
   Replace `band="pmzsd"` with `interval="normal-sd", band="pointwise"`.
   Move explicit construction choices out of `np_boot_control()` and retain
-  resampling options there. Saved plot results keep their original keys.
+  resampling options there. Rebuild saved bootstrap controls that specify
+  a calibration. Saved plot results keep their original keys.
 
-* For univariate degree-one beta regression with adaptive nearest-neighbor
-  bandwidths, fitted means, first derivatives and hat rows use a more accurate
-  calculation for ill-conditioned zero-ridge extrapolation outside the training
-  range. Standard errors based on these rows benefit from the same precision
-  change. This applies to both raw and Bernstein polynomial bases.
+* Saved plot data report the interval construction for each coverage
+  component and distinguish an omitted plotting seed from an explicit
+  `random.seed`. For unbounded density plots, the recorded `separate-tails`
+  construction now reproduces its endpoints.
+
+* Compound plot arguments now use dotted spellings, including `boot.control`,
+  `bias.control`, `data.overlay` and `gradient.order`. Plotting and replay
+  reject retired snake_case arguments before evaluating them and give the
+  replacement name. Saved `np_plot_data` objects retain their field names,
+  extraction methods and graphical overrides.
+
+## Specification tests
+
+* `npindextest()` tests the single-index specification for an Ichimura
+  fit with a continuous response or a Klein–Spady fit with a binary response.
+  It accepts a jointly estimated `npindex()` fit or bandwidth object. The
+  bootstrap refits the index direction and link bandwidth on every draw.
+
+* `nppltest()` tests a partially linear conditional mean against an
+  unrestricted alternative. It accepts a fit or bandwidth object and offers
+  experimental mixed-data calibration. The default uses 2,048 shifted Sobol
+  projection directions. Set `integration="exact"` for analytic angular
+  integration.
 
 * All ten specification, significance and distribution tests default to 399
   bootstrap draws. Bootstrap P values use the proportion at least as extreme
-  as the observed statistic (K/B). The partially linear and single-index
-  tests previously used (K+1)/(B+1). Summaries label P values consistently,
+  as the observed statistic (K/B), counting ties. Summaries
   display zero bootstrap exceedances as `0 (0 of B)` with the draw count,
   and report elapsed computation time.
+
+* `npindextest()` now forms its studentized score in scaled response units
+  to avoid overflow and underflow from large and small response units.
+  `npindextest()` and `nppltest()` display interactive progress, elapsed
+  time in summaries, and significance codes for the bootstrap p-value.
+
+## Experimental regression confidence bands
+
+* Bias-corrected confidence bands remain experimental. Coverage depends on
+  the target, sample and bandwidth, especially for derivatives and near
+  support boundaries. The plot help lists the supported combinations.
 
 * Regression plots now provide experimental Mammen wild mean bands for univariate
   degree-one and degree-two zero-ridge Bernstein beta GNN fits on known support.
@@ -25,108 +54,89 @@
   bands, and marginal normal-SD intervals under Mammen bootstrap or Gaussian
   asymptotic inference.
 
-* Regression plots accept `interval` for the interval construction and `band`
-  for pointwise, simultaneous or Bonferroni coverage. Omitting `interval`
-  retains the existing statistical defaults. Use `interval="normal-sd"`
-  for the previous explicit `band="pmzsd"` request. Move regression
-  calibration choices out of `np_boot_control()` and into `interval`.
-  Regression plot data now record the effective construction for each
-  coverage component. Existing saved plot data remain readable.
+* Add experimental simultaneous and pointwise first-derivative bands for
+  degree-zero regression with one fixed-support second-order beta predictor and
+  generalized or adaptive nearest-neighbour bandwidths. See the plot help for
+  the four assessed constructions and their coverage limitations.
 
-* `npindextest()` now forms its studentized score in scaled response units
-  to avoid overflow and underflow from large and small response units.
-  `npindextest()` and `nppltest()` display interactive progress, elapsed
-  time in summaries, and significance codes for the bootstrap p-value.
+* With a second-order beta kernel on known finite support, local-constant
+  and degree-zero GLP means support generalized and adaptive nearest-neighbour
+  bandwidths, including the supported mixed-predictor mean panels. Ordinary
+  calls retain their resampling-specific interval defaults.
 
-* Improve the covariance of bias-corrected regression estimates at extrapolated targets for one-sided Gaussian degree-zero nearest-neighbour fits using a degree-five auxiliary polynomial. The correction retains the selected bandwidth, polynomial space and ridge decisions.
+* For second-order Epanechnikov kernels, local-constant, local-linear and GLP
+  fits with degree at most one in each main coordinate support corrected bands
+  with generalized and adaptive nearest-neighbour bandwidths, on unbounded or
+  declared fixed support. Pairs and Mammen resampling default to the local
+  envelope, and Rademacher resampling uses the asymmetric SD envelope.
+  Supported first derivatives use the fitted neighbour radii.
 
-* Improve numerical precision of univariate auxiliary pilot training means and first derivatives in iterated regression bias correction.
+* Extend known-fixed-support Gaussian nearest-neighbour corrected inference to
+  local-linear and GLP models with main degrees at most one, including supported
+  mixed predictors. Derivatives above an individual coordinate's degree retain
+  their existing unavailable behavior.
 
-* Add `nppltest()` for testing a partially linear conditional mean against an unrestricted alternative. The projection test accepts a fit or bandwidth object and includes experimental mixed-data calibration.
+* Extend iterated uniform-kernel mean correction to degree-zero GNN/ANN fits
+  with unbounded or declared fixed support, using the established pairs/Mammen
+  local envelope, Rademacher tail envelope and SD constructions. Preserve
+  continuous-derivative refusal, explicit methods, fitted counts, RNG safeguards
+  and computational owners; saved evidence is limited to two originals. Main
+  observation rows retain the fitted physical coordinates so strict uniform NN
+  support ties agree with the plotted fit; auxiliary Gaussian projections remain
+  standardized.
 
-* Add experimental simultaneous and pointwise first-derivative bands for degree-zero regression with one fixed-support second-order beta predictor and generalized or adaptive nearest-neighbour bandwidths. See the plot help for the four assessed constructions and their coverage limitations.
+* Admit fixed uniform-kernel iterated correction for local-constant and
+  all-degree-zero GLP means, including mixed-predictor mean panels, with the
+  existing law-specific protective defaults and explicit calibrations.
+  Continuous uniform derivatives remain unqualified, so mixed gradient plots
+  that also request categorical contrasts remain unavailable under iterated
+  correction. Legacy routes retain their prior behavior. Gaussian auxiliary
+  pilots and the fitted uniform main kernel are preserved.
 
-* Improve frozen-radius first-derivative accuracy for univariate second-order beta nearest-neighbour local-constant and degree-zero GLP regression fits and hat rows.
+* With fixed bandwidths, second-order Epanechnikov kernels on unbounded or
+  declared fixed support and beta kernels on known finite support allow
+  asymptotic bands and pointwise normal-SD intervals. Pairs and Mammen resampling
+  default to the local envelope on eligible targets. Select `interval` to request
+  `"symmetric-sd"`, `"asymmetric-sd"` or `"asymmetric-sd-envelope"` explicitly.
+  Rademacher resampling defaults to the asymmetric SD envelope. Explicit
+  choices retain their derivative and finite-sample coverage limitations.
 
-* Improve the numerical accuracy of bounded univariate quadratic adaptive-nearest-neighbour Gaussian and beta regression fits and hat rows. The weighted-design calculation uses the rank and ridge accepted by the existing solver.
+* For fixed-bandwidth Rademacher intervals, pooled mixed targets use
+  replicate residual-pilot studentization. Other targets retain their fixed
+  observed scale.
 
-* Preserve the single evaluation row of adaptive nearest-neighbour local-constant derivative hat matrices, including bivariate beta fits.
+* Retain the existing explicit local-envelope scope for fixed raw Epanechnikov
+  GLP fits with a quadratic component and positive-degree fixed beta derivative
+  bands, where saved comparisons identified sensitivity to the calculation
+  coordinates.
 
-* Retain the existing explicit local-envelope scope for fixed raw Epanechnikov GLP fits with a quadratic component and positive-degree fixed beta derivative bands, where saved comparisons identified sensitivity to the calculation coordinates.
+* Experimental fixed Gaussian regression pairs bands now reuse the accepted
+  fitted observation rows for means and first derivatives, including regularized
+  main rows; the fitted model and auxiliary variance policy are unchanged.
+  Sparse-target coverage remains unqualified.
 
-* Enable bias-corrected mean panels for second-order beta nearest-neighbour local-constant and degree-zero GLP regression with known finite support. Ordinary calls use the established law-specific defaults. Positive-degree beta NN correction remains unqualified.
+* Add an experimental fixed-bandwidth Mammen raw/local envelope for
+  bias-corrected regression, preserving observed standard errors and all
+  existing methods.
 
-* Improve continuous second-order beta generalized nearest-neighbour regression fits and their hat/plot consumers using the original weighted design. HC0 standard errors follow the repaired training fits and may also change at other evaluation points. Accepted rank/ridge decisions and corrected-band admission limits are unchanged; uncertifiable uncertainty calculations continue to refuse.
+* Extend the opt-in regression basic-local envelope to Gaussian generalized and
+  adaptive nearest-neighbour bandwidths, retaining existing zero-radius and
+  regularization refusals. Existing calibrations are unchanged.
 
-* Extend established Epanechnikov GNN/ANN corrected constructions and defaults to local-linear and GLP main degrees at most one, with unbounded or known fixed support. Preserve explicit calibrations, NN radii, Gaussian auxiliaries, partial derivative availability and numerical/computational owners. Higher-degree limitations remain.
+* Add an opt-in experimental `basic-local-envelope` regression calibration that
+  encloses the existing basic and observed-SE local simultaneous/Bonferroni
+  envelopes, retaining the same draws, centers, standard errors and pointwise
+  bounds. Existing methods and admission limits are unchanged.
 
-* Extend known-fixed-support Gaussian nearest-neighbour corrected inference to local-linear and GLP models with main degrees at most one, including supported mixed predictors. Derivatives above an individual coordinate's degree retain their existing unavailable behavior.
+* Extend the experimental regression basic-envelope bands to already-supported
+  derivatives and categorical contrasts, retaining the complete corrected rows,
+  resampling laws and per-target grid families. Document sparse-boundary and
+  higher-order coverage limitations.
 
-* Preserve unavailable derivative panels when exporting regression plots with bias correction or all interval bands, alongside the available derivative results.
-
-* Admit known-fixed-support second-order Gaussian degree-zero GNN/ANN corrected inference, including supported mixed predictors. Preserve Gaussian defaults, explicit methods, frozen-radius derivatives and donor-specific ANN support normalization; higher-degree bounded Gaussian and fixed mixed-support boundaries are unchanged.
-
-* Preserve fitted physical support ties in fixed uniform-kernel degree-zero corrected means and existing categorical contrasts. Gaussian auxiliary projections and established interval methods remain unchanged.
-
-* Extend iterated uniform-kernel mean correction to degree-zero GNN/ANN fits with unbounded or declared fixed support, using the established pairs/Mammen local envelope, Rademacher tail envelope and SD constructions. Preserve continuous-derivative refusal, explicit methods, fitted counts, RNG safeguards and computational owners; saved evidence is limited to two originals. Main observation rows retain the fitted physical coordinates so strict uniform NN support ties agree with the plotted fit; auxiliary Gaussian projections remain standardized.
-
-* Extend the established degree-zero Epanechnikov GNN/ANN corrected constructions and defaults to declared fixed support. Retain donor-specific ANN support normalization, frozen-radius derivatives, Gaussian auxiliary fits and numerical/compute owners; higher-degree and other-kernel boundaries are unchanged.
-
-* Admit existing corrected SD/asymptotic, absolute pairs, and Mammen/Rademacher wild constructions for unbounded second-order Epanechnikov degree-zero GNN/ANN fits. The empirical defaults retain the local envelope for Mammen/pairs and the containing tail envelope for Rademacher. Main rows, fitted NN counts, Gaussian auxiliary fits, numerical policies and both RNG guards retain their owners; higher-degree and support boundaries are unchanged.
-
-* Make degree-zero unbounded second-order Epanechnikov GNN/ANN pairs bands use the existing protective local envelope by default, and admit explicit basic/separate-tail/tail-envelope alternatives. Means, first derivatives and categorical contrasts keep their numerical owners and fitted neighbour counts. Higher-degree, wild and support boundaries are unchanged; limited saved-sample comparisons are not nominal-coverage certification.
-
-* Preserve requested-default provenance in exported plot data when a Rademacher default resolves to the protective tail envelope. Interval computation and explicit-control metadata are unchanged.
-
-* Admit fixed uniform-kernel iterated correction for local-constant and all-degree-zero GLP means, including mixed-predictor mean panels, with the existing law-specific protective defaults and explicit calibrations. Continuous uniform derivatives remain unqualified, so mixed gradient plots that also request categorical contrasts remain unavailable under iterated correction. Legacy routes retain their prior behavior. Gaussian auxiliary pilots and the fitted uniform main kernel are preserved.
-
-* Admit existing fixed second-order Epanechnikov/beta Rademacher SD and tail constructions. Its empirical default uses the protective tail envelope; explicit controls and other laws retain their definitions. Nonpooled targets retain fixed observed scaling, while pooled mixed targets retain their existing replicate residual-pilot studentization.
-
-* Admit fixed second-order Epanechnikov and finite-support beta corrected asymptotic/normal-SD bands and explicit symmetric-SD pairs or Mammen bands, plus Mammen asymmetric-SD/tail-envelope bands. The qualified empirical local-envelope default remains unchanged; explicit SD alternatives retain finite-sample derivative coverage limitations.
-
-* Extend explicit experimental separate-tails and tail-envelope pairs calibration to fixed second-order Epanechnikov (none/fixed support) and beta (finite fixed support) regression. The local-envelope default remains unchanged; standardized-tail alternatives retain their finite-sample coverage limitations, including saved beta derivative misses.
-
-* Admit the existing experimental basic pairs envelope for fixed-bandwidth second-order Epanechnikov kernels with none/fixed support and beta kernels with finite fixed support. The more protective local-envelope default and the basic-envelope wild refusal remain unchanged.
-
-* Make ordinary bias-corrected fixed second-order Epanechnikov (none/fixed support) and beta (finite fixed support) empirical bootstrap bands use the qualified local envelope by default for pairs or Mammen resampling. Explicit calibrations and Gaussian defaults retain their existing meaning.
-
-* Admit experimental Epanechnikov order-2 NN regression pairs envelopes, retaining beta NN and higher-degree generalized-NN refusals.
-
-* Improve continuous second-order Gaussian and Epanechnikov generalized nearest-neighbour regression precision using the original weighted design, preserving accepted rank/ridge policy and existing corrected-band admission limits.
-
-* Align supported regression hat and apply operators with the fitted model's accepted rank/ridge decisions, including pure derivatives; mixed-derivative policies are unchanged.
-
-* Apply the existing accepted-precision rule consistently to bounded continuous Gaussian regression fits and hat operators, correcting potentially material derivative errors in ill-conditioned rows. Extend experimental fixed-support corrected bands without changing rank, ridge or RNG policies.
-
-* Apply exact single-index kernel validation consistently to fitting, gradients and hat/plot preparation; missing legacy metadata keeps its Gaussian default and unrelated prefix fields cannot replace it.
-
-* The single-index kernel-bandwidth preparation helper now refuses explicit
-  unsupported kernel metadata
-  instead of silently substituting Gaussian; missing legacy metadata retains its default.
-
-* Experimental fixed Gaussian regression pairs bands now reuse the accepted fitted observation rows for means and first derivatives, including regularized main rows; the fitted model and auxiliary variance policy are unchanged. Sparse-target coverage remains unqualified.
-
-* Plot subtitles now distinguish bias-corrected confidence bands from
-  estimate-centered variability bands, including compact labels and their
-  pointwise, Bonferroni or simultaneous scope. Experimental status is unchanged.
-
-* Extend the experimental regression basic-local envelope to fixed-bandwidth second-order beta kernels with known finite support, preserving auxiliary fits, existing methods and both RNG guards. Native derivative precision limitations remain.
-
-* Reject unsupported kernel metadata during regression preparation instead of silently substituting a Gaussian kernel. Existing public kernel support is unchanged.
-
-* Extend the experimental regression basic-local envelope to fixed-bandwidth second-order Epanechnikov kernels, retaining Gaussian auxiliary fits, declared support validation, existing methods and both RNG guards.
-
-* Add an experimental fixed-bandwidth Mammen raw/local envelope for bias-corrected regression, preserving observed standard errors and all existing methods.
-
-* Extend the opt-in regression basic-local envelope to Gaussian generalized and adaptive nearest-neighbour bandwidths, retaining existing zero-radius and regularization refusals. Existing calibrations are unchanged.
-
-* Normalize bootstrap calibration labels consistently when plot controls are edited by hand.
-
-* Add an opt-in experimental `basic-local-envelope` regression calibration that encloses the existing basic and observed-SE local simultaneous/Bonferroni envelopes, retaining the same draws, centers, standard errors and pointwise bounds. Existing methods and admission limits are unchanged.
-
-* Extend the experimental regression basic-envelope bands to already-supported derivatives and categorical contrasts, retaining the complete corrected rows, resampling laws and per-target grid families. Document sparse-boundary and higher-order coverage limitations.
-
-* Extend opt-in regression basic envelopes to fixed/geometric block counts, retaining existing block-scale policies and bounded corrected-row reuse. Pooled profiles use raw conditional block scores; existing methods are unchanged.
+* Extend opt-in regression basic envelopes to fixed/geometric block counts,
+  retaining existing block-scale policies and bounded corrected-row reuse.
+  Pooled profiles use raw conditional block scores; existing methods are
+  unchanged.
 
 * Added an experimental `basic-envelope` plot calibration for bias-corrected
   fixed-bandwidth regression means with inid resampling. It reuses bounded
@@ -134,31 +144,110 @@
   and reports basic empirical-root envelopes containing their raw
   separate-tail intervals.
 
-* Terminate exhausted coordinate degree-restart requests with a clear error, complete feasible deterministic starts across the candidate grid, and ignore coordinate restarts during exhaustive degree search as documented.
+* Improve the covariance of bias-corrected regression estimates at extrapolated
+  targets for one-sided Gaussian degree-zero nearest-neighbour fits using a
+  degree-five auxiliary polynomial. The correction retains the selected
+  bandwidth, polynomial space and ridge decisions.
 
-* Respect `degree.min` and `degree.max` for the initial baseline in exhaustive and coordinate polynomial-degree searches, including automatic selection.
+* Improve numerical precision of univariate auxiliary pilot training means and
+  first derivatives in iterated regression bias correction.
 
-* Compare captured regression model identity independently of diagnostic timing profiles, consistently with npRmpi; retain exact computational and data ownership checks.
+## Fitting and bandwidth selection
 
-* Share unchanged ordinary training and evaluation columns when complete-case filtering retains every row, preserving row names, class methods and copy-on-modify ownership.
+* For univariate degree-one beta regression with adaptive nearest-neighbor
+  bandwidths, fitted means, first derivatives and hat rows use a more accurate
+  calculation for ill-conditioned zero-ridge extrapolation outside the training
+  range. Standard errors based on these rows benefit from the same precision
+  change. This applies to both raw and Bernstein polynomial bases.
 
-* Restore fitting, standard errors, prediction and plot-data without error bands for the bundled OECD bandwidth object by restoring its local-linear metadata consistently with newly constructed bandwidth objects. Preserve the old bandwidths and dataset; add no training-data copy. Validate these bundled-object routes during release checks.
+* In second-order Epanechnikov generalized nearest-neighbour regression,
+  endpoint means and slopes in an identifiable direction are more accurate
+  when a cubic predictor has only three distinct local values. Corrected
+  bands flag a requested slope that these data cannot identify.
 
-* Reuse exactly unchanged ordinary formula columns after NA processing, preserving callback effects, row metadata and copy-on-modify ownership.
+* Ill-conditioned zero-ridge beta generalized nearest-neighbour fits have
+  more accurate fitted means for fully pooled linear fits and more accurate
+  prepared mean rows for quadratic fits.
 
-* Avoid duplicating already prepared formula columns when constructing model frames, preserving retained samples and callback behavior.
+* Improve frozen-radius first-derivative accuracy for univariate second-order
+  beta nearest-neighbour local-constant and degree-zero GLP regression fits and
+  hat rows.
 
-* Record affected public constructor and fitted-object calls with the originating package and expanded argument syntax, so ordinary `update()` replay does not depend on private S3 method names. Preserve callback evaluation counts and existing retained-data policies. Recreate older objects whose stored calls cannot be replayed.
+* Improve the numerical accuracy of bounded univariate quadratic
+  adaptive-nearest-neighbour Gaussian and beta regression fits and hat rows. The
+  weighted-design calculation uses the rank and ridge accepted by the existing
+  solver.
 
-* Treat genuinely missing forwarded `na.action` arguments as omitted across formula and native handoffs. Explicit policies and `NULL` retain their existing behavior and refusal rules.
+* Preserve the single evaluation row of adaptive nearest-neighbour
+  local-constant derivative hat matrices, including bivariate beta fits.
 
-* `npsigtest()` consumes an NA policy after preparing fresh or replacement formula data, preserving once-only evaluation and retained-data refusal semantics.
+* Improve continuous second-order beta generalized nearest-neighbour regression
+  fits and their hat/plot consumers using the original weighted design. HC0
+  standard errors follow the repaired training fits and may also change at other
+  evaluation points. Accepted rank/ridge decisions and corrected-band admission
+  limits are unchanged; uncertifiable uncertainty calculations continue to
+  refuse.
+
+* Preserve fitted physical support ties in fixed uniform-kernel degree-zero
+  corrected means and existing categorical contrasts. Gaussian auxiliary
+  projections and established interval methods remain unchanged.
+
+* Improve continuous second-order Gaussian and Epanechnikov generalized
+  nearest-neighbour regression precision using the original weighted design,
+  preserving accepted rank/ridge policy and existing corrected-band admission
+  limits.
+
+* Align supported regression hat and apply operators with the fitted model's
+  accepted rank/ridge decisions, including pure derivatives; mixed-derivative
+  policies are unchanged.
+
+* Apply the existing accepted-precision rule consistently to bounded continuous
+  Gaussian regression fits and hat operators, correcting potentially material
+  derivative errors in ill-conditioned rows. Extend experimental fixed-support
+  corrected bands without changing rank, ridge or RNG policies.
+
+* Apply exact single-index kernel validation consistently to fitting, gradients
+  and hat/plot preparation; missing legacy metadata keeps its Gaussian default
+  and unrelated prefix fields cannot replace it.
+
+* Reject unsupported kernel metadata during regression preparation instead of
+  silently substituting a Gaussian kernel. Existing public kernel support is
+  unchanged.
+
+* Terminate exhausted coordinate degree-restart requests with a clear error,
+  complete feasible deterministic starts across the candidate grid, and ignore
+  coordinate restarts during exhaustive degree search as documented.
+
+* Respect `degree.min` and `degree.max` for the initial baseline in exhaustive
+  and coordinate polynomial-degree searches, including automatic selection.
+
+* Stabilize signed higher-order Epanechnikov generalized nearest-neighbor
+  conditional-density CVLS arithmetic on clustered explanatory data, preserving
+  the existing rank and ridge decisions.
+
+* Correct conditional-distribution generalized nearest-neighbor cross-validation
+  on the full training response grid: each fold now removes only its held-out
+  observation from response bandwidth selection, both response and explanatory
+  counts are decoded on the deleted sample, and automatic recovery uses matching
+  count limits.
+
+* Fixed uniform-kernel rows now use the documented open physical support
+  consistently across dense, tree, permutation and sparse polynomial-search
+  paths.
+
+* Kernel sums reject unknown extra arguments without evaluating their values,
+  while retaining formula controls and ordinary argument matching.
+
+* Rebuilding retained unconditional uniform-kernel metadata avoids a redundant
+  kernel-order advisory; fresh requests and unrelated conditions are unchanged.
+
+## Experimental density confidence bands
 
 * Experimental plot support: known-fixed-bound beta density kernels of orders 4,
   6 and 8 now admit calibrated asymptotic and symmetric/asymmetric SD bands
   for two continuous coordinates. The existing correction and numerical
   limits are unchanged; retained coverage is strongly conservative. Higher-order
-  two-dimensional normal pmzsd and other previously excluded routes stay excluded.
+  two-dimensional normal-SD and other previously excluded routes stay excluded.
 
 * Whole-line q=1 order-two uniform corrected density plots add asymptotic normal
   pointwise and raw Bonferroni intervals using complete Q6 reference covariance.
@@ -168,13 +257,14 @@
 * Whole-line q=1 order-two Epanechnikov corrected density plots add asymptotic
   normal pointwise and raw Bonferroni companions to the unchanged M4 simultaneous
   band; `all` returns these exact components. Local coverage limitations remain.
-  Existing `pmzsd`, bootstrap methods and core estimators are unchanged.
+  Existing normal-SD intervals, bootstrap methods and core estimators are unchanged.
 
-* Plot-only, fixed-bound univariate beta bias correction now admits kernel orders
-  4, 6 and 8 for asymptotic `band="pmzsd"`, retaining the existing corrected center
-  and complete ratio-pilot normal variance. Calibrated bands are unchanged.
-  Sparse-boundary and small-bandwidth multimodal pointwise limitations remain;
-  this does not add higher-order two-dimensional or bootstrap normal bands.
+* Plot-only, fixed-bound univariate beta bias correction now admits kernel
+  orders 4, 6 and 8 for asymptotic `interval="normal-sd", band="pointwise"`,
+  retaining the existing corrected center and complete ratio-pilot normal
+  variance. Calibrated bands are unchanged. Sparse-boundary and small-bandwidth
+  multimodal pointwise limitations remain; this does not add higher-order
+  two-dimensional or bootstrap normal bands.
 
 * Plot-only `smoothed-beta-binomial` symmetric-SD density bands now also support
   fixed-bound, univariate Epanechnikov orders six and eight, retaining the complete
@@ -187,117 +277,67 @@
   family and bounded preparation storage, preserving the corrected estimator,
   numerical tolerances and currently supported band methods.
 
-* Stabilize signed higher-order Epanechnikov generalized nearest-neighbor conditional-density CVLS arithmetic on clustered explanatory data, preserving the existing rank and ridge decisions.
-
-* Correct conditional-distribution generalized nearest-neighbor cross-validation on the full training response grid: each fold now removes only its held-out observation from response bandwidth selection, both response and explanatory counts are decoded on the deleted sample, and automatic recovery uses matching count limits.
-
-* Significance-test bandwidth controls consume their original promises once
-  across selection and testing, preserving stored call syntax and metadata.
-
-* Instrumental-variable formula fits evaluate a supplied NA-policy factory once,
-  while applying the resulting policy separately to training and evaluation
-  frames. Omitted policies retain their existing behavior through wrappers.
-
-* RGL surfaces give automatically calculated clipping limits a small display-only
-  margin, reducing clipping artifacts at flat boundary regions during rotation.
-  Explicit limits, estimates, intervals and saved plot data remain unchanged.
-
-* Corrected compact uniform density plots retain physical support membership consistently in observed centers, empirical covariance and resampled features. Continuous pilot integration is unchanged.
-
-* Fixed uniform-kernel rows now use the documented open physical support consistently across dense, tree, permutation and sparse polynomial-search paths.
-
-* Ordinary LC conditional-density plots disclose unavailable uncertainty at empty empirical response windows, retaining the full target grid and withholding an unidentifiable full-family simultaneous band. Raw estimates and corrected methods are unchanged.
-
-* Stored-fit routes reject unsupported `na.action` overrides instead of silently
-  ignoring them. Existing formula replacement and regression/index prediction
-  policies remain supported, with each callback evaluated by its existing owner.
-
-* Class-probability plot families exclude omitted display rows, including
-  asymptotic Bonferroni calibration, while preserving their padded output rows.
-
-* Kernel sums reject unknown extra arguments without evaluating their values,
-  while retaining formula controls and ordinary argument matching.
-
-* Perspective floor and wall grids are painted behind the estimate, intervals
-  and overlays. Base surface-data replay uses the same renderer.
-
-* Constant conditional surfaces and surface-data replay expand automatic display
-  limits without changing estimates, intervals or explicit limits.
-
-* Compound plot arguments now use dotted spellings, for example `boot.control`, `bias.control`, `data.overlay` and `gradient.order`. The 0.80-2 snake_case argument spellings are rejected with replacement guidance; no aliases are provided. `np_plot_data` and its existing field names, saved-data replay and extraction remain unchanged. Retired snake_case plot arguments are rejected before evaluating their values, including during saved-data replay; replay retains its existing graphical-override behavior.
-
-* Equivalent direct and grouped probability trim pairs no longer conflict in
-  single-index and conditional-mode plots. Other trim interpretations and
-  genuinely conflicting controls retain their existing behavior. Conditional-mode
-  sample views do not gain grid controls.
-
-* Rebuilding retained unconditional uniform-kernel metadata avoids a redundant
-  kernel-order advisory; fresh requests and unrelated conditions are unchanged.
-
-* Supplied plot limits reach line and surface renderers and survive saved-data replay, without changing evaluation grids, estimates or intervals. Automatic ranges remain unchanged when limits are omitted.
-
-* Avoid response-vector-sized temporary labels in the shared missing-bandwidth
-  regression handoff, preserving final response names and retained data.
-
-* Respect explicit surface height limits when displaying observed data with
-  regression, partially linear and smooth-coefficient surfaces; automatic
-  ranges continue to include the observations.
-
-* Preserve explicit X/Z coordinate labels in partially linear and smooth-
-  coefficient line panels, including saved-data replay and separate scales.
-
-* Avoid oversized temporary response labels in partially linear child
-  bandwidth calls while preserving executable-option evaluation and retained
-  response-call semantics.
-
-* Preserve explicit frame and style arguments in instrumental-variable plots
-  and saved replay, including automatic ranges requested with explicit NULL.
-
-* Keep rgl interval surfaces and rugs within explicit display limits while
-  retaining visible legends.
-
-* Reject unsupported grid controls in copula plots, conditional-mode sample
-  views and their saved-data replay instead of passing on ignored requests.
-
-* Avoid expanding complete response vectors into internal LSQ bandwidth labels.
-
-* Preserve literal graphical labels through plot forwarding and saved replay; honor conditional-mode panel labels.
-
-* Formula handoffs reject explicitly quoted or compiled executable option values
-  before they can run again against prepared data. Ordinary evaluated controls,
-  structural formulas and supported callbacks retain their existing behavior.
-
-## Density plot additions
+* Corrected compact uniform density plots retain physical support membership
+  consistently in observed centers, empirical covariance and resampled features.
+  Continuous pilot integration is unchanged.
 
 * Experimental asymmetric Q6 density plot bands now support two continuous
   coordinates with fixed whole-line order-two uniform/Epanechnikov kernels,
   for pointwise and simultaneous scopes only. Bonferroni/all remain unavailable
   for this q=2 construction; retained coverage limitations remain explicit.
 
-* Add an explicit experimental smoothed-beta-binomial bootstrap law for fixed-bound, univariate order-four Epanechnikov corrected plot bands with symmetric-SD calibration. Existing methods and estimator standard errors are unchanged.
+* Add an explicit experimental smoothed-beta-binomial bootstrap law for
+  fixed-bound, univariate order-four Epanechnikov corrected plot bands with
+  symmetric-SD calibration. Existing methods and estimator standard errors are
+  unchanged.
 
-* Explicit symmetric Q6 density plot bands now support two continuous coordinates with fixed whole-line order-two uniform/Epanechnikov kernels. Paired smoothed resamples and the complete bivariate guide preserve dependence; pointwise, simultaneous, Bonferroni and all bands remain experimental and conservative in the bounded q=2 confirmation. Existing methods and native estimators are unchanged.
+* Explicit symmetric Q6 density plot bands now support two continuous
+  coordinates with fixed whole-line order-two uniform/Epanechnikov kernels.
+  Paired smoothed resamples and the complete bivariate guide preserve
+  dependence; pointwise, simultaneous, Bonferroni and all bands remain
+  experimental and conservative in the bounded q=2 confirmation. Existing
+  methods and native estimators are unchanged.
 
-* Fixed-bound univariate beta plots admit native orders four, six and eight for explicit asymptotic and symmetric/asymmetric SD pointwise, simultaneous, Bonferroni and all bands, using the unchanged guide-region/residual construction. Native fits are unchanged; normal and higher-order q2 additions are described separately above.
+* Fixed-bound univariate beta plots admit native orders four, six and eight for
+  explicit asymptotic and symmetric/asymmetric SD pointwise, simultaneous,
+  Bonferroni and all bands, using the unchanged guide-region/residual
+  construction. Native fits are unchanged; see the plot help for normal
+  intervals and higher-order bivariate bands.
 
-* Explicit asymmetric Q6 adds signed pointwise and Bonferroni/all companions on the same full empirical-range family. Raw Bonferroni limits, simultaneous hull and finite-draw warnings remain distinct; existing simultaneous and symmetric results are preserved.
+* Explicit asymmetric Q6 adds signed pointwise and Bonferroni/all companions on
+  the same full empirical-range family. Raw Bonferroni limits, simultaneous hull
+  and finite-draw warnings remain distinct; existing simultaneous and symmetric
+  results are preserved.
 
-* Explicit asymmetric Q6 density inference adds simultaneous bands on the full empirical-range grid. Each resample rebuilds that grid; signed maxima retain their signs. The corrected center, symmetric Q6 and all existing inference choices remain unchanged.
+* Explicit asymmetric Q6 density inference adds simultaneous bands on the full
+  empirical-range grid. Each resample rebuilds that grid; signed maxima retain
+  their signs. The corrected center, symmetric Q6 and all existing inference
+  choices remain unchanged.
 
-* Explicit symmetric Q6 density inference adds Bonferroni/all bands using the same draw plan. Raw Bonferroni endpoints and the simultaneous companion hull are separately retained; finite-B warnings do not change the requested draws.
+* Explicit symmetric Q6 density inference adds Bonferroni/all bands using the
+  same draw plan. Raw Bonferroni endpoints and the simultaneous companion hull
+  are separately retained; finite-B warnings do not change the requested draws.
 
-* U5 density plots now provide normal pointwise/Bonferroni and full-covariance Gaussian simultaneous/all bands for orders four/six/eight. Full influence QR retains every direction; native fits and existing methods are unchanged.
+* U5 density plots now provide normal pointwise/Bonferroni and full-covariance
+  Gaussian simultaneous/all bands for orders four/six/eight. Full influence QR
+  retains every direction; native fits and existing methods are unchanged.
 
-* Extend the fixed-bound U5 normal pointwise correction to Epanechnikov orders six/eight, retaining order-four arithmetic and native fits.
+* Extend the fixed-bound U5 normal pointwise correction to Epanechnikov orders
+  six/eight, retaining order-four arithmetic and native fits.
 
-* Explicit Q6 smoothed-bootstrap density inference now provides marginal pointwise bands while retaining its simultaneous calibration.
-* Fixed-bound univariate order-four Epanechnikov density plots add normal pointwise bias-corrected intervals using the support-reproducing beta-guide construction. Native fits and bandwidths are unchanged. Both additions remain experimental; local coverage limitations are documented.
+* Explicit Q6 smoothed-bootstrap density inference now provides marginal
+  pointwise bands while retaining its simultaneous calibration.
+
+* Fixed-bound univariate order-four Epanechnikov density plots add normal
+  pointwise bias-corrected intervals using the support-reproducing beta-guide
+  construction. Native fits and bandwidths are unchanged. These intervals remain
+  experimental, with local coverage limitations.
 
 * Add explicit plot-only `bootstrap="smoothed-q6"` symmetric-SD simultaneous
   bands for q=1 whole-line fixed-bandwidth uniform/Epanechnikov densities.
   The complete corrected functional, Q6 covariance and refitted-guide roots
   use bounded draw blocks. Existing methods, fitted estimators, bandwidths
-  and se=FALSE are unchanged; finite-grid coverage limitations remain explicit.
+  and `se=FALSE` are unchanged; finite-grid coverage limitations remain explicit.
 
 * Compact two-dimensional corrected density plots compute their complete
   covariance through centered conditional quadrature and full QR compression.
@@ -313,6 +353,127 @@
   plots add asymptotic simultaneous and all-band requests using the complete
   covariance and existing Gaussian factor. Existing pointwise, Bonferroni,
   normal and SD constructions, fitted estimators and RNG behavior are retained.
+
+## Plot display and saved results
+
+* Plot subtitles now distinguish bias-corrected confidence bands from
+  estimate-centered variability bands, including compact labels and their
+  pointwise, Bonferroni or simultaneous scope. Experimental status is unchanged.
+
+* Preserve unavailable derivative panels when exporting regression plots with
+  bias correction or all interval bands, alongside the available derivative
+  results.
+
+* Preserve requested-default provenance in exported plot data when a Rademacher
+  default resolves to the protective tail envelope. Interval computation and
+  explicit-control metadata are unchanged.
+
+* RGL surfaces give automatically calculated clipping limits a small display-only
+  margin, reducing clipping artifacts at flat boundary regions during rotation.
+  Explicit limits, estimates, intervals and saved plot data remain unchanged.
+
+* Ordinary LC conditional-density plots disclose unavailable uncertainty at
+  empty empirical response windows, retaining the full target grid and
+  withholding an unidentifiable full-family simultaneous band. Raw estimates and
+  corrected methods are unchanged.
+
+* Class-probability plot families exclude omitted display rows, including
+  asymptotic Bonferroni calibration, while preserving their padded output rows.
+
+* Perspective floor and wall grids are painted behind the estimate, intervals
+  and overlays. Base surface-data replay uses the same renderer.
+
+* Constant conditional surfaces and surface-data replay expand automatic display
+  limits without changing estimates, intervals or explicit limits.
+
+* Equivalent direct and grouped probability trim pairs no longer conflict in
+  single-index and conditional-mode plots. Other trim interpretations and
+  genuinely conflicting controls retain their existing behavior. Conditional-mode
+  sample views do not gain grid controls.
+
+* Supplied plot limits reach line and surface renderers and survive saved-data
+  replay, without changing evaluation grids, estimates or intervals. Automatic
+  ranges remain unchanged when limits are omitted.
+
+* Respect explicit surface height limits when displaying observed data with
+  regression, partially linear and smooth-coefficient surfaces; automatic
+  ranges continue to include the observations.
+
+* Preserve explicit X/Z coordinate labels in partially linear and smooth-
+  coefficient line panels, including saved-data replay and separate scales.
+
+* Preserve explicit frame and style arguments in instrumental-variable plots
+  and saved replay, including automatic ranges requested with explicit NULL.
+
+* Keep rgl interval surfaces and rugs within explicit display limits while
+  retaining visible legends.
+
+* Reject unsupported grid controls in copula plots, conditional-mode sample
+  views and their saved-data replay instead of passing on ignored requests.
+
+* Preserve literal graphical labels through plot forwarding and saved replay;
+  honor conditional-mode panel labels.
+
+## Data and formula handling
+
+* `Italy_Updated` adds annual real GDP per capita for Italy’s 20 regions
+  from 1951 through 2024. Load it with `data("Italy_Updated")`.
+
+* The bundled OECD bandwidth object again carries its local-linear
+  degree metadata for fitting, prediction, standard errors and plot data.
+  Use `plot(npreg(bw, data = oecdpanel))` with the bundled training data.
+
+* Compare captured regression model identity independently of diagnostic timing
+  profiles, consistently with npRmpi; retain exact computational and data
+  ownership checks.
+
+* Share unchanged ordinary training and evaluation columns when complete-case
+  filtering retains every row, preserving row names, class methods and
+  copy-on-modify ownership.
+
+* Reuse exactly unchanged ordinary formula columns after NA processing,
+  preserving callback effects, row metadata and copy-on-modify ownership.
+
+* Avoid duplicating already prepared formula columns when constructing model
+  frames, preserving retained samples and callback behavior.
+
+* Record affected public constructor and fitted-object calls with the
+  originating package and expanded argument syntax, so ordinary `update()`
+  replay does not depend on private S3 method names. Preserve callback
+  evaluation counts and existing retained-data policies. Recreate older objects
+  whose stored calls cannot be replayed.
+
+* Treat genuinely missing forwarded `na.action` arguments as omitted across
+  formula and native handoffs. Explicit policies and `NULL` retain their
+  existing behavior and refusal rules.
+
+* `npsigtest()` consumes an NA policy after preparing fresh or replacement
+  formula data, preserving once-only evaluation and retained-data refusal
+  semantics.
+
+* Significance-test bandwidth controls consume their original promises once
+  across selection and testing, preserving stored call syntax and metadata.
+
+* Instrumental-variable formula fits evaluate a supplied NA-policy factory once,
+  while applying the resulting policy separately to training and evaluation
+  frames. Omitted policies retain their existing behavior through wrappers.
+
+* Stored-fit routes reject unsupported `na.action` overrides instead of silently
+  ignoring them. Existing formula replacement and regression/index prediction
+  policies remain supported, with each callback evaluated by its existing owner.
+
+* Avoid response-vector-sized temporary labels in the shared missing-bandwidth
+  regression handoff, preserving final response names and retained data.
+
+* Avoid oversized temporary response labels in partially linear child
+  bandwidth calls while preserving executable-option evaluation and retained
+  response-call semantics.
+
+* Avoid expanding complete response vectors into internal LSQ bandwidth labels.
+
+* Formula handoffs reject explicitly quoted or compiled executable option values
+  before they can run again against prepared data. Ordinary evaluated controls,
+  structural formulas and supported callbacks retain their existing behavior.
 
 # np 0.80-2
 
