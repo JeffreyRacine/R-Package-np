@@ -80,7 +80,7 @@ if (master) {
       expect_refusal(plot(profile.fixture, errors = "none", output = "data", neval = 3L),
         "profile_master", "requires an active MPI slave pool")
       expect_refusal(plot(profile.fixture, errors = "asymptotic", center = "bias-corrected",
-        band = "pmzsd", output = "data", neval = 3L),
+        interval = "normal-sd", band = "pointwise", output = "data", neval = 3L),
         "profile_master_pmzsd", "requires an active MPI slave pool")
       expect_refusal(mpi.bcast.cmd(plot(profile.fixture), caller.execute = TRUE),
         "direct_broadcast", "plot(...) inside mpi.bcast.cmd(...) is unsupported")
@@ -116,7 +116,7 @@ if (master) {
           plot(model, errors = "none", output = "data", neval = 3L)
         } else {
           plot(model, errors = "asymptotic", center = "bias-corrected",
-               band = "pmzsd", output = "data", neval = 3L)
+               interval = "normal-sd", band = "pointwise", output = "data", neval = 3L)
         }
         frame <- as.data.frame(value)
         stopifnot(nrow(frame) == 3L, identical(original, serialize(model, NULL)),

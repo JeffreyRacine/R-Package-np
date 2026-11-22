@@ -639,7 +639,7 @@ np_render_control <- function(style = c("band", "bar"),
   if (identical(dots[["plot.errors.boot.method", exact = TRUE]], "residual") &&
       !(inherits(bws, "rbandwidth") &&
         identical(dots[["plot.errors.boot.calibration", exact = TRUE]], "smoothed-percentile")))
-    stop('bootstrap="residual" requires regression calibration="smoothed-percentile"', call. = FALSE)
+    stop('bootstrap="residual" requires bias-corrected regression with interval="outer-calibrated-percentile"', call. = FALSE)
   if (identical(dots[["plot.errors.boot.method", exact=TRUE]], "conditional-pilot") && !conditional.optin)
     stop('bootstrap="conditional-pilot" requires np_conditional_bias_control()',call.=FALSE)
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L

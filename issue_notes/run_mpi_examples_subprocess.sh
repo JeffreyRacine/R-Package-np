@@ -89,11 +89,11 @@ stage("plot")
 out <- plot(
   bw,
   perspective=FALSE,
-  plot.behavior="data",
-  plot.errors.method="bootstrap",
-  plot.errors.center="bias-corrected",
-  plot.errors.type="simultaneous",
-  plot.errors.boot.num=29
+  output="data",
+  errors="bootstrap",
+  center="bias-corrected",
+  band="simultaneous",
+  B=29
 )
 stopifnot(is.list(out))
 cat("JOB_OK npplot\\n")
@@ -126,12 +126,13 @@ stage("plot")
 out <- plot(
   bw,
   perspective=FALSE,
-  plot.behavior="data",
-  plot.errors.method="bootstrap",
-  plot.errors.boot.method="wild",
-  plot.errors.center="bias-corrected",
-  plot.errors.type="simultaneous",
-  plot.errors.boot.num=799
+  output="data",
+  errors="bootstrap",
+  bootstrap="wild",
+  # Exercise the original bias correction used by this historical stress test.
+  center="bias-corrected", bias.control=np_bias_control(construction="legacy"),
+  band="simultaneous",
+  B=799
 )
 stopifnot(is.list(out))
 cat("JOB_OK npplot_wild_stress\\n")

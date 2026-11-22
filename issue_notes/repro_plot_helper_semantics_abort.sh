@@ -52,19 +52,11 @@ quiet_capture <- function(expr) {
 }
 
 run_bootstrap_plot <- function(bw, xdat, ydat, zdat = NULL, boot_num = 9L) {
-  quiet_capture(
-    suppressWarnings(plot(
-      bw,
-      xdat = xdat,
-      ydat = ydat,
-      zdat = zdat,
-      plot.behavior = "data",
-      perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = boot_num
-    ))
-  )
+  args <- list(x = bw, xdat = xdat, ydat = ydat, output = "data",
+               perspective = FALSE, errors = "bootstrap", bootstrap = "wild",
+               B = boot_num)
+  if (!is.null(zdat)) args$zdat <- zdat
+  quiet_capture(suppressWarnings(do.call(plot, args)))
 }
 
 for (i in seq_len(reps)) {

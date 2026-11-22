@@ -44,17 +44,20 @@ run_udens <- function(case, bw.args) {
     fit <- npudens(tdat = tx, bws = bw)
     pdata <- suppressWarnings(plot(
       fit,
-      plot.behavior = 'data',
+      output = 'data',
       neval = 80,
-      plot.errors.method = 'bootstrap',
-      plot.errors.boot.method = 'inid',
-      plot.errors.boot.num = 49,
-      plot.errors.type = 'pointwise'
+      errors = 'bootstrap',
+      bootstrap = 'inid',
+      B = 49,
+      band = 'pointwise'
     ))
 
-    eval.df <- as.data.frame(pdata$d1$eval)
+    eval.df <- pdata$panels[[1L]]$grid
+    names(eval.df) <- names(tx)
     pred <- as.numeric(predict(fit, newdata = eval.df))
-    plotv <- as.numeric(pdata$d1$dens)
+    plotv <- pdata$panels[[1L]]$values$estimate
+    stopifnot(nrow(eval.df) == 80L, length(plotv) == nrow(eval.df),
+              length(pred) == nrow(eval.df))
     d <- max(abs(plotv - pred))
     list(ok = TRUE, d = d, err = "")
   }, error = function(e) {
@@ -83,17 +86,20 @@ run_udist <- function(case, bw.args) {
     fit <- npudist(tdat = tx, bws = bw)
     pdata <- suppressWarnings(plot(
       fit,
-      plot.behavior = 'data',
+      output = 'data',
       neval = 80,
-      plot.errors.method = 'bootstrap',
-      plot.errors.boot.method = 'inid',
-      plot.errors.boot.num = 49,
-      plot.errors.type = 'pointwise'
+      errors = 'bootstrap',
+      bootstrap = 'inid',
+      B = 49,
+      band = 'pointwise'
     ))
 
-    eval.df <- as.data.frame(pdata$d1$eval)
+    eval.df <- pdata$panels[[1L]]$grid
+    names(eval.df) <- names(tx)
     pred <- as.numeric(predict(fit, edat = eval.df))
-    plotv <- as.numeric(pdata$d1$dist)
+    plotv <- pdata$panels[[1L]]$values$estimate
+    stopifnot(nrow(eval.df) == 80L, length(plotv) == nrow(eval.df),
+              length(pred) == nrow(eval.df))
     d <- max(abs(plotv - pred))
     list(ok = TRUE, d = d, err = "")
   }, error = function(e) {

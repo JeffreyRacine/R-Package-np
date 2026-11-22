@@ -89,7 +89,7 @@ test_that("sibandwidth bootstrap helpers honor bounded neval in session mode", {
         B = 9L
       ))
 
-      d <- plot_target(out, band = "pmzsd")
+      d <- plot_target(out, band = "pointwise")
       expect_equal(nrow(d), 11L, info = paste(bt, boot.method, "mean length"))
       expect_equal(dim(as.matrix(d[c("lower", "upper")])), c(11L, 2L))
       expect_false(nrow(out$panels[[1L]]$grid) == n)

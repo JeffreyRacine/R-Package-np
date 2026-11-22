@@ -524,6 +524,16 @@
     value.key <- .npRmpi_autodispatch_fingerprint(metadata(bws))
     reference.key <- .npRmpi_autodispatch_fingerprint(metadata(original))
     result[["bws"]] <- restore(bws, original, value.key, reference.key)
+    # A regression inference capture retains its own bandwidth for validation.
+    # Restore its formula owner through the same guard as the public bandwidth.
+    if (inherits(result, "npregression") && inherits(original, "rbandwidth")) {
+      request <- result[["fit.request", exact = TRUE]]
+      captured <- request[["bws", exact = TRUE]]
+      if (inherits(captured, "rbandwidth")) {
+        request[["bws"]] <- restore(captured, original, reference.key = reference.key)
+        result[["fit.request"]] <- request
+      }
+    }
     # Partially linear fits expose a second bandwidth view. Validate it in its
     # own right and preserve its effective sample and non-metadata fields.
     alias <- result[["bw", exact = TRUE]]

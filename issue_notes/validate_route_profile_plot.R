@@ -7,6 +7,8 @@ if (mpi.comm.rank(0L) == 0L) {
   mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)
   options(np.messages = FALSE, npRmpi.autodispatch = TRUE)
 
+  stopifnot(isTRUE(npRmpi.init(mode = "spawn", nslaves = mpi.comm.size(1L) - 1L, quiet = TRUE)))
+
   set.seed(4242)
   n <- as.integer(Sys.getenv("NP_RMPI_PROFILE_PLOT_N", "40"))
   x <- runif(n)
@@ -23,23 +25,23 @@ if (mpi.comm.rank(0L) == 0L) {
   out <- suppressWarnings(
     plot(
       bw,
-      plot.behavior = "data",
+      output = "data",
       perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 5,
-      plot.errors.type = "pointwise"
+      errors = "bootstrap",
+      bootstrap = "wild",
+      B = 5,
+      band = "pointwise"
     )
   )
-  stopifnot(is.list(out), length(out) > 0)
+  stopifnot(inherits(out, "np_plot_data"), nrow(out$panels[[1L]]$values) > 0L)
 
   err <- try(
     mpi.bcast.cmd(
       plot(
         bw,
-        plot.behavior = "data",
+        output = "data",
         perspective = FALSE,
-        plot.errors.method = "none"
+        errors = "none"
       ),
       caller.execute = TRUE
     ),

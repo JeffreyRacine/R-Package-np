@@ -27140,24 +27140,41 @@ static int np_pooled_beta_linear_precision(const NPContinuousKernelRoute *route,
 /* Scoped precision sibling. Accepted rank/ridge and all incumbent kernel/tree
  * selection remain upstream. Continuous second-order GNN rows use their own
  * target radius; conditional, categorical and signed owners are unchanged. */
-/* Right extrapolation can concentrate a bounded linear beta ANN row on
- * very few donors. Retain its weights for the post-solve precision check. */
-static double np_linear_beta_ann_training_max(const NPContinuousKernelRoute *route,
-                                              int bandwidth, int continuous,
-                                              int unordered, int ordered,
-                                              double **training, int n)
+/* At a bounded edge, a linear beta ANN row outside the donor range can
+ * concentrate on very few observations. Preserve its weights for the
+ * existing condition and ridge check. Infinite edges disable that side. */
+typedef struct { double lower, upper; } NPLinearBetaANNRange;
+
+static NPLinearBetaANNRange np_linear_beta_ann_training_range(const NPContinuousKernelRoute *route,
+                                                             int bandwidth, int continuous,
+                                                             int unordered, int ordered,
+                                                             double **training, int n)
 {
+  NPLinearBetaANNRange range = {R_NegInf, R_PosInf};
   if(bandwidth != BW_ADAP_NN || continuous != 1 || unordered || ordered ||
      vector_glp_degree_extern == NULL || vector_glp_degree_extern[0] != 1 ||
      route == NULL || route->segment_count != 1 ||
      route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
-     route->segment[0].descriptor.order != 2 || route->segment[0].upper == NULL ||
-     !R_FINITE(route->segment[0].upper[0]) || n <= 0 || training == NULL)
-    return R_PosInf;
-  double xmax = training[0][0];
-  for(int i = 1; i < n; ++i)
-    if(training[0][i] > xmax) xmax = training[0][i];
-  return xmax;
+     route->segment[0].descriptor.order != 2 || n <= 0 || training == NULL)
+    return range;
+  const int lower = route->segment[0].lower != NULL && R_FINITE(route->segment[0].lower[0]);
+  const int upper = route->segment[0].upper != NULL && R_FINITE(route->segment[0].upper[0]);
+  if(lower || upper) {
+    double xmin = training[0][0], xmax = xmin;
+    for(int i = 1; i < n; ++i) {
+      const double x = training[0][i];
+      if(x < xmin) xmin = x;
+      if(x > xmax) xmax = x;
+    }
+    if(lower) range.lower = xmin;
+    if(upper) range.upper = xmax;
+  }
+  return range;
+}
+
+static inline int np_linear_beta_ann_extrapolates(NPLinearBetaANNRange range, double x)
+{
+  return x < range.lower || x > range.upper;
 }
 
 static int np_regression_precision_eligible(const NPRegressionGeneralLPFitCall *call)

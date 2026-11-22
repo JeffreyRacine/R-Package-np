@@ -13,7 +13,7 @@
 )
 
 .np_plot_family_interval_request <- function(dots, family) {
-  supplied <- as.character(intersect(names(dots), c("interval", "band", "boot.control")))
+  supplied <- as.character(intersect(names(dots), c("interval", "band", "boot.control", "random.seed")))
   interval <- dots[["interval", exact = TRUE]]
   band <- dots[["band", exact = TRUE]]
   control <- dots[["boot.control", exact = TRUE]]
@@ -21,13 +21,23 @@
     stop("replace plot.errors.boot.calibration with the plot interval argument", call. = FALSE)
   if (inherits(control, "np_boot_control") && "calibration" %in% names(control)) {
     old <- .np_plot_boot_calibration(control)
-    action <- switch(old,
-      default = "omit interval to retain the default",
-      legacy = "select construction='legacy' in the family bias.control",
-      `tail-envelope` = "use interval='asymmetric-sd-envelope'",
-      `smoothed-percentile` = "use interval='outer-calibrated-percentile'",
-      sprintf("select the corresponding interval (previous calibration '%s')", old))
-    stop(sprintf("rebuild boot.control without its calibration field and %s", action), call. = FALSE)
+    marginal <- family %in% c("npudens", "npudist")
+    replacement <- if (marginal) switch(old,
+      absolute = if (family == "npudens") old else "symmetric-sd",
+      `separate-tails` = if (family == "npudens") old else "asymmetric-sd",
+      `percentile-tails` = if (family == "npudens") old,
+      `symmetric-sd` =, `asymmetric-sd` = old,
+      `tail-envelope` = "asymmetric-sd-envelope",
+      `smoothed-percentile` = "outer-calibrated-percentile")
+    else if (family %in% c("npcdens", "npcdist") && old %in% c("symmetric-sd", "asymmetric-sd")) old
+    action <- if (old == "default") "omit interval to retain the default"
+      else if (old == "legacy" && marginal)
+        sprintf("use bias.control=np_%s_bias_control(construction='legacy')", substring(family, 3L))
+      else if (!is.null(replacement)) sprintf("use interval='%s' where supported", replacement)
+      else if (old %in% c("symmetric-sd", "absolute"))
+        "for a simultaneous asymptotic band use errors='asymptotic', band='simultaneous', interval='symmetric-sd'"
+      else sprintf("the previous calibration '%s' is unavailable for %s", old, family)
+    stop(sprintf("rebuild boot.control without its calibration field. %s", action), call. = FALSE)
   }
   if (is.character(band) && length(band) == 1L && !is.na(band) && band == "pmzsd")
     stop("use interval='normal-sd', band='pointwise' in place of band='pmzsd'", call. = FALSE)
@@ -92,7 +102,7 @@
 # readers operate on the original objects and never enter this construction path.
 # Use the emitted provider identity and the band actually returned. The literal
 # selector can have two different owners across density kernels.
-.np_plot_family_components <- function(meta, intervals, request) {
+.np_plot_family_components <- function(meta, intervals, request, family) {
   parts <- list()
   actual <- meta$calibration
   if (is.null(actual)) actual <- meta$primary
@@ -121,7 +131,8 @@
     } else if (isTRUE(actual %in% c("absolute", "symmetric-sd"))) {
       "symmetric-sd"
     } else if (isTRUE(actual %in% c("separate-tails", "percentile-tails", "asymmetric-sd"))) {
-      if (identical(actual, "percentile-tails")) actual else "asymmetric-sd"
+      if (identical(actual, "percentile-tails") ||
+          (family == "npudens" && identical(actual, "separate-tails"))) actual else "asymmetric-sd"
     } else if (construction %in% c("cdf-absolute-process-v1", "cdf-bc-v1")) {
       "symmetric-sd"
     } else if (construction == "density-bc-v2-signed") {
@@ -146,7 +157,7 @@
       endpoint <- switch(method,
         percentile = "empirical bootstrap curve quantiles",
         `symmetric-sd` = "symmetric absolute-process bounds",
-        `asymmetric-sd` = "signed process limits",
+        `separate-tails` =, `asymmetric-sd` = "signed process limits",
         `asymmetric-sd-envelope` = "hull of signed and absolute process bounds",
         `score-envelope` = "process bounds with marginal score protection",
         NULL)
@@ -164,6 +175,6 @@
 .np_plot_family_request_record <- function(request, selection) {
   if (identical(request$band, "pmzsd")) request$band <- "pointwise"
   request["interval"] <- list(selection$interval)
-  request$supplied <- union(setdiff(request$supplied, c("band", "interval", "boot.control")), selection$supplied)
+  request$supplied <- union(setdiff(request$supplied, c("band", "interval", "boot.control", "random.seed")), selection$supplied)
   request
 }
