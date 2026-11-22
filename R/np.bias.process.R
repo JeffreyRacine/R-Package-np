@@ -558,16 +558,25 @@
     if(calibration=="default")"absolute" else
     .np_plot_calibration_method(calibration, "regression")
   main <- state[["settings"]][["main"]]
+  if (isTRUE(state[["beta.gnn.mean"]]) &&
+      (!identical(target, "mean") || !identical(law, "mammen") ||
+       !band %in% c("pointwise", "simultaneous") ||
+       !effective %in% c("absolute", "basic-local-envelope")))
+    stop("experimental positive-degree beta GNN mean bands require pointwise or simultaneous Mammen inference", call.=FALSE)
   if (startsWith(target, "d") && identical(main[["kernel"]], "beta") &&
       main[["type"]] %in% c("generalized_nn", "adaptive_nn")) {
     qualified <- switch(law, inid = "basic-local-envelope", gaussian = "absolute",
                         mammen = "basic-local-envelope", rademacher = "tail-envelope", NULL)
+    qualified.scope <- (band %in% c("pointwise", "simultaneous") && identical(effective, qualified)) ||
+      (band %in% c("bonferroni", "all") && identical(law, "mammen") &&
+       identical(effective, "basic-local-envelope")) ||
+      (identical(band, "pmzsd") && law %in% c("mammen", "gaussian") && identical(effective, "absolute"))
     if (!identical(target, "d1") || !identical(state$d, 1L) ||
         length(state$factor.cols) || !is.null(state[["gradient.order"]]) ||
         !.np_bias_regression_nn_zero(state$bws, "beta") ||
         !identical(state$bws[["ckerbound"]], "fixed") ||
-        !band %in% c("pointwise", "simultaneous") || !identical(effective, qualified))
-      stop("experimental beta NN first-derivative bands require one bounded continuous predictor, degree zero, a pointwise or simultaneous band and a qualified law and calibration", call. = FALSE)
+        !qualified.scope)
+      stop("experimental beta NN first-derivative bands require one bounded continuous predictor, degree zero and a qualified combination of band, law and interval", call. = FALSE)
     state[["beta.nn.first.derivative"]] <- TRUE
   }
   refinement <- if(law %in% c("fixed","geom") && band!="pmzsd")"pilot-block" else "none"

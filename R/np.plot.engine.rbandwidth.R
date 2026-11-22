@@ -252,7 +252,7 @@
             (identical(effective.calibration, "basic-local-envelope") &&
              bws[["type", exact=TRUE]] %in% c("generalized_nn", "adaptive_nn")))) ||
           (wild.local.envelope &&
-           (identical(bws[["type", exact=TRUE]], "fixed") ||
+           (.np_bias_beta_gnn_mean(bws) || identical(bws[["type", exact=TRUE]], "fixed") ||
             (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform", "beta")) ||
              .np_bias_regression_nn_first_order(bws, "epanechnikov"))))))
       stop("basic-envelope requires inid, fixed or geom and fixed-bandwidth regression, degree-zero Epanechnikov/uniform/beta NN or first-order Epanechnikov NN; basic-local-envelope also supports other qualified NN pairs or qualified fixed/NN Mammen", call.=FALSE)

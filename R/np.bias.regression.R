@@ -51,6 +51,16 @@
       any(bws[["degree"]] == 1L)))
 }
 
+.np_bias_beta_gnn_mean <- function(bws) {
+  identical(bws[["ckertype"]], "beta") && identical(bws[["type"]], "generalized_nn") &&
+    isTRUE(bws[["ckerorder"]] == 2L) && identical(bws[["ckerbound"]], "fixed") &&
+    isTRUE(bws[["ncon"]] == 1L) && isTRUE(bws[["nuno"]] == 0L) &&
+    isTRUE(bws[["nord"]] == 0L) && identical(bws[["regtype"]], "lp") &&
+    identical(bws[["basis"]], "glp") && isTRUE(bws[["bernstein.basis"]]) &&
+    isTRUE(bws[["degree"]] %in% 1:2) && isTRUE(is.finite(bws[["ckerlb"]])) &&
+    isTRUE(is.finite(bws[["ckerub"]]))
+}
+
 .np_bias_regression_kernel_class <- function(bws, calibration) {
   if (identical(bws[["ckertype"]], "gaussian") &&
       bws[["ckerorder"]] == 2L &&
@@ -88,6 +98,8 @@
          .np_bias_regression_nn_zero(bws, "uniform")) &&
         isTRUE(bws[["ckerbound"]] %in% c("none", "fixed")))))
     return("local-envelope")
+  if (.np_bias_beta_gnn_mean(bws) && isTRUE(calibration %in% c("absolute", "basic-local-envelope")))
+    return("beta-gnn-mean")
   "unsupported"
 }
 
@@ -190,6 +202,8 @@
   kernel.class <- .np_bias_regression_kernel_class(bws, calibration)
   if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
     stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths with continuous predictors only, or qualified nearest-neighbour models with main degrees at most one",legacy.hint), call. = FALSE)
+  if (kernel.class == "beta-gnn-mean" && (!identical(law, "mammen") || !is.null(gradient.order)))
+    stop("experimental positive-degree beta GNN bands require a mean target and Mammen wild bootstrap", call.=FALSE)
   if (length(fc) && !all(vapply(x[fc],is.factor,logical(1))))
     stop("bias correction requires factor-valued categorical predictors",call.=FALSE)
   admission <- if (kernel.class == "local-envelope") list(
@@ -235,6 +249,7 @@
       bws[["ckerorder"]] == 2L && identical(bws[["ckerbound"]], "none") &&
       bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && anyDuplicated(x[[nc[which.max(reg[["degree.engine"]])]]]))
     spec[["cubic.support"]] <- list(x=x, bws=bws, axis=which.max(reg[["degree.engine"]]))
+  if (kernel.class == "beta-gnn-mean") spec[["beta.gnn.mean"]] <- TRUE
   if (!is.null(admission)) spec$settings$kernel.admission <- admission
   # Degree-zero uniform support ties use the fitted physical coordinates.
   # Auxiliary Gaussian projections retain their standardized coordinates.
@@ -398,8 +413,12 @@
   admitted <- admitted || (isTRUE(captured) && !is.null(spec$local.inference))
   admitted <- admitted || (!is.null(spec$main.capture) && inherits(captured,"np_bias_main_capture_certificate") &&
     identical(captured$state,spec))
-  if (any(ridge!=0) && !admitted)
-    stop("regularized main rows require a qualified fitted capture or generalized-NN GLP model with a stored Bernstein basis; the fitted model has not been changed",call.=FALSE)
+  if (any(ridge != 0)) {
+    if (isTRUE(spec[["beta.gnn.mean"]]))
+      stop("experimental positive-degree beta GNN mean bands require zero-ridge main rows",call.=FALSE)
+    if (!admitted)
+      stop("regularized main rows require a qualified fitted capture or generalized-NN GLP model with a stored Bernstein basis; the fitted model has not been changed",call.=FALSE)
+  }
   attr(H,"ridge.used") <- ridge
   H
 }
