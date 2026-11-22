@@ -83,6 +83,7 @@ npindexbw(\dots)
           scale.factor.search.lower = NULL,
           .restore.first.start = TRUE,
           \dots,
+          .indextest.leaf = NULL,
           .fixed.h.lower = NULL,
           .rng.collective = .npRmpi_rng_scope_collective())
 
@@ -117,6 +118,11 @@ These arguments identify the data, formula interface, method label, and whether 
     local scopes only after collective admission and activation have succeeded
     before entering a worker service. This argument is not intended for
     direct user control; leave its context-dependent default unchanged.
+  }
+
+  \item{.indextest.leaf}{
+    Internal CV objective evaluator prepared by \code{\link{npindextest}} for
+    repeated bootstrap refits. The default uses the model's usual evaluator.
   }
 
   \item{.fixed.h.lower}{
