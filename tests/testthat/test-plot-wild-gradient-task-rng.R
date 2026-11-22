@@ -31,7 +31,7 @@ test_that("master-drawn wild gradient plots do not allocate unused task seeds", 
       counter$chunks <- integer()
       actual <- plot(bw, xdat = x, ydat = y, output = "data",
         errors = "bootstrap", bootstrap = "wild",
-        band = "pmzsd", B = 11L, neval = 5L, gradients = TRUE)
+        interval = "normal-sd", band = "pointwise", B = 11L, neval = 5L, gradients = TRUE)
       expect_true(length(counter$chunks) > 0L)
       expect_true(all(counter$chunks == chunk))
       values <- lapply(actual$panels, function(z) z[c("values", "intervals")])

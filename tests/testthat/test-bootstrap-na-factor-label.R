@@ -31,5 +31,5 @@ test_that("NA-labelled factor bootstrap plots match a relabelled oracle", {
   q <- plot(z,output="data",errors="bootstrap",bootstrap="inid",B=9)
   expect_identical(.Random.seed,seed)
   expect_equal(plot_target(p)$estimate,plot_target(q)$estimate,tolerance=0)
-  expect_equal(plot_band(p,"pmzsd"),plot_band(q,"pmzsd"),tolerance=0)
+  expect_equal(plot_band(p,"pointwise"),plot_band(q,"pointwise"),tolerance=0)
 })
