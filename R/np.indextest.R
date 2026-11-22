@@ -119,7 +119,10 @@
 
 .indextest_score <- function(y, index, data) {
   g <- if (is.null(data$g.test)) index$g else data$g.test
-  .Call(C_np_indextest_score, y, index$z, data$s, g, data$h)
+  if (is.null(.np_progress_runtime$fit_forward))
+    return(.Call(C_np_indextest_score, y, index$z, data$s, g, data$h))
+  .np_with_compiled_fit_progress("Computing the single-index statistic", length(y),
+    expr = .Call(C_np_indextest_score, y, index$z, data$s, g, data$h))
 }
 
 .indextest_pilot <- function(data, index) {
@@ -130,6 +133,7 @@
   # Retain the original rowwise normalization and matrix product. Only a
   # fixed number of target rows is live at any point.
   for (first in seq.int(1L, n, by = 64L)) {
+    .np_fit_progress_step()
     rows <- seq.int(first, min(n, first + 63))
     logw <- -0.5*(outer(index$z[rows], index$z, "-")/index$g)^2
     if (binary) {
@@ -156,7 +160,9 @@
 
 .indextest_cv_leaf <- function(cv) {
   force(cv)
+  heartbeat <- .np_progress_runtime$fit_forward
   function(index, ydat, h, bws, spec, leaf.descriptor) {
+    if (!is.null(heartbeat)) heartbeat()
     out <- .Call(C_np_regression_bw_eval, numeric(), numeric(), as.double(index),
       ydat, as.double(EssDee(index)), cv$opti, cv$optd, as.double(h), 1L, 0L, 10,
       cv$degree, cv$bernstein, cv$basis, cv$lo, cv$hi, cv$support)
@@ -180,6 +186,7 @@
 
 npindextest <- function(object, bw.method = c("published", "maximum", "separate"),
                         B = 199L, random.seed = 42L) {
+  started <- proc.time()[["elapsed"]]
   call <- match.call()
   absent <- missing(object)
   .pltest_local({
@@ -195,11 +202,14 @@ npindextest <- function(object, bw.method = c("published", "maximum", "separate"
         stop("random.seed must be NULL or one representable nonnegative integer.", call. = FALSE)
       random.seed <- npValidateNonNegativeInteger(random.seed, "random.seed")
     }
-    data <- .indextest_setup(object, bw.method)
+    data <- .np_progress_activity_run("Preparing the single-index test",
+      .indextest_setup(object, bw.method))
     index <- .indextest_index(data, data$beta, data$bw)
-    scores <- .indextest_score(data$y, index, data)
+    scores <- .np_progress_activity_run("Computing the single-index statistic",
+      .indextest_score(data$y, index, data))
     observed <- max(scores)
-    data$pilot <- .indextest_pilot(data, index)
+    data$pilot <- .np_progress_activity_run("Computing the bootstrap pilot",
+      .indextest_pilot(data, index))
     if (any(!is.finite(data$pilot))) stop("The bootstrap pilot is not finite.", call. = FALSE)
     .pltest_preflight(B, "npindextest")
   }, where="npindextest")
@@ -222,13 +232,14 @@ npindextest <- function(object, bw.method = c("published", "maximum", "separate"
     exceedances=exceed, critical.values=stats::quantile(values,c(.9,.95,.99),type=1),
     bootstrap=values, rank.counts=boot$rank.counts, boot.num=B, random.seed=random.seed,
     n=length(data$y), beta=data$beta, refit.controls=data$recipe,
-    g.cv=index$g, g.test=if (is.null(data$g.test)) index$g else data$g.test, h=data$h),
+    g.cv=index$g, g.test=if (is.null(data$g.test)) index$g else data$g.test, h=data$h,
+    total.time = proc.time()[["elapsed"]] - started),
     class="indextest")
 }
 
 print.indextest <- function(x, ...) {
   cat("Maistre-Patilea single-index specification test\n")
-  cat(sprintf("T = %.6g    bootstrap p = %.5g    n = %d\n", x$statistic, x$P, x$n))
+  .np_spec_test_print_result(x)
   invisible(x)
 }
 
@@ -239,19 +250,20 @@ summary.indextest <- function(object, ...) {
       "\nPairwise bandwidths:", format(object$h),
       "\nBootstrap draws:", object$boot.num, "   Search starts per refit:",
       object$refit.controls$nmulti, "\n")
+  if (!is.null(object[["total.time"]]))
+    cat("Computation Time: ", format(object[["total.time"]]), " seconds\n", sep = "")
   invisible(object)
 }
 
 .indextest_bootstrap <- function(data, B) {
-  progress <- .np_progress_begin("Bootstrapping the single-index test", total=B, surface="bootstrap")
+  progress <- .np_progress_activity_begin(B, "Bootstrapping the single-index test", detail = NULL)
   complete <- FALSE
-  on.exit(if (!complete) .np_progress_abort(progress), add=TRUE)
+  on.exit(.np_progress_activity_end(progress, complete), add=TRUE)
   values <- numeric(B)
   for (i in seq_len(B)) {
     values[i] <- .indextest_refit(.indextest_response(data), data, i)
-    progress <- .np_progress_step(progress, done=i)
+    .np_progress_activity_step(progress, done = i)
   }
-  .np_progress_end(progress)
   complete <- TRUE
   list(statistics=values, rank.counts=NULL)
 }
