@@ -30,7 +30,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   if (identical(control$construction,"jackknife-mp1")) {
     if (cdf || method!="bootstrap" || !identical(law,"conditional-pilot") ||
         !identical(calibration,"asymmetric-sd"))
-      stop('jackknife-mp1 requires density bootstrap, explicit conditional-pilot law and asymmetric-sd calibration',call.=FALSE)
+      stop('jackknife-mp1 requires density bootstrap, bootstrap="conditional-pilot" and interval="asymmetric-sd"',call.=FALSE)
     return(TRUE)
   }
   construction <- if (!cdf && method == "asymptotic") "jackknife" else "analytic"
@@ -38,7 +38,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     stop(sprintf('this conditional inference route requires construction="%s"', construction), call. = FALSE)
   if (method == "bootstrap" && (!identical(law, "conditional-pilot") ||
       !calibration %in% c("symmetric-sd", "asymmetric-sd")))
-    stop('conditional bootstrap requires explicit bootstrap="conditional-pilot" and calibration="symmetric-sd" or "asymmetric-sd"', call. = FALSE)
+    stop('conditional bootstrap requires explicit bootstrap="conditional-pilot" and interval="symmetric-sd" or interval="asymmetric-sd"', call. = FALSE)
   TRUE
 }
 
