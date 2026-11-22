@@ -84,7 +84,7 @@ test_that("single-index fixed wild bootstrap block path matches dense path", {
   ))
 
   expect_equal(plot_target(block)$estimate, plot_target(dense)$estimate, tolerance = 1e-12)
-  expect_equal(plot_band(block, "pmzsd"), plot_band(dense, "pmzsd"), tolerance = 1e-12)
+  expect_equal(plot_band(block, "pointwise"), plot_band(dense, "pointwise"), tolerance = 1e-12)
 })
 
 test_that("single-index range-bounded wild bootstrap uses scalar-index bounds", {

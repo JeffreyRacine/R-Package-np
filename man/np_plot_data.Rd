@@ -50,9 +50,10 @@ is identified in the corresponding inference record. Unavailable values remain
 
 The object has these components:
 \describe{
-\item{schema_version}{Regression returns \code{2L}. The reader accepts
-previously saved version-one results, including their original \code{pmzsd}
-component keys. Other estimator families continue to return version one.}
+\item{schema_version}{Version two records the requested interval construction
+and effective per-component metadata on inference-enabled routes. Display-only
+routes can return version one. Saved version-one and version-two results retain
+their original component keys and can be replayed directly.}
 \item{family}{Estimator family name.}
 \item{request}{Resolved plot controls and, where applicable, explicitly supplied
 argument names. These describe the computation; changing them does not recompute it.}
@@ -69,7 +70,7 @@ and styles, including requested observations, rugs or bootstrap boxplot summarie
 \item{targets}{Scalar target identities, quantities, labels, derivative variables
 and orders, multi-indices, coefficient terms, response levels and quantile
 \code{tau} values where relevant. \code{inference_id} links to method metadata.}
-\item{inference}{In regression schema version two, each target-specific
+\item{inference}{In schema version two, each target-specific
 record has a \code{components} list keyed by \code{pointwise},
 \code{simultaneous} or \code{bonferroni}. Each entry identifies its effective
 \code{interval}, calibration, endpoint construction, status and applicable

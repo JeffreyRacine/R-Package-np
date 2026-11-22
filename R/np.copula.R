@@ -989,7 +989,7 @@ plot.npcopula <- function(x,
                                    "empirical", "all"),
                           renderer = c("base", "rgl"),
                           errors = c("none", "bootstrap", "asymptotic"),
-                          band = c("pointwise", "pmzsd", "bonferroni",
+                          band = c("pointwise", "bonferroni",
                                    "simultaneous", "all"),
                           alpha = 0.05,
                           bootstrap = c("inid", "fixed", "geom"),
@@ -1009,21 +1009,28 @@ plot.npcopula <- function(x,
                           zlim = NULL,
                           gaussian.draws = 9999L,
                           random.seed = 42L,
-                          ...) {
+                          ..., interval = NULL) {
   .np_plot_check_public_names(.np_plot_dot_names(substitute(list(...))[-1L]))
   .np_plot_stop_unused_args(
     intersect(.np_plot_dot_names(substitute(list(...))[-1L]), "neval"),
     character()
   )
   bootstrap.supplied <- !missing(bootstrap) || !missing(B)
-  interval.supplied <- !missing(band) || !missing(alpha)
+  supplied <- list()
+  if (!missing(band)) supplied["band"] <- list(band)
+  if (!missing(interval)) supplied["interval"] <- list(interval)
+  if (!missing(boot.control)) supplied["boot.control"] <- list(boot.control)
+  if (!missing(errors)) supplied$errors <- errors
+  if (!missing(center)) supplied$center <- center
+  translated <- .np_plot_family_interval_request(supplied, "npcopula")
+  interval.supplied <- !missing(band) || !missing(alpha) || !is.null(interval)
   center.argument.supplied <- !missing(center)
   view <- match.arg(view)
   surface.view <- view %in% c("rotate", "fixed", "surface")
   rotate.surface <- identical(view, "rotate")
   renderer <- .np_plot_match_renderer(renderer)
   errors <- match.arg(errors)
-  band <- match.arg(band)
+  band <- if (is.null(interval)) match.arg(band) else translated$band
   joint.request <- identical(errors, "asymptotic") && band %in% c("simultaneous", "all")
   if ((!missing(gaussian.draws) || !missing(random.seed)) && !joint.request)
     stop("Gaussian controls require asymptotic simultaneous or all bands", call. = FALSE)
@@ -1037,7 +1044,7 @@ plot.npcopula <- function(x,
     value, list(errors = errors, band = band, alpha = alpha, center = center,
                 bootstrap = bootstrap, B = B, gaussian_draws = gaussian.draws,
                 random_seed = random.seed), density = isTRUE(x$density), view = selected.view,
-    style = plot.limit.style)
+    style = plot.limit.style, interval.request = translated$.np.interval.request)
   output <- match.arg(output)
   if (!is.numeric(alpha) || length(alpha) != 1L ||
       is.na(alpha) || alpha <= 0 || alpha >= 0.5)

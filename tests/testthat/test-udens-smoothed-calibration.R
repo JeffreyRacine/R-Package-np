@@ -6,8 +6,7 @@ test_that("calibration names map to retained family owners", {
     expect_identical(.np_plot_calibration_method("tail-envelope", family), "tail-envelope")
   }
   expect_false("calibration" %in% names(np_boot_control()))
-  expect_identical(np_boot_control(calibration = "smoothed-percentile")$calibration,
-                   "smoothed-percentile")
+  expect_error(np_boot_control(calibration = "smoothed-percentile"), "move calibration")
 })
 
 test_that("calibrated stream allocation is deterministic and preserves caller RNG", {

@@ -82,10 +82,10 @@ test_that("Q6 blocks retain donor-first then noise stream and a global maximum",
 
 test_that("Q6 admission is an explicit isolated new law", {
   a <- list(errors="bootstrap", bootstrap="smoothed-q6", center="bias-corrected",
-    band="simultaneous", boot.control=np_boot_control(calibration="symmetric-sd"), B=199L)
+    band="simultaneous", plot.errors.boot.calibration="symmetric-sd", B=199L)
   expect_true(.np_udens_q6_options(a, TRUE))
   expect_error(.np_udens_q6_options(a), "only.*density")
-  for (key in c("errors", "center", "band", "boot.control")) {
+  for (key in c("errors", "center", "band", "plot.errors.boot.calibration")) {
     b <- a; b[[key]] <- NULL
     expect_error(.np_udens_q6_options(b, TRUE), "requires explicit")
   }
@@ -93,16 +93,16 @@ test_that("Q6 admission is an explicit isolated new law", {
     b<-a; b$band<-band; expect_error(.np_udens_q6_options(b,TRUE), "requires explicit")
   }
   for (cal in c("default", "absolute", "smoothed-percentile")) {
-    b<-a; b$boot.control<-np_boot_control(calibration=cal)
+    b<-a; b$plot.errors.boot.calibration <- cal
     expect_error(.np_udens_q6_options(b,TRUE), "requires explicit")
   }
   for (B in c(.5, 0, Inf, NA_real_, .Machine$integer.max+1)) {
     b<-a;b$B<-B;expect_error(.np_udens_q6_options(b,TRUE), "representable integer")
   }
   for (extra in list(list(bias.control=np_udens_bias_control()),list(gradients=TRUE),
-      list(gaussian.draws=199L),list(boot.control=np_boot_control(blocklen=2L,calibration="symmetric-sd")),
-      list(boot.control=np_boot_control(nonfixed="frozen",calibration="symmetric-sd")),
-      list(boot.control=np_boot_control(wild="rademacher",calibration="symmetric-sd"))))
+      list(gaussian.draws=199L),list(boot.control=np_boot_control(blocklen=2L)),
+      list(boot.control=np_boot_control(nonfixed="frozen")),
+      list(boot.control=np_boot_control(wild="rademacher"))))
     expect_error(.np_udens_q6_options(modifyList(a,extra),TRUE), "does not accept")
   b <- structure(list(type="fixed",ckerbound="none",ckertype="uniform",
     ckerorder=2L,ndim=1L,ncon=1L),class="bandwidth")
@@ -129,13 +129,13 @@ test_that("Q6 admission is an explicit isolated new law", {
 
 test_that("Q6 scalar normalization cannot bypass its explicit admission", {
   a <- list(errors="bootstrap", center="bias-corrected", band="simultaneous",
-    boot.control=np_boot_control(calibration="symmetric-sd"), B=199L)
+    plot.errors.boot.calibration="symmetric-sd", B=199L)
   for (law in list(factor("smoothed-q6"), c(named="smoothed-q6"))) {
     a$bootstrap <- law
     z <- .np_plot_normalize_public_dots(a, allow_smoothed_q6=TRUE)
     expect_identical(z$plot.errors.boot.method, "smoothed-q6")
     expect_error(.np_plot_normalize_public_dots(a), "only.*density")
-    for (key in c("errors", "center", "band", "boot.control")) {
+    for (key in c("errors", "center", "band", "plot.errors.boot.calibration")) {
       b <- a; b[[key]] <- NULL
       expect_error(.np_plot_normalize_public_dots(b, allow_smoothed_q6=TRUE), "requires explicit")
     }

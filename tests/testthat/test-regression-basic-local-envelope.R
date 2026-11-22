@@ -49,7 +49,7 @@ check(all(protected$bonferroni[,1,]<=protected$simultaneous[,1,]),all(protected$
 
 test_that("local envelope controls preserve defaults and have an explicit name", {
   expect_false("calibration" %in% names(np_boot_control()))
-  expect_identical(np_boot_control(calibration="basic-local-envelope")$calibration,"basic-local-envelope")
+  expect_error(np_boot_control(calibration="basic-local-envelope"), "move calibration")
   expect_error(np_boot_control(calibration="basic-local"),"calibration")
 })
 
@@ -89,12 +89,10 @@ test_that("public local envelopes enclose both constituents without changing poi
 
 test_that("only explicit regression normalization admits the local envelope", {
   dots<-list(errors="bootstrap",center="bias-corrected",bootstrap="inid",
-    boot.control=np_boot_control(calibration="basic-local-envelope"))
-  for(context in c("plot.lsqregression","plot.npdensity","plot.condensity",
-    "plot.condistribution","plot.qregression","plot.conmode",
-    "plot.smoothcoefficient","plot.plregression","plot"))
-    expect_error(.np_plot_normalize_public_dots(dots,context=context),"requires bias-corrected regression")
-  z<-.np_plot_normalize_public_dots(dots,allow_basic_local_envelope=TRUE)
+    interval="basic-local-envelope")
+  for (family in unname(.np_plot_interval_families))
+    expect_error(.np_plot_family_interval_request(dots, family), "unsupported interval")
+  z <- .np_reg_interval_request(dots)$dots
   expect_identical(z$plot.errors.boot.calibration,"basic-local-envelope")
 })
 

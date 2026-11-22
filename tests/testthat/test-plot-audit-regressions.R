@@ -111,12 +111,14 @@ test_that("conmode pmzsd gradient intervals use the pointwise renderer", {
   p <- plot_audit_method(fit)
   plot_audit_device()
   for (view in c("fixed", "sample")) {
-    pw <- p(fit, gradients = TRUE, level = "north", view = view, neval = 3L,
+    args <- list(x = fit, gradients = TRUE, level = "north", view = view,
       errors = "asymptotic", band = "pointwise", output = "plot-data", layout = FALSE)
-    pm <- p(fit, gradients = TRUE, level = "north", view = view, neval = 3L,
-      errors = "asymptotic", band = "pmzsd", output = "plot-data", layout = FALSE)
+    if (view == "fixed") args$neval <- 3L
+    pw <- do.call(p, args)
+    args$interval <- "normal-sd"
+    pm <- do.call(p, args)
     expect_true(all(is.finite(plot_target(pw)$lower)))
-    expect_identical(plot_band(pm, "pmzsd"), plot_band(pw, "pointwise"))
+    expect_identical(plot_band(pm, "pointwise"), plot_band(pw, "pointwise"))
   }
 })
 

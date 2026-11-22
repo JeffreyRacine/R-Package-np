@@ -1,5 +1,11 @@
 # np 0.80-3
 
+* Plot methods that compute intervals now use `interval` for construction and
+  `band` for coverage scope. Omitting both preserves each method's default.
+  Replace `band="pmzsd"` with `interval="normal-sd", band="pointwise"`.
+  Move explicit construction choices out of `np_boot_control()` and retain
+  resampling options there. Saved plot results keep their original keys.
+
 * For univariate degree-one beta regression with adaptive nearest-neighbor
   bandwidths, fitted means, first derivatives and hat rows use a more accurate
   calculation for ill-conditioned zero-ridge extrapolation above the training
@@ -3242,7 +3248,7 @@
   retain bootstrap-level progress. Statistical results and random-number
   streams are unchanged.
 
-* Eligible individual \`npsigtest()\` calls with fixed bandwidths and IID
+* Eligible individual `npsigtest()` calls with fixed bandwidths and IID
   residual resampling now evaluate bootstrap statistics in bounded native
   tiles. The streamed path preserves the incumbent bootstrap samples, random
   number stream, statistics, and P-values; unsupported configurations continue
@@ -3251,8 +3257,8 @@
 * Regression, conditional-density, and conditional-distribution evaluation
   rows whose required kernel normalization is exactly zero or non-finite now
   fail closed locally. Their estimate, standard error, gradient, and gradient
-  standard error components are returned as \`NA\` where requested, and the
-  corresponding hat row is \`NA\`, without invalidating defined rows. Every
+  standard error components are returned as `NA` where requested, and the
+  corresponding hat row is `NA`, without invalidating defined rows. Every
   finite nonzero normalization remains literal and unperturbed.
 
 * Fitted density and conditional-density log-likelihood aggregates now use the

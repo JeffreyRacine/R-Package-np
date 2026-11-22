@@ -124,13 +124,13 @@ test_that("all copula renderers and uncertainty layers share the coordinate map"
   captured$frames <- list(); captured$errors <- NULL
   set.seed(121)
   out <- capture_copula_provider(plot(fit, view = "fixed", output = "plot-data", errors = "bootstrap",
-    B = 3L, band = "pmzsd", legend = FALSE))$provider
+    B = 3L, band = "pointwise", interval = "normal-sd", legend = FALSE))$provider
   seed <- .Random.seed
   expect_identical(captured$frames[[1L]]$z, expected)
   expect_identical(captured$errors$lower, matrix(out$lower[permutation], 3L, 3L))
   expect_identical(captured$errors$upper, matrix(out$upper[permutation], 3L, 3L))
   set.seed(121)
-  same <- capture_copula_provider(plot(fit, output = "data", errors = "bootstrap", B = 3L, band = "pmzsd"))$provider
+  same <- capture_copula_provider(plot(fit, output = "data", errors = "bootstrap", B = 3L, band = "pointwise", interval = "normal-sd"))$provider
   expect_identical(same, out)
   expect_identical(.Random.seed, seed)
   # Run every base/coordinate/bootstrap assertion even without optional rgl.

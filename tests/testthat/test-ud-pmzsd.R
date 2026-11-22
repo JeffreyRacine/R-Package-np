@@ -31,7 +31,8 @@ test_that("omitted corrected density and CDF bands retain pmzsd semantics", {
       a <- cap$provider$d1
       flat <- as.data.frame(cap$result)
       expect_identical(entry, .Random.seed)
-      args$band <- "pmzsd"
+      args$band <- "pointwise"
+      args$interval <- "normal-sd"
       b <- capture_plot_provider(do.call(plot, args))$provider$d1
       expect_identical(a$inference, b$inference)
       expect_equal(flat$lower,

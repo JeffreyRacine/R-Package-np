@@ -12,9 +12,9 @@ test_that("CDF raw and protected tails preserve their same-call absolute control
     block <- if (law == "inid") NULL else 3L
     call$boot.control <- np_boot_control(blocklen = block)
     absolute <- capture_plot_provider(suppressWarnings(do.call(plot, call)))$provider$d1$inference
-    call$boot.control <- np_boot_control(blocklen = block, calibration = "separate-tails")
+    call$interval <- "asymmetric-sd"
     raw <- capture_plot_provider(suppressWarnings(do.call(plot, call)))$provider$d1$inference
-    call$boot.control <- np_boot_control(blocklen = block, calibration = "tail-envelope")
+    call$interval <- "asymmetric-sd-envelope"
     protected <- capture_plot_provider(suppressWarnings(do.call(plot, call)))$provider$d1$inference
     expect_identical(raw$absolute.intervals, absolute$bands)
     expect_identical(raw$rng, absolute$rng)

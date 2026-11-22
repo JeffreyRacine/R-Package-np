@@ -16,12 +16,7 @@ section below.
 \usage{
 np_boot_control(nonfixed = c("exact", "frozen"),
                 wild = c("mammen", "rademacher"),
-                blocklen = NULL,
-                calibration = c("default", "absolute", "separate-tails",
-                                "tail-envelope", "basic-envelope", "basic-local-envelope",
-                                "percentile-tails",
-                                "symmetric-sd", "asymmetric-sd",
-                                     "smoothed-percentile", "legacy"))
+                blocklen = NULL, ...)
 
 np_grid_control(xtrim = NULL, xq = NULL, slices = NULL)
 
@@ -40,10 +35,9 @@ np_render_control(style = c("band", "bar"),
   Corrected density providers reject fixed blocks whose length equals the
   training sample size: each resample then contains every observation exactly
   once and has no resampling variation. Geometric blocks are unaffected.}
-  \item{calibration}{Construction selection for supported density and
-    distribution plots. Regression plots use the \code{interval} argument
-    to \code{\link{plot.np}}. For regression, omit this field in the bootstrap
-    control, including when retaining the default.}
+  \item{...}{Reserved. Select the interval construction with \code{interval}
+    in the plot call. Older controls containing \code{calibration} must be
+    rebuilt with their original resampling settings.}
   \item{xtrim}{Optional two-element trim range for evaluation grids.}
   \item{xq}{Optional evaluation quantiles.}
   \item{slices}{Optional slice specification for routes that support it.}
@@ -53,7 +47,7 @@ np_render_control(style = c("band", "bar"),
 }
 \details{
 The explicit density plot law \code{bootstrap="smoothed-beta-binomial"}
-requires \code{calibration="symmetric-sd"}; it does not select a law implicitly.
+requires \code{interval="symmetric-sd"}; it does not select a law implicitly.
 Its fixed-bound, univariate, order-four/six/eight Epanechnikov restrictions and complete
 corrected-root construction are described in \code{\link{plot.np}}.
 
@@ -64,7 +58,7 @@ The descriptive bootstrap choices require \code{errors="bootstrap"},
 \code{"asymmetric-sd"} retains \code{"separate-tails"} for regression and
 CDFs, and transported \code{"percentile-tails"} for density. The suffix
 \code{sd} does not imply normal critical values: these empirical bands use
-bootstrap calibration. Existing \code{"tail-envelope"} remains the conservative
+bootstrap calibration. \code{interval="asymmetric-sd-envelope"} selects the conservative
 hull with the absolute-root interval; it is distinct from the raw asymmetric
 choice. Regression defaults follow the kernel/law policy below.
 
@@ -295,22 +289,17 @@ nearest-neighbour bandwidths. Neither envelope supports \code{interval="normal-s
 defaults are unchanged. Like all corrected bounds, this option is pre-beta
 research, with limited coverage evidence rather than a general guarantee.
 
-For regression set \code{bias.control=np_bias_control(construction="legacy")} to select the pre-iterated correction. For density and distribution the \code{"legacy"} calibration selects the
-pre-joint density/CDF bias-corrected bootstrap constructions. It is shorthand
-for the corresponding family \code{bias.control} with
-\code{construction="legacy"}; it is not a fourth new calibration algorithm.
-It requires corrected bootstrap inference, preserves that legacy route's
-supported bands, laws and returned-error conventions, and rejects an explicitly
-supplied nonlegacy bias control. Omitted calibration remains unchanged.
+For legacy corrected bootstrap plots, set \code{construction="legacy"} in
+the corresponding \code{np_bias_control()}, \code{np_udens_bias_control()} or
+\code{np_udist_bias_control()} passed to \code{bias.control}. The legacy provider
+determines its supported laws and scopes.
 
 For known-fixed-bound beta density plots with omitted \code{bias.control},
 \code{"symmetric-sd"} and \code{"asymmetric-sd"} select the separate refitted
 residual construction described in \code{\link{np_udens_bias_control}}.
 It requires independent resampling and explicit pointwise or simultaneous
 bands. The asymmetric rule inverts signed residual roots; the symmetric rule
-adds the guide region and takes a containing symmetric hull once. Gaussian
-density tail transport and all existing calibration aliases retain their
-meanings; omitted calibration does not silently select a beta SD variant.
+adds the guide region and takes a containing symmetric hull once. Omitting \code{interval} uses the existing default for the fitted kernel.
 
 For fixed-bound order-2 Gaussian density plots with omitted \code{bias.control},
 the same two SD selections use FG-D: construct complete signed or symmetric
@@ -321,7 +310,7 @@ explicit pointwise/simultaneous bands are required. Range bounds are rejected;
 \code{"legacy"} retains its existing route. See
 \code{\link{np_udens_bias_control}}.
 
-For density, \code{"smoothed-percentile"} uses complete unshifted corrected
+For density, \code{interval="outer-calibrated-percentile"} uses complete unshifted corrected
 curves, a data-selected outer smoothing pilot and 39 outer calibration samples.
 The complete density and its correction vary jointly. The original fitted
 object and selected bandwidth remain unchanged. Fresh outer samples repeat the
@@ -369,7 +358,7 @@ Symmetric/asymmetric density SD methods retain their existing admitted
 require explicit block lengths. Asymmetric CDF bands support admitted fixed
 bandwidth joint-process \code{inid}/\code{fixed}/\code{geom} inference;
 numeric nearest-neighbor asymmetric CDF inference remains unqualified.
-The experimental CDF \code{"smoothed-percentile"} option uses a
+The experimental CDF \code{interval="outer-calibrated-percentile"} option uses a
 Gaussian derivative-three smoothing pilot, 39 fresh outer-sample fits using
 the same bandwidth-procedure policy described above,
 complete bias-corrected CDF curves and calibrated family ranks. Its current
@@ -446,10 +435,11 @@ and estimator-specific qualifications.
   Rademacher), \code{inid}, \code{fixed}, and \code{geom} routes. Existing
   kernel, regularization and auxiliary-space restrictions still apply.
   Estimate-centered, legacy, normal-scale \code{pmzsd} and Gaussian asymptotic
-  inference do not accept an explicit calibration selector. Families other
+  inference have their own supported constructions. Families other
   than the regression, density and distribution routes described here retain their existing
   selection contracts. The Gaussian approximation is reflection-symmetric.
-  Omitted selectors in previously saved controls retain their meaning.
+  To reuse older bootstrap settings, rebuild the control without its \code{calibration}
+  field. Omit \code{interval} for the fitted method's default.
 
   The raw method uses marginal lower/upper order statistics for pointwise
   bands and separate lower/upper family-extremum quantiles for simultaneous
@@ -526,7 +516,7 @@ Plot annotations call estimate-centered bounds variability intervals or bands
 and bias-corrected bounds confidence intervals or bands. Pointwise, Bonferroni
 and simultaneous refer to coverage scope, independently of asymptotic or
 bootstrap construction. Simultaneous scope is the method's documented finite
-family; \code{band="pmzsd"} is pointwise. Confidence
+family; \code{interval="normal-sd", band="pointwise"} is pointwise. Confidence
 wording does not establish nominal coverage for experimental methods.
 
 \strong{All bias-corrected confidence intervals and bands are experimental

@@ -130,7 +130,7 @@
       .np_udens_bb_options(list(bootstrap=plot.errors.boot.method,errors=error.request$method,
         center=plot.errors.center,band=error.request$type,
         plot.errors.boot.calibration=plot.errors.boot.calibration,bias.control=bias.control,
-        plot.errors.boot.nonfixed=plot.errors.boot.nonfixed,
+        plot.errors.boot.nonfixed=match.arg(plot.errors.boot.nonfixed),
         plot.errors.boot.blocklen=plot.errors.boot.blocklen),TRUE)
       .np_udens_bb_prepare(bws,xdat,if (missing(random.seed)) 42L else random.seed)
     } else NULL

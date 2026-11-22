@@ -74,7 +74,7 @@ test_that("bounded copula grids remain usable by bootstrap plots", {
   fit <- npcopula(b, data = d, u = data.frame(x = c(.2, .8), z = c(.3, .7)),
     n.quasi.inv = 40L, er.quasi.inv = 1)
   set.seed(111)
-  out <- plot(fit, output = "data", errors = "bootstrap", B = 3L, band = "pmzsd")
+  out <- plot(fit, output = "data", errors = "bootstrap", B = 3L, band = "pointwise", interval = "normal-sd")
   out <- as.data.frame(out)
     expect_equal(nrow(out), 4L)
   expect_true(all(is.finite(as.matrix(out[c("estimate", "lower", "upper")]))))

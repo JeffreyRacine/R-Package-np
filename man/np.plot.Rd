@@ -186,22 +186,18 @@ Named options passed via \code{\dots} include:
         the bootstrap replication count.
       }
       \item{\code{interval}}{
-        Regression interval construction. Omitting this argument or supplying
-        \code{NULL} uses the established model-, law- and scope-specific default.
-        Supplying a construction without a band requests pointwise coverage.
-        See Regression interval constructions below.
+        Interval construction for plots that compute uncertainty. Omitting it
+        or supplying \code{NULL} preserves the provider's default. A selected
+        construction defaults to pointwise coverage on routes that allow an
+        omitted scope. Specialist smoothed density laws require an explicit scope.
+        See Interval constructions across families and Regression interval constructions below.
       }
       \item{\code{band}}{
-        For regression use \code{"pointwise"}, \code{"simultaneous"},
-        \code{"bonferroni"}, or \code{"all"}. Omitting both \code{band} and
-        \code{interval} retains the ordinary marginal normal-SD display.
-        For other estimators the available choices are \code{"pmzsd"}, \code{"pointwise"},
-        \code{"bonferroni"}, \code{"simultaneous"}, or \code{"all"}.
-        The common bandwidth-engine default is \code{"pmzsd"}; direct
-        \code{npcopula} and \code{npconmode} plots retain their
-        method-specific \code{"pointwise"} default. The meaning of a band
-        name depends on whether \code{errors="bootstrap"} or
-        \code{errors="asymptotic"}; see Details.
+        Coverage scope. Choose \code{"pointwise"}, \code{"simultaneous"},
+        \code{"bonferroni"} or \code{"all"} where supported. With both selectors
+        omitted, bandwidth-engine plots retain their usual marginal normal-SD
+        display. Copula and conditional-mode plots retain their pointwise default.
+        Simultaneous coverage refers to the finite target family recorded for that component.
       }
       \item{\code{boot.control}}{
         optional detailed bootstrap controls created by
@@ -468,7 +464,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   available through \code{\link{np_conditional_bias_control}}. They require
   explicit selection and preserve existing methods. Their bootstrap response law
   is selected explicitly by \code{bootstrap="conditional-pilot"}, with
-  \code{calibration="symmetric-sd"} or \code{"asymmetric-sd"}; it is not pairs
+  \code{interval="symmetric-sd"} or \code{"asymmetric-sd"}; it is not pairs
   resampling. Read the control help for correction differences, finite-grid
   limits, signed returned offsets and known coverage limitations.
 
@@ -709,7 +705,7 @@ outside this experimental derivative scope.
   ordinary percentile endpoints. See \code{\link{np_boot_control}}.
 
   In the default and legacy constructions in the table,
-  \code{errors="bootstrap", band="pmzsd"} summarizes each
+  \code{errors="bootstrap", interval="normal-sd", band="pointwise"} summarizes each
   bootstrap distribution by its standard deviation and imposes a symmetric
   normal-quantile shape on the displayed band. In contrast, bootstrap
   \code{"pointwise"} and \code{"bonferroni"} bands use the corresponding
@@ -788,7 +784,7 @@ outside this experimental derivative scope.
   conservative in the retained saved-sample study; this is not an efficiency
   or universal coverage guarantee.
   With omitted \code{bias.control}, request asymptotic errors or independent
-  bootstrap \code{calibration="symmetric-sd"}/\code{"asymmetric-sd"}, and
+  bootstrap \code{interval="symmetric-sd"}/\code{"asymmetric-sd"}, and
   explicitly choose pointwise, simultaneous, Bonferroni or all three bands
   together with \code{band="all"}. Range-derived bounds and
   literal endpoints are rejected. All slices share one finite calibration
@@ -810,7 +806,7 @@ outside this experimental derivative scope.
 
   For one continuous variable, known-fixed-bound beta kernels of orders 2, 4, 6
   and 8 and order-2 Gaussian density plots additionally support asymptotic normal intervals with omitted
-  \code{band} or \code{band="pmzsd"} and omitted \code{bias.control}.
+  \code{band} or \code{interval="normal-sd", band="pointwise"} and omitted \code{bias.control}.
   The corrected center is unchanged. The complete influence variance is
   integrated under the normalized positive ratio pilot, including guide and
   cross-covariance terms, and uses ordinary normal critical values.
@@ -848,7 +844,7 @@ outside this experimental derivative scope.
   bandwidths, higher orders and multivariate calibrated compact correction
   are not admitted by this construction.
   With \code{errors="asymptotic"}, omitted \code{band} or
-  \code{band="pmzsd"} instead uses the same corrected center and complete
+  \code{interval="normal-sd", band="pointwise"} instead uses the same corrected center and complete
   normalized ratio-pilot influence variance with normal critical values.
   Guide and cross-covariance contributions are included. These marginal
   intervals require no simulated draws; they are distinct from the calibrated
@@ -870,15 +866,15 @@ outside this experimental derivative scope.
   and independent symmetric-sd/asymmetric-sd intervals with all four explicit
   band types. These require omitted density bias controls and the same interior
   data/target restrictions. For SD bands explicitly select \code{bootstrap="inid"}
-  and the calibration in \code{boot.control}. Bootstrap pmzsd is not admitted
+  and the construction in \code{interval}. Bootstrap pmzsd is not admitted
   by this addition. Asymptotic simultaneous bands use the complete pilot and
   empirical Gaussian covariances, including all cross-coordinate guide terms. See
   \code{\link{np_udens_bias_control}} for the distinct uncertainty constructions
   and their conservative, finite-grid evidence.
   For corrected bootstrap bands, supply \code{errors="bootstrap"}, explicit
   \code{bootstrap="inid"}, an explicit band, and
-  \code{boot.control=np_boot_control(calibration="symmetric-sd")} or
-  \code{boot.control=np_boot_control(calibration="asymmetric-sd")}.
+  \code{interval="symmetric-sd"} or
+  \code{interval="asymmetric-sd"}.
   Each literal resample refits the guide; the residual functional, rather than
   the complete corrected curve, is bootstrapped at the original empirical
   residual scale. The original nonlinear guide region is included once.
@@ -942,7 +938,7 @@ outside this experimental derivative scope.
   \code{ckerbound="fixed"} bounds. It requires \code{errors="bootstrap"},
   \code{center="bias-corrected"}, an explicit \code{band="pointwise"},
   \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}, and
-  \code{boot.control=np_boot_control(calibration="symmetric-sd")}. Observations
+  \code{interval="symmetric-sd"}. Observations
   and targets must be strictly inside the bounds. Range or one-sided bounds,
   nearest-neighbor bandwidths, mixed data, other kernel orders, two-dimensional
   data, asymmetric calibration and \code{pmzsd} are not supported by this law.
@@ -972,7 +968,7 @@ outside this experimental derivative scope.
   \code{errors="bootstrap"}, \code{center="bias-corrected"},
   \code{band="pointwise"}, \code{band="simultaneous"},
   \code{band="bonferroni"} or \code{band="all"}, and
-  \code{boot.control=np_boot_control(calibration="symmetric-sd")} together.
+  \code{interval="symmetric-sd"} together.
   It is restricted to one or two continuous numeric variables, positive retained
   fixed bandwidth, whole-line second-order uniform or Epanechnikov kernels,
   at least ten finite observations and positive guide variance (positive definite
@@ -998,7 +994,7 @@ outside this experimental derivative scope.
   retained; nonnegative intersections may be reported separately. This is a
   different law and calibration from \code{smoothed-percentile}.
 
-  For two variables, \code{calibration="asymmetric-sd"} also supports
+  For two variables, \code{interval="asymmetric-sd"} also supports
   pointwise and simultaneous bands under the same explicit Q6 law. Both
   directional scales are estimated from centered conditional corrected roots,
   while calibration retains the uncentered roots relative to the complete Q6
@@ -1022,7 +1018,7 @@ outside this experimental derivative scope.
   conservative 95-percent simultaneous coverage (99.61/100 percent for uniform/
   Epanechnikov); this is not a general near-nominal coverage guarantee.
 
-  Explicit \code{calibration="asymmetric-sd"} with this law remains restricted
+  Explicit \code{interval="asymmetric-sd"} with this law remains restricted
   to one continuous variable and instead supports
   pointwise, simultaneous, Bonferroni and all bands on the full empirical-range grid only (the default
   \code{xtrim=0}, or \code{grid.control=np_grid_control(xtrim=c(0,1))}). Its center and original fixed-coordinate influence
@@ -1335,7 +1331,7 @@ outside this experimental derivative scope.
   scopes. Detailed labels identify the corrected center; compact fallbacks
   retain construction and family instead of repeating that explanation.
   Simultaneous coverage concerns the method's documented finite family,
-  usually the evaluation grid within a panel. \code{band="pmzsd"}
+  usually the evaluation grid within a panel. \code{interval="normal-sd", band="pointwise"}
   is pointwise, not simultaneous. Confidence terminology describes the
   inferential target; all bias-corrected methods remain experimental
   alpha/pre-beta, incomplete, and without a general nominal-coverage guarantee.
@@ -1696,6 +1692,34 @@ outside this experimental derivative scope.
 
 }
 
+\section{Interval constructions across families}{
+For a marginal normal interval use \code{interval="normal-sd", band="pointwise"}.
+For ordinary empirical bootstrap intervals on eligible estimate-centered or legacy
+routes use \code{interval="percentile"} with the desired \code{band}. For an
+ordinary Gaussian simultaneous band use \code{errors="asymptotic"},
+\code{interval="symmetric-sd"} and \code{band="simultaneous"}.
+
+An explicit construction selects an existing provider. Density and distribution
+correction depend on the kernel, support, bandwidth type, resampling law and
+center. See \code{\link{np_udens_bias_control}}, \code{\link{np_udist_bias_control}}
+and \code{\link{np_conditional_bias_control}} for eligibility. For example,
+\code{interval="asymmetric-sd"} can select transported percentile tails in an
+unbounded Gaussian density plot or signed residual inversion in a bounded beta
+density plot. \code{asymmetric-sd-envelope} requests the protected tail envelope
+where supported. \code{outer-calibrated-percentile} requests the qualified outer
+calibration. Density also accepts the literal \code{absolute}, \code{separate-tails}
+and \code{percentile-tails} choices where the provider supports them. The CDF
+asymptotic score envelope can be selected with \code{interval="score-envelope"}.
+Inspect the inference record for the fitted provider and each returned component.
+
+To migrate a saved bootstrap control, create a fresh \code{np_boot_control()}
+with its original \code{nonfixed}, \code{wild} and \code{blocklen}. Keep the
+original \code{bootstrap} and \code{B}. Move an explicit construction to
+\code{interval} and omit \code{interval} for the historical default. The
+former \code{band="pmzsd"} becomes \code{interval="normal-sd", band="pointwise"}.
+Saved plot data can be replayed and extracted with their original component names.
+}
+
 \section{Regression interval constructions}{
 For an \code{npreg} fit or regression bandwidth object, \code{errors} chooses
 the source of uncertainty, \code{bootstrap} its resampling law, \code{interval}
@@ -1704,7 +1728,7 @@ use the corresponding fitted geometry, correction and draws.
 \describe{
 \item{\code{"normal-sd"}}{A normal critical value times the applicable
 standard error or bootstrap SD. Use pointwise scope for the former
-\code{band="pmzsd"} display. An ordinary asymptotic Bonferroni interval
+\code{interval="normal-sd", band="pointwise"} display. An ordinary asymptotic Bonferroni interval
 also admits this construction.}
 \item{\code{"symmetric-sd"}}{The absolute-root construction in qualified
 iterated corrected fits, or the Gaussian simultaneous construction in
@@ -2090,7 +2114,7 @@ failures must be considered when experimenting with these bounds.
 A known limitation concerns pilot-based normal-scale, bias-corrected density
 intervals, including the fixed-support beta and Gaussian constructions and
 the one- and two-dimensional uniform and Epanechnikov normal constructions. These use normal critical values for
-\code{band="pmzsd"} (also selected when \code{band} is omitted on these
+\code{interval="normal-sd", band="pointwise"} (also selected when \code{band} is omitted on these
 routes). The fitted pilot reference law can substantially understate
 uncertainty even when all joint bias-correction covariance terms are included.
 Residual smoothing bias and sparse information can also cause poor coverage

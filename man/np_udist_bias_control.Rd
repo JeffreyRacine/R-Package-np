@@ -100,10 +100,10 @@ not receive this marginal envelope. An entirely zero observed process remains
 unavailable.
 
 For supported corrected empirical bootstrap bands, explicit
-\code{boot.control=np_boot_control(calibration="separate-tails")} uses signed
+\code{interval="asymmetric-sd"} uses signed
 lower and upper empirical tails in CDF units. The simultaneous roots are
 separate quantiles of the family minimum and maximum; endpoints invert those
-signed estimate displacements. \code{calibration="tail-envelope"} additionally
+signed estimate displacements. \code{interval="asymmetric-sd-envelope"} additionally
 takes the interval hull with the unchanged absolute construction. The default
 is unchanged, and \code{calibration="absolute"} requests it explicitly.
 These options preserve the selected inid, fixed or geom law, the complete
@@ -142,13 +142,13 @@ not inherit qualification from the absolute process. Explicit \code{"legacy"}
 retains the historical bootstrap center. All constructions remain research
 candidates; full empirical-range screening is distinct from confirmation.
 
-Omitting \code{band}, or selecting \code{band="pmzsd"}, uses the corrected
+Omitting \code{band}, or selecting \code{interval="normal-sd", band="pointwise"}, uses the corrected
 center plus or minus \eqn{z_{1-\alpha/2}} times the returned \code{std_error}.
 The existing pointwise provider supplies the selected-law scale, retaining
 block dependence and exact GNN resampling where applicable. Its computation
 and RNG contract are retained. Zero marginal scales give zero normal width.
 These normal intervals do not apply the score or joint envelopes and do not
-inherit their coverage results. Endpoints are in the interval rows with \code{band="pmzsd"}. Explicit \code{"pointwise"},
+inherit their coverage results. Endpoints are in the interval rows with \code{band="pointwise"}. Explicit \code{"pointwise"},
 \code{"simultaneous"}, \code{"bonferroni"} and \code{"all"} retain their
 calibrated constructions. Numeric adaptive nearest-neighbor bandwidths, unordered factors,
 bounded or higher-order kernels, large-bandwidth limits and
