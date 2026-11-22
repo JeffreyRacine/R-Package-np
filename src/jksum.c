@@ -27117,6 +27117,19 @@ static void np_regression_general_lp_fit_owner_cleanup(
 }
 
 
+/* Fixed univariate beta fits can concentrate their weights at a support
+ * boundary. Keep the original accepted solve and its own kernel weights. */
+static int np_fixed_beta_precision(const NPContinuousKernelRoute *route, int bandwidth,
+                                   int continuous, int unordered, int ordered)
+{
+  return bandwidth == BW_FIXED && continuous == 1 && !unordered && !ordered &&
+    vector_glp_degree_extern != NULL &&
+    (vector_glp_degree_extern[0] == 1 || vector_glp_degree_extern[0] == 2) &&
+    route != NULL && route->segment_count == 1 &&
+    route->segment[0].descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+    route->segment[0].descriptor.order == 2;
+}
+
 /* Fully pooled Aitchison-Aitken factors give every donor the same
  * categorical weight. The continuous GNN row still uses the fitted radius. */
 static int np_pooled_beta_linear_precision(const NPContinuousKernelRoute *route,
