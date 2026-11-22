@@ -1,5 +1,11 @@
 # npRmpi 0.80-3
 
+* Regression plots now provide experimental Mammen wild mean bands for univariate
+  degree-one and degree-two zero-ridge Bernstein beta GNN fits on known support.
+  Degree-zero beta NN slopes gain Mammen local-envelope Bonferroni and combined
+  bands, and marginal normal-SD intervals under Mammen bootstrap or Gaussian
+  asymptotic inference.
+
 * Regression plots accept `interval` for the interval construction and `band`
   for pointwise, simultaneous or Bonferroni coverage. Omitting `interval`
   retains the existing statistical defaults. Use `interval="normal-sd"`

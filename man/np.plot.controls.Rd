@@ -233,8 +233,8 @@ The qualified extension is limited to main degree components zero or one.
 Higher-degree Epanechnikov NN admissions are unchanged. Second-order beta
 GNN/ANN LC or GLP degree-zero means with known finite fixed support, including
 supported mixed mean panels and categorical mean contrasts, use these same
-established SD, pairs and wild constructions and defaults. Continuous derivative
-requests and positive-degree beta NN correction remain unqualified; requested
+established SD, pairs and wild constructions and defaults. For the experimental univariate beta NN derivative scopes and the
+degree-one and degree-two Bernstein beta GNN mean scopes, see \code{\link{np.plot}}; requested
 panels are never silently omitted. The beta comparison reuses two saved original
 samples and does not establish nominal coverage. Higher-degree bounded/wild
 Epanechnikov NN and higher-order kernels remain unqualified.

@@ -679,8 +679,12 @@ NN correction and continuous uniform derivatives remain unqualified.
   mixed predictors and categorical mean contrasts. The same established SD,
   pairs and wild constructions apply: Mammen and pairs default to the local
   envelope, and Rademacher defaults to the containing tail envelope. Explicit
-  calibrations retain their definitions. Positive-degree beta NN correction remains
-  unqualified. The ordinary-use mean comparison reuses two saved samples and does not
+  calibrations retain their definitions. Experimental univariate beta GNN means also admit pointwise and simultaneous
+  Mammen wild bands for degree-one and degree-two Bernstein GLP fits with
+  zero-ridge main rows and known finite bounds. The default uses absolute roots
+  (\code{interval="symmetric-sd"}). Select \code{interval="basic-local-envelope"}
+  for the wider local envelope. On 114 saved datasets at each degree, the two
+  constructions covered 111 and 114 complete grids, respectively. The ordinary-use mean comparison reuses two saved samples and does not
   establish nominal coverage. Fitted NN counts and support bounds stay fixed.
 
 Experimental bias-corrected first-derivative bands are available for a single
@@ -698,8 +702,12 @@ all 50 grid points on each of 114 independent datasets for both bandwidth types.
 Their median ratio of simultaneous to pointwise width was 6.80 for generalized
 and 7.14 for adaptive bandwidths. On the saved heteroskedastic exponential
 design, upper-region adaptive pointwise coverage averaged 90.63 percent at
-95 percent nominal. Fixed and geometric block pairs and Bonferroni intervals
-are outside this experimental derivative scope.
+95 percent nominal. Mammen wild basic-local-envelope also admits \code{band="bonferroni"} and
+\code{band="all"}, with diagnostics for limited draw resolution. Omitting the band
+selects marginal normal-SD intervals for default Mammen bootstrap and Gaussian
+asymptotic inference. Explicit pointwise and simultaneous calls retain their
+empirical or studentized constructions. Fixed and geometric block pairs remain
+outside this experimental derivative scope.
 
   The degree-zero and first-order Epanechnikov NN classes support ordinary asymptotic and
   \code{interval="normal-sd"} calls, explicit absolute/symmetric-SD pairs and wild bands,

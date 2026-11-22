@@ -44,7 +44,8 @@ test_that("beta NN degree-zero mean inference preserves support, law and default
     expect_s3_class(run(errors="asymptotic")$result,"np_plot_data")
     expect_s3_class(run(band="pointwise",cal="normal-sd")$result,"np_plot_data")
     expect_s3_class(run(law="inid",cal="absolute")$result,"np_plot_data")
-    expect_error(run(grad=TRUE), "experimental beta NN first-derivative")
+    if (kind == "pooled") expect_error(run(grad=TRUE), "experimental beta NN first-derivative")
+    else expect_s3_class(run(grad=TRUE)$result, "np_plot_data")
     if (kind == "pooled") {
       expect_error(run(grad=TRUE, band="pointwise"), "experimental beta NN first-derivative")
     } else {
@@ -54,8 +55,27 @@ test_that("beta NN degree-zero mean inference preserves support, law and default
     expect_error(run(cal="basic-envelope"),"basic-envelope requires inid, fixed or geom")
     higher.args <- args;higher.args$regtype <- "lp";higher.args$degree <- 1L
     higher <- do.call(npregbw,higher.args)
-    expect_identical(.np_bias_regression_kernel_class(higher,"absolute"),"unsupported")
-    expect_error(.np_bias_regression_prepare(higher,x,y,law="mammen",calibration="basic-local-envelope"),"requires a supported second-order kernel")
+    if (type == "generalized_nn" && kind != "pooled" && isTRUE(higher$bernstein.basis)) {
+      expect_identical(.np_bias_regression_kernel_class(higher,"absolute"),"beta-gnn-mean")
+      expect_error(.np_bias_regression_prepare(higher,x,y,law="inid",calibration="basic-local-envelope"),"Mammen")
+    } else {
+      expect_identical(.np_bias_regression_kernel_class(higher,"absolute"),"unsupported")
+      expect_error(.np_bias_regression_prepare(higher,x,y,law="mammen",calibration="basic-local-envelope"),"requires a supported second-order kernel")
+    }
     expect_identical(.Random.seed,seed);expect_identical(fit,held)
   }
+})
+
+test_that("experimental beta GNN means refuse regularized rows and restrict the design", {
+  bw <- list(type="generalized_nn", ckertype="beta", ckerorder=2L, ckerbound="fixed",
+             ckerlb=0, ckerub=1, ncon=1L, nuno=0L, nord=0L, regtype="lp",
+             basis="glp", bernstein.basis=TRUE, degree=2L)
+  expect_true(.np_bias_beta_gnn_mean(bw))
+  for (variant in list(list(type="adaptive_nn"), list(bernstein.basis=FALSE),
+                       list(degree=3L), list(nuno=1L), list(ckerub=Inf)))
+    expect_false(.np_bias_beta_gnn_mean(utils::modifyList(bw, variant)))
+  state <- list(bws=bw, beta.gnn.mean=TRUE)
+  reg <- list(degree.engine=2L, bernstein.basis.engine=TRUE)
+  expect_error(.np_bias_main_admit(state, matrix(1), 1e-12, reg), "zero-ridge")
+  expect_equal(as.numeric(.np_bias_main_admit(state, matrix(1), 0, reg)), 1)
 })
