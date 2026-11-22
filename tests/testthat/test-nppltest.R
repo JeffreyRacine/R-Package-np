@@ -28,3 +28,16 @@ test_that("mixed training operator uses the fitted categorical weights", {
     expect_equal(.pltest_residual_norms(H), rowSums((diag(n) - H)^2))
   }
 })
+
+test_that("selected angular columns reproduce every serial entry in anchor order", {
+  V <- cbind(c(0, 0, 1, -1, 2, 1e-14), c(1, 1, 0, 2, -1, 1))
+  full <- .Call(C_np_pltest_angles, V)
+  for (ids in list(c(6L, 2L, 4L), c(3L, 5L, 1L), 1L)) {
+    columns <- .Call(C_np_pltest_angle_columns, V, ids)
+    for (b in seq_along(ids)) {
+      rows <- seq.int(ids[b], nrow(V))
+      expect_identical(columns[rows, b], full[rows, ids[b]])
+    }
+  }
+  expect_error(.Call(C_np_pltest_angle_columns, V, c(0L, 1L)), "column index")
+})

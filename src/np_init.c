@@ -6,6 +6,7 @@
 
 /* .Call calls */
 extern SEXP C_np_pltest_angles(SEXP);
+extern SEXP C_np_pltest_angle_columns(SEXP, SEXP);
 extern SEXP C_np_indextest_score(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_worker_native_identity(void);
 extern SEXP C_np_plot_fgd_evaluate(SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -221,6 +222,7 @@ extern SEXP C_np_plot_udens_bb_guide_order(SEXP,SEXP,SEXP,SEXP,SEXP,SEXP,SEXP);
 extern SEXP C_np_plot_udens_bb_draw(SEXP, SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+  {"C_np_pltest_angle_columns", (DL_FUNC) &C_np_pltest_angle_columns, 2},
   {"C_np_pltest_angles", (DL_FUNC) &C_np_pltest_angles, 1},
     {"C_np_indextest_score", (DL_FUNC) &C_np_indextest_score, 5},
     {"C_np_plot_udens_bb_draw", (DL_FUNC) &C_np_plot_udens_bb_draw, 2},

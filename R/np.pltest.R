@@ -1,5 +1,5 @@
 # Statistic: Sun, Chen, Liang and Ruppert (2021), doi:10.5705/ss.202019.0238.
-.pltest_geometry <- function(predictors, standardize) {
+.pltest_coordinates <- function(predictors, standardize) {
   columns <- lapply(predictors, function(x) {
     if (is.factor(x) && !is.ordered(x)) {
       code <- as.integer(droplevels(x))
@@ -18,8 +18,7 @@
   V <- do.call(cbind, unname(columns))
   if (any(!is.finite(V))) stop("Non-finite projection coordinates; rescale the predictors.", call. = FALSE)
   storage.mode(V) <- "double"
-  .np_with_compiled_fit_progress("Computing projection weights", nrow(V),
-    expr = .Call(C_np_pltest_angles, V))
+  V
 }
 
 .pltest_sun_bandwidth <- function(X, y, Z, continuous, cells) {
@@ -458,10 +457,61 @@ summary.pltest <- function(object, ...) {
   invisible(NULL)
 }
 
+.pltest_angle_columns <- function(V, ids) {
+  if (mpi.comm.rank(1L) == 0L)
+    return(.np_with_compiled_fit_progress("Computing projection weights", nrow(V),
+      expr = .Call(C_np_pltest_angle_columns, V, ids)))
+  .Call(C_np_pltest_angle_columns, V, ids)
+}
+
 .pltest_angles <- function(predictors, standardize) {
-  if (!.npRmpi_cms_collective_context()) return(.pltest_geometry(predictors, standardize))
-  A <- .pltest_local(if (mpi.comm.rank(1L) == 0L) .pltest_geometry(predictors, standardize))
-  .pltest_root_value(A)
+  V <- .pltest_local(.pltest_coordinates(predictors, standardize))
+  n <- nrow(V)
+  collective <- .npRmpi_cms_collective_context()
+  ranks <- mpi.comm.size(1L)
+  # A second dispatch and matrix transfer dominate short angular calculations.
+  if (n < 512L || ranks == 1L) {
+    A <- .pltest_local(if (!collective || mpi.comm.rank(1L) == 0L)
+      .np_with_compiled_fit_progress("Computing projection weights", n,
+        expr = .Call(C_np_pltest_angles, V)))
+    return(if (collective) .pltest_root_value(A) else A)
+  }
+
+  if (collective) {
+    # Strided columns balance the triangular work. Every rank already has V
+    # and needs the completed matrix for its subsequent bootstrap draws.
+    own <- .npRmpi_bootstrap_collective_apply(n, n, function(ids, pos)
+      .pltest_angle_columns(V, ids))[[1L]]
+    rank <- mpi.comm.rank(1L)
+    A <- .pltest_local(matrix(0, n, n))
+    for (owner in seq_len(min(n, ranks)) - 1L) {
+      ids <- seq.int(owner + 1L, n, by = ranks)
+      block <- mpi.bcast.Robj(if (rank == owner) own, rank = owner, comm = 1L)
+      .pltest_local(A[, ids] <- if (rank == owner) own else block)
+    }
+  } else {
+    # Pair long and short columns so each task has comparable work and the
+    # master participates under the same scheduler as the bootstrap.
+    half <- seq_len(ceiling(n/2))
+    columns <- as.integer(rbind(half, n - half + 1L))[seq_len(n)]
+    width <- 2L * ceiling(n/(2 * ranks))
+    tasks <- .npRmpi_bootstrap_chunk_tasks(n, width, with.seeds = FALSE)
+    worker <- function(task, V, columns) {
+      ids <- columns[seq.int(task$start, length.out = task$bsz)]
+      t(.pltest_angle_columns(V, ids))
+    }
+    rows <- .np_spec_test_fanout(n, tasks, worker, ncol.out = n,
+      what = "projection weights", progress.label = "Computing projection weights",
+      profile.where = "mpi.applyLB:nppltest.geometry", progress.unit = "column",
+      V = V, columns = columns)
+    A <- t(rows[order(columns), , drop = FALSE])
+  }
+  # Mirror only after all owners have finished accumulating the lower triangle.
+  for (j in seq_len(n - 1L)) {
+    below <- seq.int(j + 1L, n)
+    A[j, below] <- A[below, j]
+  }
+  A
 }
 
 .pltest_preflight <- function(B, where = "nppltest") {

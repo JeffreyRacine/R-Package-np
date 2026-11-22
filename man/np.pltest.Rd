@@ -93,8 +93,8 @@ nppltest(object, bw.method = c("sun", "cv", "object"),
   angular calculation at fixed predictor dimension. The null training operator is reused across
   blocks of bootstrap responses. The CV-pilot HC2 option also computes the
   squared row norms of the separate pilot residual operator. In \pkg{npRmpi},
-  rank zero calculates the angular matrix. In a collective session it shares
-  this matrix with the other ranks. To use MPI,
+  the master and workers compute disjoint columns of the angular matrix for
+  larger samples. Each column retains the serial order of summation. To use MPI,
   initialize an \pkg{npRmpi} session or attach pool and call the test on
   the master. Under the package startup profile, make the same training data
   and object available on every rank and use, for example,

@@ -19,14 +19,21 @@ static void angles(double *out, const double *cosines, int count) {
 
 /* The integrated projection weights are symmetric. Accumulate one triangle,
    retaining the original point masses at coincident observations. */
-SEXP C_np_pltest_angles(SEXP coordinates) {
+static SEXP pltest_angles(SEXP coordinates, SEXP columns) {
     int n = nrows(coordinates), p = ncols(coordinates);
     if (!isReal(coordinates) || !isMatrix(coordinates) || n < 2 || p < 1)
         error("Invalid projection coordinates.");
+    int full = columns == R_NilValue;
+    if (!full && (TYPEOF(columns) != INTSXP || XLENGTH(columns) > n))
+        error("Invalid angular column indices.");
+    int width = full ? n : LENGTH(columns);
+    const int *ids = full ? NULL : INTEGER(columns);
+    for (int b = 0; b < width && !full; ++b)
+        if (ids[b] < 1 || ids[b] > n) error("Invalid angular column index.");
     const double *x = REAL(coordinates);
-    SEXP ans = PROTECT(allocMatrix(REALSXP, n, n));
+    SEXP ans = PROTECT(allocMatrix(REALSXP, n, width));
     double *a = REAL(ans);
-    R_xlen_t nn = (R_xlen_t)n * n;
+    R_xlen_t nn = (R_xlen_t)n * width;
     for (R_xlen_t i = 0; i < nn; ++i) a[i] = 0.0;
     double *u = (double *)R_alloc((size_t)n * p, sizeof(double));
     int *zero = (int *)R_alloc(n, sizeof(int));
@@ -53,8 +60,9 @@ SEXP C_np_pltest_angles(SEXP coordinates) {
             norm = sqrt(norm);
             for (int d = 0; d < p; ++d) v[d] /= norm;
         }
-        for (int j = 0; j < n; ++j) {
-            double *col = a + (size_t)j*n;
+        for (int b = 0; b < width; ++b) {
+            int j = full ? b : ids[b]-1;
+            double *col = a + (size_t)b*n;
             col[j] += zero[j] ? 1.0 : 0.5;
             const double *v = u + (size_t)j*p;
             if (zero[j]) {
@@ -74,13 +82,25 @@ SEXP C_np_pltest_angles(SEXP coordinates) {
             for (int t = 0; t < count; ++t) col[j+1+t] += angle[t] / (2.0*M_PI);
         }
     }
-    for (int j = 0; j < n; ++j)
+    for (int b = 0; b < width; ++b) {
+        int j = full ? b : ids[b]-1;
+        double *col = a + (size_t)b*n;
         for (int i = j; i < n; ++i) {
-            a[(size_t)j*n+i] /= (double)n*n;
-            a[(size_t)i*n+j] = a[(size_t)j*n+i];
+            col[i] /= (double)n*n;
+            if (full) a[(size_t)i*n+j] = col[i];
         }
+    }
     UNPROTECT(1);
     return ans;
+}
+
+SEXP C_np_pltest_angles(SEXP coordinates) {
+    return pltest_angles(coordinates, R_NilValue);
+}
+
+SEXP C_np_pltest_angle_columns(SEXP coordinates, SEXP columns) {
+    if (columns == R_NilValue) error("Angular column indices are required.");
+    return pltest_angles(coordinates, columns);
 }
 
 /* Maistre-Patilea: common scaling of all density-weighted residuals cancels
