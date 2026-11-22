@@ -173,11 +173,16 @@
     if (!is.null(heartbeat)) heartbeat()
     direct <- function() native(index, ydat, h, bws, spec, leaf.descriptor)
     # Counts and response mass share the real and imaginary FFT channels.
+    work.y <- ydat
     if (!binary) {
       limits <- range(ydat)
       magnitude <- max(abs(limits))
       if (magnitude < 1/1024 || magnitude > 1024 || diff(limits) < 1e-6*magnitude)
         return(direct())
+      # A common offset cancels in squared residuals. Remove it from the
+      # FFT channel while retaining the original responses for native trials.
+      if (limits[1L] > 0) work.y <- ydat - limits[1L]
+      else if (limits[2L] < 0) work.y <- ydat - limits[2L]
     }
     z <- as.double(index)
     n <- length(z)
@@ -202,7 +207,7 @@
     weights[nodal, 4L] <- 1
     weights <- weights/rowSums(weights)
 
-    groups <- rowsum(cbind(weights, weights*ydat), base, reorder = FALSE)
+    groups <- rowsum(cbind(weights, weights*work.y), base, reorder = FALSE)
     centers <- as.integer(rownames(groups))
     length.fft <- stats::nextn(2L*(max(centers)+4L))
     mesh <- complex(length.out = length.fft)
@@ -218,7 +223,7 @@
       total <- total + weights[, j]*field[base+offsets[j]]
     # Remove self. In sparse tails, directly accumulate the remaining donors.
     den <- Re(total)-1
-    num <- Im(total)-ydat
+    num <- Im(total)-work.y
     rare <- which(den < 1e-3)
     if (length(rare) > max(16L, n/20)) return(direct())
     for (i in rare) {
@@ -227,7 +232,7 @@
       mass <- sum(k)
       if (mass < min.mass) return(direct())
       den[i] <- mass
-      num[i] <- sum(k*ydat)
+      num[i] <- sum(k*work.y)
     }
     fitted <- num/den
     if (binary) {
@@ -242,7 +247,7 @@
       fitted <- pmax(eps, pmin(1-eps, fitted))
       loss <- -mean(ifelse(ydat == 1, log(fitted), log1p(-fitted)))
     } else {
-      loss <- mean((ydat-fitted)^2)
+      loss <- mean((work.y-fitted)^2)
     }
     counts$grid <- counts$grid + 1
     list(objective = loss, num.feval.fast = 0)

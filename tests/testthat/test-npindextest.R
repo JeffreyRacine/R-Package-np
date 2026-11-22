@@ -105,3 +105,36 @@ test_that("guarded bootstrap CV respects search controls and the native criterio
   }
   expect_equal(counts$grid, 2)
 })
+
+test_that("Ichimura grid loss preserves small variation around a large response level", {
+  # The last row has positive donor mass below the sparse-row threshold.
+  z <- c(seq(-1, 1, length.out = 156L), 1.5, 2.25, 3, 4.5)
+  h <- .25
+  # Dyadic responses preserve these differences exactly under either shift.
+  variation <- round(256 * sin(2*z))/16384
+  logw <- -.5 * (outer(z, z, "-")/h)^2
+  diag(logw) <- -Inf
+  last.mass <- sum(exp(logw[length(z), ]))
+  expect_gt(last.mass, 1e-14)
+  expect_lt(last.mass, 1e-3)
+  weights <- exp(logw - apply(logw, 1L, max))
+  residual <- rowSums(weights * outer(variation, variation, "-"))/rowSums(weights)
+  expected <- mean(residual^2)
+  counts <- new.env()
+  counts$grid <- 0
+  for (level in c(0, 1000, -1000)) {
+    response <- level + variation
+    native <- function(index, ydat, ...) {
+      expect_identical(ydat, response)
+      list(objective = -1)
+    }
+    leaf <- .indextest_grid_leaf(native, "ichimura", counts)
+    value <- leaf(z, response, h, NULL, NULL, NULL)
+    expect_lt(abs(value$objective - expected), 1e-13)
+    # The distant last row forces late delegation after the FFT.
+    sparse <- z
+    sparse[length(sparse)] <- 8
+    expect_identical(leaf(sparse, response, h, NULL, NULL, NULL)$objective, -1)
+  }
+  expect_equal(counts$grid, 3)
+})
