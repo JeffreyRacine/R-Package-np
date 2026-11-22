@@ -210,7 +210,7 @@ test_that("public MPI joint smoke retains reproducibility, metadata and RNG", {
         # MPI bandwidth marshalling records invocation timing, not science.
         # Require its contract above; compare every remaining field exactly.
         expected$bws$total.time <- actual$bws$total.time
-        expect_identical(actual, expected)
+        expect_identical(without_test_elapsed_time(actual), without_test_elapsed_time(expected))
         expect_identical(.Random.seed, after)
       }
     }
