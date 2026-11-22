@@ -170,14 +170,18 @@
   }
 }
 
-.indextest_refit <- function(y, data, draw) {
+.indextest_refit_args <- function(data) {
+  controls <- data$recipe[setdiff(names(data$recipe),
+    c("method", "bwtype", "regtype", "ckertype", "bws"))]
+  c(list(xdat = quote(data$x), ydat = quote(y), bws = quote(data$template),
+         .indextest.leaf = .indextest_cv_leaf(data$cv)), controls)
+}
+
+.indextest_refit <- function(y, data, draw, args = .indextest_refit_args(data)) {
   # Generate this response in the bootstrap RNG scope, before the search resets its seed.
   force(y)
   tryCatch({
-    controls <- data$recipe[setdiff(names(data$recipe),
-        c("method","bwtype","regtype","ckertype","bws"))]
-    fit <- do.call(npindexbw.sibandwidth, c(list(xdat = quote(data$x), ydat = quote(y),
-      bws = quote(data$template), .indextest.leaf = .indextest_cv_leaf(data$cv)), controls))
+    fit <- do.call(npindexbw.sibandwidth, args)
     ix <- .indextest_index(data, fit[["beta"]], fit[["bw"]])
     max(.indextest_score(y, ix, data))
   }, error = function(e) stop("Single-index bootstrap draw ", draw, ": ",
@@ -260,8 +264,9 @@ summary.indextest <- function(object, ...) {
   complete <- FALSE
   on.exit(.np_progress_activity_end(progress, complete), add=TRUE)
   values <- numeric(B)
+  args <- .indextest_refit_args(data)
   for (i in seq_len(B)) {
-    values[i] <- .indextest_refit(.indextest_response(data), data, i)
+    values[i] <- .indextest_refit(.indextest_response(data), data, i, args)
     .np_progress_activity_step(progress, done = i)
   }
   complete <- TRUE
