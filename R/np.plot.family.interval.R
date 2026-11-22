@@ -21,13 +21,23 @@
     stop("replace plot.errors.boot.calibration with the plot interval argument", call. = FALSE)
   if (inherits(control, "np_boot_control") && "calibration" %in% names(control)) {
     old <- .np_plot_boot_calibration(control)
-    action <- switch(old,
-      default = "omit interval to retain the default",
-      legacy = "select construction='legacy' in the family bias.control",
-      `tail-envelope` = "use interval='asymmetric-sd-envelope'",
-      `smoothed-percentile` = "use interval='outer-calibrated-percentile'",
-      sprintf("select the corresponding interval (previous calibration '%s')", old))
-    stop(sprintf("rebuild boot.control without its calibration field and %s", action), call. = FALSE)
+    marginal <- family %in% c("npudens", "npudist")
+    replacement <- if (marginal) switch(old,
+      absolute = if (family == "npudens") old else "symmetric-sd",
+      `separate-tails` = if (family == "npudens") old else "asymmetric-sd",
+      `percentile-tails` = if (family == "npudens") old,
+      `symmetric-sd` =, `asymmetric-sd` = old,
+      `tail-envelope` = "asymmetric-sd-envelope",
+      `smoothed-percentile` = "outer-calibrated-percentile")
+    else if (family %in% c("npcdens", "npcdist") && old %in% c("symmetric-sd", "asymmetric-sd")) old
+    action <- if (old == "default") "omit interval to retain the default"
+      else if (old == "legacy" && marginal)
+        sprintf("use bias.control=np_%s_bias_control(construction='legacy')", substring(family, 3L))
+      else if (!is.null(replacement)) sprintf("use interval='%s' where supported", replacement)
+      else if (old %in% c("symmetric-sd", "absolute"))
+        "for a simultaneous asymptotic band use errors='asymptotic', band='simultaneous', interval='symmetric-sd'"
+      else sprintf("the previous calibration '%s' is unavailable for %s", old, family)
+    stop(sprintf("rebuild boot.control without its calibration field. %s", action), call. = FALSE)
   }
   if (is.character(band) && length(band) == 1L && !is.na(band) && band == "pmzsd")
     stop("use interval='normal-sd', band='pointwise' in place of band='pmzsd'", call. = FALSE)
