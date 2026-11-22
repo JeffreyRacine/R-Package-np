@@ -66,3 +66,37 @@ test_that("bootstrap refits match an independently refitted response stream", {
   expect_false(reference[1L] == reference[2L])
   expect_equal(actual, reference, tolerance = 1e-8)
 })
+
+test_that("guarded bootstrap CV respects search controls and the native criterion", {
+  old <- options(np.tree = "auto")
+  on.exit(options(old), add = TRUE)
+  recipe <- list(optim.method = "Nelder-Mead")
+  expect_true(.indextest_grid_eligible(160L, recipe))
+  expect_false(.indextest_grid_eligible(159L, recipe))
+  expect_false(.indextest_grid_eligible(160L, list(optim.method = "BFGS")))
+  expect_false(.indextest_grid_eligible(160L, c(recipe, optim.reltol = 1e-12)))
+  options(np.tree = TRUE)
+  expect_false(.indextest_grid_eligible(160L, recipe))
+  expect_false(.indextest_replay(list(fval = 1, fval.vector = c(1, 2))))
+  expect_true(.indextest_replay(list(fval = 1, fval.vector = c(1, 1+1e-12))))
+  expect_true(.indextest_replay(list(fval = 1.1, fval.vector = 1)))
+
+  z <- seq(-2, 2, length.out = 160L)
+  h <- .3
+  kernel <- exp(-.5*(outer(z,z,"-")/h)^2)
+  diag(kernel) <- 0
+  counts <- new.env()
+  counts$grid <- 0
+  for (method in c("ichimura", "kleinspady")) {
+    binary <- method == "kleinspady"
+    y <- if (binary) as.double(seq_along(z) %% 3L == 0L) else sin(z)
+    mean.loo <- drop(kernel %*% y)/rowSums(kernel)
+    expected <- if (binary) -mean(ifelse(y == 1, log(mean.loo), log1p(-mean.loo))) else
+      mean((mean.loo-y)^2)
+    leaf <- .indextest_grid_leaf(function(...) stop("native trial"), method, counts)
+    expect_equal(leaf(z, y, h, NULL, NULL, NULL)$objective, expected, tolerance = 1e-10)
+    expect_error(leaf(z, y, h/1e6, NULL, NULL, NULL), "native trial")
+    if (!binary) expect_error(leaf(z, 1e80*y, h, NULL, NULL, NULL), "native trial")
+  }
+  expect_equal(counts$grid, 2)
+})

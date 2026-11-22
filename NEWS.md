@@ -1,5 +1,9 @@
 # npRmpi 0.80-3
 
+* `npindextest()` accelerates eligible joint bootstrap refits with gridded
+  Gaussian CV. Close final minima trigger a native replay. The summary reports
+  grid and native trial counts and the number of full replays.
+
 * Plot methods that compute intervals now use `interval` for construction and
   `band` for coverage scope. Omitting both preserves each method's default.
   Replace `band="pmzsd"` with `interval="normal-sd", band="pointwise"`.

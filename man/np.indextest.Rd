@@ -65,6 +65,21 @@ the starting direction and absolute stopping tolerance of \code{\link{npindexbw}
 can affect the selected fit and hence the bootstrap results. For very small
 or large units, fit and test in numerically convenient response units.
 
+For bootstrap Nelder--Mead searches with default convergence tolerances,
+at least 160 observations and automatic or disabled trees, Gaussian
+cross-validation uses interpolation and FFT convolution on the trial index.
+Sparse rows can be summed directly. Extreme response scales, unsuitable
+grids or insufficient donor mass use the native criterion. Other optimizer
+settings and explicitly enabled trees use the native evaluator throughout.
+The search checks the winning objective with the native calculation.
+A discrepancy or a near tie between the best two final start values
+(within \eqn{2\times10^{-10}\max(1,|CV|)}) triggers a full native
+search with the same starts and seed. Trial rounding near competing minima
+can still change individual draws. In a paired study with two covariates and
+240 observations, the two evaluators gave identical 5 percent decisions
+on 3,360 datasets across the two estimators, ordinary and weak-index nulls,
+off-index curvature and interaction alternatives.
+
 The pilot and statistic process pairs in blocks. For a fixed number of
 covariates their workspace grows linearly with the sample size.
 
@@ -88,7 +103,9 @@ for \code{h} in the same order. \code{g.cv} and \code{g.test} are the
 observed link and residual bandwidths. \code{beta}, \code{method},
 \code{bw.method}, \code{n}, \code{refit.controls}, \code{boot.num} and
 \code{random.seed} describe the fit and calibration. \code{call} and
-\code{model.call} retain the calls. \code{rank.counts} is NULL in serial
+\code{model.call} retain the calls. \code{cv.counts} records the numbers of grid and native bootstrap CV
+trial evaluations and complete native search replays. Evaluations used for
+final certification are excluded. \code{rank.counts} is NULL in serial
 execution and records the number of refits performed on each participating MPI rank
 in distributed execution. Print and summary return the result invisibly.
 }

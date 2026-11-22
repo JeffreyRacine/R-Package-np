@@ -104,6 +104,7 @@
     bws = descriptor$bws, invalid.penalty = "dbmax", eval.only = TRUE,
     objective = if (recipe$method == "ichimura") "ls" else "ks", .prepare.index = TRUE)
   list(x=x, y=y, s=s, scales=scales, template=template, cv=cv, recipe=recipe, h=h,
+       grid=.indextest_grid_eligible(n, recipe),
        g.test=if (bw.method=="separate") n^(-2/9), beta=bw[["beta"]], bw=bw[["bw"]])
 }
 
@@ -158,6 +159,107 @@
   data$pilot + eta*(data$y-data$pilot)
 }
 
+# Evaluate leave-one-out Gaussian sums at the trial index and bandwidth by
+# interpolating to a zero-padded grid, convolving, and interpolating back.
+.indextest_grid_leaf <- function(native, method, counts) {
+  force(native)
+  offsets <- -3:4
+  barycentric <- (-1)^(0:7) * choose(7L, 0:7)
+  binary <- identical(method, "kleinspady")
+  min.mass <- if (binary) 1e-240 else 1e-14
+  heartbeat <- .np_progress_runtime$fit_forward
+
+  function(index, ydat, h, bws, spec, leaf.descriptor) {
+    if (!is.null(heartbeat)) heartbeat()
+    direct <- function() native(index, ydat, h, bws, spec, leaf.descriptor)
+    # Counts and response mass share the real and imaginary FFT channels.
+    if (!binary) {
+      limits <- range(ydat)
+      magnitude <- max(abs(limits))
+      if (magnitude < 1/1024 || magnitude > 1024 || diff(limits) < 1e-6*magnitude)
+        return(direct())
+    }
+    z <- as.double(index)
+    n <- length(z)
+    limits <- range(z)
+    cells <- 24 * diff(limits)/h
+    if (!is.finite(cells) || cells < 24 || cells > max(4096, 4*n) ||
+        cells > .Machine$integer.max/2 - 16 || !is.finite(24/h))
+      return(direct())
+
+    coord <- (z-limits[1L]) * (24/h)
+    base <- floor(coord)
+    fraction <- coord-base
+    base <- as.integer(base) + 4L
+    weights <- outer(fraction, offsets, "-")
+    nodal <- which(fraction == 0)
+    weights[nodal, ] <- 1
+    weights <- sweep(1/weights, 2L, barycentric, "*")
+    weights[nodal, ] <- 0
+    weights[nodal, 4L] <- 1
+    weights <- weights/rowSums(weights)
+
+    groups <- rowsum(cbind(weights, weights*ydat), base, reorder = FALSE)
+    centers <- as.integer(rownames(groups))
+    length.fft <- stats::nextn(2L*(max(centers)+4L))
+    mesh <- complex(length = length.fft)
+    for (j in seq_along(offsets)) {
+      pos <- centers + offsets[j]
+      mesh[pos] <- mesh[pos] + complex(real = groups[, j], imaginary = groups[, 8L+j])
+    }
+    delta <- seq_len(length.fft)-1
+    kernel <- exp(-.5*(pmin(delta, length.fft-delta)/24)^2)
+    field <- stats::fft(stats::fft(mesh)*stats::fft(kernel), inverse = TRUE)/length.fft
+    total <- complex(length = n)
+    for (j in seq_along(offsets))
+      total <- total + weights[, j]*field[base+offsets[j]]
+    # Remove self. In sparse tails, directly accumulate the remaining donors.
+    den <- Re(total)-1
+    num <- Im(total)-ydat
+    rare <- which(den < 1e-3)
+    if (length(rare) > max(16L, n/20)) return(direct())
+    for (i in rare) {
+      k <- exp(-.5*((z-z[i])/h)^2)
+      k[i] <- 0
+      mass <- sum(k)
+      if (mass < min.mass) return(direct())
+      den[i] <- mass
+      num[i] <- sum(k*ydat)
+    }
+    fitted <- num/den
+    if (binary) {
+      # Relative precision matters when the observed outcome is very unlikely.
+      tails <- which((ydat == 1 & fitted < 1e-5) | (ydat == 0 & fitted > 1-1e-5))
+      for (i in tails) {
+        k <- exp(-.5*((z-z[i])/h)^2)
+        k[i] <- 0
+        fitted[i] <- sum(k*ydat)/sum(k)
+      }
+      eps <- sqrt(.Machine$double.eps)
+      fitted <- pmax(eps, pmin(1-eps, fitted))
+      loss <- -mean(ifelse(ydat == 1, log(fitted), log1p(-fitted)))
+    } else {
+      loss <- mean((ydat-fitted)^2)
+    }
+    counts$grid <- counts$grid + 1
+    list(objective = loss, num.feval.fast = 0)
+  }
+}
+
+.indextest_grid_eligible <- function(n, recipe) {
+  n >= 160L && identical(recipe[["optim.method"]], "Nelder-Mead") &&
+    is.null(recipe[["optim.reltol"]]) && is.null(recipe[["optim.abstol"]]) &&
+    npTreeMode() != "on"
+}
+
+.indextest_replay <- function(fit) {
+  losses <- sort(fit[["fval.vector"]])
+  best <- losses[1L]
+  tolerance <- 2e-10*max(1, abs(best))
+  abs(fit[["fval"]]-best) > tolerance ||
+    (length(losses) > 1L && losses[2L]-best <= tolerance)
+}
+
 .indextest_cv_leaf <- function(cv) {
   force(cv)
   heartbeat <- .np_progress_runtime$fit_forward
@@ -177,13 +279,40 @@
          .indextest.leaf = .indextest_cv_leaf(data$cv)), controls)
 }
 
-.indextest_refit <- function(y, data, draw, args = .indextest_refit_args(data)) {
-  # Generate this response in the bootstrap RNG scope, before the search resets its seed.
+.indextest_cv_plan <- function(data, args) {
+  counts <- new.env(parent = emptyenv())
+  reference <- args[[".indextest.leaf"]]
+  native <- function(...) {
+    counts$native <- counts$native + 1
+    reference(...)
+  }
+  args$.indextest.leaf <- if (data$grid)
+    .indextest_grid_leaf(native, data$recipe$method, counts) else native
+  list(args = args, native = native, counts = counts)
+}
+
+.indextest_refit <- function(y, data, draw, args = .indextest_refit_args(data),
+                             plan = NULL) {
+  # Materialize the response before the optimizer enters its private RNG scope.
   force(y)
   tryCatch({
+    replayed <- FALSE
+    if (!is.null(plan)) {
+      args <- plan$args
+      plan$counts$native <- plan$counts$grid <- 0
+    }
     fit <- do.call(npindexbw.sibandwidth, args)
+    if (!is.null(plan) && data$grid && .indextest_replay(fit)) {
+      # Each search uses the stored seed/starts and restores the caller's RNG.
+      args$.indextest.leaf <- plan$native
+      fit <- do.call(npindexbw.sibandwidth, args)
+      replayed <- TRUE
+    }
     ix <- .indextest_index(data, fit[["beta"]], fit[["bw"]])
-    max(.indextest_score(y, ix, data))
+    score <- max(.indextest_score(y, ix, data))
+    if (is.null(plan)) return(score)
+    c(statistic = score, grid = plan$counts$grid, native = plan$counts$native,
+      replays = as.double(replayed))
   }, error = function(e) stop("Single-index bootstrap draw ", draw, ": ",
                               conditionMessage(e), call. = FALSE))
 }
@@ -217,7 +346,7 @@ npindextest <- function(object, bw.method = c("published", "maximum", "separate"
     if (any(!is.finite(data$pilot))) stop("The bootstrap pilot is not finite.", call. = FALSE)
     .pltest_preflight(B, "npindextest")
   }, where="npindextest")
-  .pltest_same(list(bw.method,B,random.seed,data$x,data$y,data$recipe,data$beta,data$bw))
+  .pltest_same(list(bw.method,B,random.seed,data$x,data$y,data$recipe,data$beta,data$bw,data$grid))
   if (is.null(random.seed)) {
     .pltest_current_stream()
     on.exit(.pltest_current_stream(), add=TRUE)
@@ -234,7 +363,7 @@ npindextest <- function(object, bw.method = c("published", "maximum", "separate"
   structure(list(call=call, model.call=object[["call"]], method=data$recipe$method,
     bw.method=bw.method, statistic=observed, components=scores, P=exceed / B,
     exceedances=exceed, critical.values=stats::quantile(values,c(.9,.95,.99),type=1),
-    bootstrap=values, rank.counts=boot$rank.counts, boot.num=B, random.seed=random.seed,
+    bootstrap=values, rank.counts=boot$rank.counts, cv.counts=boot$cv.counts, boot.num=B, random.seed=random.seed,
     n=length(data$y), beta=data$beta, refit.controls=data$recipe,
     g.cv=index$g, g.test=if (is.null(data$g.test)) index$g else data$g.test, h=data$h,
     total.time = proc.time()[["elapsed"]] - started),
@@ -254,17 +383,21 @@ summary.indextest <- function(object, ...) {
       "\nPairwise bandwidths:", format(object$h),
       "\nBootstrap draws:", object$boot.num, "   Search starts per refit:",
       object$refit.controls$nmulti, "\n")
+  counts <- object[["cv.counts"]]
+  if (!is.null(counts))
+    cat("Bootstrap CV evaluations, grid:", counts[["grid"]], "   Native:", counts[["native"]],
+        "   Full native replays:", counts[["replays"]], "\n")
   .np_test_print_time(object)
   invisible(object)
 }
 
 .indextest_local_refits <- function(data, ids, responses = NULL) {
   .npRmpi_with_local_bootstrap(.np_plot_with_local_compiled_eval({
-    args <- .indextest_refit_args(data)
-    vapply(seq_along(ids), function(j) {
+    plan <- .indextest_cv_plan(data, .indextest_refit_args(data))
+    t(vapply(seq_along(ids), function(j) {
       y <- if (is.null(responses)) .indextest_response(data) else responses[,j]
-      .indextest_refit(y, data, ids[j], args)
-    }, numeric(1))
+      .indextest_refit(y, data, ids[j], plan = plan)
+    }, numeric(4L)))
   }))
 }
 
@@ -274,6 +407,7 @@ summary.indextest <- function(object, ...) {
     size <- mpi.comm.size(1L)
     values <- numeric(B)
     counts <- integer(size)
+    cv.counts <- c(grid=0, native=0, replays=0)
     progress <- .pltest_local(if (rank==0L) .np_progress_activity_begin(B, "Bootstrapping the single-index test", detail = NULL))
     complete <- FALSE
     on.exit(if (rank == 0L) .np_progress_activity_end(progress, complete), add=TRUE)
@@ -289,7 +423,8 @@ summary.indextest <- function(object, ...) {
         list(ids=j,values=result)
       })
       for (piece in pieces) {
-        local[piece$ids] <- piece$values
+        local[piece$ids] <- piece$values[, 1L]
+        cv.counts <- cv.counts + colSums(piece$values[, -1L, drop=FALSE])
         counts[rank+1L] <- counts[rank+1L]+length(piece$ids)
       }
       values[ids] <- mpi.allreduce(local,type=2L,op="sum",comm=1L)
@@ -299,7 +434,8 @@ summary.indextest <- function(object, ...) {
     complete <- TRUE
     counts <- mpi.allreduce(counts,type=1L,op="sum",comm=1L)
     names(counts) <- seq_len(size)-1L
-    return(list(statistics=values,rank.counts=counts[counts>0L]))
+    cv.counts[] <- mpi.allreduce(cv.counts,type=2L,op="sum",comm=1L)
+    return(list(statistics=values,rank.counts=counts[counts>0L],cv.counts=cv.counts))
   }
   size <- min(8L,max(1L,ceiling(B/(.npRmpi_bootstrap_worker_count()+1L))))
   tasks <- .npRmpi_bootstrap_chunk_tasks(B,size,with.seeds=FALSE)
@@ -309,11 +445,12 @@ summary.indextest <- function(object, ...) {
   worker <- function(task, data) {
     .npRmpi_bootstrap_use_task_rng(task)
     v <- .indextest_local_refits(data, seq.int(task$start, length.out = task$bsz))
-    cbind(statistic=v,rank=mpi.comm.rank(1L))
+    cbind(v,rank=mpi.comm.rank(1L))
   }
-  out <- .np_spec_test_fanout(B,tasks,worker,ncol.out=2L,what="single-index test",
+  out <- .np_spec_test_fanout(B,tasks,worker,ncol.out=5L,what="single-index test",
     progress.label="Bootstrapping the single-index test",profile.where="mpi.applyLB:npindextest",
     required.bindings=list(.indextest_local_refits=.indextest_local_refits),data=data)
-  counts <- table(out[,2L])
-  list(statistics=as.numeric(out[,1L]),rank.counts=setNames(as.integer(counts),names(counts)))
+  counts <- table(out[,5L])
+  cv.counts <- setNames(colSums(out[,2:4,drop=FALSE]), c("grid","native","replays"))
+  list(statistics=as.numeric(out[,1L]),cv.counts=cv.counts,rank.counts=setNames(as.integer(counts),names(counts)))
 }
