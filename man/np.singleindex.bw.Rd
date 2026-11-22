@@ -83,6 +83,7 @@ npindexbw(\dots)
           scale.factor.search.lower = NULL,
           .restore.first.start = TRUE,
           \dots,
+          .indextest.leaf = NULL,
           .fixed.h.lower = NULL)
 
 }
@@ -109,6 +110,11 @@ These arguments identify the data, formula interface, method label, and whether 
     internal logical control enabling bounded restoration of eligible
     automatically generated raw-invalid first optimizer evaluations.
     It is used by package search owners and is not intended for direct user control.
+  }
+
+  \item{.indextest.leaf}{
+    Internal CV objective evaluator prepared by \code{\link{npindextest}} for
+    repeated bootstrap refits. The default uses the model's usual evaluator.
   }
 
   \item{.fixed.h.lower}{
