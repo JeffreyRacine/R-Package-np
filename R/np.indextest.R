@@ -170,14 +170,18 @@
   }
 }
 
-.indextest_refit <- function(y, data, draw) {
+.indextest_refit_args <- function(data) {
+  controls <- data$recipe[setdiff(names(data$recipe),
+    c("method", "bwtype", "regtype", "ckertype", "bws"))]
+  c(list(xdat = quote(data$x), ydat = quote(y), bws = quote(data$template),
+         .indextest.leaf = .indextest_cv_leaf(data$cv)), controls)
+}
+
+.indextest_refit <- function(y, data, draw, args = .indextest_refit_args(data)) {
   # Generate this response in the bootstrap RNG scope, before the search resets its seed.
   force(y)
   tryCatch({
-    controls <- data$recipe[setdiff(names(data$recipe),
-        c("method","bwtype","regtype","ckertype","bws"))]
-    fit <- do.call(npindexbw.sibandwidth, c(list(xdat = quote(data$x), ydat = quote(y),
-      bws = quote(data$template), .indextest.leaf = .indextest_cv_leaf(data$cv)), controls))
+    fit <- do.call(npindexbw.sibandwidth, args)
     ix <- .indextest_index(data, fit[["beta"]], fit[["bw"]])
     max(.indextest_score(y, ix, data))
   }, error = function(e) stop("Single-index bootstrap draw ", draw, ": ",
@@ -255,11 +259,12 @@ summary.indextest <- function(object, ...) {
   invisible(object)
 }
 
-.indextest_local_refits <- function(data, first, size, responses = NULL) {
+.indextest_local_refits <- function(data, ids, responses = NULL) {
   .npRmpi_with_local_bootstrap(.np_plot_with_local_compiled_eval({
-    vapply(seq_len(size), function(j) {
+    args <- .indextest_refit_args(data)
+    vapply(seq_along(ids), function(j) {
       y <- if (is.null(responses)) .indextest_response(data) else responses[,j]
-      .indextest_refit(y, data, first+j-1)
+      .indextest_refit(y, data, ids[j], args)
     }, numeric(1))
   }))
 }
@@ -281,8 +286,7 @@ summary.indextest <- function(object, ...) {
       responses <- .pltest_root_value(responses)
       local <- numeric(length(ids))
       pieces <- .npRmpi_bootstrap_collective_apply(length(ids),length(ids),function(j,pos) {
-        result <- vapply(j,function(k) .indextest_local_refits(data,ids[k],1L,
-                            responses[,k,drop=FALSE]),numeric(1))
+        result <- .indextest_local_refits(data, ids[j], responses[, j, drop = FALSE])
         list(ids=j,values=result)
       })
       for (piece in pieces) {
@@ -305,7 +309,7 @@ summary.indextest <- function(object, ...) {
   })
   worker <- function(task, data) {
     .npRmpi_bootstrap_use_task_rng(task)
-    v <- .indextest_local_refits(data,task$start,task$bsz)
+    v <- .indextest_local_refits(data, seq.int(task$start, length.out = task$bsz))
     cbind(statistic=v,rank=mpi.comm.rank(1L))
   }
   out <- .np_spec_test_fanout(B,tasks,worker,ncol.out=2L,what="single-index test",
