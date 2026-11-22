@@ -173,6 +173,6 @@ if (!in.check) {
     # random.seed varies the bootstrap p-value for the same observations.
   }, finally = npRmpi.quit())
 }
-}
+} % enddontrun
 }
 \keyword{htest}
