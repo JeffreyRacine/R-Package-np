@@ -416,7 +416,7 @@
           identical(meta$calibration_details$attainable, FALSE))
         interval$status <- rep("diagnostic_only", nrow(interval))
       if (!is.null(reg.request)) {
-        meta <- .np_reg_interval_components(meta,recipe,names(bands),reg.request$interval,inf)
+        meta <- .np_reg_interval_components(meta,recipe,names(bands),reg.request$interval,inf,interval)
         if (identical(recipe$band,"pmzsd")) interval$band[] <- "pointwise"
       }
       values <- rbind(values, value); intervals <- rbind(intervals, interval)

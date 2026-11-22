@@ -5,8 +5,15 @@
   interval <- dots[["interval", exact=TRUE]]
   band <- dots[["band", exact=TRUE]]
   control <- dots[["boot.control", exact=TRUE]]
-  if (inherits(control, "np_boot_control") && "calibration" %in% names(control))
-    stop("regression calibration has moved to interval; rebuild boot.control using only nonfixed, wild and blocklen, and select the construction with interval", call.=FALSE)
+  if (inherits(control, "np_boot_control") && "calibration" %in% names(control)) {
+    previous <- .np_plot_boot_calibration(control)
+    if (!is.null(interval)) stop("conflicting regression constructions: use interval and rebuild boot.control without calibration",call.=FALSE)
+    replacement <- switch(previous, "default"="omit interval", "legacy"="use bias.control=np_bias_control(construction='legacy')",
+      "absolute"="use interval='symmetric-sd'", "separate-tails"="use interval='asymmetric-sd'",
+      "tail-envelope"="use interval='asymmetric-sd-envelope'", "smoothed-percentile"="use interval='outer-calibrated-percentile'",
+      "percentile-tails"="transported density tails are unavailable for regression", paste0("use interval='",previous,"'"))
+    stop(paste0("rebuild boot.control without its calibration field and ",replacement),call.=FALSE)
+  }
   if (is.character(band) && length(band) == 1L && !is.na(band) && band == "pmzsd")
     stop("for regression use interval='normal-sd', band='pointwise' in place of band='pmzsd'", call.=FALSE)
   request <- list(interval=interval, supplied=intersect(supplied, c("interval","band","boot.control")),
@@ -52,7 +59,7 @@
   list(dots=dots, request=request)
 }
 
-.np_reg_interval_components <- function(meta, recipe, keys, requested, raw.inference) {
+.np_reg_interval_components <- function(meta, recipe, keys, requested, raw.inference, intervals) {
   components <- list()
   for (key in keys) {
     public <- if (key=="pmzsd") "pointwise" else key
@@ -81,12 +88,13 @@
         "asymmetric-sd-envelope"="envelope of signed and absolute root intervals",
         "basic-envelope"="basic root envelope", "basic-local-envelope"="local-scale basic root envelope",
         "outer-calibrated-percentile"="outer-calibrated empirical residual percentile bounds")
-    student <- if (normal) "observed SD or standard error" else meta$studentization
+    student <- if (normal) "normal critical value applied to the reported SD or standard error" else meta$studentization
     if (is.null(student) && !normal)
       student <- raw.inference[["covariance",exact=TRUE]][["studentization",exact=TRUE]]
     # Scalar Gaussian-maxima metadata belongs to the joint component.
     critical <- if (!normal && (key=="simultaneous" || length(keys)==1L)) meta$critical_value else NULL
-    components[[public]] <- list(interval=interval,calibration=calibration,
+    states <- unique(intervals$status[intervals$band==key])
+    components[[public]] <- list(interval=interval,calibration=calibration,status=states,
       endpoint_construction=endpoint,studentization=student,critical_value=critical,
       resolution=resolution,calibration_status=meta$calibration_status)
     if (!is.null(meta$resolution_limited) && (key=="simultaneous" || length(keys)==1L))
