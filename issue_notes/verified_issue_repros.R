@@ -200,10 +200,10 @@ tryCatch({
     bw,
     xdat = data.frame(x = x),
     ydat = y,
-    plot.behavior = "data",
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "wild",
-    plot.errors.boot.num = 9
+    output = "data",
+    errors = "bootstrap",
+    bootstrap = "wild",
+    B = 9
   ))
   stopifnot(is.list(out), length(out) > 0)
   cat("ok\n")
@@ -224,9 +224,9 @@ tryCatch({
   on.exit(try(dev.off(), silent = TRUE), add = TRUE)
   suppressWarnings(plot(
     g,
-    plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "inid",
-    plot.errors.boot.num = 199
+    errors = "bootstrap",
+    bootstrap = "inid",
+    B = 199
   ))
   cat("ok\n")
 }, error = function(e) {

@@ -65,9 +65,9 @@ out <- suppressWarnings(plot(
   bw,
   xdat = data.frame(x = x),
   ydat = y,
-  plot.behavior = "data",
+  output = "data",
   perspective = FALSE,
-  plot.errors.method = "none"
+  errors = "none"
 ))
 stopifnot(is.list(out), length(out) > 0)
 cat("SESSION_PLOT_SANITY_OK\n")
@@ -89,9 +89,9 @@ if (mpi.comm.rank(1L) == 0L) {
     bw,
     xdat = data.frame(x = x),
     ydat = y,
-    plot.behavior = "data",
+    output = "data",
     perspective = FALSE,
-    plot.errors.method = "none"
+    errors = "none"
   ))
   stopifnot(is.list(out), length(out) > 0)
   cat("ATTACH_PLOT_SANITY_OK\n")

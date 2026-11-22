@@ -56,12 +56,13 @@ stage("plot")
 out <- plot(
   bw,
   perspective=FALSE,
-  plot.behavior="data",
-  plot.errors.method="bootstrap",
-  plot.errors.boot.method="${BOOT_METHOD}",
-  plot.errors.center="bias-corrected",
-  plot.errors.type="simultaneous",
-  plot.errors.boot.num=${B}
+  output="data",
+  errors="bootstrap",
+  bootstrap="${BOOT_METHOD}",
+  # Exercise the original bias correction used by this historical stress test.
+  center="bias-corrected", bias.control=np_bias_control(construction="legacy"),
+  band="simultaneous",
+  B=${B}
 )
 stage("done")
 stopifnot(is.list(out))
