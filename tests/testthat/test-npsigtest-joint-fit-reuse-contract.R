@@ -196,7 +196,7 @@ test_that("public joint reuse retains bootstrap arrays, metadata and RNG", {
         expect_identical(after, before)
         actual <- npsigtest(bw, xdat = x, ydat = y, index = index, joint = TRUE,
           B = 9L, pivot = pivot, boot.method = method, random.seed = 727)
-        expect_identical(actual, expected)
+        expect_identical(without_test_elapsed_time(actual), without_test_elapsed_time(expected))
         expect_identical(.Random.seed, after)
       }
     }

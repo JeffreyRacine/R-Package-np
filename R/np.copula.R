@@ -1022,6 +1022,7 @@ plot.npcopula <- function(x,
   if (!missing(boot.control)) supplied["boot.control"] <- list(boot.control)
   if (!missing(errors)) supplied$errors <- errors
   if (!missing(center)) supplied$center <- center
+  if (!missing(random.seed)) supplied["random.seed"] <- list(NULL)
   translated <- .np_plot_family_interval_request(supplied, "npcopula")
   interval.supplied <- !missing(band) || !missing(alpha) || !is.null(interval)
   center.argument.supplied <- !missing(center)

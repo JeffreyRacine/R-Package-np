@@ -29,9 +29,11 @@ test_that("component metadata reflects the provider and returned rows", {
   expect_error(.np_plot_data_validate(malformed), "invalid np_plot_data: unknown schema or family",
                fixed = TRUE)
   rows <- data.frame(band = c("pointwise", "simultaneous"), status = c("finite", "undefined"))
-  describe <- function(actual) .np_plot_family_components(
+  describe <- function(actual, family = "npudens") .np_plot_family_components(
     list(construction = "density-joint-scale-envelope-S-v1", calibration = actual),
-    rows, list(errors = "bootstrap"))$components
+    rows, list(errors = "bootstrap"), family)$components
+  expect_identical(describe("separate-tails")$pointwise$interval, "separate-tails")
+  expect_identical(describe("separate-tails", "npudist")$pointwise$interval, "asymmetric-sd")
   expect_identical(describe("percentile-tails")$pointwise$interval, "percentile-tails")
   expect_identical(describe("asymmetric-sd")$pointwise$interval, "asymmetric-sd")
   expect_identical(describe("asymmetric-sd")$simultaneous$interval, NA_character_)

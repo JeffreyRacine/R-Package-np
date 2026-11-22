@@ -6,7 +6,10 @@ test_that("equivalent trim pairs share the existing pair-owner contract", {
   for(context in c("plot.singleindex", "plot.sibandwidth", "plot.conmode")) {
     both <- list(xtrim = pair, grid.control = np_grid_control(xtrim = pair))
     single <- list(grid.control = np_grid_control(xtrim = pair))
-    expect_identical(norm(both, context), norm(single, context))
+    normalized <- norm(both, context)
+    reference <- norm(single, context)
+    expect_identical(sort(names(normalized)), sort(names(reference)))
+    expect_identical(normalized[names(reference)], reference)
     both$xtrim <- c(.2, .8)
     expect_error(norm(both, context), "conflicting plot arguments", fixed = TRUE)
   }

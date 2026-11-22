@@ -32,7 +32,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     num_reg_continuous_extern == 1 && !num_reg_unordered_extern && !num_reg_ordered_extern &&
     vector_glp_degree_extern != NULL && vector_glp_degree_extern[0] == 2 &&
     kernel_route->segment_count == 1 && kernel_route->segment[0].descriptor.order == 2;
-  const double linear_training_max = np_linear_beta_ann_training_max(kernel_route, BANDWIDTH_den_extern,
+  const NPLinearBetaANNRange linear_range = np_linear_beta_ann_training_range(kernel_route, BANDWIDTH_den_extern,
     num_reg_continuous_extern, num_reg_unordered_extern, num_reg_ordered_extern,
     matrix_X_continuous_train_extern, num_train);
   int pooled_beta = 0;
@@ -431,14 +431,14 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
       if(np_beta_scaled_row_context_fill(
            &beta_row_context, i, NULL, NULL) != NP_CONTINUOUS_ROW_OK)
         goto cleanup_lp_hat;
-      const int upper_row = matrix_X_continuous_eval_extern[0][i] > linear_training_max;
+      const int extrapolated_row = np_linear_beta_ann_extrapolates(linear_range, matrix_X_continuous_eval_extern[0][i]);
       if(np_reghat_lp_workspace_influence_row_ranked_precision(
            &reghat_workspace, kw, eval_basis, weights_out + i,
            (size_t)num_eval,
            np_lp_rank_upper_bound_from_design(
              kw, num_train, np_glp_cv_cache.nterms, &design_support),
-           (precise_beta_ann || pooled_beta || upper_row) ? &precision : NULL, np_glp_cv_cache.basis,
-           pooled_beta || upper_row) != NP_REGHAT_LP_ROW_OK) {
+           (precise_beta_ann || pooled_beta || extrapolated_row) ? &precision : NULL, np_glp_cv_cache.basis,
+           pooled_beta || extrapolated_row) != NP_REGHAT_LP_ROW_OK) {
         if(np_lp_failed_system_is_finite(&reghat_workspace.solve_workspace,
              np_glp_cv_cache.nterms, 1) &&
            np_lp_record_empty_row(kw, num_train, i, num_eval, num_train,

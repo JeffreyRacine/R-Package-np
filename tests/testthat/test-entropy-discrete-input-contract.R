@@ -1,6 +1,6 @@
 entropy_input_payload <- function(x) {
   x$timing.profile <- NULL
-  x
+  without_test_elapsed_time(x)
 }
 
 test_that("entropy plug-in bandwidths belong to their complete declared sample", {

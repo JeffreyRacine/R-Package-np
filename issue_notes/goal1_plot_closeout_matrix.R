@@ -107,10 +107,10 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      reg_bw, xdat = x_reg, ydat = y, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "wild",
-      plot.errors.boot.wild = "rademacher", plot.errors.boot.num = boot_num,
-      plot.errors.boot.blocklen = blocklen
+      reg_bw, xdat = x_reg, ydat = y, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "wild",
+      B = boot_num,
+      boot.control = np_boot_control(wild = "rademacher", blocklen = blocklen)
     ))
   ),
   list(
@@ -118,9 +118,9 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      reg_bw, xdat = x_reg, ydat = y, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "inid",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      reg_bw, xdat = x_reg, ydat = y, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "inid",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -128,9 +128,9 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      reg_bw, xdat = x_reg, ydat = y, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "fixed",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      reg_bw, xdat = x_reg, ydat = y, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "fixed",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -138,9 +138,9 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      reg_bw, xdat = x_reg, ydat = y, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "geom",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      reg_bw, xdat = x_reg, ydat = y, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "geom",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -148,9 +148,9 @@ cases <- list(
     expected = "error",
     pattern = "not supported for unconditional density/distribution estimators",
     fn = function() run_plot(plot(
-      u_bw, plot.behavior = "data", perspective = FALSE,
-      plot.errors.method = "bootstrap", plot.errors.boot.method = "wild",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      u_bw, output = "data", perspective = FALSE,
+      errors = "bootstrap", bootstrap = "wild",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -158,9 +158,9 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      u_bw, plot.behavior = "data", perspective = FALSE,
-      plot.errors.method = "bootstrap", plot.errors.boot.method = "inid",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      u_bw, output = "data", perspective = FALSE,
+      errors = "bootstrap", bootstrap = "inid",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -168,9 +168,9 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      u_bw, plot.behavior = "data", perspective = FALSE,
-      plot.errors.method = "bootstrap", plot.errors.boot.method = "fixed",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      u_bw, output = "data", perspective = FALSE,
+      errors = "bootstrap", bootstrap = "fixed",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -178,9 +178,9 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      u_bw, plot.behavior = "data", perspective = FALSE,
-      plot.errors.method = "bootstrap", plot.errors.boot.method = "geom",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      u_bw, output = "data", perspective = FALSE,
+      errors = "bootstrap", bootstrap = "geom",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -188,9 +188,9 @@ cases <- list(
     expected = "error",
     pattern = "not supported for conditional density/distribution estimators",
     fn = function() run_plot(plot(
-      c_bw, xdat = x_cd, ydat = y_cd, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "wild",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      c_bw, xdat = x_cd, ydat = y_cd, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "wild",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -198,9 +198,9 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      c_bw, xdat = x_cd, ydat = y_cd, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "inid",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      c_bw, xdat = x_cd, ydat = y_cd, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "inid",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -208,9 +208,9 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      c_bw, xdat = x_cd, ydat = y_cd, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "fixed",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      c_bw, xdat = x_cd, ydat = y_cd, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "fixed",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   ),
   list(
@@ -218,9 +218,9 @@ cases <- list(
     expected = "ok",
     pattern = "",
     fn = function() run_plot(plot(
-      c_bw, xdat = x_cd, ydat = y_cd, plot.behavior = "data", perspective = FALSE,
-      gradients = FALSE, plot.errors.method = "bootstrap", plot.errors.boot.method = "geom",
-      plot.errors.boot.num = boot_num, plot.errors.boot.blocklen = blocklen
+      c_bw, xdat = x_cd, ydat = y_cd, output = "data", perspective = FALSE,
+      gradients = FALSE, errors = "bootstrap", bootstrap = "geom",
+      B = boot_num, boot.control = np_boot_control(blocklen = blocklen)
     ))
   )
 )

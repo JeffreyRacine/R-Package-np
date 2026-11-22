@@ -21,7 +21,7 @@ test_that("CMS inference uses the compact model sample with na.exclude", {
         a <- do.call(fun, c(args, list(model = omit)))
         b <- do.call(fun, c(args, list(model = exclude)))
         fields <- setdiff(names(a), c("pcall", "bws", "timing.profile"))
-        expect_identical(a[fields], b[fields])
+        expect_identical(without_test_elapsed_time(a[fields]), without_test_elapsed_time(b[fields]))
       }
     }
     expect_identical(exclude[immutable], before)
@@ -45,7 +45,7 @@ test_that("CMS validates retained components rather than call spelling", {
       model = model, bws = .4, bandwidth.compute = FALSE, distribution = "asymptotic"))
     a <- invoke(models[[kind]][[1L]]); b <- invoke(models[[kind]][[2L]])
     fields <- setdiff(names(a), c("pcall", "bws", "timing.profile"))
-    expect_identical(a[fields], b[fields])
+    expect_identical(without_test_elapsed_time(a[fields]), without_test_elapsed_time(b[fields]))
     broken <- models[[kind]][[1L]]; broken$x <- NULL
     expect_error(invoke(broken), "must retain")
   }

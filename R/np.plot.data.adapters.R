@@ -420,7 +420,7 @@
         meta <- .np_reg_interval_components(meta,recipe,names(bands),reg.request$interval,inf,interval,gradient,n)
         if (identical(recipe$band,"pmzsd")) interval$band[] <- "pointwise"
       } else if (!is.null(family.request)) {
-        meta <- .np_plot_family_components(meta, interval, request)
+        meta <- .np_plot_family_components(meta, interval, request, family)
         interval$band[interval$band == "pmzsd"] <- "pointwise"
       }
       values <- rbind(values, value); intervals <- rbind(intervals, interval)
@@ -582,7 +582,7 @@
       for (tid in unique(tab$target_id)) {
         owner <- targets$inference_id[match(tid, targets$target_id)]
         inference[[owner]] <- .np_plot_family_components(inference[[owner]],
-          tab[tab$target_id == tid, , drop = FALSE], request)
+          tab[tab$target_id == tid, , drop = FALSE], request, family)
       }
       tab$band[tab$band == "pmzsd"] <- "pointwise"
       panels[[pid]]$intervals <- tab
