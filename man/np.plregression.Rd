@@ -558,16 +558,9 @@ if (interactive()) Sys.sleep(5)
 
 if (interactive()) plot(bw)
 
-# Note - to plot regression surfaces with variability bounds constructed
-# from bootstrapped standard errors, use the following (note that this
-# may take a minute or two depending on the speed of your computer as
-# the bootstrapping is done in real time, and note also that we override
-# the default number of bootstrap replications (9999) reducing them to 25
-# in order to quickly compute standard errors in this instance - don't
-# of course do this in general)
+# Plot the regression surfaces with variability bounds based on bootstrap standard errors.
 
 plot(bw,
-     B=25,
      errors="bootstrap")
 
 
@@ -633,16 +626,9 @@ if (interactive()) Sys.sleep(5)
 
 if (interactive()) plot(bw)
 
-# Note - to plot regression surfaces with variability bounds constructed
-# from bootstrapped standard errors, use the following (note that this
-# may take a minute or two depending on the speed of your computer as
-# the bootstrapping is done in real time, and note also that we override
-# the default number of bootstrap replications (9999) reducing them to 25
-# in order to quickly compute standard errors in this instance - don't
-# of course do this in general)
+# Plot the regression surfaces with variability bounds based on bootstrap standard errors.
 
 plot(bw,
-     B=25,
      errors="bootstrap")
 } % enddontrun
 }

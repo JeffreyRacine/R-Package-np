@@ -214,7 +214,7 @@ n <- 250
 sample.A <- data.frame(x=rnorm(n))
 sample.B <- data.frame(x=rnorm(n))
 
-npdeneqtest(sample.A,sample.B,B=99)
+npdeneqtest(sample.A,sample.B)
 
 if (interactive()) Sys.sleep(5)
 
@@ -223,14 +223,14 @@ if (interactive()) Sys.sleep(5)
 sample.A <- data.frame(x=rnorm(n))
 sample.B <- data.frame(x=rchisq(n,df=5))
 
-npdeneqtest(sample.A,sample.B,B=99)
+npdeneqtest(sample.A,sample.B)
 
 ## Mixed datatypes, distributions are equal
 
 sample.A <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))
 sample.B <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))
 
-npdeneqtest(sample.A,sample.B,B=99)
+npdeneqtest(sample.A,sample.B)
 
 if (interactive()) Sys.sleep(5)
 
@@ -239,7 +239,7 @@ if (interactive()) Sys.sleep(5)
 sample.A <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))
 sample.B <- data.frame(a=rnorm(n,sd=10),b=factor(rbinom(n,2,.25)))
 
-npdeneqtest(sample.A,sample.B,B=99)
+npdeneqtest(sample.A,sample.B)
 } % enddontrun
 }
 

@@ -646,7 +646,7 @@ with(Italy, {
 
 # First, compute the bandwidths.
 
-bw <- npcdistbw(formula=gdp~ordered(year), nmulti=1)
+bw <- npcdistbw(formula=gdp~ordered(year))
 
 # Next, compute the condistribution object...
 
@@ -685,7 +685,7 @@ with(Italy, {
 X <- data.frame(year=ordered(year))
 y <- data.frame(gdp)
 
-bw <- npcdistbw(xdat=X, ydat=y, nmulti=1)
+bw <- npcdistbw(xdat=X, ydat=y)
 
 # Next, compute the condistribution object...
 
@@ -714,7 +714,7 @@ with(faithful, {
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-bw <- npcdistbw(formula=eruptions~waiting, nmulti=1)
+bw <- npcdistbw(formula=eruptions~waiting)
 
 summary(bw)
 
@@ -745,7 +745,7 @@ with(faithful, {
 X <- data.frame(waiting)
 y <- data.frame(eruptions)
 
-bw <- npcdistbw(xdat=X, ydat=y, nmulti=1)
+bw <- npcdistbw(xdat=X, ydat=y)
 
 summary(bw)
 
@@ -771,7 +771,7 @@ Italy2 <- within(Italy, {
 # Plot only: make the plotted surface proper on the plot evaluation grid.
 
 Fhat <- npcdist(gdp ~ year, data = Italy2,
-                regtype = "lp", degree = 3, nmulti = 1)
+                regtype = "lp", degree = 3)
 
 plot(Fhat, proper = TRUE)
 
@@ -789,7 +789,6 @@ Fhat_fit <- npcdist(
   data = Italy2,
   regtype = "lp",
   degree = 3,
-  nmulti = 1,
   proper = TRUE,
   proper.control = ctrl_fit
 )
@@ -844,7 +843,6 @@ Fhat_both <- npcdist(
   data = Italy2,
   regtype = "lp",
   degree = 3,
-  nmulti = 1,
   proper = TRUE,
   proper.control = ctrl_both
 )

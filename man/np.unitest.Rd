@@ -217,7 +217,7 @@ if (interactive()) Sys.sleep(5)
 
 ## Conduct the test for this data
 
-npunitest(x,y,B=99)
+npunitest(x,y)
 
 if (interactive()) Sys.sleep(5)
 
@@ -231,7 +231,7 @@ mean(y)
 sd(x)
 sd(y)
 
-npunitest(x,y,B=99)
+npunitest(x,y)
 
 if (interactive()) Sys.sleep(5)
 
@@ -260,7 +260,7 @@ with(wage1, {
 lwage.male <- lwage[female=="Male"]
 lwage.female <- lwage[female=="Female"]
 
-npunitest(lwage.male,lwage.female,B=99)
+npunitest(lwage.male,lwage.female)
 
 if (interactive()) Sys.sleep(5)
 
@@ -287,7 +287,7 @@ if (interactive()) Sys.sleep(5)
 x <- factor(rbinom(n,2,.5))
 y <- factor(rbinom(n,2,.1))
 
-npunitest(x,y,B=99)
+npunitest(x,y)
 } % enddontrun
 }
 \keyword{ univar }

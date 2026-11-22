@@ -1186,7 +1186,7 @@ data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
 with(Italy, {
 
-bw <- npcdensbw(formula=gdp~ordered(year), nmulti=1)
+bw <- npcdensbw(formula=gdp~ordered(year))
 
 # The object bw can be used for further estimation using
 # npcdens(), plotting using plot() etc. Entering the name of
@@ -1209,7 +1209,7 @@ data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
 with(Italy, {
 
-bw <- npcdensbw(xdat=ordered(year), ydat=gdp, nmulti=1)
+bw <- npcdensbw(xdat=ordered(year), ydat=gdp)
 
 # The object bw can be used for further estimation using
 # npcdens(), plotting using plot() etc. Entering the name of

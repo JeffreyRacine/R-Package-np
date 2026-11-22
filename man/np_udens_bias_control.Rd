@@ -589,7 +589,7 @@ set.seed(123)
 x <- data.frame(x = rnorm(80))
 bw <- npudensbw(dat = x, bws = 0.45, bandwidth.compute = FALSE)
 z <- plot(bw, xdat = x, errors = "bootstrap", bootstrap = "inid",
-          center = "bias-corrected", band = "all", B = 399,
+          center = "bias-corrected", band = "all",
           neval = 3, output = "data")
 z$inference[[1]]$primary
 }

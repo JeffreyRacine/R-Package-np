@@ -279,7 +279,7 @@ lines(age, fitted(model))
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-npcmstest(model = model, xdat = age, ydat = logwage, B=9, nmulti = 1)
+npcmstest(model = model, xdat = age, ydat = logwage)
 
 # Next try Murphy & Welch's (1990) suggested quintic specification.
 
@@ -293,7 +293,7 @@ X <- data.frame(age)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-npcmstest(model = model, xdat = age, ydat = logwage, B=9, nmulti = 1)
+npcmstest(model = model, xdat = age, ydat = logwage)
 
 # Note - you can pass in multiple arguments to this function. For
 # instance, to use local linear rather than local constant regression,
@@ -328,7 +328,7 @@ model <- lm(growth ~ oecd +
 
 X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 
-npcmstest(model = model, xdat = X, ydat = growth, B=9, nmulti = 1)
+npcmstest(model = model, xdat = X, ydat = growth)
 
 })
 } % enddontrun

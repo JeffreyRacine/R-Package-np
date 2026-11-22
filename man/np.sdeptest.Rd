@@ -196,26 +196,26 @@ n <- 100
 ## Stationary persistent time-series
 
 yt <- ar.series(0.95,rnorm(n))
-npsdeptest(yt,lag.num=2,B=99,method="summation")
+npsdeptest(yt,lag.num=2,method="summation")
 
 if (interactive()) Sys.sleep(5)
 
 ## Stationary independent time-series
 
 yt <- ar.series(0.0,rnorm(n))
-npsdeptest(yt,lag.num=2,B=99,method="summation")
+npsdeptest(yt,lag.num=2,method="summation")
 
 ## Stationary persistent time-series
 
 yt <- ar.series(0.95,rnorm(n))
-npsdeptest(yt,lag.num=2,B=99,method="integration")
+npsdeptest(yt,lag.num=2,method="integration")
 
 if (interactive()) Sys.sleep(5)
 
 ## Stationary independent time-series
 
 yt <- ar.series(0.0,rnorm(n))
-npsdeptest(yt,lag.num=2,B=99,method="integration")
+npsdeptest(yt,lag.num=2,method="integration")
 
 } % enddontrun
 

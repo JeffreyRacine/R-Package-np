@@ -1113,7 +1113,7 @@ data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
 with(Italy, {
 
-bw <- npcdistbw(formula=gdp~ordered(year), nmulti=1)
+bw <- npcdistbw(formula=gdp~ordered(year))
 
 # The object bw can be used for further estimation using
 # npcdist(), plotting using plot() etc. Entering the name of
@@ -1136,7 +1136,7 @@ data("Italy")
 Italy <- Italy[seq_len(min(300, nrow(Italy))), ]
 with(Italy, {
 
-bw <- npcdistbw(xdat=ordered(year), ydat=gdp, nmulti=1)
+bw <- npcdistbw(xdat=ordered(year), ydat=gdp)
 
 # The object bw can be used for further estimation using npcdist(),
 # plotting using plot() etc. Entering the name of the object provides

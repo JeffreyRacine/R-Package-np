@@ -214,28 +214,28 @@ n <- 100
 ## Asymmetric discrete probability distribution function
 
 x <- factor(rbinom(n,2,.8))
-npsymtest(x,B=99)
+npsymtest(x)
 
 if (interactive()) Sys.sleep(5)
 
 ## Symmetric discrete probability distribution function
 
 x <- factor(rbinom(n,2,.5))
-npsymtest(x,B=99)
+npsymtest(x)
 
 if (interactive()) Sys.sleep(5)
 
 ## Asymmetric continuous distribution function
 
 y <- rchisq(n,df=2)
-npsymtest(y,B=99)
+npsymtest(y)
 
 if (interactive()) Sys.sleep(5)
 
 ## Symmetric continuous distribution function
 
 y <- rnorm(n)
-npsymtest(y,B=99)
+npsymtest(y)
 
 ## Time-series bootstrap
 
@@ -252,12 +252,12 @@ ar.series <- function(phi,epsilon) {
 ## Asymmetric time-series
 
 yt <- ar.series(0.5,rchisq(n,df=3))
-npsymtest(yt,B=99,boot.method="geom")
+npsymtest(yt,boot.method="geom")
 
 ## Symmetric time-series
 
 yt <- ar.series(0.5,rnorm(n))
-npsymtest(yt,B=99,boot.method="geom")
+npsymtest(yt,boot.method="geom")
 
 } % enddontrun
 
