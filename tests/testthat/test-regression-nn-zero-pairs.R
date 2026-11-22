@@ -21,24 +21,24 @@ test_that("degree-zero Epanechnikov NN exposes pairs without changing its rows",
       expect_identical(st,local)
       value <- suppressWarnings(plot(fit,errors="bootstrap",center="bias-corrected",
         bootstrap=law,B=99L,neval=3L,band="all",gradients=TRUE,alpha=.1,
-        random.seed=1125602L,output="data",boot.control=np_boot_control(
-          calibration=cal,blocklen=if(law=="inid")NULL else 5L)))
+        random.seed=1125602L,output="data",interval=regression_test_interval(cal), boot.control=np_boot_control(blocklen=if(law=="inid")NULL else 5L)))
       expect_s3_class(value,"np_plot_data")
       expect_true(all(vapply(value$inference,function(z)
-        identical(z$calibration,cal)&&identical(z$resampling_law,law),TRUE)))
+        identical(z$components$simultaneous$calibration,cal)&&identical(z$resampling_law,law),TRUE)))
       expect_identical(fit,held);expect_identical(.Random.seed,seed)
       if(cal=="basic-envelope")
         expect_error(plot(fit,errors="bootstrap",center="bias-corrected",
-          bootstrap="wild",band="all",output="data",boot.control=np_boot_control(calibration=cal)),
+          bootstrap="wild",band="all",output="data",interval=regression_test_interval(cal)),
           "basic-envelope requires inid, fixed or geom")
     }
-    run <- function(control=NULL) {
+    run <- function(control=NULL,interval=NULL) {
       a <- list(x=fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",
         B=99L,neval=3L,band="all",gradients=TRUE,alpha=.1,random.seed=1125602L,output="data")
+      a$interval <- interval
       if(!is.null(control)) a$boot.control <- control
       suppressWarnings(capture_plot_provider(do.call(plot,a)))
     }
-    automatic <- run();explicit <- run(np_boot_control(calibration="basic-local-envelope"))
+    automatic <- run();explicit <- run(interval="basic-local-envelope")
     a <- automatic$provider[[1L]]$inference;e <- explicit$provider[[1L]]$inference
     expect_identical(a$calibration.requested,"default")
     expect_identical(a$calibration.method,"basic-local-envelope")

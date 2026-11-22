@@ -51,7 +51,7 @@ test_that("public basic envelopes preserve objects, state and explicit admission
   bw <- npregbw(xdat=x,ydat=y,bws=.25,regtype="ll",bandwidth.compute=FALSE)
   fit <- npreg(bws=bw,txdat=x,tydat=y);saved <- fit;rng <- .Random.seed
   args <- list(x=fit,errors="bootstrap",center="bias-corrected",bootstrap="inid",B=199L,
-    band="all",neval=4L,output="data",boot.control=np_boot_control(calibration="basic-envelope"))
+    band="all",neval=4L,output="data",interval="basic-envelope")
   out <- suppressWarnings(do.call(plot,args));d <- as.data.frame(out,band="simultaneous")
   expect_equal(nrow(d),4L);expect_true(all(is.finite(d$lower)));expect_true(all(d$lower<=d$upper))
   expect_identical(fit,saved);expect_identical(.Random.seed,rng)
@@ -63,9 +63,9 @@ test_that("public basic envelopes preserve objects, state and explicit admission
   derivative <- suppressWarnings(do.call(plot,bad))
   expect_true(all(is.finite(as.data.frame(derivative,band="simultaneous")$lower)))
   bad <- args;bad$band <- "pmzsd"
-  expect_error(do.call(plot,bad),"empirical bands")
+  expect_error(do.call(plot,bad),"in place of band=")
   bad <- args;bad$center <- "estimate"
-  expect_error(do.call(plot,bad),"iterated bias-corrected regression")
+  expect_error(do.call(plot,bad),"unavailable for this regression center")
   expect_identical(.Random.seed,rng)
 })
 

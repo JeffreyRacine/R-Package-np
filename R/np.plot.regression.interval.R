@@ -37,7 +37,10 @@
   center <- dots[["center", exact=TRUE]]
   corrected <- !is.null(center) && identical(.np_plot_scalar_match(center,
     c("estimate","bias-corrected"),"center"), "bias-corrected")
-  legacy <- identical(dots[["bias.control", exact=TRUE]][["construction", exact=TRUE]], "legacy")
+  bias <- dots[["bias.control", exact=TRUE]]
+  if (!is.null(bias) && !inherits(bias, "np_bias_control"))
+    stop("regression bias.control must be created by np_bias_control()", call.=FALSE)
+  legacy <- identical(bias[["construction", exact=TRUE]], "legacy")
   iterated <- corrected && !legacy
   if (corrected && legacy && method=="asymptotic")
     stop("legacy corrected intervals require bootstrap errors",call.=FALSE)
@@ -59,10 +62,16 @@
   list(dots=dots, request=request)
 }
 
-.np_reg_interval_components <- function(meta, recipe, keys, requested, raw.inference, intervals) {
+.np_reg_interval_components <- function(meta, recipe, keys, requested, raw.inference, intervals, gradient, grid.size) {
   components <- list()
   for (key in keys) {
     public <- if (key=="pmzsd") "pointwise" else key
+    states <- unique(intervals$status[intervals$band==key])
+    if (recipe$iterated && !length(raw.inference) && identical(states, "undefined")) {
+      components[[public]] <- list(interval=NA_character_, calibration=NULL, status=states,
+        endpoint_construction=NULL, studentization=NULL)
+      next
+    }
     normal <- key=="pmzsd" || (recipe$method=="asymptotic" && !recipe$iterated &&
                              key %in% c("pointwise","bonferroni"))
     outer <- identical(recipe$calibration,"smoothed-percentile")
@@ -88,12 +97,29 @@
         "asymmetric-sd-envelope"="envelope of signed and absolute root intervals",
         "basic-envelope"="basic root envelope", "basic-local-envelope"="local-scale basic root envelope",
         "outer-calibrated-percentile"="outer-calibrated empirical residual percentile bounds")
+    if (outer) {
+      # The mean provider keeps nominal marginal quantiles on multirow grids.
+      # Both providers collapse all scopes to the joint hull for a singleton.
+      endpoint <- if (grid.size == 1L) {
+        if (gradient) "single-target E6 outer-calibrated marginal and family hull" else
+          "single-target E1 outer-calibrated companion interval"
+      } else if (gradient) switch(key,
+        pointwise="unshifted corrected curves with E6 outer-calibrated marginal ranks",
+        simultaneous="E6 outer-calibrated family interval enclosing its marginal intervals",
+        bonferroni="nominal Bonferroni interval enclosing the E6 outer-calibrated family interval")
+      else switch(key,
+        pointwise="nominal marginal quantiles of unshifted corrected curves",
+        simultaneous="E1 outer-calibrated family interval enclosing nominal marginal intervals",
+        bonferroni="nominal Bonferroni interval enclosing the E1 outer-calibrated family interval")
+      calibration <- if (!gradient && grid.size > 1L && key == "pointwise")
+        "nominal marginal ranks" else if (gradient) "E6 outer rank calibration" else
+        "E1 outer rank calibration"
+    }
     student <- if (normal) "normal critical value applied to the reported SD or standard error" else meta$studentization
     if (is.null(student) && !normal)
       student <- raw.inference[["covariance",exact=TRUE]][["studentization",exact=TRUE]]
     # Scalar Gaussian-maxima metadata belongs to the joint component.
     critical <- if (!normal && (key=="simultaneous" || length(keys)==1L)) meta$critical_value else NULL
-    states <- unique(intervals$status[intervals$band==key])
     components[[public]] <- list(interval=interval,calibration=calibration,status=states,
       endpoint_construction=endpoint,studentization=student,critical_value=critical,
       resolution=resolution,calibration_status=meta$calibration_status)

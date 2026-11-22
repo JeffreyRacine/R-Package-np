@@ -50,7 +50,9 @@ is identified in the corresponding inference record. Unavailable values remain
 
 The object has these components:
 \describe{
-\item{schema_version}{Integer schema identifier, currently \code{1L}.}
+\item{schema_version}{Regression returns \code{2L}. The reader accepts
+previously saved version-one results, including their original \code{pmzsd}
+component keys. Other estimator families continue to return version one.}
 \item{family}{Estimator family name.}
 \item{request}{Resolved plot controls and, where applicable, explicitly supplied
 argument names. These describe the computation; changing them does not recompute it.}
@@ -67,7 +69,14 @@ and styles, including requested observations, rugs or bootstrap boxplot summarie
 \item{targets}{Scalar target identities, quantities, labels, derivative variables
 and orders, multi-indices, coefficient terms, response levels and quantile
 \code{tau} values where relevant. \code{inference_id} links to method metadata.}
-\item{inference}{Compact records of the actual construction, law, calibration,
+\item{inference}{In regression schema version two, each target-specific
+record has a \code{components} list keyed by \code{pointwise},
+\code{simultaneous} or \code{bonferroni}. Each entry identifies its effective
+\code{interval}, calibration, endpoint construction, status and applicable
+resolution or critical-value diagnostics. For example,
+\code{x$inference[[1]]$components$simultaneous$interval} identifies the
+construction used for that joint band. The request retains the user's
+construction and supplied arguments. Compact records of the actual construction, law, calibration,
 SE reference, projection and available resolution diagnostics. Categorical
 contrast metadata records the lower and upper comparison levels for every grid
 row, with orientation \code{upper minus lower}. Full bootstrap

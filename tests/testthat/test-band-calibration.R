@@ -1,6 +1,6 @@
 # Tiny default-lane contracts. Public/MPI matrices stay in the retained harness.
 test_that("bootstrap calibration validates names and preserves old controls", {
-  expect_identical(np_boot_control()$calibration,"default")
+  expect_false("calibration" %in% names(np_boot_control()))
   old <- np_boot_control();old$calibration <- NULL
   expect_identical(.np_plot_boot_calibration(old),"default")
   for (cal in c("absolute","separate-tails","tail-envelope"))

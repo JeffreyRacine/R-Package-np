@@ -5,7 +5,7 @@ test_that("calibration names map to retained family owners", {
       if (family == "density") "percentile-tails" else "separate-tails")
     expect_identical(.np_plot_calibration_method("tail-envelope", family), "tail-envelope")
   }
-  expect_identical(np_boot_control()$calibration, "default")
+  expect_false("calibration" %in% names(np_boot_control()))
   expect_identical(np_boot_control(calibration = "smoothed-percentile")$calibration,
                    "smoothed-percentile")
 })

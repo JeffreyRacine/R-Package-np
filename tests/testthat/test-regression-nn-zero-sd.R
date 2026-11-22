@@ -21,7 +21,8 @@ test_that("degree-zero NN SD and wild laws preserve defaults and state", {
       a <- list(x=fit,errors=errors,center="bias-corrected",neval=3L,
         gradients=TRUE,alpha=.2,random.seed=1126202L,output="data",band=band)
       if(errors=="bootstrap"){a$bootstrap <- law;a$B <- 63L}else a$gaussian.draws <- 63L
-      if(errors=="bootstrap"&&(!is.null(cal)||wild!="mammen"))a$boot.control <- np_boot_control(wild=wild,calibration=if(is.null(cal))"default"else cal)
+      if (!is.null(cal)) a$interval <- regression_test_interval(cal)
+      if (wild != "mammen") a$boot.control <- np_boot_control(wild=wild)
       suppressWarnings(capture_plot_provider(do.call(plot,a)))
     }
     for(wild in c("mammen","rademacher")) {
@@ -36,7 +37,7 @@ test_that("degree-zero NN SD and wild laws preserve defaults and state", {
       expect_identical(value$provider[[1L]]$inference$calibration.method,"absolute")
     }
     expect_s3_class(run(errors="asymptotic")$result,"np_plot_data")
-    expect_s3_class(run(band="pmzsd")$result,"np_plot_data")
+    expect_s3_class(run(band="pointwise",cal="normal-sd")$result,"np_plot_data")
     expect_s3_class(run(law="inid",cal="absolute")$result,"np_plot_data")
     expect_error(run(cal="basic-envelope"),"basic-envelope requires inid, fixed or geom")
     higher.args <- args;higher.args$regtype <- "lp";higher.args$degree <- 2L

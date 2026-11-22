@@ -22,7 +22,8 @@ test_that("bounded Gaussian degree-zero NN keeps Gaussian defaults and fitted st
       a <- list(x=fit,errors=errors,center="bias-corrected",neval=3L,
         gradients=TRUE,alpha=.2,random.seed=1126802L,output="data",band=band)
       if(errors=="bootstrap"){a$bootstrap <- if(law%in%c("mammen","rademacher"))"wild"else law;a$B <- 63L}else a$gaussian.draws <- 63L
-      if(errors=="bootstrap"&&(!is.null(cal)||law=="rademacher"))a$boot.control <- np_boot_control(wild=if(law=="rademacher")law else"mammen",calibration=if(is.null(cal))"default"else cal)
+      if (!is.null(cal)) a$interval <- regression_test_interval(cal)
+      if (law == "rademacher") a$boot.control <- np_boot_control(wild="rademacher")
       suppressWarnings(capture_plot_provider(do.call(plot,a)))
     }
     for(law in c("mammen","rademacher","inid")) {
@@ -33,7 +34,7 @@ test_that("bounded Gaussian degree-zero NN keeps Gaussian defaults and fitted st
       expect_identical(a,e);expect_identical(default$result$panels,explicit$result$panels)
     }
     expect_s3_class(run(errors="asymptotic")$result,"np_plot_data")
-    expect_s3_class(run(band="pmzsd")$result,"np_plot_data")
+    expect_s3_class(run(band="pointwise",cal="normal-sd")$result,"np_plot_data")
     expect_error(run(cal="basic-envelope"),"basic-envelope requires inid, fixed or geom")
     higher.args <- args;higher.args$regtype <- "lp";higher.args$degree <- 2L
     higher <- do.call(npregbw,higher.args)

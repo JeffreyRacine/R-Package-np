@@ -48,7 +48,7 @@ check(all(protected$bonferroni[,1,]<=protected$simultaneous[,1,]),all(protected$
 })
 
 test_that("local envelope controls preserve defaults and have an explicit name", {
-  expect_identical(np_boot_control()$calibration,"default")
+  expect_false("calibration" %in% names(np_boot_control()))
   expect_identical(np_boot_control(calibration="basic-local-envelope")$calibration,"basic-local-envelope")
   expect_error(np_boot_control(calibration="basic-local"),"calibration")
 })
@@ -61,7 +61,7 @@ test_that("public local envelopes enclose both constituents without changing poi
   fit<-npreg(bws=bw,txdat=x,tydat=y);held<-fit;seed<-.Random.seed
   run<-function(cal,law)withCallingHandlers(plot(fit,errors="bootstrap",center="bias-corrected",
     bootstrap=law,B=199L,neval=6L,band="all",output="data",random.seed=102052L,
-    boot.control=np_boot_control(calibration=cal,blocklen=if(law=="inid")NULL else 5L)),
+    interval=regression_test_interval(cal), boot.control=np_boot_control(blocklen=if(law=="inid")NULL else 5L)),
     warning=function(w)if(grepl("resolution",conditionMessage(w),ignore.case=TRUE))invokeRestart("muffleWarning"))
   for(law in c("inid","fixed","geom")) {
     raw<-run("basic-envelope",law);local<-run("basic-local-envelope",law)
@@ -77,7 +77,7 @@ test_that("public local envelopes enclose both constituents without changing poi
     }
     for(panel in seq_along(local$panels)) {
       i<-local$targets$inference_id[panel]
-      expect_identical(local$inference[[i]]$calibration,"basic-local-envelope")
+      expect_identical(local$inference[[i]]$components$simultaneous$calibration,"basic-local-envelope")
       expect_identical(local$inference[[i]]$resampling_law,law)
     }
     expect_identical(fit,held);expect_identical(.Random.seed,seed)
@@ -108,7 +108,7 @@ test_that("nearest-neighbour local envelopes retain fixed selected indices", {
     fit<-npreg(bws=bw,txdat=x,tydat=y);held<-fit;seed<-.Random.seed
     run<-function(cal,object=fit,...)suppressWarnings(plot(object,errors="bootstrap",
       center="bias-corrected",bootstrap="inid",B=199L,neval=6L,band="all",output="data",
-      random.seed=103072L,boot.control=np_boot_control(calibration=cal),...))
+      random.seed=103072L,interval=regression_test_interval(cal),...))
     z<-run("basic-local-envelope");zz<-run("basic-local-envelope",bw,xdat=x,ydat=y)
     for(b in c("pointwise","simultaneous","bonferroni"))
       expect_identical(as.data.frame(z,band=b),as.data.frame(zz,band=b))
@@ -117,7 +117,7 @@ test_that("nearest-neighbour local envelopes retain fixed selected indices", {
     for(wild in c("mammen","rademacher"))
       expect_error(plot(fit,errors="bootstrap",center="bias-corrected",
         bootstrap="wild",B=199L,neval=6L,band="all",output="data",
-        boot.control=np_boot_control(calibration="basic-local-envelope",wild=wild)),
+        interval="basic-local-envelope", boot.control=np_boot_control(wild=wild)),
         "fixed-bandwidth")
     expect_identical(.Random.seed,seed)
   }

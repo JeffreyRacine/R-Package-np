@@ -1,5 +1,13 @@
 # np 0.80-3
 
+* Regression plots accept `interval` for the interval construction and `band`
+  for pointwise, simultaneous or Bonferroni coverage. Omitting `interval`
+  retains the existing statistical defaults. Use `interval="normal-sd"`
+  for the previous explicit `band="pmzsd"` request. Move regression
+  calibration choices out of `np_boot_control()` and into `interval`.
+  Regression plot data now record the effective construction for each
+  coverage component. Existing saved plot data remain readable.
+
 * `npindextest()` now forms its studentized score in scaled response units
   to avoid overflow and underflow from large and small response units.
   `npindextest()` and `nppltest()` display interactive progress, elapsed

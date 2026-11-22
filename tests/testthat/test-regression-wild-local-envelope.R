@@ -32,7 +32,7 @@ test_that("Mammen local envelopes preserve the observed SE and use generation SD
   expect_identical(.Random.seed,seed)
   public <- suppressWarnings(plot(fit,center="bias-corrected",errors="bootstrap",
     bootstrap="wild",band="all",B=199L,neval=7L,output="data",
-    random.seed=103142L,boot.control=np_boot_control(calibration="basic-local-envelope",wild="mammen")))
+    random.seed=103142L,interval="basic-local-envelope", boot.control=np_boot_control(wild="mammen")))
   d <- as.data.frame(public,band="simultaneous")
   expect_true(all(is.finite(d$lower)) && all(d$lower<=d$upper))
   expect_identical(.Random.seed,seed)
@@ -159,7 +159,7 @@ test_that("public wild local admission keeps its law and categorical exclusions"
   run <- function(object,calibration,wild) suppressWarnings(plot(object,
     errors="bootstrap",center="bias-corrected",bootstrap="wild",B=99L,
     neval=5L,band="all",output="data",random.seed=103164L,
-    boot.control=np_boot_control(calibration=calibration,wild=wild)))
+    interval=regression_test_interval(calibration), boot.control=np_boot_control(wild=wild)))
   expect_error(run(fit,"basic-local-envelope","rademacher"),"requires inid")
   expect_identical(.Random.seed,held)
   expect_error(run(cfit,"basic-local-envelope","mammen"),"categorical-only")

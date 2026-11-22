@@ -158,7 +158,7 @@ test_that("ordered regression gradient wild bootstrap targets adjacent differenc
     perspective = FALSE,
     gradients = TRUE,
     errors = "bootstrap",
-    band = "pmzsd",
+    band = "pointwise", interval = "normal-sd",
     bootstrap = "wild",
     boot.control = np_boot_control(wild = "rademacher"),
     B = B,
