@@ -74,7 +74,8 @@
 
 .np_plot_data_validate <- function(x) {
   fail <- function(message) stop(paste0("invalid np_plot_data: ", message), call. = FALSE)
-  if (!is.list(x) || !identical(x$schema_version, 1L) ||
+  if (!is.list(x) || !(identical(x$schema_version, 1L) ||
+      (identical(x$schema_version,2L) && identical(x$family,"npreg") && "interval" %in% names(x$request))) ||
       !is.character(x$family) || length(x$family) != 1L || is.na(x$family))
     fail("unknown schema or family")
   if (!is.list(x$panels) || is.null(names(x$panels)) ||
@@ -123,6 +124,17 @@
     intervals <- panel$intervals
     if (!identical(names(intervals), names(.np_plot_data_empty_intervals())))
       fail("unexpected interval fields")
+    if (identical(x$schema_version,2L) && nrow(intervals)) {
+      keys <- unique(intervals[c("target_id","band")])
+      owners <- x$targets$inference_id[match(keys$target_id,x$targets$target_id)]
+      for (i in seq_len(nrow(keys))) {
+        part <- x$inference[[owners[i]]]$components[[keys$band[i]]]
+        if (!is.list(part) || !all(c("interval","calibration","endpoint_construction","studentization") %in% names(part)) ||
+            !is.character(part$interval) || length(part$interval)!=1L ||
+            !keys$band[i] %in% c("pointwise","bonferroni","simultaneous"))
+          fail("interval has no valid regression component")
+      }
+    }
     finite <- is.finite(intervals$lower) & is.finite(intervals$upper)
     if (any(intervals$lower[finite] > intervals$upper[finite]))
       fail("reversed interval endpoints")
@@ -155,7 +167,8 @@
 .np_plot_data <- function(family, request, panels, targets, inference = list(),
                           coverage_families = list(), diagnostics = list(),
                           family_exclusions = list()) {
-  out <- structure(list(schema_version = 1L, family = family, request = request,
+  schema <- if (identical(family,"npreg") && "interval" %in% names(request)) 2L else 1L
+  out <- structure(list(schema_version = schema, family = family, request = request,
     panels = panels, targets = targets, inference = inference,
     coverage_families = coverage_families, diagnostics = diagnostics),
     class = "np_plot_data")

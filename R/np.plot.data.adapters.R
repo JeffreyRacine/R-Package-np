@@ -234,6 +234,11 @@
 .np_plot_data_from_engine <- function(raw, bws, options, method = NULL) {
   request <- .np_plot_data_request(options, method)
   family <- .np_plot_data_engine_family(bws)
+  reg.request <- attr(options,"np.reg.interval",exact=TRUE)
+  if (!is.null(reg.request)) {
+    recipe <- attr(raw,"np.reg.recipe",exact=TRUE)
+    if (is.null(recipe)) stop("regression plot provider omitted its interval record",call.=FALSE)
+  }
   if (family == "npcdist" && isTRUE(options$quantreg)) family <- "npqreg"
   if (inherits(bws, "lsqregressionbandwidth")) family <- "nplsqreg"
   panels <- list(); targets <- .np_plot_data_targets(); inference <- list(); families <- list()
@@ -410,6 +415,10 @@
       if (isTRUE(meta$calibration_details$diagnostic_only) ||
           identical(meta$calibration_details$attainable, FALSE))
         interval$status <- rep("diagnostic_only", nrow(interval))
+      if (!is.null(reg.request)) {
+        meta <- .np_reg_interval_components(meta,recipe,names(bands),reg.request$interval,inf)
+        if (identical(recipe$band,"pmzsd")) interval$band[] <- "pointwise"
+      }
       values <- rbind(values, value); intervals <- rbind(intervals, interval)
       inference[[owner]] <- meta
     }
@@ -420,6 +429,11 @@
     display <- .np_plot_data_display(raw, coordinates, display)
     panels[[panel_id]] <- .np_plot_data_panel(coordinates$grid, coordinates$roles,
       values, intervals, display)
+  }
+  if (!is.null(reg.request)) {
+    if (identical(request$band,"pmzsd")) request$band <- "pointwise"
+    request["interval"] <- list(reg.request$interval)
+    request$supplied <- union(setdiff(request$supplied,c("band","interval","boot.control")),reg.request$supplied)
   }
   .np_plot_data(family, request, panels, targets, inference, families)
 }

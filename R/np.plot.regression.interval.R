@@ -9,7 +9,7 @@
     stop("regression calibration has moved to interval; rebuild boot.control using only nonfixed, wild and blocklen, and select the construction with interval", call.=FALSE)
   if (is.character(band) && length(band) == 1L && !is.na(band) && band == "pmzsd")
     stop("for regression use interval='normal-sd', band='pointwise' in place of band='pmzsd'", call.=FALSE)
-  request <- list(interval=interval, supplied=intersect(supplied, c("interval","band")),
+  request <- list(interval=interval, supplied=intersect(supplied, c("interval","band","boot.control")),
                   band=band)
   dots$interval <- NULL
   if (is.null(interval)) return(list(dots=dots, request=request))
@@ -50,4 +50,54 @@
   dots$band <- scope
   if (!is.null(calibration)) dots[["plot.errors.boot.calibration"]] <- calibration
   list(dots=dots, request=request)
+}
+
+.np_reg_interval_components <- function(meta, recipe, keys, requested, raw.inference) {
+  components <- list()
+  for (key in keys) {
+    public <- if (key=="pmzsd") "pointwise" else key
+    normal <- key=="pmzsd" || (recipe$method=="asymptotic" && !recipe$iterated &&
+                             key %in% c("pointwise","bonferroni"))
+    outer <- identical(recipe$calibration,"smoothed-percentile")
+    interval <- if (normal) "normal-sd" else if (outer) "outer-calibrated-percentile" else
+      if (recipe$iterated) switch(meta$calibration,
+        "separate-tails"="asymmetric-sd", "asymmetric-sd"="asymmetric-sd",
+        "tail-envelope"="asymmetric-sd-envelope", "absolute"="symmetric-sd",
+        "symmetric-sd"="symmetric-sd", "basic-envelope"="basic-envelope",
+        "basic-local-envelope"="basic-local-envelope",
+        stop("regression interval publication has an unknown calibration",call.=FALSE)) else
+      if (recipe$method=="asymptotic") "symmetric-sd" else "percentile"
+    if (!is.null(requested) && !identical(interval,as.character(requested)))
+      stop("regression interval provider returned a different construction",call.=FALSE)
+    resolution <- meta$resolution
+    if (is.data.frame(resolution)) resolution <- resolution[resolution$band==key,,drop=FALSE]
+    calibration <- if (normal) "normal critical value" else if (interval=="percentile")
+      "empirical curve ranks" else meta$calibration
+    endpoint <- if (normal) "center plus or minus a normal critical value times SD" else
+      if (!is.null(meta$endpoint_construction)) meta$endpoint_construction else switch(interval,
+        "percentile"="empirical bootstrap curve quantiles",
+        "symmetric-sd"="absolute Gaussian or bootstrap root bounds",
+        "asymmetric-sd"="signed standardized root inversion",
+        "asymmetric-sd-envelope"="envelope of signed and absolute root intervals",
+        "basic-envelope"="basic root envelope", "basic-local-envelope"="local-scale basic root envelope",
+        "outer-calibrated-percentile"="outer-calibrated empirical residual percentile bounds")
+    student <- if (normal) "observed SD or standard error" else meta$studentization
+    if (is.null(student) && !normal)
+      student <- raw.inference[["covariance",exact=TRUE]][["studentization",exact=TRUE]]
+    # Scalar Gaussian-maxima metadata belongs to the joint component.
+    critical <- if (!normal && (key=="simultaneous" || length(keys)==1L)) meta$critical_value else NULL
+    components[[public]] <- list(interval=interval,calibration=calibration,
+      endpoint_construction=endpoint,studentization=student,critical_value=critical,
+      resolution=resolution,calibration_status=meta$calibration_status)
+    if (!is.null(meta$resolution_limited) && (key=="simultaneous" || length(keys)==1L))
+      components[[public]]$resolution_limited <- meta$resolution_limited
+    if (!is.null(meta$critical_value_raw) && (key=="simultaneous" || length(keys)==1L))
+      components[[public]]$critical_value_raw <- meta$critical_value_raw
+  }
+  meta[c("calibration","endpoint_construction","studentization","critical_value","resolution",
+         "calibration_status","resolution_limited","critical_value_raw")] <- NULL
+  if (identical(recipe$method,"bootstrap") && identical(recipe$bootstrap,"wild"))
+    meta$wild_multiplier <- recipe$wild
+  meta$components <- components
+  meta
 }
