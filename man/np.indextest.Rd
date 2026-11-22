@@ -72,9 +72,9 @@ Sparse rows can be summed directly. Extreme response scales, unsuitable
 grids or insufficient donor mass use the native criterion. Other optimizer
 settings and explicitly enabled trees use the native evaluator throughout.
 The search checks the winning objective with the native calculation.
-A discrepancy or a near tie between the best two final start values
-(within \eqn{2\times10^{-10}\max(1,|CV|)}) triggers a full native
-search with the same starts and seed. Trial rounding near competing minima
+A full native search repeats the original starts and seed if the
+discrepancy exceeds \eqn{2\times10^{-10}\max(1,|CV|)}, or if the two best
+final start values are within this tolerance. Trial rounding near competing minima
 can still change individual draws. In a paired study with two covariates and
 240 observations, the two evaluators gave identical 5 percent decisions
 on 3,360 datasets across the two estimators, ordinary and weak-index nulls,
