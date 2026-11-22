@@ -190,6 +190,9 @@
     coord <- (z-limits[1L]) * (24/h)
     base <- floor(coord)
     fraction <- coord-base
+    # A positive subnormal distance to a grid point can overflow the
+    # reciprocal barycentric weights before they are normalized.
+    if (any(fraction > 0 & fraction < 64*.Machine$double.xmin)) return(direct())
     base <- as.integer(base) + 4L
     weights <- outer(fraction, offsets, "-")
     nodal <- which(fraction == 0)

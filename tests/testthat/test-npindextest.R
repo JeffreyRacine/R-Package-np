@@ -96,6 +96,11 @@ test_that("guarded bootstrap CV respects search controls and the native criterio
     leaf <- .indextest_grid_leaf(function(...) stop("native trial"), method, counts)
     expect_equal(leaf(z, y, h, NULL, NULL, NULL)$objective, expected, tolerance = 1e-10)
     expect_error(leaf(z, y, h/1e6, NULL, NULL, NULL), "native trial")
+    tiny <- .Machine$double.xmin * .Machine$double.eps
+    if (tiny > 0) {
+      near.node <- c(0, tiny, seq(.01, 2, length.out = 158L))
+      expect_error(leaf(near.node, y, h, NULL, NULL, NULL), "native trial")
+    }
     if (!binary) expect_error(leaf(z, 1e80*y, h, NULL, NULL, NULL), "native trial")
   }
   expect_equal(counts$grid, 2)
