@@ -89,9 +89,21 @@
     stop("The centered covariates must have full column rank.", call. = FALSE)
   h <- switch(bw.method, published = n^(-2/9), maximum = c(.5,1,2)*n^(-2/9),
               separate = n^(-17/36))
-  d2 <- as.double(stats::dist(s))^2
-  if (any(!is.finite(d2))) stop("The standardized distances are not finite.", call. = FALSE)
-  list(x=x, y=y, s=s, scales=scales, distances=d2, recipe=recipe, h=h,
+  # Recreate the specified starts, including automatic zero placeholders.
+  # Reusing the observed winning coefficients would change the bootstrap.
+  initial <- recipe[["bws"]]
+  if (is.null(initial)) initial <- numeric(ncol(x) + 1L)
+  template <- sibandwidth(beta = initial[seq_len(ncol(x))], h = tail(initial, 1L),
+    method = recipe$method, nobs = n, xdati = bw$xdati, ydati = bw$ydati,
+    xnames = names(x), ynames = bw$ynames, bandwidth = tail(initial, 1L),
+    bandwidth.compute = TRUE)
+  template <- npSetScaleFactorSearchLower(template, recipe$scale.factor.search.lower)
+  descriptor <- .npindexbw_prepare_lp_regression_leaf_descriptor(
+    x[[1L]], y, 1, template, .npindex_resolve_spec(template))
+  cv <- .npregbw_call_fixed_degree_core(xdat = x[,1L,drop=FALSE], ydat = y,
+    bws = descriptor$bws, invalid.penalty = "dbmax", eval.only = TRUE,
+    objective = if (recipe$method == "ichimura") "ls" else "ks", .prepare.index = TRUE)
+  list(x=x, y=y, s=s, scales=scales, template=template, cv=cv, recipe=recipe, h=h,
        g.test=if (bw.method=="separate") n^(-2/9), beta=bw[["beta"]], bw=bw[["bw"]])
 }
 
@@ -107,21 +119,31 @@
 
 .indextest_score <- function(y, index, data) {
   g <- if (is.null(data$g.test)) index$g else data$g.test
-  .Call(C_np_indextest_score, y, index$z, data$distances, g, data$h)
+  .Call(C_np_indextest_score, y, index$z, data$s, g, data$h)
 }
 
 .indextest_pilot <- function(data, index) {
   y <- data$y
-  logw <- -0.5*(outer(index$z, index$z, "-")/index$g)^2
-  if (data$recipe$method == "kleinspady") {
-    L <- exp(logw)
-    success <- rowSums(L[,y==1,drop=FALSE])
-    failure <- rowSums(L[,y==0,drop=FALSE])
-    return(success/(success+failure))
+  n <- length(y)
+  pilot <- numeric(n)
+  binary <- data$recipe$method == "kleinspady"
+  # Retain the original rowwise normalization and matrix product. Only a
+  # fixed number of target rows is live at any point.
+  for (first in seq.int(1L, n, by = 32L)) {
+    rows <- seq.int(first, min(n, first + 31))
+    logw <- -0.5*(outer(index$z[rows], index$z, "-")/index$g)^2
+    if (binary) {
+      weights <- exp(logw)
+      success <- rowSums(weights[,y == 1,drop = FALSE])
+      failure <- rowSums(weights[,y == 0,drop = FALSE])
+      pilot[rows] <- success/(success + failure)
+    } else {
+      logw[cbind(seq_along(rows), rows)] <- -Inf
+      weights <- exp(logw - apply(logw, 1L, max))
+      pilot[rows] <- drop(weights %*% y)/rowSums(weights)
+    }
   }
-  diag(logw) <- -Inf
-  weights <- exp(logw - apply(logw, 1L, max))
-  drop(weights %*% y / rowSums(weights))
+  pilot
 }
 
 .indextest_response <- function(data) {
@@ -132,9 +154,24 @@
   data$pilot + eta*(data$y-data$pilot)
 }
 
+.indextest_cv_leaf <- function(cv) {
+  force(cv)
+  function(index, ydat, h, bws, spec, leaf.descriptor) {
+    out <- .Call(C_np_regression_bw_eval, numeric(), numeric(), as.double(index),
+      ydat, as.double(EssDee(index)), cv$opti, cv$optd, as.double(h), 1L, 0L, 10,
+      cv$degree, cv$bernstein, cv$basis, cv$lo, cv$hi, cv$support)
+    list(objective = out$fval[1L], num.feval.fast = out$fast.history[1L])
+  }
+}
+
 .indextest_refit <- function(y, data, draw) {
+  # Generate this response in the bootstrap RNG scope, before the search resets its seed.
+  force(y)
   tryCatch({
-    fit <- do.call(npindexbw, c(list(xdat=quote(data$x), ydat=quote(y)), data$recipe))
+    controls <- data$recipe[setdiff(names(data$recipe),
+        c("method","bwtype","regtype","ckertype","bws"))]
+    fit <- do.call(npindexbw.sibandwidth, c(list(xdat = quote(data$x), ydat = quote(y),
+      bws = quote(data$template), .indextest.leaf = .indextest_cv_leaf(data$cv)), controls))
     ix <- .indextest_index(data, fit[["beta"]], fit[["bw"]])
     max(.indextest_score(y, ix, data))
   }, error = function(e) stop("Single-index bootstrap draw ", draw, ": ",

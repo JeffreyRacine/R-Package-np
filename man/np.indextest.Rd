@@ -58,7 +58,8 @@ weights. The Klein--Spady adaptation draws Bernoulli responses from inclusive
 CV fitted probabilities. The one-sided p-value includes the observed draw
 in its numerator and denominator. Predictor geometry is reusable, while the
 estimated direction and its kernel weights depend on each bootstrap response.
-Memory for the pairwise geometry is quadratic in the sample size.
+The pilot and statistic process pairs in blocks. For a fixed number of
+covariates their workspace grows linearly with the sample size.
 
 The fit and test should use the same package defaults. Some explicit
 optimizer controls or starting values survive only as expressions in the

@@ -3212,6 +3212,7 @@ npindexbw.sibandwidth <-
            scale.factor.search.lower = NULL,
            .restore.first.start = TRUE,
            ...,
+           .indextest.leaf = NULL,
            .fixed.h.lower = NULL,
            .rng.collective = .npRmpi_rng_scope_collective()){
   .np_reject_native_data(substitute(list(...))[-1L])
@@ -3457,6 +3458,8 @@ npindexbw.sibandwidth <-
           ##objective function use c(1,beta). However, we do indeed return
           ##c(1,beta) which can be used in the index.model function above.
 
+          ichimura.leaf <- if (is.null(.indextest.leaf))
+            .npindexbw_eval_ichimura_lp_via_npreg else .indextest.leaf
           ichimura <- function(param) {
             bandwidth_progress_step()
 
@@ -3494,7 +3497,7 @@ npindexbw.sibandwidth <-
                   retain.raw = !is.null(start.guard) && isTRUE(start.guard$active)
                 )
               } else {
-                .npindexbw_eval_ichimura_lp_via_npreg(
+                ichimura.leaf(
                   index = index,
                   ydat = ydat,
                   h = h,
@@ -3542,6 +3545,8 @@ npindexbw.sibandwidth <-
           ## objective function use c(1,beta). However, we do indeed return
           ## c(1,beta) which can be used in the index.model function above.
 
+          kleinspady.leaf <- if (is.null(.indextest.leaf))
+            .npindexbw_eval_kleinspady_lp_via_npreg else .indextest.leaf
           kleinspady <- function(param) {
             bandwidth_progress_step()
 
@@ -3590,7 +3595,7 @@ npindexbw.sibandwidth <-
                   result$raw.objective <- collective[["raw.objective"]]
                 result
               } else {
-                .npindexbw_eval_kleinspady_lp_via_npreg(
+                kleinspady.leaf(
                   index = index,
                   ydat = ydat,
                   h = h,
@@ -3868,7 +3873,7 @@ npindexbw.sibandwidth <-
           bws$numimp <- numimp
           bws$fval.vector <- fval.value
         }
-      })[["elapsed"]]
+      }, gcFirst = is.null(.indextest.leaf))[["elapsed"]]
     ## Return a list with beta (we append the restricted value of
     ## beta_1=1), the bandwidth h, the value of the objective function at
     ## its minimum, the number of restarts that resulted in an improved

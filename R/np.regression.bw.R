@@ -742,7 +742,8 @@ npregbw.rbandwidth <-
                                             eval.only = FALSE,
                                             localize = TRUE,
                                             objective = c("ls", "ks"),
-                                            .entry.guard = NULL) {
+                                            .entry.guard = NULL,
+                                            .prepare.index = FALSE) {
   invalid.penalty <- match.arg(invalid.penalty)
   objective <- match.arg(objective)
   penalty.multiplier <-
@@ -877,6 +878,18 @@ npregbw.rbandwidth <-
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
+  # The test refits the same complete Gaussian LC design repeatedly. Keep
+  # the canonical native option vectors; index, response, scale and h vary.
+  if (isTRUE(.prepare.index)) {
+    stopifnot(isTRUE(eval.only), bws$ncon == 1L, bws$nuno + bws$nord == 0L,
+              identical(bws$type, "fixed"), identical(bws$ckerbound, "none"),
+              identical(reg.spec$regtype.engine, "lc"), !isTRUE(bws$scaling))
+    return(list(opti = as.integer(myopti), optd = as.double(myoptd),
+                degree = as.integer(degree.c), basis = as.integer(npLpBasisCode(reg.spec$basis.engine)),
+                bernstein = as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+                lo = as.double(cker.bounds.c$lb), hi = as.double(cker.bounds.c$ub),
+                support = .np_native_categorical_support(bws)))
+  }
   if (isTRUE(eval.only)) {
     # Force the R payload before the service's native-entry agreement. The
     # ordinary (non-service) route retains the direct .Call primitive.

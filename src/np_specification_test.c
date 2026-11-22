@@ -83,14 +83,16 @@ SEXP C_np_pltest_angles(SEXP coordinates) {
 
 /* Maistre-Patilea: common scaling of all density-weighted residuals cancels
    on studentization. Pair order matches stats::dist (lower triangle). */
-SEXP C_np_indextest_score(SEXP response, SEXP index, SEXP distances,
+SEXP C_np_indextest_score(SEXP response, SEXP index, SEXP coordinates,
                           SEXP bandwidth, SEXP widths) {
     int n = LENGTH(response), m = LENGTH(widths);
     if (!isReal(response) || !isReal(index) || LENGTH(index) != n || n < 2 ||
-        !isReal(distances) || XLENGTH(distances) != (R_xlen_t)n*(n-1)/2 ||
+        !isReal(coordinates) || !isMatrix(coordinates) || nrows(coordinates) != n ||
+        ncols(coordinates) < 1 ||
         !isReal(bandwidth) || XLENGTH(bandwidth) != 1 || !isReal(widths) || m < 1)
         error("Invalid single-index statistic inputs.");
-    const double *y = REAL(response), *z = REAL(index), *d2 = REAL(distances);
+    const double *y = REAL(response), *z = REAL(index), *x = REAL(coordinates);
+    const int p = ncols(coordinates);
     double g = asReal(bandwidth);
     if (!R_FINITE(g) || g <= 0.0) error("Invalid residual bandwidth.");
     SEXP ans = PROTECT(allocVector(REALSXP,m));
@@ -112,19 +114,36 @@ SEXP C_np_indextest_score(SEXP response, SEXP index, SEXP distances,
             u[j] -= delta;
         }
     }
-    R_xlen_t pair = 0;
+    /* Keep one strip of squared distances. Each coordinate is contiguous
+       along the strip, and all requested test widths share its geometry. */
+    enum { block = 256 };
+    double d2[block];
     for (int i = 0; i < n; ++i) {
         if ((i % 64) == 0) R_CheckUserInterrupt();
-        for (int j = i+1; j < n; ++j, ++pair) {
-            double dz = z[i]-z[j];
-            double orthogonal = fmax(d2[pair]-dz*dz,0.0);
-            double product = u[i]*u[j];
-            for (int l = 0; l < m; ++l) {
-                double t = dz/h[l];
-                double a = product*exp(-0.5*(orthogonal+t*t));
-                score[l] += a;
-                squares[l] += a*a;
+        for (int first = i+1; first < n; ) {
+            int count = n-first < block ? n-first : block;
+            for (int k = 0; k < count; ++k) d2[k] = 0.0;
+            for (int col = 0; col < p; ++col) {
+                const double *v = x + (size_t)col*n;
+                for (int k = 0; k < count; ++k) {
+                    double delta = v[i] - v[first+k];
+                    d2[k] += delta*delta;
+                }
             }
+            for (int k = 0; k < count; ++k) {
+                int j = first+k;
+                if (!R_FINITE(d2[k])) error("Non-finite standardized distance.");
+                double dz = z[i]-z[j];
+                double orthogonal = fmax(d2[k]-dz*dz,0.0);
+                double product = u[i]*u[j];
+                for (int l = 0; l < m; ++l) {
+                    double t = dz/h[l];
+                    double a = product*exp(-0.5*(orthogonal+t*t));
+                    score[l] += a;
+                    squares[l] += a*a;
+                }
+            }
+            first += count;
         }
     }
     for (int l = 0; l < m; ++l) {
