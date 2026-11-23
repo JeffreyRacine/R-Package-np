@@ -158,6 +158,9 @@
 
 ## Fitting and bandwidth selection
 
+* Instrumental-variable fits accept explicit bandwidth search controls when
+  constructing the fitted values and the derivative adjoint.
+
 * For univariate degree-one beta regression with adaptive nearest-neighbor
   bandwidths, fitted means, first derivatives and hat rows use a more accurate
   calculation for ill-conditioned zero-ridge extrapolation outside the training

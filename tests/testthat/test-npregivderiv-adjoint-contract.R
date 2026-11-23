@@ -44,6 +44,9 @@ test_that("npregivderiv adjoint dots remove only operator-owned names", {
 
   expect_identical(observed, expected)
   expect_identical(filter.dots(unname(dots)), unname(dots))
+  mixed <- list(bwmethod = "cv.aic", ftol = 1e-5, itmax = 20L, tol = 1e-5,
+                ckerorder = 4L, bwscaling = FALSE, unknown = TRUE)
+  expect_identical(filter.dots(mixed), mixed[c("ckerorder", "bwscaling", "unknown")])
 })
 
 test_that("npregivderiv monotonicity guard uses only computed norms", {
