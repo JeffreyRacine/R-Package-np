@@ -19,6 +19,13 @@ test_that("formula residuals retain training omissions with external evaluation"
       for (explicit in c(FALSE, TRUE)) {
         args <- list(bws = bw, newdata = e, residuals = TRUE, se = TRUE)
         if (explicit) args$na.action <- get(policy, asNamespace("stats"))
+        if (explicit && (family == "npscoef" ||
+                         (family == "npreg" && policy == "na.omit"))) {
+          expect_error(do.call(get(family), args),
+                       "na.action override is not supported for this stored-fit route",
+                       fixed = TRUE)
+          next
+        }
         fit <- do.call(get(family), args)
         expect_equal(unname(residuals(fit)), unname(residuals(train)), tolerance = 1e-12)
         expect_identical(unname(which(is.na(residuals(fit)))),
