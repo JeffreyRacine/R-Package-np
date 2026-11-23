@@ -51,13 +51,17 @@ test_that("response and adjoint LP owners retain validated factorizations", {
   # owner has the categorical SE-off base-adjoint call.
   expect_identical(vapply(owner.bodies, count.calls, integer(1L),
                           name = adjoint.name),
-                   setNames(c(1L, 1L, 6L), owner.names))
+                   setNames(c(1L, 1L, 7L), owner.names))
   # The opt-in plot projection reuses the accepted factor for one more adjoint.
   # Ordinary fitted calls leave fit_projection NULL.
   expect_match(owner.bodies[[3L]], "if(call->fit_projection != NULL)", fixed = TRUE)
   conditional <- owner.bodies[[1L]]
   frame <- owner.bodies[[2L]]
   fit <- owner.bodies[[3L]]
+  # Lean gradient replay solves one additional adjoint against this row's factor.
+  expect_match(fit, "call->fit_projection->inference_gradient != NULL", fixed = TRUE)
+  expect_match(fit, "call->fit_projection->inference_residual == NULL", fixed = TRUE)
+  expect_match(fit, "accepted derivative projection solve failed", fixed = TRUE)
   # Both transport wrappers must enter this same arithmetic/factor owner.
   for (ann in c(FALSE, TRUE)) {
     wrapper <- np_test_extract_c_function(jksum_lines,
