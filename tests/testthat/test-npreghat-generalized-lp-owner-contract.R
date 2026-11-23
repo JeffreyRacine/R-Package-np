@@ -338,7 +338,7 @@ test_that("tree-disabled higher-degree lp scalar apply routes through exact matr
   check_scalar_apply_contract(degree = c(2L, 2L), s = c(1L, 0L))
 })
 
-test_that("public LP mean matrices use the typed native capability", {
+test_that("public LP mean matrices use the fitted capture and reproduce quadratic data", {
   candidate <- getFromNamespace(".npreghat_native_matrix_candidate", "np")
   has_extended_nn <- getFromNamespace("npRegressionHasExtendedNn", "np")
   native_matrix <- getFromNamespace(
@@ -360,6 +360,13 @@ test_that("public LP mean matrices use the typed native capability", {
       ckertype = kernel, ckerorder = 2L
     )
   }
+
+  capture <- getFromNamespace(".npreghat_fitted_capture", "np")
+  visits <- 0L
+  local_mocked_bindings(.npreghat_fitted_capture = function(...) {
+    visits <<- visits + 1L
+    capture(...)
+  }, .package = "np")
 
   bw.fixed <- make_bw("fixed", 0.32)
   bw.gnn <- make_bw("generalized_nn", 9L)
@@ -383,12 +390,18 @@ test_that("public LP mean matrices use the typed native capability", {
   expect_false(do.call(candidate, candidate_args(bw.fixed, s = 1L)))
 
   for (bw in list(bw.fixed, bw.gnn)) {
+    before <- visits
     public <- npreghat(bws = bw, txdat = x, output = "matrix")
+    expect_identical(visits, before + 1L)
+    captured <- capture(bw, x, NULL, 0L)
+    expect_identical(as.vector(public), as.vector(captured))
+    polynomials <- cbind(1, x$x, x$x^2)
+    expect_lt(max(abs(public %*% polynomials - polynomials)), 1e-12)
     native <- native_matrix(
       bw, txdat = x, degree = 2L, basis = "glp",
       bernstein.basis = FALSE, s = 0L
     )
-    expect_identical(as.vector(public), as.vector(native))
+    expect_lt(max(abs(public - native)), 8 * .Machine$double.eps)
     expect_identical(
       attr(public, "ridge.used", exact = TRUE),
       attr(native, "ridge.used", exact = TRUE)
