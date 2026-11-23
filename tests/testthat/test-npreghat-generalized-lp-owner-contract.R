@@ -311,7 +311,7 @@ test_that("npRmpi tree-disabled higher-degree lp scalar apply routes through exa
   npreghat_tree_disabled_lp_scalar_apply_guard_case()
 })
 
-test_that("public LP mean matrices use the typed native capability", {
+test_that("public LP mean matrices use the fitted capture and reproduce quadratic data", {
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
   skip_if(is.null(env), "installed npRmpi unavailable for subprocess proof")
   ok_tag <- "NPRMPI_PUBLIC_LP_NATIVE_MATRIX_CONTRACT_OK"
@@ -323,6 +323,11 @@ test_that("public LP mean matrices use the typed native capability", {
     "candidate <- getFromNamespace('.npreghat_native_matrix_candidate', 'npRmpi')",
     "has_extended_nn <- getFromNamespace('npRegressionHasExtendedNn', 'npRmpi')",
     "native_matrix <- getFromNamespace('.npreghat_exact_lp_matrix_from_regression_core', 'npRmpi')",
+    "capture <- getFromNamespace('.npreghat_fitted_capture', 'npRmpi')",
+    "visits <- 0L",
+    "testthat::local_mocked_bindings(.npreghat_fitted_capture=function(...) {",
+    "  visits <<- visits + 1L; capture(...)",
+    "}, .package='npRmpi')",
     "local_regression <- getFromNamespace('.npRmpi_with_local_regression', 'npRmpi')",
     "set.seed(20260816)",
     "n <- 42L",
@@ -343,9 +348,15 @@ test_that("public LP mean matrices use the typed native capability", {
     "stopifnot(do.call(candidate, candidate_args(bw.fixed, output='constraint')))",
     "stopifnot(!do.call(candidate, candidate_args(bw.fixed, s=1L)))",
     "for (bw in list(bw.fixed, bw.gnn)) {",
+    "  before <- visits",
     "  public <- npreghat(bws=bw, txdat=x, output='matrix')",
+    "  stopifnot(identical(visits, before+1L))",
+    "  captured <- local_regression(capture(bw, x, NULL, 0L))",
+    "  stopifnot(identical(as.vector(public), as.vector(captured)))",
+    "  polynomials <- cbind(1, x$x, x$x^2)",
+    "  stopifnot(max(abs(public %*% polynomials-polynomials)) < 1e-12)",
     "  native <- local_regression(native_matrix(bw, txdat=x, degree=2L, basis='glp', bernstein.basis=FALSE, s=0L))",
-    "  stopifnot(identical(as.vector(public), as.vector(native)))",
+    "  stopifnot(max(abs(public-native)) < 8 * .Machine$double.eps)",
     "  stopifnot(identical(attr(public, 'ridge.used', exact=TRUE), attr(native, 'ridge.used', exact=TRUE)))",
     "  stopifnot(inherits(public, 'npreghat'))",
     "  stopifnot(identical(attr(public, 'trainiseval', exact=TRUE), TRUE))",
