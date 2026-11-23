@@ -37,3 +37,17 @@ test_that("runtime acceleration certificate follows delivered worker state", {
   e$mpi.comm.rank <- function(comm) 0L; e$mpi.comm.size <- function(comm) 1L
   expect_false(f(force=TRUE)); expect_identical(sends,before)
 })
+
+test_that("NOMAD diagnostic attributes follow the worker option snapshot", {
+  keys <- c("np.developer.native.nomad.diagnostics", "npRmpi.developer.native.nomad.diagnostics")
+  old <- options(setNames(rep(list(NULL), length(keys)), keys))
+  on.exit(options(old), add = TRUE)
+  absent <- .npRmpi_autodispatch_option_snapshot()
+  expect_identical(absent[keys], setNames(rep(list(NULL), length(keys)), keys))
+  expect_true(all(keys %in% names(absent)))
+  for (enabled in list(c(TRUE, FALSE), c(FALSE, TRUE))) {
+    values <- setNames(as.list(enabled), keys)
+    options(values)
+    expect_identical(.npRmpi_autodispatch_option_snapshot()[keys], values)
+  }
+})
