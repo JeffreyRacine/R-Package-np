@@ -51,14 +51,18 @@
       any(bws[["degree"]] == 1L)))
 }
 
-.np_bias_beta_gnn_mean <- function(bws) {
-  identical(bws[["ckertype"]], "beta") && identical(bws[["type"]], "generalized_nn") &&
+.np_bias_beta_nn_mean <- function(bws, type, degrees) {
+  identical(bws[["ckertype"]], "beta") && identical(bws[["type"]], type) &&
     isTRUE(bws[["ckerorder"]] == 2L) && identical(bws[["ckerbound"]], "fixed") &&
     isTRUE(bws[["ncon"]] == 1L) && isTRUE(bws[["nuno"]] == 0L) &&
     isTRUE(bws[["nord"]] == 0L) && identical(bws[["regtype"]], "lp") &&
     identical(bws[["basis"]], "glp") && isTRUE(bws[["bernstein.basis"]]) &&
-    isTRUE(bws[["degree"]] %in% 1:2) && isTRUE(is.finite(bws[["ckerlb"]])) &&
+    isTRUE(bws[["degree"]] %in% degrees) && isTRUE(is.finite(bws[["ckerlb"]])) &&
     isTRUE(is.finite(bws[["ckerub"]]))
+}
+
+.np_bias_beta_gnn_mean <- function(bws) {
+  .np_bias_beta_nn_mean(bws, "generalized_nn", 1:2)
 }
 
 .np_bias_regression_kernel_class <- function(bws, calibration) {
@@ -186,7 +190,7 @@
   bws
 }
 
-.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE, gradient.order = NULL, law = NULL, calibration = NULL) {
+.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE, gradient.order = NULL, law = NULL, calibration = NULL, explicit.ann.mean = FALSE) {
   x <- toFrame(x)
   if (!is.numeric(y) || length(y) != nrow(x) || any(!is.finite(y)) || anyNA(x))
     stop("bias correction requires finite retained training data", call. = FALSE)
@@ -200,6 +204,17 @@
     stop(paste0("iterated fixed uniform correction requires a local-constant or all-degree-zero GLP fit",
                 legacy.hint), call. = FALSE)
   kernel.class <- .np_bias_regression_kernel_class(bws, calibration)
+  if (explicit.ann.mean) {
+    if (!.np_bias_beta_nn_mean(bws, "adaptive_nn", 1L) || npRegressionHasExtendedNn(bws) ||
+        !is.null(gradient.order) || !identical(law, "mammen") ||
+        !isTRUE(calibration %in% c("absolute", "basic-local-envelope")))
+      stop("experimental beta ANN mean bands require a degree-one bounded Bernstein fit and Mammen wild bootstrap", call.=FALSE)
+    defaults <- np_bias_control()
+    fields <- setdiff(names(defaults), "supplied")
+    if (!identical(control[fields], defaults[fields]))
+      stop("experimental beta ANN mean bands require the assessed auxiliary bias settings", call.=FALSE)
+    kernel.class <- "beta-ann-mean"
+  }
   if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
     stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths with continuous predictors only, or qualified nearest-neighbour models with main degrees at most one",legacy.hint), call. = FALSE)
   if (kernel.class == "beta-gnn-mean" && (!identical(law, "mammen") || !is.null(gradient.order)))
@@ -249,6 +264,10 @@
       bws[["ckerorder"]] == 2L && identical(bws[["ckerbound"]], "none") &&
       bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && anyDuplicated(x[[nc[which.max(reg[["degree.engine"]])]]]))
     spec[["cubic.support"]] <- list(x=x, bws=bws, axis=which.max(reg[["degree.engine"]]))
+  if (kernel.class == "beta-ann-mean") {
+    spec[["beta.ann.mean.range"]] <- range(x[[nc]])
+    spec[["main.physical"]] <- list(x=x, bws=bws)
+  }
   if (kernel.class == "beta-gnn-mean") spec[["beta.gnn.mean"]] <- TRUE
   if (!is.null(admission)) spec$settings$kernel.admission <- admission
   # Degree-zero uniform support ties use the fitted physical coordinates.
@@ -414,6 +433,8 @@
   admitted <- admitted || (!is.null(spec$main.capture) && inherits(captured,"np_bias_main_capture_certificate") &&
     identical(captured$state,spec))
   if (any(ridge != 0)) {
+    if (!is.null(spec[["beta.ann.mean.range"]]))
+      stop("experimental beta ANN mean bands require zero-ridge fitted main rows", call.=FALSE)
     if (isTRUE(spec[["beta.gnn.mean"]]))
       stop("experimental positive-degree beta GNN mean bands require zero-ridge main rows",call.=FALSE)
     if (!admitted)
@@ -549,6 +570,12 @@
   if (isTRUE(spec$pooled)) return(.np_bias_profile_rows(spec,grid,map))
   if (nrow(map)>500L || nrow(unique(grid[spec$numeric.cols]))>25L)
     stop("internal bias target block exceeded",call.=FALSE)
+  observed <- spec[["beta.ann.mean.range"]]
+  if (!is.null(observed)) {
+    coords <- grid[[spec$numeric.cols]]
+    if (any(map$target != "mean") || any(!is.finite(coords) | coords < observed[1L] | coords > observed[2L]))
+      stop("experimental beta ANN mean bands require evaluation within the observed training range", call.=FALSE)
+  }
   cubic <- if (!is.null(spec[["cubic.support"]])) .np_bias_cubic_targets(spec,grid,map)
   physical <- spec[["main.physical"]]
   main.grid <- if (!is.null(physical)) grid else NULL
