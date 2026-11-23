@@ -1,19 +1,13 @@
 # AGENTS.md
 
 Use `/Users/jracine/Development/AGENTS.md` as the canonical workflow and benchmarking policy.
-Hard default: enforce `Sweep Safety Protocol (Default Across Scope Repos)` from the canonical AGENTS file.
+Follow its sweep safety rules and incorporated protocols. For release qualification, candidate replacement and systemwide installation verification, use the workspace task guide at `/Users/jracine/Development/SKILLS.md`.
 
 Repo-specific note:
 - Merge (do not overwrite) R-layer and man-page files when porting from `np-master`.
 - Any new or ported benchmark/function must follow MPI protocol from `/Users/jracine/Development/AGENTS.md`: start/stop slaves, broadcast commands/options/data explicitly, support passable `nslaves`/`rslaves`, and keep parity with serial seed/DGP/options.
-- Performance evidence policy for this repo follows canonical AGENTS exactly:
-  - `times=5` is smoke only; decision screening starts at interleaved paired-seed `times=25`;
-  - predeclare MEI (absolute seconds + relative percent, center + tail), use paired deltas + CI (mean + bootstrap median), and allow early accept at `times=25` only for obvious wins;
-  - otherwise confirm with interleaved paired-seed `times>=100` (or higher when pilot variance implies it);
-  - accept on performance grounds only when paired mean and paired median agree;
-  - tail/spread checks (`p90`/`p95`, `sd`/`IQR`/`MAD`) must also be non-regressing versus MEI/tolerance;
-  - all gated methods/modes must agree in direction, otherwise anomaly rationalization versus MEI is mandatory;
-  - default MPI performance gates to `nslaves=1`; for scaling/performance claims include at least one `nslaves>1` run; `nslaves=0` is unsupported.
+- For release timing alerts, use the workspace's bounded, same-host paired comparison. Report seconds and percent for the affected route, tree setting and worker count. Where MPI shows a jump, separate the changed computation from communication before attributing a slowdown.
+- For optimization claims, follow the paired center, tail, scaling and sample-size rules in `/Users/jracine/Development/protocols/PERFORMANCE_RULES.md`. Start MPI screening with one worker and include multiple workers for a scaling claim. Spawn sessions require at least one worker.
 - Keep shared regression summary telemetry in sync with `np-master`: `num.feval`, `num.feval.fast`.
 - Keep `man/np.kernels.Rd` and kernel/options/plot cross-links aligned, while preserving package-specific `npRmpi` docs text.
 - Runtime contract: `npRmpi` must never call serial `np` estimator/plot/bootstrap/helper code paths and must not silently fall back to serial execution when MPI mode is selected.
@@ -43,7 +37,7 @@ Repo-specific note:
   - reproduce first with `NP_DEMO_N=100`, `NP=2`, and `DEMOS='<single demo>'`;
   - validate effective profile command with `make -n run-profile` and confirm `R_PROFILE_USER` path;
   - for suspected hangs, monitor worker split with `ps -p '<pid1,pid2>' -o 'pid,stat,etime,%cpu,command'`;
-  - if one worker remains near idle while another remains busy, abort and clean stale `slavedaemon.R`/`Rslaves.sh` before retry.
+  - inspect progress and process ownership before treating an idle rank as a hang. For a confirmed hang, stop the owning launcher and clean up only its verified processes, following the workspace MPI rules.
 
 ## Rd Documentation Campaign Policy (2026-04-28)
 
@@ -90,10 +84,10 @@ readability campaign, not an API or MPI-runtime refactor.
 
 This repository follows a strict canonical execution rule:
 
-1. One canonical implementation per method (outside explicit `np.tree` branching).
+1. Preserve the statistical contract of each method across its qualified computational paths. The workspace engineering context documents the supported dense and tree paths.
 2. Unsupported configurations must fail fast with explicit `stop(...)` diagnostics.
 3. No silent remap/coercion of user-selected options (for example `bwmethod`, `regtype`, kernels, `cv.iterate`, or bounds transforms).
 4. No hidden alternate execution paths for the same method semantics.
 5. All fit-defining options (for example `degree`, `basis`, `bernstein.basis`, kernels, and bounds) must be propagated and used by the canonical path.
-6. `np.tree=FALSE` is the default; when `np.tree=TRUE`, behavior must remain semantics-preserving and option-compatible with the canonical path.
+6. The default is `np.tree = "auto"`. Preserve the explicit `TRUE` and `FALSE` settings, including the documented eligibility rules. For selector changes, verify numerical parity and the computation actually selected in each affected mode.
 7. Remove or reject legacy/debug compatibility branches that add redundant runtime overhead once canonical behavior exists.

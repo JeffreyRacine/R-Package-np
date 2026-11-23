@@ -1,5 +1,11 @@
 # SKILLS.md
 
+## Release qualification and delivery
+
+Use the maintainer workspace task guide at `/Users/jracine/Development/SKILLS.md`. Its **Verify a delivered package** section covers the candidate, Git branch and installed library. The same guide links the bounded release timing screen and the protocol for formal performance claims.
+
+For MPI verification, record which library the worker loaded, the worker count, the numerical result and clean teardown for the exercised route.
+
 ## Skill: Rd Mental-Model Documentation Cleanup
 
 Use this skill for `.Rd` documentation updates in `npRmpi`.
