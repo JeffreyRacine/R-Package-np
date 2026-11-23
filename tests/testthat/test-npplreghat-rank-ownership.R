@@ -52,3 +52,32 @@ test_that("identified partial-linear hat outputs preserve the shared solve", {
     expect_equal(as.numeric(pred$se.fit),sqrt(drop(H^2%*%as.numeric(residuals(training))^2)),tolerance=3e-12)
   }
 })
+
+test_that("GNN partial-linear hats distinguish reproduction from weak identification", {
+  old <- options(np.messages = FALSE, npRmpi.hat.operator.fanout = FALSE)
+  on.exit(options(old), add = TRUE)
+  set.seed(825)
+  n <- 29L
+  z <- data.frame(z = sort(runif(n)))
+  y <- sin(5 * z$z) + rnorm(n, sd = .1)
+  perturbation <- rnorm(n)
+  for (exact in c(TRUE, FALSE)) {
+    x <- data.frame(x = if (exact) z$z else z$z + 1e-7 * perturbation)
+    bw <- npplregbw(xdat = x, zdat = z, ydat = y, bws = matrix(9, 2L, 1L),
+                    regtype = "lp", degree = 2L, bwtype = "generalized_nn",
+                    bandwidth.compute = FALSE)
+    for (rows in list(seq_len(n), rev(seq_len(n)))) {
+      draw <- function() npplreghat(bw, txdat = x[rows, , drop = FALSE],
+                                    tzdat = z[rows, , drop = FALSE],
+                                    exdat = x[1:4, , drop = FALSE],
+                                    ezdat = z[1:4, , drop = FALSE], y = y[rows])
+      if (exact) {
+        expect_error(draw(), "residualized linear regressors are rank deficient")
+      } else {
+        value <- draw()
+        expect_length(value, 4L)
+        expect_true(all(is.finite(value)))
+      }
+    }
+  }
+})

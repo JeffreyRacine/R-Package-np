@@ -1266,12 +1266,7 @@ npindexhat <-
     resx.train <- matrix(0.0, nrow = n, ncol = p)
     formation.error <- numeric(p)
     for (j in seq_len(p)) {
-      xhat.train <- .npreghat_complete(
-        bws = bws$bw[[j + 1L]],
-        txdat = tzdat,
-        y = x.train.num[, j],
-        output = "apply"
-      )
+      xhat.train <- .np_plreghat_training_mean(bws$bw[[j + 1L]], tzdat, x.train.num[, j])
       resx.train[, j] <- x.train.num[, j] - as.vector(xhat.train)
       formation.error[j] <- .np_plreg_residual_formation_error(x.train.num[, j], xhat.train)
     }
@@ -1353,6 +1348,17 @@ npindexhat <-
   )
 }
 
+# A training regressor's fitted mean sets the scale of the partial-linear rank
+# check. Applying reconstructed hat rows can lose exact polynomial reproduction.
+.np_plreghat_training_mean <- function(bws, z, x) {
+  if (.npreghat_fitted_capture_scope(bws) && !anyNA(z) && !anyNA(x)) {
+    as.vector(.npRmpi_with_local_regression(
+      .np_regression_direct(bws, z, x, local.mode = TRUE))$mean)
+  } else {
+    as.vector(.npreghat_complete(bws = bws, txdat = z, y = x, output = "apply"))
+  }
+}
+
 npplreghat <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
@@ -1428,12 +1434,7 @@ npplreghat <-
       )
 
       for (j in seq_len(p)) {
-        xhat.train <- as.vector(.npreghat_complete(
-          bws = bws$bw[[j + 1L]],
-          txdat = tzdat,
-          y = x.train.num[, j],
-          output = "apply"
-        ))
+        xhat.train <- .np_plreghat_training_mean(bws$bw[[j + 1L]], tzdat, x.train.num[, j])
         xhat.eval <- as.vector(.npreghat_complete(
           bws = bws$bw[[j + 1L]],
           txdat = tzdat,
@@ -1488,12 +1489,7 @@ npplreghat <-
 
     out <- .npRmpi_with_local_hat_helper({
       for (j in seq_len(p)) {
-        xhat.train <- .npreghat_complete(
-          bws = bws$bw[[j + 1L]],
-          txdat = tzdat,
-          y = x.train.num[, j],
-          output = "apply"
-        )
+        xhat.train <- .np_plreghat_training_mean(bws$bw[[j + 1L]], tzdat, x.train.num[, j])
         xhat.eval <- .npreghat_complete(
           bws = bws$bw[[j + 1L]],
           txdat = tzdat,
