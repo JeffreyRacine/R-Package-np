@@ -683,6 +683,15 @@ NN correction and continuous uniform derivatives remain unqualified.
   constructions covered 111 and 114 complete grids, respectively. The ordinary-use mean comparison reuses two saved samples and does not
   establish nominal coverage. Fitted NN counts and support bounds stay fixed.
 
+Experimental degree-one beta adaptive nearest-neighbour mean bands require a
+single continuous predictor, known finite bounds, a second-order beta kernel,
+a stored Bernstein GLP basis, zero-ridge fitted rows and evaluation within
+the observed training range. With the standard auxiliary bias settings, choose
+Mammen wild bootstrap and explicitly request \code{interval="symmetric-sd"} or
+\code{interval="basic-local-envelope"} for pointwise or simultaneous inference.
+Across two saved studies the absolute construction covered 5 of 6 and 8 of 8
+whole grids. The wider local envelope covered 6 of 6 and 8 of 8.
+
 Experimental bias-corrected first-derivative bands are available for a single
 continuous predictor with known finite bounds, a second-order beta kernel,
 local-constant or degree-zero GLP regression and generalized or adaptive

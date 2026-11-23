@@ -1,5 +1,10 @@
 # npRmpi 0.80-3
 
+* Experimental bias-corrected mean bands for bounded degree-one Bernstein beta
+  adaptive nearest-neighbour regression support explicit `interval="symmetric-sd"`
+  and `interval="basic-local-envelope"` with Mammen wild bootstrap, on the
+  observed training range at zero fitted ridge.
+
 * Plot methods that compute intervals now use `interval` for construction and
   `band` for coverage scope. Omitting both preserves each method's default.
   Replace `band="pmzsd"` with `interval="normal-sd", band="pointwise"`.
