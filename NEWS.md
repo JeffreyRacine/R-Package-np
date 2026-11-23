@@ -158,6 +158,10 @@
 
 ## Fitting and bandwidth selection
 
+* Partial-linear hat calculations use fitted training means for the rank
+  check on supported local-polynomial fits. Exactly reproduced linear
+  regressors are rejected consistently by the fit and its hat operator.
+
 * Instrumental-variable fits accept explicit bandwidth search controls when
   constructing the fitted values and the derivative adjoint.
 
