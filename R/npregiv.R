@@ -317,6 +317,8 @@ npregiv.default <- function(y,
                       p=0,
                       shrink=TRUE,
                       warning.immediate=TRUE,
+                      # Bandwidth search owns these controls. Keep them out of kernel sums.
+                      bwmethod, debug, bw.init,
                       ...) {
 
       ## 14/1/15, Toulouse - note that the weights herein ** DO NOT **
@@ -589,6 +591,8 @@ npregiv.default <- function(y,
                      bandwidth.divide=TRUE,
                      ukertype="liracine",
                      okertype="liracine",
+                     # Bandwidth search owns these controls. Keep them out of kernel sums.
+                     bwmethod, debug, bw.init,
                      ...) {
 
     ## Don't think this error checking is robust

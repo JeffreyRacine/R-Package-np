@@ -74,7 +74,11 @@ npregivderiv <- function(y, ...) {
 .np_iv_deriv_adjoint_dots <- function(dots) {
   dot.names <- names(dots)
   if(is.null(dot.names)) return(dots)
-  owned <- c("bandwidth.divide", "ukertype", "okertype")
+  # Upstream regression selects the bandwidth. Its optimization controls have
+  # no meaning in the CDF-weighted adjoint, which uses that fitted bandwidth.
+  kernel <- c(names(formals(npksum.numeric)), names(formals(kbandwidth.numeric)))
+  search.only <- setdiff(names(formals(npregbw.default)), kernel)
+  owned <- c("bandwidth.divide", "ukertype", "okertype", search.only)
   dots[!(!is.na(dot.names) & dot.names %in% owned)]
 }
 
