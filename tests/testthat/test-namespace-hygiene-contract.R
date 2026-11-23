@@ -101,7 +101,12 @@ test_that("profile startup template resolves the worker loop through a namespace
   env$slave.hostinfo <- function(...) invisible(NULL)
   env$quit <- function(...) stop("quit should not be called in the profile source probe", call. = FALSE)
 
+  assign(".npRmpi_session_facts", function(...) {
+    tracker$facts <- list(...)
+    invisible(NULL)
+  }, envir = fake.ns)
   sys.source(profile, envir = env)
+  expect_identical(tracker$facts, list(npRmpi.profile.active = TRUE))
 
   expect_identical(tracker$namespace_name, "npRmpi")
   expect_true(isTRUE(tracker$init_called))
