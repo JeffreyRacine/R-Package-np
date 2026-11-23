@@ -5,6 +5,8 @@ test_that("the bounded MPI plan preserves every sorted test and heavy singleton"
   sys.source(helper, envir = scope)
   files <- sort(list.files(testthat::test_path(), "^test-.*\\.[rR]$"))
   singletons <- scope$npRmpi_full_test_singleton_files()
+  expect_true(all(c("test-regression-nn-uniform-zero.R",
+                    "test-regression-operator-owner-contract.R") %in% singletons))
   for (size in c(1L, 3L, 10L)) {
     plan <- scope$npRmpi_full_test_plan(files, size)
     expect_identical(unlist(plan, use.names = FALSE), files)

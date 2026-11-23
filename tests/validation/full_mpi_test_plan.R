@@ -28,6 +28,10 @@ npRmpi_full_test_singleton_files <- function() {
     "test-regression-hc0-general-lp-derivative-02-beta-modes.R",
     "test-regression-hc0-general-lp-derivative-contract.R",
     "test-regression-hc0-scalar-categorical-contract.R",
+    # The uniform NN tests exhaust a shared budget with the other NN fits.
+    "test-regression-nn-uniform-zero.R",
+    # End the affected group here to preserve the following group memberships.
+    "test-regression-operator-owner-contract.R",
     "test-session-routing-subprocess-contract.R"
   )
 }
