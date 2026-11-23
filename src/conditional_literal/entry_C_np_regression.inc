@@ -355,8 +355,11 @@ SEXP C_np_regression(SEXP tuno,
     SET_VECTOR_ELT(projection_result, 1, projection_rows);
     SET_VECTOR_ELT(projection_result, 2, ScalarLogical(fit_projection.constant));
     for(int i=0;i<en;++i)if(REAL(precision_policy)[en+i]>0) {
-      if(fit_projection.check_cubic_support)
-        setAttrib(projection_basis,install(".np.cubic.support"),ScalarInteger(fit_projection.check_cubic_support));
+      if(fit_projection.check_cubic_support) {
+        SEXP support = PROTECT(ScalarInteger(fit_projection.check_cubic_support));
+        setAttrib(projection_basis, install(".np.cubic.support"), support);
+        UNPROTECT(1);
+      }
       setAttrib(projection_rows,install(".np.fit.precision"),precision_policy);
       if(inference_gradient!=R_NilValue)
         setAttrib(inference_gradient,install(".np.fit.precision"),precision_policy);
