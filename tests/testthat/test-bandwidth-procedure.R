@@ -14,6 +14,8 @@ test_that('density default selection forwards explicit transform.bounds', {
     bws
   }
   # Adapter argument assembly only; real worker ownership is covered separately.
+  old <- options(npRmpi.autodispatch = FALSE)
+  on.exit(options(old), add = TRUE)
   local_mocked_bindings(npudensbw.bandwidth = selector,
     .npRmpi_require_active_slave_pool = function(...) invisible(NULL))
   d <- data.frame(x = seq(-1, 1, length.out = 8))
