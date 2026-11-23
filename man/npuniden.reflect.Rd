@@ -154,11 +154,13 @@ model <- npuniden.reflect(X)
 model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf)
 
 ylim <- c(0,max(c(dgp,model$f,model.unadjusted$f)))
-if (interactive()) plot(X,model$f,ylab="Density",ylim=ylim,type="l")
-lines(X,model.unadjusted$f,lty=2,col=2)
-lines(X,dgp,lty=3,col=3)
-rug(X)
-legend("topleft",c("Data-Reflection","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n")
+if (interactive()) {
+  plot(X,model$f,ylab="Density",ylim=ylim,type="l")
+  lines(X,model.unadjusted$f,lty=2,col=2)
+  lines(X,dgp,lty=3,col=3)
+  rug(X)
+  legend("topleft",c("Data-Reflection","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n")
+}
 
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
 ## asymptotic point-wise confidence intervals
@@ -173,19 +175,23 @@ oldpar <- par(no.readonly = TRUE)
 on.exit(par(oldpar), add = TRUE)
 par(mfrow=c(1,2))
 ylim=range(c(model$f,model$f+1.96*model$sd.f,model$f-1.96*model$sd.f,dbeta(X,5,3)))
-if (interactive()) plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
-lines(X,model$f+1.96*model$sd.f,lty=2)
-lines(X,model$f-1.96*model$sd.f,lty=2)
-lines(X,dbeta(X,5,3),col=2)
-rug(X)
-legend("topleft",c("Density","DGP"),lty=c(1,1),col=1:2,bty="n")
+if (interactive()) {
+  plot(X,model$f,ylim=ylim,ylab="Density",type="l")
+  lines(X,model$f+1.96*model$sd.f,lty=2)
+  lines(X,model$f-1.96*model$sd.f,lty=2)
+  lines(X,dbeta(X,5,3),col=2)
+  rug(X)
+  legend("topleft",c("Density","DGP"),lty=c(1,1),col=1:2,bty="n")
+}
 
-if (interactive()) plot(X,model$F,ylab="Distribution",type="l")
-lines(X,model$F+1.96*model$sd.F,lty=2)
-lines(X,model$F-1.96*model$sd.F,lty=2)
-lines(X,pbeta(X,5,3),col=2)
-rug(X)
-legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
+if (interactive()) {
+  plot(X,model$F,ylab="Distribution",type="l")
+  lines(X,model$F+1.96*model$sd.F,lty=2)
+  lines(X,model$F-1.96*model$sd.F,lty=2)
+  lines(X,pbeta(X,5,3),col=2)
+  rug(X)
+  legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
+}
 
 
 ## Example 3: Age for working age males in the cps71 data set bounded
