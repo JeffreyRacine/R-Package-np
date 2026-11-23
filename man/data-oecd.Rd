@@ -52,7 +52,12 @@
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 data("oecdpanel")
 summary(oecdpanel)
-plot(npreg(bw, data = oecdpanel), neval = 5L)
+local({
+  started <- !isTRUE(suppressMessages(npRmpi.session.info())$nslaves > 0L)
+  if (started) npRmpi.init(nslaves = 1L)
+  tryCatch(plot(npreg(bw, data = oecdpanel), neval = 5L),
+           finally = if (started) npRmpi.quit(force = TRUE))
+})
 } % enddontrun
 }
 \references{
