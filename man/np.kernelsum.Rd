@@ -523,14 +523,16 @@ den <- fitted(npudens(tdat=x, edat=x.eval, bws=bw$bw))
 # Plot the true DGP, the npksum()/(nh) estimate and (identical)
 # npudens() estimate
 
-if (interactive()) plot(x.eval, dnorm(x.eval), xlab="X", ylab="Density", type="l")
-points(x.eval, den.ksum, col="blue")
-points(x.eval, den, col="red", cex=0.2)
-legend(1, .4, 
-       c("DGP", "npksum()", 
-       "npudens()"), 
-       col=c("black", "blue", "red"), 
-       lty=c(1, 1, 1))
+if (interactive()) {
+  plot(x.eval, dnorm(x.eval), xlab="X", ylab="Density", type="l")
+  points(x.eval, den.ksum, col="blue")
+  points(x.eval, den, col="red", cex=0.2)
+  legend(1, .4,
+         c("DGP", "npksum()",
+         "npudens()"),
+         col=c("black", "blue", "red"),
+         lty=c(1, 1, 1))
+}
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -591,8 +593,10 @@ bw <- npregbw(xdat=age, ydat=logwage)
 fit.lc <- npksum(txdat=age, tydat=logwage, bws=bw$bw)$ksum/
           npksum(txdat=age, bws=bw$bw)$ksum
 
-if (interactive()) plot(age, logwage, xlab="Age", ylab="log(wage)")
-lines(age, fit.lc)
+if (interactive()) {
+  plot(age, logwage, xlab="Age", ylab="log(wage)")
+  lines(age, fit.lc)
+}
 
 # Sleep for 5 seconds so that we can examine the output...
 

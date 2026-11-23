@@ -791,8 +791,10 @@ summary(model)
 # all computations are completed (if you use
 # errors="asymptotic" the figure will instantly appear).
 
-if (interactive()) plot(bw, errors="bootstrap")
-points(ordered(year), gdp, cex=.2, col="red")
+if (interactive()) {
+  plot(bw, errors="bootstrap")
+  points(ordered(year), gdp, cex=.2, col="red")
+}
 
 })
 
@@ -827,8 +829,10 @@ summary(model)
 # all computations are completed (if you use
 # errors="asymptotic" the figure will instantly appear).
 
-if (interactive()) plot(bw, errors="bootstrap")
-points(ordered(year), gdp, cex=.2, col="red")
+if (interactive()) {
+  plot(bw, errors="bootstrap")
+  points(ordered(year), gdp, cex=.2, col="red")
+}
 
 })
 
@@ -846,8 +850,10 @@ bw <- npregbw(logwage~age, regtype="ll", bwmethod="cv.aic", data = cps71)
 
 # Next, plot the regression function...
 
-if (interactive()) plot(bw, errors="asymptotic")
-with(cps71, points(age, logwage, cex=.2, col="red"))
+if (interactive()) {
+  plot(bw, errors="asymptotic")
+  with(cps71, points(age, logwage, cex=.2, col="red"))
+}
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -871,8 +877,10 @@ bw <- npregbw(xdat=cps71$age, ydat=cps71$logwage, regtype="ll", bwmethod="cv.aic
 
 # Next, plot the regression function...
 
-if (interactive()) plot(bw, errors="asymptotic")
-with(cps71, points(age, logwage, cex=.2, col="red"))
+if (interactive()) {
+  plot(bw, errors="asymptotic")
+  with(cps71, points(age, logwage, cex=.2, col="red"))
+}
 
 # Sleep for 5 seconds so that we can examine the output...
 

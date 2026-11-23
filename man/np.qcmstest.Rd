@@ -293,8 +293,10 @@ with(cps71, {
 
 model <- rq(logwage~age+I(age^2), tau=0.5, model=TRUE)
 
-if (interactive()) plot(age, logwage)
-lines(age, fitted(model))
+if (interactive()) {
+  plot(age, logwage)
+  lines(age, fitted(model))
+}
 
 X <- data.frame(age)
 
@@ -311,8 +313,10 @@ if (interactive()) Sys.sleep(5)
 
 model <- rq(logwage~age+I(age^2)+I(age^3)+I(age^4)+I(age^5), model=TRUE)
 
-if (interactive()) plot(age, logwage)
-lines(age, fitted(model))
+if (interactive()) {
+  plot(age, logwage)
+  lines(age, fitted(model))
+}
 
 X <- data.frame(age)
 

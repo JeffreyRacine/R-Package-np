@@ -275,8 +275,10 @@ with(cps71, {
 
 model <- lm(logwage~age+I(age^2), x=TRUE, y=TRUE)
 
-if (interactive()) plot(age, logwage)
-lines(age, fitted(model))
+if (interactive()) {
+  plot(age, logwage)
+  lines(age, fitted(model))
+}
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
@@ -287,8 +289,10 @@ npcmstest(model = model, xdat = age, ydat = logwage)
 
 model <- lm(logwage~age+I(age^2)+I(age^3)+I(age^4)+I(age^5), x=TRUE, y=TRUE)
 
-if (interactive()) plot(age, logwage)
-lines(age, fitted(model))
+if (interactive()) {
+  plot(age, logwage)
+  lines(age, fitted(model))
+}
 
 X <- data.frame(age)
 

@@ -225,10 +225,12 @@ X <- sort(rnorm(n))
 h <- npuniden.boundary(X,a=-Inf,b=Inf)$h
 foo <- npuniden.sc(X,h=h,constraint="density",a=-Inf,b=Inf,lb=.1,ub=.2)
 ylim <- range(c(foo$f.sc,foo$f))
-if (interactive()) plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
-lines(X,foo$f,col=2,lty=2)
-rug(X)
-legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+  lines(X,foo$f,col=2,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+}
 
 ## Example 2: Beta(5,1), DGP is monotone increasing, impose valid
 ## restriction
@@ -242,17 +244,21 @@ oldpar <- par(no.readonly = TRUE)
 on.exit(par(oldpar), add = TRUE)
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
-if (interactive()) plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
-lines(X,foo$f,col=2,lty=2)
-rug(X)
-legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+  lines(X,foo$f,col=2,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+}
 
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-if (interactive()) plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
-lines(X,foo$f.deriv,col=2,lty=2)
-abline(h=0,lty=2)
-rug(X)
-legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
+  lines(X,foo$f.deriv,col=2,lty=2)
+  abline(h=0,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+}
 
 ## Example 3: Beta(1,5), DGP is monotone decreasing, impose valid
 ## restriction
@@ -264,17 +270,21 @@ foo <- npuniden.sc(X=X,h=h,constraint=c("mono.decr"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
-if (interactive()) plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
-lines(X,foo$f,col=2,lty=2)
-rug(X)
-legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+  lines(X,foo$f,col=2,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+}
 
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-if (interactive()) plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
-lines(X,foo$f.deriv,col=2,lty=2)
-abline(h=0,lty=2)
-rug(X)
-legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
+  lines(X,foo$f.deriv,col=2,lty=2)
+  abline(h=0,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+}
  
 ## Example 4: N(0,1), DGP is log-concave, impose invalid concavity
 ## restriction
@@ -286,17 +296,21 @@ foo <- npuniden.sc(X=X,h=h,a=-Inf,b=Inf,constraint=c("concave"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
-if (interactive()) plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
-lines(X,foo$f,col=2,lty=2)
-rug(X)
-legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+  lines(X,foo$f,col=2,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+}
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
 
-if (interactive()) plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
-lines(X,foo$f.deriv,col=2,lty=2)
-abline(h=0,lty=2)
-rug(X)
-legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
+  lines(X,foo$f.deriv,col=2,lty=2)
+  abline(h=0,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+}
 
 ## Example 45: Beta(3/4,3/4), DGP is convex, impose valid restriction
 
@@ -307,17 +321,21 @@ foo <- npuniden.sc(X=X,h=h,constraint=c("convex"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
-if (interactive()) plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
-lines(X,foo$f,col=2,lty=2)
-rug(X)
-legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+  lines(X,foo$f,col=2,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+}
 
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-if (interactive()) plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
-lines(X,foo$f.deriv,col=2,lty=2)
-abline(h=0,lty=2)
-rug(X)
-legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
+  lines(X,foo$f.deriv,col=2,lty=2)
+  abline(h=0,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+}
 
 ## Example 6: N(0,1), DGP is log-concave, impose log-concavity
 ## restriction
@@ -330,22 +348,26 @@ foo <- npuniden.sc(X=X,h=h,a=-Inf,b=Inf,constraint=c("log-concave"))
 par(mfrow=c(1,2))
 
 ylim <- range(c(log(foo$f.sc),log(foo$f)))
-if (interactive()) plot(X,log(foo$f.sc),type="l",ylim=ylim,xlab="X",ylab="Log-Density")
-lines(X,log(foo$f),col=2,lty=2)
-rug(X)
-legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,log(foo$f.sc),type="l",ylim=ylim,xlab="X",ylab="Log-Density")
+  lines(X,log(foo$f),col=2,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
+}
 
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-if (interactive()) plot(X,
-                        foo$f.sc.deriv,
-                        type="l",
-                        ylim=ylim,
-                        xlab="X",
-                        ylab="Second Derivative of Log-Density")
-lines(X,foo$f.deriv,col=2,lty=2)
-abline(h=0,lty=2)
-rug(X)
-legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
+if (interactive()) {
+  plot(X,
+                          foo$f.sc.deriv,
+                          type="l",
+                          ylim=ylim,
+                          xlab="X",
+                          ylab="Second Derivative of Log-Density")
+  lines(X,foo$f.deriv,col=2,lty=2)
+  abline(h=0,lty=2)
+  rug(X)
+  legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
+}
 } % enddontrun
 }
 \keyword{ nonparametric }

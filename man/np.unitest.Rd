@@ -250,8 +250,10 @@ fx <- density(x)
 fy <- density(y)
 xlim <- c(min(fx$x,fy$x),max(fx$x,fy$x))
 ylim <- c(min(fx$y,fy$y),max(fx$y,fy$y))
-if (interactive()) plot(fx,xlim=xlim,ylim=ylim,xlab="Data",main="f(x), f(y)")
-lines(fy$x,fy$y,col="red")
+if (interactive()) {
+  plot(fx,xlim=xlim,ylim=ylim,xlab="Data",main="f(x), f(y)")
+  lines(fy$x,fy$y,col="red")
+}
 
 if (interactive()) Sys.sleep(5)
 
