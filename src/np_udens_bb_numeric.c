@@ -48,7 +48,16 @@ SEXP C_np_plot_udens_bb_factor(SEXP Q,SEXP T,SEXP A,SEXP HI,SEXP M,SEXP NS){
  for(int row=0;row<k;row++){R_CheckUserInterrupt();pair ea=val(0);for(R_xlen_t i=0;i<n;i++){if(!R_FINITE(a[row+i*k]))error("nonfinite kernel row");ea=add(ea,mul(w[i],val(a[row+i*k])));}pair mean=val(0),variance=val(0);
   for(R_xlen_t i=0;i<n;i++){pair psi=sub(val(a[row+i*k]),ea);for(int j=0;j<2;j++)psi=add(psi,mul(val(hi[row+j*k]),basis(i,j+1,t,n,m)));REAL(factor)[row+i*k]=dval(psi)*sqrt(dval(w[i])/nn);mean=add(mean,mul(w[i],psi));variance=add(variance,mul(w[i],mul(psi,psi)));}
   variance=divp(variance,val(nn));
-  if(!R_FINITE(dval(mean)) || fabs(dval(mean))>1e-12 || !R_FINITE(dval(variance)) || dval(variance)<=0) error("beta-binomial complete influence is not centered with positive variance");REAL(ans)[row]=dval(mean);REAL(ans)[row+k]=dval(variance);REAL(ans)[row+2*k]=correction;REAL(ans)[row+3*k]=dval(sub(moments[0],val(1)));REAL(ans)[row+4*k]=dval(moments[1]);REAL(ans)[row+5*k]=dval(moments[2]);
+  if (!R_FINITE(dval(mean)) || fabs(dval(mean)) > 1e-12 ||
+      !R_FINITE(dval(variance)) || dval(variance) <= 0) {
+    error("beta-binomial complete influence is not centered with positive variance");
+  }
+  REAL(ans)[row] = dval(mean);
+  REAL(ans)[row + k] = dval(variance);
+  REAL(ans)[row + 2 * k] = correction;
+  REAL(ans)[row + 3 * k] = dval(sub(moments[0], val(1)));
+  REAL(ans)[row + 4 * k] = dval(moments[1]);
+  REAL(ans)[row + 5 * k] = dval(moments[2]);
  }
  setAttrib(ans,install("factor"),factor);UNPROTECT(2);return ans;
 }
