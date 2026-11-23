@@ -58,7 +58,14 @@ test_that("activated beta absolute rows enter the canonical central engine", {
 
   expect_match(activation, "NPContinuousKernelDerivativeDiagnostics",
                fixed = TRUE)
-  expect_match(activation, "kernel_weighted_sum_np_route(", fixed = TRUE)
+  route.owner <- "route_status = kernel_weighted_sum_np_fold_route("
+  calls <- regmatches(activation, gregexpr(route.owner, activation, fixed = TRUE))
+  expect_identical(lengths(calls), 2L)
+  normalized <- gsub("[[:space:]]+", " ", activation)
+  expect_match(normalized, "&route_diagnostics, fold_requested ? &fold : NULL, lc_nn_derivative)",
+               fixed = TRUE)
+  expect_match(normalized, "&route, &route_diagnostics, NULL, lc_nn_derivative)",
+               fixed = TRUE)
   expect_match(activation, "&route", fixed = TRUE)
   expect_false(grepl(
     "beta_bandwidth_code == BW_FIXED || !has_overlap",
