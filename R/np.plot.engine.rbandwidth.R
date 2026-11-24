@@ -251,6 +251,10 @@
       (!gradients || all(plot.gradient.order.label[bws$icon] == 1L))
     explicit.ann <- explicit.mammen && .np_bias_beta_nn_mean(bws, "adaptive_nn", 1L)
     explicit.nn <- explicit.mammen && .np_bias_explicit_nn_target(bws, gradients)
+    if (explicit.nn && gradients && identical(bws[["ckertype"]], "beta") &&
+        identical(bws[["type"]], "generalized_nn") && isTRUE(bws[["degree"]] == 2L))
+      explicit.nn <- identical(error.request$type, "pointwise") ||
+        identical(effective.calibration, "basic-local-envelope")
     wild.local.envelope <- identical(effective.calibration,"basic-local-envelope") &&
       as.character(plot.errors.boot.method)[1L]=="wild" &&
       as.character(plot.errors.boot.wild)[1L]=="mammen"

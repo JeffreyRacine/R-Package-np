@@ -675,10 +675,12 @@ means and first derivatives, and quadratic Bernstein ANN means. Choose
 These constructions use full-rank, zero-ridge fitted rows, the usual
 auxiliary settings and evaluation within the observed training range.
 
-First derivatives of degree-one and degree-two univariate Bernstein beta
-GNN fits on known finite support also support these two explicit Mammen
-constructions on the observed training range at zero fitted ridge.
-Select \code{gradients=TRUE} and pointwise or simultaneous coverage.
+For first derivatives of univariate Bernstein beta GNN fits on known finite
+support, select \code{gradients=TRUE} and evaluate within the observed
+training range at zero fitted ridge. Degree-one fits support both explicit
+Mammen constructions for pointwise and simultaneous bands. Degree-two fits
+support both constructions for pointwise bands. For a simultaneous
+degree-two slope band, explicitly select \code{interval="basic-local-envelope"}.
 
 For quadratic univariate Bernstein beta ANN fits the two explicit Mammen
 constructions support means and first derivatives under the same bounds,
