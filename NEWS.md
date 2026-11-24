@@ -1,5 +1,9 @@
 # np 0.80-3
 
+* Explicit Mammen local envelopes support means and first derivatives on
+  qualified univariate quadratic Bernstein Gaussian GNN fits with finite known
+  bounds and zero fitted ridge throughout the observed evaluation range.
+
 * Experimental cubic Bernstein beta ANN means and first derivatives support
   an explicit Mammen basic local envelope for simultaneous and Bonferroni
   inference on full-rank grids with zero fitted ridge throughout.
