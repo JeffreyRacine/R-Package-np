@@ -675,6 +675,11 @@ means and first derivatives, and quadratic Bernstein ANN means. Choose
 These constructions use full-rank, zero-ridge fitted rows, the usual
 auxiliary settings and evaluation within the observed training range.
 
+First derivatives of degree-one and degree-two univariate Bernstein beta
+GNN fits on known finite support also support these two explicit Mammen
+constructions on the observed training range at zero fitted ridge.
+Select \code{gradients=TRUE} and pointwise or simultaneous coverage.
+
 Experimental degree-one beta adaptive nearest-neighbour mean bands require a
 single continuous predictor, known finite bounds, a second-order beta kernel,
 a stored Bernstein GLP basis, zero-ridge fitted rows and evaluation within
