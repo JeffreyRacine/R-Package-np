@@ -89,7 +89,7 @@ test_that("beta NN slope companions keep their selected law and finite-draw diag
   fit <- npreg(bw,txdat=x,tydat=y)
   a <- list(x=fit,errors="bootstrap",center="bias-corrected",gradients=TRUE,neval=5L,
             B=39L,bootstrap="inid",random.seed=43L,output="data")
-  z <- expect_warning(do.call(plot,c(a,list(band="all"))),"resolution")
+  expect_warning(z <- do.call(plot,c(a,list(band="all"))),"resolution")
   meta <- z$inference[[1L]]
   expect_identical(meta$resampling_law,"inid")
   expect_true(meta$components$bonferroni$resolution$resolution_limited)
