@@ -58,6 +58,9 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     !hc0_residual_preparing;
   const int preserve_point = ordinary_hc0 &&
     call->hc0_context->point_already_computed;
+  /* The training point is already available in the HC0 variance pass.
+   * Its SE consumer forms the identical mean row from this factor below. */
+  const int defer_epa_mean_row = epa_ann && preserve_point && call->fit_projection == NULL;
   const int categorical_pair = call->ordinary_response && call->do_grad &&
     (num_reg_unordered + num_reg_ordered > 0) &&
     !call->categorical_point_invariant;
@@ -617,7 +620,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	          if(!preserve_point)
 	            for(i = 0; i < owner->nterms; i++)
 	              out_owner[0] += owner->eval_basis[i]*owner->coefficient[i];
-              if(precise_owner) {
+              if(precise_owner && !defer_epa_mean_row) {
                 if(!np_regression_precision_row(&owner->precision,owner->eval_basis)) {
                   owner_solve_failed=1;break;
                 }
@@ -1243,7 +1246,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
                                  call->matrix_X_continuous_eval,
                                  j,
                                  owner->eval_basis);
-    if(precise && !np_regression_precision_row(&owner->precision,owner->eval_basis)) {
+    if(precise && !defer_epa_mean_row && !np_regression_precision_row(&owner->precision,owner->eval_basis)) {
       execution->status=NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;return R_NilValue;
     }
     if(!preserve_point) {
