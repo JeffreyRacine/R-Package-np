@@ -45,3 +45,21 @@ test_that("positive-degree beta NN slope choices are explicit", {
     }
   }
 })
+test_that("experimental linear uniform ANN mean bands keep continuous slopes outside admission", {
+  skip_on_cran()
+  old <- options(np.messages=FALSE,np.plot.progress=FALSE)
+  on.exit(options(old),add=TRUE)
+  x <- data.frame(x=seq(.02,.98,length.out=90))
+  y <- x$x^2+.05*cos(seq_len(nrow(x)))
+  b <- npregbw(xdat=x,ydat=y,bws=19,regtype="lp",degree=1L,basis="glp",bernstein.basis=TRUE,
+               bwtype="adaptive_nn",ckertype="uniform",bandwidth.compute=FALSE)
+  args <- list(x=npreg(b,txdat=x,tydat=y),errors="bootstrap",center="bias-corrected",band="simultaneous",
+               neval=3L,alpha=.1,B=99L,random.seed=23L,output="data")
+  expect_error(do.call(plot,args))
+  args$interval <- "basic-local-envelope"
+  r <- suppressWarnings(do.call(plot,args))
+  expect_identical(r$inference[[1L]]$resampling_law,"mammen")
+  expect_identical(r$inference[[1L]]$components$simultaneous$interval,args$interval)
+  expect_error(do.call(plot,c(args,list(gradients=TRUE))))
+  expect_false(.np_bias_explicit_nn_target(utils::modifyList(b,list(ckerbound="fixed")),FALSE))
+})

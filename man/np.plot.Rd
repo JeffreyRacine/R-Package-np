@@ -684,6 +684,11 @@ For quadratic univariate Bernstein beta ANN fits the two explicit Mammen
 constructions support means and first derivatives under the same bounds,
 ridge, evaluation range and auxiliary settings.
 
+Univariate first-degree Bernstein uniform ANN means with no boundary correction
+also support the two explicitly selected Mammen constructions within the
+observed range at zero fitted ridge. Coverage evidence spans three saved
+datasets.
+
 Experimental degree-one beta adaptive nearest-neighbour mean bands require a
 single continuous predictor, known finite bounds, a second-order beta kernel,
 a stored Bernstein GLP basis, zero-ridge fitted rows and evaluation within

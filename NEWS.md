@@ -1,5 +1,8 @@
 # np 0.80-3
 
+* Experimental Mammen intervals support explicit first-degree Bernstein uniform
+  ANN mean bands with no boundary correction.
+
 * Explicit Mammen pointwise and simultaneous bands support quadratic beta ANN means and first derivatives on the assessed bounded Bernstein designs.
 
 * Explicit Mammen first-derivative bands support degree-one and degree-two beta GNN fits on known finite support.
