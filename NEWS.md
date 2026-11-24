@@ -29,8 +29,8 @@
 * Explicit Mammen pointwise and simultaneous bands support quadratic beta ANN means and first derivatives on the assessed bounded Bernstein designs.
 
 * Beta GNN first derivatives on known finite support admit both explicit Mammen
-  constructions for degree-one bands and degree-two pointwise bands. Degree-two
-  simultaneous slopes admit the explicit basic local envelope.
+  constructions for pointwise and simultaneous bands at degrees one and two.
+  Quadratic Bonferroni and combined slopes require the basic local envelope.
 
 * Experimental univariate Bernstein Epanechnikov NN mean and slope bands use fitted observation rows on quadratic and cubic GNN and ANN fits with full-rank, zero-ridge rows.
 
