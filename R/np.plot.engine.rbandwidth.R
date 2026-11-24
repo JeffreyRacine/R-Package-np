@@ -222,7 +222,8 @@
       stop("bias.control requires center='bias-corrected' and inference errors",call.=FALSE)
     percentile.request <- identical(plot.errors.boot.calibration, "smoothed-percentile")
     if (percentile.request && missing(plot.errors.boot.method)) plot.errors.boot.method <- "residual"
-    if (bias.request && is.null(bias.control)) bias.control <- if (percentile.request)
+    default.bias <- bias.request && is.null(bias.control)
+    if (default.bias) bias.control <- if (percentile.request)
       np_bias_control(adaptation="none") else np_bias_control()
     if (bias.request) bias.control <- .np_bias_validate_control(bias.control)
     new.bias <- bias.request && identical(bias.control[["construction"]],"iterated")
@@ -236,8 +237,37 @@
     effective.calibration <- if (new.bias) .np_bias_regression_calibration(bws,
       plot.errors.boot.calibration, error.request$method, error.request$type,
       as.character(plot.errors.boot.method)[1L], as.character(plot.errors.boot.wild)[1L],
-      gradients = gradients) else
+      gradients = gradients, gradient.order = plot.gradient.order.label,
+      default.controls = default.bias && missing(plot.errors.boot.wild)) else
       plot.errors.boot.calibration
+    # Read the requested construction before an omitted choice resolves to absolute.
+    explicit.mammen <- new.bias &&
+      plot.errors.boot.calibration %in% c("absolute", "basic-local-envelope") &&
+      identical(error.request$method, "bootstrap") &&
+      error.request$type %in% c("simultaneous", "pointwise", "bonferroni", "all") &&
+      as.character(plot.errors.boot.method)[1L] == "wild" &&
+      as.character(plot.errors.boot.wild)[1L] == "mammen" &&
+      (!gradients || all(plot.gradient.order.label[bws$icon] == 1L))
+    explicit.ann <- explicit.mammen && .np_bias_beta_nn_mean(bws, "adaptive_nn", 1L)
+    explicit.nn <- explicit.mammen && .np_bias_explicit_nn_target(bws, gradients)
+    if (new.bias && identical(plot.errors.boot.calibration, "basic-local-envelope") &&
+        identical(error.request$method, "bootstrap") &&
+        error.request$type %in% c("simultaneous", "pointwise", "bonferroni", "all") &&
+        (!gradients || all(plot.gradient.order.label[bws$icon] == 1L)) &&
+        .np_bias_gnn_local_pairs(bws, gradients, as.character(plot.errors.boot.method)[1L],
+                                 plot.errors.boot.calibration))
+      explicit.nn <- TRUE
+    if (explicit.nn && identical(bws[["ckertype"]], "gaussian"))
+      explicit.nn <- identical(effective.calibration, "basic-local-envelope") ||
+        (!gradients && explicit.mammen && identical(bws[["type"]], "generalized_nn") &&
+         identical(effective.calibration, "absolute"))
+    if (explicit.nn && .np_bias_beta_nn_mean(bws, "adaptive_nn", 3L))
+      explicit.nn <- error.request$type %in% c("simultaneous", "bonferroni") &&
+        identical(effective.calibration, "basic-local-envelope")
+    if (explicit.nn && gradients && identical(bws[["ckertype"]], "beta") &&
+        identical(bws[["type"]], "generalized_nn") && isTRUE(bws[["degree"]] == 2L))
+      explicit.nn <- identical(error.request$type, "pointwise") ||
+        identical(effective.calibration, "basic-local-envelope")
     wild.local.envelope <- identical(effective.calibration,"basic-local-envelope") &&
       as.character(plot.errors.boot.method)[1L]=="wild" &&
       as.character(plot.errors.boot.wild)[1L]=="mammen"
@@ -249,7 +279,7 @@
             (identical(effective.calibration, "basic-local-envelope") &&
              bws[["type", exact=TRUE]] %in% c("generalized_nn", "adaptive_nn")))) ||
           (wild.local.envelope &&
-           (.np_bias_beta_gnn_mean(bws) || identical(bws[["type", exact=TRUE]], "fixed") ||
+           (explicit.ann || explicit.nn || .np_bias_beta_gnn_mean(bws) || identical(bws[["type", exact=TRUE]], "fixed") ||
             (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform", "beta")) ||
              .np_bias_regression_nn_first_order(bws, "epanechnikov"))))))
       stop("basic-envelope requires inid, fixed or geom and fixed-bandwidth regression, degree-zero Epanechnikov/uniform/beta NN or first-order Epanechnikov NN; basic-local-envelope also supports other qualified NN pairs or qualified fixed/NN Mammen", call.=FALSE)
@@ -321,6 +351,7 @@
     plot.errors <- normalized.opts$plot.errors
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
       .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE,
+        explicit.nn=explicit.nn, explicit.ann.mean=explicit.ann && !gradients, explicit.ann.slope=explicit.ann && gradients,
         calibration=effective.calibration,
         gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
         law=if(percentile.request)"mammen" else if(plot.errors.method=="asymptotic")"gaussian" else

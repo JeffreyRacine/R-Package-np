@@ -155,10 +155,13 @@ static SEXP np_plot_beta_moment_body(void *data)
     for(int z=13;z<=16;++z)
       if(TYPEOF(A(z))!=INTSXP||XLENGTH(A(z))!=1||INTEGER(A(z))[0]==NA_INTEGER)
         error("beta derivative replay needs integer basis/direction metadata");
+    c->precision.local_cubic = mode==BW_ADAP_NN && order==2 && pc==1 &&
+      nu==0 && no==0 && w==4 && INTEGER(A(12))[0]==3 &&
+      INTEGER(A(16))[0]<=1 && getAttrib(B,install(".np.beta.local.cubic"))!=R_NilValue;
     fit_policy=getAttrib(A(11),install(".np.fit.precision"));
     if(fit_policy!=R_NilValue) {
       int rows,columns;np_plot_beta_moment_dims(fit_policy,&rows,&columns);
-      if(!original_scope || rows!=m || columns!=2)
+      if((!original_scope && !c->precision.local_cubic) || rows!=m || columns!=2)
         error("beta derivative replay precision metadata differs");
       for(int j=0;j<m;++j)
         if(REAL(fit_policy)[j]<0.0 || REAL(fit_policy)[m+j]<0.0)
@@ -290,7 +293,7 @@ static SEXP np_plot_beta_moment_body(void *data)
         error("beta derivative replay accepted ridge/anchor differs");
       for(int i=0;i<w;++i){
         const double v=c->solve.rhs_work[i],accepted=REAL(A(11))[(size_t)i*m+j];
-        if(!R_FINITE(v) || (original_scope ?
+        if(!R_FINITE(v) || ((original_scope || (precise && c->precision.local_cubic)) ?
            (precise ? eval_basis[i]!=accepted : v!=accepted) :
            fabs(v-accepted)>2e-11*(1.0+fabs(accepted))))
           error("beta derivative replay level adjoint differs from accepted fit");

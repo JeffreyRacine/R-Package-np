@@ -13,15 +13,30 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   const int num_reg_continuous = call->num_reg_continuous;
   const int use_bernstein = (int_glp_bernstein_extern != 0);
   const int precision_eligible = np_regression_precision_eligible(call);
+  const int epa_ann = BANDWIDTH_reg == BW_ADAP_NN && call->ordinary_response &&
+    call->kernel_route == NULL && num_reg_continuous == 1 &&
+    !num_reg_unordered && !num_reg_ordered && !int_cker_bound_extern &&
+    call->kernel_c[0] == 4 && use_bernstein && int_glp_basis_extern == 1 &&
+    vector_glp_degree_extern != NULL &&
+    (vector_glp_degree_extern[0] == 2 || vector_glp_degree_extern[0] == 3) &&
+    (!call->do_grad || !vector_glp_gradient_order_extern ||
+     vector_glp_gradient_order_extern[0] == 1);
+  const int local_cubic = call->ordinary_response && !call->all_large_kernel_rows &&
+    np_cubic_beta_ann_local(call->kernel_route, BANDWIDTH_reg, num_reg_continuous,
+                            num_reg_unordered, num_reg_ordered) &&
+    (!call->do_grad || !vector_glp_gradient_order_extern ||
+     vector_glp_gradient_order_extern[0] == 1);
+  owner->precision.local_cubic = local_cubic;
+  if(call->fit_projection) call->fit_projection->local_cubic = local_cubic;
   const NPLinearBetaANNRange linear_range = call->ordinary_response && !call->all_large_kernel_rows ?
     np_linear_beta_ann_training_range(call->kernel_route, BANDWIDTH_reg, num_reg_continuous,
                              num_reg_unordered, num_reg_ordered, call->matrix_X_continuous_train,
                              num_obs_train) : (NPLinearBetaANNRange){R_NegInf, R_PosInf};
-  int has_extrapolation = 0;
+  int has_beta_edge = 0;
   if(R_FINITE(linear_range.lower) || R_FINITE(linear_range.upper)) {
     for(int q = 0; q < num_obs_eval; ++q) {
-      if(np_linear_beta_ann_extrapolates(linear_range, call->matrix_X_continuous_eval[0][q])) {
-        has_extrapolation = 1;
+      if(np_linear_beta_ann_edge(linear_range, call->matrix_X_continuous_eval[0][q])) {
+        has_beta_edge = 1;
         break;
       }
     }
@@ -31,8 +46,11 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     np_pooled_beta_linear_precision(call->kernel_route,
       BANDWIDTH_reg, num_reg_continuous, num_reg_unordered, num_reg_ordered,
       call->kernel_u, call->lambda, call->num_categories);
-  const int retain_precision_weights = (precision_eligible && BANDWIDTH_reg == BW_ADAP_NN) ||
-    (pooled_beta && call->do_merr);
+  const int fixed_beta = call->ordinary_response && !call->all_large_kernel_rows &&
+    np_fixed_beta_precision(call->kernel_route, BANDWIDTH_reg, num_reg_continuous,
+                            num_reg_unordered, num_reg_ordered);
+  const int retain_precision_weights = (precision_eligible && BANDWIDTH_reg == BW_ADAP_NN) || epa_ann || local_cubic ||
+    ((pooled_beta || fixed_beta) && call->do_merr);
   const double epsilon = 1.0/(double)MAX(1, num_obs_train);
   const int hc0_residual_preparing = call->hc0_context != NULL &&
     call->hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
@@ -40,6 +58,12 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     !hc0_residual_preparing;
   const int preserve_point = ordinary_hc0 &&
     call->hc0_context->point_already_computed;
+  /* The training point is already available in the HC0 variance pass.
+   * Its SE consumer forms the identical mean row from this factor below. */
+  const int defer_epa_mean_row = epa_ann && preserve_point && call->fit_projection == NULL;
+  /* Returning an SE must preserve the fitted points. Compact only the
+   * variance pass after those points and their residuals are available. */
+  owner->precision.compact_zero = defer_epa_mean_row;
   const int categorical_pair = call->ordinary_response && call->do_grad &&
     (num_reg_unordered + num_reg_ordered > 0) &&
     !call->categorical_point_invariant;
@@ -178,7 +202,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   if(moment_errors)
     owner->power2_moments = (double *)malloc(
       (size_t)owner->nterms*(size_t)owner->nterms*sizeof(double));
-  if(retain_precision_weights || has_extrapolation || (moment_errors && reuse_fit_kernel_row) ||
+  if(retain_precision_weights || has_beta_edge || (moment_errors && reuse_fit_kernel_row) ||
      (hc0_information_row && !categorical_pair))
     owner->retained_kernel_row = (double *)malloc(
       (size_t)num_obs_train*sizeof(double));
@@ -221,7 +245,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
      (include_response_square && owner->squared_response == NULL) ||
      owner->moments == NULL ||
      (moment_errors && owner->power2_moments == NULL) ||
-     ((retain_precision_weights || has_extrapolation || (moment_errors && reuse_fit_kernel_row) ||
+     ((retain_precision_weights || has_beta_edge || (moment_errors && reuse_fit_kernel_row) ||
        (hc0_information_row && !categorical_pair)) &&
       owner->retained_kernel_row == NULL) ||
      owner->coefficient == NULL ||
@@ -333,7 +357,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 #endif
 
   for(j = 0; j < num_obs_eval; ++j) {
-    const int extrapolated_row = has_extrapolation && np_linear_beta_ann_extrapolates(linear_range, call->matrix_X_continuous_eval[0][j]);
+    const int beta_edge_row = has_beta_edge && np_linear_beta_ann_edge(linear_range, call->matrix_X_continuous_eval[0][j]);
     NPLPSupportRankContext support_rank = {0, owner->nterms, owner->active_design};
     double sk, ey, ey2, sigma2hat;
     double pristine_anchor = 0.0;
@@ -342,8 +366,8 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     int precise = 0;
     double * const hc0_kernel_row = categorical_pair ?
       owner->categorical_base_kernel_row :
-      ((hc0_information_row || retain_precision_weights || extrapolated_row) ? owner->retained_kernel_row : NULL);
-    const int divide_retained_weights = retain_precision_weights || extrapolated_row || categorical_pair ||
+      ((hc0_information_row || retain_precision_weights || beta_edge_row) ? owner->retained_kernel_row : NULL);
+    const int divide_retained_weights = retain_precision_weights || beta_edge_row || categorical_pair ||
       (hc0_information_row && !reuse_fit_kernel_row);
     const double hc0_kernel_divisor =
       reuse_fit_kernel_row && !categorical_pair ? call->bandwidth_product : 1.0;
@@ -378,10 +402,10 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	         * its ordinary power-two moments still come from the native provider. */
 	        const int need_mpi_kernel_row = !categorical_pair &&
 	          (retain_precision_weights || (call->do_merr && call->kernel_route == NULL) || hc0_information_row);
-	        if(need_mpi_kernel_row || has_extrapolation)
+	        if(need_mpi_kernel_row || has_beta_edge)
 	          owner->mpi_kernel_row = (double *)malloc(
 	            (size_t)num_obs_train*sizeof(double));
-	        if((need_mpi_kernel_row || has_extrapolation) && owner->mpi_kernel_row == NULL)
+	        if((need_mpi_kernel_row || has_beta_edge) && owner->mpi_kernel_row == NULL)
 	          error("\n** Error: memory allocation failed.");
 
 	        local_pos = 0;
@@ -391,7 +415,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	          NPLPSolvePolicyDiagnostics solve_diagnostics_owner = {0, 0.0};
 	          int have_vcov_owner = 0;
               int precise_owner = 0;
-              const int extrapolated_owner = has_extrapolation && np_linear_beta_ann_extrapolates(linear_range, call->matrix_X_continuous_eval[0][jj]);
+              const int extrapolated_owner = has_beta_edge && np_linear_beta_ann_edge(linear_range, call->matrix_X_continuous_eval[0][jj]);
 	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
           /* Append only this rank's accepted replay state to its existing row.
            * The last status cell and incumbent chunk/row ownership stay intact. */
@@ -567,8 +591,10 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	            break;
 	          }
               precise_owner = (precision_eligible ||
-                ((pooled_beta || extrapolated_owner) && solve_diagnostics_owner.ridge_total == 0.0)) &&
-                np_regression_precision_needed(&owner->solve_workspace,owner->nterms);
+                ((pooled_beta || fixed_beta || extrapolated_owner || epa_ann || (local_cubic && support_rank.count == owner->nterms)) &&
+                 solve_diagnostics_owner.ridge_total == 0.0)) &&
+                ((extrapolated_owner && np_linear_beta_ann_at_training_limit(linear_range, call->matrix_X_continuous_eval[0][jj])) ||
+                 np_regression_precision_needed(&owner->solve_workspace,owner->nterms));
               if(precise_owner && !np_regression_precision_prepare(call,owner,
                    owner_kernel_row,1.0,solve_diagnostics_owner.ridge_total,
                    pristine_anchor_owner)) {
@@ -597,7 +623,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	          if(!preserve_point)
 	            for(i = 0; i < owner->nterms; i++)
 	              out_owner[0] += owner->eval_basis[i]*owner->coefficient[i];
-              if(precise_owner) {
+              if(precise_owner && !defer_epa_mean_row) {
                 if(!np_regression_precision_row(&owner->precision,owner->eval_basis)) {
                   owner_solve_failed=1;break;
                 }
@@ -1197,8 +1223,10 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
-    precise = (precision_eligible || ((pooled_beta || extrapolated_row) && solve_diagnostics.ridge_total == 0.0)) &&
-      np_regression_precision_needed(&owner->solve_workspace,owner->nterms);
+    precise = (precision_eligible || ((pooled_beta || fixed_beta || beta_edge_row || epa_ann ||
+        (local_cubic && support_rank.count == owner->nterms)) && solve_diagnostics.ridge_total == 0.0)) &&
+      ((beta_edge_row && np_linear_beta_ann_at_training_limit(linear_range, call->matrix_X_continuous_eval[0][j])) ||
+       np_regression_precision_needed(&owner->solve_workspace,owner->nterms));
     if(precise && !np_regression_precision_prepare(call,owner,hc0_kernel_row,
          hc0_kernel_divisor,solve_diagnostics.ridge_total,pristine_anchor)) {
       execution->status=NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;return R_NilValue;
@@ -1221,7 +1249,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
                                  call->matrix_X_continuous_eval,
                                  j,
                                  owner->eval_basis);
-    if(precise && !np_regression_precision_row(&owner->precision,owner->eval_basis)) {
+    if(precise && !defer_epa_mean_row && !np_regression_precision_row(&owner->precision,owner->eval_basis)) {
       execution->status=NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;return R_NilValue;
     }
     if(!preserve_point) {

@@ -183,6 +183,11 @@ SEXP C_np_plot_regression_gradient_projection(SEXP args)
   if(projection.emitted+skipped!=m)
     error("plot gradient projection did not visit every evaluation row");
   for(int i=0;i<m;++i)if(REAL(policy)[m+i]>0) {
+    if(projection.local_cubic) {
+      SEXP local = PROTECT(ScalarLogical(TRUE));
+      setAttrib(B, install(".np.beta.local.cubic"), local);
+      UNPROTECT(1);
+    }
     if(projection.check_cubic_support) {
       SEXP support = PROTECT(ScalarInteger(projection.check_cubic_support));
       setAttrib(B, install(".np.cubic.support"), support);
