@@ -101,3 +101,20 @@ test_that("explicit Epanechnikov ANN first derivatives retain their row guards",
   expect_error(.np_bias_main_admit(spec, H, rho, list(degree.engine=3L)), "zero-ridge")
 })
 
+test_that("cubic beta ANN bands refuse the whole grid when an endpoint selects ridge", {
+  skip_on_cran()
+  opt <- options(np.messages=FALSE, np.plot.progress=FALSE)
+  on.exit(options(opt), add=TRUE)
+  v <- readRDS(test_path("fixtures", "r112-cubic-beta-ann.rds"))
+  x <- data.frame(x=v$x)
+  bw <- npregbw(xdat=x, ydat=v$y, bws=24L, bandwidth.compute=FALSE,
+    regtype="lp", degree=3L, basis="glp", bernstein.basis=TRUE,
+    bwtype="adaptive_nn", ckertype="beta", ckerbound="fixed", ckerlb=-1, ckerub=1)
+  fit <- npreg(bw, txdat=x, tydat=v$y)
+  a <- list(x=fit, errors="bootstrap", center="bias-corrected", B=59L, neval=3L,
+            random.seed=97L, output="data", interval="basic-local-envelope")
+  for (target in c(FALSE, TRUE))
+    expect_error(do.call(plot, c(a, list(gradients=target, band="simultaneous"))), "zero-ridge")
+  expect_error(do.call(plot, c(a, list(band="all"))))
+  expect_error(do.call(plot, c(a, list(band="pointwise"))))
+})
