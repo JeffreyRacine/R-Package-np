@@ -9,7 +9,7 @@
   constructions for degree-one bands and degree-two pointwise bands. Degree-two
   simultaneous slopes admit the explicit basic local envelope.
 
-* Experimental univariate Bernstein Epanechnikov NN mean and slope bands use fitted observation rows on higher-degree GNN fits and quadratic ANN mean fits.
+* Experimental univariate Bernstein Epanechnikov NN mean and slope bands use fitted observation rows on quadratic and cubic GNN and ANN fits with full-rank, zero-ridge rows.
 
 * Experimental degree-one beta adaptive nearest-neighbour first-derivative
   bands support explicit Mammen symmetric-SD and basic local-envelope

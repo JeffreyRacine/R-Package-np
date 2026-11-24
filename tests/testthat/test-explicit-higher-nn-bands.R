@@ -16,7 +16,8 @@ test_that("explicit higher Epanechnikov NN bands retain the fitted hat and the r
     expect_identical(m$resampling_law,"mammen")
     expect_identical(m$components$simultaneous$interval,construction)
   }
-  expect_false(.np_bias_explicit_nn_target(utils::modifyList(b,list(type="adaptive_nn")),TRUE))
+  expect_true(.np_bias_explicit_nn_target(utils::modifyList(b,list(type="adaptive_nn")),TRUE))
+  expect_false(.np_bias_explicit_nn_target(utils::modifyList(b,list(type="adaptive_nn",degree=4L)),TRUE))
   expect_false(.np_bias_explicit_nn_target(utils::modifyList(b,list(bernstein.basis=FALSE)),FALSE))
   st <- .np_bias_regression_prepare(b,x,y,adapt=TRUE,gradient.order=1L,law="mammen",
     calibration="absolute",explicit.nn=TRUE)
@@ -69,3 +70,34 @@ test_that("experimental linear uniform ANN mean bands keep continuous slopes out
   expect_error(do.call(plot,c(args,list(gradients=TRUE))))
   expect_false(.np_bias_explicit_nn_target(utils::modifyList(b,list(ckerbound="fixed")),FALSE))
 })
+
+test_that("explicit Epanechnikov ANN first derivatives retain their row guards", {
+  skip_on_cran()
+  old <- options(np.messages=FALSE, np.plot.progress=FALSE)
+  on.exit(options(old), add=TRUE)
+  v <- readRDS(test_path("fixtures", "r112-epanechnikov-ann.rds"))
+  x <- data.frame(x=v$x)
+  b <- npregbw(xdat=x, ydat=v$y, bws=53, bandwidth.compute=FALSE,
+    regtype="lp", degree=3L, basis="glp", bernstein.basis=TRUE,
+    bwtype="adaptive_nn", ckertype="epanechnikov")
+  fit <- npreg(b, txdat=x, tydat=v$y)
+  a <- list(x=fit, errors="bootstrap", center="bias-corrected", band="simultaneous",
+    gradients=TRUE, output="data", B=99L, neval=3L, random.seed=91L)
+  expect_error(do.call(plot, a))
+  got <- suppressWarnings(do.call(plot, c(a, list(interval="symmetric-sd"))))
+  expect_identical(got$inference[[1L]]$components$simultaneous$interval,"symmetric-sd")
+  st <- .np_bias_regression_prepare(b, x, v$y, adapt=TRUE, gradient.order=1L,
+    law="mammen", calibration="absolute", explicit.nn=TRUE)
+  outside <- data.frame(x=1.1496080229039194)
+  H <- npreghat(b, txdat=x, exdat=outside, s=1L)
+  rho <- attr(H, "ridge.used", exact=TRUE)
+  expect_gt(rho, 0)
+  expect_error(.np_bias_regression_rows(st, outside, data.frame(row=1L,target="d1")),
+    "observed training range")
+  spec <- st
+  spec$x <- st$main.physical$x
+  spec$bws <- st$main.physical$bws
+  expect_error(.np_bias_main_rows(spec, outside, 1L), "identifiable full-rank")
+  expect_error(.np_bias_main_admit(spec, H, rho, list(degree.engine=3L)), "zero-ridge")
+})
+

@@ -75,8 +75,7 @@
       !isTRUE(bws[["ncon"]] == 1L) || !isTRUE(bws[["nuno"]] == 0L) ||
       !isTRUE(bws[["nord"]] == 0L) || !identical(bws[["regtype"]], "lp") ||
       !identical(bws[["basis"]], "glp") || !isTRUE(bws[["bernstein.basis"]])) return(FALSE)
-  (identical(bws[["type"]], "generalized_nn") && bws[["degree"]] %in% 2:3) ||
-    (identical(bws[["type"]], "adaptive_nn") && !slope && bws[["degree"]] == 2L)
+  bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && bws[["degree"]] %in% 2:3
 }
 
 .np_bias_beta_gnn_mean <- function(bws) {

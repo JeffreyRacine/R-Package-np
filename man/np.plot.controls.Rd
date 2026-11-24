@@ -224,7 +224,7 @@ finite-sample uncertainty. Explicit narrower methods retain their definitions.
 Known bounds transform with the data; bounded ANN retains donor-specific
 support normalizers and the existing frozen-radius derivative convention.
 The qualified extension is limited to main degree components zero or one.
-Higher-degree Epanechnikov NN admissions are unchanged. Second-order beta
+For unbounded univariate quadratic or cubic Bernstein Epanechnikov GNN and ANN fits, see the explicit Mammen mean and first-derivative constructions in \code{\link{plot.np}}. Second-order beta
 GNN/ANN LC or GLP degree-zero means with known finite fixed support, including
 supported mixed mean panels and categorical mean contrasts, use these same
 established SD, pairs and wild constructions and defaults. For the experimental univariate beta NN derivative scopes and the
