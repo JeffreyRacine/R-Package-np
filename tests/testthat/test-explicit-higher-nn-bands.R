@@ -135,6 +135,13 @@ test_that("known-support quadratic Gaussian GNN uses explicit Mammen local bands
   z <- suppressWarnings(do.call(plot,c(a,list(interval="basic-local-envelope"))))
   expect_identical(z$inference[[1L]]$resampling_law,"mammen")
   expect_identical(z$inference[[1L]]$components$bonferroni$interval,"basic-local-envelope")
+  pairs <- suppressWarnings(do.call(plot,c(a,list(interval="basic-local-envelope",bootstrap="inid"))))
+  expect_identical(pairs$inference[[1L]]$resampling_law,"inid")
+  mean.args <- a
+  mean.args$gradients <- FALSE
+  absolute <- suppressWarnings(do.call(plot,c(mean.args,list(interval="symmetric-sd"))))
+  expect_identical(absolute$inference[[1L]]$components$simultaneous$interval,"symmetric-sd")
+  expect_error(do.call(plot,mean.args))
   for (fields in list(list(type="adaptive_nn"),list(ncon=2L),list(ckerub=Inf),
                       list(degree=3L),list(bernstein.basis=FALSE)))
     expect_false(.np_bias_explicit_nn_target(utils::modifyList(bw,fields),TRUE))
@@ -156,6 +163,6 @@ test_that("explicit local Epanechnikov GNN pairs retain the cubic slope boundary
   obj <- suppressWarnings(do.call(plot,c(a,list(interval="basic-local-envelope"))))
   expect_identical(obj$inference[[1L]]$resampling_law,"fixed")
   expect_identical(obj$inference[[1L]]$components$bonferroni$interval,"basic-local-envelope")
-  expect_false(.np_bias_epa_local_pairs(utils::modifyList(b,list(degree=3L)),TRUE,"inid","basic-local-envelope"))
-  expect_false(.np_bias_epa_local_pairs(b,TRUE,"rademacher","basic-local-envelope"))
+  expect_false(.np_bias_gnn_local_pairs(utils::modifyList(b,list(degree=3L)),TRUE,"inid","basic-local-envelope"))
+  expect_false(.np_bias_gnn_local_pairs(b,TRUE,"rademacher","basic-local-envelope"))
 })

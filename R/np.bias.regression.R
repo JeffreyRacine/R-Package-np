@@ -82,9 +82,9 @@
     bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && bws[["degree"]] %in% 2:3
 }
 
-.np_bias_epa_local_pairs <- function(bws, slope, law, calibration) {
+.np_bias_gnn_local_pairs <- function(bws, slope, law, calibration) {
   identical(calibration, "basic-local-envelope") && law %in% c("inid", "fixed", "geom") &&
-    identical(bws[["type"]], "generalized_nn") && identical(bws[["ckertype"]], "epanechnikov") &&
+    identical(bws[["type"]], "generalized_nn") && bws[["ckertype"]] %in% c("epanechnikov", "gaussian") &&
     .np_bias_explicit_nn_target(bws, slope) && (!slope || isTRUE(bws[["degree"]] == 2L))
 }
 
@@ -259,7 +259,7 @@
     fields <- setdiff(names(defaults), "supplied")
     if (!.np_bias_explicit_nn_target(bws, slope) || npRegressionHasExtendedNn(bws) ||
         (slope && !isTRUE(gradient.order == 1L)) ||
-        !(identical(law, "mammen") || .np_bias_epa_local_pairs(bws, slope, law, calibration)) ||
+        !(identical(law, "mammen") || .np_bias_gnn_local_pairs(bws, slope, law, calibration)) ||
         !isTRUE(calibration %in% c("absolute", "basic-local-envelope")) ||
         !identical(control[fields], defaults[fields]))
       stop("experimental NN bands require the assessed target, resampling law, construction and auxiliary settings", call.=FALSE)

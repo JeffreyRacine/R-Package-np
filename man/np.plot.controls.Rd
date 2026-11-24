@@ -249,7 +249,12 @@ are unchanged. NN radii stay frozen for derivatives; bounded ANN retains its
 donor-specific support normalization. Partial-degree models retain the existing
 refusal or unavailable-panel behavior for derivatives above a coordinate's degree.
 For a univariate quadratic Bernstein Gaussian GNN fit with two known finite
-bounds and nonextended neighbour count, an explicit Mammen wild
+bounds and nonextended neighbour count, independent, fixed-block and
+geometric-block pairs may explicitly select the basic local envelope for
+means and first derivatives. The two saved designs contained independent
+observations. Explicit Mammen \code{interval="symmetric-sd"} is available for
+the mean. On the same two designs the simultaneous symmetric-SD slope missed
+both whole grids. For Mammen wild, an explicit
 \code{interval="basic-local-envelope"} supports means and first derivatives
 on full-rank, zero-ridge grids within the observed range. Both simultaneous
 grids were covered on two saved datasets for each target. The full mean

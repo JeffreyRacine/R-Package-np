@@ -257,11 +257,12 @@
         identical(error.request$method, "bootstrap") &&
         error.request$type %in% c("simultaneous", "pointwise", "bonferroni", "all") &&
         (!gradients || all(plot.gradient.order.label[bws$icon] == 1L)) &&
-        .np_bias_epa_local_pairs(bws, gradients, as.character(plot.errors.boot.method)[1L],
+        .np_bias_gnn_local_pairs(bws, gradients, as.character(plot.errors.boot.method)[1L],
                                  plot.errors.boot.calibration))
       explicit.nn <- TRUE
     if (explicit.nn && identical(bws[["ckertype"]], "gaussian"))
-      explicit.nn <- identical(effective.calibration, "basic-local-envelope")
+      explicit.nn <- identical(effective.calibration, "basic-local-envelope") ||
+        (!gradients && explicit.mammen && identical(effective.calibration, "absolute"))
     if (explicit.nn && .np_bias_beta_nn_mean(bws, "adaptive_nn", 3L))
       explicit.nn <- error.request$type %in% c("simultaneous", "bonferroni") &&
         identical(effective.calibration, "basic-local-envelope")
