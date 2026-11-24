@@ -61,6 +61,9 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   /* The training point is already available in the HC0 variance pass.
    * Its SE consumer forms the identical mean row from this factor below. */
   const int defer_epa_mean_row = epa_ann && preserve_point && call->fit_projection == NULL;
+  /* Returning an SE must preserve the fitted points. Compact only the
+   * variance pass after those points and their residuals are available. */
+  owner->precision.compact_zero = defer_epa_mean_row;
   const int categorical_pair = call->ordinary_response && call->do_grad &&
     (num_reg_unordered + num_reg_ordered > 0) &&
     !call->categorical_point_invariant;

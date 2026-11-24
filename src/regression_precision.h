@@ -6,6 +6,9 @@ typedef struct {
   int n, p, m, work_capacity, work_m, work_p;
   size_t matrix_capacity, vector_capacity;
   double *a, *vectors, *work;
+  /* Optional exact-zero donor map for the Epanechnikov HC0 variance pass. */
+  int compact_zero, active_count, active_capacity;
+  int *active_donors;
   int *pivot;
   int pivot_capacity;
   double *tau, *scale, *sw, *u, *row;
