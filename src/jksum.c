@@ -24068,6 +24068,19 @@ static void np_regression_general_lp_fit_owner_cleanup(
 }
 
 
+/* Fixed univariate beta fits can concentrate their weights at a support
+ * boundary. Keep the original accepted solve and its own kernel weights. */
+static int np_fixed_beta_precision(const NPContinuousKernelRoute *route, int bandwidth,
+                                   int continuous, int unordered, int ordered)
+{
+  return bandwidth == BW_FIXED && continuous == 1 && !unordered && !ordered &&
+    vector_glp_degree_extern != NULL &&
+    (vector_glp_degree_extern[0] == 1 || vector_glp_degree_extern[0] == 2) &&
+    route != NULL && route->segment_count == 1 &&
+    route->segment[0].descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+    route->segment[0].descriptor.order == 2;
+}
+
 /* Fully pooled Aitchison-Aitken factors give every donor the same
  * categorical weight. The continuous GNN row still uses the fitted radius. */
 static int np_pooled_beta_linear_precision(const NPContinuousKernelRoute *route,
@@ -24091,7 +24104,7 @@ static int np_pooled_beta_linear_precision(const NPContinuousKernelRoute *route,
 /* Scoped precision sibling. Accepted rank/ridge and all incumbent kernel/tree
  * selection remain upstream. Continuous second-order GNN rows use their own
  * target radius; conditional, categorical and signed owners are unchanged. */
-/* At a bounded edge, a linear beta ANN row outside the donor range can
+/* At a bounded edge, a linear beta ANN row at or outside the donor range can
  * concentrate on very few observations. Preserve its weights for the
  * existing condition and ridge check. Infinite edges disable that side. */
 typedef struct { double lower, upper; } NPLinearBetaANNRange;
@@ -24123,9 +24136,27 @@ static NPLinearBetaANNRange np_linear_beta_ann_training_range(const NPContinuous
   return range;
 }
 
-static inline int np_linear_beta_ann_extrapolates(NPLinearBetaANNRange range, double x)
+static inline int np_linear_beta_ann_edge(NPLinearBetaANNRange range, double x)
 {
-  return x < range.lower || x > range.upper;
+  return x <= range.lower || x >= range.upper;
+}
+
+/* At the first or last donor the slope row can amplify a small Gram error
+ * in the corrected variance even when the general condition screen passes. */
+static inline int np_linear_beta_ann_at_training_limit(NPLinearBetaANNRange range, double x)
+{
+  return x == range.lower || x == range.upper;
+}
+
+static int np_cubic_beta_ann_local(const NPContinuousKernelRoute *route, int bandwidth,
+                                   int continuous, int unordered, int ordered)
+{
+  return bandwidth == BW_ADAP_NN && route != NULL && continuous == 1 &&
+    unordered == 0 && ordered == 0 && int_glp_bernstein_extern &&
+    int_glp_basis_extern == 1 && vector_glp_degree_extern != NULL &&
+    vector_glp_degree_extern[0] == 3 && route->segment_count == 1 &&
+    route->segment[0].descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+    route->segment[0].descriptor.order == 2;
 }
 
 static int np_regression_precision_eligible(const NPRegressionGeneralLPFitCall *call)

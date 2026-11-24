@@ -431,8 +431,9 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   } else if(return_hat_flag) {
     out = PROTECT(allocMatrix(REALSXP, num_obs_eval, num_obs_train));
     nprotect++;
-    if(descriptor.family == NP_CKERNEL_FAMILY_LEGACY &&
-       (lp_engine == NP_LP_ENGINE_GENERAL || leave_one_out_flag)) {
+    if(descriptor.family == NP_CKERNEL_FAMILY_BETA ||
+       (descriptor.family == NP_CKERNEL_FAMILY_LEGACY &&
+        (lp_engine == NP_LP_ENGINE_GENERAL || leave_one_out_flag))) {
       ridge_used = PROTECT(allocVector(REALSXP, num_obs_eval));
       nprotect++;
     }

@@ -1,5 +1,53 @@
 # np 0.80-4
 
+* Independent, fixed-block and geometric-block pairs can explicitly select
+  the experimental basic local envelope on univariate quadratic Bernstein
+  Epanechnikov GNN means and slopes and cubic means.
+
+* On bounded quadratic Gaussian adaptive NN fits, the explicit Mammen local
+  envelope supports zero-ridge Bernstein means and first derivatives.
+
+* On bounded quadratic Gaussian GNN fits, independent and block pairs support
+  explicit local envelopes. Mammen symmetric-SD is available for means.
+
+* Explicit Mammen local envelopes support means and first derivatives on
+  qualified univariate quadratic Bernstein Gaussian GNN fits with finite known
+  bounds and zero fitted ridge throughout the observed evaluation range.
+
+* Experimental cubic Bernstein beta ANN means and first derivatives support
+  an explicit Mammen basic local envelope for simultaneous and Bonferroni
+  inference on full-rank grids with zero fitted ridge throughout.
+
+* Qualified empirical NN intervals now include Bonferroni and combined output
+  for their supported Mammen constructions. The degree-zero beta first
+  derivative also supports these scopes for its qualified independent pairs,
+  Rademacher and Gaussian laws.
+
+* Experimental Mammen intervals support explicit first-degree Bernstein uniform
+  ANN mean bands with no boundary correction.
+
+* Explicit Mammen pointwise and simultaneous bands support quadratic beta ANN means and first derivatives on the assessed bounded Bernstein designs.
+
+* Beta GNN first derivatives on known finite support admit both explicit Mammen
+  constructions for degree-one bands and degree-two pointwise bands. Degree-two
+  simultaneous slopes admit the explicit basic local envelope.
+
+* Experimental univariate Bernstein Epanechnikov NN mean and slope bands use fitted observation rows on quadratic and cubic GNN and ANN fits with full-rank, zero-ridge rows.
+
+* Experimental degree-one beta adaptive nearest-neighbour first-derivative
+  bands support explicit Mammen symmetric-SD and basic local-envelope
+  constructions on the same bounded Bernstein designs as the mean bands.
+
+* Experimental bias-corrected mean bands for bounded degree-one Bernstein beta
+  adaptive nearest-neighbour regression support explicit `interval="symmetric-sd"`
+  and `interval="basic-local-envelope"` with Mammen wild bootstrap, on the
+  observed training range at zero fitted ridge.
+
+* A simultaneous first-derivative band for known-support fixed beta regression
+  with a degree-one or degree-two Bernstein fit uses the Mammen wild basic
+  local envelope when the controls are omitted. Pointwise slopes retain the
+  explicit local-envelope requirement.
+
 # np 0.80-3
 
 * Plot methods that compute intervals now use `interval` for construction and

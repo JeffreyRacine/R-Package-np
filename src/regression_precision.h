@@ -6,6 +6,9 @@ typedef struct {
   int n, p, m, work_capacity, work_m, work_p;
   size_t matrix_capacity, vector_capacity;
   double *a, *vectors, *work;
+  /* Optional exact-zero donor map for the Epanechnikov HC0 variance pass. */
+  int compact_zero, active_count, active_capacity;
+  int *active_donors;
   int *pivot;
   int pivot_capacity;
   double *tau, *scale, *sw, *u, *row;
@@ -13,6 +16,9 @@ typedef struct {
   /* The seven-column cubic-by-linear GLP may have one algebraic alias
    * on three rounded abscissae. All other precision owners leave this off. */
   int check_cubic_support, cubic_alias;
+  int local_cubic;
+  double cubic_center, cubic_scale, *local_columns;
+  size_t local_capacity;
   int cubic_columns[4];
   double cubic_levels[3][4];
   const double *weights;

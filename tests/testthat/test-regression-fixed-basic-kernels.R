@@ -85,3 +85,33 @@ test_that("fixed non-Gaussian basic envelopes match literal pairs roots", {
     }
   }
 })
+
+test_that("fixed beta Bernstein slope defaults select only the simultaneous Mammen envelope", {
+  b <- list(type="fixed", ckertype="beta", ckerorder=2L, ckerbound="fixed",
+            ckerlb=0, ckerub=1, regtype="lp", basis="glp", bernstein.basis=TRUE,
+            degree=1L, ncon=1L, nuno=0L, nord=0L)
+  resolve <- function(b, band="simultaneous", method="bootstrap", law="wild",
+                      wild="mammen", order=1L, calibration="default", defaults=TRUE)
+    .np_bias_regression_calibration(b, calibration, method, band, law, wild,
+                                    gradients=TRUE, gradient.order=order, default.controls=defaults)
+  refusal <- "requires the explicit basic-local-envelope"
+  for (degree in 1:2) {
+    b$degree <- degree
+    expect_identical(resolve(b), "basic-local-envelope")
+    expect_identical(resolve(b, band="pointwise", calibration="basic-local-envelope"),
+                     "basic-local-envelope")
+  }
+  for (scope in c("pointwise", "pmzsd", "bonferroni", "all"))
+    expect_error(resolve(b, band=scope), refusal)
+  expect_error(resolve(b, order=2L), refusal)
+  expect_error(resolve(b, defaults=FALSE), refusal)
+  expect_error(resolve(b, method="asymptotic"), refusal)
+  expect_error(resolve(b, law="inid"), refusal)
+  expect_error(resolve(b, wild="rademacher"), refusal)
+  expect_error(resolve(b, calibration="absolute"), refusal)
+  for (change in list(list(degree=3L), list(bernstein.basis=FALSE),
+                      list(ncon=2L), list(nuno=1L), list(nord=1L),
+                      list(ckerorder=4L), list(ckerlb=-Inf), list(ckerub=Inf),
+                      list(ckerbound="none"), list(basis="additive"), list(regtype="ll")))
+    expect_error(resolve(utils::modifyList(b,change)), refusal)
+})

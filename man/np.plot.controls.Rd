@@ -90,11 +90,19 @@ mixed-predictor targets retain replicate residual-pilot studentization for
 empirical bands. This does not extend either basic envelope to Rademacher or
 alter Gaussian defaults; the saved derivative limitations still apply.
 
-For fixed-bandwidth raw Epanechnikov GLP fits with a quadratic component,
-and fixed-bandwidth beta derivatives with a positive main degree, the
-supported iterated empirical bands require explicit
-\code{interval="basic-local-envelope"} with pairs or
-Mammen resampling. Saved cases show numerical sensitivity in the fitted rows.
+For a fixed-bandwidth, second-order beta kernel on one continuous
+predictor with known finite support, an experimental simultaneous band
+is available for the first derivative of a degree-one or degree-two
+Bernstein GLP fit with zero-ridge evaluation rows. With
+\code{center="bias-corrected"}, \code{errors="bootstrap"},
+\code{gradients=TRUE} and \code{band="simultaneous"}, omitting
+\code{interval}, \code{boot.control} and \code{bias.control} selects
+the Mammen wild basic local envelope. Simultaneous slope bands were
+wide on the saved fits. Pointwise slopes still require explicit
+\code{interval="basic-local-envelope"} with supported pairs or Mammen
+resampling. The explicit requirement also applies to other supported
+positive-degree fixed beta derivative bands and to fixed raw
+Epanechnikov GLP fits with a quadratic component.
 
 Fixed uniform-kernel models with \code{ckerbound="none"} or \code{"fixed"}
 support iterated mean correction for local-constant fits and GLP fits with
@@ -224,11 +232,11 @@ finite-sample uncertainty. Explicit narrower methods retain their definitions.
 Known bounds transform with the data; bounded ANN retains donor-specific
 support normalizers and the existing frozen-radius derivative convention.
 The qualified extension is limited to main degree components zero or one.
-Higher-degree Epanechnikov NN admissions are unchanged. Second-order beta
+For unbounded univariate quadratic or cubic Bernstein Epanechnikov GNN and ANN fits, see the explicit Mammen mean and first-derivative constructions in \code{\link{plot.np}}. Second-order beta
 GNN/ANN LC or GLP degree-zero means with known finite fixed support, including
 supported mixed mean panels and categorical mean contrasts, use these same
 established SD, pairs and wild constructions and defaults. For the experimental univariate beta NN derivative scopes and the
-degree-one and degree-two Bernstein beta GNN mean scopes, see \code{\link{plot.np}}; requested
+degree-one and degree-two Bernstein beta GNN mean scopes and the explicitly selected degree-one beta ANN mean constructions, see \code{\link{plot.np}}; requested
 panels are never silently omitted. The beta comparison reuses two saved original
 samples and does not establish nominal coverage. Higher-degree bounded/wild
 Epanechnikov NN and higher-order kernels remain unqualified.
@@ -240,7 +248,20 @@ with main degrees at most one, including supported mixed predictors. Gaussian de
 are unchanged. NN radii stay frozen for derivatives; bounded ANN retains its
 donor-specific support normalization. Partial-degree models retain the existing
 refusal or unavailable-panel behavior for derivatives above a coordinate's degree.
-Higher-degree bounded Gaussian NN, fixed-bandwidth mixed Gaussian models and
+For a univariate quadratic Bernstein Gaussian GNN fit with two known finite
+bounds and nonextended neighbour count, independent, fixed-block and
+geometric-block pairs may explicitly select the basic local envelope for
+means and first derivatives. The two saved designs contained independent
+observations. Explicit Mammen \code{interval="symmetric-sd"} is available for
+the mean. On the same two designs the simultaneous symmetric-SD slope missed
+both whole grids. For Mammen wild, an explicit
+\code{interval="basic-local-envelope"} supports means and first derivatives
+on full-rank, zero-ridge grids within the observed range. Both simultaneous
+grids were covered on two saved datasets for each target. The full mean
+band widths averaged 0.50 and 0.26 on those datasets, and the slope widths
+averaged 21.74 and 9.20. Pointwise, Bonferroni and combined output use
+the same law and fitted bandwidth. Other higher-degree bounded Gaussian NN
+fits, fixed-bandwidth mixed Gaussian models and
 range bounds remain unqualified. The two saved NN samples provide
 limited availability evidence and do not establish nominal coverage. The existing adaptation and accepted fitted-row
 precision rules are retained. Zero nearest-neighbour radii and
@@ -248,6 +269,11 @@ unqualified regularized main rows retain their existing refusals.
 The original \code{"basic-envelope"} public option supports fixed bandwidths
 and qualified degree-zero or first-order Epanechnikov NN models, or degree-zero
 uniform or known-fixed-support beta NN mean models; it remains pairs-only.
+The same explicit Mammen basic local envelope supports quadratic Bernstein
+adaptive NN means and first derivatives on those bounds, with the observed
+training range, full-rank and zero-ridge requirements. On the two saved ANN
+fits the simultaneous slope widths averaged 39.98 and 17.59. The pointwise
+slope bands covered 50 and 46 of their respective 50 coordinates.
 
 For fixed-bandwidth second-order Gaussian (unbounded, or known fixed support
 with continuous predictors only), Epanechnikov

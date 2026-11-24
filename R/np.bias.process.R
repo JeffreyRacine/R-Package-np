@@ -560,17 +560,28 @@
   main <- state[["settings"]][["main"]]
   if (isTRUE(state[["beta.gnn.mean"]]) &&
       (!identical(target, "mean") || !identical(law, "mammen") ||
-       !band %in% c("pointwise", "simultaneous") ||
+       !(band %in% c("pointwise", "simultaneous") ||
+         (band %in% c("bonferroni", "all") && calibration %in% c("absolute", "basic-local-envelope"))) ||
        !effective %in% c("absolute", "basic-local-envelope")))
-    stop("experimental positive-degree beta GNN mean bands require pointwise or simultaneous Mammen inference", call.=FALSE)
-  if (startsWith(target, "d") && identical(main[["kernel"]], "beta") &&
+    stop("experimental positive-degree beta GNN mean bands require a qualified Mammen band scope and construction", call.=FALSE)
+  if (identical(state[["explicit.nn.target"]], "d1") && identical(main[["kernel"]], "beta")) {
+    if (!identical(target, "d1") || !identical(law, "mammen") ||
+        !band %in% c("simultaneous", "pointwise", "bonferroni", "all") || !effective %in% c("absolute", "basic-local-envelope"))
+      stop("experimental positive-degree beta NN slopes require an explicit empirical Mammen construction", call.=FALSE)
+    state[["beta.nn.first.derivative"]] <- TRUE
+  } else if (identical(state[["beta.ann.target"]], "d1")) {
+    if (!identical(target, "d1") || !identical(law, "mammen") ||
+        !band %in% c("pointwise", "simultaneous", "bonferroni", "all") ||
+        !effective %in% c("absolute", "basic-local-envelope"))
+      stop("experimental degree-one beta ANN slopes require an explicit empirical Mammen first-derivative band", call.=FALSE)
+    state[["beta.nn.first.derivative"]] <- TRUE
+  } else if (startsWith(target, "d") && identical(main[["kernel"]], "beta") &&
       main[["type"]] %in% c("generalized_nn", "adaptive_nn")) {
     qualified <- switch(law, inid = "basic-local-envelope", gaussian = "absolute",
                         mammen = "basic-local-envelope", rademacher = "tail-envelope", NULL)
-    qualified.scope <- (band %in% c("pointwise", "simultaneous") && identical(effective, qualified)) ||
-      (band %in% c("bonferroni", "all") && identical(law, "mammen") &&
-       identical(effective, "basic-local-envelope")) ||
-      (identical(band, "pmzsd") && law %in% c("mammen", "gaussian") && identical(effective, "absolute"))
+    qualified.scope <- (band %in% c("pointwise", "simultaneous", "bonferroni", "all") &&
+      !is.null(qualified) && identical(effective, qualified)) ||
+      (identical(band, "pmzsd") && !is.null(qualified) && identical(effective, "absolute"))
     if (!identical(target, "d1") || !identical(state$d, 1L) ||
         length(state$factor.cols) || !is.null(state[["gradient.order"]]) ||
         !.np_bias_regression_nn_zero(state$bws, "beta") ||

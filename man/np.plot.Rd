@@ -584,11 +584,19 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   empirical bands. This does not extend either basic envelope to Rademacher or
   alter Gaussian defaults; the saved derivative limitations still apply.
 
-For fixed-bandwidth raw Epanechnikov GLP fits with a quadratic component,
-and fixed-bandwidth beta derivatives with a positive main degree, the
-supported iterated empirical bands require explicit
-\code{interval="basic-local-envelope"} with pairs or
-Mammen resampling. Saved cases show numerical sensitivity in the fitted rows.
+For a fixed-bandwidth, second-order beta kernel on one continuous
+predictor with known finite support, an experimental simultaneous band
+is available for the first derivative of a degree-one or degree-two
+Bernstein GLP fit with zero-ridge evaluation rows. With
+\code{center="bias-corrected"}, \code{errors="bootstrap"},
+\code{gradients=TRUE} and \code{band="simultaneous"}, omitting
+\code{interval}, \code{boot.control} and \code{bias.control} selects
+the Mammen wild basic local envelope. Simultaneous slope bands were
+wide on the saved fits. Pointwise slopes still require explicit
+\code{interval="basic-local-envelope"} with supported pairs or Mammen
+resampling. The explicit requirement also applies to other supported
+positive-degree fixed beta derivative bands and to fixed raw
+Epanechnikov GLP fits with a quadratic component.
 
 Fixed uniform-kernel models with \code{ckerbound="none"} or \code{"fixed"}
 support iterated mean correction for local-constant fits and GLP fits with
@@ -667,6 +675,70 @@ NN correction and continuous uniform derivatives remain unqualified.
   constructions covered 111 and 114 complete grids, respectively. The ordinary-use mean comparison reuses two saved samples and does not
   establish nominal coverage. Fitted NN counts and support bounds stay fixed.
 
+For univariate second-order Epanechnikov regression with no support
+boundary correction (\code{ckerbound="none"}), experimental pointwise and
+simultaneous Mammen intervals support quadratic and cubic Bernstein GNN
+and ANN means and first derivatives. On three saved ANN datasets both
+constructions covered every simultaneous grid. For quadratic and cubic slopes
+the median paired width ratios of local-envelope to symmetric-SD were
+4.40 and 5.55. Choose
+\code{interval="symmetric-sd"} or \code{interval="basic-local-envelope"}.
+These constructions use full-rank, zero-ridge fitted rows, the usual
+auxiliary settings and evaluation within the observed training range.
+
+For unbounded univariate quadratic Bernstein Epanechnikov GNN means and first
+derivatives, and cubic means, the explicit basic local envelope also accepts
+independent, fixed-block and geometric-block pairs. Select the law with
+\code{bootstrap="inid"}, \code{"fixed"} or \code{"geom"}. The same full-rank,
+zero-ridge and observed-range checks apply. The three saved designs each
+had independent observations. Their widths and coverage describe those
+designs. Calibration for dependent data requires an appropriate block length.
+
+For first derivatives of univariate Bernstein beta GNN fits on known finite
+support, select \code{gradients=TRUE} and evaluate within the observed
+training range at zero fitted ridge. Degree-one fits support both explicit
+Mammen constructions for pointwise and simultaneous bands. Degree-two fits
+support both constructions for pointwise bands. For a simultaneous
+degree-two slope band, explicitly select \code{interval="basic-local-envelope"}.
+
+For quadratic univariate Bernstein beta ANN fits the two explicit Mammen
+constructions support means and first derivatives under the same bounds,
+ridge, evaluation range and auxiliary settings.
+
+For cubic Bernstein beta ANN means and first derivatives, the explicit
+Mammen basic local envelope supports simultaneous and Bonferroni bands on
+the same known support and observed training range. Every requested position
+must have a full-rank, zero-ridge fitted row. Two of three saved fits met
+that condition. Both complete grids were covered, with wide slope bands.
+
+Univariate first-degree Bernstein uniform ANN means with no boundary correction
+also support the two explicitly selected Mammen constructions within the
+observed range at zero fitted ridge. Coverage evidence spans three saved
+datasets.
+
+For the explicit univariate higher-degree Epanechnikov, degree-one uniform
+ANN mean and degree-one or degree-two beta NN constructions above,
+\code{band="bonferroni"} applies the adjusted empirical ranks and
+\code{band="all"} returns the pointwise, simultaneous and Bonferroni
+components on shared draws. Choose the interval explicitly. A quadratic
+beta GNN first derivative requires the basic local envelope for either scope.
+Limited tail resolution is recorded with the returned intervals.
+
+Experimental degree-one beta adaptive nearest-neighbour mean bands require a
+single continuous predictor, known finite bounds, a second-order beta kernel,
+a stored Bernstein GLP basis, zero-ridge fitted rows and evaluation within
+the observed training range. With the standard auxiliary bias settings, choose
+Mammen wild bootstrap and explicitly request \code{interval="symmetric-sd"} or
+\code{interval="basic-local-envelope"} for pointwise or simultaneous inference.
+The same explicit intervals support first derivatives with \code{gradients=TRUE}
+under these experimental degree-one conditions. In two saved studies the
+absolute slope bands covered five of six and eight of eight complete grids.
+The local envelope covered all six and all eight, with median paired widths
+over four times the absolute widths in each study.
+
+For means, across two saved studies the absolute construction covered 5 of 6 and 8 of 8
+whole grids. The wider local envelope covered 6 of 6 and 8 of 8.
+
 Experimental bias-corrected first-derivative bands are available for a single
 continuous predictor with known finite bounds, a second-order beta kernel,
 local-constant or degree-zero GLP regression and generalized or adaptive
@@ -682,10 +754,10 @@ all 50 grid points on each of 114 independent datasets for both bandwidth types.
 Their median ratio of simultaneous to pointwise width was 6.80 for generalized
 and 7.14 for adaptive bandwidths. On the saved heteroskedastic exponential
 design, upper-region adaptive pointwise coverage averaged 90.63 percent at
-95 percent nominal. Mammen wild basic-local-envelope also admits \code{band="bonferroni"} and
+95 percent nominal. These four constructions also admit \code{band="bonferroni"} and
 \code{band="all"}, with diagnostics for limited draw resolution. Omitting the band
-selects marginal normal-SD intervals for default Mammen bootstrap and Gaussian
-asymptotic inference. Explicit pointwise and simultaneous calls retain their
+selects marginal normal-SD intervals using the corrected target standard error
+for each of these laws. Explicit pointwise and simultaneous calls retain their
 empirical or studentized constructions. Fixed and geometric block pairs remain
 outside this experimental derivative scope.
 
@@ -1406,12 +1478,30 @@ outside this experimental derivative scope.
   and explicit methods are unchanged. NN radii remain frozen for derivatives;
   bounded ANN retains donor-specific support normalization. Derivatives above a
   coordinate's degree retain their existing refusal or unavailable-panel behavior.
-  Higher-degree bounded Gaussian NN, fixed-bandwidth mixed Gaussian models and
+  For a univariate quadratic Bernstein Gaussian GNN fit with two known finite
+bounds and nonextended neighbour count, independent, fixed-block and
+geometric-block pairs may explicitly select the basic local envelope for
+means and first derivatives. The two saved designs contained independent
+observations. Explicit Mammen \code{interval="symmetric-sd"} is available for
+the mean. On the same two designs the simultaneous symmetric-SD slope missed
+both whole grids. For Mammen wild, an explicit
+\code{interval="basic-local-envelope"} supports means and first derivatives
+on full-rank, zero-ridge grids within the observed range. Both simultaneous
+grids were covered on two saved datasets for each target. The full mean
+band widths averaged 0.50 and 0.26 on those datasets, and the slope widths
+averaged 21.74 and 9.20. Pointwise, Bonferroni and combined output use
+the same law and fitted bandwidth. Other higher-degree bounded Gaussian NN
+fits, fixed-bandwidth mixed Gaussian models and
   range bounds remain unqualified. Existing adaptation and
   fitted-row precision rules are preserved. The two saved NN samples do not
   establish nominal coverage.
   The following legacy centering discussion applies to the other supported
   families and to explicit regression \code{construction="legacy"}.
+The same explicit Mammen basic local envelope supports quadratic Bernstein
+adaptive NN means and first derivatives on those bounds, with the observed
+training range, full-rank and zero-ridge requirements. On the two saved ANN
+fits the simultaneous slope widths averaged 39.98 and 17.59. The pointwise
+slope bands covered 50 and 46 of their respective 50 coordinates.
 
   When bootstrap errors are requested, \code{center="bias-corrected"}
   recenters the plotted bootstrap bounds on a method-specific
