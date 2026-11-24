@@ -43,6 +43,12 @@ test_that("positive-degree beta NN slope choices are explicit", {
       z <- suppressWarnings(do.call(plot,c(a,list(interval=interval))))
       expect_identical(z$inference[[1L]]$components$pointwise$interval,interval)
     }
+    if (type == "generalized_nn" && degree == 2L) {
+      a$band <- "simultaneous"
+      expect_error(do.call(plot,c(a,list(interval="symmetric-sd"))), "mean target")
+      local <- suppressWarnings(do.call(plot,c(a,list(interval="basic-local-envelope"))))
+      expect_identical(local$inference[[1L]]$components$simultaneous$interval,"basic-local-envelope")
+    }
   }
 })
 test_that("experimental linear uniform ANN mean bands keep continuous slopes outside admission", {
