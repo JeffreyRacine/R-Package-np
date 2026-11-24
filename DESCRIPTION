@@ -1,6 +1,6 @@
 Package: np
-Version: 0.80-3
-Date: 2026-11-22
+Version: 0.80-4
+Date: 2026-11-24
 Depends: R (>= 3.5.0)
 Imports: compiler, boot, methods, quadprog, quantreg, matrixStats (>= 1.0.0), stats, crs (>= 0.15-46)
 Suggests: MASS, logspline, ks, testthat, withr, knitr, rmarkdown, rgl, htmlwidgets
