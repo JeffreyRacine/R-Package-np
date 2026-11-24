@@ -49,7 +49,12 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   const int fixed_beta = call->ordinary_response && !call->all_large_kernel_rows &&
     np_fixed_beta_precision(call->kernel_route, BANDWIDTH_reg, num_reg_continuous,
                             num_reg_unordered, num_reg_ordered);
-  const int retain_precision_weights = (precision_eligible && BANDWIDTH_reg == BW_ADAP_NN) || epa_ann || local_cubic ||
+  const int pooled_gaussian = call->ordinary_response && !call->all_large_kernel_rows &&
+    call->kernel_route == NULL && num_reg_continuous == 1 &&
+    np_pooled_gaussian_quadratic(BANDWIDTH_reg, int_cker_bound_extern, call->kernel_c[0],
+      num_reg_continuous, num_reg_unordered, num_reg_ordered, call->kernel_u,
+      call->num_categories, call->lambda);
+  const int retain_precision_weights = pooled_gaussian || (precision_eligible && BANDWIDTH_reg == BW_ADAP_NN) || epa_ann || local_cubic ||
     ((pooled_beta || fixed_beta) && call->do_merr);
   const double epsilon = 1.0/(double)MAX(1, num_obs_train);
   const int hc0_residual_preparing = call->hc0_context != NULL &&
@@ -997,7 +1002,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
-    precise = (precision_eligible || ((pooled_beta || fixed_beta || beta_edge_row || epa_ann ||
+    precise = (precision_eligible || ((pooled_gaussian || pooled_beta || fixed_beta || beta_edge_row || epa_ann ||
         (local_cubic && support_rank.count == owner->nterms)) && solve_diagnostics.ridge_total == 0.0)) &&
       ((beta_edge_row && np_linear_beta_ann_at_training_limit(linear_range, call->matrix_X_continuous_eval[0][j])) ||
        np_regression_precision_needed(&owner->solve_workspace,owner->nterms));

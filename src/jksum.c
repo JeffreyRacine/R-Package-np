@@ -24101,6 +24101,23 @@ static int np_pooled_beta_linear_precision(const NPContinuousKernelRoute *route,
   return 1;
 }
 
+/* With fully pooled binary AA factors the categorical kernel is constant.
+ * Retain the physical kernel row from the moment traversal for the quadratic
+ * weighted-design solve only when its accepted zero-ridge factor needs it. */
+static int np_pooled_gaussian_quadratic(int mode, int bounded, int kernel,
+  int ncon, int nuno, int nord, const int *unordered, const int *levels,
+  const double *lambda)
+{
+  if(mode != BW_GEN_NN || !bounded || kernel != 0 || ncon != 1 || nuno != 2 ||
+     nord || int_glp_basis_extern != 1 || vector_glp_degree_extern == NULL ||
+     vector_glp_degree_extern[0] != 2)
+    return 0;
+  for(int j = 0; j < 2; ++j)
+    if(unordered[j] != UKERNEL_UAA || levels[j] != 2 || lambda[j] != 0.5)
+      return 0;
+  return 1;
+}
+
 /* Scoped precision sibling. Accepted rank/ridge and all incumbent kernel/tree
  * selection remain upstream. Continuous second-order GNN rows use their own
  * target radius; conditional, categorical and signed owners are unchanged. */
