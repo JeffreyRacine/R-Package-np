@@ -1,5 +1,9 @@
 # npRmpi 0.80-3
 
+* Independent, fixed-block and geometric-block pairs can explicitly select
+  the experimental basic local envelope on univariate quadratic Bernstein
+  Epanechnikov GNN means and slopes and cubic means.
+
 * Explicit Mammen local envelopes support means and first derivatives on
   qualified univariate quadratic Bernstein Gaussian GNN fits with finite known
   bounds and zero fitted ridge throughout the observed evaluation range.

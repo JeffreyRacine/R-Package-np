@@ -139,3 +139,23 @@ test_that("known-support quadratic Gaussian GNN uses explicit Mammen local bands
                       list(degree=3L),list(bernstein.basis=FALSE)))
     expect_false(.np_bias_explicit_nn_target(utils::modifyList(bw,fields),TRUE))
 })
+
+test_that("explicit local Epanechnikov GNN pairs retain the cubic slope boundary", {
+  skip_on_cran()
+  opt <- options(np.messages=FALSE, np.plot.progress=FALSE)
+  on.exit(options(opt),add=TRUE)
+  x <- data.frame(x=seq(-.89,.97,length.out=80L))
+  y <- sin(x$x)+.03*cos(seq_len(nrow(x)))
+  b <- npregbw(xdat=x,ydat=y,bws=19,regtype="lp",degree=2L,basis="glp",
+    bernstein.basis=TRUE,bwtype="generalized_nn",ckertype="epanechnikov",bandwidth.compute=FALSE)
+  fit <- npreg(b,txdat=x,tydat=y)
+  a <- list(x=fit,errors="bootstrap",center="bias-corrected",gradients=TRUE,
+            bootstrap="fixed",boot.control=np_boot_control(blocklen=5L),output="data",
+            neval=4L,B=69L,band="all",random.seed=231L)
+  expect_error(do.call(plot,a))
+  obj <- suppressWarnings(do.call(plot,c(a,list(interval="basic-local-envelope"))))
+  expect_identical(obj$inference[[1L]]$resampling_law,"fixed")
+  expect_identical(obj$inference[[1L]]$components$bonferroni$interval,"basic-local-envelope")
+  expect_false(.np_bias_epa_local_pairs(utils::modifyList(b,list(degree=3L)),TRUE,"inid","basic-local-envelope"))
+  expect_false(.np_bias_epa_local_pairs(b,TRUE,"rademacher","basic-local-envelope"))
+})

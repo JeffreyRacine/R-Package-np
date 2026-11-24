@@ -702,6 +702,14 @@ the median paired width ratios of local-envelope to symmetric-SD were
 These constructions use full-rank, zero-ridge fitted rows, the usual
 auxiliary settings and evaluation within the observed training range.
 
+For unbounded univariate quadratic Bernstein Epanechnikov GNN means and first
+derivatives, and cubic means, the explicit basic local envelope also accepts
+independent, fixed-block and geometric-block pairs. Select the law with
+\code{bootstrap="inid"}, \code{"fixed"} or \code{"geom"}. The same full-rank,
+zero-ridge and observed-range checks apply. The three saved designs each
+had independent observations. Their widths and coverage describe those
+designs. Calibration for dependent data requires an appropriate block length.
+
 For first derivatives of univariate Bernstein beta GNN fits on known finite
 support, select \code{gradients=TRUE} and evaluate within the observed
 training range at zero fitted ridge. Degree-one fits support both explicit

@@ -82,6 +82,12 @@
     bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && bws[["degree"]] %in% 2:3
 }
 
+.np_bias_epa_local_pairs <- function(bws, slope, law, calibration) {
+  identical(calibration, "basic-local-envelope") && law %in% c("inid", "fixed", "geom") &&
+    identical(bws[["type"]], "generalized_nn") && identical(bws[["ckertype"]], "epanechnikov") &&
+    .np_bias_explicit_nn_target(bws, slope) && (!slope || isTRUE(bws[["degree"]] == 2L))
+}
+
 .np_bias_beta_gnn_mean <- function(bws) {
   .np_bias_beta_nn_mean(bws, "generalized_nn", 1:2)
 }
@@ -252,10 +258,11 @@
     defaults <- np_bias_control()
     fields <- setdiff(names(defaults), "supplied")
     if (!.np_bias_explicit_nn_target(bws, slope) || npRegressionHasExtendedNn(bws) ||
-        (slope && !isTRUE(gradient.order == 1L)) || !identical(law, "mammen") ||
+        (slope && !isTRUE(gradient.order == 1L)) ||
+        !(identical(law, "mammen") || .np_bias_epa_local_pairs(bws, slope, law, calibration)) ||
         !isTRUE(calibration %in% c("absolute", "basic-local-envelope")) ||
         !identical(control[fields], defaults[fields]))
-      stop("experimental NN bands require the assessed target, Mammen construction and auxiliary settings", call.=FALSE)
+      stop("experimental NN bands require the assessed target, resampling law, construction and auxiliary settings", call.=FALSE)
     kernel.class <- "explicit-nn"
   }
   if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
