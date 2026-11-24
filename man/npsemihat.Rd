@@ -2,11 +2,10 @@
 \alias{npindexhat}
 \alias{npplreghat}
 \alias{npscoefhat}
-\title{Experimental Hat Operators for Semiparametric Estimators}
+\title{Hat Operators for Semiparametric Estimators}
 \description{
 Constructs hat operators for semiparametric estimators so that fitted values
 or bootstrap draws can be computed by matrix application in one step.
-These interfaces are currently experimental.
 }
 \usage{
 npindexhat(bws,
