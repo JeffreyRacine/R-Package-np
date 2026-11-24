@@ -596,7 +596,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
 	            break;
 	          }
               precise_owner = (precision_eligible ||
-                ((pooled_beta || fixed_beta || extrapolated_owner || epa_ann || (local_cubic && support_rank.count == owner->nterms)) &&
+                ((pooled_gaussian || pooled_beta || fixed_beta || extrapolated_owner || epa_ann || (local_cubic && support_rank.count == owner->nterms)) &&
                  solve_diagnostics_owner.ridge_total == 0.0)) &&
                 ((extrapolated_owner && np_linear_beta_ann_at_training_limit(linear_range, call->matrix_X_continuous_eval[0][jj])) ||
                  np_regression_precision_needed(&owner->solve_workspace,owner->nterms));
