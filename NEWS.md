@@ -1,5 +1,9 @@
 # npRmpi 0.80-3
 
+* Experimental degree-one beta adaptive nearest-neighbour first-derivative
+  bands support explicit Mammen symmetric-SD and basic local-envelope
+  constructions on the same bounded Bernstein designs as the mean bands.
+
 * Experimental bias-corrected mean bands for bounded degree-one Bernstein beta
   adaptive nearest-neighbour regression support explicit `interval="symmetric-sd"`
   and `interval="basic-local-envelope"` with Mammen wild bootstrap, on the
