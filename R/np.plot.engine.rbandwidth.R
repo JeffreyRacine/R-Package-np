@@ -239,22 +239,15 @@
       gradients = gradients) else
       plot.errors.boot.calibration
     # Read the requested construction before an omitted choice resolves to absolute.
-    explicit.ann <- new.bias &&
-      plot.errors.boot.calibration %in% c("absolute", "basic-local-envelope") &&
-      .np_bias_beta_nn_mean(bws, "adaptive_nn", 1L) &&
-      (!gradients || all(plot.gradient.order.label[bws$icon] == 1L)) &&
-      identical(error.request$method, "bootstrap") &&
-      error.request$type %in% c("simultaneous", "pointwise") &&
-      as.character(plot.errors.boot.method)[1L] == "wild" &&
-      as.character(plot.errors.boot.wild)[1L] == "mammen"
-    explicit.nn <- new.bias &&
+    explicit.mammen <- new.bias &&
       plot.errors.boot.calibration %in% c("absolute", "basic-local-envelope") &&
       identical(error.request$method, "bootstrap") &&
       error.request$type %in% c("simultaneous", "pointwise") &&
       as.character(plot.errors.boot.method)[1L] == "wild" &&
       as.character(plot.errors.boot.wild)[1L] == "mammen" &&
-      (!gradients || all(plot.gradient.order.label[bws$icon] == 1L)) &&
-      .np_bias_explicit_nn_target(bws, gradients)
+      (!gradients || all(plot.gradient.order.label[bws$icon] == 1L))
+    explicit.ann <- explicit.mammen && .np_bias_beta_nn_mean(bws, "adaptive_nn", 1L)
+    explicit.nn <- explicit.mammen && .np_bias_explicit_nn_target(bws, gradients)
     wild.local.envelope <- identical(effective.calibration,"basic-local-envelope") &&
       as.character(plot.errors.boot.method)[1L]=="wild" &&
       as.character(plot.errors.boot.wild)[1L]=="mammen"
