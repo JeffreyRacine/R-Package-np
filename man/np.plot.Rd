@@ -748,10 +748,10 @@ all 50 grid points on each of 114 independent datasets for both bandwidth types.
 Their median ratio of simultaneous to pointwise width was 6.80 for generalized
 and 7.14 for adaptive bandwidths. On the saved heteroskedastic exponential
 design, upper-region adaptive pointwise coverage averaged 90.63 percent at
-95 percent nominal. Mammen wild basic-local-envelope also admits \code{band="bonferroni"} and
+95 percent nominal. These four constructions also admit \code{band="bonferroni"} and
 \code{band="all"}, with diagnostics for limited draw resolution. Omitting the band
-selects marginal normal-SD intervals for default Mammen bootstrap and Gaussian
-asymptotic inference. Explicit pointwise and simultaneous calls retain their
+selects marginal normal-SD intervals using the corrected target standard error
+for each of these laws. Explicit pointwise and simultaneous calls retain their
 empirical or studentized constructions. Fixed and geometric block pairs remain
 outside this experimental derivative scope.
 
