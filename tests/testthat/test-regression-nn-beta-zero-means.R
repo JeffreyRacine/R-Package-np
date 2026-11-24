@@ -77,3 +77,25 @@ test_that("experimental beta GNN means refuse regularized rows and restrict the 
   expect_error(.np_bias_main_admit(state, matrix(1), 1e-12, reg), "zero-ridge")
   expect_equal(as.numeric(.np_bias_main_admit(state, matrix(1), 0, reg)), 1)
 })
+
+test_that("beta NN slope companions keep their selected law and finite-draw diagnostics", {
+  skip_on_cran()
+  old <- options(np.messages=FALSE, np.plot.progress=FALSE)
+  on.exit(options(old),add=TRUE)
+  x <- data.frame(x=seq(.02,.98,length.out=80L))
+  y <- sin(3*x$x)+.1*cos(seq_len(nrow(x)))
+  bw <- npregbw(xdat=x,ydat=y,bws=15,regtype="lc",bandwidth.compute=FALSE,
+                bwtype="adaptive_nn",ckertype="beta",ckerbound="fixed",ckerlb=0,ckerub=1)
+  fit <- npreg(bw,txdat=x,tydat=y)
+  a <- list(x=fit,errors="bootstrap",center="bias-corrected",gradients=TRUE,neval=5L,
+            B=39L,bootstrap="inid",random.seed=43L,output="data")
+  z <- expect_warning(do.call(plot,c(a,list(band="all"))),"resolution")
+  meta <- z$inference[[1L]]
+  expect_identical(meta$resampling_law,"inid")
+  expect_true(meta$components$bonferroni$resolution$resolution_limited)
+  w <- suppressWarnings(do.call(plot,c(a,list(band="bonferroni"))))
+  expect_identical(as.data.frame(w,band="bonferroni")$lower,as.data.frame(z,band="bonferroni")$lower)
+  marginal <- suppressWarnings(do.call(plot,a))
+  expect_identical(marginal$inference[[1L]]$components$pointwise$interval,"normal-sd")
+  expect_error(do.call(plot,utils::modifyList(a,list(bootstrap="geom",band="all"))))
+})
