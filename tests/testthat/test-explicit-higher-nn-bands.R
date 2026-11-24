@@ -46,7 +46,13 @@ test_that("positive-degree beta NN slope choices are explicit", {
     }
     if (type == "generalized_nn" && degree == 2L) {
       a$band <- "simultaneous"
-      expect_error(do.call(plot,c(a,list(interval="symmetric-sd"))), "mean target")
+      absolute <- suppressWarnings(do.call(plot,c(a,list(interval="symmetric-sd"))))
+      expect_identical(absolute$inference[[1L]]$components$simultaneous$interval,"symmetric-sd")
+      for (scope in c("bonferroni", "all")) {
+        companion <- a
+        companion$band <- scope
+        expect_error(do.call(plot,c(companion,list(interval="symmetric-sd"))), "mean target")
+      }
       local <- suppressWarnings(do.call(plot,c(a,list(interval="basic-local-envelope"))))
       expect_identical(local$inference[[1L]]$components$simultaneous$interval,"basic-local-envelope")
     }

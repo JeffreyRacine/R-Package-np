@@ -266,7 +266,7 @@
         identical(effective.calibration, "basic-local-envelope")
     if (explicit.nn && gradients && identical(bws[["ckertype"]], "beta") &&
         identical(bws[["type"]], "generalized_nn") && isTRUE(bws[["degree"]] == 2L))
-      explicit.nn <- identical(error.request$type, "pointwise") ||
+      explicit.nn <- error.request$type %in% c("pointwise", "simultaneous") ||
         identical(effective.calibration, "basic-local-envelope")
     wild.local.envelope <- identical(effective.calibration,"basic-local-envelope") &&
       as.character(plot.errors.boot.method)[1L]=="wild" &&
