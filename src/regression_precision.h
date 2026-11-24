@@ -13,6 +13,9 @@ typedef struct {
   /* The seven-column cubic-by-linear GLP may have one algebraic alias
    * on three rounded abscissae. All other precision owners leave this off. */
   int check_cubic_support, cubic_alias;
+  int local_cubic;
+  double cubic_center, cubic_scale, *local_columns;
+  size_t local_capacity;
   int cubic_columns[4];
   double cubic_levels[3][4];
   const double *weights;

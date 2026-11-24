@@ -21,6 +21,13 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
     (vector_glp_degree_extern[0] == 2 || vector_glp_degree_extern[0] == 3) &&
     (!call->do_grad || !vector_glp_gradient_order_extern ||
      vector_glp_gradient_order_extern[0] == 1);
+  const int local_cubic = call->ordinary_response && !call->all_large_kernel_rows &&
+    np_cubic_beta_ann_local(call->kernel_route, BANDWIDTH_reg, num_reg_continuous,
+                            num_reg_unordered, num_reg_ordered) &&
+    (!call->do_grad || !vector_glp_gradient_order_extern ||
+     vector_glp_gradient_order_extern[0] == 1);
+  owner->precision.local_cubic = local_cubic;
+  if(call->fit_projection) call->fit_projection->local_cubic = local_cubic;
   const NPLinearBetaANNRange linear_range = call->ordinary_response && !call->all_large_kernel_rows ?
     np_linear_beta_ann_training_range(call->kernel_route, BANDWIDTH_reg, num_reg_continuous,
                              num_reg_unordered, num_reg_ordered, call->matrix_X_continuous_train,
@@ -42,7 +49,7 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
   const int fixed_beta = call->ordinary_response && !call->all_large_kernel_rows &&
     np_fixed_beta_precision(call->kernel_route, BANDWIDTH_reg, num_reg_continuous,
                             num_reg_unordered, num_reg_ordered);
-  const int retain_precision_weights = (precision_eligible && BANDWIDTH_reg == BW_ADAP_NN) || epa_ann ||
+  const int retain_precision_weights = (precision_eligible && BANDWIDTH_reg == BW_ADAP_NN) || epa_ann || local_cubic ||
     ((pooled_beta || fixed_beta) && call->do_merr);
   const double epsilon = 1.0/(double)MAX(1, num_obs_train);
   const int hc0_residual_preparing = call->hc0_context != NULL &&
@@ -984,7 +991,8 @@ static NP_ALWAYS_INLINE SEXP np_regression_general_lp_fit_body(
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
-    precise = (precision_eligible || ((pooled_beta || fixed_beta || beta_edge_row || epa_ann) && solve_diagnostics.ridge_total == 0.0)) &&
+    precise = (precision_eligible || ((pooled_beta || fixed_beta || beta_edge_row || epa_ann ||
+        (local_cubic && support_rank.count == owner->nterms)) && solve_diagnostics.ridge_total == 0.0)) &&
       ((beta_edge_row && np_linear_beta_ann_at_training_limit(linear_range, call->matrix_X_continuous_eval[0][j])) ||
        np_regression_precision_needed(&owner->solve_workspace,owner->nterms));
     if(precise && !np_regression_precision_prepare(call,owner,hc0_kernel_row,
