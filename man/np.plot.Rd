@@ -636,8 +636,10 @@ bandwidths and unbounded or declared fixed support. Their defaults follow the
 same declared-law mapping; explicit methods remain available. Neighbour counts
 and Gaussian auxiliary fits remain fixed, and bounded ANN retains donor-specific
 support normalization. The additional NN comparison uses only two saved
-original samples and does not establish nominal coverage. Higher-degree uniform
-NN correction and continuous uniform derivatives remain unqualified.
+original samples and does not establish nominal coverage. Univariate first-degree Bernstein uniform adaptive NN means also support explicit
+Mammen symmetric-SD and basic local envelopes with no boundary correction,
+within the observed range at zero ridge. Continuous uniform derivatives remain
+outside the iterated correction.
 
 
   Regression additionally offers the experimental inid/fixed/geometric
@@ -664,7 +666,9 @@ NN correction and continuous uniform derivatives remain unqualified.
   These experimental extensions are not a general coverage guarantee.
   The local envelope also admits unbounded second-order Epanechnikov
   pairs resampling with adaptive NN, and generalized NN with main degrees
-  at most one in every continuous predictor. Neighbour counts remain fixed.
+  at most one in every continuous predictor. The univariate Bernstein GNN
+  pairs extensions for quadratic means and slopes and cubic means are
+  described below. Neighbour counts stay fixed.
   For second-order Epanechnikov LC, local-linear or GLP fits with unbounded or
   declared fixed support and main degrees at most one in every continuous
   predictor, either NN type also admits explicit
@@ -688,8 +692,7 @@ NN correction and continuous uniform derivatives remain unqualified.
   zero-ridge main rows and known finite bounds. The default uses absolute roots
   (\code{interval="symmetric-sd"}). Select \code{interval="basic-local-envelope"}
   for the wider local envelope. On 114 saved datasets at each degree, the two
-  constructions covered 111 and 114 complete grids, respectively. The ordinary-use mean comparison reuses two saved samples and does not
-  establish nominal coverage. Fitted NN counts and support bounds stay fixed.
+  constructions covered 111 and 114 complete grids, respectively. The same 114 originals were reused across degrees and constructions. Fitted NN counts and support bounds stay fixed.
 
 For univariate second-order Epanechnikov regression with no support
 boundary correction (\code{ckerbound="none"}), experimental pointwise and
@@ -725,7 +728,14 @@ For cubic Bernstein beta ANN means and first derivatives, the explicit
 Mammen basic local envelope supports simultaneous and Bonferroni bands on
 the same known support and observed training range. Every requested position
 must have a full-rank, zero-ridge fitted row. Two of three saved fits met
-that condition. Both complete grids were covered, with wide slope bands.
+that condition. Both complete grids were covered, with mean full slope widths
+of 20.91 and 172.10. Specify \code{band="simultaneous"} or
+\code{band="bonferroni"} with \code{interval="basic-local-envelope"}.
+An interval supplied alone requests pointwise inference. Pointwise and
+combined output remain unavailable for this cubic construction. On the
+smaller eligible original the diagnostic pointwise slope covered 3 of 10
+upper-grid positions. The third original selected positive ridge at its
+upper endpoint and the full-grid request was refused.
 
 Univariate first-degree Bernstein uniform ANN means with no boundary correction
 also support the two explicitly selected Mammen constructions within the

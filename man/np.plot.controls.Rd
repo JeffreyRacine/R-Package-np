@@ -126,8 +126,10 @@ bandwidths and unbounded or declared fixed support. Their defaults follow the
 same declared-law mapping; explicit methods remain available. Neighbour counts
 and Gaussian auxiliary fits remain fixed, and bounded ANN retains donor-specific
 support normalization. The additional NN comparison uses only two saved
-original samples and does not establish nominal coverage. Higher-degree uniform
-NN correction and continuous uniform derivatives remain unqualified.
+original samples and does not establish nominal coverage. Univariate first-degree Bernstein uniform adaptive NN means also support explicit
+Mammen symmetric-SD and basic local envelopes with no boundary correction,
+within the observed range at zero ridge. Continuous uniform derivatives remain
+outside the iterated correction.
 
 
 The experimental \code{interval="basic-envelope"} is available for
@@ -209,19 +211,21 @@ and bounds are transformed together. Native beta derivative precision
 limitations and refusals for undefined canonical rows (including some exact
 support endpoints) remain. For inid, fixed and geometric pairs resampling,
 this option also admits unbounded second-order Epanechnikov nearest-neighbour
-bandwidths. Adaptive NN retains the existing derivative construction; generalized
-NN is restricted to main polynomial degrees at most one in every continuous
-predictor. Neighbour counts remain fixed during inference. Second-order
+bandwidths. Adaptive NN retains its existing derivative construction. Generalized
+NN supports main degrees at most one in every continuous predictor. For a
+single unbounded Bernstein predictor, the explicit local pairs envelope also
+supports quadratic means and first derivatives and cubic means on full-rank,
+zero-ridge grids within the training range. Neighbour counts stay fixed during inference. Second-order
 Epanechnikov LC, local-linear and GLP fits with unbounded or declared fixed support
 and main degrees at most one in every continuous predictor also admit explicit \code{"basic-envelope"}, \code{"asymmetric-sd"}
-(including \code{"asymmetric-sd"}) and \code{"asymmetric-sd-envelope"} pairs bands
+and \code{"asymmetric-sd-envelope"} pairs bands
 for either NN type. Their omitted/default pairs calibration is the unchanged,
 more protective local envelope. Means, frozen-radius first derivatives and
 categorical contrasts retain their existing corrected rows. The comparisons
 use only two saved original samples and do not establish nominal coverage.
 For that degree-zero or first-order Epanechnikov NN class, ordinary asymptotic and \code{interval="normal-sd"} calls
 also use the established corrected-process SD construction. Explicit
-\code{"symmetric-sd"} or \code{"symmetric-sd"} admits pairs, Mammen and Rademacher;
+\code{"symmetric-sd"} admits pairs, Mammen and Rademacher;
 separate tails and the tail envelope additionally admit both wild laws.
 The Mammen empirical default uses the local envelope and the Rademacher default
 uses its containing tail envelope. Gaussian auxiliary fits and all fitted
@@ -231,15 +235,19 @@ The two saved-sample comparisons do not establish nominal coverage or remove
 finite-sample uncertainty. Explicit narrower methods retain their definitions.
 Known bounds transform with the data; bounded ANN retains donor-specific
 support normalizers and the existing frozen-radius derivative convention.
-The qualified extension is limited to main degree components zero or one.
-For unbounded univariate quadratic or cubic Bernstein Epanechnikov GNN and ANN fits, see the explicit Mammen mean and first-derivative constructions in \code{\link{plot.np}}. Second-order beta
-GNN/ANN LC or GLP degree-zero means with known finite fixed support, including
-supported mixed mean panels and categorical mean contrasts, use these same
-established SD, pairs and wild constructions and defaults. For the experimental univariate beta NN derivative scopes and the
-degree-one and degree-two Bernstein beta GNN mean scopes and the explicitly selected degree-one beta ANN mean constructions, see \code{\link{plot.np}}; requested
-panels are never silently omitted. The beta comparison reuses two saved original
-samples and does not establish nominal coverage. Higher-degree bounded/wild
-Epanechnikov NN and higher-order kernels remain unqualified.
+On unbounded univariate quadratic and cubic Bernstein Epanechnikov GNN
+and ANN fits, users may explicitly select Mammen symmetric-SD or basic local
+envelopes for means and first derivatives, subject to the fitted-row checks.
+Declared bounds currently restrict the Epanechnikov NN extensions to main
+degrees at most one. These options require second-order kernels.
+
+For known finite beta support, GNN and ANN degree-zero means, including
+supported mixed mean panels and categorical contrasts, use the established
+SD, pairs and wild constructions. For the degree-zero first derivative and
+the distinct rules for positive-degree Bernstein beta NN means and slopes,
+see \code{\link{plot.np}}. The cubic beta ANN local envelope requires an
+explicit simultaneous or Bonferroni request and zero fitted ridge at every
+requested position.
 Inherited numerical limitations of fitted and derivative rows remain.
 These experimental extensions do not guarantee nominal coverage.
 Second-order Gaussian correction supports known fixed support for continuous
