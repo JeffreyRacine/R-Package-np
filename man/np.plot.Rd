@@ -1517,6 +1517,11 @@ fits, fixed-bandwidth mixed Gaussian models and
   establish nominal coverage.
   The following legacy centering discussion applies to the other supported
   families and to explicit regression \code{construction="legacy"}.
+The same explicit Mammen basic local envelope supports quadratic Bernstein
+adaptive NN means and first derivatives on those bounds, with the observed
+training range, full-rank and zero-ridge requirements. On the two saved ANN
+fits the simultaneous slope widths averaged 39.98 and 17.59. The pointwise
+slope bands covered 50 and 46 of their respective 50 coordinates.
 
   When bootstrap errors are requested, \code{center="bias-corrected"}
   recenters the plotted bootstrap bounds on a method-specific

@@ -4,6 +4,9 @@
   the experimental basic local envelope on univariate quadratic Bernstein
   Epanechnikov GNN means and slopes and cubic means.
 
+* On bounded quadratic Gaussian adaptive NN fits, the explicit Mammen local
+  envelope supports zero-ridge Bernstein means and first derivatives.
+
 * On bounded quadratic Gaussian GNN fits, independent and block pairs support
   explicit local envelopes. Mammen symmetric-SD is available for means.
 

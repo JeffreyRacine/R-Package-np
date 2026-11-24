@@ -259,7 +259,8 @@
       explicit.nn <- TRUE
     if (explicit.nn && identical(bws[["ckertype"]], "gaussian"))
       explicit.nn <- identical(effective.calibration, "basic-local-envelope") ||
-        (!gradients && explicit.mammen && identical(effective.calibration, "absolute"))
+        (!gradients && explicit.mammen && identical(bws[["type"]], "generalized_nn") &&
+         identical(effective.calibration, "absolute"))
     if (explicit.nn && .np_bias_beta_nn_mean(bws, "adaptive_nn", 3L))
       explicit.nn <- error.request$type %in% c("simultaneous", "bonferroni") &&
         identical(effective.calibration, "basic-local-envelope")
