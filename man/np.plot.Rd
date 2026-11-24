@@ -683,6 +683,14 @@ NN correction and continuous uniform derivatives remain unqualified.
   constructions covered 111 and 114 complete grids, respectively. The ordinary-use mean comparison reuses two saved samples and does not
   establish nominal coverage. Fitted NN counts and support bounds stay fixed.
 
+For univariate second-order Epanechnikov regression with no support
+boundary correction (\code{ckerbound="none"}), experimental pointwise and
+simultaneous Mammen intervals support quadratic and cubic Bernstein GNN
+means and first derivatives, and quadratic Bernstein ANN means. Choose
+\code{interval="symmetric-sd"} or \code{interval="basic-local-envelope"}.
+These constructions use full-rank, zero-ridge fitted rows, the usual
+auxiliary settings and evaluation within the observed training range.
+
 Experimental degree-one beta adaptive nearest-neighbour mean bands require a
 single continuous predictor, known finite bounds, a second-order beta kernel,
 a stored Bernstein GLP basis, zero-ridge fitted rows and evaluation within

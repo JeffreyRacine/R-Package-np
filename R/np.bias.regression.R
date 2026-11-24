@@ -61,6 +61,16 @@
     isTRUE(is.finite(bws[["ckerub"]]))
 }
 
+.np_bias_explicit_nn_target <- function(bws, slope) {
+  if (!identical(bws[["ckertype"]], "epanechnikov") ||
+      !isTRUE(bws[["ckerorder"]] == 2L) || !identical(bws[["ckerbound"]], "none") ||
+      !isTRUE(bws[["ncon"]] == 1L) || !isTRUE(bws[["nuno"]] == 0L) ||
+      !isTRUE(bws[["nord"]] == 0L) || !identical(bws[["regtype"]], "lp") ||
+      !identical(bws[["basis"]], "glp") || !isTRUE(bws[["bernstein.basis"]])) return(FALSE)
+  (identical(bws[["type"]], "generalized_nn") && bws[["degree"]] %in% 2:3) ||
+    (identical(bws[["type"]], "adaptive_nn") && !slope && bws[["degree"]] == 2L)
+}
+
 .np_bias_beta_gnn_mean <- function(bws) {
   .np_bias_beta_nn_mean(bws, "generalized_nn", 1:2)
 }
@@ -190,7 +200,7 @@
   bws
 }
 
-.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE, gradient.order = NULL, law = NULL, calibration = NULL, explicit.ann.mean = FALSE, explicit.ann.slope = FALSE) {
+.np_bias_regression_prepare <- function(bws, x, y, control = np_bias_control(), adapt = FALSE, gradient.order = NULL, law = NULL, calibration = NULL, explicit.ann.mean = FALSE, explicit.ann.slope = FALSE, explicit.nn = FALSE) {
   x <- toFrame(x)
   if (!is.numeric(y) || length(y) != nrow(x) || any(!is.finite(y)) || anyNA(x))
     stop("bias correction requires finite retained training data", call. = FALSE)
@@ -215,6 +225,17 @@
     if (!identical(control[fields], defaults[fields]))
       stop("experimental degree-one beta ANN bands require the assessed auxiliary bias settings", call.=FALSE)
     kernel.class <- "beta-ann-linear"
+  }
+  if (explicit.nn) {
+    slope <- !is.null(gradient.order)
+    defaults <- np_bias_control()
+    fields <- setdiff(names(defaults), "supplied")
+    if (!.np_bias_explicit_nn_target(bws, slope) || npRegressionHasExtendedNn(bws) ||
+        (slope && !isTRUE(gradient.order == 1L)) || !identical(law, "mammen") ||
+        !isTRUE(calibration %in% c("absolute", "basic-local-envelope")) ||
+        !identical(control[fields], defaults[fields]))
+      stop("experimental NN bands require the assessed target, Mammen construction and auxiliary settings", call.=FALSE)
+    kernel.class <- "explicit-nn"
   }
   if (kernel.class == "unsupported" || reg[["basis.engine"]] != "glp")
     stop(paste0("iterated regression bias correction requires a supported second-order kernel, at least one continuous predictor and a GLP main model; fixed-support Gaussian correction requires fixed bandwidths with continuous predictors only, or qualified nearest-neighbour models with main degrees at most one",legacy.hint), call. = FALSE)
@@ -265,6 +286,11 @@
       bws[["ckerorder"]] == 2L && identical(bws[["ckerbound"]], "none") &&
       bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && anyDuplicated(x[[nc[which.max(reg[["degree.engine"]])]]]))
     spec[["cubic.support"]] <- list(x=x, bws=bws, axis=which.max(reg[["degree.engine"]]))
+  if (kernel.class == "explicit-nn") {
+    spec[["explicit.nn.target"]] <- if (slope) "d1" else "mean"
+    spec[["explicit.nn.range"]] <- range(x[[nc]])
+    spec[["main.physical"]] <- list(x=x, bws=bws, physical.slope=slope, canonical=TRUE)
+  }
   if (kernel.class == "beta-ann-linear") {
     spec[["beta.ann.target"]] <- if (explicit.ann.slope) "d1" else "mean"
     spec[["beta.ann.range"]] <- range(x[[nc]])
@@ -392,6 +418,22 @@
 .np_bias_main_rows <- function(spec,evals,nu) {
   s <- integer(spec$d); if(nu)s[nu] <- .np_bias_derivative_order(spec,nu)
   reg <- npValidatedConditionalRegSpec(spec$bws,where="bias main operator",ncon.field="ncon")
+  if (isTRUE(spec[["main.physical"]][["canonical"]])) {
+    H <- npreghat(spec$bws, txdat=spec$x, exdat=evals, s=s, output="matrix", .np.require.finite=TRUE)
+    ridge <- attr(H, "ridge.used", exact=TRUE)
+    # Nonzero coefficients certify support. Check the kernel itself only for
+    # sparse or tied rows, where cancellation can hide a supported donor.
+    degree <- reg[["degree.engine"]]
+    count <- rowSums(H != 0)
+    uncertain <- if (anyDuplicated(spec$x[[1L]])) seq_len(nrow(H)) else which(count <= degree)
+    if (length(uncertain)) {
+      K <- .np_kernel_weights_direct(spec$bws, txdat=spec$x, exdat=evals[uncertain,,drop=FALSE], bandwidth.divide=TRUE)
+      if (any(vapply(seq_along(uncertain), function(j)
+          length(unique(spec$x[[1L]][K[,j] > 0])) <= degree, logical(1))))
+        stop("experimental NN bands require identifiable full-rank main rows", call.=FALSE)
+    }
+    return(.np_bias_main_admit(spec,H,ridge,reg))
+  }
   if (spec$bws[["type"]]=="generalized_nn" && any(reg[["degree.engine"]]>1L)) {
     # Retain the qualified prepared-adjoint GNN owner used by the checkpoint.
     K <- .np_kernel_weights_direct(spec$bws,txdat=spec$x,exdat=evals,bandwidth.divide=TRUE)
@@ -435,6 +477,8 @@
   admitted <- admitted || (!is.null(spec$main.capture) && inherits(captured,"np_bias_main_capture_certificate") &&
     identical(captured$state,spec))
   if (any(ridge != 0)) {
+    if (!is.null(spec[["explicit.nn.target"]]))
+      stop("experimental NN bands require zero-ridge fitted main rows", call.=FALSE)
     if (!is.null(spec[["beta.ann.range"]]))
       stop("experimental degree-one beta ANN bands require zero-ridge fitted main rows", call.=FALSE)
     if (isTRUE(spec[["beta.gnn.mean"]]))
@@ -572,6 +616,13 @@
   if (isTRUE(spec$pooled)) return(.np_bias_profile_rows(spec,grid,map))
   if (nrow(map)>500L || nrow(unique(grid[spec$numeric.cols]))>25L)
     stop("internal bias target block exceeded",call.=FALSE)
+  if (!is.null(spec[["explicit.nn.target"]])) {
+    bounds <- spec[["explicit.nn.range"]]
+    coord <- grid[[spec$numeric.cols]]
+    if (any(map$target != spec[["explicit.nn.target"]]) ||
+        any(!is.finite(coord) | coord < bounds[1L] | coord > bounds[2L]))
+      stop("experimental NN bands require their qualified target within the observed training range", call.=FALSE)
+  }
   observed <- spec[["beta.ann.range"]]
   if (!is.null(observed)) {
     coords <- grid[[spec$numeric.cols]]
