@@ -648,7 +648,10 @@
       main$x <- physical[["x"]]
       main$xcon <- main$x[spec$numeric.cols]
       main$bws <- physical[["bws"]]
-      fitted.rows <- .np_bias_original(main,main.grid,map)
+      # A single-target correction block contains at most 25 grid positions.
+      # Submit that whole block to the existing generalized-NN fitted hat.
+      block <- if (isTRUE(physical[["canonical"]]) && identical(main$bws[["type"]], "generalized_nn")) 25L else 16L
+      fitted.rows <- .np_bias_original(main,main.grid,map,block=block)
       if (isTRUE(physical[["physical.slope"]])) {
         slope <- map$target == "d1"
         fitted.rows[slope,] <- fitted.rows[slope,,drop=FALSE] * spec$scale[1L]

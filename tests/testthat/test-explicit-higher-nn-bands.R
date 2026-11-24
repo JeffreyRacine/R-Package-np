@@ -20,7 +20,7 @@ test_that("explicit higher Epanechnikov NN bands retain the fitted hat and the r
   expect_false(.np_bias_explicit_nn_target(utils::modifyList(b,list(bernstein.basis=FALSE)),FALSE))
   st <- .np_bias_regression_prepare(b,x,y,adapt=TRUE,gradient.order=1L,law="mammen",
     calibration="absolute",explicit.nn=TRUE)
-  g <- x[c(1L,35L,100L),,drop=FALSE]
+  g <- x[round(seq(1, nrow(x), length.out=25L)),,drop=FALSE]
   rows <- .np_bias_regression_rows(st,g,data.frame(row=seq_len(nrow(g)),target="d1"))
   H <- npreghat(b,txdat=x,exdat=g,s=1L,output="matrix")
   expect_equal(as.double(rows$original),as.double(H),tolerance=1e-10)
