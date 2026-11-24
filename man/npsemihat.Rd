@@ -158,7 +158,7 @@ tz <- data.frame(z = z)
 ibw <- npindexbw(xdat = data.frame(x, x2 = x^2), ydat = y,
                  bws = c(0.5, 1.0, 1.0), bandwidth.compute = FALSE)
 iH <- npindexhat(bws = ibw, txdat = data.frame(x, x2 = x^2), output = "matrix")
-iH.fitted <- iH %*% y
+iH.fitted <- iH \%*\% y
 iA <- npindexhat(bws = ibw, txdat = data.frame(x, x2 = x^2),
                  y = y, output = "constraint")
 all.equal(iA, t(iH) * y)
@@ -169,7 +169,7 @@ pbw <- npplregbw(xdat = tx, zdat = tz, ydat = y,
                  bws = matrix(c(0.2, 0.2), nrow = 2L, ncol = 1L),
                  bandwidth.compute = FALSE)
 pH <- npplreghat(bws = pbw, txdat = tx, tzdat = tz, output = "matrix")
-pH.fitted <- pH %*% y
+pH.fitted <- pH \%*\% y
 pfit <- npplreg(bws = pbw, txdat = tx, tydat = y, tzdat = tz)
 head(cbind(fitted(pfit), pH.fitted), n = 2L)
 
@@ -177,7 +177,7 @@ sbw <- npscoefbw(xdat = tx, zdat = tz, ydat = y,
                  bws = 0.2, bandwidth.compute = FALSE)
 sH <- npscoefhat(bws = sbw, txdat = tx, tzdat = tz,
                  output = "matrix", iterate = FALSE)
-sH.fitted <- sH %*% y
+sH.fitted <- sH \%*\% y
 sfit <- npscoef(bws = sbw, txdat = tx, tydat = y, tzdat = tz,
                 iterate = FALSE)
 head(cbind(fitted(sfit), sH.fitted), n = 2L)
