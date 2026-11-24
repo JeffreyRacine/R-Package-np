@@ -269,6 +269,11 @@ unqualified regularized main rows retain their existing refusals.
 The original \code{"basic-envelope"} public option supports fixed bandwidths
 and qualified degree-zero or first-order Epanechnikov NN models, or degree-zero
 uniform or known-fixed-support beta NN mean models; it remains pairs-only.
+The same explicit Mammen basic local envelope supports quadratic Bernstein
+adaptive NN means and first derivatives on those bounds, with the observed
+training range, full-rank and zero-ridge requirements. On the two saved ANN
+fits the simultaneous slope widths averaged 39.98 and 17.59. The pointwise
+slope bands covered 50 and 46 of their respective 50 coordinates.
 
 For fixed-bandwidth second-order Gaussian (unbounded, or known fixed support
 with continuous predictors only), Epanechnikov

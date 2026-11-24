@@ -75,7 +75,7 @@
       !isTRUE(bws[["nord"]] == 0L) || !identical(bws[["regtype"]], "lp") ||
       !identical(bws[["basis"]], "glp") || !isTRUE(bws[["bernstein.basis"]])) return(FALSE)
   if (identical(bws[["ckertype"]], "gaussian"))
-    return(identical(bws[["type"]], "generalized_nn") && isTRUE(bws[["degree"]] == 2L) &&
+    return(bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && isTRUE(bws[["degree"]] == 2L) &&
       identical(bws[["ckerbound"]], "fixed") &&
       isTRUE(is.finite(bws[["ckerlb"]])) && isTRUE(is.finite(bws[["ckerub"]])))
   identical(bws[["ckertype"]], "epanechnikov") && identical(bws[["ckerbound"]], "none") &&

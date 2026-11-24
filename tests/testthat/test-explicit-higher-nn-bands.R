@@ -142,7 +142,10 @@ test_that("known-support quadratic Gaussian GNN uses explicit Mammen local bands
   absolute <- suppressWarnings(do.call(plot,c(mean.args,list(interval="symmetric-sd"))))
   expect_identical(absolute$inference[[1L]]$components$simultaneous$interval,"symmetric-sd")
   expect_error(do.call(plot,mean.args))
-  for (fields in list(list(type="adaptive_nn"),list(ncon=2L),list(ckerub=Inf),
+  adaptive <- utils::modifyList(bw,list(type="adaptive_nn"))
+  expect_true(.np_bias_explicit_nn_target(adaptive,TRUE))
+  expect_false(.np_bias_gnn_local_pairs(adaptive,TRUE,"inid","basic-local-envelope"))
+  for (fields in list(list(ncon=2L),list(ckerub=Inf),
                       list(degree=3L),list(bernstein.basis=FALSE)))
     expect_false(.np_bias_explicit_nn_target(utils::modifyList(bw,fields),TRUE))
 })
