@@ -1,5 +1,7 @@
 # np 0.80-3
 
+* Explicit Mammen pointwise and simultaneous bands support quadratic beta ANN means and first derivatives on the assessed bounded Bernstein designs.
+
 * Explicit Mammen first-derivative bands support degree-one and degree-two beta GNN fits on known finite support.
 
 * Experimental univariate Bernstein Epanechnikov NN mean and slope bands use fitted observation rows on higher-degree GNN fits and quadratic ANN mean fits.
