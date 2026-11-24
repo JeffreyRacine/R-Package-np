@@ -18,7 +18,9 @@ npindextest(object, bw.method = c("published", "maximum", "separate"),
 \arguments{
   \item{object}{An \code{\link{npindex}} fit or \code{\link{npindexbw}}
     object obtained by joint estimation of the direction and link bandwidth
-    on the retained training data. A fitted object with replacement training
+    on the retained training data. The default index fit is local constant.
+    Local-linear and prespecified local-polynomial fits use the degree and
+    basis stored in the supplied object. A fitted object with replacement training
     data must reproduce the stored search criterion. For \code{summary}, an \code{indextest}
     result.}
   \item{bw.method}{Test bandwidth choice. \code{"published"} uses the
@@ -36,7 +38,7 @@ npindextest(object, bw.method = c("published", "maximum", "separate"),
 \details{
 Use independent observations, at least two continuous numeric covariates of
 full centered rank, and a fixed, unbounded second-order Gaussian
-local-constant fit. Klein--Spady requires both numeric response values 0
+index fit. Klein--Spady requires both numeric response values 0
 and 1. The hypothesis concerns existence of a single-index representation.
 Off-index curvature and interactions are examples of departures. No link
 function is specified under the null.
@@ -45,12 +47,27 @@ The statistic combines off-diagonal products of density-weighted,
 leave-one-out residuals with Gaussian weights in the estimated index and
 its orthogonal complement. All test bandwidths are on the standardized,
 unit-direction index. The published convention sets \eqn{h=n^{-2/9}} and
-uses the fitted CV link bandwidth for the residuals. The joint maximum uses
+uses the fitted CV link bandwidth for the residuals of a local-constant fit. The joint maximum uses
 the largest studentized statistic over factors 0.5, 1 and 2 and recomputes
 that maximum on every bootstrap draw. The experimental separate-bandwidth
 version uses \eqn{g=n^{-2/9}} for residuals and \eqn{h=n^{-17/36}} for pairs.
 These last two choices extend the paper's empirical procedure. The separate
 pair was conservative and had lower power in small two-covariate simulations.
+
+For a local-linear or fixed-degree polynomial index fit, each draw keeps
+the fitted degree, basis and Bernstein setting. These fits extend the
+procedure of Maistre and Patilea. On the observed standardized index,
+a separate Gaussian local-constant least-squares CV bandwidth supplies the
+pilot, including valid Bernoulli probabilities. With \code{"published"} or
+\code{"maximum"} it also supplies the residual bandwidth and is reselected
+on each refitted index. With \code{"separate"} the residual bandwidth follows
+the fixed rule above. The polynomial degree must be prespecified.
+
+In simulations at \eqn{n=192} with two continuous covariates and fixed
+Bernstein degrees 0 through 5, higher degrees often reduced power against
+off-index interactions. On one curved Klein--Spady null, degrees 2 and 3
+rejected 12 and 13 times in 128 replications at the 5 percent level.
+Degrees outside this range were not studied.
 
 Every draw refits the direction and CV bandwidth using the original model's
 search settings. Ichimura uses leave-one-out CV fitted means and Mammen wild
@@ -65,7 +82,7 @@ the starting direction and absolute stopping tolerance of \code{\link{npindexbw}
 can affect the selected fit and hence the bootstrap results. For very small
 or large units, fit and test in numerically convenient response units.
 
-For bootstrap Nelder--Mead searches with default convergence tolerances,
+For local-constant bootstrap Nelder--Mead searches with default convergence tolerances,
 at least 160 observations and automatic or disabled trees, Gaussian
 cross-validation uses interpolation and FFT convolution on the trial index.
 Sparse rows can be summed directly. Extreme response scales, unsuitable
@@ -99,8 +116,9 @@ An object of class \code{indextest}. \code{statistic}, \code{P},
 \code{exceedances}, \code{critical.values} and \code{bootstrap} report the
 observed statistic, p-value, exceedance count, upper critical values and
 ordered bootstrap statistics. \code{components} gives the observed values
-for \code{h} in the same order. \code{g.cv} and \code{g.test} are the
-observed link and residual bandwidths. \code{beta}, \code{method},
+for \code{h} in the same order. \code{g.cv}, \code{g.pilot} and \code{g.test} are the
+observed model, bootstrap pilot and score residual bandwidths on the
+standardized index. \code{beta}, \code{method},
 \code{bw.method}, \code{n}, \code{refit.controls}, \code{boot.num} and
 \code{random.seed} describe the fit and calibration. \code{call} and
 \code{model.call} retain the calls. \code{cv.counts} records the numbers of grid and native bootstrap CV
