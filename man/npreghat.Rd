@@ -250,10 +250,10 @@ data(cps71)
 bw <- npregbw(xdat = cps71$age, ydat = cps71$logwage,
               regtype = "ll", bandwidth.compute = FALSE, bws = 1.0)
 H <- npreghat(bws = bw, txdat = data.frame(age = cps71$age))
-H.fitted <- H %*% cps71$logwage
+H.fitted <- H \%*\% cps71$logwage
 A <- npreghat(bws = bw, txdat = data.frame(age = cps71$age),
               y = cps71$logwage, output = "constraint")
-all.equal(A, t(H) * cps71$logwage)
+all.equal(as.vector(A), as.vector(t(H) * cps71$logwage))
 ghat <- npreg(bws = bw)
 head(cbind(fitted(ghat), H.fitted), n = 2L)
 }
