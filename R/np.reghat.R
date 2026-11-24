@@ -1012,6 +1012,13 @@ npreghat <-
      identical(bws[["ckertype"]], "gaussian") && identical(bws[["ckerbound"]], "fixed") &&
      identical(as.integer(bws[["ckerorder"]]), 2L) && bws$ncon == 1L &&
      bws$nuno == 0L && bws$nord == 0L)
+  epa.ann <- identical(bws[["type"]], "adaptive_nn") &&
+    identical(bws[["ckertype"]], "epanechnikov") && bws[["ckerorder"]] == 2L &&
+    identical(bws[["ckerbound"]], "none") && bws$ncon == 1L &&
+    bws$nuno == 0L && bws$nord == 0L && identical(basis, "glp") &&
+    isTRUE(bernstein.basis) && degree %in% 2:3 && (!want.grad || s == 1L)
+  if (epa.ann) attr(kw, ".np.precision.zero.only") <- TRUE
+  precision.eligible <- precision.eligible || epa.ann
   if(precision.eligible) attr(kw,".np.precision.eligible") <- TRUE
   matprod.mode <- getOption("matprod")
   H.fast <- if (ncol(W.train) == 1L ||
@@ -1046,7 +1053,10 @@ npreghat <-
       empty.rows[j] <- 1L
       next
     }
-    if(precision.eligible && !all(w==w[1L])) attr(A.base,".np.precision.eligible") <- TRUE
+    if(precision.eligible && !all(w==w[1L])) {
+      attr(A.base,".np.precision.eligible") <- TRUE
+      if (epa.ann) attr(A.base,".np.precision.zero.only") <- TRUE
+    }
     solved <- .Call("C_np_lp_adjoint_prepared", A.base, as.double(rhs),
                     as.integer(ntrain),
                     as.integer(min(ncol(W.train), sum(w != 0.0))),

@@ -503,6 +503,8 @@ static SEXP np_reghat_matrix_execution_run(void *data)
   SEXP admission=getAttrib(execution->kw,install(".np.precision.eligible"));
   const int precision_eligible=admission!=R_NilValue && TYPEOF(admission)==LGLSXP &&
     XLENGTH(admission)==1 && LOGICAL(admission)[0]==TRUE;
+  const int zero_only = precision_eligible &&
+    getAttrib(execution->kw,install(".np.precision.zero.only")) != R_NilValue;
   for(int j = 0; j < neval; j++){
     const double * const weights =
       REAL(execution->kw) + (size_t)j*(size_t)ntrain;
@@ -548,7 +550,7 @@ static SEXP np_reghat_matrix_execution_run(void *data)
       error("LP solve failed in compiled hat-matrix path after bounded ridging");
     if(row_status != NP_REGHAT_LP_ROW_OK)
       error("invalid wider-LP compiled hat-matrix input");
-    int precise=precision_eligible && np_regression_precision_needed(&workspace->solve_workspace,nterms);
+    int precise=precision_eligible && (!zero_only || ridge==0.0) && np_regression_precision_needed(&workspace->solve_workspace,nterms);
     if(precise) {
       int constant=1;for(int i=1;i<ntrain && constant;++i)constant=weights[i]==weights[0];
       precise=!constant;
