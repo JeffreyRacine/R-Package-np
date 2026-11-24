@@ -27,3 +27,21 @@ test_that("explicit higher Epanechnikov NN bands retain the fitted hat and the r
   expect_error(.np_bias_main_admit(st,matrix(1),1e-12,list(degree.engine=3L)),"zero-ridge")
   expect_error(.np_bias_regression_rows(st,data.frame(x=1),data.frame(row=1L,target="d1")),"observed training range")
 })
+test_that("positive-degree beta NN slope choices are explicit", {
+  skip_on_cran()
+  options0 <- options(np.messages=FALSE,np.plot.progress=FALSE)
+  on.exit(options(options0),add=TRUE)
+  x <- data.frame(x=seq(-.9,.95,length.out=100L))
+  y <- exp(x$x)+.05*cos(seq_len(nrow(x)))
+  for (degree in 1:2) {
+    b <- npregbw(xdat=x,ydat=y,bws=29,regtype="lp",degree=degree,basis="glp",bernstein.basis=TRUE,
+                 bwtype="generalized_nn",ckertype="beta",ckerbound="fixed",ckerlb=-1,ckerub=1,bandwidth.compute=FALSE)
+    a <- list(x=npreg(b,txdat=x,tydat=y),gradients=TRUE,neval=3L,center="bias-corrected",errors="bootstrap",
+              output="data",band="pointwise",B=99L,alpha=.1,random.seed=31L)
+    expect_error(do.call(plot,a))
+    for (interval in c("symmetric-sd","basic-local-envelope")) {
+      z <- suppressWarnings(do.call(plot,c(a,list(interval=interval))))
+      expect_identical(z$inference[[1L]]$components$pointwise$interval,interval)
+    }
+  }
+})
