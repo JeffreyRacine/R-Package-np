@@ -441,7 +441,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
              kw, num_train, np_glp_cv_cache.nterms, &design_support),
            (precise_beta_ann || pooled_beta || fixed_beta || beta_edge_row) ? &precision : NULL, np_glp_cv_cache.basis,
            pooled_beta || fixed_beta || beta_edge_row,
-           beta_edge_row && np_linear_beta_ann_at_training_limit(linear_range, matrix_X_continuous_eval_extern[0][i])) != NP_REGHAT_LP_ROW_OK) {
+           beta_edge_row && np_linear_beta_ann_at_training_limit(linear_range, matrix_X_continuous_eval_extern[0][i]),
+           ridge_used_out ? ridge_used_out+i : NULL) != NP_REGHAT_LP_ROW_OK) {
         if(np_lp_failed_system_is_finite(&reghat_workspace.solve_workspace,
              np_glp_cv_cache.nterms, 1) &&
            np_lp_record_empty_row(kw, num_train, i, num_eval, num_train,

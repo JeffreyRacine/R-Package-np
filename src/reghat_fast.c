@@ -355,7 +355,7 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked_precision(
   double *row_out,
   size_t output_stride,
   int support_rank, NPRegressionPrecision *precision, double **columns,
-  int zero_ridge_only, int require_factor)
+  int zero_ridge_only, int require_factor, double *ridge_used)
 {
   NPReghatLPRowStatus status;
   int observation;
@@ -370,9 +370,10 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked_precision(
     workspace->ntrain, workspace->nterms, workspace->design,
     weights, basis_eval, workspace->weighted_design,
     &workspace->solve_workspace, workspace->prediction, 0, support_rank,
-    precision ? &anchor : NULL, precision ? &ridge : NULL);
+    precision ? &anchor : NULL, (precision || ridge_used) ? &ridge : NULL);
   if(status != NP_REGHAT_LP_ROW_OK)
     return status;
+  if(ridge_used != NULL) *ridge_used = ridge;
   if(precision != NULL && (!zero_ridge_only || ridge == 0.0) &&
      (require_factor || np_regression_precision_needed(&workspace->solve_workspace, workspace->nterms))) {
     if(!np_regression_precision_factor(precision, columns, weights, workspace->ntrain,
@@ -403,7 +404,7 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row_ranked(
   int support_rank)
 {
   return np_reghat_lp_workspace_influence_row_ranked_precision(workspace, weights,
-    basis_eval, row_out, output_stride, support_rank, NULL, NULL, 0, 0);
+    basis_eval, row_out, output_stride, support_rank, NULL, NULL, 0, 0, NULL);
 }
 
 /* Search consumers deliberately retain their incumbent numerical admission.
