@@ -648,7 +648,12 @@
       main$x <- physical[["x"]]
       main$xcon <- main$x[spec$numeric.cols]
       main$bws <- physical[["bws"]]
-      .np_bias_original(main,main.grid,map)
+      fitted.rows <- .np_bias_original(main,main.grid,map)
+      if (isTRUE(physical[["physical.slope"]])) {
+        slope <- map$target == "d1"
+        fitted.rows[slope,] <- fitted.rows[slope,,drop=FALSE] * spec$scale[1L]
+      }
+      fitted.rows
     }
   } else {
     diagnostic <- attr(original,"main.regularization",exact=TRUE)
