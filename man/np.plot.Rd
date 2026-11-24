@@ -696,6 +696,10 @@ GNN fits on known finite support also support these two explicit Mammen
 constructions on the observed training range at zero fitted ridge.
 Select \code{gradients=TRUE} and pointwise or simultaneous coverage.
 
+For quadratic univariate Bernstein beta ANN fits the two explicit Mammen
+constructions support means and first derivatives under the same bounds,
+ridge, evaluation range and auxiliary settings.
+
 Experimental degree-one beta adaptive nearest-neighbour mean bands require a
 single continuous predictor, known finite bounds, a second-order beta kernel,
 a stored Bernstein GLP basis, zero-ridge fitted rows and evaluation within

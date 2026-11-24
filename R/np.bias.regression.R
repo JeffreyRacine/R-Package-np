@@ -63,6 +63,7 @@
 
 .np_bias_explicit_nn_target <- function(bws, slope) {
   if (slope && .np_bias_beta_gnn_mean(bws)) return(TRUE)
+  if (.np_bias_beta_nn_mean(bws, "adaptive_nn", 2L)) return(TRUE)
   if (!identical(bws[["ckertype"]], "epanechnikov") ||
       !isTRUE(bws[["ckerorder"]] == 2L) || !identical(bws[["ckerbound"]], "none") ||
       !isTRUE(bws[["ncon"]] == 1L) || !isTRUE(bws[["nuno"]] == 0L) ||
