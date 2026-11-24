@@ -60,10 +60,7 @@ SEXP C_np_plot_regression_gradient_projection(SEXP args)
       ((op[REG_BWI]==BW_FIXED && op[REG_CKRNEVI]==0) ||
        (op[REG_BWI]==BW_GEN_NN && (op[REG_CKRNEVI]==0 || op[REG_CKRNEVI]==4)))) ||
     (op[REG_CKFAMILYI]==NP_CKERNEL_FAMILY_BETA && op[REG_BWI]==BW_GEN_NN);
-  if(capture_gradient && (nu || no || !capture_kernel_scope ||
-     op[REG_CKORDERI]!=2 || (double)width*pc>INT_MAX))
-    error("lean gradient capture requires continuous fixed Gaussian2 or generalized-NN Gaussian2/Epanechnikov2/beta2 regression");
-  const double resident=(capture_gradient ? (op[REG_GRAD]?(double)m*width*pc:0.0)+m+3.0*pc : 0.0)+
+  const double resident=(capture_gradient ? (op[REG_GRAD]?(double)m*width*pc:0.0)+m+3.0*nc : 0.0)+
     (double)width*(n+(double)m)+
     2.0*(n+(double)m)*nc+2.0*n+2.0*m+(double)m*nc+256.0*width*width;
   if(!R_FINITE(resident) || resident>R_XLEN_T_MAX ||
@@ -110,6 +107,18 @@ SEXP C_np_plot_regression_gradient_projection(SEXP args)
     if(ISNAN(REAL(v[22])[i]) || ISNAN(REAL(v[23])[i]) ||
        !(REAL(v[22])[i]<REAL(v[23])[i]))
       error("plot gradient projection: invalid support bounds");
+  if(capture_gradient) {
+    const int pooled = op[REG_GRAD] && nu == 2 && no == 0 && pc == 1 && basis == 1 &&
+      INTEGER(v[15])[0] == 2 && INTEGER(v[16])[0] == 1 &&
+      op[REG_BWI] == BW_GEN_NN && op[REG_CKFAMILYI] == NP_CKERNEL_FAMILY_LEGACY &&
+      op[REG_CKRNEVI] == 0 && op[REG_UKRNEVI] == UKERNEL_UAA &&
+      op[REG_MLEVI] == 2 && REAL(v[9])[1] != REAL(v[10])[0] &&
+      REAL(v[9])[3] != REAL(v[10])[0] && REAL(v[8])[0] <= n-1 &&
+      REAL(v[8])[1] == 0.5 && REAL(v[8])[2] == 0.5;
+    if(((nu || no) && !pooled) || !capture_kernel_scope ||
+       op[REG_CKORDERI]!=2 || (double)width*pc>INT_MAX)
+      error("lean gradient capture requires continuous fixed Gaussian2 or generalized-NN Gaussian2/Epanechnikov2/beta2 regression, or a fully pooled quadratic Gaussian GNN slope");
+  }
   if(op[REG_BWI]!=BW_FIXED && op[REG_BWI]!=BW_GEN_NN && op[REG_BWI]!=BW_ADAP_NN)
     error("plot gradient projection: invalid bandwidth mode");
   np_continuous_kernel_descriptor descriptor=np_continuous_kernel_descriptor_or_error(
@@ -144,11 +153,11 @@ SEXP C_np_plot_regression_gradient_projection(SEXP args)
       gradient_projection=PROTECT(allocMatrix(REALSXP,m,width*pc));++protected_count;
     }
     ridge=PROTECT(allocVector(REALSXP,m));++protected_count;
-    gate=PROTECT(allocMatrix(REALSXP,3,pc));++protected_count;
+    gate=PROTECT(allocMatrix(REALSXP,3,nc));++protected_count;
     if(gradient_projection!=R_NilValue)
       for(R_xlen_t i=0;i<XLENGTH(gradient_projection);++i)REAL(gradient_projection)[i]=NA_REAL;
     for(int i=0;i<m;++i)REAL(ridge)[i]=NA_REAL;
-    memset(REAL(gate),0,(size_t)pc*3*sizeof(double));
+    memset(REAL(gate),0,(size_t)nc*3*sizeof(double));
   }
   double extra[6]={0};int variance_unavailable=0;int *gradient_zero=NULL;
   NPRegressionFitProjection projection={.ntrain=n,.neval=m,.width=width,

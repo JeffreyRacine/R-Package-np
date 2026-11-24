@@ -475,7 +475,8 @@ npreghat <-
   out
 }
 
-.npreghat_exact_matrix_from_core <- function(bws, txdat, exdat = NULL, s = NULL, allow.empty.rows = FALSE) {
+.npreghat_exact_matrix_from_core <- function(bws, txdat, exdat = NULL, s = NULL, allow.empty.rows = FALSE,
+                                             capture.ridge = FALSE) {
   miss.ex <- is.null(exdat)
   neval <- if (miss.ex) nrow(txdat) else nrow(exdat)
   ntrain <- nrow(txdat)
@@ -514,7 +515,21 @@ npreghat <-
     }
   }
 
-  for (j in seq_len(ntrain)) {
+  columns <- seq_len(ntrain)
+  if (capture.ridge) {
+    # Ridge depends on the design. Retain it from the first indicator fit
+    # while preserving the fitted response coefficients for every donor.
+    y1 <- numeric(ntrain)
+    y1[1L] <- 1
+    captured <- .npRmpi_with_local_regression(.np_plot_lsq_gradient_projection(
+      bws, txdat, y1, if (miss.ex) txdat else exdat, gradient.order = 1L,
+      capture.gradient = TRUE, allow.empty.rows = allow.empty.rows, training = miss.ex))
+    H[, 1L] <- captured$gradient[, target.col]
+    attr(H, "ridge.used") <- captured$ridge
+    if (any(captured$empty.rows != 0L)) empty.rows <- captured$empty.rows
+    columns <- columns[-1L]
+  }
+  for (j in columns) {
     yj <- numeric(ntrain)
     yj[j] <- 1.0
     H[, j] <- fit_one(yj)
@@ -2546,7 +2561,18 @@ npreghat.rbandwidth <-
       leave.one.out = leave.one.out
     )
 
-    fitted.capture.route <- .npreghat_fitted_capture_scope(bws) &&
+    # The two fully pooled binary factors contribute a constant weight.
+    # Both support modes retain the ridge from the fitted slope owner.
+    pooled.slope <- first.derivative.request && bws$nuno == 2L && bws$nord == 0L &&
+      bws$ncon == 1L && identical(output,"matrix") && identical(bws$type,"generalized_nn") &&
+      identical(bws$ckertype,"gaussian") && bws$ckerorder == 2L && bws$ckerbound %in% c("fixed", "none") &&
+      identical(reg.spec$degree.engine,2L) && identical(reg.spec$basis.engine,"glp") &&
+      identical(bws$ukertype,"aitchisonaitken") && !npRegressionHasExtendedNn(bws) &&
+      identical(unname(lengths(bws$xdati$all.dlev[bws$iuno])),c(2L,2L)) &&
+      .np_physical_bandwidth(bws)[bws$icon] <= nrow(txdat)-1L &&
+      all(.np_physical_bandwidth(bws)[bws$iuno] == 0.5)
+    fitted.capture.route <- (.npreghat_fitted_capture_scope(bws) ||
+      (pooled.slope && identical(bws$ckerbound, "fixed"))) &&
       !isTRUE(leave.one.out) && ridge==0 &&
       identical(reg.spec$regtype.engine,"lp") && !constant.basis &&
       sum(s>0L)<=1L && !direct.apply
@@ -2712,6 +2738,10 @@ npreghat.rbandwidth <-
       H <- if(fitted.capture.route) {
         .npRmpi_with_local_regression(.npreghat_fitted_capture(bws,txdat,
           if(no.ex)NULL else exdat,s,allow.empty.rows=allow.empty.rows))
+      } else if (pooled.slope && identical(bws$ckerbound, "none") && exact.lp.kernel.route) {
+        .npRmpi_with_local_regression(.npreghat_exact_matrix_from_core(
+          bws, txdat, if (no.ex) NULL else exdat, s,
+          allow.empty.rows = allow.empty.rows, capture.ridge = TRUE))
       } else if (exact.beta.native.route || native.lp.mean.matrix.route ||
                    native.loo.route ||
                    (lc.derivative.exact.route && !beta.kernel)) {
@@ -2780,7 +2810,8 @@ npreghat.rbandwidth <-
         return(finish.empty.rows(
           .np_hat_constraint_from_matrix(H, y, "npreghat"), empty.rows))
 
-      ridge.used <- if (report.epa.ridge || fitted.capture.route || exact.beta.native.route || native.lp.mean.matrix.route || native.loo.route) {
+      ridge.used <- if (report.epa.ridge || (pooled.slope && exact.lp.kernel.route) ||
+                        fitted.capture.route || exact.beta.native.route || native.lp.mean.matrix.route || native.loo.route) {
         .npreghat_native_ridge_used(
           H, nrow(H), "npreghat(..., output = 'matrix')", empty.rows
         )

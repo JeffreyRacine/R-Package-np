@@ -352,6 +352,10 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
 
   np_lp_design_support_prepare(&design_support, np_glp_cv_cache.basis,
                                 num_train, np_glp_cv_cache.nterms);
+  const int pooled_gaussian = kernel_route == NULL && num_reg_continuous_extern == 1 &&
+    np_pooled_gaussian_quadratic(BANDWIDTH_den_extern, int_cxker_bound_extern, kernel_cx[0],
+      num_reg_continuous_extern, num_reg_unordered_extern, num_reg_ordered_extern,
+      kernel_ux, num_categories_extern_X, lambdax);
   if(kernel_route != NULL) {
     pooled_beta = deriv_order == 0 && np_pooled_beta_linear_precision(kernel_route,
       BANDWIDTH_den_extern, num_reg_continuous_extern, num_reg_unordered_extern,
@@ -577,6 +581,18 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     }
     if(ridge_used_out != NULL)
       ridge_used_out[i] = solve_diagnostics.ridge_total;
+    if(pooled_gaussian && solve_diagnostics.ridge_total == 0.0 &&
+       np_regression_precision_needed(&solve_workspace, np_glp_cv_cache.nterms)) {
+      if(!np_regression_precision_factor(&precision, np_glp_cv_cache.basis, kw,
+           num_train, np_glp_cv_cache.nterms, 0.0, solve_workspace.gram_source[0]) ||
+         !np_regression_precision_row(&precision, eval_basis))
+        goto cleanup_lp_hat;
+      for(j = 0; j < num_train; ++j) {
+        const int orig_j = int_TREE_X == NP_TREE_TRUE ? ipt_extern_X[j] : j;
+        weights_out[i + (size_t)num_eval*orig_j] = precision.row[j];
+      }
+      continue;
+    }
 
     for(j = 0; j < num_train; j++){
       double zju = 0.0;
