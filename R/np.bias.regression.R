@@ -471,18 +471,23 @@
     beta.mean <- !nu && spec$d == 1L && !length(spec$factor.cols) &&
       identical(spec$bws[["ckertype"]], "beta") && spec$bws[["ckerorder"]] == 2L &&
       reg[["degree.engine"]][1L] == 2L
+    precise.row <- beta.mean || (spec$d == 1L && !length(spec$factor.cols) &&
+      sum(s) <= 1L && identical(spec$bws[["ckertype"]], "gaussian") &&
+      spec$bws[["ckerorder"]] == 2L && spec$bws[["bw"]][1L] <= nrow(P)-1L &&
+      identical(spec$bws[["ckerbound"]], "none") && isTRUE(reg[["bernstein.basis.engine"]]) &&
+      identical(reg[["degree.engine"]], 3L))
     H <- matrix(0,nrow(evals),nrow(spec$x));ridge <- numeric(nrow(evals))
     for(j in seq_len(nrow(evals))) {
       weighted <- P*K[,j]
       gram <- crossprod(P,weighted)
-      if (beta.mean) {
+      if (precise.row) {
         attr(gram, ".np.precision.eligible") <- TRUE
         attr(gram, ".np.precision.zero.only") <- TRUE
       }
       solved <- .Call("C_np_lp_adjoint_prepared_ridge",gram,as.double(V[j,]),
         as.integer(nrow(P)),as.integer(min(ncol(P),sum(K[,j]!=0))),PACKAGE="np")
       ridge[j] <- solved$ridge
-      policy <- if (beta.mean) attr(solved$v, ".np.fit.precision", exact=TRUE)
+      policy <- if (precise.row) attr(solved$v, ".np.fit.precision", exact=TRUE)
       if (!is.null(policy)) {
         direction <- matrix(solved$v,nrow=1L)
         attr(direction, ".np.fit.precision") <- policy
