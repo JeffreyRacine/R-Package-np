@@ -718,6 +718,14 @@ also support the two explicitly selected Mammen constructions within the
 observed range at zero fitted ridge. Coverage evidence spans three saved
 datasets.
 
+For the explicit univariate higher-degree Epanechnikov, degree-one uniform
+ANN mean and degree-one or degree-two beta NN constructions above,
+\code{band="bonferroni"} applies the adjusted empirical ranks and
+\code{band="all"} returns the pointwise, simultaneous and Bonferroni
+components on shared draws. Choose the interval explicitly. A quadratic
+beta GNN first derivative requires the basic local envelope for either scope.
+Limited tail resolution is recorded with the returned intervals.
+
 Experimental degree-one beta adaptive nearest-neighbour mean bands require a
 single continuous predictor, known finite bounds, a second-order beta kernel,
 a stored Bernstein GLP basis, zero-ridge fitted rows and evaluation within

@@ -244,7 +244,7 @@
     explicit.mammen <- new.bias &&
       plot.errors.boot.calibration %in% c("absolute", "basic-local-envelope") &&
       identical(error.request$method, "bootstrap") &&
-      error.request$type %in% c("simultaneous", "pointwise") &&
+      error.request$type %in% c("simultaneous", "pointwise", "bonferroni", "all") &&
       as.character(plot.errors.boot.method)[1L] == "wild" &&
       as.character(plot.errors.boot.wild)[1L] == "mammen" &&
       (!gradients || all(plot.gradient.order.label[bws$icon] == 1L))
