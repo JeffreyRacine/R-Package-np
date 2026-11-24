@@ -174,3 +174,19 @@ test_that("fixed-degree tests reproduce the supplied index search and projected 
   bw$degree.search <- list(method="coordinate")
   expect_error(.indextest_setup(bw, "published"), "prespecified degree")
 })
+
+test_that("a public polynomial fit retains its collective training certificate", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  # A saved Ichimura bootstrap draw whose local and collective evaluations
+  # of the same winning point differ on Apple silicon.
+  d <- readRDS(test_path("fixtures", "indextest_collective_training.rds"))
+  bw <- npindexbw(xdat=d$x, ydat=d$y, method="ichimura", regtype="lp",
+                  degree=3L, bernstein.basis=TRUE)
+  reference <- npindextest(bw, B=9L)
+  actual <- npindextest(npindex(bw), B=9L)
+  expect_identical(actual$statistic, reference$statistic)
+  expect_identical(actual$bootstrap, reference$bootstrap)
+  replacement <- npindex(bws=bw, txdat=d$x, tydat=rev(d$y))
+  expect_error(npindextest(replacement, B=9L), "training sample")
+})

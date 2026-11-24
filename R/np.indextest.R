@@ -39,7 +39,7 @@
     spec[c("regtype", "basis", "degree", "bernstein.basis")], controls)
 }
 
-.indextest_setup <- function(object, bw.method) {
+.indextest_setup <- function(object, bw.method, allow.collective = FALSE) {
   bw <- if (inherits(object, "singleindex")) object[["bws"]] else object
   if (!inherits(bw, "sibandwidth"))
     stop("object must be an npindex() fit or npindexbw() bandwidth object.", call. = FALSE)
@@ -77,12 +77,16 @@
     stop("Klein-Spady requires a numeric 0/1 response.", call. = FALSE)
   # A held-bandwidth npindex fit can replace its training data. Check the
   # original search criterion once before using that direction for inference.
+  collective.fval <- NULL
   if (inherits(object, "singleindex")) {
     checked <- .np_plot_with_local_compiled_eval(.npindexbw_certify_selected_candidate(c(bw[["beta"]][-1L], bw[["bw"]]),
       as.matrix(x), y, bw, .npindex_resolve_spec(bw)))
     if (!isTRUE(all.equal(as.double(checked$objective), as.double(bw[["fval"]]),
-                          tolerance = 1e-8)))
-      stop("The stored index search does not match the fit's training sample. Refit npindexbw on these data.", call. = FALSE)
+                          tolerance = 1e-8))) {
+      if (!allow.collective || recipe$regtype == "lc")
+        stop("The stored index search does not match the fit's training sample. Refit npindexbw on these data.", call. = FALSE)
+      collective.fval <- as.double(bw[["fval"]])
+    }
   }
   centered <- sweep(as.matrix(x), 2L, colMeans(x))
   scales <- sqrt(colMeans(centered^2))
@@ -112,8 +116,33 @@
       objective = if (recipe$method == "ichimura") "ls" else "ks", .prepare.index = TRUE)
   }
   list(x=x, y=y, s=s, scales=scales, template=template, cv=cv, recipe=recipe, h=h,
-       grid=.indextest_grid_eligible(n, recipe),
+       grid=.indextest_grid_eligible(n, recipe), collective.fval=collective.fval,
        g.test=if (bw.method=="separate") n^(-2/9), beta=bw[["beta"]], bw=bw[["bw"]])
+}
+
+# A public MPI polynomial search may have evaluated its winning point
+# collectively. For a fitted object, certify that same point on its retained
+# training sample with the existing collective evaluator when necessary.
+.indextest_collective_objective <- function(param, x, y, template) {
+  rank <- mpi.comm.rank(1L)
+  ctx <- list(comm = 1L, rank = rank, size = mpi.comm.size(1L), root = rank == 0L)
+  result <- .npindexbw_service_transaction(ctx, function(guard)
+    .npindexbw_eval_objective_raw(param, x, y, template, .npindex_resolve_spec(template),
+                                  localize = FALSE, .entry.guard = guard))
+  if (!is.null(result$service.error)) stop(result$service.error)
+  as.double(result$objective)
+}
+
+.indextest_check_collective_fit <- function(data) {
+  args <- list(c(data$beta[-1L], data$bw), as.matrix(data$x), data$y, data$template)
+  actual <- if (.npRmpi_cms_collective_context()) {
+    do.call(.indextest_collective_objective, args)
+  } else {
+    command <- as.call(c(list(.indextest_collective_objective), args))
+    .npRmpi_bcast_cmd_expr(command, comm = 1L, caller.execute = TRUE)
+  }
+  if (!isTRUE(all.equal(actual, data$collective.fval, tolerance = 1e-8)))
+    stop("The stored index search does not match the fit's training sample. Refit npindexbw on these data.", call. = FALSE)
 }
 
 .indextest_index <- function(data, beta, bw) {
@@ -370,7 +399,16 @@ npindextest <- function(object, bw.method = c("published", "maximum", "separate"
       random.seed <- npValidateNonNegativeInteger(random.seed, "random.seed")
     }
     data <- .np_progress_activity_run("Preparing the single-index test",
-      .indextest_setup(object, bw.method))
+      .indextest_setup(object, bw.method, allow.collective = TRUE))
+    .pltest_preflight(B, "npindextest")
+  }, where="npindextest")
+  .pltest_same(list(bw.method,B,random.seed,data$x,data$y,data$recipe,data$beta,data$bw,
+                    data$grid,data$collective.fval))
+  .pltest_local({
+    if (!is.null(data$collective.fval)) {
+      .indextest_check_collective_fit(data)
+      data$collective.fval <- NULL
+    }
     index <- .indextest_index(data, data$beta, data$bw)
     model.g <- index$g
     if (data$recipe$regtype != "lc")
@@ -382,9 +420,7 @@ npindextest <- function(object, bw.method = c("published", "maximum", "separate"
     data$pilot <- .np_progress_activity_run("Computing the bootstrap pilot",
       .indextest_pilot(data, index))
     if (any(!is.finite(data$pilot))) stop("The bootstrap pilot is not finite.", call. = FALSE)
-    .pltest_preflight(B, "npindextest")
   }, where="npindextest")
-  .pltest_same(list(bw.method,B,random.seed,data$x,data$y,data$recipe,data$beta,data$bw,data$grid))
   if (is.null(random.seed)) {
     .pltest_current_stream()
     on.exit(.pltest_current_stream(), add=TRUE)
