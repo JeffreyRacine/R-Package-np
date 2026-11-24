@@ -20,6 +20,7 @@
   replay <- c("bws","optim.maxit","optim.maxattempts","optim.reltol","optim.abstol",
               "random.seed","scale.factor.init.lower","scale.factor.init.upper",
               "scale.factor.init")
+  stored <- c(stored, "basis", "degree", "bernstein.basis", "degree.select", "nomad", "search.engine")
   unhandled <- setdiff(names(args), c(stored,replay))
   if (length(args) && (is.null(names(args)) || any(!nzchar(names(args))) || length(unhandled)))
     stop("Cannot reconstruct this original search call. Use a supported, named npindexbw call.")
@@ -33,18 +34,21 @@
     if (!literal(expr)) stop("Original ",key," value is unavailable. Refit with literal controls or do.call using evaluated controls.")
     controls[key] <- list(eval(expr, baseenv()))
   }
-  c(list(method = bw[["method"]], nmulti = starts, regtype = "lc",
-         bwtype = "fixed", ckertype = "gaussian"), controls)
+  spec <- .npindex_resolve_spec(bw)
+  c(list(method = bw[["method"]], nmulti = starts, bwtype = "fixed", ckertype = "gaussian"),
+    spec[c("regtype", "basis", "degree", "bernstein.basis")], controls)
 }
 
 .indextest_setup <- function(object, bw.method) {
   bw <- if (inherits(object, "singleindex")) object[["bws"]] else object
   if (!inherits(bw, "sibandwidth"))
     stop("object must be an npindex() fit or npindexbw() bandwidth object.", call. = FALSE)
-  if (!identical(bw[["regtype"]], "lc") || !identical(bw[["type"]], "fixed") ||
+  if (!is.null(bw[["degree.search"]]))
+    stop("Supply an index fit with a prespecified degree. Automatic degree selection is unsupported.", call. = FALSE)
+  if (!isTRUE(bw[["regtype"]] %in% c("lc", "ll", "lp")) || !identical(bw[["type"]], "fixed") ||
       !identical(bw[["ckertype"]], "gaussian") || !identical(bw[["ckerbound"]], "none") ||
       !isTRUE(bw[["ckerorder"]] == 2))
-    stop("The test requires a fixed, unbounded, second-order Gaussian local-constant fit.", call. = FALSE)
+    stop("The test requires a fixed, unbounded, second-order Gaussian index fit with fixed degree.", call. = FALSE)
   if (length(bw[["fval"]]) != 1L || !is.finite(bw[["fval"]]))
     stop("The test requires a joint index and bandwidth search.", call. = FALSE)
   if (!is.null(bw[["index.design"]]))
@@ -96,13 +100,17 @@
   template <- sibandwidth(beta = initial[seq_len(ncol(x))], h = tail(initial, 1L),
     method = recipe$method, nobs = n, xdati = bw$xdati, ydati = bw$ydati,
     xnames = names(x), ynames = bw$ynames, bandwidth = tail(initial, 1L),
-    bandwidth.compute = TRUE)
+    bandwidth.compute = TRUE, regtype = recipe$regtype, basis = recipe$basis,
+    degree = recipe$degree, bernstein.basis = recipe$bernstein.basis)
   template <- npSetScaleFactorSearchLower(template, recipe$scale.factor.search.lower)
-  descriptor <- .npindexbw_prepare_lp_regression_leaf_descriptor(
-    x[[1L]], y, 1, template, .npindex_resolve_spec(template))
-  cv <- .npregbw_call_fixed_degree_core(xdat = x[,1L,drop=FALSE], ydat = y,
-    bws = descriptor$bws, invalid.penalty = "dbmax", eval.only = TRUE,
-    objective = if (recipe$method == "ichimura") "ls" else "ks", .prepare.index = TRUE)
+  cv <- NULL
+  if (recipe$regtype == "lc") {
+    descriptor <- .npindexbw_prepare_lp_regression_leaf_descriptor(
+      x[[1L]], y, 1, template, .npindex_resolve_spec(template))
+    cv <- .npregbw_call_fixed_degree_core(xdat = x[,1L,drop=FALSE], ydat = y,
+      bws = descriptor$bws, invalid.penalty = "dbmax", eval.only = TRUE,
+      objective = if (recipe$method == "ichimura") "ls" else "ks", .prepare.index = TRUE)
+  }
   list(x=x, y=y, s=s, scales=scales, template=template, cv=cv, recipe=recipe, h=h,
        grid=.indextest_grid_eligible(n, recipe),
        g.test=if (bw.method=="separate") n^(-2/9), beta=bw[["beta"]], bw=bw[["bw"]])
@@ -116,6 +124,17 @@
   if (length(g)!=1L || !is.finite(g) || g<=0 || any(!is.finite(z)))
     stop("The fitted index or link bandwidth is invalid.", call. = FALSE)
   list(z=z, g=g)
+}
+
+# Fixed-degree index fits use a separate LC pilot on the standardized index.
+# The single-regressor CV search has the same defaults as npregbw(z, y).
+.indextest_projected_g <- function(z, y) {
+  fit <- .npregbw_run_fixed_degree(data.frame(z = z), y, 0,
+    list(regtype = "lc", bwmethod = "cv.ls"), list(bandwidth.compute = TRUE), "y")
+  g <- as.double(fit[["bw"]])
+  if (length(g) != 1L || !is.finite(g) || g <= 0)
+    stop("The projected Gaussian CV bandwidth must be finite and positive.", call. = FALSE)
+  g
 }
 
 .indextest_score <- function(y, index, data) {
@@ -255,7 +274,7 @@
 }
 
 .indextest_grid_eligible <- function(n, recipe) {
-  n >= 160L && identical(recipe[["optim.method"]], "Nelder-Mead") &&
+  identical(recipe[["regtype"]], "lc") && n >= 160L && identical(recipe[["optim.method"]], "Nelder-Mead") &&
     is.null(recipe[["optim.reltol"]]) && is.null(recipe[["optim.abstol"]]) &&
     npTreeMode() != "on"
 }
@@ -282,9 +301,14 @@
 
 .indextest_refit_args <- function(data) {
   controls <- data$recipe[setdiff(names(data$recipe),
-    c("method", "bwtype", "regtype", "ckertype", "bws"))]
+    c("method", "bwtype", "regtype", "basis", "degree", "bernstein.basis", "ckertype", "bws"))]
+  # The gridded LC loss is specific to the LC model. Other index fits use
+  # their ordinary, degree-aware objective with the supplied template.
+  leaf <- if (data$recipe$regtype == "lc") .indextest_cv_leaf(data$cv) else
+    switch(data$recipe$method, ichimura = .npindexbw_eval_ichimura_lp_via_npreg,
+           kleinspady = .npindexbw_eval_kleinspady_lp_via_npreg)
   c(list(xdat = quote(data$x), ydat = quote(y), bws = quote(data$template),
-         .indextest.leaf = .indextest_cv_leaf(data$cv)), controls)
+         .indextest.leaf = leaf), controls)
 }
 
 .indextest_cv_plan <- function(data, args) {
@@ -317,6 +341,8 @@
       replayed <- TRUE
     }
     ix <- .indextest_index(data, fit[["beta"]], fit[["bw"]])
+    if (data$recipe$regtype != "lc" && is.null(data$g.test))
+      ix$g <- .indextest_projected_g(ix$z, y)
     score <- max(.indextest_score(y, ix, data))
     if (is.null(plan)) return(score)
     c(statistic = score, grid = plan$counts$grid, native = plan$counts$native,
@@ -346,6 +372,10 @@ npindextest <- function(object, bw.method = c("published", "maximum", "separate"
     data <- .np_progress_activity_run("Preparing the single-index test",
       .indextest_setup(object, bw.method))
     index <- .indextest_index(data, data$beta, data$bw)
+    model.g <- index$g
+    if (data$recipe$regtype != "lc")
+      index$g <- .np_progress_activity_run("Selecting the projected Gaussian bandwidth",
+        .pltest_with_local_fit(.indextest_projected_g(index$z, data$y)))
     scores <- .np_progress_activity_run("Computing the single-index statistic",
       .indextest_score(data$y, index, data))
     observed <- max(scores)
@@ -373,7 +403,7 @@ npindextest <- function(object, bw.method = c("published", "maximum", "separate"
     exceedances=exceed, critical.values=stats::quantile(values,c(.9,.95,.99),type=1),
     bootstrap=values, rank.counts=boot$rank.counts, cv.counts=boot$cv.counts, boot.num=B, random.seed=random.seed,
     n=length(data$y), beta=data$beta, refit.controls=data$recipe,
-    g.cv=index$g, g.test=if (is.null(data$g.test)) index$g else data$g.test, h=data$h,
+    g.cv=model.g, g.pilot=index$g, g.test=if (is.null(data$g.test)) index$g else data$g.test, h=data$h,
     total.time = proc.time()[["elapsed"]] - started),
     class="indextest")
 }
@@ -391,6 +421,9 @@ summary.indextest <- function(object, ...) {
       "\nPairwise bandwidths:", format(object$h),
       "\nBootstrap draws:", object$boot.num, "   Search starts per refit:",
       object$refit.controls$nmulti, "\n")
+  if (object$refit.controls$regtype %in% c("ll","lp"))
+    cat("Index smoother:", object$refit.controls$regtype, "   Fixed degree:", object$refit.controls$degree,
+        "   Projected pilot bandwidth:", format(object$g.pilot), "\n")
   counts <- object[["cv.counts"]]
   if (!is.null(counts))
     cat("Bootstrap CV evaluations, grid:", counts[["grid"]], "   Native:", counts[["native"]],
