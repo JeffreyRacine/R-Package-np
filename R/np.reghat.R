@@ -2755,7 +2755,7 @@ npreghat.rbandwidth <-
         return(finish.empty.rows(
           .np_hat_constraint_from_matrix(H, y, "npreghat"), empty.rows))
 
-      ridge.used <- if (fitted.capture.route || native.lp.mean.matrix.route || native.loo.route) {
+      ridge.used <- if (fitted.capture.route || exact.beta.native.route || native.lp.mean.matrix.route || native.loo.route) {
         .npreghat_native_ridge_used(
           H, nrow(H), "npreghat(..., output = 'matrix')", empty.rows
         )
