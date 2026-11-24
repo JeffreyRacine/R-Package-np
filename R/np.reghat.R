@@ -1083,7 +1083,8 @@ npreghat <-
                                                           degree = integer(0),
                                                           bernstein.basis = FALSE,
                                                           return.norm = FALSE,
-                                                          allow.empty.rows = FALSE) {
+                                                          allow.empty.rows = FALSE,
+                                                          report.ridge = FALSE) {
   miss.ex <- is.null(exdat)
   eval.data <- if (miss.ex) txdat else exdat
   ntrain <- nrow(txdat)
@@ -1140,6 +1141,7 @@ npreghat <-
   if (epa.ann) attr(kw, ".np.precision.zero.only") <- TRUE
   precision.eligible <- precision.eligible || epa.ann
   if(precision.eligible) attr(kw,".np.precision.eligible") <- TRUE
+  if (report.ridge) attr(kw, ".np.report.ridge") <- TRUE
   matprod.mode <- getOption("matprod")
   H.fast <- if (ncol(W.train) == 1L ||
                 identical(matprod.mode, "default") ||
@@ -1161,6 +1163,7 @@ npreghat <-
 
   H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
   norms <- if (return.norm) matrix(NA_real_, neval, 3L) else NULL
+  ridge <- if (report.ridge) rep.int(NA_real_, neval)
   empty.rows <- NULL
   for (j in seq_len(neval)) {
     w <- kw[, j]
@@ -1177,11 +1180,15 @@ npreghat <-
       attr(A.base,".np.precision.eligible") <- TRUE
       if (epa.ann) attr(A.base,".np.precision.zero.only") <- TRUE
     }
-    solved <- .Call("C_np_lp_adjoint_prepared", A.base, as.double(rhs),
+    solved <- .Call(if (report.ridge) "C_np_lp_adjoint_prepared_ridge" else "C_np_lp_adjoint_prepared", A.base, as.double(rhs),
                     as.integer(ntrain),
                     as.integer(min(ncol(W.train), sum(w != 0.0))),
                     PACKAGE = "npRmpi")
 
+    if (report.ridge) {
+      ridge[j] <- solved$ridge
+      solved <- solved$v
+    }
     policy <- attr(solved,".np.fit.precision",exact=TRUE)
     if(!is.null(policy)) {
       direction <- matrix(solved,nrow=1L)
@@ -1201,6 +1208,7 @@ npreghat <-
     }
   }
 
+  if (report.ridge) attr(H, "ridge.used") <- ridge
   if (!is.null(empty.rows)) attr(H, ".np.empty.rows") <- empty.rows
   if (return.norm) list(hat = H, norm = norms) else H
 }
@@ -2695,6 +2703,12 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
+      report.epa.ridge <- identical(output, "matrix") && exact.lp.kernel.route &&
+        identical(bws[["ckertype"]], "epanechnikov") && bws[["ckerorder"]] == 2L &&
+        identical(bws[["type"]], "adaptive_nn") && identical(bws[["ckerbound"]], "none") &&
+        bws$ncon == 1L && bws$nuno == 0L && bws$nord == 0L &&
+        identical(reg.spec$basis.engine, "glp") && isTRUE(reg.spec$bernstein.basis.engine) &&
+        reg.spec$degree.engine %in% 2:3
       H <- if(fitted.capture.route) {
         .npRmpi_with_local_regression(.npreghat_fitted_capture(bws,txdat,
           if(no.ex)NULL else exdat,s,allow.empty.rows=allow.empty.rows))
@@ -2736,7 +2750,8 @@ npreghat.rbandwidth <-
           basis = reg.spec$basis.engine,
           degree = reg.spec$degree.engine,
           bernstein.basis = reg.spec$bernstein.basis.engine,
-          allow.empty.rows = allow.empty.rows
+          allow.empty.rows = allow.empty.rows,
+          report.ridge = report.epa.ridge
         ))
       } else {
         .npreghat_exact_matrix_from_core(
@@ -2765,7 +2780,7 @@ npreghat.rbandwidth <-
         return(finish.empty.rows(
           .np_hat_constraint_from_matrix(H, y, "npreghat"), empty.rows))
 
-      ridge.used <- if (fitted.capture.route || exact.beta.native.route || native.lp.mean.matrix.route || native.loo.route) {
+      ridge.used <- if (report.epa.ridge || fitted.capture.route || exact.beta.native.route || native.lp.mean.matrix.route || native.loo.route) {
         .npreghat_native_ridge_used(
           H, nrow(H), "npreghat(..., output = 'matrix')", empty.rows
         )

@@ -490,6 +490,8 @@ static SEXP np_reghat_matrix_execution_run(void *data)
    * protects R_NilValue without allocating an unrequested norm matrix. */
   SEXP norms = PROTECT(execution->return_norm ?
                        allocMatrix(REALSXP, neval, 3) : R_NilValue);
+  SEXP ridge_values = PROTECT(getAttrib(execution->kw, install(".np.report.ridge")) != R_NilValue ?
+                       allocVector(REALSXP, neval) : R_NilValue);
   SEXP empty_flags = R_NilValue;
   PROTECT_INDEX empty_index;
   PROTECT_WITH_INDEX(empty_flags, &empty_index);
@@ -537,6 +539,7 @@ static SEXP np_reghat_matrix_execution_run(void *data)
           memset(INTEGER(empty_flags), 0, (size_t)neval*sizeof(int));
         }
         INTEGER(empty_flags)[j] = 1;
+        if(ridge_values != R_NilValue) REAL(ridge_values)[j] = NA_REAL;
         for(int k = 0; k < ntrain; ++k)
           REAL(out)[j + (size_t)neval*(size_t)k] = NA_REAL;
         if(execution->return_norm)
@@ -550,6 +553,7 @@ static SEXP np_reghat_matrix_execution_run(void *data)
       error("LP solve failed in compiled hat-matrix path after bounded ridging");
     if(row_status != NP_REGHAT_LP_ROW_OK)
       error("invalid wider-LP compiled hat-matrix input");
+    if(ridge_values != R_NilValue) REAL(ridge_values)[j] = ridge;
     int precise=precision_eligible && (!zero_only || ridge==0.0) && np_regression_precision_needed(&workspace->solve_workspace,nterms);
     if(precise) {
       int constant=1;for(int i=1;i<ntrain && constant;++i)constant=weights[i]==weights[0];
@@ -575,6 +579,7 @@ static SEXP np_reghat_matrix_execution_run(void *data)
     }
   }
 
+  if(ridge_values != R_NilValue) setAttrib(out, install("ridge.used"), ridge_values);
   if(empty_flags != R_NilValue)
     setAttrib(out, install(".np.empty.rows"), empty_flags);
   if(execution->return_norm) {
@@ -585,10 +590,10 @@ static SEXP np_reghat_matrix_execution_run(void *data)
     SET_STRING_ELT(names, 0, mkChar("hat"));
     SET_STRING_ELT(names, 1, mkChar("norm"));
     setAttrib(result, R_NamesSymbol, names);
-    UNPROTECT(5);
+    UNPROTECT(6);
     return result;
   }
-  UNPROTECT(3);
+  UNPROTECT(4);
   return out;
 }
 
