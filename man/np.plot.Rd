@@ -670,7 +670,10 @@ NN correction and continuous uniform derivatives remain unqualified.
 For univariate second-order Epanechnikov regression with no support
 boundary correction (\code{ckerbound="none"}), experimental pointwise and
 simultaneous Mammen intervals support quadratic and cubic Bernstein GNN
-means and first derivatives, and quadratic Bernstein ANN means. Choose
+and ANN means and first derivatives. On three saved ANN datasets both
+constructions covered every simultaneous grid. For quadratic and cubic slopes
+the median paired width ratios of local-envelope to symmetric-SD were
+4.40 and 5.55. Choose
 \code{interval="symmetric-sd"} or \code{interval="basic-local-envelope"}.
 These constructions use full-rank, zero-ridge fitted rows, the usual
 auxiliary settings and evaluation within the observed training range.
