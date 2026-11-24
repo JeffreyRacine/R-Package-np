@@ -560,19 +560,20 @@
   main <- state[["settings"]][["main"]]
   if (isTRUE(state[["beta.gnn.mean"]]) &&
       (!identical(target, "mean") || !identical(law, "mammen") ||
-       !band %in% c("pointwise", "simultaneous") ||
+       !(band %in% c("pointwise", "simultaneous") ||
+         (band %in% c("bonferroni", "all") && calibration %in% c("absolute", "basic-local-envelope"))) ||
        !effective %in% c("absolute", "basic-local-envelope")))
-    stop("experimental positive-degree beta GNN mean bands require pointwise or simultaneous Mammen inference", call.=FALSE)
+    stop("experimental positive-degree beta GNN mean bands require a qualified Mammen band scope and construction", call.=FALSE)
   if (identical(state[["explicit.nn.target"]], "d1") && identical(main[["kernel"]], "beta")) {
     if (!identical(target, "d1") || !identical(law, "mammen") ||
-        !band %in% c("simultaneous", "pointwise") || !effective %in% c("absolute", "basic-local-envelope"))
-      stop("experimental positive-degree beta NN slopes require an explicit pointwise or simultaneous Mammen construction", call.=FALSE)
+        !band %in% c("simultaneous", "pointwise", "bonferroni", "all") || !effective %in% c("absolute", "basic-local-envelope"))
+      stop("experimental positive-degree beta NN slopes require an explicit empirical Mammen construction", call.=FALSE)
     state[["beta.nn.first.derivative"]] <- TRUE
   } else if (identical(state[["beta.ann.target"]], "d1")) {
     if (!identical(target, "d1") || !identical(law, "mammen") ||
-        !band %in% c("pointwise", "simultaneous") ||
+        !band %in% c("pointwise", "simultaneous", "bonferroni", "all") ||
         !effective %in% c("absolute", "basic-local-envelope"))
-      stop("experimental degree-one beta ANN slopes require a pointwise or simultaneous Mammen first-derivative band", call.=FALSE)
+      stop("experimental degree-one beta ANN slopes require an explicit empirical Mammen first-derivative band", call.=FALSE)
     state[["beta.nn.first.derivative"]] <- TRUE
   } else if (startsWith(target, "d") && identical(main[["kernel"]], "beta") &&
       main[["type"]] %in% c("generalized_nn", "adaptive_nn")) {
