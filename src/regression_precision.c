@@ -14,7 +14,7 @@ void np_regression_precision_init(NPRegressionPrecision *q)
 { memset(q, 0, sizeof(*q)); }
 void np_regression_precision_clear(NPRegressionPrecision *q)
 {
-  free(q->a); free(q->vectors); free(q->work); free(q->pivot);
+  free(q->local_columns); free(q->a); free(q->vectors); free(q->work); free(q->pivot);
   np_regression_precision_init(q);
 }
 
@@ -113,6 +113,34 @@ static int cubic_identified_direction(const NPRegressionPrecision *q,
   return 0;
 }
 
+/* The first normalized Legendre coordinate is affine in physical x. Center
+ * at the highest-weight donor and scale by the weighted RMS distance. This
+ * changes coordinates only after the native full-rank zero-ridge decision. */
+static int local_cubic_columns(NPRegressionPrecision *q, const double *linear,
+                               const double *weights, int n, double maxw,
+                               double **columns)
+{
+  if(!reserve_double(&q->local_columns,&q->local_capacity,(size_t)n*4))return 0;
+  int peak=0;
+  while(peak<n && weights[peak]!=maxw)++peak;
+  if(peak==n)return 0;
+  const double center=linear[peak];
+  double mass=0, square=0;
+  for(int i=0;i<n;++i) {
+    const double w=weights[i]/maxw, dx=linear[i]-center;
+    mass+=w; square+=w*dx*dx;
+  }
+  const double scale=sqrt(square/mass);
+  if(!(scale>0) || !R_FINITE(scale))return 0;
+  for(int k=0;k<4;++k)columns[k]=q->local_columns+(size_t)n*k;
+  for(int i=0;i<n;++i) {
+    const double t=weights[i]>0?(linear[i]-center)/scale:0;
+    columns[0][i]=1; columns[1][i]=t;
+    columns[2][i]=t*t; columns[3][i]=t*t*t;
+  }
+  q->cubic_center=center; q->cubic_scale=scale;
+  return 1;
+}
 int np_regression_precision_factor(NPRegressionPrecision *q,
   double *const *basis, const double *weights, int n, int p,
   double ridge, double anchor)
@@ -138,6 +166,12 @@ int np_regression_precision_factor(NPRegressionPrecision *q,
     if(weights[i]>maxw)maxw=weights[i];
   }
   if(maxw==0)return 0;
+  double *local[4];
+  q->cubic_scale=0;
+  if(q->local_cubic && ridge==0.0) {
+    if(p!=4 || !local_cubic_columns(q,basis[1],weights,n,maxw,local))return 0;
+    basis=local;
+  }
   q->max_weight=maxw;q->anchor=anchor;q->root_ridge=sqrt(ridge/maxw);
   if(!R_FINITE(q->root_ridge))return 0;
   for(int i=0;i<n;++i)q->sw[i]=sqrt(weights[i]/maxw);
@@ -178,6 +212,21 @@ int np_regression_precision_factor(NPRegressionPrecision *q,
 int np_regression_precision_row(NPRegressionPrecision *q, const double *direction)
 {
   if(q->weights==NULL||direction==NULL)return 0;
+  double local[4];
+  if(q->cubic_scale>0) {
+    /* In the normalized Legendre basis B2=sqrt(5)*(B1^2-1)/2.
+     * A first-derivative request thus supplies B1(x) through B2'/B1'. */
+    const double scale=q->cubic_scale;
+    if(direction[0]==1.0) {
+      const double t=(direction[1]-q->cubic_center)/scale;
+      local[0]=1; local[1]=t; local[2]=t*t; local[3]=t*t*t;
+    } else if(direction[0]==0.0 && direction[1]!=0.0) {
+      const double t=(direction[2]/(sqrt(5.0)*direction[1])-q->cubic_center)/scale;
+      const double slope=direction[1]/scale;
+      local[0]=0; local[1]=slope; local[2]=2*t*slope; local[3]=3*t*t*slope;
+    } else return 0;
+    direction=local;
+  }
   const int m=q->m,n=q->n;
   const int p = q->cubic_alias && cubic_identified_direction(q,direction)
     ? q->p - 1 : q->p;

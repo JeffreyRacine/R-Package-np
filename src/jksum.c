@@ -27197,6 +27197,17 @@ static inline int np_linear_beta_ann_at_training_limit(NPLinearBetaANNRange rang
   return x == range.lower || x == range.upper;
 }
 
+static int np_cubic_beta_ann_local(const NPContinuousKernelRoute *route, int bandwidth,
+                                   int continuous, int unordered, int ordered)
+{
+  return bandwidth == BW_ADAP_NN && route != NULL && continuous == 1 &&
+    unordered == 0 && ordered == 0 && int_glp_bernstein_extern &&
+    int_glp_basis_extern == 1 && vector_glp_degree_extern != NULL &&
+    vector_glp_degree_extern[0] == 3 && route->segment_count == 1 &&
+    route->segment[0].descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+    route->segment[0].descriptor.order == 2;
+}
+
 static int np_regression_precision_eligible(const NPRegressionGeneralLPFitCall *call)
 {
   /* Bounded univariate adaptive rows have donor-specific radii. The fit
