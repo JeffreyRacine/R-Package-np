@@ -69,7 +69,7 @@
       isTRUE(bws[["nuno"]] == 0L) && isTRUE(bws[["nord"]] == 0L) &&
       identical(bws[["regtype"]], "lp") && identical(bws[["basis"]], "glp") &&
       isTRUE(bws[["bernstein.basis"]]) && isTRUE(bws[["degree"]] == 1L))
-  if (.np_bias_beta_nn_mean(bws, "adaptive_nn", 2L)) return(TRUE)
+  if (.np_bias_beta_nn_mean(bws, "adaptive_nn", 2:3)) return(TRUE)
   if (!identical(bws[["ckertype"]], "epanechnikov") ||
       !isTRUE(bws[["ckerorder"]] == 2L) || !identical(bws[["ckerbound"]], "none") ||
       !isTRUE(bws[["ncon"]] == 1L) || !isTRUE(bws[["nuno"]] == 0L) ||

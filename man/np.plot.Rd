@@ -697,6 +697,12 @@ For quadratic univariate Bernstein beta ANN fits the two explicit Mammen
 constructions support means and first derivatives under the same bounds,
 ridge, evaluation range and auxiliary settings.
 
+For cubic Bernstein beta ANN means and first derivatives, the explicit
+Mammen basic local envelope supports simultaneous and Bonferroni bands on
+the same known support and observed training range. Every requested position
+must have a full-rank, zero-ridge fitted row. Two of three saved fits met
+that condition. Both complete grids were covered, with wide slope bands.
+
 Univariate first-degree Bernstein uniform ANN means with no boundary correction
 also support the two explicitly selected Mammen constructions within the
 observed range at zero fitted ridge. Coverage evidence spans three saved

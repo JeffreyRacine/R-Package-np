@@ -1,5 +1,14 @@
 # np 0.80-3
 
+* Experimental cubic Bernstein beta ANN means and first derivatives support
+  an explicit Mammen basic local envelope for simultaneous and Bonferroni
+  inference on full-rank grids with zero fitted ridge throughout.
+
+* Qualified empirical NN intervals now include Bonferroni and combined output
+  for their supported Mammen constructions. The degree-zero beta first
+  derivative also supports these scopes for its qualified independent pairs,
+  Rademacher and Gaussian laws.
+
 * Experimental Mammen intervals support explicit first-degree Bernstein uniform
   ANN mean bands with no boundary correction.
 
