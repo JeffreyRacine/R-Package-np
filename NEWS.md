@@ -129,10 +129,10 @@
   replicate residual-pilot studentization. Other targets retain their fixed
   observed scale.
 
-* Retain the existing explicit local-envelope scope for fixed raw Epanechnikov
-  GLP fits with a quadratic component and positive-degree fixed beta derivative
-  bands, where saved comparisons identified sensitivity to the calculation
-  coordinates.
+* A simultaneous first-derivative band for known-support fixed beta regression
+  with a degree-one or degree-two Bernstein fit uses the Mammen wild basic
+  local envelope when the controls are omitted. Pointwise slopes retain the
+  explicit local-envelope requirement.
 
 * Experimental fixed Gaussian regression pairs bands now reuse the accepted
   fitted observation rows for means and first derivatives, including regularized
