@@ -563,7 +563,13 @@
        !band %in% c("pointwise", "simultaneous") ||
        !effective %in% c("absolute", "basic-local-envelope")))
     stop("experimental positive-degree beta GNN mean bands require pointwise or simultaneous Mammen inference", call.=FALSE)
-  if (startsWith(target, "d") && identical(main[["kernel"]], "beta") &&
+  if (identical(state[["beta.ann.target"]], "d1")) {
+    if (!identical(target, "d1") || !identical(law, "mammen") ||
+        !band %in% c("pointwise", "simultaneous") ||
+        !effective %in% c("absolute", "basic-local-envelope"))
+      stop("experimental degree-one beta ANN slopes require a pointwise or simultaneous Mammen first-derivative band", call.=FALSE)
+    state[["beta.nn.first.derivative"]] <- TRUE
+  } else if (startsWith(target, "d") && identical(main[["kernel"]], "beta") &&
       main[["type"]] %in% c("generalized_nn", "adaptive_nn")) {
     qualified <- switch(law, inid = "basic-local-envelope", gaussian = "absolute",
                         mammen = "basic-local-envelope", rademacher = "tail-envelope", NULL)

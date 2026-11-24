@@ -242,9 +242,10 @@
       gradients = gradients) else
       plot.errors.boot.calibration
     # Read the requested construction before an omitted choice resolves to absolute.
-    explicit.ann.mean <- new.bias && !gradients &&
+    explicit.ann <- new.bias &&
       plot.errors.boot.calibration %in% c("absolute", "basic-local-envelope") &&
       .np_bias_beta_nn_mean(bws, "adaptive_nn", 1L) &&
+      (!gradients || all(plot.gradient.order.label[bws$icon] == 1L)) &&
       identical(error.request$method, "bootstrap") &&
       error.request$type %in% c("simultaneous", "pointwise") &&
       as.character(plot.errors.boot.method)[1L] == "wild" &&
@@ -260,7 +261,7 @@
             (identical(effective.calibration, "basic-local-envelope") &&
              bws[["type", exact=TRUE]] %in% c("generalized_nn", "adaptive_nn")))) ||
           (wild.local.envelope &&
-           (explicit.ann.mean || .np_bias_beta_gnn_mean(bws) || identical(bws[["type", exact=TRUE]], "fixed") ||
+           (explicit.ann || .np_bias_beta_gnn_mean(bws) || identical(bws[["type", exact=TRUE]], "fixed") ||
             (.np_bias_regression_nn_zero(bws, c("epanechnikov", "uniform", "beta")) ||
              .np_bias_regression_nn_first_order(bws, "epanechnikov"))))))
       stop("basic-envelope requires inid, fixed or geom and fixed-bandwidth regression, degree-zero Epanechnikov/uniform/beta NN or first-order Epanechnikov NN; basic-local-envelope also supports other qualified NN pairs or qualified fixed/NN Mammen", call.=FALSE)
@@ -327,7 +328,7 @@
     plot.errors <- normalized.opts$plot.errors
     bias.state <- if(new.bias).np_plot_activity_run("Preparing regression bias correction",
       .np_bias_regression_prepare(bws,xdat,ydat,bias.control,adapt=TRUE,
-        explicit.ann.mean=explicit.ann.mean,
+        explicit.ann.mean=explicit.ann && !gradients, explicit.ann.slope=explicit.ann && gradients,
         calibration=effective.calibration,
         gradient.order=if(gradients)plot.gradient.order.label[which(bws$icon)] else NULL,
          law=if(percentile.request)"mammen" else if(plot.errors.method=="asymptotic")"gaussian" else

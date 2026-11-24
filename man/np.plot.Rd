@@ -673,7 +673,13 @@ a stored Bernstein GLP basis, zero-ridge fitted rows and evaluation within
 the observed training range. With the standard auxiliary bias settings, choose
 Mammen wild bootstrap and explicitly request \code{interval="symmetric-sd"} or
 \code{interval="basic-local-envelope"} for pointwise or simultaneous inference.
-Across two saved studies the absolute construction covered 5 of 6 and 8 of 8
+The same explicit intervals support first derivatives with \code{gradients=TRUE}
+under these experimental degree-one conditions. In two saved studies the
+absolute slope bands covered five of six and eight of eight complete grids.
+The local envelope covered all six and all eight, with median paired widths
+over four times the absolute widths in each study.
+
+For means, across two saved studies the absolute construction covered 5 of 6 and 8 of 8
 whole grids. The wider local envelope covered 6 of 6 and 8 of 8.
 
 Experimental bias-corrected first-derivative bands are available for a single

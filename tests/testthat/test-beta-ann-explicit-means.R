@@ -28,11 +28,26 @@ test_that("linear bounded beta ANN mean intervals require an explicit assessed c
   a$interval <- "symmetric-sd"
   for (s in c("bonferroni","all"))
     expect_error(do.call(plot,utils::modifyList(a,list(band=s))),"supported second-order")
-  for (extra in list(list(gradients=TRUE),list(bootstrap="inid"),
+  for (extra in list(list(bootstrap="inid"),
                      list(boot.control=np_boot_control(wild="rademacher"))))
     expect_error(do.call(plot,utils::modifyList(a,extra)),"supported second-order")
   expect_error(do.call(plot,utils::modifyList(a,list(bias.control=np_bias_control(iterations=1L)))),
                "auxiliary bias settings")
+  slope <- utils::modifyList(a,list(gradients=TRUE))
+  for (scope in c("simultaneous","pointwise")) {
+    slope$band <- scope
+    for (interval in c("symmetric-sd","basic-local-envelope")) {
+      slope$interval <- interval
+      obj <- suppressWarnings(do.call(plot,slope))
+      expect_identical(obj$inference[[1L]]$components[[scope]]$interval,interval)
+      limits <- as.data.frame(obj,band=scope)
+      expect_true(all(is.finite(limits$lower) & limits$lower <= limits$upper))
+    }
+  }
+  slope$interval <- NULL
+  expect_error(do.call(plot,slope),"supported second-order")
+  slope$interval <- "symmetric-sd"
+  expect_error(do.call(plot,utils::modifyList(slope,list(band="all"))),"supported second-order")
   expect_true(.np_bias_beta_nn_mean(b,"adaptive_nn",1L))
   for (change in list(list(bernstein.basis=FALSE),list(degree=2L),list(ncon=2L),
                       list(nuno=1L),list(ckerub=Inf),list(ckerbound="none")))
