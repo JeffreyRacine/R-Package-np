@@ -1490,7 +1490,15 @@ outside this experimental derivative scope.
   and explicit methods are unchanged. NN radii remain frozen for derivatives;
   bounded ANN retains donor-specific support normalization. Derivatives above a
   coordinate's degree retain their existing refusal or unavailable-panel behavior.
-  Higher-degree bounded Gaussian NN, fixed-bandwidth mixed Gaussian models and
+  For a univariate quadratic Bernstein Gaussian GNN fit with two known finite
+bounds and nonextended neighbour count, an explicit Mammen wild
+\code{interval="basic-local-envelope"} supports means and first derivatives
+on full-rank, zero-ridge grids within the observed range. Both simultaneous
+grids were covered on two saved datasets for each target. The full mean
+band widths averaged 0.50 and 0.26 on those datasets, and the slope widths
+averaged 21.74 and 9.20. Pointwise, Bonferroni and combined output use
+the same law and fitted bandwidth. Other higher-degree bounded Gaussian NN
+fits, fixed-bandwidth mixed Gaussian models and
   range bounds remain unqualified. Existing adaptation and
   fitted-row precision rules are preserved. The two saved NN samples do not
   establish nominal coverage.

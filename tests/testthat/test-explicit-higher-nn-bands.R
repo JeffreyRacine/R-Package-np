@@ -118,3 +118,24 @@ test_that("cubic beta ANN bands refuse the whole grid when an endpoint selects r
   expect_error(do.call(plot, c(a, list(band="all"))))
   expect_error(do.call(plot, c(a, list(band="pointwise"))))
 })
+
+test_that("known-support quadratic Gaussian GNN uses explicit Mammen local bands", {
+  skip_on_cran()
+  opt <- options(np.messages=FALSE, np.plot.progress=FALSE)
+  on.exit(options(opt), add=TRUE)
+  x <- data.frame(x=seq(-.95,.95,length.out=80L))
+  y <- sin(3*x$x)+.1*cos(seq_len(nrow(x)))
+  bw <- npregbw(xdat=x, ydat=y, bws=18, bandwidth.compute=FALSE, regtype="lp",
+    degree=2L, basis="glp", bernstein.basis=TRUE, bwtype="generalized_nn",
+    ckertype="gaussian", ckerbound="fixed", ckerlb=-1, ckerub=1)
+  a <- list(x=npreg(bw,txdat=x,tydat=y), center="bias-corrected", errors="bootstrap",
+            gradients=TRUE, neval=4L, B=79L, output="data", band="all", random.seed=32L)
+  expect_error(do.call(plot,a))
+  expect_error(do.call(plot,c(a,list(interval="symmetric-sd"))))
+  z <- suppressWarnings(do.call(plot,c(a,list(interval="basic-local-envelope"))))
+  expect_identical(z$inference[[1L]]$resampling_law,"mammen")
+  expect_identical(z$inference[[1L]]$components$bonferroni$interval,"basic-local-envelope")
+  for (fields in list(list(type="adaptive_nn"),list(ncon=2L),list(ckerub=Inf),
+                      list(degree=3L),list(bernstein.basis=FALSE)))
+    expect_false(.np_bias_explicit_nn_target(utils::modifyList(bw,fields),TRUE))
+})

@@ -248,7 +248,15 @@ with main degrees at most one, including supported mixed predictors. Gaussian de
 are unchanged. NN radii stay frozen for derivatives; bounded ANN retains its
 donor-specific support normalization. Partial-degree models retain the existing
 refusal or unavailable-panel behavior for derivatives above a coordinate's degree.
-Higher-degree bounded Gaussian NN, fixed-bandwidth mixed Gaussian models and
+For a univariate quadratic Bernstein Gaussian GNN fit with two known finite
+bounds and nonextended neighbour count, an explicit Mammen wild
+\code{interval="basic-local-envelope"} supports means and first derivatives
+on full-rank, zero-ridge grids within the observed range. Both simultaneous
+grids were covered on two saved datasets for each target. The full mean
+band widths averaged 0.50 and 0.26 on those datasets, and the slope widths
+averaged 21.74 and 9.20. Pointwise, Bonferroni and combined output use
+the same law and fitted bandwidth. Other higher-degree bounded Gaussian NN
+fits, fixed-bandwidth mixed Gaussian models and
 range bounds remain unqualified. The two saved NN samples provide
 limited availability evidence and do not establish nominal coverage. The existing adaptation and accepted fitted-row
 precision rules are retained. Zero nearest-neighbour radii and

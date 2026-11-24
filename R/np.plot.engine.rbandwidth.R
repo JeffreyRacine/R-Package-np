@@ -250,6 +250,8 @@
       (!gradients || all(plot.gradient.order.label[bws$icon] == 1L))
     explicit.ann <- explicit.mammen && .np_bias_beta_nn_mean(bws, "adaptive_nn", 1L)
     explicit.nn <- explicit.mammen && .np_bias_explicit_nn_target(bws, gradients)
+    if (explicit.nn && identical(bws[["ckertype"]], "gaussian"))
+      explicit.nn <- identical(effective.calibration, "basic-local-envelope")
     if (explicit.nn && .np_bias_beta_nn_mean(bws, "adaptive_nn", 3L))
       explicit.nn <- error.request$type %in% c("simultaneous", "bonferroni") &&
         identical(effective.calibration, "basic-local-envelope")

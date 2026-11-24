@@ -70,12 +70,16 @@
       identical(bws[["regtype"]], "lp") && identical(bws[["basis"]], "glp") &&
       isTRUE(bws[["bernstein.basis"]]) && isTRUE(bws[["degree"]] == 1L))
   if (.np_bias_beta_nn_mean(bws, "adaptive_nn", 2:3)) return(TRUE)
-  if (!identical(bws[["ckertype"]], "epanechnikov") ||
-      !isTRUE(bws[["ckerorder"]] == 2L) || !identical(bws[["ckerbound"]], "none") ||
+  if (!isTRUE(bws[["ckerorder"]] == 2L) ||
       !isTRUE(bws[["ncon"]] == 1L) || !isTRUE(bws[["nuno"]] == 0L) ||
       !isTRUE(bws[["nord"]] == 0L) || !identical(bws[["regtype"]], "lp") ||
       !identical(bws[["basis"]], "glp") || !isTRUE(bws[["bernstein.basis"]])) return(FALSE)
-  bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && bws[["degree"]] %in% 2:3
+  if (identical(bws[["ckertype"]], "gaussian"))
+    return(identical(bws[["type"]], "generalized_nn") && isTRUE(bws[["degree"]] == 2L) &&
+      identical(bws[["ckerbound"]], "fixed") &&
+      isTRUE(is.finite(bws[["ckerlb"]])) && isTRUE(is.finite(bws[["ckerub"]])))
+  identical(bws[["ckertype"]], "epanechnikov") && identical(bws[["ckerbound"]], "none") &&
+    bws[["type"]] %in% c("generalized_nn", "adaptive_nn") && bws[["degree"]] %in% 2:3
 }
 
 .np_bias_beta_gnn_mean <- function(bws) {
