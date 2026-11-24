@@ -30,6 +30,16 @@ test_that("fixed cv.ls is exact on in-class local polynomial fixtures", {
 
   tol <- 1e-20
 
+  # An isolated boundary observation on the saved projection has an accepted
+  # zero-ridge fit. Deleting it must still reproduce an in-class cubic.
+  set.seed(2314)
+  index <- rnorm(80) - 0.119923377473893 * rnorm(80)
+  cubic <- fixed_cvls_objective(
+    data.frame(index = index), index^3, "lp", 3L, 0.14665681383218038,
+    bernstein.basis = TRUE
+  )
+  expect_lt(cubic, tol)
+
   set.seed(20260308)
   x1 <- sort(runif(30))
   y1 <- 1 + 2 * x1

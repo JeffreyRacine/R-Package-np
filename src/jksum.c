@@ -14653,6 +14653,62 @@ static double np_rly_cv_diagonal(const double first_self, const int row,
   return value;
 }
 
+/* Local tree-off accumulation uses triangular batches. A tightly grouped
+ * batch may carry a single pooled weight even when the full row does not.
+ * Remember its actual weight so the precision pass uses the same design. */
+static double np_cv_constant_batch(const double *w, int n)
+{
+  if (w[0] != w[n-1]) return NAN;
+  for (int i=1; i<n-1; ++i)
+    if (w[i] != w[0]) return NAN;
+  return w[0];
+}
+
+static int np_cv_gaussian_deleted_weights(double *x, int n, int target,
+    double **bandwidth, double *vsf, int tree, double *weights,
+    const double *constant_batch, const NP_OuterPackCtx *options)
+{
+  int kernel = CK_GAUSS2, op = OP_NORMAL;
+  double *center = x + target, scratch = 0.0;
+  memset(weights, 0, (size_t)n * sizeof(*weights));
+  if (kernel_weighted_sum_np_ctx_ex(
+        &kernel, NULL, NULL, BW_FIXED, n, 1, 0, 0, 1,
+        0, 0, 1, 1, 1, 0, 0, 0, 0, &op, OP_NOOP, 0, 0, NULL, 1, 0, 0,
+        tree ? int_TREE_X : NP_TREE_FALSE, 0, tree ? kdt_extern_X : NULL,
+        NULL, NULL, NULL, NULL, NULL, &x, NULL, NULL, &center,
+        NULL, NULL, NULL, vsf, 1, bandwidth, bandwidth, NULL, NULL, NULL,
+        NULL, &scratch, NULL, weights, NULL, NULL, options, NULL, NULL,
+        0, NULL, NULL) != 0)
+    return 0;
+  if (constant_batch != NULL) {
+    for (int j=0; j<target; ++j)
+      if (R_FINITE(constant_batch[j])) weights[j] = constant_batch[j];
+    if (target<n-1 && R_FINITE(constant_batch[target]))
+      for (int j=target+1; j<n; ++j) weights[j] = constant_batch[target];
+  }
+  weights[target] = 0.0;
+  return 1;
+}
+
+/* A zero-ridge decision alone does not establish distinct polynomial support.
+ * Restrict the precision evaluation to the univariate full-design case. The
+ * ordinary solver has already made its rank/ridge decision for this row. */
+static int np_cv_has_polynomial_support(const double *linear_basis,
+    const double *weights, int n, int p, double *seen)
+{
+  int count = 0;
+  for (int i=0; i<n; ++i) {
+    if (weights[i] == 0.0) continue;
+    int j = 0;
+    while (j<count && seen[j] != linear_basis[i]) ++j;
+    if (j==count) {
+      seen[count++] = linear_basis[i];
+      if (count==p) return 1;
+    }
+  }
+  return 0;
+}
+
 static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     const int bwm,
     const int num_obs,
@@ -14719,6 +14775,12 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
 #define NP_LP_CV_FAIL() do { local_fail = 1; goto lp_cv_collective_gate; } while(0)
 
+  NPRegressionPrecision precision = {0};
+  double *constant_batch = NULL;
+  const int gaussian_cv = bwm == RBWM_CVLS && nterms > 1 &&
+    num_reg_continuous == 1 && !num_reg_unordered && !num_reg_ordered &&
+    !int_cker_bound_extern && kernel_c[0] == CK_GAUSS2 && operator[0] == OP_NORMAL;
+
   np_lp_solve_workspace_init(&solve_workspace);
 
   if((num_obs <= 0) || (num_reg_continuous <= 0))
@@ -14782,6 +14844,10 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
   if(!use_sparse_tree){
     kw = alloc_vecd(MAX(1, num_obs));
+    if (gaussian_cv && !use_tree && !use_mpi_transport) {
+      constant_batch = malloc((size_t)num_obs * sizeof(*constant_batch));
+      if (constant_batch == NULL) NP_LP_CV_FAIL();
+    }
     train_u = (double **)malloc((size_t)MAX(1, num_reg_unordered)*sizeof(double *));
     train_o = (double **)malloc((size_t)MAX(1, num_reg_ordered)*sizeof(double *));
     train_c = (double **)malloc((size_t)MAX(1, num_reg_continuous)*sizeof(double *));
@@ -15048,6 +15114,8 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   NULL) != 0)
       NP_LP_CV_FAIL();
+    if (constant_batch != NULL)
+      constant_batch[j] = np_cv_constant_batch(kw, nsub);
 
     if(use_mpi_transport){
       double * const sj = moments_acc + (size_t)j*(size_t)nterms*(size_t)nterms;
@@ -15246,8 +15314,25 @@ lp_cv_collective_gate:
          &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK)
       goto cleanup_lp_cv;
 
-    for(a = 0; a < nterms; a++)
-      fit += eval_basis[a]*solve_workspace.rhs_work[a];
+    int use_precision = gaussian_cv && solve_diagnostics.ridge_steps == 0 &&
+      np_regression_precision_needed(&solve_workspace, nterms);
+    if (use_precision) {
+      if (!np_cv_gaussian_deleted_weights(matrix_X_continuous[0], num_obs, eval_idx,
+            matrix_bandwidth, vsf, use_tree, kw, constant_batch, &frozen_runtime_options))
+        goto cleanup_lp_cv;
+      use_precision = np_cv_has_polynomial_support(basis[1], kw, num_obs, nterms,
+                                                   solve_workspace.rank_values);
+    }
+    if (use_precision) {
+      if (!np_regression_precision_factor(&precision, basis, kw, num_obs, nterms, 0.0, 1.0) ||
+          !np_regression_precision_row(&precision, eval_basis))
+        goto cleanup_lp_cv;
+      fit = np_regression_precision_apply(&precision, vector_Y);
+      if (!R_FINITE(fit)) goto cleanup_lp_cv;
+    } else {
+      for(a = 0; a < nterms; a++)
+        fit += eval_basis[a]*solve_workspace.rhs_work[a];
+    }
 
     {
       const double loss_y =
@@ -15268,6 +15353,8 @@ lp_cv_collective_gate:
   result.ok = 1;
 
 cleanup_lp_cv:
+  free(constant_batch);
+  np_regression_precision_clear(&precision);
   if(rly_log_normalizer != NULL) free(rly_log_normalizer);
   if(train_u != NULL) free(train_u);
   if(train_o != NULL) free(train_o);
