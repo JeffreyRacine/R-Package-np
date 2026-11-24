@@ -63,11 +63,18 @@ pilot, including valid Bernoulli probabilities. With \code{"published"} or
 on each refitted index. With \code{"separate"} the residual bandwidth follows
 the fixed rule above. The polynomial degree must be prespecified.
 
-In simulations at \eqn{n=192} with two continuous covariates and fixed
+In serial simulations at \eqn{n=192} with two continuous covariates and fixed
 Bernstein degrees 0 through 5, higher degrees often reduced power against
 off-index interactions. On one curved Klein--Spady null, degrees 2 and 3
 rejected 12 and 13 times in 128 replications at the 5 percent level.
-Degrees outside this range were not studied.
+The size and power study covered degrees 0 through 5.
+
+The observed statistic uses the direction in the supplied fit. Each MPI rank
+performs complete bootstrap refits with the same estimator and search settings.
+For higher-degree fits, the serial and collective CV searches can converge to
+different minima on the same observations. This can change the fitted mean and
+the test decision even with identical seeds. When comparing implementations,
+first compare the supplied index coefficients and fitted bandwidths.
 
 Every draw refits the direction and CV bandwidth using the original model's
 search settings. Ichimura uses leave-one-out CV fitted means and Mammen wild
