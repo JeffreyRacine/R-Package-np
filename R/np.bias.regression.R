@@ -125,9 +125,8 @@
 }
 
 .np_bias_regression_calibration <- function(bws, calibration, method, band,
-                                             bootstrap, wild, gradients = FALSE) {
-  # These fixed fitted rows retain the scope of the previously supported
-  # explicit local envelope until the physical-coordinate discrepancies are resolved.
+                                             bootstrap, wild, gradients = FALSE,
+                                             gradient.order = 1L, default.controls = TRUE) {
   if (identical(bws[["type"]], "fixed") &&
       !identical(calibration, "basic-local-envelope")) {
     degree <- bws[["degree"]]
@@ -136,6 +135,17 @@
       identical(bws[["bernstein.basis"]], FALSE) && any(degree == 2L)
     beta.derivative <- identical(bws[["ckertype"]], "beta") && isTRUE(gradients) &&
       (identical(bws[["regtype"]], "ll") || any(degree > 0L))
+    if (beta.derivative && identical(calibration, "default") && default.controls &&
+        identical(method, "bootstrap") && identical(band, "simultaneous") &&
+        identical(bootstrap, "wild") && identical(wild, "mammen") &&
+        isTRUE(gradient.order == 1L) && isTRUE(bws[["ckerorder"]] == 2L) &&
+        identical(bws[["ckerbound"]], "fixed") &&
+        isTRUE(is.finite(bws[["ckerlb"]])) && isTRUE(is.finite(bws[["ckerub"]])) &&
+        isTRUE(bws[["ncon"]] == 1L) && isTRUE(bws[["nuno"]] == 0L) &&
+        isTRUE(bws[["nord"]] == 0L) && identical(bws[["regtype"]], "lp") &&
+        identical(bws[["basis"]], "glp") && isTRUE(bws[["bernstein.basis"]]) &&
+        isTRUE(degree %in% 1:2))
+      return("basic-local-envelope")
     if (raw.quadratic || beta.derivative)
       stop("this fixed-bandwidth iterated regression target requires the explicit basic-local-envelope calibration for supported pairs or Mammen bands", call. = FALSE)
   }

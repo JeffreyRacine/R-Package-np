@@ -90,11 +90,19 @@ mixed-predictor targets retain replicate residual-pilot studentization for
 empirical bands. This does not extend either basic envelope to Rademacher or
 alter Gaussian defaults; the saved derivative limitations still apply.
 
-For fixed-bandwidth raw Epanechnikov GLP fits with a quadratic component,
-and fixed-bandwidth beta derivatives with a positive main degree, the
-supported iterated empirical bands require explicit
-\code{interval="basic-local-envelope"} with pairs or
-Mammen resampling. Saved cases show numerical sensitivity in the fitted rows.
+For a fixed-bandwidth, second-order beta kernel on one continuous
+predictor with known finite support, an experimental simultaneous band
+is available for the first derivative of a degree-one or degree-two
+Bernstein GLP fit with zero-ridge evaluation rows. With
+\code{center="bias-corrected"}, \code{errors="bootstrap"},
+\code{gradients=TRUE} and \code{band="simultaneous"}, omitting
+\code{interval}, \code{boot.control} and \code{bias.control} selects
+the Mammen wild basic local envelope. Simultaneous slope bands were
+wide on the saved fits. Pointwise slopes still require explicit
+\code{interval="basic-local-envelope"} with supported pairs or Mammen
+resampling. The explicit requirement also applies to other supported
+positive-degree fixed beta derivative bands and to fixed raw
+Epanechnikov GLP fits with a quadratic component.
 
 Fixed uniform-kernel models with \code{ckerbound="none"} or \code{"fixed"}
 support iterated mean correction for local-constant fits and GLP fits with

@@ -222,7 +222,8 @@
       stop("bias.control requires center='bias-corrected' and inference errors",call.=FALSE)
     percentile.request <- identical(plot.errors.boot.calibration, "smoothed-percentile")
     if (percentile.request && missing(plot.errors.boot.method)) plot.errors.boot.method <- "residual"
-    if (bias.request && is.null(bias.control)) bias.control <- if (percentile.request)
+    default.bias <- bias.request && is.null(bias.control)
+    if (default.bias) bias.control <- if (percentile.request)
       np_bias_control(adaptation="none") else np_bias_control()
     if (bias.request) bias.control <- .np_bias_validate_control(bias.control)
     new.bias <- bias.request && identical(bias.control[["construction"]],"iterated")
@@ -236,7 +237,8 @@
     effective.calibration <- if (new.bias) .np_bias_regression_calibration(bws,
       plot.errors.boot.calibration, error.request$method, error.request$type,
       as.character(plot.errors.boot.method)[1L], as.character(plot.errors.boot.wild)[1L],
-      gradients = gradients) else
+      gradients = gradients, gradient.order = plot.gradient.order.label,
+      default.controls = default.bias && missing(plot.errors.boot.wild)) else
       plot.errors.boot.calibration
     # Read the requested construction before an omitted choice resolves to absolute.
     explicit.mammen <- new.bias &&
