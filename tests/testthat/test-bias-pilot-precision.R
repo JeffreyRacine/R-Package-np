@@ -69,3 +69,30 @@ test_that("univariate P1 preserves the canonical solve on tied numerical support
     expect_identical(.np_bias_pilot_rows(p, at, FALSE)$mean, canonical)
   }
 })
+test_that("P1 batches only a common ordered donor set and preserves individual rows", {
+  x <- data.frame(x = seq(0, 1, length.out = 96L))
+  b <- .08
+  n <- nrow(x)
+  bw <- npregbw(xdat = x, ydat = x$x, bws = b, bandwidth.compute = FALSE)
+  pilot <- list(x = x, xcon = x, numeric.cols = 1L, d = 1L, q = 3L,
+                factor.cols = integer(), groups = list(all = seq_len(n)),
+                b = b, bernstein = TRUE, pilot.bws = .np_bias_regbw(bw, x, b, 3L, TRUE))
+  sizes <- integer()
+  original <- .np_kernel_weights_direct
+  local_mocked_bindings(.np_kernel_weights_direct = function(..., exdat) {
+    sizes <<- c(sizes, nrow(exdat))
+    original(..., exdat = exdat)
+  })
+  ii <- c(96L, 4L, 23L, 4L, 1L)
+  for (order in list(seq_len(n), rev(seq_len(n)))) {
+    pilot$groups$all <- order
+    owner <- .np_bias_pilot_owner(pilot)
+    scalar <- do.call(rbind, lapply(ii, owner))
+    sizes <- integer()
+    expect_identical(owner(ii), scalar)
+    expect_identical(sizes, if (identical(order, seq_len(n))) length(ii) else rep(1L, length(ii)))
+    expect_identical(dim(owner(integer())), c(0L, n))
+    expect_error(owner(seq_len(17L)), "invalid pilot row request")
+    expect_error(owner(c(1L, NA_integer_)), "invalid pilot row request")
+  }
+})

@@ -275,7 +275,7 @@ function (spec, grid, map, op)
 }
 
 .np_bias_pilot_rows <-
-function (spec, at, derivatives = TRUE, orders = NULL, .training = FALSE)
+function (spec, at, derivatives = TRUE, orders = NULL, .training = FALSE, kernel.weights = NULL)
 {
     ii <- spec$groups[[.np_bias_key(spec, at)]]
     if (is.null(ii))
@@ -295,7 +295,9 @@ function (spec, at, derivatives = TRUE, orders = NULL, .training = FALSE)
         zero[, ] <- 0
         v <- drop(basis(u, exdat = zero, degree = spec$q, basis = "glp", bernstein.basis = spec$bernstein))
     }
-    k <- drop(.np_kernel_weights_direct(spec$pilot.bws, txdat = x, exdat = at[spec$numeric.cols], bandwidth.divide = TRUE))
+    k <- kernel.weights
+    if (is.null(k))
+        k <- drop(.np_kernel_weights_direct(spec$pilot.bws, txdat = x, exdat = at[spec$numeric.cols], bandwidth.divide = TRUE))
     # The QR uses the same weighted design after the canonical zero-ridge check.
     # It supplies univariate training means as well as derivative targets.
     # A singular support has no equivalent full-rank polynomial basis. Keep
@@ -381,16 +383,25 @@ function (W, row_owner, block = 16L)
 function (spec)
 {
     # All streamed P1 rows use the same fixed kernel bandwidth descriptor.
-    if (spec$d == 1L && identical(spec$pilot.bws[["type"]], "fixed") &&
-        !inherits(spec$pilot.bws, "kbandwidth"))
+    fixed.univariate <- spec$d == 1L && identical(spec$pilot.bws[["type"]], "fixed")
+    if (fixed.univariate && !inherits(spec$pilot.bws, "kbandwidth"))
         spec$pilot.bws <- kbandwidth(spec$pilot.bws)
+    # A batched column and a scalar row must use the same donors in the same order.
+    batch.weights <- fixed.univariate && length(spec$groups) == 1L &&
+        identical(unname(spec$groups[[1L]]), seq_len(nrow(spec$x)))
     force(spec)
     function(ii) {
         if (length(ii) > 16L || anyNA(ii) || any(ii < 1L | ii > nrow(spec$x)) || any(ii != floor(ii)))
             stop("invalid pilot row request")
+        weights <- if (batch.weights && length(ii) > 1L)
+            .np_kernel_weights_direct(spec$pilot.bws, txdat = spec$xcon,
+                                      exdat = spec$x[ii, spec$numeric.cols, drop = FALSE],
+                                      bandwidth.divide = TRUE)
         ans <- matrix(0, length(ii), nrow(spec$x))
         for (j in seq_along(ii)) {
-            row <- .np_bias_pilot_rows(spec, spec$x[ii[j], , drop = FALSE], FALSE, .training = TRUE)
+            row <- .np_bias_pilot_rows(spec, spec$x[ii[j], , drop = FALSE], FALSE,
+                                       .training = TRUE,
+                                       kernel.weights = if (!is.null(weights)) weights[, j])
             ans[j, row$indices] <- row$mean
         }
         ans
