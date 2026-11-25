@@ -1,13 +1,28 @@
 # Recompute each normalized conditional CDF under the same multinomial counts.
 .np_conditional_pairs_block <- function(task, plan) {
-  ratio <- function(numerator, weight) {
+  denominator <- function(weight) {
     total <- crossprod(task$value, weight)
     if (any(!is.finite(total)) || any(total <= 0))
       stop("resampled conditional CDF has zero or nonfinite predictor mass", call. = FALSE)
-    crossprod(task$value, numerator) / total[, plan$ix, drop = FALSE]
+    total[, plan$ix, drop = FALSE]
   }
-  sweep(2 * ratio(plan$main, plan$w) - ratio(plan$wide, plan$jw),
-        2L, plan$center, "-")
+  stable <- plan[["stable"]]
+  if (is.null(stable)) {
+    # Keep only one denominator live at a time on the ordinary path.
+    ratio <- function(numerator, weight) {
+      mass <- denominator(weight)
+      crossprod(task$value, numerator) / mass
+    }
+    return(sweep(2 * ratio(plan$main, plan$w) - ratio(plan$wide, plan$jw),
+                 2L, plan$center, "-"))
+  }
+  main.mass <- denominator(plan$w)
+  wide.mass <- denominator(plan$jw)
+  roots <- function(data) {
+    sweep(2 * (crossprod(task$value, data$main) / main.mass) -
+          crossprod(task$value, data$wide) / wide.mass, 2L, data$center, "-")
+  }
+  cbind(roots(plan), roots(stable))
 }
 
 # Integrated unit-variance second-order Epanechnikov kernel.
@@ -273,6 +288,25 @@
     if (is.null(conditioning.bounds) && is.null(profile.weights)) .np_conditional_pairs_support(x, targets, h[1L])
   }
 
+  # The explicit standardized maximum needs a second numerical root per
+  # target and draw. Both use the same counts, denominator and worker task.
+  if (identical(simultaneous, "rms-envelope") && !is.null(profile.weights)) {
+    cap <- 256 * 1024^2
+    nx <- length(unique(grid$x))
+    ny <- length(unique(grid$y))
+    reserved <- 64 * B + 32 * m + 8 * (12 * n * nx + 8 * n * ny + 24 * n + 32 * 10000)
+    if (identical(pointwise, "local-wilson")) reserved <- reserved + 128 * (n + m)
+    fixed <- 2 * as.double(n) * B + 12 * n * 128 + 256 * n + 16 * m + 8 * B
+    # Per target, four simultaneous copies of the two-channel draw output
+    # bound collection and transposition; donor setup is independent of B.
+    per.target <- 48 * n + 8 * B
+    size <- min(tile.size, floor(((cap - reserved) / 8 - fixed) / per.target))
+    if (size < 1L || m > 12 * size)
+      stop("RMS envelope exceeds the 256 MiB numerical workspace or transport limit", call. = FALSE)
+    tile.size <- as.integer(size)
+    tiled <- tiled || size < m
+    bytes <- max(bytes, 8 * (fixed + size * per.target))
+  }
   if (identical(pointwise, "local-wilson")) {
     # Reserve sorting, cumulative weights and the second set of endpoint arrays.
     bytes <- bytes + 128 * (as.double(n) + m)
@@ -303,7 +337,7 @@
     bytes <- bytes + 8 * (8 * as.double(n) * length(targets.y) + 12 * n + 32 * 10000)
     if (bytes > 256 * 1024^2)
       stop("higher-order pairs numerical workspace exceeds the 256 MiB budget", call. = FALSE)
-    prepare <- .np_conditional_high_pairs_provider(y, targets.y, h[2L], response.kernel, response.order, conditioning)
+    prepare <- .np_conditional_high_pairs_provider(y, targets.y, h[2L], response.kernel, response.order, conditioning, rms = rms.envelope)
   } else if (identical(response.kernel, "beta")) {
     targets.y <- unique(grid$y)
     # Two response tables plus their construction, workspace and outward bounds.
@@ -340,10 +374,11 @@
       tile$plan$tile.label <- sprintf("Conditional inference, target tile %d of %d",
                                      (first - 1L) %/% tile.size + 1L, ceiling(m / tile.size))
     }
-    roots <- .np_conditional_dispatch(tasks, tile$plan, "pairs-score", length(idx))
+    roots <- .np_conditional_dispatch(tasks, tile$plan, "pairs-score",
+                                      length(idx) * if (rms.envelope) 2L else 1L)
     if (!is.null(profile.weights)) original[idx] <- colSums(tile$plan$main)
     center[idx] <- tile$plan$center
-    if (tiled) {
+    if (tiled || rms.envelope) {
       for (i in seq_along(idx)) {
         v <- roots[i, ]
         se[idx[i]] <- sd(v)
@@ -360,7 +395,7 @@
     point[idx, 2L] <- pmax(center[idx] - cuts[2L, idx], tile$score[, 2L])
     if (rms.envelope) {
       for (i in seq_along(idx)) {
-        absolute <- abs(roots[i, ])
+        absolute <- abs(roots[length(idx) + i, ])
         peak <- max(absolute)
         if (peak == 0) next
         # The bootstrap roots are bounded. Relative scaling also protects tiny roots.

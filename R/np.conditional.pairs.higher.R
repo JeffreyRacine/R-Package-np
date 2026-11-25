@@ -40,7 +40,7 @@
   }
 }
 
-.np_conditional_high_pairs_provider <- function(y, targets, h, kernel, order, conditioning = NULL) {
+.np_conditional_high_pairs_provider <- function(y, targets, h, kernel, order, conditioning = NULL, rms = FALSE) {
   scale <- 2^(1 / order)
   targets <- sort(unique(targets))
   main.y <- .np_conditional_high_integral(y, targets, h, kernel, order)
@@ -61,7 +61,26 @@
     score <- .np_conditional_range_interval(center, list(lower = colSums(bounds$lower)[z$ix],
       span = span[z$ix], q = q[, z$ix, drop = FALSE], qmax = apply(q, 2L, max)[z$ix]),
       "sharp-score", alpha)
-    list(plan = list(ix = z$ix, w = z$w, jw = z$jw,
-                     main = main, wide = wide, center = center), score = score)
+    plan <- list(ix = z$ix, w = z$w, jw = z$jw,
+                 main = main, wide = wide, center = center)
+    if (rms) {
+      # Working around an observed donor avoids forming tiny deviations by
+      # subtracting conditional probabilities which have rounded to one.
+      centered <- function(weights, response) {
+        anchor <- max.col(t(weights), ties.method = "first")
+        shift <- response[cbind(anchor[z$ix], iy)]
+        W <- weights[, z$ix, drop = FALSE]
+        deviation <- sweep(response[, iy, drop = FALSE], 2L, shift, "-")
+        total <- colSums(W)
+        mean <- colSums(W * deviation) / total
+        numerator <- W * sweep(deviation, 2L, mean, "-")
+        list(numerator = numerator, original = colSums(numerator) / total)
+      }
+      a <- centered(z$w, main.y)
+      b <- centered(z$jw, wide.y)
+      plan$stable <- list(main = a$numerator, wide = b$numerator,
+                          center = 2 * a$original - b$original)
+    }
+    list(plan = plan, score = score)
   }
 }
