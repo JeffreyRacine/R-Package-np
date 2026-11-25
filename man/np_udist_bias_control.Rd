@@ -37,6 +37,12 @@ target-specific signed donor range protects the marginal intervals. The
 declared endpoints receive exact zero-width intervals and do not contribute
 to the stochastic family size. The lower endpoint assumes no point mass
 there. Interior targets with numerically unresolved variance are refused.
+Univariate second-order whole-line Epanechnikov generalized nearest-neighbor
+bandwidths also support the Gaussian asymptotic joint-process construction.
+It holds the fitted neighbor count fixed and includes variation in each query
+radius. It requires an interior count, a positive query radius and a finite
+positive local distance-spacing estimate. Literal pairs and block resampling
+for this geometry have separate radius requirements and are not included.
 The corresponding fixed uniform kernel uses the integral of
 \eqn{(9-15u^2)/8} on \eqn{[-1,1]}. With the large-bandwidth option enabled,
 the uniform correction requires the range of training and evaluation values
