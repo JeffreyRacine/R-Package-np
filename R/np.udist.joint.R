@@ -5,6 +5,9 @@
                                      bands = c("pointwise", "simultaneous", "bonferroni"),
                                      corrected = TRUE, blocklen = NULL, selection = NULL,
                                      calibration = NULL) {
+  if (identical(state$metadata$kernel, "uniform2") &&
+      (!identical(law, "gaussian") || !is.null(calibration)))
+    stop("the uniform CDF process requires Gaussian asymptotic calibration", call. = FALSE)
   if (identical(state$metadata$kernel, "epanechnikov2") &&
       (!identical(law, "gaussian") || !is.null(calibration)))
     stop("the Epanechnikov CDF process requires Gaussian asymptotic calibration", call. = FALSE)
@@ -157,6 +160,8 @@
     rng = list(kind = kind, entry = entry, start = start, end = end))
   if (identical(state$metadata$kernel, "epanechnikov2"))
     answer$settings$correction <- "integrated fourth-order Epanechnikov kernel"
+  if (identical(state$metadata$kernel, "uniform2"))
+    answer$settings$correction <- "integrated fourth-order uniform equivalent kernel"
   if (nearest) {
     answer$settings$h <- NULL
     answer$settings$counts <- state$requested

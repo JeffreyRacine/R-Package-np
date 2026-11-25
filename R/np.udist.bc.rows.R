@@ -17,6 +17,10 @@
   .5 + t*(45 + t2*(21*t2 - 50))/32
 }
 
+.np_udist_uniform_cdf4 <- function(t) {
+  .5 + t*(9 - 5*t*t)/8
+}
+
 .np_udist_bc_rows <- function(state, grid, corrected = TRUE) {
   if (!identical(state$type, "fixed")) return(.np_udist_bc_gnn_rows(state, grid, corrected))
   .np_udist_bc_grid(state, grid)
@@ -24,7 +28,12 @@
     stop("corrected must be TRUE or FALSE", call. = FALSE)
   if (nrow(grid) > 25L) stop("CDF row provider requires bounded target tiles", call. = FALSE)
   .np_udist_bc_budget(state, nrow(grid), 1L, nrow(grid))
-  if (identical(state$metadata$kernel, "epanechnikov2")) {
+  if (identical(state$metadata$kernel, "uniform2")) {
+    t <- outer(grid[[1L]], state$x[[1L]], "-") / state$h[1L]
+    t[] <- pmax(-1, pmin(1, t))
+    original <- .5 + .5*t
+    z <- list(original = original, corrected = if (corrected) .np_udist_uniform_cdf4(t) else original)
+  } else if (identical(state$metadata$kernel, "epanechnikov2")) {
     t <- outer(grid[[1L]], state$x[[1L]], "-") / state$h[1L] / sqrt(5)
     t[] <- pmax(-1, pmin(1, t))
     t2 <- t*t

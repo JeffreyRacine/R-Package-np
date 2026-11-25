@@ -2,6 +2,10 @@
 # The score interval targets their expectation at fixed bandwidth and target;
 # smoothing bias and data-selected targets require separate coverage evidence.
 .np_udist_marginal_range <- function(q, kernel = "gaussian2") {
+  if (identical(kernel, "uniform2")) {
+    lower <- .np_udist_uniform_cdf4(-sqrt(3/5))
+    return(c(lower = lower, upper = 1-lower))
+  }
   if (identical(kernel, "epanechnikov2")) {
     lower <- .np_udist_epanechnikov_cdf4(-sqrt(3/7))
     return(c(lower = lower, upper = 1-lower))

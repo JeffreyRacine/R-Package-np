@@ -65,9 +65,9 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   if (identical(calibration, "smoothed-percentile") &&
       (ncol(x) != 1L || !is.numeric(x[[1L]]) || !identical(bws$type, "fixed")))
     stop("CDF smoothed-percentile requires a fixed univariate numeric fit", call.=FALSE)
-  allow.epanechnikov <- identical(construction, "joint-process") && identical(method, "asymptotic") &&
+  allow.compact <- identical(construction, "joint-process") && identical(method, "asymptotic") &&
     identical(control.calibration, "default") && is.null(calibration)
-  state <- .np_udist_bc_prepare(bws, x, allow.epanechnikov = allow.epanechnikov)
+  state <- .np_udist_bc_prepare(bws, x, allow.compact = allow.compact)
   if (identical(construction, "joint-process") &&
       (!state$q %in% 0:2 || !state$s %in% 0:2))
     stop("joint CDF process currently admits at most two numeric and two ordered variables; use an explicit qualified construction", call. = FALSE)

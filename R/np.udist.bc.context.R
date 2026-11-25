@@ -1,9 +1,10 @@
 # Private CDF prototype: immutable retained-data context, no public dispatch.
-.np_udist_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2, allow.epanechnikov = FALSE) {
+.np_udist_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2, allow.compact = FALSE) {
   if (is.list(bws) && bws[["type", exact = TRUE]] %in% c("generalized_nn", "adaptive_nn"))
     return(.np_udist_bc_nn_prepare(bws, x, max.bytes))
-  compact <- isTRUE(allow.epanechnikov) && is.list(bws) &&
-    identical(bws[["ckertype", exact = TRUE]], "epanechnikov") &&
+  kernel <- if (is.list(bws)) bws[["ckertype", exact = TRUE]]
+  compact <- isTRUE(allow.compact) &&
+    (identical(kernel, "epanechnikov") || identical(kernel, "uniform")) &&
     is.data.frame(x) && ncol(x) == 1L && is.numeric(x[[1L]])
   if (!is.list(bws) || !identical(bws[["type", exact = TRUE]], "fixed") ||
       !(compact || identical(bws[["ckertype", exact = TRUE]], "gaussian")) ||
@@ -49,7 +50,7 @@
       training = as.double(toMatrix(x[j])), raw.probe = raw, effective.probe = effective)
   })
   metadata <- if (compact) {
-    list(normalization = "n-squared", support = "Lebesgue", kernel = "epanechnikov2",
+    list(normalization = "n-squared", support = "Lebesgue", kernel = paste0(kernel, "2"),
          correction = "integrated fourth-order equivalent kernel")
   } else {
     list(normalization = "n-squared", support = "Lebesgue x integer lattice",
@@ -72,7 +73,9 @@
     stop("CDF evaluation must retain fitted ordered levels", call. = FALSE)
   if (identical(state$type, "fixed") && state$q && npLogicalOption("np.largeh", TRUE)) {
     tol <- getOption("np.largeh.rel.tol", 1e-3)
-    threshold <- if (identical(state$metadata$kernel, "epanechnikov2")) sqrt(tol) else sqrt(-2*log(1-tol))
+    threshold <- if (identical(state$metadata$kernel, "uniform2")) {
+      1  # All sample-to-target differences lie inside the uniform support.
+    } else if (identical(state$metadata$kernel, "epanechnikov2")) sqrt(tol) else sqrt(-2*log(1-tol))
     span <- vapply(which(state$numeric), function(j) diff(range(state$x[[j]], grid[[j]])), numeric(1L))
     if (any(span <= state$h[state$numeric]*threshold))
       stop("large-h/global-limit CDF correction is outside this investigation", call. = FALSE)

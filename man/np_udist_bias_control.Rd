@@ -29,6 +29,11 @@ equivalent kernel. The centered contributions supply the complete covariance
 and the Gaussian maximum over the requested finite grid. The marginal score
 uses the signed range of these contributions. Smoothing bias, sparse targets
 and a bandwidth or grid selected from the data affect population coverage.
+The corresponding fixed uniform kernel uses the integral of
+\eqn{(9-15u^2)/8} on \eqn{[-1,1]}. With the large-bandwidth option enabled,
+the uniform correction requires the range of training and evaluation values
+to exceed the bandwidth. Population coverage of this experimental construction
+has been explored on a limited set of finite grids.
 
 The default joint-process construction admits fixed and generalized-nearest-neighbor
 unbounded second-order Gaussian kernels with at most two numeric and two ordered variables. Ordered
