@@ -19,7 +19,16 @@
     stop("corrected must be TRUE or FALSE", call. = FALSE)
   if (nrow(grid) > 25L) stop("CDF row provider requires bounded target tiles", call. = FALSE)
   .np_udist_bc_budget(state, nrow(grid), 1L, nrow(grid))
-  z <- .np_udist_bc_continuous(state$x[state$numeric], grid[state$numeric], state$h[state$numeric], corrected)
+  if (identical(state$metadata$kernel, "epanechnikov2")) {
+    t <- outer(grid[[1L]], state$x[[1L]], "-") / state$h[1L] / sqrt(5)
+    t[] <- pmax(-1, pmin(1, t))
+    t2 <- t*t
+    original <- .5 + .25*t*(3-t2)
+    # The primitive of the moment-corrected kernel has signed range outside [0, 1].
+    z <- list(original = original, corrected = if (corrected) .5 + t*(45+t2*(21*t2-50))/32 else original)
+  } else {
+    z <- .np_udist_bc_continuous(state$x[state$numeric], grid[state$numeric], state$h[state$numeric], corrected)
+  }
   for (category in state$category) {
     r <- outer(as.double(toMatrix(grid[category$index])), category$training, "-")
     z$original <- z$original * .np_udist_bc_ordered(r, category$lambda, FALSE)

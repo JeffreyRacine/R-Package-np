@@ -23,6 +23,13 @@ with \code{bootstrap="inid"}, \code{"fixed"} or \code{"geom"} for literal
 independent, circular fixed-length or stationary geometric-block resampling. Explicit
 \code{construction="legacy"} retains previous bootstrap correction.
 
+For one numeric coordinate with a fixed, whole-line second-order Epanechnikov
+bandwidth, the asymptotic joint-process construction integrates a fourth-order
+equivalent kernel. The centered contributions supply the complete covariance
+and the Gaussian maximum over the requested finite grid. The marginal score
+uses the signed range of these contributions. Smoothing bias, sparse targets
+and a bandwidth or grid selected from the data affect population coverage.
+
 The default joint-process construction admits fixed and generalized-nearest-neighbor
 unbounded second-order Gaussian kernels with at most two numeric and two ordered variables. Ordered
 smoothing retains the canonical categorical representation: nonnumeric ordered

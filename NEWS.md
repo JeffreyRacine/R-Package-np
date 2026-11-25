@@ -1,5 +1,9 @@
 # np 0.80-4
 
+* Experimental bias-corrected CDF plots support asymptotic confidence bands
+  for one continuous variable with a fixed, whole-line second-order
+  Epanechnikov kernel. Simultaneous coverage refers to the requested grid.
+
 * `npindextest()` now accepts a prespecified local-polynomial index smoother
   and refits that degree in every bootstrap draw. The local-constant smoother
   remains the default.
