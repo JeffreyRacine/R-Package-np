@@ -18,7 +18,7 @@ conditional CDF inference and conditional density bootstrap inference;
 use \code{"jackknife"} for conditional density asymptotic inference.
 Use \code{"jackknife-mp1"} for the separate asymmetric studentized
 conditional density bootstrap described below. Use \code{"pairs-score"} for the conditional CDF pairs bootstrap.}
-\item{simultaneous}{For qualified two-predictor Gaussian-response conditional CDF
+\item{simultaneous}{The RMS calculation centers donor probabilities before forming ratios so small tail deviations retain their numerical precision. For qualified two-predictor Gaussian-response conditional CDF
 pairs-score profiles, \code{"rms-envelope"} adds a second simultaneous bound
 using the maximum absolute bootstrap deviation divided by its pointwise
 root-mean-square. The band contains the original joint band and the

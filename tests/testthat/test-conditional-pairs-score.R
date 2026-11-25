@@ -567,3 +567,36 @@ test_that("an RMS request exceeding its memory allowance refuses before preparin
     NULL, 256 * 1024^2 - 1, profile.weights = fail, simultaneous = "rms-envelope"), "RMS envelope exceeds")
   expect_identical(.Random.seed, before)
 })
+
+test_that("RMS pairs preserve changes below one CDF rounding unit", {
+  response <- c(0, 0, 0, .5)
+  target <- seq(10.5, 12.5, by=.1)
+  h <- c(.3, 1)
+  w <- matrix(c(.125, .375, .25, .25), ncol=1L)
+  v <- matrix(c(.25, .25, .125, .375), ncol=1L)
+  weights <- list(targets=0, main=w, wide=v)
+  prepare <- .np_conditional_high_pairs_provider(response, target, 1, "gaussian",
+                                                  2L, weights, rms=TRUE)
+  plan <- prepare(1:4, response, data.frame(x=0, y=target), h, .05, "gaussian")$plan
+  counts <- cbind(rep(1L, 4L), c(2L,1L,1L,0L), c(0L,0L,1L,3L))
+  both <- .np_conditional_pairs_block(list(value=counts),plan)
+  main <- .np_conditional_high_integral(response, target, 1, "gaussian", 2L)
+  wide <- .np_conditional_high_integral(response, target, sqrt(2), "gaussian", 2L)
+  change <- function(weights) {
+    counts[4L,] * weights[4L] / as.numeric(crossprod(counts,weights)) - weights[4L]
+  }
+  # In a two-value donor population the exact change factors into a change
+  # of normalized mass and a difference of the two stored probabilities.
+  want <- 2 * outer(change(w),main[4L,]-main[1L,]) -
+              outer(change(v),wide[4L,]-wide[1L,])
+  m <- length(target)
+  expect_equal(dim(both), c(3L, 2L*m))
+  stable <- both[,m+seq_len(m),drop=FALSE]
+  tiny <- abs(want)>0 & abs(want)<.Machine$double.eps
+  expect_true(any(tiny))
+  expect_true(all(abs(stable[tiny]/want[tiny]-1)<1e-12))
+  expect_true(all(abs(stable-want)<=1e-12*abs(want)))
+  plan$stable <- NULL
+  expect_identical(both[,seq_len(m),drop=FALSE],
+                   .np_conditional_pairs_block(list(value=counts),plan))
+})
