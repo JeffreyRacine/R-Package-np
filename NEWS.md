@@ -1,5 +1,13 @@
 # npRmpi 0.80-4
 
+* `npindextest()` now accepts a prespecified local-polynomial index smoother
+  and refits that degree in every bootstrap draw. The local-constant smoother
+  remains the default.
+
+* Leave-one-out least-squares bandwidth selection for univariate Gaussian
+  local-polynomial regression with fixed bandwidths now evaluates
+  ill-conditioned zero-ridge fits more accurately.
+
 * Independent, fixed-block and geometric-block pairs can explicitly select
   the experimental basic local envelope on univariate quadratic Bernstein
   Epanechnikov GNN means and slopes and cubic means.
