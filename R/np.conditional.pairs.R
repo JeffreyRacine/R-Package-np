@@ -254,7 +254,7 @@
   invisible(NULL)
 }
 
-.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL, response.order = 2L, conditioning.bounds = NULL, profile.weights = NULL) {
+.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL, response.order = 2L, conditioning.bounds = NULL, profile.weights = NULL, simultaneous = NULL) {
   n <- length(x)
   m <- nrow(grid)
   tiled <- !is.null(tile.size)
@@ -278,6 +278,16 @@
     bytes <- bytes + 128 * (as.double(n) + m)
     if (bytes > 256 * 1024^2)
       stop("local Wilson numerical workspace exceeds the 256 MiB budget", call. = FALSE)
+  }
+  rms.envelope <- identical(simultaneous, "rms-envelope")
+  if (!is.null(simultaneous) && (!rms.envelope || is.null(profile.weights)))
+    stop("unsupported pairs-score simultaneous calculation", call. = FALSE)
+  if (rms.envelope) {
+    bytes <- bytes + 64 * as.double(B) + 32 * m
+    if (bytes > 256 * 1024^2)
+      stop("RMS envelope exceeds the 256 MiB numerical workspace", call. = FALSE)
+    draw.rms.max <- numeric(B)
+    root.rms <- numeric(m)
   }
   conditioning <- NULL
   if (!is.null(conditioning.bounds) || !is.null(profile.weights)) {
@@ -348,6 +358,20 @@
     }
     point[idx, 1L] <- pmin(center[idx] - cuts[3L, idx], tile$score[, 1L])
     point[idx, 2L] <- pmax(center[idx] - cuts[2L, idx], tile$score[, 2L])
+    if (rms.envelope) {
+      for (i in seq_along(idx)) {
+        absolute <- abs(roots[i, ])
+        peak <- max(absolute)
+        if (peak == 0) next
+        # The bootstrap roots are bounded. Relative scaling also protects tiny roots.
+        relative <- absolute / peak
+        scale <- sqrt(mean(relative^2))
+        root.rms[idx[i]] <- peak * scale
+        if (root.rms[idx[i]] == 0)
+          stop("positive bootstrap RMS is below numerical resolution", call. = FALSE)
+        draw.rms.max <- pmax(draw.rms.max, relative / scale)
+      }
+    }
     rm(roots, tile)
   }
   raw <- unname(quantile(draw.max, 1-alpha, type = 1L))
@@ -396,6 +420,20 @@
     ans$primary <- "positive local Wilson and basic pairs pointwise interval"
     ans$conditioning <- "fixed bandwidths; joint pairs resampling; Wilson uses local homogeneity"
     ans$endpoint.construction <- "local Wilson and basic pairs pointwise hull; original sharp-score joint radius with outward nesting"
+  }
+  if (rms.envelope) {
+    multiplier <- unname(quantile(draw.rms.max, 1-alpha, type = 1L))
+    width <- multiplier * root.rms
+    joint[, 1L] <- pmin(joint[, 1L], center - width)
+    joint[, 2L] <- pmax(joint[, 2L], center + width)
+    bonf[, 1L] <- pmin(bonf[, 1L], joint[, 1L])
+    bonf[, 2L] <- pmax(bonf[, 2L], joint[, 2L])
+    ans$bands$simultaneous <- joint
+    ans$bands$bonferroni <- bonf
+    ans$settings <- list(critical.components = list(raw.radius = radius,
+      rms.multiplier = multiplier, root.rms = root.rms))
+    ans$endpoint.construction <- paste(ans$endpoint.construction,
+      "joint hull also includes the maximum of RMS-scaled pairs deviations", sep = ". ")
   }
   if (!is.null(ans$range.construction))
     ans$endpoint.construction <- paste(ans$endpoint.construction, ans$range.construction, sep = ". ")

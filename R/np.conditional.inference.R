@@ -1,12 +1,20 @@
 # Explicit experimental conditional inference; incumbent NULL controls are unchanged.
 np_conditional_bias_control <- function(construction = c("analytic", "jackknife", "jackknife-mp1", "pairs-score"),
-                                        pointwise = NULL) {
+                                        pointwise = NULL, simultaneous = NULL) {
   construction <- match.arg(construction)
+  if (!is.null(pointwise) &&
+      !(identical(construction, "pairs-score") && identical(pointwise, "local-wilson")))
+    stop("pointwise = 'local-wilson' requires construction = 'pairs-score'", call. = FALSE)
+  if (!is.null(simultaneous)) {
+    if (!(identical(construction, "pairs-score") && identical(simultaneous, "rms-envelope")))
+      stop("simultaneous = 'rms-envelope' requires construction = 'pairs-score'", call. = FALSE)
+    return(structure(list(construction = construction, pointwise = pointwise,
+                          simultaneous = simultaneous, version = 3L),
+                     class = "np_conditional_bias_control"))
+  }
   if (is.null(pointwise))
     return(structure(list(construction = construction, version = 1L),
                      class = "np_conditional_bias_control"))
-  if (!identical(construction, "pairs-score") || !identical(pointwise, "local-wilson"))
-    stop("pointwise = 'local-wilson' requires construction = 'pairs-score'", call. = FALSE)
   structure(list(construction = construction, pointwise = pointwise, version = 2L),
             class = "np_conditional_bias_control")
 }
@@ -18,13 +26,16 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
       stop('bootstrap="conditional-pilot" requires np_conditional_bias_control()', call. = FALSE)
     return(FALSE)
   }
+  simultaneous <- if (is.list(control)) control[["simultaneous", exact = TRUE]]
   pointwise <- if (is.list(control)) control[["pointwise", exact = TRUE]]
   if (!inherits(control, "np_conditional_bias_control") ||
       !is.list(control) || !identical(control[["construction", exact = TRUE]] %in%
         c("analytic", "jackknife", "jackknife-mp1", "pairs-score"), TRUE) ||
       (!is.null(pointwise) && !(identical(pointwise, "local-wilson") &&
         identical(control[["construction", exact = TRUE]], "pairs-score"))) ||
-      !identical(control, np_conditional_bias_control(control[["construction", exact = TRUE]], pointwise)))
+      (!is.null(simultaneous) && !(identical(simultaneous, "rms-envelope") &&
+        identical(control[["construction", exact = TRUE]], "pairs-score"))) ||
+      !identical(control, np_conditional_bias_control(control[["construction", exact = TRUE]], pointwise, simultaneous)))
     stop("invalid np_conditional_bias_control object", call. = FALSE)
   if (!identical(center, "bias-corrected") ||
       !method %in% c("bootstrap", "asymptotic"))
@@ -45,6 +56,8 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     identical(bws$cykertype, "gaussian") && bws$cykerorder == 2L &&
     (bws$xnuno == 0L || identical(bws$uxkertype, "aitchisonaitken")) &&
     (bws$xnord == 0L || identical(bws$oxkertype, "liracine"))
+  if (!is.null(simultaneous) && !profiles)
+    stop("rms-envelope requires a qualified two-predictor conditional CDF profile", call. = FALSE)
   spec <- npConditionalRegEngineSpec(bws, where = "conditional bias inference")
   if (isTRUE(gradients) || isTRUE(quantreg) || isTRUE(proper) ||
       !identical(spec$reg.engine, "lc") || (!profiles && bws$xndim != 1L) || bws$yndim != 1L ||
@@ -292,11 +305,11 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
 }
 
 .np_conditional_plot_interval <- function(bws, x, y, ex, ey, cdf, method,
-                                          calibration, B, alpha, band, construction=NULL, pointwise=NULL) {
+                                          calibration, B, alpha, band, construction=NULL, pointwise=NULL, simultaneous=NULL) {
   .np_plot_corrected_activity_run("Preparing conditional inference", {
   ex <- toFrame(ex); ey <- toFrame(ey)
   if (ncol(x) == 2L && identical(construction, "pairs-score")) {
-    a <- .np_conditional_profile_inference(bws, x, y, ex, ey, B, alpha, pointwise)
+    a <- .np_conditional_profile_inference(bws, x, y, ex, ey, B, alpha, pointwise, simultaneous)
   } else {
     grid <- data.frame(x=ex[[1L]], y=ey[[1L]])
     h <- c(.npcdhat_physical_bandwidth(bws,"x"), .npcdhat_physical_bandwidth(bws,"y"))

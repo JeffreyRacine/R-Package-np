@@ -29,7 +29,7 @@
   list(targets = seq_len(nrow(ex)), main = weights(h), wide = weights(wide))
 }
 
-.np_conditional_profile_inference <- function(bws, x, y, ex, ey, B, alpha, pointwise) {
+.np_conditional_profile_inference <- function(bws, x, y, ex, ey, B, alpha, pointwise, simultaneous = NULL) {
   coordinates <- .np_conditional_profile_rows(ex)
   grid <- data.frame(x = coordinates$index, y = ey[[1L]])
   hx <- .npcdhat_physical_bandwidth(bws, "x")
@@ -53,7 +53,7 @@
   prepare <- function() .np_conditional_profile_weights(bws, x, ex[coordinates$first, , drop = FALSE])
   answer <- .np_conditional_pairs_score(training, y[[1L]], grid, h, allocation$B, alpha,
     original = NULL, bytes = allocation$estimated.bytes, tile.size = allocation[["tile.size"]],
-    pointwise = pointwise, profile.weights = prepare)
+    pointwise = pointwise, profile.weights = prepare, simultaneous = simultaneous)
   answer$physical.bandwidth <- c(hx, hy)
   answer$grid <- cbind(ex, ey)
   answer

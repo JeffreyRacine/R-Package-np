@@ -517,3 +517,51 @@ test_that("special conditioning weights cannot enter the Gaussian-X-only prepara
     response.kernel = "uniform", profile.weights = weights), "no qualified response range")
   expect_identical(.Random.seed, before)
 })
+
+test_that("a profile RMS envelope preserves both pointwise choices and the existing band", {
+  expect_identical(np_conditional_bias_control("pairs-score")$version, 1L)
+  expect_identical(np_conditional_bias_control("pairs-score", "local-wilson")$version, 2L)
+  expect_error(np_conditional_bias_control("analytic", simultaneous = "rms-envelope"), "requires construction")
+  expect_error(np_conditional_bias_control("pairs-score", simultaneous = "other"), "rms-envelope")
+  x <- seq(-1, 1, length.out = 30L)
+  dat <- data.frame(x = x, level = factor(rep(letters[1:3], 10L)), y = sin(x) + rep(c(-.4,.3,.1), 10L))
+  bw <- npcdistbw(y ~ x + level, data = dat, regtype = "lc",
+                  bws = c(.3,.4,.14), bandwidth.compute = FALSE)
+  one <- npcdistbw(y ~ x, data = dat, regtype = "lc",
+                   bws = c(.3,.4), bandwidth.compute = FALSE)
+  args <- list(x = bw, neval = 7L, center = "bias-corrected", errors = "bootstrap",
+               interval = "percentile", bootstrap = "inid", band = "all",
+               xtrim = .1, B = 199L, random.seed = 51L, output = "data")
+  set.seed(27L)
+  before <- .Random.seed
+  for (point in list(NULL, "local-wilson")) {
+    args$bias.control <- np_conditional_bias_control("pairs-score", point)
+    plain <- suppressWarnings(do.call(plot, args))
+    args$bias.control <- np_conditional_bias_control("pairs-score", point, "rms-envelope")
+    augmented <- suppressWarnings(do.call(plot, args))
+    for (j in seq_along(plain$panels)) {
+      bounds <- function(obj, band) as.data.frame(obj, panel = j, target = 1L, band = band)
+      expect_identical(bounds(plain, "pointwise"), bounds(augmented, "pointwise"))
+      a <- bounds(plain, "simultaneous")
+      b <- bounds(augmented, "simultaneous")
+      c <- bounds(augmented, "bonferroni")
+      expect_true(all(c$lower <= b$lower & b$lower <= a$lower & a$upper <= b$upper & b$upper <= c$upper))
+      components <- augmented$inference[[j]]$calibration_details$critical_components
+      expect_length(components$root.rms, nrow(b))
+      expect_true(is.finite(components$rms.multiplier) && components$rms.multiplier >= 0)
+    }
+  }
+  args$x <- one
+  expect_error(do.call(plot, args), "two-predictor")
+  expect_identical(.Random.seed, before)
+})
+
+test_that("an RMS request exceeding its memory allowance refuses before preparing weights", {
+  grid <- data.frame(x = c(0, 1), y = c(0, 1))
+  fail <- function() stop("unexpected call to prepare profile weights")
+  set.seed(83L)
+  before <- .Random.seed
+  expect_error(.np_conditional_pairs_score(1:8, 1:8, grid, c(.3,.4), 99L, .05,
+    NULL, 256 * 1024^2 - 1, profile.weights = fail, simultaneous = "rms-envelope"), "RMS envelope exceeds")
+  expect_identical(.Random.seed, before)
+})
