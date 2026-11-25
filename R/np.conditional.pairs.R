@@ -39,7 +39,7 @@
   bytes <- max(bytes, 8 * (10 * n * m + 2 * n * B + 8 * m * B + 12 * n * 128))
   if (!is.finite(bytes) || bytes > 256 * 1024^2)
     stop("conditional pairs numerical workspace exceeds the 256 MiB budget", call. = FALSE)
-  z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h))
+  z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE))
   delta <- outer(y, z$gy, function(a, b) b - a)
   numerator <- function(weight, width) {
     weight[, z$ix, drop = FALSE] * pnorm(delta / width)[, z$iy, drop = FALSE]

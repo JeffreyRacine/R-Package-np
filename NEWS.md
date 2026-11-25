@@ -4,7 +4,8 @@
 * Added experimental asymptotic bias-corrected bands for a univariate fixed-bandwidth beta CDF on known continuous support.
 * Experimental fixed Gaussian conditional CDF bands support an explicit
   sharp-score envelope with an inid pairs companion. Select it with
-  `np_conditional_bias_control("pairs-score")`.
+  `np_conditional_bias_control("pairs-score")`. Its numerical budget now allows
+  up to 2,500 grid points and 50 response coordinates for this construction.
 
 * Experimental fixed uniform density bands now combine Q6 and empirical
   Gaussian critical values for simultaneous inference on a finite grid.

@@ -93,10 +93,21 @@ centers or endpoints.
 
 The family consists of the actual requested finite evaluation points within
 one panel or surface. Separate panels are not a joint family; a finite grid is
-not the entire continuous domain. Initial admission is at most 256 target points
-and 25 distinct response targets. Choose, for example, \code{neval=9} for an
-81-point surface; the ordinary default 50-by-50 surface exceeds this new method's
-scope. Inputs exceeding the numerical workspace budget of 256 MiB fail before
+not the entire continuous domain. The analytic and conditional-pilot methods admit up to 256 target
+points and 25 distinct response coordinates. The explicit \code{"pairs-score"}
+method admits up to 2,500 points and 50 response coordinates when its numerical
+workspace fits. A 50-by-50 surface with the default 9,999 draws exceeds this
+budget. For example, \code{neval=9} requests an 81-point surface.
+On 32 saved cross-validated samples with 25 targets, nominal 95\% simultaneous
+coverage was 31/32 for \code{"pairs-score"} and 0/32 for the ordinary corrected
+inid percentile construction selected by omitting \code{bias.control}. On the corresponding
+50-by-50 grids, the largest admissible draw counts were 797 at n=150 and
+283 at n=400. The simultaneous band covered all 32 untrimmed surfaces, with
+a width exceeding one CDF unit in every sample (mean 1.81). Trimming the
+predictor by 10\% at each end gave 30/32 and mean width 0.52. The empirical
+Bonferroni tails on these grids reach the extreme observed draws; their
+envelope also includes the simultaneous band.
+Inputs exceeding the numerical workspace budget of 256 MiB fail before
 resampling; the grid and draw count are never silently reduced. The budget is
 not a bound on total R-process memory. Bootstrap \code{B} and asymptotic
 \code{gaussian.draws} must be integers at least two; defaults are 9999.

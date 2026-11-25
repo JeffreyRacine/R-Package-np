@@ -475,6 +475,13 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \code{interval="symmetric-sd"} or \code{"asymmetric-sd"}; it is not pairs
   resampling. For conditional CDFs, the separate \code{"pairs-score"}
   construction uses \code{bootstrap="inid"} and \code{interval="percentile"}.
+  With \code{center="bias-corrected"}, omitting \code{bias.control} selects
+  the ordinary inid percentile construction when \code{bootstrap="inid"} and
+  \code{interval="percentile"}. At nominal 95\%, it covered none of 32
+  five-by-five grids in a saved two-design comparison for either the
+  conditional CDF or the conditional density. In a separate conditional CDF
+  confirmation on 32 grids of the same size, \code{"pairs-score"} covered 31
+  and the ordinary inid percentile construction covered zero.
   Read the control help for correction differences, finite-grid
   limits, signed returned offsets and known coverage limitations.
 
