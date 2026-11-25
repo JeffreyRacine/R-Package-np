@@ -68,16 +68,49 @@
        q = q[, z$ix, drop = FALSE], qmax = apply(q, 2L, max)[z$ix])
 }
 
+# Evaluate each conditioning row at the fitted and widened physical bandwidth.
+.np_conditional_beta_conditioning <- function(x, targets, h, bounds) {
+  if (length(bounds) != 2L || any(!is.finite(bounds)) || bounds[1L] >= bounds[2L] ||
+      any(x < bounds[1L] | x > bounds[2L]) || any(targets < bounds[1L] | targets > bounds[2L]))
+    stop("beta conditioning requires data and targets inside known finite support", call. = FALSE)
+  targets <- unique(targets)
+  train <- data.frame(x = x)
+  evaluation <- data.frame(x = targets)
+  geometry <- untangle(train)
+  weight <- function(width) {
+    bw <- kbandwidth.numeric(width, ckertype = "beta", ckerorder = 2L,
+                             ckerbound = "fixed", ckerlb = bounds[1L], ckerub = bounds[2L],
+                             nobs = length(x), xdati = geometry, xnames = "x")
+    values <- .np_conditional_literal_density_matrix(bw, train, evaluation, "normal")
+    mass <- rowSums(values)
+    if (any(!is.finite(mass)) || any(mass <= 0) || any(values < 0))
+      stop("undefined beta conditioning mass", call. = FALSE)
+    t(values / mass)
+  }
+  list(targets = targets, main = weight(h), wide = weight(sqrt(2) * h))
+}
+
+.np_conditional_pairs_context <- function(x, y, grid, h, conditioning) {
+  if (is.null(conditioning))
+    return(.np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE)))
+  gx <- unique(grid$x)
+  group <- match(gx, conditioning$targets)
+  list(ix = match(grid$x, gx), w = conditioning$main[, group, drop = FALSE],
+       jw = conditioning$wide[, group, drop = FALSE])
+}
+
 # The empirical event is shared by all three response kernels. Process each
 # conditioning coordinate once after all pairs tiles have been reduced.
-.np_conditional_local_wilson <- function(x, y, grid, bandwidth, alpha) {
+.np_conditional_local_wilson <- function(x, y, grid, bandwidth, alpha, conditioning = NULL) {
   ord <- order(y)
   end <- findInterval(grid$y, y[ord]) + 1L
   level <- qnorm(1 - alpha / 2)
   limits <- matrix(0, nrow(grid), 2L)
   groups <- split(seq_len(nrow(grid)), match(grid$x, unique(grid$x)))
   for (ids in groups) {
-    weight <- dnorm((grid$x[ids[1L]] - x[ord]) / bandwidth)
+    target <- grid$x[ids[1L]]
+    weight <- if (is.null(conditioning)) dnorm((target - x[ord]) / bandwidth)
+              else conditioning$main[ord, match(target, conditioning$targets)]
     cumulative <- c(0, cumsum(weight))
     total <- cumulative[length(cumulative)]
     probability <- cumulative[end[ids]] / total
@@ -90,7 +123,7 @@
 }
 
 # Build the two response tables once. Workers need only the usual donor plan.
-.np_conditional_beta_pairs_provider <- function(response, targets, bandwidth, bounds) {
+.np_conditional_beta_pairs_provider <- function(response, targets, bandwidth, bounds, conditioning = NULL) {
   width <- diff(bounds)
   if (length(bounds) != 2L || any(!is.finite(bounds)) || !is.finite(width) || width <= 0 ||
       any(response < bounds[1L] | response > bounds[2L]) ||
@@ -122,7 +155,7 @@
   edges <- length(response) + seq_along(edge)
   bins <- seq_len(length(edge) - 1L)
   function(x, y, grid, h, alpha, response.kernel) {
-    z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE))
+    z <- .np_conditional_pairs_context(x, y, grid, h, conditioning)
     iy <- match(grid$y, targets)
     main <- z$w[, z$ix, drop = FALSE] * fitted[obs, iy, drop = FALSE]
     wide <- z$jw[, z$ix, drop = FALSE] * wider[obs, iy, drop = FALSE]
@@ -195,10 +228,15 @@
        tile.size = as.integer(tile))
 }
 
-.np_conditional_pairs_support <- function(x, targets, h, tasks = NULL) {
-  for (width in c(h, sqrt(2) * h)) {
+.np_conditional_pairs_support <- function(x, targets, h, tasks = NULL, conditioning = NULL) {
+  for (scale in seq_len(2L)) {
+    width <- if (scale == 1L) h else sqrt(2) * h
     for (target in targets) {
-      w <- dnorm((target - x) / width)
+      if (is.null(conditioning)) w <- dnorm((target - x) / width)
+      else {
+        weights <- if (scale == 1L) conditioning$main else conditioning$wide
+        w <- weights[, match(target, conditioning$targets)]
+      }
       mass <- sum(w)
       if (!is.finite(mass) || mass <= 0) stop("undefined predictor mass", call. = FALSE)
       if (is.null(tasks)) next
@@ -216,7 +254,7 @@
   invisible(NULL)
 }
 
-.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL, response.order = 2L) {
+.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL, response.order = 2L, conditioning.bounds = NULL) {
   n <- length(x)
   m <- nrow(grid)
   tiled <- !is.null(tile.size)
@@ -232,7 +270,7 @@
         is.null(allocation) || tile.size > allocation$tile.size || m > 12 * tile.size)
       stop("invalid or over-budget conditional pairs tile size", call. = FALSE)
     targets <- unique(grid$x)
-    .np_conditional_pairs_support(x, targets, h[1L])
+    if (is.null(conditioning.bounds)) .np_conditional_pairs_support(x, targets, h[1L])
   }
 
   if (identical(pointwise, "local-wilson")) {
@@ -241,21 +279,29 @@
     if (bytes > 256 * 1024^2)
       stop("local Wilson numerical workspace exceeds the 256 MiB budget", call. = FALSE)
   }
+  conditioning <- NULL
+  if (!is.null(conditioning.bounds)) {
+    targets <- unique(grid$x)
+    bytes <- bytes + 8 * (12 * as.double(n) * length(targets) + 12 * n)
+    if (bytes > 256 * 1024^2)
+      stop("beta conditioning numerical workspace exceeds the 256 MiB budget", call. = FALSE)
+    conditioning <- .np_conditional_beta_conditioning(x, targets, h[1L], conditioning.bounds)
+  }
   prepare <- .np_conditional_pairs_prepare
-  if (response.order > 2L) {
+  if (response.order > 2L || (!is.null(conditioning) && identical(response.kernel, "gaussian"))) {
     targets.y <- unique(grid$y)
     # Two native response tables, their setup and the unit-scale support grid.
     bytes <- bytes + 8 * (8 * as.double(n) * length(targets.y) + 12 * n + 32 * 10000)
     if (bytes > 256 * 1024^2)
       stop("higher-order pairs numerical workspace exceeds the 256 MiB budget", call. = FALSE)
-    prepare <- .np_conditional_high_pairs_provider(y, targets.y, h[2L], response.kernel, response.order)
+    prepare <- .np_conditional_high_pairs_provider(y, targets.y, h[2L], response.kernel, response.order, conditioning)
   } else if (identical(response.kernel, "beta")) {
     targets.y <- unique(grid$y)
     # Two response tables plus their construction, workspace and outward bounds.
     bytes <- bytes + 8 * (8 * (as.double(n) + 65) * length(targets.y) + 12 * n)
     if (bytes > 256 * 1024^2)
       stop("beta pairs numerical workspace exceeds the 256 MiB budget", call. = FALSE)
-    prepare <- .np_conditional_beta_pairs_provider(y, targets.y, h[2L], response.bounds)
+    prepare <- .np_conditional_beta_pairs_provider(y, targets.y, h[2L], response.bounds, conditioning)
   }
   probs <- c(alpha / (2*m), alpha/2, 1-alpha/2, 1-alpha/(2*m))
   center <- se <- numeric(m)
@@ -274,8 +320,9 @@
       })
       attr(tasks, "rng_final_state") <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
     }
+    if (first == 1L && (tiled || !is.null(conditioning)))
+      .np_conditional_pairs_support(x, targets, h[1L], tasks, conditioning)
     if (tiled) {
-      if (first == 1L) .np_conditional_pairs_support(x, targets, h[1L], tasks)
       tile$plan$tile.label <- sprintf("Conditional inference, target tile %d of %d",
                                      (first - 1L) %/% tile.size + 1L, ceiling(m / tile.size))
     }
@@ -311,7 +358,9 @@
        primary = "fixed-X sharp-score envelope and basic inid pairs companion",
        conditioning = "bandwidths fixed; pairs resample X and Y jointly; marginal score conditions on X",
        endpoint.construction = "jackknife center; hull of sharp-score and signed basic pairs limits; one joint radius",
-       scope = if (response.order > 2L)
+       scope = if (!is.null(conditioning))
+         sprintf("experimental LC conditional CDF, fixed known-support beta2 X and %s2 Y, requested finite family", response.kernel)
+       else if (response.order > 2L)
          sprintf("experimental LC conditional CDF, fixed Gaussian2 X and %s order %d Y, requested finite family", response.kernel, response.order)
        else if (identical(response.kernel, "beta"))
          "experimental LC conditional CDF, fixed Gaussian2 X and known-support beta2 Y, requested finite family"
@@ -322,7 +371,7 @@
        else "experimental LC conditional CDF, fixed Gaussian2, requested finite family",
        resolution.limited = B*alpha/(2*m) < 1, estimated.numerical.bytes = bytes)
   if (identical(pointwise, "local-wilson")) {
-    local <- .np_conditional_local_wilson(x, y, grid, h[1L], alpha)
+    local <- .np_conditional_local_wilson(x, y, grid, h[1L], alpha, conditioning)
     local[, 1L] <- pmin(center, center - cuts[3L, ], local[, 1L])
     local[, 2L] <- pmax(center, center - cuts[2L, ], local[, 2L])
     extended <- local[, 1L] < joint[, 1L] | local[, 2L] > joint[, 2L]

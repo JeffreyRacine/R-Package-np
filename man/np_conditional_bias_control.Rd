@@ -26,7 +26,7 @@ companion. The jackknife center and basic pairs interval are included.
 The common simultaneous band and Bonferroni endpoints expand where required
 for pointwise nesting. The Wilson scale assumes locally homogeneous conditional
 probabilities. Coverage is experimental; joint inference is for the finite
-requested grid. The strongest evidence is on trimmed explanatory grids.}
+requested grid. Known-support beta2 conditioning is also available with a Gaussian2 or known-support beta2 response. The strongest evidence is on trimmed explanatory grids.}
 }
 \value{A validated control object for the \code{bias.control} argument of
 \code{plot} applied to \code{npcdist} or \code{npcdens} fits or bandwidths.}
@@ -36,7 +36,7 @@ variable and one continuous response, fixed unbounded second-order Gaussian
 kernels. The explicit pairs-score construction also admits an unbounded
 Gaussian or Epanechnikov response kernel of order 2, 4, 6 or 8,
 a uniform response kernel, and a beta2 response on known finite
-support with Gaussian explanatory smoothing. For beta responses the donor range is
+support with Gaussian explanatory smoothing. Fixed beta2 conditioning on known finite support admits unbounded Gaussian2 or known-support beta2 responses. Conditioning weights use the fitted beta density at both bandwidth scales. For beta responses the donor range is
 enclosed using monotonicity of the integrated kernels at both bandwidth scales.
 For a higher-order response of order \eqn{k}, the widened X and Y bandwidths
 use factors \eqn{\sqrt{2}} and \eqn{2^{1/k}}, respectively. Both
