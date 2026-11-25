@@ -25,7 +25,7 @@ conditional density bootstrap described below. Use \code{"pairs-score"} for the 
 These are experimental opt-ins for local constant, one continuous explanatory
 variable and one continuous response, fixed unbounded second-order Gaussian
 kernels. The explicit pairs-score construction also admits an unbounded
-second-order Epanechnikov response kernel with Gaussian explanatory smoothing.
+second-order Epanechnikov or uniform response kernel with Gaussian explanatory smoothing.
 Gradients, quantiles, shape projections, nonfixed bandwidths and mixed
 variables are not admitted. Original fits and selected bandwidths remain fixed.
 
@@ -42,6 +42,10 @@ conditional Gaussian donor mixture, with pilot bandwidths multiplied by
 
 With \code{construction="pairs-score"}, specify \code{errors="bootstrap"},
 \code{bootstrap="inid"} and \code{interval="percentile"}.
+For a uniform response, both ratios use its integrated rectangular kernel.
+The signed donor range is computed at the four support knots. The widened
+response bandwidth must also preserve the fitted kernel. Sparse explanatory
+samples can produce wide simultaneous intervals even on smooth distributions.
 For an Epanechnikov response, both ratios and the signed donor range use the
 integrated Epanechnikov kernel at the fitted and widened response bandwidths.
 On 32 saved fits with 9,999 draws and 50-by-50 targets this construction covered

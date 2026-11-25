@@ -19,16 +19,16 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   if (!identical(center, "bias-corrected") ||
       !method %in% c("bootstrap", "asymptotic"))
     stop('conditional bias.control requires center="bias-corrected" and errors="asymptotic" or "bootstrap"', call. = FALSE)
-  epan.response <- identical(control$construction, "pairs-score") && identical(bws$cykertype, "epanechnikov")
+  compact.response <- identical(control$construction, "pairs-score") && bws$cykertype %in% c("epanechnikov", "uniform")
   spec <- npConditionalRegEngineSpec(bws, where = "conditional bias inference")
   if (isTRUE(gradients) || isTRUE(quantreg) || isTRUE(proper) ||
       !identical(spec$reg.engine, "lc") || bws$xndim != 1L || bws$yndim != 1L ||
       bws$xncon != 1L || bws$yncon != 1L || !identical(bws$type, "fixed") ||
-      !identical(bws$cxkertype, "gaussian") || (!identical(bws$cykertype, "gaussian") && !epan.response) ||
+      !identical(bws$cxkertype, "gaussian") || (!identical(bws$cykertype, "gaussian") && !compact.response) ||
       bws$cxkerorder != 2L || bws$cykerorder != 2L ||
       any(is.finite(c(bws$cxkerlb, bws$cxkerub, bws$cykerlb, bws$cykerub))))
     stop(if (identical(control$construction, "pairs-score"))
-      "conditional CDF pairs-score requires LC, one continuous X and Y, fixed unbounded Gaussian2 X and Gaussian2 or Epanechnikov2 Y, no gradients/quantiles/proper projection"
+      "conditional CDF pairs-score requires LC, one continuous X and Y, fixed unbounded Gaussian2 X and Gaussian2, Epanechnikov2 or uniform Y, no gradients/quantiles/proper projection"
     else "conditional bias inference requires LC, one continuous X and Y, fixed unbounded Gaussian2 kernels, no gradients/quantiles/proper projection", call. = FALSE)
   if (identical(control$construction, "pairs-score")) {
     if (!cdf || method != "bootstrap" || !identical(law, "inid") ||
@@ -175,7 +175,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     stop("alpha must lie in (0, 0.5)", call.=FALSE)
   if (identical(construction, "pairs-score")) {
     if (!isTRUE(cdf) || method != "bootstrap" || !identical(calibration, "default") ||
-        !is.matrix(cdf.centers) || !identical(dim(cdf.centers), c(nrow(grid), if (identical(response.kernel, "epanechnikov")) 1L else 2L)) ||
+        !is.matrix(cdf.centers) || !identical(dim(cdf.centers), c(nrow(grid), if (response.kernel %in% c("epanechnikov", "uniform")) 1L else 2L)) ||
         any(!is.finite(cdf.centers[, 1L])))
       stop("invalid conditional CDF pairs-score inputs", call. = FALSE)
     .np_conditional_runtime_admit(length(x), B)
@@ -253,15 +253,15 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     if (!is.numeric(tol) || length(tol)!=1L || !is.finite(tol) || tol<=0 || tol>=.1)
       stop("invalid np.largeh.rel.tol",call.=FALSE)
     t <- sqrt(-2*log(1-tol))
-    ty <- if (identical(bws$cykertype, "epanechnikov")) sqrt(tol) else t
+    ty <- switch(bws$cykertype, uniform = 1, epanechnikov = sqrt(tol), t)
     # The new response-kernel route uses both ordinary and sqrt(2)-wide ratios.
-    enlargement <- if (identical(bws$cykertype, "epanechnikov")) sqrt(2) else 1
+    enlargement <- if (bws$cykertype %in% c("epanechnikov", "uniform")) sqrt(2) else 1
     if(diff(range(x[[1L]],ex[[1L]]))<=enlargement*hx*t || diff(range(y[[1L]],ey[[1L]]))<=enlargement*hy*ty)
       stop("experimental conditional CDF inference does not admit the near-constant kernel substitution",call.=FALSE)
   }
   K <- .np_conditional_literal_density_matrix(.npcdhat_make_xkbw(bws,x),x,ex,"normal")
   G <- .np_conditional_literal_density_matrix(.npcdhat_make_ybw(bws,y),y,ey,"integral")
-  if (identical(bws$cykertype, "epanechnikov")) {
+  if (bws$cykertype %in% c("epanechnikov", "uniform")) {
     mass <- rowSums(K)
     if (any(!is.finite(mass)) || any(mass <= 0))
       stop("conditional CDF denominator is undefined", call. = FALSE)
