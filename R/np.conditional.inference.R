@@ -1,5 +1,5 @@
 # Explicit experimental conditional inference; incumbent NULL controls are unchanged.
-np_conditional_bias_control <- function(construction = c("analytic", "jackknife", "jackknife-mp1")) {
+np_conditional_bias_control <- function(construction = c("analytic", "jackknife", "jackknife-mp1", "pairs-score")) {
   structure(list(construction = match.arg(construction), version = 1L),
             class = "np_conditional_bias_control")
 }
@@ -27,6 +27,12 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
       bws$cxkerorder != 2L || bws$cykerorder != 2L ||
       any(is.finite(c(bws$cxkerlb, bws$cxkerub, bws$cykerlb, bws$cykerub))))
     stop("conditional bias inference requires LC, one continuous X and Y, fixed unbounded Gaussian2 kernels, no gradients/quantiles/proper projection", call. = FALSE)
+  if (identical(control$construction, "pairs-score")) {
+    if (!cdf || method != "bootstrap" || !identical(law, "inid") ||
+        !identical(calibration, "default"))
+      stop('pairs-score requires conditional CDF, bootstrap="inid" and percentile intervals', call. = FALSE)
+    return(TRUE)
+  }
   if (identical(control$construction,"jackknife-mp1")) {
     if (cdf || method!="bootstrap" || !identical(law,"conditional-pilot") ||
         !identical(calibration,"asymmetric-sd"))
@@ -82,6 +88,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
 
 .np_conditional_root_block <- function(task, plan, family) {
   if (family == "jackknife-mp1") return(.np_conditional_mp1_block(task,plan))
+  if (family == "pairs-score") return(.np_conditional_pairs_block(task, plan))
   if (family == "gaussian") return(t(plan$factor %*% task$value))
   if (family == "cdf") return(t(.np_conditional_cp_apply(plan, task$value)))
   z <- plan$z; Y <- task$value; out <- matrix(0, z$m, task$bsz)
@@ -126,6 +133,15 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   allocation <- .np_conditional_workspace(x, y, grid, h, B); B <- allocation$B
   if (!is.numeric(alpha) || length(alpha)!=1L || !is.finite(alpha) || alpha<=0 || alpha>=.5)
     stop("alpha must lie in (0, 0.5)", call.=FALSE)
+  if (identical(construction, "pairs-score")) {
+    if (!isTRUE(cdf) || method != "bootstrap" || !identical(calibration, "default") ||
+        !is.matrix(cdf.centers) || !identical(dim(cdf.centers), c(nrow(grid), 2L)) ||
+        any(!is.finite(cdf.centers[, 1L])))
+      stop("invalid conditional CDF pairs-score inputs", call. = FALSE)
+    .np_conditional_runtime_admit(length(x), B)
+    return(.np_conditional_pairs_score(x, y, grid, h, B, alpha, cdf.centers[, 1L],
+                                       allocation$estimated.bytes))
+  }
   if (!is.logical(cdf) || length(cdf)!=1L || is.na(cdf) ||
       !method %in% c("asymptotic", "bootstrap") ||
       (method=="bootstrap" && !calibration %in% c("symmetric-sd", "asymmetric-sd")))
@@ -219,7 +235,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   .np_conditional_workspace(x[[1L]],y[[1L]],grid,h,B)
   cc <- if(cdf) .np_conditional_cdf_centers(bws,x,y,ex,ey) else NULL
   a <- .np_conditional_inference(x[[1L]],y[[1L]],grid,h,cdf,method,calibration,B,alpha,cc,construction)
-  if(isTRUE(a$resolution.limited)) .np_warning("conditional-pilot Bonferroni tails have limited finite-draw resolution; increase B for better tail resolution")
+  if(isTRUE(a$resolution.limited)) .np_warning(paste(a$law, "Bonferroni tails have limited finite-draw resolution; increase B for better tail resolution"))
   widths <- lapply(a$bands,function(v)cbind(lower=a$center-v[,1L],upper=v[,2L]-a$center,center=a$center))
   chosen <- if(band=="all") "simultaneous" else band
   list(err=widths[[chosen]], all.err=widths, inference=a)

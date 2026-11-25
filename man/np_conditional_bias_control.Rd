@@ -9,14 +9,14 @@ Selects explicitly the experimental local-constant conditional
 inference constructions. Existing plots and methods are unchanged when this
 control is omitted.}
 \usage{
-np_conditional_bias_control(construction = c("analytic", "jackknife", "jackknife-mp1"))
+np_conditional_bias_control(construction = c("analytic", "jackknife", "jackknife-mp1", "pairs-score"))
 }
 \arguments{
 \item{construction}{The corrected functional. Use \code{"analytic"} for
 conditional CDF inference and conditional density bootstrap inference;
 use \code{"jackknife"} for conditional density asymptotic inference.
 Use \code{"jackknife-mp1"} for the separate asymmetric studentized
-conditional density bootstrap described below.}
+conditional density bootstrap described below. Use \code{"pairs-score"} for the conditional CDF pairs bootstrap.}
 }
 \value{A validated control object for the \code{bias.control} argument of
 \code{plot} applied to \code{npcdist} or \code{npcdens} fits or bandwidths.}
@@ -28,7 +28,7 @@ variables are not admitted. Original fits and selected bandwidths remain fixed.
 
 Specify \code{center="bias-corrected"} and an explicit \code{band}:
 \code{"pointwise"}, \code{"simultaneous"}, \code{"bonferroni"} or \code{"all"}.
-With \code{errors="bootstrap"}, explicitly specify
+For the analytic or studentized bootstrap, explicitly specify
 \code{bootstrap="conditional-pilot"} and
 \code{interval="symmetric-sd"} or
 \code{interval="asymmetric-sd"}.
@@ -36,6 +36,15 @@ This law keeps explanatory observations fixed and draws each response from its
 conditional Gaussian donor mixture, with pilot bandwidths multiplied by
 \eqn{\sqrt{2}}. It is not ordinary pairs resampling and does not replace
 \code{inid}, \code{fixed}, \code{geom}, residual or wild resampling.
+
+With \code{construction="pairs-score"}, specify \code{errors="bootstrap"},
+\code{bootstrap="inid"} and \code{interval="percentile"}.
+Each multinomial sample recomputes both conditional CDF ratios in the
+two-bandwidth jackknife. Pointwise limits combine inverted signed empirical
+root quantiles and a marginal sharp-score interval. The simultaneous radius
+covers the empirical absolute maximum quantile and all marginal intervals.
+Bonferroni limits contain both the tail-adjusted basic limits and the joint
+band. These experimental bounds target the requested finite grid.
 
 The analytic correction contains both explanatory-weight and response-kernel
 curvature. Each bootstrap root includes the complete corrected functional,
