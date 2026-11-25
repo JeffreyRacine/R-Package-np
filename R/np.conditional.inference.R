@@ -26,8 +26,6 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
         identical(control[["construction", exact = TRUE]], "pairs-score"))) ||
       !identical(control, np_conditional_bias_control(control[["construction", exact = TRUE]], pointwise)))
     stop("invalid np_conditional_bias_control object", call. = FALSE)
-  if (identical(pointwise, "local-wilson") && !identical(bws$cykertype, "gaussian"))
-    stop("the local Wilson companion requires a Gaussian response kernel", call. = FALSE)
   if (!identical(center, "bias-corrected") ||
       !method %in% c("bootstrap", "asymptotic"))
     stop('conditional bias.control requires center="bias-corrected" and errors="asymptotic" or "bootstrap"', call. = FALSE)

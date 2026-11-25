@@ -311,6 +311,28 @@ test_that("uniform response pairs preserve the fit and reject the widened global
                "near-constant")
 })
 
+test_that("the local pointwise choice preserves compact response kernels", {
+  x <- seq(-1, 1, length.out = 53L)
+  d <- data.frame(x = x, y = x + cos(seq_along(x)))
+  for (kernel in c("uniform", "epanechnikov")) {
+    bw <- npcdistbw(y ~ x, data = d, cykertype = kernel,
+                    bws = c(.35, .4), bandwidth.compute = FALSE, regtype = "lc")
+    args <- list(x = npcdist(bw), errors = "bootstrap", bootstrap = "inid",
+                 interval = "percentile", band = "all", center = "bias-corrected",
+                 B = 399L, random.seed = 71L, neval = 3L, output = "data")
+    args$bias.control <- np_conditional_bias_control("pairs-score")
+    sharp <- do.call(plot, args)
+    args$bias.control <- np_conditional_bias_control("pairs-score", pointwise = "local-wilson")
+    local <- do.call(plot, args)
+    expect_identical(sharp$inference[[1L]]$critical_value_raw,
+                     local$inference[[1L]]$critical_value_raw)
+    expect_match(local$inference[[1L]]$endpoint_construction, "Wilson")
+    point <- as.data.frame(local, panel = 1L, target = 1L, band = "pointwise")
+    joint <- as.data.frame(local, panel = 1L, target = 1L, band = "simultaneous")
+    expect_true(all(joint$lower <= point$lower & joint$upper >= point$upper))
+  }
+})
+
 test_that("local Wilson companion uses positive probabilities and preserves the original control", {
   old <- np_conditional_bias_control("pairs-score")
   expect_identical(names(old), c("construction", "version"))
