@@ -76,7 +76,8 @@
     available <- scope == "pointwise" || (method == "asymptotic" && !specialized && scope == "bonferroni")
     if (scope == "pointwise") scope <- "pmzsd"
   } else if (interval == "percentile") {
-    available <- method == "bootstrap" && !specialized
+    available <- method == "bootstrap" && (!specialized ||
+      (family == "npcdist" && identical(bias[["construction", exact = TRUE]], "pairs-score")))
   } else if (interval == "score-envelope") {
     available <- corrected && method == "asymptotic" &&
       (is.null(bias) || identical(bias, np_udist_bias_control()) ||
@@ -117,6 +118,8 @@
       NA_character_
     } else if (normal) {
       "normal-sd"
+    } else if (identical(meta$correction, "pairs-score")) {
+      "percentile"
     } else if (identical(actual, "score-envelope")) {
       "score-envelope"
     } else if (construction %in% c("density-calibrated-unshifted-smoothed-percentile-v2",

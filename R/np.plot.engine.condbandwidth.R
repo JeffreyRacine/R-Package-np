@@ -217,6 +217,9 @@
       error.request$method, as.character(plot.errors.center)[1L],
       plot.errors.boot.calibration, as.character(plot.errors.boot.method)[1L],
       gradients, quantreg, proper)
+    conditional.label <- if (new.conditional) {
+      if (identical(bias.control$construction, "pairs-score")) "pairs-score" else "conditional-pilot"
+    }
     if (new.conditional) {
       if (!error.request$type %in% c("pointwise","simultaneous","bonferroni","all"))
         stop('conditional inference requires an explicit pointwise, simultaneous, bonferroni or all band',call.=FALSE)
@@ -633,7 +636,7 @@
             }
             if (plot.errors) {
               .np_plot_error_surfaces_rgl(
-                  construction = if(new.conditional) "conditional-pilot" else NULL,
+                  construction = conditional.label,
                 x = x1.eval,
                 y = x2.eval,
                 plot.errors.type = plot.errors.type,
@@ -728,7 +731,7 @@
               border = scalar_default(border, .np_plot_color("context_border")),
               lwd = scalar_default(lwd, par()$lwd),
               annotation = .np_plot_variability_annotation_spec(
-                construction = if(new.conditional) "conditional-pilot" else NULL,
+                construction = conditional.label,
                 plot.errors.method = plot.errors.method,
                 plot.errors.type = plot.errors.type,
                 plot.errors.alpha = plot.errors.alpha,
@@ -746,7 +749,7 @@
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
-                construction = if(new.conditional) "conditional-pilot" else NULL,
+                construction = conditional.label,
                 legend = plot.legend,
                 x = "topright",
                 lty = .np_plot_lty("solid"),
@@ -935,7 +938,7 @@
           cex.main = cex.main,
           cex.sub = cex.sub,
           annotation = .np_plot_variability_annotation_spec(
-                construction = if(new.conditional) "conditional-pilot" else NULL,
+                construction = conditional.label,
             plot.errors.method, plot.errors.type, plot.errors.alpha,
             plot.errors.center, sub.supplied, plot.args = list(),
             context = engine.ctx$annotation, continuous = !xi.factor,
@@ -1338,7 +1341,7 @@
             if (plot.errors && component.available &&
                 !(xi.factor && plot.bootstrap && plot.bxp)){
               panel.annotation <- .np_plot_variability_annotation_spec(
-                construction = if(new.conditional) "conditional-pilot" else NULL,
+                construction = conditional.label,
                 plot.errors.method = plot.errors.method,
                 plot.errors.type = plot.errors.type,
                 plot.errors.alpha = plot.errors.alpha,
@@ -1350,7 +1353,7 @@
               )
               if (plot.errors.type == "all") {
                 draw.all.error.types(
-                  construction = if(new.conditional) "conditional-pilot" else NULL,
+                  construction = conditional.label,
                   ex = as.numeric(ei),
                   center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
                   all.err = temp.all.err,
@@ -1673,7 +1676,7 @@
               if (plot.errors && component.available &&
                   !(xi.factor && plot.bootstrap && plot.bxp)){
                 panel.annotation <- .np_plot_variability_annotation_spec(
-                construction = if(new.conditional) "conditional-pilot" else NULL,
+                construction = conditional.label,
                   plot.errors.method = plot.errors.method,
                   plot.errors.type = plot.errors.type,
                   plot.errors.alpha = plot.errors.alpha,
@@ -1685,7 +1688,7 @@
                 )
                 if (plot.errors.type == "all") {
                   draw.all.error.types(
-                  construction = if(new.conditional) "conditional-pilot" else NULL,
+                  construction = conditional.label,
                     ex = as.numeric(ei),
                     center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
                     all.err = temp.all.err,
@@ -1873,7 +1876,7 @@
             if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
               err.block <- data.err[, seq(3*idx - 2L, length.out = 3L), drop = FALSE]
               panel.annotation <- .np_plot_variability_annotation_spec(
-                construction = if(new.conditional) "conditional-pilot" else NULL,
+                construction = conditional.label,
                 plot.errors.method = plot.errors.method,
                 plot.errors.type = plot.errors.type,
                 plot.errors.alpha = plot.errors.alpha,
@@ -1885,7 +1888,7 @@
               )
               if (plot.errors.type == "all") {
                 draw.all.error.types(
-                  construction = if(new.conditional) "conditional-pilot" else NULL,
+                  construction = conditional.label,
                   ex = as.numeric(allei[,plot.index]),
                   center = .np_plot_error_center(data.eval[,idx], err.block, plotOnEstimate),
                   all.err = data.err.all[[idx]],

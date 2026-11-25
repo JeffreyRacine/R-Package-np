@@ -753,6 +753,8 @@
       sprintf("%s %s beta-binomial; corrected center",level,band))
   }
 
+  if (identical(construction, "pairs-score"))
+    candidates <- sprintf("%s %s inid pairs bootstrap band with score safeguard", level, band)
   if (identical(construction,"conditional-pilot")) {
     candidates <- c(sprintf("%s %s conditional-pilot band; corrected center with score safeguard%s", level, band,
       if(band %in% c("simultaneous","all")) "; finite grid within panel" else ""),
@@ -768,7 +770,7 @@
       candidates <- sub(" simultaneous ", paste0(" ", display.scope, " "),
                         candidates, fixed = TRUE)
     } else if (isTRUE(construction %in% c("guide-region", "smoothed-beta-binomial",
-                                          "conditional-pilot"))) {
+                                          "conditional-pilot", "pairs-score"))) {
       candidates <- sub(paste0(" ", band, " "), paste0(" ", display.scope, " "),
                         candidates, fixed = TRUE)
     }
@@ -13104,7 +13106,7 @@ plotFactor <- function(f, y, ...){
     return(c(pointwise = "Pointwise (guide + residual envelope)",
       simultaneous = "Simultaneous (guide + residual envelope, finite family)",
       bonferroni = "Bonferroni (guide + residual envelope)"))
-  if (identical(construction,"conditional-pilot"))
+  if (isTRUE(construction %in% c("conditional-pilot", "pairs-score")))
     return(c(pointwise="Pointwise (score safeguard)",
       simultaneous="Simultaneous (finite grid, score safeguard)",
       bonferroni="Bonferroni (companion envelope)"))
