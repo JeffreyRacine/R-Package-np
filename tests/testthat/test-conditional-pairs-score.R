@@ -267,3 +267,44 @@ test_that("compact-response extrema reject signed conditioning weights", {
   z <- list(w=matrix(c(-.1, 1.1)), jw=matrix(c(.2, .8)), ix=1L)
   expect_error(.np_conditional_pairs_range(z, "epanechnikov"), "nonnegative conditioning weights")
 })
+
+test_that("the uniform response uses both finite knots of the signed donor", {
+  w <- c(0, .03, .6, .37, 0)
+  w2 <- c(.07, .5, .2, 0, .23)
+  z <- list(w=matrix(w), jw=matrix(w2), ix=1L)
+  s <- .np_conditional_pairs_range(z, "uniform")
+  knots <- c(-sqrt(2), -1, 1, sqrt(2))
+  G <- function(t) pmax(0, pmin(1, (1+t)/2))
+  v <- outer(2*w, G(knots)) - outer(w2, G(knots/sqrt(2)))
+  lo <- apply(v, 1L, min)
+  hi <- apply(v, 1L, max)
+  expect_equal(s$lower, sum(lo), tolerance=1e-14)
+  expect_equal(drop(s$span*s$q), hi-lo, tolerance=1e-14)
+  expect_error(.np_conditional_pairs_range(list(w=matrix(-1),jw=matrix(1),ix=1L),
+                                            "uniform"), "nonnegative")
+})
+
+test_that("uniform response pairs preserve the fit and reject the widened global limit", {
+  d <- data.frame(x=seq(-.5,.5,length.out=51))
+  d$y <- .5*cos(seq_along(d$x))
+  fit <- function(h) npcdistbw(y~x, data=d, regtype="lc", cykertype="uniform",
+                                bws=c(h,.2), bandwidth.compute=FALSE)
+  old <- options(np.largeh=TRUE)
+  on.exit(options(old))
+  args <- list(x=npcdist(fit(.25)), center="bias-corrected", band="all",
+               errors="bootstrap", interval="percentile", bootstrap="inid",
+               bias.control=np_conditional_bias_control("pairs-score"),
+               neval=3L, B=399L, output="data", random.seed=309L)
+  set.seed(119L)
+  before <- .Random.seed
+  v <- do.call(plot,args)
+  expect_identical(.Random.seed,before)
+  a <- as.data.frame(v,panel=1L,target=1L,band="simultaneous")
+  reference <- as.data.frame(plot(args$x,errors="none",neval=3L,output="data"),
+                             panel=1L,target=1L)
+  expect_equal(a$estimate,reference$estimate,tolerance=2e-8)
+  expect_true(all(a$lower <= a$upper))
+  bw <- fit(.8*diff(range(d$y)))
+  expect_error(.np_conditional_cdf_centers(bw,d["x"],d["y"],d["x"],d["y"]),
+               "near-constant")
+})

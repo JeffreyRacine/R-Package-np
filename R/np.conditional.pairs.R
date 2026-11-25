@@ -24,7 +24,16 @@
   b <- z$jw
   low <- pmin(0 * a, a - b)
   high <- pmax(0 * a, a - b)
-  if (identical(response.kernel, "epanechnikov")) {
+  if (identical(response.kernel, "uniform")) {
+    if (!isTRUE(min(a, b) >= 0))
+      stop("uniform donor ranges require nonnegative conditioning weights", call. = FALSE)
+    # A signed difference of two uniform distribution functions is linear
+    # between its knots. The outer knots are already in low and high.
+    value <- a - b * (.5 + .5 / sqrt(2))
+    reflected <- a - b - value
+    low <- pmin(low, value, reflected)
+    high <- pmax(high, value, reflected)
+  } else if (identical(response.kernel, "epanechnikov")) {
     if (!isTRUE(min(a, b) >= 0))
       stop("Epanechnikov donor ranges require nonnegative conditioning weights", call. = FALSE)
     # On the common support the derivative is linear in the squared argument.
@@ -62,7 +71,9 @@
 .np_conditional_pairs_prepare <- function(x, y, grid, h, alpha, response.kernel = "gaussian") {
   z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE))
   delta <- outer(y, z$gy, function(a, b) b - a)
-  primitive <- if (identical(response.kernel, "epanechnikov")) .np_conditional_epan_cdf else pnorm
+  primitive <- switch(response.kernel, gaussian = pnorm, epanechnikov = .np_conditional_epan_cdf,
+    uniform = function(u) stats::punif(u, -1, 1),
+    stop("unsupported response kernel for conditional CDF pairs-score", call. = FALSE))
   numerator <- function(weight, width) {
     weight[, z$ix, drop = FALSE] * primitive(delta / width)[, z$iy, drop = FALSE]
   }
@@ -183,7 +194,9 @@
        primary = "fixed-X sharp-score envelope and basic inid pairs companion",
        conditioning = "bandwidths fixed; pairs resample X and Y jointly; marginal score conditions on X",
        endpoint.construction = "jackknife center; hull of sharp-score and signed basic pairs limits; one joint radius",
-       scope = if (identical(response.kernel, "epanechnikov"))
+       scope = if (identical(response.kernel, "uniform"))
+         "experimental LC conditional CDF, fixed Gaussian2 X and uniform Y, requested finite family"
+       else if (identical(response.kernel, "epanechnikov"))
          "experimental LC conditional CDF, fixed Gaussian2 X and Epanechnikov2 Y, requested finite family"
        else "experimental LC conditional CDF, fixed Gaussian2, requested finite family",
        resolution.limited = B*alpha/(2*m) < 1, estimated.numerical.bytes = bytes)
