@@ -279,13 +279,13 @@
     base
 }
 
-.np_conditional_den_context <- function(x, y, grid, h) {
+.np_conditional_den_context <- function(x, y, grid, h, pairs.score = FALSE) {
     stopifnot(is.numeric(x), is.numeric(y), length(x) == length(y), length(x) >= 3, is.data.frame(grid),
         identical(names(grid), c("x", "y")), length(h) == 2, all(is.finite(c(x, y, unlist(grid), h))),
         all(h > 0))
     gx <- sort(unique(grid$x))
     gy <- sort(unique(grid$y))
-    stopifnot(length(gy) <= 25, nrow(grid) <= 256)
+    .np_conditional_grid_admit(nrow(grid), length(gy), pairs.score)
     u <- outer(x, gx, function(a, b) (b - a)/h[1])
     K <- dnorm(u)
     mass <- colSums(K)

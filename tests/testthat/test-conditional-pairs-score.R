@@ -75,7 +75,44 @@ test_that("the explicit conditional CDF plot records both interval components", 
   expect_match(info$endpoint_construction,"basic pairs")
   expect_gte(info$critical_value,info$critical_value_raw)
   expect_setequal(names(info$components),c("pointwise","simultaneous","bonferroni"))
+  control <- np_conditional_bias_control("pairs-score")
+  expect_warning(
+    large <- plot(fit, center = "bias-corrected", errors = "bootstrap",
+                  bootstrap = "inid", interval = "percentile", band = "all",
+                  bias.control = control, neval = 26L, B = 399L,
+                  output = "data", random.seed = 309L),
+    "Bonferroni tails have limited finite-draw resolution")
+  frame <- as.data.frame(large, panel = 1L, target = 1L, band = "pointwise")
+  small <- as.data.frame(ans, panel = 1L, target = 1L, band = "pointwise")
+  shared <- merge(small, frame, by = c("eval_1", "eval_2"), suffixes = c(".small", ".large"))
+  expect_equal(nrow(frame), 26L * 26L)
+  expect_gte(nrow(shared), 4L)
+  expect_equal(shared$lower.small, shared$lower.large, tolerance = 1e-12)
+  expect_equal(shared$upper.small, shared$upper.large, tolerance = 1e-12)
+  expect_true(all(is.finite(frame$lower) & frame$lower <= frame$upper))
+  expect_identical(large$inference[[1L]]$correction, "pairs-score")
   expect_error(plot(fit, center="bias-corrected", errors="bootstrap", bootstrap="geom",
     bias.control=np_conditional_bias_control("pairs-score"), band="simultaneous",
     neval=3L, B=399L, output="data"),"pairs-score|block")
+})
+
+test_that("only explicit pairs-score admits affordable larger conditional grids", {
+  x <- seq(-1, 1, length.out = 80L)
+  g <- expand.grid(x = x[1:17], y = x[1:17])
+  expect_error(.np_conditional_workspace(x, x, g, c(.3, .4), 199L), "256 target")
+  expect_lt(.np_conditional_workspace(x, x, g, c(.3, .4), 199L, TRUE)$estimated.bytes,
+            256 * 1024^2)
+  x.long <- seq(-1, 1, length.out = 1400L)
+  for (ny in c(25L, 26L)) {
+    rectangular <- expand.grid(x = x[1:10], y = x[seq_len(ny)])
+    expect_lt(.np_conditional_workspace(x.long, x.long, rectangular,
+                                        c(.3, .4), 399L, TRUE)$estimated.bytes,
+              256 * 1024^2)
+  }
+  full <- expand.grid(x = x[1:50], y = x[1:50])
+  expect_error(.np_conditional_workspace(x, x, full, c(.3, .4), 9999L, TRUE), "256 MiB")
+  expect_error(.np_conditional_workspace(x, x, full[c(seq_len(2500), 1), ],
+                                         c(.3, .4), 99L, TRUE), "2500 target")
+  expect_error(.np_conditional_workspace(x, x, data.frame(x = 0, y = x[1:51]),
+                                         c(.3, .4), 99L, TRUE), "50 distinct")
 })

@@ -48,7 +48,16 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   TRUE
 }
 
-.np_conditional_workspace <- function(x, y, grid, h, B) {
+# Analytic moments grow quadratically in the number of response targets.
+# Pairs draws use only donor weights, numerators and the returned root matrix.
+.np_conditional_grid_admit <- function(m, ny, pairs.score) {
+  cap <- if (pairs.score) c(2500L, 50L) else c(256L, 25L)
+  if (m < 1L || m > cap[1L] || ny > cap[2L])
+    stop(sprintf("experimental conditional inference supports at most %d target points and %d distinct response targets; reduce neval explicitly",
+                 cap[1L], cap[2L]), call. = FALSE)
+}
+
+.np_conditional_workspace <- function(x, y, grid, h, B, pairs.score = FALSE) {
   if (!is.numeric(x) || !is.numeric(y) || length(x) != length(y) || length(x) < 3L ||
       !is.data.frame(grid) || !identical(names(grid), c("x", "y")) ||
       !is.numeric(grid$x) || !is.numeric(grid$y) || length(h) != 2L ||
@@ -57,12 +66,20 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   B <- .np_plot_gaussian_integer(B, "conditional inference draws")
   if (B < 2L) stop("conditional inference requires at least 2 draws", call.=FALSE)
   n <- length(x); m <- nrow(grid); ny <- length(unique(grid$y)); nx <- length(unique(grid$x))
-  if (m < 1L || m > 256L || ny > 25L)
-    stop("experimental conditional inference supports at most 256 target points and 25 distinct response targets; reduce neval explicitly", call. = FALSE)
-  # Includes response payloads, roots, moments, eigenfactor and block temporaries.
-  bytes <- 8 * (4*n*(3*ny+1)^2 + 12*n*(nx+ny) +
-    2*n*B + 8*m*B + 12*m*m + 12*n*128 + 256*n)
-  if (!is.finite(bytes) || bytes > 256*1024^2)
+  .np_conditional_grid_admit(m, ny, pairs.score)
+  limit <- 256 * 1024^2
+  within.old.grid <- m <= 256L && ny <= 25L
+  bytes <- if (within.old.grid)
+    8 * (4*n*(3*ny+1)^2 + 12*n*(nx+ny) +
+      2*n*B + 8*m*B + 12*m*m + 12*n*128 + 256*n)
+  else Inf
+  if (pairs.score && bytes > limit) {
+    # The pairs provider builds donor and draw matrices, not analytic moments.
+    # Preserve the reported budget on old admissions; use the same pairs bound
+    # for any other candidate so shrinking a successful grid cannot refuse it.
+    bytes <- 8 * (24 * n * m + 3 * n * B + 12 * m * B + 12 * n * 128 + 256 * n)
+  }
+  if (!is.finite(bytes) || bytes > limit)
     stop("conditional inference numerical workspace exceeds the 256 MiB budget; reduce the requested grid or draws explicitly", call. = FALSE)
   list(B = B, estimated.bytes = bytes)
 }
@@ -130,7 +147,8 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
 
 .np_conditional_inference <- function(x, y, grid, h, cdf, method, calibration,
                                       B=9999L, alpha=.05, cdf.centers=NULL, construction=NULL) {
-  allocation <- .np_conditional_workspace(x, y, grid, h, B); B <- allocation$B
+  allocation <- .np_conditional_workspace(x, y, grid, h, B, identical(construction, "pairs-score"))
+  B <- allocation$B
   if (!is.numeric(alpha) || length(alpha)!=1L || !is.finite(alpha) || alpha<=0 || alpha>=.5)
     stop("alpha must lie in (0, 0.5)", call.=FALSE)
   if (identical(construction, "pairs-score")) {
@@ -232,7 +250,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   ex <- toFrame(ex); ey <- toFrame(ey)
   grid <- data.frame(x=ex[[1L]], y=ey[[1L]])
   h <- c(.npcdhat_physical_bandwidth(bws,"x"), .npcdhat_physical_bandwidth(bws,"y"))
-  .np_conditional_workspace(x[[1L]],y[[1L]],grid,h,B)
+  .np_conditional_workspace(x[[1L]], y[[1L]], grid, h, B, identical(construction, "pairs-score"))
   cc <- if(cdf) .np_conditional_cdf_centers(bws,x,y,ex,ey) else NULL
   a <- .np_conditional_inference(x[[1L]],y[[1L]],grid,h,cdf,method,calibration,B,alpha,cc,construction)
   if(isTRUE(a$resolution.limited)) .np_warning(paste(a$law, "Bonferroni tails have limited finite-draw resolution; increase B for better tail resolution"))
