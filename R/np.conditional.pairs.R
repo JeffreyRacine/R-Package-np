@@ -89,6 +89,80 @@
   limits
 }
 
+# Build the two response tables once. Workers need only the usual donor plan.
+.np_conditional_beta_pairs_provider <- function(response, targets, bandwidth, bounds) {
+  width <- diff(bounds)
+  if (length(bounds) != 2L || any(!is.finite(bounds)) || !is.finite(width) || width <= 0 ||
+      any(response < bounds[1L] | response > bounds[2L]) ||
+      any(targets < bounds[1L] | targets > bounds[2L]))
+    stop("beta pairs inference requires data and targets inside known finite support", call. = FALSE)
+  targets <- sort(unique(targets))
+  donor <- (response - bounds[1L]) / width
+  donor.upper <- (bounds[2L] - response) / width
+  left <- (targets - bounds[1L]) / width
+  right <- (bounds[2L] - targets) / width
+  edge <- seq(0, 1, length.out = 65L)
+  primitive <- function(s) {
+    precision <- (width / s)^2
+    if (!is.finite(precision))
+      stop("beta pairs bandwidth exceeds representable precision", call. = FALSE)
+    shape1 <- 1 + precision * c(donor, edge)
+    shape2 <- 1 + precision * c(donor.upper, rev(edge))
+    values <- vapply(seq_along(targets), function(j) {
+      if (left[j] <= .5) pbeta(left[j], shape1, shape2)
+      else pbeta(right[j], shape2, shape1, lower.tail = FALSE)
+    }, numeric(length(shape1)))
+    if (any(!is.finite(values)))
+      stop("beta pairs response integrals must be finite", call. = FALSE)
+    values
+  }
+  fitted <- primitive(bandwidth)
+  wider <- primitive(sqrt(2) * bandwidth)
+  obs <- seq_along(response)
+  edges <- length(response) + seq_along(edge)
+  bins <- seq_len(length(edge) - 1L)
+  function(x, y, grid, h, alpha, response.kernel) {
+    z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE))
+    iy <- match(grid$y, targets)
+    main <- z$w[, z$ix, drop = FALSE] * fitted[obs, iy, drop = FALSE]
+    wide <- z$jw[, z$ix, drop = FALSE] * wider[obs, iy, drop = FALSE]
+    center <- 2 * colSums(main) - colSums(wide)
+    score <- matrix(0, length(center), 2L)
+    for (j in unique(iy)) {
+      idx <- which(iy == j)
+      if (targets[j] == bounds[1L] || targets[j] == bounds[2L]) {
+        score[idx, ] <- as.numeric(targets[j] == bounds[2L])
+        next
+      }
+      a <- 2 * z$w[, z$ix[idx], drop = FALSE]
+      b <- z$jw[, z$ix[idx], drop = FALSE]
+      first <- fitted[edges, j]
+      second <- wider[edges, j]
+      # Each primitive decreases in its donor coordinate. Opposite ends of
+      # each bin therefore enclose the signed contribution at every donor.
+      lower <- upper <- a
+      lower[] <- Inf
+      upper[] <- -Inf
+      for (i in bins) {
+        lower <- pmin(lower, a * first[i + 1L] - b * second[i])
+        upper <- pmax(upper, a * first[i] - b * second[i + 1L])
+      }
+      allowance <- 2e-13 * (abs(lower) + abs(upper) + a + b)
+      lower <- lower - allowance
+      ranges <- upper + allowance - lower
+      span <- colSums(ranges)
+      if (any(!is.finite(span) | span <= 0))
+        stop("undefined beta signed donor range", call. = FALSE)
+      q <- sweep(ranges, 2L, span, "/")
+      score[idx, ] <- .np_conditional_range_interval(center[idx], list(
+        lower = colSums(lower), span = span, q = q, qmax = apply(q, 2L, max)),
+        "sharp-score", alpha)
+    }
+    list(plan = list(ix = z$ix, w = z$w, jw = z$jw,
+                     main = main, wide = wide, center = center), score = score)
+  }
+}
+
 .np_conditional_pairs_prepare <- function(x, y, grid, h, alpha, response.kernel = "gaussian") {
   z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE))
   delta <- outer(y, z$gy, function(a, b) b - a)
@@ -142,7 +216,7 @@
   invisible(NULL)
 }
 
-.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL) {
+.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL) {
   n <- length(x)
   m <- nrow(grid)
   tiled <- !is.null(tile.size)
@@ -167,6 +241,15 @@
     if (bytes > 256 * 1024^2)
       stop("local Wilson numerical workspace exceeds the 256 MiB budget", call. = FALSE)
   }
+  prepare <- .np_conditional_pairs_prepare
+  if (identical(response.kernel, "beta")) {
+    targets.y <- unique(grid$y)
+    # Two response tables plus their construction, workspace and outward bounds.
+    bytes <- bytes + 8 * (8 * (as.double(n) + 65) * length(targets.y) + 12 * n)
+    if (bytes > 256 * 1024^2)
+      stop("beta pairs numerical workspace exceeds the 256 MiB budget", call. = FALSE)
+    prepare <- .np_conditional_beta_pairs_provider(y, targets.y, h[2L], response.bounds)
+  }
   probs <- c(alpha / (2*m), alpha/2, 1-alpha/2, 1-alpha/(2*m))
   center <- se <- numeric(m)
   point <- matrix(NA_real_, m, 2L, dimnames = list(NULL, c("lower", "upper")))
@@ -174,7 +257,7 @@
   draw.max <- numeric(B)
   for (first in seq.int(1L, m, by = tile.size)) {
     idx <- seq.int(first, min(m, first + tile.size - 1L))
-    tile <- .np_conditional_pairs_prepare(x, y, grid[idx, , drop = FALSE], h, alpha, response.kernel)
+    tile <- prepare(x, y, grid[idx, , drop = FALSE], h, alpha, response.kernel)
     if (first == 1L) {
       # Every target sees exactly the same coordinator-generated pairs draws.
       prob <- rep(1 / n, n)
@@ -221,7 +304,9 @@
        primary = "fixed-X sharp-score envelope and basic inid pairs companion",
        conditioning = "bandwidths fixed; pairs resample X and Y jointly; marginal score conditions on X",
        endpoint.construction = "jackknife center; hull of sharp-score and signed basic pairs limits; one joint radius",
-       scope = if (identical(response.kernel, "uniform"))
+       scope = if (identical(response.kernel, "beta"))
+         "experimental LC conditional CDF, fixed Gaussian2 X and known-support beta2 Y, requested finite family"
+       else if (identical(response.kernel, "uniform"))
          "experimental LC conditional CDF, fixed Gaussian2 X and uniform Y, requested finite family"
        else if (identical(response.kernel, "epanechnikov"))
          "experimental LC conditional CDF, fixed Gaussian2 X and Epanechnikov2 Y, requested finite family"
