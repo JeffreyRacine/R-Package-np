@@ -566,6 +566,37 @@ test_that("an RMS request exceeding its memory allowance refuses before preparin
   expect_identical(.Random.seed, before)
 })
 
+test_that("compact CDF conditioning needs explicit RMS pairs and verifies mass", {
+  x <- seq(-1, 1, length.out = 40L)
+  d <- data.frame(x = x, y = .3 * x + sin(seq_along(x)))
+  b <- function(k, dat = d) npcdistbw(y ~ x, data = dat, regtype = "lc",
+    cxkertype = k, bws = c(.35,.45), bandwidth.compute = FALSE)
+  args <- list(x = b("epanechnikov"), errors = "bootstrap", interval = "percentile",
+    bootstrap = "inid", center = "bias-corrected", band = "all", B = 199L,
+    random.seed = 25L, xtrim = .1, neval = 6L, output = "data")
+  set.seed(34L)
+  seed <- .Random.seed
+  args$bias.control <- np_conditional_bias_control("pairs-score")
+  expect_error(do.call(plot, args), "pairs-score requires")
+  args$bias.control <- np_conditional_bias_control("pairs-score", "local-wilson", "rms-envelope")
+  p <- suppressWarnings(do.call(plot, args))
+  expect_match(p$inference[[1]]$scope, "epanechnikov2 X")
+  args$x <- b("uniform")
+  expect_error(do.call(plot, args), "Epanechnikov conditioning")
+  args$bias.control <- np_conditional_bias_control("pairs-score", simultaneous = "rms-envelope")
+  expect_error(do.call(plot, args), "Epanechnikov conditioning")
+  args$x <- b("epanechnikov")
+  u <- suppressWarnings(do.call(plot, args))
+  for (p in list(p,u)) {
+    a <- as.data.frame(p,panel=1L,target=1L,band="pointwise")
+    j <- as.data.frame(p,panel=1L,target=1L,band="simultaneous")
+    full <- as.data.frame(p,panel=1L,target=1L,band="bonferroni")
+    expect_true(all(is.finite(j$lower) & j$lower <= a$lower & a$upper <= j$upper))
+    expect_true(all(full$lower <= j$lower & j$upper <= full$upper))
+  }
+  expect_identical(.Random.seed, seed)
+})
+
 test_that("RMS pairs preserve changes below one CDF rounding unit", {
   response <- c(0, 0, 0, .5)
   target <- seq(10.5, 12.5, by=.1)

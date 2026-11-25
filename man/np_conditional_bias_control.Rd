@@ -19,12 +19,16 @@ use \code{"jackknife"} for conditional density asymptotic inference.
 Use \code{"jackknife-mp1"} for the separate asymmetric studentized
 conditional density bootstrap described below. Use \code{"pairs-score"} for the conditional CDF pairs bootstrap.}
 \item{simultaneous}{The RMS calculation centers donor probabilities before forming ratios so small tail deviations retain their numerical precision. For qualified two-predictor Gaussian-response conditional CDF
-pairs-score profiles, \code{"rms-envelope"} adds a second simultaneous bound
+pairs-score profiles and one continuous fixed Epanechnikov2 X
+with Gaussian2 Y, \code{"rms-envelope"} adds a second simultaneous bound
 using the maximum absolute bootstrap deviation divided by its pointwise
 root-mean-square. The band contains the original joint band and the
 Bonferroni band contains both. Pointwise limits stay fixed. The finite
 simultaneous family consists of the coordinates in each requested panel.
-All-zero bootstrap coordinates contribute zero to the scaled maximum.}
+All-zero bootstrap coordinates contribute zero to the scaled maximum.
+For Epanechnikov conditioning, every requested original and resampled denominator
+must be positive at both bandwidths. Sparse full-range plots can therefore
+refuse; a trimmed grid is a distinct user request. All received pairs draws are retained.}
 \item{pointwise}{For pairs-score intervals, the default uses sharp-score pointwise protection.
 With fixed Gaussian conditioning and an unbounded Gaussian or Epanechnikov response kernel
 of order 2, 4, 6 or 8, a uniform response kernel, or a beta2 response on known finite support, explicitly
