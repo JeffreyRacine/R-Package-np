@@ -357,3 +357,36 @@ test_that("local Wilson companion uses positive probabilities and preserves the 
   expect_equal(got, reference, tolerance = 1e-14)
   expect_identical(got[3, ], got[5, ])
 })
+test_that("beta pairs intervals respect response support and the native CDF", {
+  x <- seq(-1, 1, length.out = 57L)
+  y <- (-5 + 8 * plogis(x + sin(3 * x)))
+  d <- data.frame(x = x, y = y)
+  g <- data.frame(x = c(-.2, 0, .3, .3), y = c(-5, -1, 3, 3))
+  h <- c(.36, .74)
+  provider <- .np_conditional_beta_pairs_provider(y, g$y, h[2], c(-5, 3))
+  a <- provider(x, y, g, h, .05, "beta")
+  expect_equal(as.numeric(a$score[1, ]), c(0, 0))
+  expect_equal(as.numeric(a$score[3, ]), c(1, 1))
+  expect_identical(a$score[3, ], a$score[4, ])
+  expect_error(.np_conditional_beta_pairs_provider(y, -6, h[2], c(-5, 3)), "inside")
+  for (scale in c(1, sqrt(2))) {
+    bw <- npcdistbw(y ~ x, data = d, regtype = "lc", cykertype = "beta",
+                    cykerbound = "fixed", cykerlb = -5, cykerub = 3,
+                    bws = rev(h) * scale, bandwidth.compute = FALSE)
+    native <- fitted(npcdist(bw, txdat = d["x"], tydat = d["y"],
+                            exdat = g["x"], eydat = g["y"]))
+    observed <- colSums(if (scale == 1) a$plan$main else a$plan$wide)
+    expect_equal(unname(observed), as.numeric(native), tolerance = 2e-12)
+  }
+  args <- list(x = npcdist(bw), errors = "bootstrap", bootstrap = "inid",
+               band = "all", center = "bias-corrected", interval = "percentile",
+               B = 399L, neval = 3L, output = "data", random.seed = 17L)
+  args$bias.control <- np_conditional_bias_control("pairs-score")
+  sharp <- do.call(plot, args)
+  args$bias.control <- np_conditional_bias_control("pairs-score", pointwise = "local-wilson")
+  local <- do.call(plot, args)
+  expect_identical(local$inference[[1L]]$critical_value_raw, sharp$inference[[1L]]$critical_value_raw)
+  joint <- as.data.frame(local, panel = 1L, target = 1L, band = "simultaneous")
+  point <- as.data.frame(local, panel = 1L, target = 1L, band = "pointwise")
+  expect_true(all(joint$lower <= point$lower & joint$upper >= point$upper))
+})

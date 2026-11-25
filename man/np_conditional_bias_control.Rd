@@ -20,7 +20,7 @@ Use \code{"jackknife-mp1"} for the separate asymmetric studentized
 conditional density bootstrap described below. Use \code{"pairs-score"} for the conditional CDF pairs bootstrap.}
 \item{pointwise}{For pairs-score intervals, the default uses sharp-score pointwise protection.
 With fixed Gaussian conditioning and a second-order Gaussian, Epanechnikov or
-uniform response kernel, explicitly
+uniform response kernel, or a beta2 response on known finite support, explicitly
 select \code{"local-wilson"} to use a positive local-probability Wilson
 companion. The jackknife center and basic pairs interval are included.
 The common simultaneous band and Bonferroni endpoints expand where required
@@ -34,7 +34,9 @@ requested grid. The strongest evidence is on trimmed explanatory grids.}
 These are experimental opt-ins for local constant, one continuous explanatory
 variable and one continuous response, fixed unbounded second-order Gaussian
 kernels. The explicit pairs-score construction also admits an unbounded
-second-order Epanechnikov or uniform response kernel with Gaussian explanatory smoothing.
+second-order Epanechnikov or uniform response kernel, and a beta2 response on known finite
+support with Gaussian explanatory smoothing. For beta responses the donor range is
+enclosed using monotonicity of the integrated kernels at both bandwidth scales.
 Gradients, quantiles, shape projections, nonfixed bandwidths and mixed
 variables are not admitted. Original fits and selected bandwidths remain fixed.
 
