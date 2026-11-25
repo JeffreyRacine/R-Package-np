@@ -19,8 +19,8 @@ use \code{"jackknife"} for conditional density asymptotic inference.
 Use \code{"jackknife-mp1"} for the separate asymmetric studentized
 conditional density bootstrap described below. Use \code{"pairs-score"} for the conditional CDF pairs bootstrap.}
 \item{pointwise}{For pairs-score intervals, the default uses sharp-score pointwise protection.
-With fixed Gaussian conditioning and a second-order Gaussian, Epanechnikov or
-uniform response kernel, or a beta2 response on known finite support, explicitly
+With fixed Gaussian conditioning and an unbounded Gaussian or Epanechnikov response kernel
+of order 2, 4, 6 or 8, a uniform response kernel, or a beta2 response on known finite support, explicitly
 select \code{"local-wilson"} to use a positive local-probability Wilson
 companion. The jackknife center and basic pairs interval are included.
 The common simultaneous band and Bonferroni endpoints expand where required
@@ -34,9 +34,15 @@ requested grid. The strongest evidence is on trimmed explanatory grids.}
 These are experimental opt-ins for local constant, one continuous explanatory
 variable and one continuous response, fixed unbounded second-order Gaussian
 kernels. The explicit pairs-score construction also admits an unbounded
-second-order Epanechnikov or uniform response kernel, and a beta2 response on known finite
+Gaussian or Epanechnikov response kernel of order 2, 4, 6 or 8,
+a uniform response kernel, and a beta2 response on known finite
 support with Gaussian explanatory smoothing. For beta responses the donor range is
 enclosed using monotonicity of the integrated kernels at both bandwidth scales.
+For a higher-order response of order \eqn{k}, the widened X and Y bandwidths
+use factors \eqn{\sqrt{2}} and \eqn{2^{1/k}}, respectively. Both
+response integrals use the fitted kernel. A conservative interpolation
+bound encloses the signed donor contributions at both scales. Wide bands
+can result on sparse grids. The higher-order evidence concerns finite grids.
 Gradients, quantiles, shape projections, nonfixed bandwidths and mixed
 variables are not admitted. Original fits and selected bandwidths remain fixed.
 

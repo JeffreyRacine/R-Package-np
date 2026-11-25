@@ -388,3 +388,41 @@ test_that("beta pairs intervals respect response support and the native CDF", {
   point <- as.data.frame(local, panel = 1L, target = 1L, band = "pointwise")
   expect_true(all(joint$lower <= point$lower & joint$upper >= point$upper))
 })
+
+test_that("higher-order conditional CDF pairs retain both fitted kernels and dilations", {
+  x <- seq(-1.2, 1.5, length.out = 61L)
+  d <- data.frame(x = x, y = .5 * x + cos(seq_along(x)))
+  grid <- data.frame(x = c(-.3, -.1, .4, -.3), y = c(-.8, .2, .65, -.8))
+  h <- c(.36, .41)
+  for (kernel in c("gaussian", "epanechnikov")) {
+    for (order in c(4L, 6L, 8L)) {
+      make <- function(scale) {
+        npcdistbw(y ~ x, data = d, cykertype = kernel, cykerorder = order,
+                  bws = rev(h * scale), bandwidth.compute = FALSE, regtype = "lc")
+      }
+      evaluate <- function(b) fitted(npcdist(b, txdat = d["x"], tydat = d["y"],
+                                              exdat = grid["x"], eydat = grid["y"]))
+      main <- make(1)
+      wide <- make(c(sqrt(2), 2^(1 / order)))
+      provider <- .np_conditional_high_pairs_provider(d$y, grid$y, h[2L], kernel, order)
+      z <- provider(x, d$y, grid, h, .05, kernel)
+      expect_equal(colSums(z$plan$main), as.numeric(evaluate(main)), tolerance = 2e-12)
+      expect_equal(colSums(z$plan$wide), as.numeric(evaluate(wide)), tolerance = 2e-12)
+      expect_identical(z$score[1L, ], z$score[4L, ])
+      args <- list(x = main, errors = "bootstrap", bootstrap = "inid",
+                   interval = "percentile", center = "bias-corrected", band = "all",
+                   B = 99L, neval = 3L, random.seed = 71L, output = "data",
+                   bias.control = np_conditional_bias_control("pairs-score", pointwise = "local-wilson"))
+      set.seed(937L)
+      seed <- .Random.seed
+      pd <- suppressWarnings(do.call(plot, args))
+      expect_identical(.Random.seed, seed)
+      point <- as.data.frame(pd, panel = 1L, target = 1L, band = "pointwise")
+      joint <- as.data.frame(pd, panel = 1L, target = 1L, band = "simultaneous")
+      expect_true(all(is.finite(point$lower) & joint$lower <= point$lower & point$upper <= joint$upper))
+      wrong <- args
+      wrong$bootstrap <- "fixed"
+      expect_error(do.call(plot, wrong), "inid|unavailable")
+    }
+  }
+})
