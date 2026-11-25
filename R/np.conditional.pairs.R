@@ -254,7 +254,7 @@
   invisible(NULL)
 }
 
-.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL, response.order = 2L, conditioning.bounds = NULL) {
+.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL, response.order = 2L, conditioning.bounds = NULL, profile.weights = NULL) {
   n <- length(x)
   m <- nrow(grid)
   tiled <- !is.null(tile.size)
@@ -270,7 +270,7 @@
         is.null(allocation) || tile.size > allocation$tile.size || m > 12 * tile.size)
       stop("invalid or over-budget conditional pairs tile size", call. = FALSE)
     targets <- unique(grid$x)
-    if (is.null(conditioning.bounds)) .np_conditional_pairs_support(x, targets, h[1L])
+    if (is.null(conditioning.bounds) && is.null(profile.weights)) .np_conditional_pairs_support(x, targets, h[1L])
   }
 
   if (identical(pointwise, "local-wilson")) {
@@ -280,12 +280,12 @@
       stop("local Wilson numerical workspace exceeds the 256 MiB budget", call. = FALSE)
   }
   conditioning <- NULL
-  if (!is.null(conditioning.bounds)) {
+  if (!is.null(conditioning.bounds) || !is.null(profile.weights)) {
     targets <- unique(grid$x)
     bytes <- bytes + 8 * (12 * as.double(n) * length(targets) + 12 * n)
     if (bytes > 256 * 1024^2)
-      stop("beta conditioning numerical workspace exceeds the 256 MiB budget", call. = FALSE)
-    conditioning <- .np_conditional_beta_conditioning(x, targets, h[1L], conditioning.bounds)
+      stop(if (is.null(profile.weights)) "beta conditioning numerical workspace exceeds the 256 MiB budget" else "conditioning profiles exceed the 256 MiB budget", call. = FALSE)
+    conditioning <- if (is.null(profile.weights)) .np_conditional_beta_conditioning(x, targets, h[1L], conditioning.bounds) else profile.weights()
   }
   prepare <- .np_conditional_pairs_prepare
   if (response.order > 2L || (!is.null(conditioning) && identical(response.kernel, "gaussian"))) {
@@ -304,6 +304,7 @@
     prepare <- .np_conditional_beta_pairs_provider(y, targets.y, h[2L], response.bounds, conditioning)
   }
   probs <- c(alpha / (2*m), alpha/2, 1-alpha/2, 1-alpha/(2*m))
+  if (!is.null(profile.weights)) original <- numeric(m)
   center <- se <- numeric(m)
   point <- matrix(NA_real_, m, 2L, dimnames = list(NULL, c("lower", "upper")))
   cuts <- matrix(NA_real_, 4L, m)
@@ -327,6 +328,7 @@
                                      (first - 1L) %/% tile.size + 1L, ceiling(m / tile.size))
     }
     roots <- .np_conditional_dispatch(tasks, tile$plan, "pairs-score", length(idx))
+    if (!is.null(profile.weights)) original[idx] <- colSums(tile$plan$main)
     center[idx] <- tile$plan$center
     if (tiled) {
       for (i in seq_along(idx)) {
@@ -358,7 +360,9 @@
        primary = "fixed-X sharp-score envelope and basic inid pairs companion",
        conditioning = "bandwidths fixed; pairs resample X and Y jointly; marginal score conditions on X",
        endpoint.construction = "jackknife center; hull of sharp-score and signed basic pairs limits; one joint radius",
-       scope = if (!is.null(conditioning))
+       scope = if (!is.null(profile.weights))
+         "experimental LC conditional CDF, two fixed-bandwidth predictors, Gaussian2 response; requested panel"
+       else if (!is.null(conditioning))
          sprintf("experimental LC conditional CDF, fixed known-support beta2 X and %s2 Y, requested finite family", response.kernel)
        else if (response.order > 2L)
          sprintf("experimental LC conditional CDF, fixed Gaussian2 X and %s order %d Y, requested finite family", response.kernel, response.order)
