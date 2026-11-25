@@ -216,7 +216,7 @@
   invisible(NULL)
 }
 
-.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL) {
+.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL, response.order = 2L) {
   n <- length(x)
   m <- nrow(grid)
   tiled <- !is.null(tile.size)
@@ -242,7 +242,14 @@
       stop("local Wilson numerical workspace exceeds the 256 MiB budget", call. = FALSE)
   }
   prepare <- .np_conditional_pairs_prepare
-  if (identical(response.kernel, "beta")) {
+  if (response.order > 2L) {
+    targets.y <- unique(grid$y)
+    # Two native response tables, their setup and the unit-scale support grid.
+    bytes <- bytes + 8 * (8 * as.double(n) * length(targets.y) + 12 * n + 32 * 10000)
+    if (bytes > 256 * 1024^2)
+      stop("higher-order pairs numerical workspace exceeds the 256 MiB budget", call. = FALSE)
+    prepare <- .np_conditional_high_pairs_provider(y, targets.y, h[2L], response.kernel, response.order)
+  } else if (identical(response.kernel, "beta")) {
     targets.y <- unique(grid$y)
     # Two response tables plus their construction, workspace and outward bounds.
     bytes <- bytes + 8 * (8 * (as.double(n) + 65) * length(targets.y) + 12 * n)
@@ -304,7 +311,9 @@
        primary = "fixed-X sharp-score envelope and basic inid pairs companion",
        conditioning = "bandwidths fixed; pairs resample X and Y jointly; marginal score conditions on X",
        endpoint.construction = "jackknife center; hull of sharp-score and signed basic pairs limits; one joint radius",
-       scope = if (identical(response.kernel, "beta"))
+       scope = if (response.order > 2L)
+         sprintf("experimental LC conditional CDF, fixed Gaussian2 X and %s order %d Y, requested finite family", response.kernel, response.order)
+       else if (identical(response.kernel, "beta"))
          "experimental LC conditional CDF, fixed Gaussian2 X and known-support beta2 Y, requested finite family"
        else if (identical(response.kernel, "uniform"))
          "experimental LC conditional CDF, fixed Gaussian2 X and uniform Y, requested finite family"
