@@ -96,12 +96,16 @@ one panel or surface. Separate panels are not a joint family; a finite grid is
 not the entire continuous domain. The analytic and conditional-pilot methods admit up to 256 target
 points and 25 distinct response coordinates. The explicit \code{"pairs-score"}
 method admits up to 2,500 points and 50 response coordinates when its numerical
-workspace fits. A 50-by-50 surface with the default 9,999 draws exceeds this
-budget. For example, \code{neval=9} requests an 81-point surface.
+workspace fits. For requests up to 9,999 draws, target tiles can share the same pairs draws
+when storing the full draw matrix would exceed this budget. The complete grid
+still determines each simultaneous maximum. At most twelve target tiles reuse the counts. On a 50-by-50 grid the
+native-center workspace admits at most 556 observations on this tiled route.
+For 2,500 targets and 9,999 draws, nominal 95\\% Bonferroni limits
+have only 0.10 expected draws per tail. For example, \code{neval=9} requests an 81-point surface.
 On 32 saved cross-validated samples with 25 targets, nominal 95\% simultaneous
 coverage was 31/32 for \code{"pairs-score"} and 0/32 for the ordinary corrected
 inid percentile construction selected by omitting \code{bias.control}. On the corresponding
-50-by-50 grids, the largest admissible draw counts were 797 at n=150 and
+50-by-50 grids, the earlier untiled calculation used 797 draws at n=150 and
 283 at n=400. The simultaneous band covered all 32 untrimmed surfaces, with
 a width exceeding one CDF unit in every sample (mean 1.81). Trimming the
 predictor by 10\% at each end gave 30/32 and mean width 0.52. The empirical

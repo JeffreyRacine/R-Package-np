@@ -110,9 +110,62 @@ test_that("only explicit pairs-score admits affordable larger conditional grids"
               256 * 1024^2)
   }
   full <- expand.grid(x = x[1:50], y = x[1:50])
-  expect_error(.np_conditional_workspace(x, x, full, c(.3, .4), 9999L, TRUE), "256 MiB")
+  allocation <- .np_conditional_workspace(x, x, full, c(.3, .4), 9999L, TRUE)
+  expect_lt(allocation$tile.size, nrow(full))
+  expect_lte(allocation$estimated.bytes, 256 * 1024^2)
+  expect_error(.np_conditional_workspace(x.long, x.long, full, c(.3, .4), 9999L, TRUE),
+               "256 MiB")
   expect_error(.np_conditional_workspace(x, x, full[c(seq_len(2500), 1), ],
                                          c(.3, .4), 99L, TRUE), "2500 target")
   expect_error(.np_conditional_workspace(x, x, data.frame(x = 0, y = x[1:51]),
                                          c(.3, .4), 99L, TRUE), "50 distinct")
+})
+
+test_that("pairs-score target tiles preserve the complete finite-grid calculation", {
+  x <- seq(-1.5, 1.5, length.out = 30L)
+  y <- sin(x) + cos(seq_along(x)) / 3
+  grid <- expand.grid(x = c(.3, -.6, .1), y = c(.4, -.2))
+  grid <- grid[c(4L, 1L, 3L, 4L, 2L, 6L), ]
+  run <- function(tile) .np_with_seed(309L, .np_conditional_pairs_score(
+    x, y, grid, c(.4, .3), 129L, .05, rep(0, nrow(grid)), 0, tile))
+  baseline <- run(NULL)
+  for (size in c(1L, 4L)) {
+    tiled <- run(size)
+    for (field in c("center", "bands", "se", "critical.raw", "critical"))
+      expect_equal(tiled[[field]], baseline[[field]], tolerance = 1e-12)
+  }
+})
+
+test_that("the over-budget pairs selector limits both storage and transmissions", {
+  choose <- function(n, nx, ny, draws) {
+    x <- seq(-1, 1, length.out = n)
+    g <- expand.grid(x = seq_len(nx), y = seq_len(ny))
+    .np_conditional_workspace(x, x, g, c(.3, .4), draws, TRUE)
+  }
+  expect_identical(choose(400L, 50L, 50L, 9999L)$tile.size, 250L)
+  expect_identical(choose(1000L, 18L, 18L, 9999L)$tile.size, 139L)
+  expect_identical(choose(1400L, 18L, 18L, 9999L)$tile.size, 31L)
+  expect_error(choose(1450L, 18L, 18L, 9999L), "budget")
+  expect_error(choose(150L, 50L, 50L, 10000L), "9,999")
+  expect_error(choose(557L, 50L, 50L, 9999L), "budget")
+})
+
+test_that("zero predictor mass in a late tile refuses before dispatch", {
+  x <- c((1:9)/100, 20)
+  y <- seq_along(x)
+  grid <- data.frame(x = c(.03, .06, 20), y = c(2, 5, 1))
+  local_mocked_bindings(.np_conditional_dispatch = function(...)
+    stop("unexpected dispatch before checking support"), .package = "np")
+  run <- function(g, tile = 1L) .np_conditional_pairs_score(
+    x, y, g, c(.01, .4), 129L, .05, numeric(nrow(g)), 0, tile)
+  for (tile in list(0L, 2.5, NA_real_, Inf, 4L))
+    expect_error(run(grid, tile), "tile size")
+  set.seed(123)
+  state <- .Random.seed
+  g <- grid
+  g$x[3L] <- 1000
+  expect_error(run(g), "undefined predictor mass")
+  expect_identical(.Random.seed, state)
+  expect_error(.np_with_seed(309L, run(grid)), "resampled conditional CDF has zero")
+  expect_identical(.Random.seed, state)
 })
