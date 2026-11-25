@@ -1,12 +1,18 @@
 # Private CDF prototype: immutable retained-data context, no public dispatch.
-.np_udist_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2) {
+.np_udist_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2, allow.epanechnikov = FALSE) {
   if (is.list(bws) && bws[["type", exact = TRUE]] %in% c("generalized_nn", "adaptive_nn"))
     return(.np_udist_bc_nn_prepare(bws, x, max.bytes))
+  compact <- isTRUE(allow.epanechnikov) && is.list(bws) &&
+    identical(bws[["ckertype", exact = TRUE]], "epanechnikov") &&
+    is.data.frame(x) && ncol(x) == 1L && is.numeric(x[[1L]])
   if (!is.list(bws) || !identical(bws[["type", exact = TRUE]], "fixed") ||
-      !identical(bws[["ckertype", exact = TRUE]], "gaussian") ||
+      !(compact || identical(bws[["ckertype", exact = TRUE]], "gaussian")) ||
       !isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) ||
-      !identical(bws[["ckerbound", exact = TRUE]], "none"))
+      !identical(bws[["ckerbound", exact = TRUE]], "none")) {
+    if (is.list(bws) && identical(bws[["ckertype", exact = TRUE]], "epanechnikov"))
+      stop("Epanechnikov CDF correction requires one numeric coordinate, fixed unbounded second-order bandwidths and joint-process asymptotic errors", call. = FALSE)
     stop("CDF correction requires fixed unbounded second-order Gaussian bandwidths", call. = FALSE)
+  }
   if (!is.data.frame(x) || nrow(x) < 2L || !ncol(x) || anyNA(x) ||
       anyDuplicated(names(x)) || any(!nzchar(names(x))) ||
       !identical(names(x), bws[["xnames", exact = TRUE]]) ||
@@ -42,11 +48,17 @@
     list(index = j, lambda = h[j], levels = levels(x[[j]]), support = support,
       training = as.double(toMatrix(x[j])), raw.probe = raw, effective.probe = effective)
   })
+  metadata <- if (compact) {
+    list(normalization = "n-squared", support = "Lebesgue", kernel = "epanechnikov2",
+         correction = "integrated fourth-order equivalent kernel")
+  } else {
+    list(normalization = "n-squared", support = "Lebesgue x integer lattice",
+         coefficient = .5, ordered.operator = "R(2S-S*S)", kernel = "gaussian2")
+  }
   list(x = x, n = nrow(x), q = sum(numeric), s = sum(ordered), numeric = numeric,
     h = h, bws = bws, type = "fixed", max.bytes = max.bytes,
     row.ids = rownames(x), category = category, construction = "cdf-bc-v1",
-    metadata = list(normalization = "n-squared", support = "Lebesgue x integer lattice",
-      coefficient = .5, ordered.operator = "R(2S-S*S)", kernel = "gaussian2"))
+    metadata = metadata)
 }
 
 .np_udist_bc_grid <- function(state, grid) {
@@ -59,7 +71,8 @@
       !identical(levels(grid[[z$index]]), z$levels))
     stop("CDF evaluation must retain fitted ordered levels", call. = FALSE)
   if (identical(state$type, "fixed") && state$q && npLogicalOption("np.largeh", TRUE)) {
-    threshold <- sqrt(-2*log(1-getOption("np.largeh.rel.tol", 1e-3)))
+    tol <- getOption("np.largeh.rel.tol", 1e-3)
+    threshold <- if (identical(state$metadata$kernel, "epanechnikov2")) sqrt(tol) else sqrt(-2*log(1-tol))
     span <- vapply(which(state$numeric), function(j) diff(range(state$x[[j]], grid[[j]])), numeric(1L))
     if (any(span <= state$h[state$numeric]*threshold))
       stop("large-h/global-limit CDF correction is outside this investigation", call. = FALSE)

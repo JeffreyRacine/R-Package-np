@@ -1,14 +1,18 @@
 # Fixed Gaussian2 numeric CDF contributions have this certified signed range.
 # The score interval targets their expectation at fixed bandwidth and target;
 # smoothing bias and data-selected targets require separate coverage evidence.
-.np_udist_marginal_range <- function(q) {
+.np_udist_marginal_range <- function(q, kernel = "gaussian2") {
+  if (identical(kernel, "epanechnikov2")) {
+    t <- -sqrt(3/7)
+    lower <- .5 + t*(45+t^2*(21*t^2-50))/32
+    return(c(lower = lower, upper = 1-lower))
+  }
   t <- sqrt(1 + 2/q)
   a <- pnorm(-t) - (q/2) * t * dnorm(t)
   c(lower = a, upper = 1 - a)
 }
 
-.np_udist_marginal_score <- function(center, n, q, alpha) {
-  bounds <- .np_udist_marginal_range(q)
+.np_udist_marginal_score <- function(center, n, q, alpha, bounds = .np_udist_marginal_range(q)) {
   span <- bounds[2L] - bounds[1L]
   p <- (center - bounds[1L])/span
   if (any(!is.finite(p)) || any(p < 0 | p > 1))
@@ -23,14 +27,15 @@
 
 # Preserve the calibrated process and RNG. Only the deterministic marginal
 # envelope and the minimum uniform outward nesting envelope change endpoints.
-.np_udist_marginal_envelope <- function(answer, widths, n, q, alpha) {
+.np_udist_marginal_envelope <- function(answer, widths, n, q, alpha, kernel = "gaussian2") {
+  bounds <- .np_udist_marginal_range(q, kernel)
   center <- answer$center
   m <- length(center)
   answer$reference.bands <- answer$intervals
   answer$reference.critical <- answer$critical
   expansion <- numeric(length(alpha))
   for (k in seq_along(alpha)) {
-    score <- .np_udist_marginal_score(center, n, q, alpha[k])
+    score <- .np_udist_marginal_score(center, n, q, alpha[k], bounds)
     point <- cbind(pmin(center-widths$pointwise[, k], score[, 1L]),
                    pmax(center+widths$pointwise[, k], score[, 2L]))
     joint <- max(widths$simultaneous[, k], center-point[, 1L],
@@ -50,7 +55,7 @@
     }
   }
   answer$settings$marginal.calibration <- "signed-contribution score envelope"
-  answer$settings$marginal.range <- .np_udist_marginal_range(q)
+  answer$settings$marginal.range <- bounds
   answer$settings$marginal.target <- "fixed-bandwidth contribution expectation"
   answer$settings$nesting.expansion <- expansion
   answer

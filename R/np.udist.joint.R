@@ -5,6 +5,9 @@
                                      bands = c("pointwise", "simultaneous", "bonferroni"),
                                      corrected = TRUE, blocklen = NULL, selection = NULL,
                                      calibration = NULL) {
+  if (identical(state$metadata$kernel, "epanechnikov2") &&
+      (!identical(law, "gaussian") || !is.null(calibration)))
+    stop("the Epanechnikov CDF process requires Gaussian asymptotic calibration", call. = FALSE)
   existed <- exists(".Random.seed", .GlobalEnv, inherits = FALSE)
   entry <- if (existed) get(".Random.seed", .GlobalEnv, inherits = FALSE) else NULL
   kind <- RNGkind(); success <- FALSE
@@ -152,6 +155,8 @@
       representation = "bounded observation factors", metadata = state$metadata,
       target.ids = rownames(grid), scope = "declared finite family"),
     rng = list(kind = kind, entry = entry, start = start, end = end))
+  if (identical(state$metadata$kernel, "epanechnikov2"))
+    answer$settings$correction <- "integrated fourth-order Epanechnikov kernel"
   if (nearest) {
     answer$settings$h <- NULL
     answer$settings$counts <- state$requested
@@ -162,7 +167,7 @@
   }
   if (isTRUE(corrected) && identical(state$type, "fixed") &&
       state$q %in% 1:2 && state$s == 0L && law %in% c("gaussian", "inid"))
-    answer <- .np_udist_marginal_envelope(answer, widths, state$n, state$q, alpha)
+    answer <- .np_udist_marginal_envelope(answer, widths, state$n, state$q, alpha, state$metadata$kernel)
   if (signed.calibration || score.calibration) {
     tail.result <- if (signed.calibration) .np_band_tail_finish(tails) else NULL
     score <- isTRUE(corrected) && identical(state$type, "fixed") &&
