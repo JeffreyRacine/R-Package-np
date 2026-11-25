@@ -489,19 +489,6 @@
         pc = (.np_plot_center_is_bias_corrected(plot.errors.center))
         center.val <- if(pc) terr[,3] else tobj$mean
 
-        lerr = matrix(data = center.val - terr[,1],
-          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
-
-        herr = matrix(data = center.val + terr[,2],
-          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
-
-        if (plot.errors.type == "all" && !is.null(terr.all)) {
-          lerr.all <- lapply(terr.all, function(te)
-            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
-          herr.all <- lapply(terr.all, function(te)
-            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
-        }
-
       } else if (plot.errors.method == "asymptotic") {
         terr.obj <- .np_plot_asymptotic_error_from_se(
           se = tobj$merr,
@@ -535,6 +522,9 @@
         terr[,1:2] <- terr.obj$err
         terr.all <- terr.obj$all.err
         center.val <- tobj$mean
+      }
+
+      if (plot.errors) {
         lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
