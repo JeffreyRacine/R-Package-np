@@ -287,7 +287,6 @@
       stop(if (is.null(profile.weights)) "beta conditioning numerical workspace exceeds the 256 MiB budget" else "conditioning profiles exceed the 256 MiB budget", call. = FALSE)
     conditioning <- if (is.null(profile.weights)) .np_conditional_beta_conditioning(x, targets, h[1L], conditioning.bounds) else profile.weights()
   }
-  prepare <- .np_conditional_pairs_prepare
   if (response.order > 2L || (!is.null(conditioning) && identical(response.kernel, "gaussian"))) {
     targets.y <- unique(grid$y)
     # Two native response tables, their setup and the unit-scale support grid.
@@ -302,6 +301,10 @@
     if (bytes > 256 * 1024^2)
       stop("beta pairs numerical workspace exceeds the 256 MiB budget", call. = FALSE)
     prepare <- .np_conditional_beta_pairs_provider(y, targets.y, h[2L], response.bounds, conditioning)
+  } else if (is.null(conditioning)) {
+    prepare <- .np_conditional_pairs_prepare
+  } else {
+    stop("no qualified response range for the supplied conditioning weights", call. = FALSE)
   }
   probs <- c(alpha / (2*m), alpha/2, 1-alpha/2, 1-alpha/(2*m))
   if (!is.null(profile.weights)) original <- numeric(m)
@@ -374,6 +377,10 @@
          "experimental LC conditional CDF, fixed Gaussian2 X and Epanechnikov2 Y, requested finite family"
        else "experimental LC conditional CDF, fixed Gaussian2, requested finite family",
        resolution.limited = B*alpha/(2*m) < 1, estimated.numerical.bytes = bytes)
+  if (identical(response.kernel, "beta"))
+    ans$range.construction <- "conservative enclosure from monotone beta response intervals"
+  else if (response.order > 2L || !is.null(conditioning))
+    ans$range.construction <- "conservative chord enclosure of signed donor extrema"
   if (identical(pointwise, "local-wilson")) {
     local <- .np_conditional_local_wilson(x, y, grid, h[1L], alpha, conditioning)
     local[, 1L] <- pmin(center, center - cuts[3L, ], local[, 1L])
@@ -390,5 +397,7 @@
     ans$conditioning <- "fixed bandwidths; joint pairs resampling; Wilson uses local homogeneity"
     ans$endpoint.construction <- "local Wilson and basic pairs pointwise hull; original sharp-score joint radius with outward nesting"
   }
+  if (!is.null(ans$range.construction))
+    ans$endpoint.construction <- paste(ans$endpoint.construction, ans$range.construction, sep = ". ")
   ans
 }

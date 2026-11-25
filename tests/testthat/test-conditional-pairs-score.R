@@ -505,3 +505,15 @@ test_that("conditional pairs use the complete fitted predictor profile", {
   wide <- npcdistbw(y ~ z + x, data = d, bws = c(.3, .55, .34), bandwidth.compute = FALSE)
   expect_error(.np_conditional_profile_weights(wide, d[c("z","x")], ex), "outside")
 })
+
+test_that("special conditioning weights cannot enter the Gaussian-X-only preparation", {
+  y <- seq(-1, 1, length.out = 12L)
+  g <- data.frame(x = 1L, y = 0)
+  weights <- function() list(targets = 1L,
+    main = matrix(rep(1 / length(y), length(y))), wide = matrix(rep(1 / length(y), length(y))))
+  set.seed(319L)
+  before <- .Random.seed
+  expect_error(.np_conditional_pairs_score(y, y, g, c(.3,.2), 99L, .05, NULL, 0,
+    response.kernel = "uniform", profile.weights = weights), "no qualified response range")
+  expect_identical(.Random.seed, before)
+})
