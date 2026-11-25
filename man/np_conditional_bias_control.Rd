@@ -18,8 +18,9 @@ conditional CDF inference and conditional density bootstrap inference;
 use \code{"jackknife"} for conditional density asymptotic inference.
 Use \code{"jackknife-mp1"} for the separate asymmetric studentized
 conditional density bootstrap described below. Use \code{"pairs-score"} for the conditional CDF pairs bootstrap.}
-\item{pointwise}{The default uses the sharp-score pointwise protection.
-For Gaussian fixed-bandwidth conditional CDF pairs-score intervals, explicitly
+\item{pointwise}{For pairs-score intervals, the default uses sharp-score pointwise protection.
+With fixed Gaussian conditioning and a second-order Gaussian, Epanechnikov or
+uniform response kernel, explicitly
 select \code{"local-wilson"} to use a positive local-probability Wilson
 companion. The jackknife center and basic pairs interval are included.
 The common simultaneous band and Bonferroni endpoints expand where required
