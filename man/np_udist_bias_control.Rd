@@ -35,8 +35,14 @@ asymptotic pointwise, simultaneous and Bonferroni bands. The correction uses
 twice the fitted beta CDF minus the CDF at half its concentration. A
 target-specific signed donor range protects the marginal intervals. The
 declared endpoints receive exact zero-width intervals and do not contribute
-to the stochastic family size. The lower endpoint assumes no point mass
-there. Interior targets with numerically unresolved variance are refused.
+to the stochastic family size. This construction assumes a continuous
+distribution with externally known support. A training observation on either
+bound causes a refusal, including when sample extremes are supplied as known
+bounds. With positive density near a bound, smoothing bias can persist at
+interior targets within a few squared relative bandwidths of it on the unit
+support scale. The conservative donor-range enclosure can determine the
+published width. Request a pointwise, simultaneous or Bonferroni band, or all
+three. Normal-SD intervals and interiors with unresolved variation are refused.
 Univariate second-order whole-line Epanechnikov generalized nearest-neighbor
 bandwidths also support the Gaussian asymptotic joint-process construction.
 It holds the fitted neighbor count fixed and includes variation in each query

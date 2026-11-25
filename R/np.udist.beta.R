@@ -7,6 +7,8 @@
       length(upper) != 1L || !is.finite(upper-lower) || upper <= lower ||
       any(x < lower | x > upper))
     stop("beta CDF requires finite known bounds containing the training observations", call. = FALSE)
+  if (any(x == lower | x == upper))
+    stop("beta corrected CDF inference requires observations strictly inside the known support; boundary mass or rounding is not covered", call. = FALSE)
   width <- unname(upper-lower)
   precision <- (width / h)^2
   if (!is.finite(precision) || precision <= 0)

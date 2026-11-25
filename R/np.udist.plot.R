@@ -68,7 +68,7 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   allow.compact <- identical(construction, "joint-process") && identical(method, "asymptotic") &&
     identical(control.calibration, "default") && is.null(calibration)
   if (identical(bws[["ckertype", exact = TRUE]], "beta") && identical(band, "pmzsd"))
-    stop("beta corrected CDF bands require pointwise, simultaneous, Bonferroni or all scopes", call. = FALSE)
+    stop("beta corrected CDF normal-SD intervals are unqualified; request a score-protected pointwise, simultaneous or Bonferroni band", call. = FALSE)
   state <- .np_udist_bc_prepare(bws, x, allow.compact = allow.compact)
   if (identical(construction, "joint-process") &&
       (!state$q %in% 0:2 || !state$s %in% 0:2))
