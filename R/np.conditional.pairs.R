@@ -10,20 +10,46 @@
         2L, plan$center, "-")
 }
 
+# Integrated unit-variance second-order Epanechnikov kernel.
+.np_conditional_epan_cdf <- function(u) {
+  t <- u / sqrt(5)
+  t[] <- pmin(1, pmax(-1, t))
+  tail <- .25 * (1 - abs(t))^2 * (2 + abs(t))
+  ifelse(t < 0, tail, 1 - tail)
+}
+
 # Exact extrema of each signed donor contribution over the response coordinate.
-.np_conditional_pairs_range <- function(z) {
+.np_conditional_pairs_range <- function(z, response.kernel = "gaussian") {
   a <- 2 * z$w
   b <- z$jw
   low <- pmin(0 * a, a - b)
   high <- pmax(0 * a, a - b)
-  both <- which(a > 0 & b > 0)
-  squared <- 4 * (log(a[both]) - log(b[both]) + log(2) / 2)
-  index <- both[squared > 0]
-  roots <- sqrt(squared[squared > 0])
-  for (v in list(-roots, roots)) {
-    value <- a[index] * pnorm(v) - b[index] * pnorm(v / sqrt(2))
-    low[index] <- pmin(low[index], value)
-    high[index] <- pmax(high[index], value)
+  if (identical(response.kernel, "epanechnikov")) {
+    if (!isTRUE(min(a, b) >= 0))
+      stop("Epanechnikov donor ranges require nonnegative conditioning weights", call. = FALSE)
+    # On the common support the derivative is linear in the squared argument.
+    # From the inner to the outer knot it is nonpositive. Only the positive
+    # crossing and its reflection can enlarge the range beyond its endpoints.
+    scale <- sqrt(2)
+    index <- which(b > 0 & a > b / scale)
+    numerator <- a[index] - b[index] / scale
+    denominator <- a[index] - b[index] / scale^3
+    root <- sqrt(5 * numerator / denominator)
+    value <- a[index] * .np_conditional_epan_cdf(root) -
+      b[index] * .np_conditional_epan_cdf(root / scale)
+    reflected <- (a[index] - b[index]) - value
+    low[index] <- pmin(low[index], value, reflected)
+    high[index] <- pmax(high[index], value, reflected)
+  } else {
+    both <- which(a > 0 & b > 0)
+    squared <- 4 * (log(a[both]) - log(b[both]) + log(2) / 2)
+    index <- both[squared > 0]
+    roots <- sqrt(squared[squared > 0])
+    for (v in list(-roots, roots)) {
+      value <- a[index] * pnorm(v) - b[index] * pnorm(v / sqrt(2))
+      low[index] <- pmin(low[index], value)
+      high[index] <- pmax(high[index], value)
+    }
   }
   span <- colSums(high - low)
   if (any(!is.finite(span)) || any(span <= 0))
@@ -33,16 +59,17 @@
        q = q[, z$ix, drop = FALSE], qmax = apply(q, 2L, max)[z$ix])
 }
 
-.np_conditional_pairs_prepare <- function(x, y, grid, h, alpha) {
+.np_conditional_pairs_prepare <- function(x, y, grid, h, alpha, response.kernel = "gaussian") {
   z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE))
   delta <- outer(y, z$gy, function(a, b) b - a)
+  primitive <- if (identical(response.kernel, "epanechnikov")) .np_conditional_epan_cdf else pnorm
   numerator <- function(weight, width) {
-    weight[, z$ix, drop = FALSE] * pnorm(delta / width)[, z$iy, drop = FALSE]
+    weight[, z$ix, drop = FALSE] * primitive(delta / width)[, z$iy, drop = FALSE]
   }
   main <- numerator(z$w, h[2L])
   wide <- numerator(z$jw, z$H[2L])
   center <- 2 * colSums(main) - colSums(wide)
-  score <- .np_conditional_range_interval(center, .np_conditional_pairs_range(z),
+  score <- .np_conditional_range_interval(center, .np_conditional_pairs_range(z, response.kernel),
                                           "sharp-score", alpha)
   plan <- list(ix = z$ix, w = z$w, jw = z$jw, main = main, wide = wide, center = center)
   list(plan = plan, score = score)
@@ -83,7 +110,7 @@
   invisible(NULL)
 }
 
-.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL) {
+.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian") {
   n <- length(x)
   m <- nrow(grid)
   tiled <- !is.null(tile.size)
@@ -109,7 +136,7 @@
   draw.max <- numeric(B)
   for (first in seq.int(1L, m, by = tile.size)) {
     idx <- seq.int(first, min(m, first + tile.size - 1L))
-    tile <- .np_conditional_pairs_prepare(x, y, grid[idx, , drop = FALSE], h, alpha)
+    tile <- .np_conditional_pairs_prepare(x, y, grid[idx, , drop = FALSE], h, alpha, response.kernel)
     if (first == 1L) {
       # Every target sees exactly the same coordinator-generated pairs draws.
       prob <- rep(1 / n, n)
@@ -156,6 +183,8 @@
        primary = "fixed-X sharp-score envelope and basic inid pairs companion",
        conditioning = "bandwidths fixed; pairs resample X and Y jointly; marginal score conditions on X",
        endpoint.construction = "jackknife center; hull of sharp-score and signed basic pairs limits; one joint radius",
-       scope = "experimental LC conditional CDF, fixed Gaussian2, requested finite family",
+       scope = if (identical(response.kernel, "epanechnikov"))
+         "experimental LC conditional CDF, fixed Gaussian2 X and Epanechnikov2 Y, requested finite family"
+       else "experimental LC conditional CDF, fixed Gaussian2, requested finite family",
        resolution.limited = B*alpha/(2*m) < 1, estimated.numerical.bytes = bytes)
 }
