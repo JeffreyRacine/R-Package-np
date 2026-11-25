@@ -66,7 +66,7 @@
 
 .np_udens_uniform_normal_request <- function(bws,control,center,method,band,calibration=NULL) {
   is.null(control) && is.null(calibration) && identical(center,"bias-corrected") &&
-    identical(method,"asymptotic") && isTRUE(band %in% c("pointwise","bonferroni")) &&
+    identical(method,"asymptotic") && isTRUE(band %in% c("pointwise","bonferroni","simultaneous","all")) &&
     inherits(bws,"bandwidth") && identical(bws[["ckertype",exact=TRUE]],"uniform") &&
     identical(bws[["type",exact=TRUE]],"fixed") &&
     identical(bws[["ckerbound",exact=TRUE]],"none") &&
@@ -87,8 +87,22 @@
   state
 }
 
-.np_udens_uniform_normal_public <- function(state,grid,alpha,band) {
-  if (!.np_udens_uniform_normal_active(state) || !isTRUE(band %in% c("pointwise","bonferroni")) ||
+.np_udens_gaussian_absolute_maximum <- function(factor, B, progress) {
+  m <- nrow(factor)
+  maxima <- numeric(B)
+  for (first in seq.int(1L, B, by = 128L)) {
+    ids <- first:min(B, first + 127L)
+    z <- matrix(rnorm(m * length(ids)), m)
+    values <- factor %*% z
+    if (any(!is.finite(values))) stop("nonfinite compact density Gaussian process", call. = FALSE)
+    maxima[ids] <- apply(abs(values), 2L, max)
+    progress("Gaussian maximum", max(ids), B)
+  }
+  maxima
+}
+
+.np_udens_uniform_normal_public <- function(state,grid,alpha,band,B = NULL) {
+  if (!.np_udens_uniform_normal_active(state) || !isTRUE(band %in% c("pointwise","bonferroni","simultaneous","all")) ||
       !is.data.frame(grid) || ncol(grid)!=1L || !nrow(grid) ||
       !identical(names(grid),names(state$x)) || !is.numeric(grid[[1L]]) ||
       any(!is.finite(grid[[1L]])) || !is.numeric(alpha) || length(alpha)!=1L ||
@@ -96,8 +110,15 @@
     stop("invalid uniform normal-band request",call.=FALSE)
   progress <- function(stage,done,total) .np_plot_progress_notify(
     stage=paste("Compact density Q6 normal:",stage),done=done,total=total,unit="work")
+  joint <- band %in% c("simultaneous", "all")
+  if (joint) {
+    B <- .np_plot_gaussian_integer(B, "density draws", .Machine$integer.max)
+    m <- length(unique(grid[[1L]]))
+    .np_udens_q6_budget(state$n, m, B = B, block = 128L)
+    .np_plot_gaussian_draws(B, alpha, m)
+  }
   ref <- .np_plot_corrected_activity_run("Constructing uniform density normal intervals",
-    .np_udens_q6_reference(state$x[[1L]],state$h,grid[[1L]],"uniform",progress))
+    .np_udens_q6_reference(state$x[[1L]],state$h,grid[[1L]],"uniform",progress,keep.factor=joint))
   inference <- list(center=ref$center[ref$index],se=ref$se[ref$index],bands=list(),
     covariance=NULL,checks=ref$diagnostics,
     settings=list(construction=state$construction,law="gaussian",h=state$h,n=state$n,q=1L,
@@ -106,5 +127,21 @@
       reference="empirical mixture plus h*sqrt(2/3)*Student6 noise",
       covariance="complete corrected-curve influence under Q6",
       correction="order-six compact operator with fitted normal guide"))
-  .np_udens_whole_normal_assemble(inference,alpha,band)
+  if (joint) {
+    maximum <- .np_plot_corrected_activity_run("Calibrating the uniform density band",
+      .np_with_seed(state$plot.random.seed, .np_udens_gaussian_absolute_maximum(ref$factor, B, progress)))
+    critical <- unname(quantile(maximum, 1-alpha, type = 7L))
+    center <- inference$center
+    inference$bands$simultaneous <- array(c(center-critical, center+critical),
+      c(length(center), 2L, 1L), dimnames = list(NULL, c("lower", "upper"), as.character(alpha)))
+    inference$critical <- critical
+    inference$settings$B <- B
+    inference$settings$quantile.type <- 7L
+    inference$settings$critical.units <- "density"
+    inference$settings$maximum.statistic <- "unstudentized absolute Gaussian maximum"
+    inference$settings$calibration <- "Gaussian maximum and normal quantiles"
+  }
+  result <- .np_udens_whole_normal_assemble(inference,alpha,band)
+  if (joint) result$inference$settings$calibration.status <- "unstudentized finite-grid Gaussian maximum in density units with complete Q6 covariance"
+  result
 }

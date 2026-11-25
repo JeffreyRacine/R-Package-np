@@ -119,7 +119,7 @@ np_udens_bias_control <- function(construction = c("joint-scale", "positive-cova
   if (.np_udens_q6_active(state))
     return(.np_udens_q6_public_errors(state, grid, alpha, B, band))
   if (.np_udens_uniform_normal_active(state))
-    return(.np_udens_uniform_normal_public(state, grid, alpha, band))
+    return(.np_udens_uniform_normal_public(state, grid, alpha, band, B))
   if (.np_udens_m4_active(state))
     return(.np_udens_m4_public_errors(state, grid, alpha, B, band))
   if (.np_udens_compact_active(state))
