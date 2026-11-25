@@ -5,6 +5,9 @@
                                      bands = c("pointwise", "simultaneous", "bonferroni"),
                                      corrected = TRUE, blocklen = NULL, selection = NULL,
                                      calibration = NULL) {
+  beta <- identical(state$metadata$kernel, "beta2")
+  if (beta && (!identical(law, "gaussian") || !is.null(calibration) || !isTRUE(corrected)))
+    stop("the beta CDF process requires corrected Gaussian asymptotic calibration", call. = FALSE)
   if (identical(state$metadata$kernel, "uniform2") &&
       (!identical(law, "gaussian") || !is.null(calibration)))
     stop("the uniform CDF process requires Gaussian asymptotic calibration", call. = FALSE)
@@ -59,6 +62,8 @@
     stop("numeric GNN bootstrap empirical standard deviation requires at least two CDF draws", call. = FALSE)
   .np_udist_bc_grid(state, grid)
   m <- nrow(grid); budget <- .np_udist_bc_budget(state, m, B, tile)
+  edges <- if (beta) which(grid[[1L]] == state$beta$lower | grid[[1L]] == state$beta$upper)
+  family.size <- m-length(edges)
   if (signed.calibration || score.calibration) {
     extra <- 192*as.double(m)*length(alpha)
     if (signed.calibration)
@@ -73,7 +78,7 @@
       tails <- .np_band_tail_prepare(B, map, alpha, byte.limit = extra)
     }
   }
-  stochastic <- law != "gaussian" || any(bands != "pointwise")
+  stochastic <- family.size > 0L && (law != "gaussian" || any(bands != "pointwise"))
   if (stochastic && !existed) runif(1L)
   start <- if (stochastic) get(".Random.seed", .GlobalEnv, inherits = FALSE) else entry
   end <- NULL
@@ -125,12 +130,14 @@
           map[ii, , drop = FALSE], seq_len(B))
     }
   }
-  if (any(!is.finite(se)) || !any(se > 0))
+  if (beta && any(se == 0 & !(seq_len(m) %in% edges)))
+    stop("beta CDF interior variation is numerically unresolved", call. = FALSE)
+  if (any(!is.finite(se)) || (family.size > 0L && !any(se > 0)))
     stop("absolute CDF process unavailable: no positive observed variance", call. = FALSE)
   raw <- if (stochastic) unname(quantile(limits$maximum, 1-alpha, type = 1L)) else NULL
   if (law == "gaussian") {
     point <- outer(se, qnorm(alpha/2, lower.tail = FALSE))
-    bonf <- outer(se, qnorm(alpha/(2*m), lower.tail = FALSE))
+    bonf <- outer(se, qnorm(alpha/(2*max(1L, family.size)), lower.tail = FALSE))
     joint <- if (stochastic) pmin(apply(bonf, 2L, max),
       pmax(apply(point, 2L, max), raw)) else apply(point, 2L, max)
   }
@@ -138,6 +145,7 @@
     point <- limits$point; bonf <- limits$bonf; joint <- raw
   }
   joint <- matrix(rep(joint, each = m), m, length(alpha))
+  if (length(edges)) joint[edges, ] <- 0
   raw.bonf <- bonf; bonf <- pmax(bonf, joint)
   widths <- list(pointwise = point, simultaneous = joint, bonferroni = bonf)
   intervals <- lapply(widths[bands], function(w) {
@@ -160,6 +168,14 @@
     rng = list(kind = kind, entry = entry, start = start, end = end))
   if (identical(state$metadata$kernel, "epanechnikov2"))
     answer$settings$correction <- "integrated fourth-order Epanechnikov kernel"
+  if (beta) {
+    answer$settings$correction <- state$metadata$correction
+    answer$calibration <- list(endpoint.source = ifelse(seq_len(m) %in% edges,
+      "exact support endpoint under the continuous law", "signed beta score envelope"))
+    answer$settings$structural.endpoints <- as.integer(edges)
+    answer$settings$stochastic.family.size <- family.size
+    answer$settings$draws <- if (stochastic) B else 0L
+  }
   if (identical(state$metadata$kernel, "uniform2"))
     answer$settings$correction <- "integrated fourth-order uniform equivalent kernel"
   if (nearest) {
@@ -172,7 +188,8 @@
   }
   if (isTRUE(corrected) && identical(state$type, "fixed") &&
       state$q %in% 1:2 && state$s == 0L && law %in% c("gaussian", "inid"))
-    answer <- .np_udist_marginal_envelope(answer, widths, state$n, state$q, alpha, state$metadata$kernel)
+    answer <- .np_udist_marginal_envelope(answer, widths, state$n, state$q, alpha, state$metadata$kernel,
+      if (beta) .np_udist_beta_ranges(grid[[1L]], state$beta), edges)
   if (signed.calibration || score.calibration) {
     tail.result <- if (signed.calibration) .np_band_tail_finish(tails) else NULL
     score <- isTRUE(corrected) && identical(state$type, "fixed") &&
@@ -184,7 +201,7 @@
     answer$settings$calibration.method <- calibration
   }
   empirical.bands <- if (law == "gaussian") {
-    if (m > 1L) intersect(bands, "simultaneous") else character()
+    if (family.size > 1L) intersect(bands, "simultaneous") else character()
   } else bands
   if (length(empirical.bands))
     answer$resolution <- .np_band_resolution(B, rep("cdf", m), alpha,

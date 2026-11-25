@@ -28,7 +28,11 @@
     stop("corrected must be TRUE or FALSE", call. = FALSE)
   if (nrow(grid) > 25L) stop("CDF row provider requires bounded target tiles", call. = FALSE)
   .np_udist_bc_budget(state, nrow(grid), 1L, nrow(grid))
-  if (identical(state$metadata$kernel, "uniform2")) {
+  if (identical(state$metadata$kernel, "beta2")) {
+    component <- .np_udist_beta_rows(grid[[1L]], state$beta, state$beta$left, state$beta$right)
+    z <- list(original = component$ordinary,
+              corrected = if (corrected) 2*component$ordinary-component$wide else component$ordinary)
+  } else if (identical(state$metadata$kernel, "uniform2")) {
     t <- outer(grid[[1L]], state$x[[1L]], "-") / state$h[1L]
     t[] <- pmax(-1, pmin(1, t))
     original <- .5 + .5*t
