@@ -1,10 +1,9 @@
-# Fixed Gaussian2 numeric CDF contributions have this certified signed range.
+# Certified signed range of the fixed-bandwidth continuous CDF contributions.
 # The score interval targets their expectation at fixed bandwidth and target;
 # smoothing bias and data-selected targets require separate coverage evidence.
 .np_udist_marginal_range <- function(q, kernel = "gaussian2") {
   if (identical(kernel, "epanechnikov2")) {
-    t <- -sqrt(3/7)
-    lower <- .5 + t*(45+t^2*(21*t^2-50))/32
+    lower <- .np_udist_epanechnikov_cdf4(-sqrt(3/7))
     return(c(lower = lower, upper = 1-lower))
   }
   t <- sqrt(1 + 2/q)

@@ -12,6 +12,11 @@
   list(original = P, corrected = if (corrected) P + .5 * Q else P)
 }
 
+# Fourth-order Epanechnikov primitive on its standardized support [-1, 1].
+.np_udist_epanechnikov_cdf4 <- function(t, t2 = t*t) {
+  .5 + t*(45 + t2*(21*t2 - 50))/32
+}
+
 .np_udist_bc_rows <- function(state, grid, corrected = TRUE) {
   if (!identical(state$type, "fixed")) return(.np_udist_bc_gnn_rows(state, grid, corrected))
   .np_udist_bc_grid(state, grid)
@@ -25,7 +30,7 @@
     t2 <- t*t
     original <- .5 + .25*t*(3-t2)
     # The primitive of the moment-corrected kernel has signed range outside [0, 1].
-    z <- list(original = original, corrected = if (corrected) .5 + t*(45+t2*(21*t2-50))/32 else original)
+    z <- list(original = original, corrected = if (corrected) .np_udist_epanechnikov_cdf4(t, t2) else original)
   } else {
     z <- .np_udist_bc_continuous(state$x[state$numeric], grid[state$numeric], state$h[state$numeric], corrected)
   }
