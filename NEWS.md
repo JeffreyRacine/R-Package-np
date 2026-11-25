@@ -1,5 +1,6 @@
 # npRmpi 0.80-4
 
+* Added experimental asymptotic bias-corrected bands for a univariate fixed-bandwidth beta CDF on known continuous support.
 * Experimental fixed Gaussian conditional CDF bands support an explicit
   sharp-score envelope with an inid pairs companion. Select it with
   `np_conditional_bias_control("pairs-score")`.

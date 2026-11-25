@@ -6,10 +6,15 @@
   compact <- isTRUE(allow.compact) &&
     (identical(kernel, "epanechnikov") || identical(kernel, "uniform")) &&
     is.data.frame(x) && ncol(x) == 1L && is.numeric(x[[1L]])
+  beta <- isTRUE(allow.compact) && identical(kernel, "beta") &&
+    identical(bws[["ckerbound", exact = TRUE]], "fixed") &&
+    is.data.frame(x) && ncol(x) == 1L && is.numeric(x[[1L]])
   if (!is.list(bws) || !identical(bws[["type", exact = TRUE]], "fixed") ||
-      !(compact || identical(bws[["ckertype", exact = TRUE]], "gaussian")) ||
+      !(beta || compact || identical(bws[["ckertype", exact = TRUE]], "gaussian")) ||
       !isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) ||
-      !identical(bws[["ckerbound", exact = TRUE]], "none")) {
+      (!beta && !identical(bws[["ckerbound", exact = TRUE]], "none"))) {
+    if (identical(kernel, "beta"))
+      stop("beta CDF correction requires one numeric coordinate, known fixed bounds, fixed second-order bandwidths and joint-process asymptotic bands", call. = FALSE)
     if (is.list(bws) && identical(bws[["ckertype", exact = TRUE]], "epanechnikov"))
       stop("Epanechnikov CDF correction requires one numeric coordinate, fixed unbounded second-order bandwidths and joint-process asymptotic errors", call. = FALSE)
     stop("CDF correction requires fixed unbounded second-order Gaussian bandwidths", call. = FALSE)
@@ -49,17 +54,23 @@
     list(index = j, lambda = h[j], levels = levels(x[[j]]), support = support,
       training = as.double(toMatrix(x[j])), raw.probe = raw, effective.probe = effective)
   })
-  metadata <- if (compact) {
+  support <- if (beta) .np_udist_beta_support(bws, x[[1L]], h)
+  metadata <- if (beta) {
+    list(normalization = "n-squared", support = c(support$lower, support$upper),
+         continuous.law = TRUE, kernel = "beta2", correction = "signed fourth-order beta CDF")
+  } else if (compact) {
     list(normalization = "n-squared", support = "Lebesgue", kernel = paste0(kernel, "2"),
          correction = "integrated fourth-order equivalent kernel")
   } else {
     list(normalization = "n-squared", support = "Lebesgue x integer lattice",
          coefficient = .5, ordered.operator = "R(2S-S*S)", kernel = "gaussian2")
   }
-  list(x = x, n = nrow(x), q = sum(numeric), s = sum(ordered), numeric = numeric,
+  state <- list(x = x, n = nrow(x), q = sum(numeric), s = sum(ordered), numeric = numeric,
     h = h, bws = bws, type = "fixed", max.bytes = max.bytes,
     row.ids = rownames(x), category = category, construction = "cdf-bc-v1",
     metadata = metadata)
+  if (beta) state$beta <- support
+  state
 }
 
 .np_udist_bc_grid <- function(state, grid) {
@@ -71,6 +82,11 @@
   for (z in state$category) if (!is.ordered(grid[[z$index]]) ||
       !identical(levels(grid[[z$index]]), z$levels))
     stop("CDF evaluation must retain fitted ordered levels", call. = FALSE)
+  if (identical(state$metadata$kernel, "beta2")) {
+    if (any(grid[[1L]] < state$beta$lower | grid[[1L]] > state$beta$upper))
+      stop("beta CDF targets must lie within the declared support", call. = FALSE)
+    return(invisible(TRUE))
+  }
   if (identical(state$type, "fixed") && state$q && npLogicalOption("np.largeh", TRUE)) {
     tol <- getOption("np.largeh.rel.tol", 1e-3)
     threshold <- if (identical(state$metadata$kernel, "uniform2")) {

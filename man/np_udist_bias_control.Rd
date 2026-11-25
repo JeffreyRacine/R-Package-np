@@ -29,6 +29,14 @@ equivalent kernel. The centered contributions supply the complete covariance
 and the Gaussian maximum over the requested finite grid. The marginal score
 uses the signed range of these contributions. Smoothing bias, sparse targets
 and a bandwidth or grid selected from the data affect population coverage.
+For one continuously distributed variable with known finite bounds, the
+second-order fixed beta kernel also supports corrected joint-process
+asymptotic pointwise, simultaneous and Bonferroni bands. The correction uses
+twice the fitted beta CDF minus the CDF at half its concentration. A
+target-specific signed donor range protects the marginal intervals. The
+declared endpoints receive exact zero-width intervals and do not contribute
+to the stochastic family size. The lower endpoint assumes no point mass
+there. Interior targets with numerically unresolved variance are refused.
 The corresponding fixed uniform kernel uses the integral of
 \eqn{(9-15u^2)/8} on \eqn{[-1,1]}. With the large-bandwidth option enabled,
 the uniform correction requires the range of training and evaluation values
