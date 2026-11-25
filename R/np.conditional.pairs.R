@@ -16,6 +16,8 @@
     return(sweep(2 * ratio(plan$main, plan$w) - ratio(plan$wide, plan$jw),
                  2L, plan$center, "-"))
   }
+  # Reuse one numeric count matrix in all six products on this worker.
+  storage.mode(task$value) <- "double"
   main.mass <- denominator(plan$w)
   wide.mass <- denominator(plan$jw)
   roots <- function(data) {
