@@ -308,3 +308,28 @@ test_that("uniform response pairs preserve the fit and reject the widened global
   expect_error(.np_conditional_cdf_centers(bw,d["x"],d["y"],d["x"],d["y"]),
                "near-constant")
 })
+
+test_that("local Wilson companion uses positive probabilities and preserves the original control", {
+  old <- np_conditional_bias_control("pairs-score")
+  expect_identical(names(old), c("construction", "version"))
+  expect_identical(old$version, 1L)
+  new <- np_conditional_bias_control("pairs-score", pointwise = "local-wilson")
+  expect_identical(new$version, 2L)
+  expect_identical(new, unserialize(serialize(new, NULL)))
+  expect_error(np_conditional_bias_control("analytic", pointwise = "local-wilson"), "pairs-score")
+  expect_error(np_conditional_bias_control("pairs-score", pointwise = "other"), "local-wilson")
+  y <- c(1, 0, 1, 3)
+  x <- c(-1, 0, 1, 2)
+  grid <- data.frame(x = c(0, 1, 0, 1, 0), y = c(-1, 0, 1, 4, 1))
+  got <- .np_conditional_local_wilson(x, y, grid, .8, .05)
+  reference <- t(vapply(seq_len(nrow(grid)), function(i) {
+    a <- dnorm((x - grid$x[i]) / .8)
+    a <- a / sum(a)
+    phat <- sum(a[y <= grid$y[i]])
+    z2 <- qnorm(.975)^2 * sum(a * a)
+    disc <- z2 * phat * (1 - phat) + z2^2 / 4
+    (phat + z2 / 2 + c(-1, 1) * sqrt(disc)) / (1 + z2)
+  }, numeric(2L)))
+  expect_equal(got, reference, tolerance = 1e-14)
+  expect_identical(got[3, ], got[5, ])
+})

@@ -68,6 +68,27 @@
        q = q[, z$ix, drop = FALSE], qmax = apply(q, 2L, max)[z$ix])
 }
 
+# The empirical event is shared by all three response kernels. Process each
+# conditioning coordinate once after all pairs tiles have been reduced.
+.np_conditional_local_wilson <- function(x, y, grid, bandwidth, alpha) {
+  ord <- order(y)
+  end <- findInterval(grid$y, y[ord]) + 1L
+  level <- qnorm(1 - alpha / 2)
+  limits <- matrix(0, nrow(grid), 2L)
+  groups <- split(seq_len(nrow(grid)), match(grid$x, unique(grid$x)))
+  for (ids in groups) {
+    weight <- dnorm((grid$x[ids[1L]] - x[ord]) / bandwidth)
+    cumulative <- c(0, cumsum(weight))
+    total <- cumulative[length(cumulative)]
+    probability <- cumulative[end[ids]] / total
+    scale <- level^2 * sum((weight / total)^2)
+    half <- sqrt(scale * (probability * (1 - probability) + scale / 4))
+    middle <- probability + scale / 2
+    limits[ids, ] <- cbind(middle - half, middle + half) / (1 + scale)
+  }
+  limits
+}
+
 .np_conditional_pairs_prepare <- function(x, y, grid, h, alpha, response.kernel = "gaussian") {
   z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE))
   delta <- outer(y, z$gy, function(a, b) b - a)
@@ -121,7 +142,7 @@
   invisible(NULL)
 }
 
-.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian") {
+.np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL) {
   n <- length(x)
   m <- nrow(grid)
   tiled <- !is.null(tile.size)
@@ -140,6 +161,12 @@
     .np_conditional_pairs_support(x, targets, h[1L])
   }
 
+  if (identical(pointwise, "local-wilson")) {
+    # Reserve sorting, cumulative weights and the second set of endpoint arrays.
+    bytes <- bytes + 128 * (as.double(n) + m)
+    if (bytes > 256 * 1024^2)
+      stop("local Wilson numerical workspace exceeds the 256 MiB budget", call. = FALSE)
+  }
   probs <- c(alpha / (2*m), alpha/2, 1-alpha/2, 1-alpha/(2*m))
   center <- se <- numeric(m)
   point <- matrix(NA_real_, m, 2L, dimnames = list(NULL, c("lower", "upper")))
@@ -186,7 +213,7 @@
   joint <- cbind(lower = center - radius, upper = center + radius)
   bonf <- cbind(lower = pmin(center - cuts[4L, ], joint[, 1L]),
                 upper = pmax(center - cuts[1L, ], joint[, 2L]))
-  list(center = center, original = original, se = se,
+  ans <- list(center = center, original = original, se = se,
        bands = list(pointwise = point, simultaneous = joint, bonferroni = bonf),
        critical = radius, critical.raw = raw, critical.units = "CDF",
        alpha = alpha, B = B, physical.bandwidth = h, grid = grid,
@@ -200,4 +227,21 @@
          "experimental LC conditional CDF, fixed Gaussian2 X and Epanechnikov2 Y, requested finite family"
        else "experimental LC conditional CDF, fixed Gaussian2, requested finite family",
        resolution.limited = B*alpha/(2*m) < 1, estimated.numerical.bytes = bytes)
+  if (identical(pointwise, "local-wilson")) {
+    local <- .np_conditional_local_wilson(x, y, grid, h[1L], alpha)
+    local[, 1L] <- pmin(center, center - cuts[3L, ], local[, 1L])
+    local[, 2L] <- pmax(center, center - cuts[2L, ], local[, 2L])
+    extended <- local[, 1L] < joint[, 1L] | local[, 2L] > joint[, 2L]
+    joint[, 1L] <- pmin(joint[, 1L], local[, 1L])
+    joint[, 2L] <- pmax(joint[, 2L], local[, 2L])
+    bonf[, 1L] <- pmin(bonf[, 1L], joint[, 1L])
+    bonf[, 2L] <- pmax(bonf[, 2L], joint[, 2L])
+    ans$bands <- list(pointwise = local, simultaneous = joint, bonferroni = bonf)
+    ans$pointwise.calibration <- "local-wilson"
+    ans$nested.coordinates <- which(extended)
+    ans$primary <- "positive local Wilson and basic pairs pointwise interval"
+    ans$conditioning <- "fixed bandwidths; joint pairs resampling; Wilson uses local homogeneity"
+    ans$endpoint.construction <- "local Wilson and basic pairs pointwise hull; original sharp-score joint radius with outward nesting"
+  }
+  ans
 }
