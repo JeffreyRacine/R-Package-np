@@ -72,7 +72,9 @@
        critical = radius, critical.raw = raw, critical.units = "CDF",
        alpha = alpha, B = B, physical.bandwidth = h, grid = grid,
        law = "inid", correction = "pairs-score", calibration = "percentile",
-       endpoint.construction = "signed basic pairs roots with marginal sharp-score and finite-grid containment",
+       primary = "fixed-X sharp-score envelope and basic inid pairs companion",
+       conditioning = "bandwidths fixed; pairs resample X and Y jointly; marginal score conditions on X",
+       endpoint.construction = "jackknife center; hull of sharp-score and signed basic pairs limits; one joint radius",
        scope = "experimental LC conditional CDF, fixed Gaussian2, requested finite family",
        resolution.limited = B*alpha/(2*m) < 1, estimated.numerical.bytes = bytes)
 }
