@@ -473,7 +473,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   explicit selection and preserve existing methods. Their bootstrap response law
   is selected explicitly by \code{bootstrap="conditional-pilot"}, with
   \code{interval="symmetric-sd"} or \code{"asymmetric-sd"}; it is not pairs
-  resampling. Read the control help for correction differences, finite-grid
+  resampling. For conditional CDFs, the separate \code{"pairs-score"}
+  construction uses \code{bootstrap="inid"} and \code{interval="percentile"}.
+  Read the control help for correction differences, finite-grid
   limits, signed returned offsets and known coverage limitations.
 
   For MPI startup/performance guidance (including message-passing tradeoffs and the manual-broadcast template), see \code{\link{npRmpi.init}} details and \code{inst/Rprofile}.

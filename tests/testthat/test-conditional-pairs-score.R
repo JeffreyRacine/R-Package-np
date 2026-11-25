@@ -18,3 +18,65 @@ test_that("conditional CDF pairs recalculate both denominators for resampled row
   plan$w[] <- 0
   expect_error(.np_conditional_pairs_block(list(value = matrix(1L, 4)), plan), "predictor mass")
 })
+
+test_that("conditional score and basic pairs companions retain signed endpoints and scopes", {
+  control <- np_conditional_bias_control("pairs-score")
+  expect_identical(control$construction,"pairs-score")
+  g <- data.frame(x=c(-.2,.2),y=c(.1,.4))
+  x <- seq(-1,1,length.out=31); y <- sin(x*3)
+  B <- 199L
+  roots <- rbind(seq(-2,4,length.out=B),seq(-.5,.9,length.out=B))
+  local_mocked_bindings(.np_conditional_dispatch = function(tasks, plan, family, m) {
+    expect_identical(family,"pairs-score"); roots
+  }, .package = "npRmpi")
+  run <- function() .np_with_seed(32L, .np_conditional_pairs_score(
+    x, y, g, c(.4,.45), B, .05, rep(.5,2L), 0))
+  z <- run()
+  q <- t(apply(roots,1L,quantile,c(.025,.975),type=1,names=FALSE))
+  expect_equal(z$bands$pointwise[1L,1L],unname(z$center[1L]-q[1L,2L]),ignore_attr=TRUE)
+  expect_equal(z$bands$pointwise[1L,2L],unname(z$center[1L]-q[1L,1L]),ignore_attr=TRUE)
+  expect_equal(z$critical.raw,unname(quantile(apply(abs(roots),2,max),.95,type=1)))
+  expect_true(all(z$bands$simultaneous[,1]<=z$bands$pointwise[,1]))
+  expect_true(all(z$bands$simultaneous[,2]>=z$bands$pointwise[,2]))
+  roots[,] <- 0
+  roots[1,1:4] <- 5
+  rare <- run()
+  expect_gt(rare$critical,rare$critical.raw)
+  expect_equal(unname(rare$bands$bonferroni[1,1]),rare$center[1]-5)
+  expect_identical(rare$law,"inid")
+  label <- .np_plot_variability_descriptor("bootstrap","simultaneous",.05,"bias-corrected",construction="pairs-score")
+  expect_true(any(grepl("score",unlist(label),fixed=TRUE)))
+  expect_true(any(grepl("pairs",unlist(label),fixed=TRUE)))
+})
+
+test_that("signed CDF donor ranges account for interior extrema", {
+  w <- c(.02,.1,.88); w2 <- c(.2,.4,.4)
+  z <- list(w=matrix(w,3),jw=matrix(w2,3),ix=1L)
+  b <- .np_conditional_pairs_range(z)
+  u <- seq(-12,12,length.out=20001L)
+  values <- outer(2*w,pnorm(u)) - outer(w2,pnorm(u/sqrt(2)))
+  lo <- apply(values,1,min);hi <- apply(values,1,max)
+  expect_lt(abs(b$lower-sum(lo)),2e-7)
+  expect_lt(max(abs(b$span*b$q[,1]-(hi-lo))),2e-7)
+})
+
+test_that("the explicit conditional CDF plot records both interval components", {
+  skip_if_not(.mpi_pool_active() && !.mpi_suite_local_mode_owned(), "requires the active distributed pool")
+  x <- seq(-1.5, 1.5, length.out = 70)
+  d <- data.frame(x=x, y=sin(3*x)+.3*cos(seq_along(x)))
+  bw <- npcdistbw(y ~ x, data=d, bws=c(.33,.4), regtype="lc", bandwidth.compute=FALSE)
+  fit <- npcdist(bw)
+  ans <- plot(fit, center="bias-corrected", errors="bootstrap", bootstrap="inid",
+    interval="percentile", bias.control=np_conditional_bias_control("pairs-score"),
+    band="all", neval=3L, B=399L, output="data", random.seed=309L)
+  info <- ans$inference[[1L]]
+  expect_identical(info$resampling_law,"inid")
+  expect_identical(info$correction,"pairs-score")
+  expect_match(info$primary,"sharp-score")
+  expect_match(info$endpoint_construction,"basic pairs")
+  expect_gte(info$critical_value,info$critical_value_raw)
+  expect_setequal(names(info$components),c("pointwise","simultaneous","bonferroni"))
+  expect_error(plot(fit, center="bias-corrected", errors="bootstrap", bootstrap="geom",
+    bias.control=np_conditional_bias_control("pairs-score"), band="simultaneous",
+    neval=3L, B=399L, output="data"),"pairs-score|block")
+})

@@ -1,7 +1,7 @@
 # npRmpi 0.80-4
 
 * Experimental fixed Gaussian conditional CDF bands support an explicit
-  inid pairs bootstrap with a marginal score safeguard. Select it with
+  sharp-score envelope with an inid pairs companion. Select it with
   `np_conditional_bias_control("pairs-score")`.
 
 * Experimental fixed uniform density bands now combine Q6 and empirical

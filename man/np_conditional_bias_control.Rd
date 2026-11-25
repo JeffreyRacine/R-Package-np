@@ -40,12 +40,17 @@ conditional Gaussian donor mixture, with pilot bandwidths multiplied by
 
 With \code{construction="pairs-score"}, specify \code{errors="bootstrap"},
 \code{bootstrap="inid"} and \code{interval="percentile"}.
+This is a fixed-X sharp-score envelope around the jackknife center with a
+basic inid pairs companion. Either term can determine the displayed limits.
 Each multinomial sample recomputes both conditional CDF ratios in the
 two-bandwidth jackknife. Pointwise limits combine inverted signed empirical
 root quantiles and a marginal sharp-score interval. The simultaneous radius
 covers the empirical absolute maximum quantile and all marginal intervals.
 Bonferroni limits contain both the tail-adjusted basic limits and the joint
-band. These experimental bounds target the requested finite grid.
+band. The fitted bandwidths remain fixed while predictor and response observations
+are resampled together. The marginal score companion conditions on the
+observed predictor weights. Its certified range concerns the smoothed
+functional and does not bound residual bias for the population CDF.
 
 The analytic correction contains both explanatory-weight and response-kernel
 curvature. Each bootstrap root includes the complete corrected functional,
@@ -79,8 +84,9 @@ change either existing analytic SD bootstrap construction.
 A nominal marginal sharp-score safeguard uses the certified range of each
 signed contribution and its heterogeneous variance bound. It augments the
 Gaussian or bootstrap intervals. The density asymptotic and jackknife-MP1 constructions use a
-marginal hull; the other constructions also propagate required widths within
-explanatory slices. Companion hulls protect interval nesting. These are
+marginal hull. The pairs-score construction uses one absolute radius across
+all targets. The analytic pilot bootstrap and analytic CDF asymptotic bands
+propagate required widths within explanatory slices. Companion hulls protect interval nesting. These are
 approximate confidence constructions, not finite-sample honesty guarantees.
 No clipping, positivity projection or forced properness is applied to corrected
 centers or endpoints.
@@ -104,7 +110,7 @@ the construction, law, calibration and available studentization diagnostics.
 Corrected centers may be signed and need not be interval midpoints. Internal
 pilot samples, covariance workspaces and RNG states are not returned.
 
-Saved Gaussian-design studies support full-grid CDF coverage at n=100 and 400,
+For the earlier analytic and jackknife constructions, saved Gaussian-design studies support full-grid CDF coverage at n=100 and 400,
 and density coverage at n=400 and 800. CDF plot subfamilies and marginal intervals
 can be conservative above 99\%. Density bootstrap small-n studies failed lower
 coverage gates. These failures remain limitations; they do not establish

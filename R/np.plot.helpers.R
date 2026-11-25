@@ -754,7 +754,8 @@
   }
 
   if (identical(construction, "pairs-score"))
-    candidates <- sprintf("%s %s inid pairs bootstrap band with score safeguard", level, band)
+    candidates <- c(sprintf("%s %s sharp-score band with inid pairs companion; jackknife-corrected center", level, band),
+      sprintf("%s %s score and pairs band; corrected center", level, band))
   if (identical(construction,"conditional-pilot")) {
     candidates <- c(sprintf("%s %s conditional-pilot band; corrected center with score safeguard%s", level, band,
       if(band %in% c("simultaneous","all")) "; finite grid within panel" else ""),
@@ -13106,7 +13107,11 @@ plotFactor <- function(f, y, ...){
     return(c(pointwise = "Pointwise (guide + residual envelope)",
       simultaneous = "Simultaneous (guide + residual envelope, finite family)",
       bonferroni = "Bonferroni (guide + residual envelope)"))
-  if (isTRUE(construction %in% c("conditional-pilot", "pairs-score")))
+  if (identical(construction, "pairs-score"))
+    return(c(pointwise = "Pointwise (sharp score and basic pairs)",
+      simultaneous = "Simultaneous (score and pairs, finite grid)",
+      bonferroni = "Bonferroni (basic pairs tails and joint envelope)"))
+  if (identical(construction, "conditional-pilot"))
     return(c(pointwise="Pointwise (score safeguard)",
       simultaneous="Simultaneous (finite grid, score safeguard)",
       bonferroni="Bonferroni (companion envelope)"))
