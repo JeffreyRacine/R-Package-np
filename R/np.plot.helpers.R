@@ -753,6 +753,8 @@
       sprintf("%s %s beta-binomial; corrected center",level,band))
   }
 
+  if (identical(construction, "pairs-local-wilson"))
+    candidates <- sprintf("%s %s local Wilson and pairs band; nested joint bounds", level, band)
   if (identical(construction, "pairs-score"))
     candidates <- c(sprintf("%s %s sharp-score band with inid pairs companion; jackknife-corrected center", level, band),
       sprintf("%s %s score and pairs band; corrected center", level, band))
@@ -771,7 +773,7 @@
       candidates <- sub(" simultaneous ", paste0(" ", display.scope, " "),
                         candidates, fixed = TRUE)
     } else if (isTRUE(construction %in% c("guide-region", "smoothed-beta-binomial",
-                                          "conditional-pilot", "pairs-score"))) {
+                                          "conditional-pilot", "pairs-score", "pairs-local-wilson"))) {
       candidates <- sub(paste0(" ", band, " "), paste0(" ", display.scope, " "),
                         candidates, fixed = TRUE)
     }
@@ -13107,6 +13109,10 @@ plotFactor <- function(f, y, ...){
     return(c(pointwise = "Pointwise (guide + residual envelope)",
       simultaneous = "Simultaneous (guide + residual envelope, finite family)",
       bonferroni = "Bonferroni (guide + residual envelope)"))
+  if (identical(construction, "pairs-local-wilson"))
+    return(c(pointwise = "Pointwise (local Wilson and basic pairs)",
+      simultaneous = "Simultaneous (nested sharp-score and pairs, finite grid)",
+      bonferroni = "Bonferroni (basic pairs tails and nested joint envelope)"))
   if (identical(construction, "pairs-score"))
     return(c(pointwise = "Pointwise (sharp score and basic pairs)",
       simultaneous = "Simultaneous (score and pairs, finite grid)",

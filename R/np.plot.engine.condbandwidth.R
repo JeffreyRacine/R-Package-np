@@ -218,7 +218,8 @@
       plot.errors.boot.calibration, as.character(plot.errors.boot.method)[1L],
       gradients, quantreg, proper)
     conditional.label <- if (new.conditional) {
-      if (identical(bias.control$construction, "pairs-score")) "pairs-score" else "conditional-pilot"
+      if (identical(bias.control[["pointwise", exact = TRUE]], "local-wilson")) "pairs-local-wilson"
+      else if (identical(bias.control$construction, "pairs-score")) "pairs-score" else "conditional-pilot"
     }
     if (new.conditional) {
       if (!error.request$type %in% c("pointwise","simultaneous","bonferroni","all"))
@@ -428,7 +429,8 @@
           x.eval[,1L,drop=FALSE],x.eval[,2L,drop=FALSE],cdf,plot.errors.method,
           plot.errors.boot.calibration,
           if(plot.errors.method=="bootstrap") plot.errors.boot.num else gaussian.draws,
-          plot.errors.alpha,plot.errors.type,construction=bias.control$construction)
+          plot.errors.alpha,plot.errors.type,construction=bias.control$construction,
+          pointwise=bias.control[["pointwise", exact = TRUE]])
         terr <- conditional.interval$err; terr.all <- conditional.interval$all.err
         center.val <- conditional.interval$inference$center
         lerr <- matrix(center.val-terr[,1L],x1.neval,x2.neval)
@@ -1070,7 +1072,8 @@
                 subcol(exdat,ei,i)[seq_len(xi.neval),,drop=FALSE],eydat[seq_len(xi.neval),,drop=FALSE],cdf,plot.errors.method,
                 plot.errors.boot.calibration,
                 if(plot.errors.method=="bootstrap") plot.errors.boot.num else gaussian.draws,
-                plot.errors.alpha,plot.errors.type,construction=bias.control$construction)
+                plot.errors.alpha,plot.errors.type,construction=bias.control$construction,
+                pointwise=bias.control[["pointwise", exact = TRUE]])
               temp.err[seq_len(xi.neval),] <- conditional.interval$err
               temp.all.err <- conditional.interval$all.err
               if(plot.behavior!="plot") plot.out[[plot.index]] <-
@@ -1536,7 +1539,8 @@
                 exdat[seq_len(xi.neval),,drop=FALSE],subcol(eydat,ei,i)[seq_len(xi.neval),,drop=FALSE],cdf,plot.errors.method,
                 plot.errors.boot.calibration,
                 if(plot.errors.method=="bootstrap") plot.errors.boot.num else gaussian.draws,
-                plot.errors.alpha,plot.errors.type,construction=bias.control$construction)
+                plot.errors.alpha,plot.errors.type,construction=bias.control$construction,
+                pointwise=bias.control[["pointwise", exact = TRUE]])
               temp.err[seq_len(xi.neval),] <- conditional.interval$err
               temp.all.err <- conditional.interval$all.err
               if(plot.behavior!="plot") plot.out[[plot.index]] <-

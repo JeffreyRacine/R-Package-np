@@ -10,7 +10,7 @@ inference constructions. Existing plots and methods are unchanged when this
 control is omitted.}
 \usage{
 np_conditional_bias_control(construction = c("analytic", "jackknife",
-  "jackknife-mp1", "pairs-score"))
+  "jackknife-mp1", "pairs-score"), pointwise = NULL)
 }
 \arguments{
 \item{construction}{The corrected functional. Use \code{"analytic"} for
@@ -18,6 +18,14 @@ conditional CDF inference and conditional density bootstrap inference;
 use \code{"jackknife"} for conditional density asymptotic inference.
 Use \code{"jackknife-mp1"} for the separate asymmetric studentized
 conditional density bootstrap described below. Use \code{"pairs-score"} for the conditional CDF pairs bootstrap.}
+\item{pointwise}{The default uses the sharp-score pointwise protection.
+For Gaussian fixed-bandwidth conditional CDF pairs-score intervals, explicitly
+select \code{"local-wilson"} to use a positive local-probability Wilson
+companion. The jackknife center and basic pairs interval are included.
+The common simultaneous band and Bonferroni endpoints expand where required
+for pointwise nesting. The Wilson scale assumes locally homogeneous conditional
+probabilities. Coverage is experimental; joint inference is for the finite
+requested grid. The strongest evidence is on trimmed explanatory grids.}
 }
 \value{A validated control object for the \code{bias.control} argument of
 \code{plot} applied to \code{npcdist} or \code{npcdens} fits or bandwidths.}
