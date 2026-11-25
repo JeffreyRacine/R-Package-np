@@ -56,18 +56,21 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     identical(bws$cykertype, "gaussian") && bws$cykerorder == 2L &&
     (bws$xnuno == 0L || identical(bws$uxkertype, "aitchisonaitken")) &&
     (bws$xnord == 0L || identical(bws$oxkertype, "liracine"))
-  if (!is.null(simultaneous) && !profiles)
-    stop("rms-envelope requires a qualified two-predictor conditional CDF profile", call. = FALSE)
+  compact.x <- identical(simultaneous, "rms-envelope") && bws$xndim == 1L &&
+    bws$xncon == 1L && identical(bws$cxkertype, "epanechnikov") &&
+    identical(bws$cykertype, "gaussian") && bws$cykerorder == 2L
+  if (!is.null(simultaneous) && !profiles && !compact.x)
+    stop("rms-envelope requires a qualified two-predictor profile or one Epanechnikov conditioning kernel", call. = FALSE)
   spec <- npConditionalRegEngineSpec(bws, where = "conditional bias inference")
   if (isTRUE(gradients) || isTRUE(quantreg) || isTRUE(proper) ||
       !identical(spec$reg.engine, "lc") || (!profiles && bws$xndim != 1L) || bws$yndim != 1L ||
       (!profiles && bws$xncon != 1L) || bws$yncon != 1L || !identical(bws$type, "fixed") ||
-      (!identical(bws$cxkertype, "gaussian") && !beta.conditioning) || (!identical(bws$cykertype, "gaussian") && !compact.response && !beta.response) ||
+      (!identical(bws$cxkertype, "gaussian") && !beta.conditioning && !compact.x) || (!identical(bws$cykertype, "gaussian") && !compact.response && !beta.response) ||
       bws$cxkerorder != 2L || (bws$cykerorder != 2L && !higher.response) ||
       (!beta.conditioning && any(is.finite(c(bws$cxkerlb, bws$cxkerub)))) ||
       (!beta.response && any(is.finite(c(bws$cykerlb, bws$cykerub)))))
     stop(if (identical(control$construction, "pairs-score"))
-      "conditional CDF pairs-score requires LC, one continuous X and Y, fixed unbounded Gaussian2 X and Gaussian or Epanechnikov orders 2/4/6/8, uniform or known-support beta2 Y, or known-support beta2 X with Gaussian2 or known-support beta2 Y, or one additional Gaussian2/AA-unordered/Li-Racine-ordered X with Gaussian2 Y, no gradients/quantiles/proper projection"
+      "conditional CDF pairs-score requires LC, one continuous X and Y, fixed unbounded Gaussian2 X and Gaussian or Epanechnikov orders 2/4/6/8, uniform or known-support beta2 Y, or known-support beta2 X with Gaussian2 or known-support beta2 Y, or one additional Gaussian2/AA-unordered/Li-Racine-ordered X with Gaussian2 Y, or the RMS envelope with one Epanechnikov2 X and Gaussian2 Y, no gradients/quantiles/proper projection"
     else "conditional bias inference requires LC, one continuous X and Y, fixed unbounded Gaussian2 kernels, no gradients/quantiles/proper projection", call. = FALSE)
   if (identical(control$construction, "pairs-score")) {
     if (!cdf || method != "bootstrap" || !identical(law, "inid") ||
@@ -319,7 +322,8 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
                                           calibration, B, alpha, band, construction=NULL, pointwise=NULL, simultaneous=NULL) {
   .np_plot_corrected_activity_run("Preparing conditional inference", {
   ex <- toFrame(ex); ey <- toFrame(ey)
-  if (ncol(x) == 2L && identical(construction, "pairs-score")) {
+  if (identical(construction, "pairs-score") &&
+      (ncol(x) == 2L || identical(simultaneous, "rms-envelope"))) {
     a <- .np_conditional_profile_inference(bws, x, y, ex, ey, B, alpha, pointwise, simultaneous)
   } else {
     grid <- data.frame(x=ex[[1L]], y=ey[[1L]])

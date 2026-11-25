@@ -1,6 +1,8 @@
 # Map every pair of coordinates, retaining factor levels and formula order.
 .np_conditional_profile_rows <- function(ex) {
   first <- match(ex[[1L]], unique(ex[[1L]]))
+  if (ncol(ex) == 1L)
+    return(list(index = first, first = !duplicated(first)))
   second <- match(ex[[2L]], unique(ex[[2L]]))
   key <- first + as.double(nrow(ex)) * (second - 1)
   list(index = match(key, unique(key)), first = !duplicated(key))
@@ -45,7 +47,8 @@
     if (!is.numeric(tol) || length(tol) != 1L || !is.finite(tol) || tol <= 0 || tol >= .1)
       stop("invalid np.largeh.rel.tol", call. = FALSE)
     cutoff <- sqrt(2) * sqrt(-2 * log(1 - tol))
-    near <- vapply(continuous, function(j) diff(range(x[[j]], ex[[j]])) <= cutoff * hx[j], logical(1L))
+    x.cutoff <- if (identical(bws$cxkertype, "epanechnikov")) sqrt(2 * tol) else cutoff
+    near <- vapply(continuous, function(j) diff(range(x[[j]], ex[[j]])) <= x.cutoff * hx[j], logical(1L))
     if (any(near) || diff(range(y[[1L]], ey[[1L]])) <= cutoff * hy)
       stop("experimental conditional CDF inference does not admit the near-constant kernel substitution", call. = FALSE)
   }
@@ -54,6 +57,8 @@
   answer <- .np_conditional_pairs_score(training, y[[1L]], grid, h, allocation$B, alpha,
     original = NULL, bytes = allocation$estimated.bytes, tile.size = allocation[["tile.size"]],
     pointwise = pointwise, profile.weights = prepare, simultaneous = simultaneous)
+  if (ncol(x) == 1L)
+    answer$scope <- sprintf("experimental LC conditional CDF, fixed %s2 X and Gaussian2 Y; positive mass in all requested pairs", bws$cxkertype)
   answer$physical.bandwidth <- c(hx, hy)
   answer$grid <- cbind(ex, ey)
   answer
