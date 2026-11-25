@@ -143,7 +143,7 @@
        m3 = m3, m4 = m4, nodes = length(u), cuts = cuts)
 }
 
-.np_udens_q6_reference <- function(x, h, grid, kernel, progress = NULL) {
+.np_udens_q6_reference <- function(x, h, grid, kernel, progress = NULL, keep.factor = FALSE) {
   .np_udens_q6_geometry(x, h, grid, kernel)
   targets <- sort(unique(grid)); index <- match(grid, targets)
   low <- .np_udens_q6_covariance(x, h, targets, kernel, 64L)
@@ -165,11 +165,13 @@
   if (any(!is.finite(se)) || any(se <= 0))
     stop("Q6 original scale is not positive finite", call. = FALSE)
   if (!is.null(progress)) progress("reference covariance", 2L, 2L)
-  list(x = x, h = h, kernel = kernel, grid = targets, index = index,
+  reference <- list(x = x, h = h, kernel = kernel, grid = targets, index = index,
        center = center, reference.center = center.q, se = se, covariance = high$C,
        diagnostics = c(covariance = refinement, center = centering,
                        reconstruction = reconstruction),
        construction = "density-compact-q6-symmetric-v1")
+  if (keep.factor) reference$factor <- factor
+  reference
 }
 
 .np_udens_q6_maximum <- function(Y, reference) {

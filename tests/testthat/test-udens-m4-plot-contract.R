@@ -66,13 +66,13 @@ test_that("compact normal companions use marginal and raw Bonferroni quantiles",
 })
 
 
-test_that("uniform normal companions do not admit maximum or smoothed laws", {
+test_that("uniform normal bands admit Gaussian maxima only at the qualified geometry", {
   b <- structure(list(type="fixed",ckertype="uniform",ckerorder=2L,
     ckerbound="none",ndim=1L,ncon=1L),class="bandwidth")
   request <- function(band,method="asymptotic",calibration=NULL,z=b)
     .np_udens_uniform_normal_request(z,NULL,"bias-corrected",method,band,calibration)
-  for (band in c("pointwise","bonferroni")) expect_true(request(band))
-  for (band in c("pmzsd","simultaneous","all")) expect_false(request(band))
+  for (band in c("pointwise","bonferroni","simultaneous","all")) expect_true(request(band))
+  expect_false(request("pmzsd"))
   expect_false(request("pointwise",method="bootstrap"))
   expect_false(request("pointwise",calibration="symmetric-sd"))
   for (change in list(list(ckerbound="fixed"),list(ckerbound="range"),
