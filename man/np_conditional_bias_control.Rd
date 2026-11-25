@@ -24,7 +24,9 @@ conditional density bootstrap described below. Use \code{"pairs-score"} for the 
 \details{
 These are experimental opt-ins for local constant, one continuous explanatory
 variable and one continuous response, fixed unbounded second-order Gaussian
-kernels. Gradients, quantiles, shape projections, nonfixed bandwidths and mixed
+kernels. The explicit pairs-score construction also admits an unbounded
+second-order Epanechnikov response kernel with Gaussian explanatory smoothing.
+Gradients, quantiles, shape projections, nonfixed bandwidths and mixed
 variables are not admitted. Original fits and selected bandwidths remain fixed.
 
 Specify \code{center="bias-corrected"} and an explicit \code{band}:
@@ -40,6 +42,20 @@ conditional Gaussian donor mixture, with pilot bandwidths multiplied by
 
 With \code{construction="pairs-score"}, specify \code{errors="bootstrap"},
 \code{bootstrap="inid"} and \code{interval="percentile"}.
+For an Epanechnikov response, both ratios and the signed donor range use the
+integrated Epanechnikov kernel at the fitted and widened response bandwidths.
+On 32 saved fits with 9,999 draws and 50-by-50 targets this construction covered
+30 trimmed and all 32 untrimmed surfaces. Mean simultaneous widths were 0.53
+and 1.87 CDF units respectively. Pointwise intervals were conservative on both
+grids. Evidence supports trimmed grids at sample sizes 150 and 400; misses in the five-by-five
+comparison concentrated in the mixture design. On 64 separate dense grids, trimmed
+simultaneous coverage was 62 of 64; one original of each design missed at n=400. Untrimmed joint widths commonly exceed
+one CDF unit. Pointwise coverage is near 99 percent, and the dense-grid Bonferroni tails
+are resolution-limited. The same seed supplies common bootstrap counts across fits of each size.
+The ordinary estimate uses the native kernel constants; the corrected ratios use the
+exact integrated polynomial (about 1.1e-10 maximum primitive difference).
+The original kernel, bandwidth and finite target family are held fixed.
+
 This is a fixed-X sharp-score envelope around the jackknife center with a
 basic inid pairs companion. Either term can determine the displayed limits.
 Each multinomial sample recomputes both conditional CDF ratios in the

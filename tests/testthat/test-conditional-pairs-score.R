@@ -171,3 +171,101 @@ test_that("zero predictor mass in a late tile refuses before dispatch", {
   expect_error(.np_with_seed(309L, run(grid)), "resampled conditional CDF has zero")
   expect_identical(.Random.seed, state)
 })
+
+test_that("the Epanechnikov response uses its native scale and exact signed range", {
+  s <- sqrt(5)
+  u <- c(-1.1, -1, -1 + 1e-8, -.25, 0, .25, 1 - 1e-8, 1, 1.1)
+  reference <- vapply(u, function(t) {
+    if (t <= -1) return(0)
+    integrate(function(v) .75 * (1 - v^2), -1, min(t, 1))$value
+  }, numeric(1))
+  expect_equal(.np_conditional_epan_cdf(s * u), reference, tolerance = 1e-14)
+  expect_gt(.np_conditional_epan_cdf(s * u[3]), 0)
+  w <- c(0, .03, .6, .37, 0)
+  jw <- c(.07, .5, .2, 0, .23)
+  z <- list(w = matrix(w), jw = matrix(jw), ix = 1L)
+  scores <- .np_conditional_pairs_range(z, "epanechnikov")
+  u <- seq(-s * sqrt(2), s * sqrt(2), length.out = 30001L)
+  primitive <- function(v) {
+    v <- pmax(-1, pmin(1, v/s))
+    .5 + .25*v*(3 - v^2)
+  }
+  signed <- outer(2*w, primitive(u)) - outer(jw, primitive(u / sqrt(2)))
+  low <- apply(signed, 1L, min)
+  high <- apply(signed, 1L, max)
+  expect_equal(scores$lower, sum(low), tolerance = 1e-7)
+  expect_equal(drop(scores$span*scores$q), high-low, tolerance = 1e-7)
+})
+
+test_that("the pairs companion admits only the requested compact response", {
+  d <- data.frame(x = seq(-1, 1, length.out = 55L))
+  d$y <- sin(2*d$x) + cos(seq_len(nrow(d)))
+  fit <- function(kx, ky) {
+    bw <- npcdistbw(y ~ x, data = d, bws = c(.35, .4), regtype = "lc",
+                    bandwidth.compute = FALSE, cxkertype = kx, cykertype = ky)
+    npcdist(bw)
+  }
+  a <- list(x = fit("gaussian", "epanechnikov"), center = "bias-corrected",
+            errors = "bootstrap", bootstrap = "inid", interval = "percentile",
+            band = "all", bias.control = np_conditional_bias_control("pairs-score"),
+            neval = 3L, B = 399L, output = "data", random.seed = 309L)
+  old <- RNGkind()
+  # The public caller supplies a scoped seed and must restore its entry state.
+  set.seed(45)
+  state <- .Random.seed
+  z <- do.call(plot, a)
+  expect_identical(.Random.seed, state)
+  expect_identical(RNGkind(), old)
+  expect_identical(z$inference[[1L]]$correction, "pairs-score")
+  v <- as.data.frame(z, panel = 1L, target = 1L, band = "simultaneous")
+  uncorrected <- as.data.frame(plot(a$x, errors = "none", neval = 3L,
+                                    output = "data"), panel = 1L, target = 1L)
+  expect_equal(v$estimate, uncorrected$estimate, tolerance = 2e-8)
+  expect_true(all(is.finite(v$lower) & v$lower <= v$upper))
+  a$x <- fit("epanechnikov", "gaussian")
+  expect_error(do.call(plot, a), "Gaussian2 X")
+})
+test_that("compact response pairs preserve endpoint order, saturation and ties", {
+  x <- seq(-1, 1, length.out = 48L)
+  y <- rep(c(-.8, 0, .8), each = 16L)
+  g <- data.frame(x = c(0, -.2, .2, -.2, 0), y = c(9, 0, -9, 0, 9))
+  ord <- c(3L, 5L, 1L, 4L, 2L)
+  draw <- function(g) .np_with_seed(312L, .np_conditional_pairs_score(
+    x, y, g, c(.43, .18), 199L, .05, rep(0, nrow(g)), 0,
+    response.kernel = "epanechnikov"))
+  z <- draw(g)
+  zz <- draw(g[ord, , drop = FALSE])
+  expect_equal(z$center[c(1L, 3L, 5L)], c(1, 0, 1), tolerance = 1e-14)
+  expect_equal(z$center[ord], zz$center, tolerance = 1e-14)
+  for (sc in names(z$bands)) {
+    expect_equal(z$bands[[sc]][ord, , drop = FALSE], zz$bands[[sc]], tolerance = 1e-14)
+    expect_equal(unname(z$bands[[sc]][2L, ]), unname(z$bands[[sc]][4L, ]))
+  }
+})
+
+test_that("the compact response detects a substitution at either fitted scale", {
+  old <- options(np.largeh=TRUE, np.largeh.rel.tol=.001)
+  on.exit(options(old))
+  d <- data.frame(x=seq(-.5,.5,length.out=27), y=seq(-.5,.5,length.out=27))
+  calc <- function(h) {
+    bw <- npcdistbw(y ~ x, data=d, regtype="lc", cykertype="epanechnikov",
+                    bws=unname(rev(h)), bandwidth.compute=FALSE)
+    .np_conditional_cdf_centers(bw, d["x"], d["y"], d["x"], d["y"])
+  }
+  for(axis in 1:2) {
+    radius <- if(axis==1) sqrt(-2*log1p(-.001)) else sqrt(.001)
+    for(scale in c(1.01, .80)) {
+      h <- c(.3,.3)
+      h[axis] <- scale/radius
+      expect_error(calc(h), "near-constant kernel substitution")
+      options(np.largeh=FALSE)
+      expect_true(all(is.finite(calc(h))))
+      options(np.largeh=TRUE)
+    }
+  }
+})
+
+test_that("compact-response extrema reject signed conditioning weights", {
+  z <- list(w=matrix(c(-.1, 1.1)), jw=matrix(c(.2, .8)), ix=1L)
+  expect_error(.np_conditional_pairs_range(z, "epanechnikov"), "nonnegative conditioning weights")
+})
