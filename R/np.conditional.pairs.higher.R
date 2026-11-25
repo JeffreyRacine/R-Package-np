@@ -40,14 +40,14 @@
   }
 }
 
-.np_conditional_high_pairs_provider <- function(y, targets, h, kernel, order) {
+.np_conditional_high_pairs_provider <- function(y, targets, h, kernel, order, conditioning = NULL) {
   scale <- 2^(1 / order)
   targets <- sort(unique(targets))
   main.y <- .np_conditional_high_integral(y, targets, h, kernel, order)
   wide.y <- .np_conditional_high_integral(y, targets, h * scale, kernel, order)
   envelope <- .np_conditional_high_envelope(kernel, order, scale)
   function(x, y, grid, h, alpha, response.kernel) {
-    z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE))
+    z <- .np_conditional_pairs_context(x, y, grid, h, conditioning)
     iy <- match(grid$y, targets)
     main <- z$w[, z$ix, drop = FALSE] * main.y[, iy, drop = FALSE]
     wide <- z$jw[, z$ix, drop = FALSE] * wide.y[, iy, drop = FALSE]

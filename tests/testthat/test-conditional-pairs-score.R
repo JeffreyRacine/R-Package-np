@@ -428,3 +428,51 @@ test_that("higher-order conditional CDF pairs retain both fitted kernels and dil
     }
   }
 })
+
+test_that("bounded beta conditioning retains the fitted rows and all pairs counts", {
+  d <- data.frame(x = seq(-3, 2, length.out = 75L), y = seq(.01, .99, length.out = 75L))
+  g <- data.frame(x = c(-3, .3, 2, .3), y = c(.05, .4, .95, .4))
+  h <- .45
+  cache <- .np_conditional_beta_conditioning(d$x, unique(g$x), h, c(-3, 2))
+  expect_equal(colSums(cache$main), rep(1, 3L), tolerance = 1e-14)
+  q <- (d$x + 3)/5
+  want <- vapply((unique(g$x)+3)/5, function(t) {
+    w <- dbeta(q, 1 + t*(5/h)^2, 1+(1-t)*(5/h)^2)
+    w/sum(w)
+  }, numeric(nrow(d)))
+  expect_equal(unname(cache$main), unname(want), tolerance = 2e-12)
+  expect_error(.np_conditional_beta_conditioning(d$x, 2.1, h, c(-3, 2)), "inside known")
+  sparse <- list(targets = 0, main = matrix(c(1, 0)), wide = matrix(c(.5, .5)))
+  tasks <- list(list(value = matrix(c(0L, 2L), ncol = 1L)))
+  expect_error(.np_conditional_pairs_support(c(0, 1), 0, h, tasks, sparse), "zero or nonfinite")
+  for (kernel in c("beta", "gaussian")) {
+    args <- list(formula = y ~ x, data = d, regtype = "lc", cxkertype = "beta",
+                 cxkerbound = "fixed", cxkerlb = -3, cxkerub = 2,
+                 bws = c(.14, h), bandwidth.compute = FALSE)
+    if (kernel == "beta")
+      args <- c(args, list(cykertype = "beta", cykerbound = "fixed", cykerlb = 0, cykerub = 1))
+    bw <- do.call(npcdistbw, args)
+    main <- as.numeric(fitted(npcdist(bw, txdat = d["x"], tydat = d["y"],
+                                      exdat = g["x"], eydat = g["y"])))
+    args$bws <- sqrt(2) * args$bws
+    wide <- as.numeric(fitted(npcdist(do.call(npcdistbw, args), txdat = d["x"], tydat = d["y"],
+                                      exdat = g["x"], eydat = g["y"])))
+    provider <- if (kernel == "beta") .np_conditional_beta_pairs_provider(d$y, g$y, .14, c(0, 1), cache)
+                else .np_conditional_high_pairs_provider(d$y, g$y, .14, "gaussian", 2L, cache)
+    tile <- provider(d$x, d$y, g, c(h, .14), .05, kernel)
+    expect_equal(colSums(tile$plan$main), main, tolerance = 2e-8)
+    expect_equal(colSums(tile$plan$wide), wide, tolerance = 2e-8)
+    controls <- list(x = bw, errors = "bootstrap", bootstrap = "inid", center = "bias-corrected",
+                     band = "all", interval = "percentile", output = "data", neval = 4,
+                     B = 99L, random.seed = 78L, bias.control = np_conditional_bias_control("pairs-score", "local-wilson"))
+    set.seed(12L)
+    before <- .Random.seed
+    pd <- suppressWarnings(do.call(plot, controls))
+    expect_identical(.Random.seed, before)
+    pt <- as.data.frame(pd, panel = 1L, target = 1L, band = "pointwise")
+    sm <- as.data.frame(pd, panel = 1L, target = 1L, band = "simultaneous")
+    expect_true(all(is.finite(pt$lower) & sm$lower <= pt$lower & pt$upper <= sm$upper))
+    controls$bootstrap <- "fixed"
+    expect_error(do.call(plot, controls), "inid|unavailable")
+  }
+})
