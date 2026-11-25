@@ -1,3 +1,13 @@
+.np_plot_regression_section_ylab <- function(response, predictor, gradients, categorical, order) {
+  if (!gradients)
+    return(paste("", response))
+  if (categorical)
+    return(paste("Delta", response, "/ Delta", predictor))
+  if (order > 1L)
+    return(paste0("d^", order, " ", response, " / d ", predictor, "^", order))
+  paste("d", response, "/ d", predictor)
+}
+
 .np_plot_rbandwidth_engine <-
   function(bws,
            xdat,
@@ -997,24 +1007,10 @@
           if (!is.null(panel.ylim))
             plot.args$ylim <- panel.ylim
           plot.args$xlab <- scalar_default(xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
-          response.label <- gen.label(bws$ynames, "Conditional Mean")
-          predictor.label <- gen.label(bws$xnames[i], paste("X", i, sep = ""))
-          default.ylab <- if (gradients) {
-            if (xi.factor) {
-              paste("Delta", response.label, "/ Delta", predictor.label)
-            } else if (plot.gradient.order.label[i] > 1L) {
-              paste0("d^", plot.gradient.order.label[i], " ",
-                     response.label,
-                     " / d ",
-                     predictor.label,
-                     "^",
-                     plot.gradient.order.label[i])
-            } else {
-              paste("d", response.label, "/ d", predictor.label)
-            }
-          } else {
-            paste("", response.label)
-          }
+          default.ylab <- .np_plot_regression_section_ylab(
+            gen.label(bws$ynames, "Conditional Mean"),
+            gen.label(bws$xnames[i], paste("X", i, sep = "")),
+            gradients, xi.factor, plot.gradient.order.label[i])
           plot.args$ylab <- scalar_default(ylab, default.ylab)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
@@ -1307,24 +1303,10 @@
             plot.args$y <- .np_plot_geometry_values(data.eval[,i])
           plot.args$ylim <- c(y.min, y.max)
           plot.args$xlab <- scalar_default(xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
-          response.label <- gen.label(bws$ynames, "Conditional Mean")
-          predictor.label <- gen.label(bws$xnames[i], paste("X", i, sep = ""))
-          default.ylab <- if (gradients) {
-            if (xi.factor) {
-              paste("Delta", response.label, "/ Delta", predictor.label)
-            } else if (plot.gradient.order.label[i] > 1L) {
-              paste0("d^", plot.gradient.order.label[i], " ",
-                     response.label,
-                     " / d ",
-                     predictor.label,
-                     "^",
-                     plot.gradient.order.label[i])
-            } else {
-              paste("d", response.label, "/ d", predictor.label)
-            }
-          } else {
-            paste("", response.label)
-          }
+          default.ylab <- .np_plot_regression_section_ylab(
+            gen.label(bws$ynames, "Conditional Mean"),
+            gen.label(bws$xnames[i], paste("X", i, sep = "")),
+            gradients, xi.factor, plot.gradient.order.label[i])
           plot.args$ylab <- scalar_default(ylab, default.ylab)
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
