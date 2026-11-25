@@ -10,7 +10,7 @@ inference constructions. Existing plots and methods are unchanged when this
 control is omitted.}
 \usage{
 np_conditional_bias_control(construction = c("analytic", "jackknife",
-  "jackknife-mp1", "pairs-score"), pointwise = NULL)
+  "jackknife-mp1", "pairs-score"), pointwise = NULL, simultaneous = NULL)
 }
 \arguments{
 \item{construction}{The corrected functional. Use \code{"analytic"} for
@@ -18,6 +18,13 @@ conditional CDF inference and conditional density bootstrap inference;
 use \code{"jackknife"} for conditional density asymptotic inference.
 Use \code{"jackknife-mp1"} for the separate asymmetric studentized
 conditional density bootstrap described below. Use \code{"pairs-score"} for the conditional CDF pairs bootstrap.}
+\item{simultaneous}{For qualified two-predictor Gaussian-response conditional CDF
+pairs-score profiles, \code{"rms-envelope"} adds a second simultaneous bound
+using the maximum absolute bootstrap deviation divided by its pointwise
+root-mean-square. The band contains the original joint band and the
+Bonferroni band contains both. Pointwise limits stay fixed. The finite
+simultaneous family consists of the coordinates in each requested panel.
+All-zero bootstrap coordinates contribute zero to the scaled maximum.}
 \item{pointwise}{For pairs-score intervals, the default uses sharp-score pointwise protection.
 With fixed Gaussian conditioning and an unbounded Gaussian or Epanechnikov response kernel
 of order 2, 4, 6 or 8, a uniform response kernel, or a beta2 response on known finite support, explicitly

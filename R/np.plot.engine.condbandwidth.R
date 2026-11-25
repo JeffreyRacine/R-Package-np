@@ -430,7 +430,8 @@
           plot.errors.boot.calibration,
           if(plot.errors.method=="bootstrap") plot.errors.boot.num else gaussian.draws,
           plot.errors.alpha,plot.errors.type,construction=bias.control$construction,
-          pointwise=bias.control[["pointwise", exact = TRUE]])
+          pointwise=bias.control[["pointwise", exact = TRUE]],
+          simultaneous=bias.control[["simultaneous", exact = TRUE]])
         terr <- conditional.interval$err; terr.all <- conditional.interval$all.err
         center.val <- conditional.interval$inference$center
         lerr <- matrix(center.val-terr[,1L],x1.neval,x2.neval)
@@ -1073,7 +1074,8 @@
                 plot.errors.boot.calibration,
                 if(plot.errors.method=="bootstrap") plot.errors.boot.num else gaussian.draws,
                 plot.errors.alpha,plot.errors.type,construction=bias.control$construction,
-                pointwise=bias.control[["pointwise", exact = TRUE]])
+                pointwise=bias.control[["pointwise", exact = TRUE]],
+                simultaneous=bias.control[["simultaneous", exact = TRUE]])
               temp.err[seq_len(xi.neval),] <- conditional.interval$err
               temp.all.err <- conditional.interval$all.err
               if(plot.behavior!="plot") plot.out[[plot.index]] <-
@@ -1540,7 +1542,8 @@
                 plot.errors.boot.calibration,
                 if(plot.errors.method=="bootstrap") plot.errors.boot.num else gaussian.draws,
                 plot.errors.alpha,plot.errors.type,construction=bias.control$construction,
-                pointwise=bias.control[["pointwise", exact = TRUE]])
+                pointwise=bias.control[["pointwise", exact = TRUE]],
+                simultaneous=bias.control[["simultaneous", exact = TRUE]])
               temp.err[seq_len(xi.neval),] <- conditional.interval$err
               temp.all.err <- conditional.interval$all.err
               if(plot.behavior!="plot") plot.out[[plot.index]] <-
