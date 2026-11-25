@@ -1,5 +1,6 @@
 # npRmpi 0.80-4
 
+* Added experimental Gaussian-process bands for the bias-corrected univariate Epanechnikov generalized nearest-neighbor CDF.
 * Added experimental asymptotic bias-corrected bands for a univariate fixed-bandwidth beta CDF on known continuous support.
 * Experimental fixed Gaussian conditional CDF bands support an explicit
   sharp-score envelope with an inid pairs companion. Select it with

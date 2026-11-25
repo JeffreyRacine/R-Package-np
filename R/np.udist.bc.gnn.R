@@ -1,5 +1,5 @@
 # Query-radius CDF influence. Counts are immutable; geometry belongs to a sample.
-.np_udist_bc_nn_prepare <- function(bws, x, max.bytes) {
+.np_udist_bc_nn_prepare <- function(bws, x, max.bytes, allow.epanechnikov = FALSE) {
   numeric <- vapply(x, is.numeric, logical(1L))
   if (!identical(bws[["type", exact = TRUE]], "generalized_nn") && any(numeric))
     stop("corrected ANN CDF inference is parked at its population-remainder gate", call. = FALSE)
@@ -11,7 +11,9 @@
     stop("CDF NN inference requires interior unscaled counts", call. = FALSE)
   spec <- bws; spec[["type"]] <- "fixed"; spec[["scaling"]] <- FALSE
   spec[["bw"]] <- requested; spec[["bw"]][numeric] <- 1
-  state <- .np_udist_bc_prepare(spec, x, max.bytes)
+  compact <- isTRUE(allow.epanechnikov) && identical(bws[["ckertype", exact = TRUE]], "epanechnikov") &&
+    identical(bws[["type", exact = TRUE]], "generalized_nn")
+  state <- .np_udist_bc_prepare(spec, x, max.bytes, allow.compact = compact)
   state$type <- bws[["type", exact = TRUE]]; state$bws <- bws
   state$requested <- requested[numeric]; state$rank <- rank
   state$metadata$radius <- "sample-specific query kth distance"
@@ -46,6 +48,26 @@
   .np_udist_bc_budget(state, nrow(grid), 1L, nrow(grid))
   geometry <- .np_udist_bc_gnn_geometry(state, grid)
   x <- state$x[state$numeric]; g <- grid[state$numeric]; q <- state$q
+  if (identical(state$metadata$kernel, "epanechnikov2")) {
+    radius <- geometry$radius[, 1L]
+    distance <- outer(g[[1L]], x[[1L]], "-")
+    u <- (distance/radius)/sqrt(5)
+    t <- u
+    t[] <- pmin(1, pmax(-1, u))
+    t2 <- t*t
+    original <- .5 + .25*t*(3-t2)
+    L <- if (corrected) .np_udist_epanechnikov_cdf4(t, t2) else original
+    kernel <- if (corrected) (1-t2)*(45-105*t2)/32 else .75*(1-t2)
+    # Clamping is exact for the primitive; its density is zero outside support.
+    slope <- rowMeans(-t*kernel)/radius
+    phi <- L - (slope/geometry$density.sum[, 1L])*(abs(distance) <= radius)
+  } else {
+    return(.np_udist_bc_gaussian_gnn_rows(state, grid, corrected, geometry, x, g, q))
+  }
+  .np_udist_bc_gnn_factor(original, L, phi, state$n, geometry)
+}
+
+.np_udist_bc_gaussian_gnn_rows <- function(state, grid, corrected, geometry, x, g, q) {
   # Recurrence also evaluates q=0 exactly, without an NN geometry requirement.
   continuous <- function(skip = integer()) {
     P <- matrix(1, nrow(grid), state$n); Q <- P*0
@@ -73,7 +95,11 @@
     inside <- abs(outer(g[[j]], x[[j]], "-")) <= h
     phi <- phi-rowMeans(D)/geometry$density.sum[, j]*inside
   }
-  shifted <- phi-phi[, 1L]; F <- (shifted-rowMeans(shifted))/state$n
+  .np_udist_bc_gnn_factor(original, L, phi, state$n, geometry)
+}
+
+.np_udist_bc_gnn_factor <- function(original, L, phi, n, geometry) {
+  shifted <- phi-phi[, 1L]; F <- (shifted-rowMeans(shifted))/n
   if (any(!is.finite(L)) || any(!is.finite(F))) stop("nonfinite CDF GNN influence", call. = FALSE)
   list(original = original, corrected = L,
     original.center = original[, 1L]+rowMeans(original-original[, 1L]),

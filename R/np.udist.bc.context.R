@@ -1,7 +1,7 @@
 # Private CDF prototype: immutable retained-data context, no public dispatch.
 .np_udist_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2, allow.compact = FALSE) {
   if (is.list(bws) && bws[["type", exact = TRUE]] %in% c("generalized_nn", "adaptive_nn"))
-    return(.np_udist_bc_nn_prepare(bws, x, max.bytes))
+    return(.np_udist_bc_nn_prepare(bws, x, max.bytes, allow.epanechnikov = allow.compact))
   kernel <- if (is.list(bws)) bws[["ckertype", exact = TRUE]]
   compact <- isTRUE(allow.compact) &&
     (identical(kernel, "epanechnikov") || identical(kernel, "uniform")) &&
