@@ -9,7 +9,8 @@ Selects explicitly the experimental local-constant conditional
 inference constructions. Existing plots and methods are unchanged when this
 control is omitted.}
 \usage{
-np_conditional_bias_control(construction = c("analytic", "jackknife", "jackknife-mp1", "pairs-score"))
+np_conditional_bias_control(construction = c("analytic", "jackknife",
+  "jackknife-mp1", "pairs-score"))
 }
 \arguments{
 \item{construction}{The corrected functional. Use \code{"analytic"} for
