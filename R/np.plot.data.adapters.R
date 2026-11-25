@@ -128,6 +128,8 @@
       is.null(calibrated$selection)) calibrated <- calibrated[[1L]]
   detail <- select_values(calibrated, c("attainable", "diagnostic.only", "boundary.used",
     "support.used", "outer.completions", "order.index", "endpoint.source", "calibration"))
+  components <- .np_plot_data_field(settings, "critical.components")
+  if (!is.null(components)) detail$critical_components <- components
   detail$selection <- select_values(.np_plot_data_field(calibrated, "selection", list()),
     c("q", "k", "status"))
   if (identical(get("calibration.requested"), "default") &&

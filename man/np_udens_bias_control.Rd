@@ -72,8 +72,10 @@ kernels support asymptotic pointwise and raw Bonferroni normal intervals through
 the complete Q6 covariance, including fitted-guide influence and cross terms.
 Its positive reference is the empirical mixture plus
 \eqn{h\sqrt{2/3}} times Student-six noise. The normal calculation draws no
-bootstrap samples. The simultaneous band uses the unstudentized absolute
-Gaussian maximum on the unique supplied grid, calibrated by a type-7 quantile.
+bootstrap samples. The simultaneous band uses the larger of two type-7
+Gaussian absolute-maximum quantiles on the unique supplied grid. One uses the
+Q6 covariance and the other the complete empirical influence covariance,
+including the fitted normal guide. The marginal scales are unchanged.
 \code{all} also returns the pointwise and raw Bonferroni companions. Explicit \code{bootstrap="smoothed-q6"} remains a distinct
 conditional bootstrap procedure.
 

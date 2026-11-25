@@ -87,18 +87,68 @@
   state
 }
 
-.np_udens_gaussian_absolute_maximum <- function(factor, B, progress) {
+# Observation influence of the signed compact curve, including the fitted normal
+# guide. QR accumulates centered rows without retaining an n-by-grid matrix.
+.np_udens_uniform_empirical_factor <- function(x, h, grid) {
+  n <- length(x)
+  location <- mean(x)
+  variance <- mean((x - location)^2)
+  sigma <- sqrt(variance)
+  rule <- .np_udens_q6_rule(64L)
+  weights <- rule$w * .np_udens_q6_kernel(rule$x, "uniform")
+  nodes <- outer(grid, h * rule$x, "+")
+  score <- function(t, scale) {
+    z <- (t - location) / sigma
+    dnorm(t, location, sigma) * if (scale) z^2 - 1 else z / sigma
+  }
+  guide <- cbind(score(grid, FALSE) - drop(score(nodes, FALSE) %*% weights),
+                 score(grid, TRUE) - drop(score(nodes, TRUE) %*% weights))
+  targets <- length(grid)
+  count <- 0L
+  average <- numeric(targets)
+  triangular <- matrix(numeric(), 0L, targets)
+  for (first in seq.int(1L, n, by = 64L)) {
+    y <- x[first:min(n, first + 63L)]
+    size <- length(y)
+    u <- (y - location) / sigma
+    rows <- .np_udens_q6_kernel(outer(y, grid, "-") / h, "uniform") / h +
+      cbind(y - location, (u^2 - 1) / 2) %*% t(guide)
+    block.mean <- colMeans(rows)
+    delta <- block.mean - average
+    joined <- rbind(triangular, sweep(rows, 2L, block.mean, "-"),
+                    delta * sqrt(as.double(count) * size / (count + size)))
+    if (any(!is.finite(joined)))
+      stop("nonfinite empirical uniform density influence", call. = FALSE)
+    decomposition <- qr(joined, LAPACK = TRUE)
+    triangular <- qr.R(decomposition)[, order(decomposition$pivot), drop = FALSE]
+    average <- average + delta * (size / (count + size))
+    count <- count + size
+  }
+  # The symmetric square root fixes the draw orientation even at repeated or
+  # zero singular values, without flooring variance or inverting the covariance.
+  s <- svd(triangular / n, nu = 0L)
+  sweep(s$v, 2L, s$d, "*") %*% t(s$v)
+}
+
+.np_udens_gaussian_absolute_maximum <- function(factor, B, progress, empirical = NULL) {
   m <- nrow(factor)
   maxima <- numeric(B)
+  if (!is.null(empirical)) empirical.maxima <- numeric(B)
   for (first in seq.int(1L, B, by = 128L)) {
     ids <- first:min(B, first + 127L)
     z <- matrix(rnorm(m * length(ids)), m)
     values <- factor %*% z
     if (any(!is.finite(values))) stop("nonfinite compact density Gaussian process", call. = FALSE)
     maxima[ids] <- apply(abs(values), 2L, max)
+    if (!is.null(empirical)) {
+      values <- empirical %*% z
+      if (any(!is.finite(values)))
+        stop("nonfinite empirical uniform density Gaussian process", call. = FALSE)
+      empirical.maxima[ids] <- apply(abs(values), 2L, max)
+    }
     progress("Gaussian maximum", max(ids), B)
   }
-  maxima
+  if (is.null(empirical)) maxima else cbind(Q6 = maxima, empirical = empirical.maxima)
 }
 
 .np_udens_uniform_normal_public <- function(state,grid,alpha,band,B = NULL) {
@@ -128,9 +178,14 @@
       covariance="complete corrected-curve influence under Q6",
       correction="order-six compact operator with fitted normal guide"))
   if (joint) {
+    empirical <- .np_plot_corrected_activity_run("Constructing empirical uniform density covariance",
+      .np_udens_uniform_empirical_factor(state$x[[1L]], state$h, ref$grid))
     maximum <- .np_plot_corrected_activity_run("Calibrating the uniform density band",
-      .np_with_seed(state$plot.random.seed, .np_udens_gaussian_absolute_maximum(ref$factor, B, progress)))
-    critical <- unname(quantile(maximum, 1-alpha, type = 7L))
+      .np_with_seed(state$plot.random.seed, .np_udens_gaussian_absolute_maximum(ref$factor, B, progress, empirical)))
+    component <- apply(maximum, 2L, quantile, probs = 1-alpha, type = 7L, names = FALSE)
+    critical <- max(component)
+    inference$settings$covariance <- "Q6 normal marginals; joint Q6 and complete empirical corrected-curve influences"
+    inference$settings$critical.components <- component
     center <- inference$center
     inference$bands$simultaneous <- array(c(center-critical, center+critical),
       c(length(center), 2L, 1L), dimnames = list(NULL, c("lower", "upper"), as.character(alpha)))
@@ -142,6 +197,6 @@
     inference$settings$calibration <- "Gaussian maximum and normal quantiles"
   }
   result <- .np_udens_whole_normal_assemble(inference,alpha,band)
-  if (joint) result$inference$settings$calibration.status <- "unstudentized finite-grid Gaussian maximum in density units with complete Q6 covariance"
+  if (joint) result$inference$settings$calibration.status <- "unstudentized finite-grid Gaussian maximum in density units using the larger Q6 and empirical critical values"
   result
 }

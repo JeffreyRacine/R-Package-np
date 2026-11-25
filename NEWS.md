@@ -1,5 +1,8 @@
 # npRmpi 0.80-4
 
+* Experimental fixed uniform density bands now combine Q6 and empirical
+  Gaussian critical values for simultaneous inference on a finite grid.
+
 * Experimental bias-corrected CDF plots support asymptotic confidence bands
   for one continuous variable with a fixed, whole-line second-order
   Epanechnikov kernel. Simultaneous coverage refers to the requested grid.
