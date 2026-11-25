@@ -6,6 +6,9 @@
                                      corrected = TRUE, blocklen = NULL, selection = NULL,
                                      calibration = NULL) {
   beta <- identical(state$metadata$kernel, "beta2")
+  halfline <- identical(state$metadata$kernel, "gaussian2-halfline")
+  if (halfline && (!identical(law, "gaussian") || !is.null(calibration) || !isTRUE(corrected)))
+    stop("half-line CDF inference requires corrected Gaussian asymptotic calibration", call. = FALSE)
   if (beta && (!identical(law, "gaussian") || !is.null(calibration) || !isTRUE(corrected)))
     stop("the beta CDF process requires corrected Gaussian asymptotic calibration", call. = FALSE)
   if (identical(state$metadata$kernel, "uniform2") &&
@@ -63,6 +66,7 @@
   .np_udist_bc_grid(state, grid)
   m <- nrow(grid); budget <- .np_udist_bc_budget(state, m, B, tile)
   edges <- if (beta) which(grid[[1L]] == state$beta$lower | grid[[1L]] == state$beta$upper)
+  if (halfline) edges <- which(grid[[1L]] %in% state$metadata$support)
   family.size <- m-length(edges)
   if (signed.calibration || score.calibration) {
     extra <- 192*as.double(m)*length(alpha)
@@ -132,6 +136,8 @@
   }
   if (beta && any(se == 0 & !(seq_len(m) %in% edges)))
     stop("beta CDF interior variation is numerically unresolved", call. = FALSE)
+  if (halfline && any(se == 0 & !(seq_len(m) %in% edges)))
+    stop("half-line CDF interior variation is numerically unresolved", call. = FALSE)
   if (any(!is.finite(se)) || (family.size > 0L && !any(se > 0)))
     stop("absolute CDF process unavailable: no positive observed variance", call. = FALSE)
   raw <- if (stochastic) unname(quantile(limits$maximum, 1-alpha, type = 1L)) else NULL
@@ -186,7 +192,9 @@
       "literal exact GNN center displacement" else "complete GNN influence process"
     if (gnn.bootstrap) answer$settings$scale <- "selected-law empirical SD of exact center displacements"
   }
-  if (isTRUE(corrected) && identical(state$type, "fixed") &&
+  if (halfline)
+    answer <- .np_udist_halfline_envelope(answer, widths, state$x[[1L]], grid[[1L]], alpha, edges)
+  else if (isTRUE(corrected) && identical(state$type, "fixed") &&
       state$q %in% 1:2 && state$s == 0L && law %in% c("gaussian", "inid"))
     answer <- .np_udist_marginal_envelope(answer, widths, state$n, state$q, alpha, state$metadata$kernel,
       if (beta) .np_udist_beta_ranges(grid[[1L]], state$beta), edges)
