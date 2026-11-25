@@ -79,6 +79,12 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     # for any other candidate so shrinking a successful grid cannot refuse it.
     bytes <- 8 * (24 * n * m + 3 * n * B + 12 * m * B + 12 * n * 128 + 256 * n)
   }
+  if (pairs.score && bytes > limit) {
+    if (B > 9999L)
+      stop("conditional pairs numerical workspace exceeds the 256 MiB budget and tiling supports at most 9,999 draws; reduce the grid or draws explicitly", call. = FALSE)
+    allocation <- .np_conditional_pairs_allocation(n, m, B)
+    if (!is.null(allocation)) return(allocation)
+  }
   if (!is.finite(bytes) || bytes > limit)
     stop("conditional inference numerical workspace exceeds the 256 MiB budget; reduce the requested grid or draws explicitly", call. = FALSE)
   list(B = B, estimated.bytes = bytes)
@@ -133,9 +139,11 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     .np_conditional_mp1_variance=.np_conditional_mp1_variance,
     .np_conditional_mp1_between=.np_conditional_mp1_between,
     .np_conditional_den_probabilities=.np_conditional_den_probabilities))
+  label <- plan[["tile.label"]]
+  if (is.null(label)) label <- "Conditional inference"
   out <- .npRmpi_bootstrap_run_fanout(tasks, worker, ncol.out=m,
     what="conditional inference", profile.where="mpi.applyLB:conditional-inference",
-    progress.label="Conditional inference", progress.unit="rep",
+    progress.label=label, progress.unit="rep",
     required.bindings=bindings, plan=plan, family=family)
   t(out)
 }
@@ -169,7 +177,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
       stop("invalid conditional CDF pairs-score inputs", call. = FALSE)
     .np_conditional_runtime_admit(length(x), B)
     return(.np_conditional_pairs_score(x, y, grid, h, B, alpha, cdf.centers[, 1L],
-                                       allocation$estimated.bytes))
+                                       allocation$estimated.bytes, allocation[["tile.size"]]))
   }
   if (!is.logical(cdf) || length(cdf)!=1L || is.na(cdf) ||
       !method %in% c("asymptotic", "bootstrap") ||
