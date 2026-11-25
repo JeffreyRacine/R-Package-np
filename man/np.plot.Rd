@@ -998,8 +998,9 @@ outside this experimental derivative scope.
   and raw Bonferroni normal intervals using the complete positive-reference Q6
   covariance. Its reference is the empirical mixture plus bandwidth-scaled
   Student-six noise. This asymptotic normal calculation does not draw smoothed
-  bootstrap samples. Its simultaneous band calibrates an unstudentized absolute
-  Gaussian maximum on the supplied finite grid. \code{all} returns this band
+  bootstrap samples. Its simultaneous band uses the larger of the unstudentized
+  Gaussian maximum quantiles under Q6 and the complete empirical influence
+  covariance on the supplied finite grid. \code{all} returns this band
   and the pointwise and raw Bonferroni intervals. Explicit \code{bootstrap="smoothed-q6"}, existing
   \code{pmzsd} and other methods retain their contracts. Neither reference
   guarantees nominal coverage at every location, especially in sparse tails.
