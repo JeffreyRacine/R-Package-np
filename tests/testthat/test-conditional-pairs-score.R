@@ -474,3 +474,34 @@ test_that("bounded beta conditioning retains the fitted rows and all pairs count
     expect_error(do.call(plot, controls), "inid|unavailable")
   }
 })
+
+test_that("conditional pairs use the complete fitted predictor profile", {
+  d <- data.frame(x = seq(-1, 1, length.out = 72L),
+                  z = ordered(rep(c("-2","0","3"), 24L), levels = c("-2","0","3")))
+  d$y <- sin(2 * d$x) + .2 * as.integer(d$z) + .1 * cos(seq_len(nrow(d)))
+  b <- npcdistbw(y ~ z + x, data = d, regtype = "lc", oxkertype = "liracine",
+                 bws = c(.3, .15, .34), bandwidth.compute = FALSE)
+  ex <- d[c(1L, 30L, 48L, 1L), c("z", "x")]
+  ex$x[3L] <- ex$x[2L]
+  ex$z[3L] <- d$z[1L]
+  profiles <- .np_conditional_profile_rows(ex)
+  expect_identical(profiles$index, c(1L, 2L, 3L, 1L))
+  cache <- .np_conditional_profile_weights(b, d[c("z","x")], ex[profiles$first, , drop = FALSE])
+  expect_equal(colSums(cache$main), rep(1, 3L), tolerance = 2e-14, ignore_attr = TRUE)
+  expect_equal(colSums(cache$wide), rep(1, 3L), tolerance = 2e-14, ignore_attr = TRUE)
+  args <- list(x = npcdist(b), errors = "bootstrap", bootstrap = "inid", interval = "percentile",
+               center = "bias-corrected", band = "all", output = "data", neval = 7L, B = 99L,
+               random.seed = 55L, bias.control = np_conditional_bias_control("pairs-score","local-wilson"))
+  set.seed(29L)
+  before <- .Random.seed
+  pd <- suppressWarnings(do.call(plot, args))
+  expect_identical(.Random.seed, before)
+  expect_length(pd$panels, 3L)
+  for (j in seq_len(3L)) {
+    a <- as.data.frame(pd, panel=j, target=1L, band="pointwise")
+    s <- as.data.frame(pd, panel=j, target=1L, band="simultaneous")
+    expect_true(all(is.finite(a$lower) & a$lower <= a$upper & s$lower <= a$lower & s$upper >= a$upper))
+  }
+  wide <- npcdistbw(y ~ z + x, data = d, bws = c(.3, .55, .34), bandwidth.compute = FALSE)
+  expect_error(.np_conditional_profile_weights(wide, d[c("z","x")], ex), "outside")
+})

@@ -40,16 +40,21 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     bws$cykerorder == 2L && (identical(bws$cykertype, "gaussian") || beta.response)
   higher.response <- identical(control$construction, "pairs-score") &&
     bws$cykertype %in% c("gaussian", "epanechnikov") && bws$cykerorder %in% c(4L, 6L, 8L)
+  profiles <- identical(control$construction, "pairs-score") && bws$xndim == 2L &&
+    bws$xncon >= 1L && identical(bws$cxkertype, "gaussian") &&
+    identical(bws$cykertype, "gaussian") && bws$cykerorder == 2L &&
+    (bws$xnuno == 0L || identical(bws$uxkertype, "aitchisonaitken")) &&
+    (bws$xnord == 0L || identical(bws$oxkertype, "liracine"))
   spec <- npConditionalRegEngineSpec(bws, where = "conditional bias inference")
   if (isTRUE(gradients) || isTRUE(quantreg) || isTRUE(proper) ||
-      !identical(spec$reg.engine, "lc") || bws$xndim != 1L || bws$yndim != 1L ||
-      bws$xncon != 1L || bws$yncon != 1L || !identical(bws$type, "fixed") ||
+      !identical(spec$reg.engine, "lc") || (!profiles && bws$xndim != 1L) || bws$yndim != 1L ||
+      (!profiles && bws$xncon != 1L) || bws$yncon != 1L || !identical(bws$type, "fixed") ||
       (!identical(bws$cxkertype, "gaussian") && !beta.conditioning) || (!identical(bws$cykertype, "gaussian") && !compact.response && !beta.response) ||
       bws$cxkerorder != 2L || (bws$cykerorder != 2L && !higher.response) ||
       (!beta.conditioning && any(is.finite(c(bws$cxkerlb, bws$cxkerub)))) ||
       (!beta.response && any(is.finite(c(bws$cykerlb, bws$cykerub)))))
     stop(if (identical(control$construction, "pairs-score"))
-      "conditional CDF pairs-score requires LC, one continuous X and Y, fixed unbounded Gaussian2 X and Gaussian or Epanechnikov orders 2/4/6/8, uniform or known-support beta2 Y, or known-support beta2 X with Gaussian2 or known-support beta2 Y, no gradients/quantiles/proper projection"
+      "conditional CDF pairs-score requires LC, one continuous X and Y, fixed unbounded Gaussian2 X and Gaussian or Epanechnikov orders 2/4/6/8, uniform or known-support beta2 Y, or known-support beta2 X with Gaussian2 or known-support beta2 Y, or one additional Gaussian2/AA-unordered/Li-Racine-ordered X with Gaussian2 Y, no gradients/quantiles/proper projection"
     else "conditional bias inference requires LC, one continuous X and Y, fixed unbounded Gaussian2 kernels, no gradients/quantiles/proper projection", call. = FALSE)
   if (identical(control$construction, "pairs-score")) {
     if (!cdf || method != "bootstrap" || !identical(law, "inid") ||
@@ -290,13 +295,17 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
                                           calibration, B, alpha, band, construction=NULL, pointwise=NULL) {
   .np_plot_corrected_activity_run("Preparing conditional inference", {
   ex <- toFrame(ex); ey <- toFrame(ey)
-  grid <- data.frame(x=ex[[1L]], y=ey[[1L]])
-  h <- c(.npcdhat_physical_bandwidth(bws,"x"), .npcdhat_physical_bandwidth(bws,"y"))
-  .np_conditional_workspace(x[[1L]], y[[1L]], grid, h, B, identical(construction, "pairs-score"))
-  cc <- if(cdf) .np_conditional_cdf_centers(bws,x,y,ex,ey) else NULL
-  a <- .np_conditional_inference(x[[1L]],y[[1L]],grid,h,cdf,method,calibration,B,alpha,cc,construction,response.kernel=bws$cykertype,pointwise=pointwise,
-                                 response.bounds=if (identical(bws$cykertype, "beta")) c(bws$cykerlb, bws$cykerub), response.order=bws$cykerorder,
-                                 conditioning.bounds=if (identical(bws$cxkertype, "beta")) c(bws$cxkerlb, bws$cxkerub))
+  if (ncol(x) == 2L && identical(construction, "pairs-score")) {
+    a <- .np_conditional_profile_inference(bws, x, y, ex, ey, B, alpha, pointwise)
+  } else {
+    grid <- data.frame(x=ex[[1L]], y=ey[[1L]])
+    h <- c(.npcdhat_physical_bandwidth(bws,"x"), .npcdhat_physical_bandwidth(bws,"y"))
+    .np_conditional_workspace(x[[1L]], y[[1L]], grid, h, B, identical(construction, "pairs-score"))
+    cc <- if(cdf) .np_conditional_cdf_centers(bws,x,y,ex,ey) else NULL
+    a <- .np_conditional_inference(x[[1L]],y[[1L]],grid,h,cdf,method,calibration,B,alpha,cc,construction,response.kernel=bws$cykertype,pointwise=pointwise,
+                                   response.bounds=if (identical(bws$cykertype, "beta")) c(bws$cykerlb, bws$cykerub), response.order=bws$cykerorder,
+                                   conditioning.bounds=if (identical(bws$cxkertype, "beta")) c(bws$cxkerlb, bws$cxkerub))
+  }
   if(isTRUE(a$resolution.limited)) .np_warning(paste(a$law, "Bonferroni tails have limited finite-draw resolution; increase B for better tail resolution"))
   widths <- lapply(a$bands,function(v)cbind(lower=a$center-v[,1L],upper=v[,2L]-a$center,center=a$center))
   chosen <- if(band=="all") "simultaneous" else band

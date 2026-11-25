@@ -26,7 +26,7 @@ companion. The jackknife center and basic pairs interval are included.
 The common simultaneous band and Bonferroni endpoints expand where required
 for pointwise nesting. The Wilson scale assumes locally homogeneous conditional
 probabilities. Coverage is experimental; joint inference is for the finite
-requested grid. Known-support beta2 conditioning is also available with a Gaussian2 or known-support beta2 response. The strongest evidence is on trimmed explanatory grids.}
+requested grid. Known-support beta2 conditioning is also available with a Gaussian2 or known-support beta2 response. Fixed two-predictor profiles with a Gaussian2 response can use two unbounded Gaussian2 predictors, or one such predictor and an unordered Aitchison--Aitken or ordered Li--Racine predictor. Each displayed panel has its own finite simultaneous family. Categorical bandwidths are doubled at the wider scale and must remain admissible. The strongest evidence is on trimmed explanatory grids.}
 }
 \value{A validated control object for the \code{bias.control} argument of
 \code{plot} applied to \code{npcdist} or \code{npcdens} fits or bandwidths.}
