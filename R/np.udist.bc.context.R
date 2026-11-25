@@ -1,5 +1,18 @@
 # Private CDF prototype: immutable retained-data context, no public dispatch.
-.np_udist_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2, allow.compact = FALSE) {
+.np_udist_bc_prepare <- function(bws, x, max.bytes = 256 * 1024^2, allow.compact = FALSE, halfline = FALSE) {
+  support <- NULL
+  if (halfline) {
+    support <- c(bws[["ckerlb", exact = TRUE]], bws[["ckerub", exact = TRUE]])
+    if (!inherits(bws, "dbandwidth") || !identical(bws[["type", exact = TRUE]], "fixed") ||
+        !identical(bws[["ckertype", exact = TRUE]], "gaussian") ||
+        !identical(bws[["ckerbound", exact = TRUE]], "fixed") ||
+        !isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) ||
+        !is.data.frame(x) || ncol(x) != 1L || !is.numeric(x[[1L]]) ||
+        length(support) != 2L || anyNA(support) || support[1L] >= support[2L] ||
+        sum(is.finite(support)) != 1L || anyNA(x[[1L]]) ||
+        any(x[[1L]] <= support[1L] | x[[1L]] >= support[2L]) || anyDuplicated(x[[1L]]))
+      stop("boundary-rank requires one continuous, untied sample strictly inside a declared Gaussian2 fixed-bandwidth half-line", call. = FALSE)
+  }
   if (is.list(bws) && bws[["type", exact = TRUE]] %in% c("generalized_nn", "adaptive_nn"))
     return(.np_udist_bc_nn_prepare(bws, x, max.bytes, allow.epanechnikov = allow.compact))
   kernel <- if (is.list(bws)) bws[["ckertype", exact = TRUE]]
@@ -12,7 +25,7 @@
   if (!is.list(bws) || !identical(bws[["type", exact = TRUE]], "fixed") ||
       !(beta || compact || identical(bws[["ckertype", exact = TRUE]], "gaussian")) ||
       !isTRUE(bws[["ckerorder", exact = TRUE]] == 2L) ||
-      (!beta && !identical(bws[["ckerbound", exact = TRUE]], "none"))) {
+      (!beta && !halfline && !identical(bws[["ckerbound", exact = TRUE]], "none"))) {
     if (identical(kernel, "beta"))
       stop("beta CDF correction requires one numeric coordinate, known fixed bounds, fixed second-order bandwidths and joint-process asymptotic bands", call. = FALSE)
     if (is.list(bws) && identical(bws[["ckertype", exact = TRUE]], "epanechnikov"))
@@ -54,8 +67,11 @@
     list(index = j, lambda = h[j], levels = levels(x[[j]]), support = support,
       training = as.double(toMatrix(x[j])), raw.probe = raw, effective.probe = effective)
   })
-  support <- if (beta) .np_udist_beta_support(bws, x[[1L]], h)
-  metadata <- if (beta) {
+  if (beta) support <- .np_udist_beta_support(bws, x[[1L]], h)
+  metadata <- if (halfline) {
+    list(normalization = "n(n-1)", support = support, continuous.law = TRUE,
+         kernel = "gaussian2-halfline", correction = "anchored cubic")
+  } else if (beta) {
     list(normalization = "n-squared", support = c(support$lower, support$upper),
          continuous.law = TRUE, kernel = "beta2", correction = "signed fourth-order beta CDF")
   } else if (compact) {
@@ -82,6 +98,9 @@
   for (z in state$category) if (!is.ordered(grid[[z$index]]) ||
       !identical(levels(grid[[z$index]]), z$levels))
     stop("CDF evaluation must retain fitted ordered levels", call. = FALSE)
+  if (identical(state$metadata$kernel, "gaussian2-halfline") &&
+      any(grid[[1L]] < state$metadata$support[1L] | grid[[1L]] > state$metadata$support[2L]))
+    stop("half-line CDF targets must lie within the known support", call. = FALSE)
   if (identical(state$metadata$kernel, "beta2")) {
     if (any(grid[[1L]] < state$beta$lower | grid[[1L]] > state$beta$upper))
       stop("beta CDF targets must lie within the declared support", call. = FALSE)

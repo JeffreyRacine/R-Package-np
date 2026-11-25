@@ -28,7 +28,11 @@
     stop("corrected must be TRUE or FALSE", call. = FALSE)
   if (nrow(grid) > 25L) stop("CDF row provider requires bounded target tiles", call. = FALSE)
   .np_udist_bc_budget(state, nrow(grid), 1L, nrow(grid))
-  if (identical(state$metadata$kernel, "beta2")) {
+  halfline <- identical(state$metadata$kernel, "gaussian2-halfline")
+  if (halfline) {
+    z <- .np_udist_halfline_rows(state$x[[1L]], grid[[1L]], state$h[1L], state$metadata$support)
+    if (!corrected) z$corrected <- z$original
+  } else if (identical(state$metadata$kernel, "beta2")) {
     component <- .np_udist_beta_rows(grid[[1L]], state$beta, state$beta$left, state$beta$right)
     z <- list(original = component$ordinary,
               corrected = if (corrected) 2*component$ordinary-component$wide else component$ordinary)
@@ -56,7 +60,8 @@
   shifted <- z$corrected - z$corrected[, 1L]
   mean.shift <- rowMeans(shifted)
   z$center <- z$corrected[, 1L] + mean.shift
-  z$factor <- (shifted - mean.shift) / state$n
+  divisor <- if (halfline) sqrt(as.double(state$n)*(state$n-1)) else state$n
+  z$factor <- (shifted - mean.shift) / divisor
   z$original.center <- z$original[, 1L] + rowMeans(z$original - z$original[, 1L])
   z$se <- sqrt(rowSums(z$factor^2))
   z

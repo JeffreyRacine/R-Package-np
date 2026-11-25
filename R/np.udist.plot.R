@@ -1,13 +1,13 @@
 # Private distribution-specific inference controls; no regression pilot state.
 np_udist_bias_control <- function(construction = c("joint-process", "cdf", "legacy"),
-                                   calibration = c("default", "score-envelope")) {
+                                   calibration = c("default", "score-envelope", "boundary-rank")) {
   construction <- match.arg(construction)
   calibration <- match.arg(calibration)
   if (identical(calibration, "default"))
     return(structure(list(construction = construction, version = 1L),
                      class = "np_udist_bias_control"))
   if (!identical(construction, "joint-process"))
-    stop("score-envelope requires the joint-process CDF construction", call. = FALSE)
+    stop(paste(calibration, "requires the joint-process CDF construction"), call. = FALSE)
   structure(list(construction = construction, calibration = calibration, version = 2L),
             class = "np_udist_bias_control")
 }
@@ -32,7 +32,7 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
   control.calibration <- if (is.list(control)) control[["calibration", exact = TRUE]] else NULL
   if (is.null(control.calibration)) control.calibration <- "default"
   if (!is.character(control.calibration) || length(control.calibration) != 1L ||
-      is.na(control.calibration) || !control.calibration %in% c("default", "score-envelope"))
+      is.na(control.calibration) || !control.calibration %in% c("default", "score-envelope", "boundary-rank"))
     stop("bias.control must be created by np_udist_bias_control()", call. = FALSE)
   if (!inherits(control, "np_udist_bias_control") || length(construction) != 1L ||
       !is.character(construction) || is.na(construction) ||
@@ -69,7 +69,11 @@ np_udist_bias_control <- function(construction = c("joint-process", "cdf", "lega
     identical(control.calibration, "default") && is.null(calibration)
   if (identical(bws[["ckertype", exact = TRUE]], "beta") && identical(band, "pmzsd"))
     stop("beta corrected CDF normal-SD intervals are unqualified; request a score-protected pointwise, simultaneous or Bonferroni band", call. = FALSE)
-  state <- .np_udist_bc_prepare(bws, x, allow.compact = allow.compact)
+  halfline <- identical(control.calibration, "boundary-rank")
+  if (halfline && (!identical(method, "asymptotic") || !is.null(calibration) ||
+      identical(band, "pmzsd")))
+    stop("boundary-rank requires Gaussian asymptotic pointwise, simultaneous or Bonferroni intervals", call. = FALSE)
+  state <- .np_udist_bc_prepare(bws, x, allow.compact = allow.compact, halfline = halfline)
   if (identical(construction, "joint-process") &&
       (!state$q %in% 0:2 || !state$s %in% 0:2))
     stop("joint CDF process currently admits at most two numeric and two ordered variables; use an explicit qualified construction", call. = FALSE)

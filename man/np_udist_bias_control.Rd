@@ -7,13 +7,30 @@ and not recommended for general-purpose inference.} See the experimental-status
 section below.
 Selects the research CDF construction or legacy bootstrap centering.}
 \usage{np_udist_bias_control(construction = c("joint-process", "cdf", "legacy"),
-                      calibration = c("default", "score-envelope"))}
+                      calibration = c("default", "score-envelope", "boundary-rank"))}
 \arguments{
 \item{construction}{The joint corrected CDF process or legacy correction.}
 \item{calibration}{The default construction or the explicit, side-specific
-score envelope for supported fixed numeric Gaussian asymptotic bands.}
+score envelope for supported fixed numeric Gaussian asymptotic bands.
+\code{"boundary-rank"} requests the anchored Gaussian construction for a continuous
+univariate CDF with exactly one known finite support endpoint.}
 }
 \details{
+The experimental \code{"boundary-rank"} calibration requires a fixed second-order
+Gaussian bandwidth, declared one-sided support, distinct observations in the
+interior, and \code{errors="asymptotic"}. It uses a signed cubic boundary
+correction, a Gaussian process on the requested finite grid and order-statistic
+intervals at the sample extrema. Beyond either sample extreme, monotonicity
+extends its rank bound to all more extreme coordinates. For this calibration
+a Bonferroni-only request accepts the same \code{gaussian.draws} as the
+corresponding simultaneous band. At an interior coordinate where a normal interval excludes all
+probabilities it is enlarged to include the empirical CDF's uniform
+Dvoretzky--Kiefer--Wolfowitz interval. The known support endpoint has an exact
+CDF under the continuous law. Smoothing and bandwidth-selection bias are not
+covered by an exact finite-sample guarantee. The corrected estimate can cross
+the probability range. Pointwise, simultaneous and Bonferroni intervals are
+nested on the same target grid.
+
 This private research implementation is undergoing full empirical-range
 qualification. It does not establish a finite-sample coverage guarantee.
 With \code{center="bias-corrected"}, omitting \code{bias.control} selects

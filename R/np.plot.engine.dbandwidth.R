@@ -118,10 +118,13 @@
                                                       plot.errors.type)
     joint.request <- identical(error.request$method, "asymptotic") &&
       error.request$type %in% c("simultaneous", "all")
-    if (!missing(gaussian.draws) && !joint.request)
+    ranked.bonferroni <- identical(error.request$method, "asymptotic") &&
+      identical(error.request$type, "bonferroni") && inherits(bias.control, "np_udist_bias_control") &&
+      identical(bias.control[["calibration", exact = TRUE]], "boundary-rank")
+    if (!missing(gaussian.draws) && !joint.request && !ranked.bonferroni)
       stop("gaussian.draws requires asymptotic simultaneous or all bands", call. = FALSE)
     joint.eligible <- joint.request
-    if (joint.request)
+    if (joint.request || ranked.bonferroni)
       gaussian.draws <- .np_plot_gaussian_integer(gaussian.draws, "gaussian.draws")
     block.automatic <- is.null(plot.errors.boot.blocklen)
     normalized.opts <- .np_plot_normalize_common_options(
