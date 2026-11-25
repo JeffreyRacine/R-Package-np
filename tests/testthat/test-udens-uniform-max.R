@@ -24,3 +24,36 @@ test_that("the joint envelope compares two marginal maximum quantiles", {
   expect_equal(factor, t(factor), tolerance = 1e-12)
   expect_equal(factor[1, ], factor[2, ], tolerance = 1e-12)
 })
+
+test_that("uniform joint critical value and multiblock influence include the fitted guide", {
+  x <- seq(-2.2, 2.5, length.out = 83L) + .09 * sin(seq_len(83L))
+  g <- c(-1.1, -.7, -.15, .32, .74)
+  h <- .52
+  rule <- .np_udens_q6_rule(64L)
+  kernel <- function(u) ifelse(abs(u) < 1, (225 - 1050*u^2 + 945*u^4)/128, 0)
+  k <- kernel(outer(x, g, "-") / h) / h
+  nodes <- outer(g, h * rule$x, "+")
+  weights <- kernel(rule$x) * rule$w
+  functional <- function(p) {
+    location <- sum(p*x)
+    sigma <- sqrt(sum(p*(x-location)^2))
+    drop(crossprod(p,k)) + dnorm(g,location,sigma) -
+      drop(dnorm(nodes,location,sigma) %*% weights)
+  }
+  n <- length(x)
+  p <- rep(1/n,n)
+  eps <- 2e-6
+  rows <- t(vapply(seq_len(n), function(i) {
+    towards <- -p
+    towards[i] <- towards[i] + 1
+    (functional(p+eps*towards) - functional(p-eps*towards))/(2*eps)
+  }, numeric(length(g))))
+  F <- .np_udens_uniform_empirical_factor(x,h,g)
+  expect_lt(max(abs(tcrossprod(F)-crossprod(rows)/n^2)),1e-10)
+  state <- list(construction="density-uniform-q6-normal-v1",x=data.frame(x=x),
+                n=n,h=h,plot.random.seed=309L)
+  band <- .np_udens_uniform_normal_public(state,data.frame(x=g),.05,"all",9999L)$inference
+  critical <- max(band$settings$critical.components)
+  expect_equal(band$critical,critical,tolerance=1e-14)
+  expect_equal(as.numeric(band$bands$simultaneous[,2L,1L]),band$center+critical,tolerance=1e-14)
+})
