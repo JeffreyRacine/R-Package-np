@@ -35,18 +35,32 @@ The wider unstudentized test is a modification of JLWY supported by finite-sampl
 \seealso{\code{\link{npscoef}}, \code{\link{npscoefbw}}, \code{\link{nppltest}}, \code{\link{npindextest}}}
 \examples{
 \dontrun{
+# set.seed() controls the simulated data. Each test uses the default
+# bootstrap seed (random.seed = 42) and 399 bootstrap draws.
 set.seed(42)
 n <- 240L
 d <- data.frame(x1 = rnorm(n), x2 = rnorm(n), z = runif(n, -1, 1))
-# Null: both slopes vary with z. Seed 42 gives 386/399 for the default test.
-d$y <- with(d, sin(z) + x1 * cos(z) + x2 * z + rnorm(n))
-bw <- npscoefbw(y ~ x1 + x2 | z, data = d)
-summary(npscoeftest(bw))
-# The paper's application bandwidths give 386/399 on this sample, too.
-summary(npscoeftest(bw, method = "jlwy"))
-# Alternative: an interaction between the slopes violates the null.
-# Seed 42 gives 0/399. Other samples and bootstrap seeds can differ.
-d$y <- with(d, y + 1.5 * x1 * x2)
-summary(npscoeftest(npscoef(y ~ x1 + x2 | z, data = d)))
+noise <- rnorm(n)
+
+# Under the null, the intercept and both slopes can vary with z.
+# At each fixed z, the conditional mean is affine in x1 and x2.
+d$y0 <- with(d, sin(z) + x1 * cos(z) + x2 * z + noise)
+bw0 <- npscoefbw(y0 ~ x1 + x2 | z, data = d)
+fit0 <- npscoef(bw0)
+summary(npscoeftest(fit0))
+# P Value: 0.9674185 (386 of 399). Fail to reject the null at level 0.05.
+
+# Under the alternative, keep the same predictors and noise but add
+# x1 * x2. The slope on x1 now depends on x2 even when z is fixed.
+d$y1 <- with(d, y0 + 1.5 * x1 * x2)
+bw1 <- npscoefbw(y1 ~ x1 + x2 | z, data = d)
+summary(npscoeftest(bw1))
+# P Value: 0 (0 of 399). Reject the null at level 0.05.
+
+# Zero means that no bootstrap score reached the observed statistic.
+# Another data seed can give a rejection under the null or a failure to
+# reject under the alternative. Changing only random.seed varies the
+# bootstrap draws for the same sample.
+} % enddontrun
 }
-}
+\keyword{htest}
