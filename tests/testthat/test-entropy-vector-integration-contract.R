@@ -127,3 +127,22 @@ test_that("entropy acceleration preserves the explicit scalar-option contract", 
   expect_equal(accelerated, scalar,
                tolerance = 128 * .Machine$double.eps)
 })
+
+test_that("blocked product kernels preserve pairing across donor and grid boundaries", {
+  axis <- getFromNamespace(".np_entropy_quadrature_axis", "np")
+  panel <- getFromNamespace(".np_entropy_gaussian_panels", "np")
+  set.seed(1108)
+  x <- round(rnorm(517), 1)
+  y <- 0.7 * x + rnorm(length(x))
+  bw <- c(0.41, 0.5, 0.23, 0.19)
+  a <- axis(-4, 4, bw[3], 2L)
+  b <- axis(-4, 4, bw[4], 2L)
+  # Native pointwise integrals use both marginals and the paired joint density.
+  points <- t(as.matrix(expand.grid(a$grid, b$grid)))
+  value <- .Call("C_np_entropy_gaussian_integrand", points, x, y, bw,
+                 PACKAGE = "np")
+  reference <- 0.5 * sum(as.vector(value) *
+    as.vector(tcrossprod(a$weights, b$weights)))
+  expect_lt(abs(panel(x, y, bw, a, b) - reference), 2e-13)
+  expect_gt(abs(panel(x, rev(y), bw, a, b) - reference), 1e-3)
+})
