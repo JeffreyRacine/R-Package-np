@@ -28,10 +28,21 @@ test_that("selected-coordinate attribute is protected across allocating native c
                     wrapper, fixed = TRUE)
   expect_length(protected, 1L)
   expect_lt(protected, min(grep("coerceVector(", wrapper, fixed = TRUE)))
-  # Count actual PROTECT tokens, including inline assignments but excluding
-  # UNPROTECT. The 27 baseline protections plus 14 extra-protection sites
-  # include the promoted compact-inference and precision-metadata branches.
-  expect_length(grep("\\bPROTECT\\(", wrapper, perl = TRUE), 41L)
+  # 27 fixed protections, 14 sites charged to extra_protect, and two
+  # block-local cubic attributes that are popped immediately after attachment.
+  expect_length(grep("\\bPROTECT\\(", wrapper, perl = TRUE), 43L)
+  local.pops <- grep("UNPROTECT(1);", wrapper, fixed = TRUE)
+  expect_length(local.pops, 2L)
+  expect_identical(trimws(wrapper[local.pops[1L] + (-3L:0L)]), c(
+    "if(fit_projection.local_cubic) {",
+    "SEXP local = PROTECT(ScalarLogical(TRUE));",
+    'setAttrib(projection_basis, install(".np.beta.local.cubic"), local);',
+    "UNPROTECT(1);"))
+  expect_identical(trimws(wrapper[local.pops[2L] + (-3L:0L)]), c(
+    "if(fit_projection.check_cubic_support) {",
+    "SEXP support = PROTECT(ScalarInteger(fit_projection.check_cubic_support));",
+    'setAttrib(projection_basis, install(".np.cubic.support"), support);',
+    "UNPROTECT(1);"))
   empty.start <- grep("PROTECT(empty_flags = allocVector(INTSXP, en));",
                       wrapper, fixed = TRUE)
   certificate.start <- grep("SEXP certificate = PROTECT(allocVector(LGLSXP, gsize));",
