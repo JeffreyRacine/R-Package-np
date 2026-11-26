@@ -1195,14 +1195,15 @@ npreghat <-
       attr(A.base,".np.precision.eligible") <- TRUE
       if (epa.ann) attr(A.base,".np.precision.zero.only") <- TRUE
     }
-    solved <- .Call(if (report.ridge) "C_np_lp_adjoint_prepared_ridge" else "C_np_lp_adjoint_prepared", A.base, as.double(rhs),
-                    as.integer(ntrain),
-                    as.integer(min(ncol(W.train), sum(w != 0.0))),
-                    PACKAGE = "npRmpi")
-
+    support.rank <- as.integer(min(ncol(W.train), sum(w != 0.0)))
     if (report.ridge) {
+      solved <- .Call("C_np_lp_adjoint_prepared_ridge", A.base, as.double(rhs),
+                      as.integer(ntrain), support.rank, PACKAGE = "npRmpi")
       ridge[j] <- solved$ridge
       solved <- solved$v
+    } else {
+      solved <- .Call("C_np_lp_adjoint_prepared", A.base, as.double(rhs),
+                      as.integer(ntrain), support.rank, PACKAGE = "npRmpi")
     }
     policy <- attr(solved,".np.fit.precision",exact=TRUE)
     if(!is.null(policy)) {
