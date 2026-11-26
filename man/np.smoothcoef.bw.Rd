@@ -648,6 +648,9 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+  For continuous slope regressors and modifiers, \code{\link{npscoeftest}}
+  tests the varying-coefficient specification against a general conditional mean.
+
   The primary response must be a one-dimensional numeric (integer or double)
   vector. Factors and ordered factors are not accepted as primary responses,
   including retained responses used in a new fit or bandwidth search.
@@ -907,7 +910,7 @@ or standard-deviation factors.
 
 }
 
-\seealso{
+\seealso{\code{\link{npscoeftest}}, 
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{

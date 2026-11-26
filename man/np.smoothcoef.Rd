@@ -255,6 +255,9 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   }
 }
 \details{
+  For continuous slope regressors and modifiers, \code{\link{npscoeftest}}
+  tests the varying-coefficient specification against a general conditional mean.
+
   The primary response must be a one-dimensional numeric (integer or double)
   vector. Factors and ordered factors are not accepted as primary responses,
   including retained responses used in a new fit or bandwidth search.
@@ -481,7 +484,7 @@ bias-corrected inference. Method-specific assumptions, restrictions and known
 failures must be considered when experimenting with these bounds.
 }
 
-\seealso{
+\seealso{\code{\link{npscoeftest}}, 
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}},
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}}, \code{\link{hist}},
   \code{\link{npudens}}, \code{\link{npudist}},
