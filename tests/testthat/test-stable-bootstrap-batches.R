@@ -32,6 +32,7 @@ test_that("OLS projections and shared kernel rows preserve individual CMS draws"
   design <- np:::.np_cms_bootstrap_qr(fit)
   expect_s3_class(design, "qr")
   Ys <- matrix(rnorm(n * 9L), n)
+  Ys[, 1L] <- Ys[, 1L] + 1e10
   scores <- vapply(seq_len(ncol(Ys)), function(j) {
     oracle <- np:::.np_cms_refit_residuals(fit, Ys[, j])
     actual <- np:::.np_cms_refit_residuals(fit, Ys[, j], design.qr = design)
