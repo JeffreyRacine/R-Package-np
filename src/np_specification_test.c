@@ -83,6 +83,69 @@ SEXP C_np_pltest_angles(SEXP coordinates) {
     return ans;
 }
 
+/* For one projected order, accumulate the squared prefix sums of every
+   residual column. Tied observations all see the prefix at the group end.
+   Match matrixStats' extended accumulators and R's intervening double
+   roundings, including on hosts where a multiply-add could be contracted. */
+SEXP C_np_pltest_prefix_scores(SEXP residuals, SEXP order, SEXP ends)
+{
+    if (!isReal(residuals) || !isMatrix(residuals) ||
+        TYPEOF(order) != INTSXP || TYPEOF(ends) != INTSXP)
+        error("Invalid Sobol prefix score inputs.");
+    int n = nrows(residuals), columns = ncols(residuals);
+    R_xlen_t groups = XLENGTH(ends);
+    if (n < 1 || XLENGTH(order) != n || groups > n)
+        error("Invalid Sobol projection dimensions.");
+    const int *ord = INTEGER(order), *end = INTEGER(ends);
+    for (int i = 0; i < n; ++i)
+        if (ord[i] < 1 || ord[i] > n)
+            error("Invalid Sobol row index.");
+    int last = 0;
+    for (R_xlen_t g = 0; g < groups; ++g) {
+        if (end[g] <= last || end[g] > n)
+            error("Invalid Sobol tie endpoints.");
+        last = end[g];
+    }
+    if (groups && last != n)
+        error("Incomplete Sobol tie endpoints.");
+
+#ifdef HAVE_LONG_DOUBLE
+    typedef long double accumulator;
+#else
+    typedef double accumulator;
+#endif
+    const double *values = REAL(residuals);
+    SEXP ans = PROTECT(allocVector(REALSXP, columns));
+    double *out = REAL(ans);
+    for (int j = 0; j < columns; ++j) {
+        if (j % 16 == 0) R_CheckUserInterrupt();
+        const double *column = values + (R_xlen_t)j * n;
+        accumulator prefix = 0, total = 0;
+        if (!groups) {
+            for (int i = 0; i < n; ++i) {
+                prefix += column[ord[i] - 1];
+                double x = (double)prefix;
+                volatile double square = x * x;
+                total += square;
+            }
+        } else {
+            int first = 0;
+            for (R_xlen_t g = 0; g < groups; ++g) {
+                for (int i = first; i < end[g]; ++i)
+                    prefix += column[ord[i] - 1];
+                double x = (double)prefix;
+                volatile double square = x * x;
+                volatile double weighted = square * (end[g] - first);
+                total += weighted;
+                first = end[g];
+            }
+        }
+        out[j] = (double)total;
+    }
+    UNPROTECT(1);
+    return ans;
+}
+
 /* Maistre-Patilea: common scaling of all density-weighted residuals cancels
    on studentization. Pair order matches stats::dist (lower triangle). */
 SEXP C_np_indextest_score(SEXP response, SEXP index, SEXP coordinates,

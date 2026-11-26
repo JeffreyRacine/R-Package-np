@@ -285,13 +285,8 @@
     if (any(!is.finite(z))) stop("Non-finite projected coordinates; rescale the predictors.", call. = FALSE)
     ord <- order(z, method = "radix")
     sorted <- z[ord]
-    sums <- matrixStats::colCumsums(E, rows = ord, useNames = FALSE)
-    if (anyDuplicated(sorted)) {
-      ends <- c(which(sorted[-1L] != sorted[-n]), n)
-      ans <- ans + matrixStats::colSums2(sums[ends, , drop = FALSE]^2 * diff(c(0L, ends)), useNames = FALSE)
-    } else {
-      ans <- ans + matrixStats::colSums2(sums^2, useNames = FALSE)
-    }
+    ends <- if (anyDuplicated(sorted)) c(which(sorted[-1L] != sorted[-n]), n) else integer()
+    ans <- ans + .Call(C_np_pltest_prefix_scores, E, ord, ends)
   }
   ans <- ans / (as.double(n)^2 * nrow(directions))
   if (any(extreme)) ans[extreme] <- (ans[extreme] * scale) * scale

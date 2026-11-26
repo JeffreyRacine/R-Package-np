@@ -76,3 +76,17 @@ test_that("the public test scores its observed residuals with the selected integ
   expect_null(exact$directions)
   expect_equal(exact$statistic, sum(e * (.Call(C_np_pltest_angles, V) %*% e)), tolerance = 1e-12)
 })
+
+test_that("Sobol prefix scores reproduce the column oracle at tied thresholds", {
+  E <- cbind(c(1e16, 1, -1e16, 2, -0.5), c(3, -1, 2, 4, -7))
+  ord <- c(2L, 4L, 1L, 3L, 5L)
+  sums <- matrixStats::colCumsums(E, rows = ord, useNames = FALSE)
+  for (ends in list(integer(), c(2L, 3L, 5L), 5L)) {
+    terms <- if (length(ends)) sums[ends, , drop = FALSE]^2 * diff(c(0L, ends)) else sums^2
+    expect_identical(.Call(C_np_pltest_prefix_scores, E, ord, ends),
+                     matrixStats::colSums2(terms, useNames = FALSE))
+  }
+  expect_error(.Call(C_np_pltest_prefix_scores, E, c(NA_integer_, ord[-1L]), integer()),
+               "row index")
+  expect_error(.Call(C_np_pltest_prefix_scores, E, ord, 4L), "Incomplete")
+})

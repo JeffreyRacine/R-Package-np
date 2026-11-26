@@ -155,7 +155,9 @@
   for (first in seq.int(1L, n, by = 64L)) {
     .np_fit_progress_step()
     rows <- seq.int(first, min(n, first + 63))
-    logw <- -0.5*(outer(index$z[rows], index$z, "-")/index$g)^2
+    nr <- length(rows)
+    delta <- matrix(index$z[rows] - rep(index$z, each = nr), nrow = nr)
+    logw <- -0.5*(delta/index$g)^2
     if (binary) {
       weights <- exp(logw)
       success <- rowSums(weights[,y == 1,drop = FALSE])
@@ -163,7 +165,7 @@
       pilot[rows] <- success/(success + failure)
     } else {
       logw[cbind(seq_along(rows), rows)] <- -Inf
-      weights <- exp(logw - apply(logw, 1L, max))
+      weights <- exp(logw - matrixStats::rowMaxs(logw, useNames = FALSE))
       pilot[rows] <- drop(weights %*% y)/rowSums(weights)
     }
   }
@@ -218,10 +220,10 @@
     # reciprocal barycentric weights before they are normalized.
     if (any(fraction > 0 & fraction < 64*.Machine$double.xmin)) return(direct())
     base <- as.integer(base) + 4L
-    weights <- outer(fraction, offsets, "-")
+    weights <- vapply(offsets, function(offset) fraction - offset, numeric(n))
     nodal <- which(fraction == 0)
     weights[nodal, ] <- 1
-    weights <- sweep(1/weights, 2L, barycentric, "*")
+    weights <- (1/weights) * rep(barycentric, each = n)
     weights[nodal, ] <- 0
     weights[nodal, 4L] <- 1
     weights <- weights/rowSums(weights)
