@@ -288,6 +288,28 @@
   invisible(NULL)
 }
 
+.np_conditional_pairs_wilson_bands <- function(ans, x, y, grid, bandwidth, alpha,
+                                               conditioning, cuts, description) {
+  center <- ans$center
+  joint <- ans$bands$simultaneous
+  bonf <- ans$bands$bonferroni
+  local <- .np_conditional_local_wilson(x, y, grid, bandwidth, alpha, conditioning)
+  local[, 1L] <- pmin(center, center - cuts[3L, ], local[, 1L])
+  local[, 2L] <- pmax(center, center - cuts[2L, ], local[, 2L])
+  extended <- local[, 1L] < joint[, 1L] | local[, 2L] > joint[, 2L]
+  joint[, 1L] <- pmin(joint[, 1L], local[, 1L])
+  joint[, 2L] <- pmax(joint[, 2L], local[, 2L])
+  bonf[, 1L] <- pmin(bonf[, 1L], joint[, 1L])
+  bonf[, 2L] <- pmax(bonf[, 2L], joint[, 2L])
+  ans$bands <- list(pointwise = local, simultaneous = joint, bonferroni = bonf)
+  ans$pointwise.calibration <- "local-wilson"
+  ans$nested.coordinates <- which(extended)
+  ans$primary <- "positive local Wilson and basic pairs pointwise interval"
+  ans$conditioning <- "fixed bandwidths; joint pairs resampling; Wilson uses local homogeneity"
+  ans$endpoint.construction <- description
+  ans
+}
+
 .np_conditional_pairs_score <- function(x, y, grid, h, B, alpha, original, bytes, tile.size = NULL, response.kernel = "gaussian", pointwise = NULL, response.bounds = NULL, response.order = 2L, conditioning.bounds = NULL, profile.weights = NULL, simultaneous = NULL) {
   n <- length(x)
   m <- nrow(grid)
@@ -312,7 +334,8 @@
   design <- identical(simultaneous, "design-envelope")
   rms.envelope <- identical(simultaneous, "rms-envelope")
   if (design && (!identical(response.kernel, "gaussian") || response.order != 2L ||
-                 !is.null(pointwise) || !is.null(conditioning.bounds) || !is.null(profile.weights)))
+                 (!is.null(pointwise) && !identical(pointwise, "local-wilson")) ||
+                 !is.null(conditioning.bounds) || !is.null(profile.weights)))
     stop("unsupported local-constant design-envelope calculation", call. = FALSE)
   if (!is.null(simultaneous) && !design && !(rms.envelope && !is.null(profile.weights)))
     stop("unsupported pairs-score simultaneous calculation", call. = FALSE)
@@ -444,13 +467,18 @@
     ans <- .np_conditional_design_intervals(center, point, design.scale, alpha, cuts,
                                             root.rms, se, draw.max, draw.rms.max)
     resolution <- .np_conditional_design_resolution(B, m, alpha)
-    return(c(ans, list(original = original, alpha = alpha, B = B, physical.bandwidth = h,
+    ans <- c(ans, list(original = original, alpha = alpha, B = B, physical.bandwidth = h,
       grid = grid, law = "inid", correction = "pairs-score", calibration = "percentile",
       primary = "fixed-X sharp-score and basic pairs pointwise envelope",
       conditioning = "selected bandwidths fixed; pairs resample X and Y jointly",
       endpoint.construction = "predictor-scaled and coordinate-RMS whole-grid maxima with outward pointwise protection",
       scope = "experimental local-constant conditional CDF, fixed unbounded Gaussian2 X and Y",
-      resolution = resolution, resolution.limited = resolution$limited, estimated.numerical.bytes = bytes)))
+      resolution = resolution, resolution.limited = resolution$limited, estimated.numerical.bytes = bytes))
+    if (identical(pointwise, "local-wilson")) {
+      ans <- .np_conditional_pairs_wilson_bands(ans, x, y, grid, h[1L], alpha, conditioning, cuts,
+        "local Wilson and basic pairs pointwise hull; predictor-scaled and coordinate-RMS joint maxima with sharp-score protection and outward nesting")
+    }
+    return(ans)
   }
   raw <- unname(quantile(draw.max, 1-alpha, type = 1L))
   radius <- max(raw, center - point[, 1L], point[, 2L] - center)
@@ -484,20 +512,10 @@
   else if (response.order > 2L || !is.null(conditioning))
     ans$range.construction <- "conservative chord enclosure of signed donor extrema"
   if (identical(pointwise, "local-wilson")) {
-    local <- .np_conditional_local_wilson(x, y, grid, h[1L], alpha, conditioning)
-    local[, 1L] <- pmin(center, center - cuts[3L, ], local[, 1L])
-    local[, 2L] <- pmax(center, center - cuts[2L, ], local[, 2L])
-    extended <- local[, 1L] < joint[, 1L] | local[, 2L] > joint[, 2L]
-    joint[, 1L] <- pmin(joint[, 1L], local[, 1L])
-    joint[, 2L] <- pmax(joint[, 2L], local[, 2L])
-    bonf[, 1L] <- pmin(bonf[, 1L], joint[, 1L])
-    bonf[, 2L] <- pmax(bonf[, 2L], joint[, 2L])
-    ans$bands <- list(pointwise = local, simultaneous = joint, bonferroni = bonf)
-    ans$pointwise.calibration <- "local-wilson"
-    ans$nested.coordinates <- which(extended)
-    ans$primary <- "positive local Wilson and basic pairs pointwise interval"
-    ans$conditioning <- "fixed bandwidths; joint pairs resampling; Wilson uses local homogeneity"
-    ans$endpoint.construction <- "local Wilson and basic pairs pointwise hull; original sharp-score joint radius with outward nesting"
+    ans <- .np_conditional_pairs_wilson_bands(ans, x, y, grid, h[1L], alpha, conditioning, cuts,
+      "local Wilson and basic pairs pointwise hull; original sharp-score joint radius with outward nesting")
+    joint <- ans$bands$simultaneous
+    bonf <- ans$bands$bonferroni
   }
   if (rms.envelope) {
     multiplier <- unname(quantile(draw.rms.max, 1-alpha, type = 1L))
