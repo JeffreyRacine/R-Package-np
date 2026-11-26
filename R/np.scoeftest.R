@@ -253,7 +253,7 @@ summary.scoeftest <- function(object, ...) {
     # H_ij = v_i' D_j K_ji. The same adjoint applies to every wild draw.
     adjoint <- .npscoef_batch_zero_solve(t(s$design[ids, , drop = FALSE]), gram)
     if (is.null(adjoint))
-      stop("A local coefficient design requires ridge regularization. The prototype supports nonsingular local fits; increase the null bandwidth or simplify X.", call. = FALSE)
+      stop("A local coefficient design requires ridge regularization. npscoeftest() requires nonsingular local fits. Increase the null bandwidth or simplify X.", call. = FALSE)
     .sct_check_hat_rows(s, ids, weights, adjoint, moments)
     fitted <- colSums(adjoint * moments[s$gram.terms + seq_len(p), , drop = FALSE])
     leverage <- weights[cbind(ids, seq_along(ids))] *

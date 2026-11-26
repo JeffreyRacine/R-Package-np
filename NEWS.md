@@ -112,7 +112,7 @@
   projection directions. Set `integration="exact"` for analytic angular
   integration. MPI distributes projection work and bootstrap draws across ranks.
 
-* All ten specification, significance and distribution tests default to 399
+* All eleven specification, significance and distribution tests default to 399
   bootstrap draws. Bootstrap P values use the proportion at least as extreme
   as the observed statistic (K/B), counting ties. Summaries
   display zero bootstrap exceedances as `0 (0 of B)` with the draw count,
