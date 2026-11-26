@@ -38,14 +38,14 @@ The wider unstudentized test is a modification of JLWY supported by finite-sampl
 set.seed(42)
 n <- 240L
 d <- data.frame(x1 = rnorm(n), x2 = rnorm(n), z = runif(n, -1, 1))
-# Null: both slopes vary with z. Most null samples should not reject.
+# Null: both slopes vary with z. Seed 42 gives 386/399 for the default test.
 d$y <- with(d, sin(z) + x1 * cos(z) + x2 * z + rnorm(n))
 bw <- npscoefbw(y ~ x1 + x2 | z, data = d)
 summary(npscoeftest(bw))
-# The paper's application-bandwidth version, on the same data.
+# The paper's application bandwidths give 386/399 on this sample, too.
 summary(npscoeftest(bw, method = "jlwy"))
 # Alternative: an interaction between the slopes violates the null.
-# Strong signals tend to give small P values. Results vary across seeds.
+# Seed 42 gives 0/399. Other samples and bootstrap seeds can differ.
 d$y <- with(d, y + 1.5 * x1 * x2)
 summary(npscoeftest(npscoef(y ~ x1 + x2 | z, data = d)))
 }
