@@ -38,6 +38,13 @@ use the multiplier \eqn{\sqrt{2}}. In 18 independent samples the 95\%
 simultaneous band covered all 18 untrimmed and trimmed grids. Full-grid
 widths were smaller on average and trimmed widths were slightly larger than
 with the common-radius comparison. Pointwise coverage was conservative.
+To select the local Wilson pointwise interval on this same model, use
+\code{np_conditional_bias_control("pairs-score", pointwise="local-wilson",
+simultaneous="design-envelope")}. The joint and Bonferroni bands retain their
+sharp-score protection and expand wherever needed to contain the selected
+marginal interval. In the same 18 samples, interior pointwise coverage was
+97.2\% untrimmed and 97.8\% trimmed, compared with about 99\% for sharp-score
+pointwise limits. The local Wilson component assumes local homogeneity.
 
 Selected bandwidths can leave residual smoothing bias. The sharp-score component
 concerns the smoothed functional. Coverage of the population CDF is empirical.

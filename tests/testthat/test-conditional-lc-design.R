@@ -4,8 +4,9 @@ test_that("the local-constant design envelope has a separate explicit control", 
   ctrl <- np_conditional_bias_control("pairs-score", simultaneous = "design-envelope")
   expect_identical(ctrl$version, 4L)
   expect_error(np_conditional_bias_control("analytic", simultaneous = "design-envelope"), "requires pairs-score")
-  expect_error(np_conditional_bias_control("pairs-score", "local-wilson", "design-envelope"),
-               "sharp-score")
+  local <- np_conditional_bias_control("pairs-score", "local-wilson", "design-envelope")
+  expect_identical(local$version, 5L)
+  expect_identical(local$pointwise, "local-wilson")
 })
 
 test_that("design-envelope Bonferroni diagnostics identify the actual finite ranks", {
@@ -44,6 +45,18 @@ test_that("the local-constant design envelope preserves its sharp-score marginal
   expect_true(all(joint$lower <= point$lower & joint$upper >= point$upper))
   expect_true(all(bonf$lower <= joint$lower & bonf$upper >= joint$upper))
   expect_false(identical(joint$lower, matrix.for(base, "simultaneous")$lower))
+  separate <- retrieve(np_conditional_bias_control("pairs-score", pointwise = "local-wilson"))
+  combined <- retrieve(np_conditional_bias_control("pairs-score", "local-wilson", "design-envelope"))
+  local <- matrix.for(separate, "pointwise")
+  cols <- c("lower", "upper")
+  expect_equal(matrix.for(combined, "pointwise")[cols], local[cols], tolerance = 2e-12)
+  for (scope in c("simultaneous", "bonferroni")) {
+    old <- matrix.for(alternative, scope)
+    z <- matrix.for(combined, scope)
+    expect_equal(z$lower, pmin(old$lower, local$lower), tolerance = 2e-12)
+    expect_equal(z$upper, pmax(old$upper, local$upper), tolerance = 2e-12)
+  }
+  expect_match(combined$inference[[1L]]$endpoint_construction, "local Wilson.*predictor-scaled")
 })
 
 test_that("the local-constant design option refuses polynomial conditional fits", {

@@ -6,10 +6,11 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
       !(identical(construction, "pairs-score") && identical(pointwise, "local-wilson")))
     stop("pointwise = 'local-wilson' requires construction = 'pairs-score'", call. = FALSE)
   if (identical(simultaneous, "design-envelope")) {
-    if (!identical(construction, "pairs-score") || !is.null(pointwise))
-      stop("design-envelope requires pairs-score with sharp-score pointwise protection", call. = FALSE)
-    return(structure(list(construction = construction, pointwise = NULL,
-                          simultaneous = simultaneous, version = 4L),
+    if (!identical(construction, "pairs-score"))
+      stop("design-envelope requires pairs-score", call. = FALSE)
+    version <- if (is.null(pointwise)) 4L else 5L
+    return(structure(list(construction = construction, pointwise = pointwise,
+                          simultaneous = simultaneous, version = version),
                      class = "np_conditional_bias_control"))
   }
   if (!is.null(simultaneous)) {
