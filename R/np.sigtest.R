@@ -643,7 +643,7 @@ npsigtest.npregression <-
 }
 
 .np_npsig_scalar_batch_eligible <- function(bws, n) {
-  n >= 96L && identical(bws[["regtype.engine", exact = TRUE]], "lc") &&
+  n >= 96L && npIsCanonicalLp0Spec(bws, ncon = bws$ncon) &&
     identical(bws$type, "fixed") && identical(bws$ckertype, "gaussian") &&
     isTRUE(bws$ckerorder == 2L) && identical(bws$ckerbound, "none") &&
     bws$ncon > 0L && !npUseContinuousTree(bws$ncon, bws)
