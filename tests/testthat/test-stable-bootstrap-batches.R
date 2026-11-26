@@ -21,6 +21,20 @@ test_that("batched categorical inference retains near-pooled and shifted contras
   }
 })
 
+test_that("categorical bootstrap batching follows the fitted polynomial degree", {
+  old <- options(np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+  eligible <- np:::.np_npsig_scalar_batch_eligible
+  # Use canonical engine metadata as carried by mixed-data bandwidth objects.
+  bw <- list(ncon = 2L, type = "fixed", ckertype = "gaussian", ckerorder = 2L,
+             ckerbound = "none", regtype.engine = "lp", degree.engine = c(0L, 0L))
+  expect_true(eligible(bw, 120L))
+  bw$degree.engine <- c(0L, 1L)
+  expect_false(eligible(bw, 120L))
+  bw$degree.engine <- c(1L, 1L)
+  expect_false(eligible(bw, 120L))
+})
+
 test_that("OLS projections and shared kernel rows preserve individual CMS draws", {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
