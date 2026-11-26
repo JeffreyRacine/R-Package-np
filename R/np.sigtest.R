@@ -176,7 +176,8 @@ if (getRversion() >= "2.15.1")
   local.idx <- seq_len(n.boot)
   local.idx <- local.idx[(local.idx - 1L) %% size == rank]
   local.vals <- as.numeric(unlist(.npRmpi_bootstrap_collective_apply(
-    n.boot, 8L, function(ids, pos) as.numeric(worker(ids, boot.seeds)),
+    n.boot, if (is.null(progress.context$tile.width)) 8L else progress.context$tile.width,
+    function(ids, pos) as.numeric(worker(ids, boot.seeds)),
     progress = if (!is.null(progress.context)) function(done) {
       progress.context$state <- .np_progress_step(progress.context$state, done = done)
     }, comm = comm), use.names = FALSE))
@@ -641,6 +642,68 @@ npsigtest.npregression <-
   ))
 }
 
+.np_npsig_scalar_batch_eligible <- function(bws, n) {
+  n >= 96L && identical(bws[["regtype.engine", exact = TRUE]], "lc") &&
+    identical(bws$type, "fixed") && identical(bws$ckertype, "gaussian") &&
+    isTRUE(bws$ckerorder == 2L) && identical(bws$ckerbound, "none") &&
+    bws$ncon > 0L && !npUseContinuousTree(bws$ncon, bws)
+}
+
+.np_npsig_scalar_batch_width <- function(n) {
+  as.integer(max(1, min(64, floor(16 * 1024^2 / (8 * 8 * as.double(n))))))
+}
+
+.np_npsig_scalar_batch <- function(bws, xdat, index, response, structural, context) {
+  n <- nrow(xdat)
+  if (is.integer(response)) storage.mode(response) <- "double"
+  bw <- kbandwidth(bws)
+  categories <- which(bws$iuno | bws$iord)
+  coordinate <- match(index, categories)
+  width <- max(1L, min(96L, floor(16 * 1024^2 /
+    (8 * as.double(n) * (4 + 2 * length(categories))))))
+  starts <- seq.int(1L, n, by = width)
+  residual <- matrix(0, n, ncol(response))
+  for (start in starts) {
+    rows <- seq.int(start, min(n, start + width - 1L))
+    level <- npksum(txdat = xdat, exdat = xdat[rows, , drop = FALSE],
+      bws = bw, return.kernel.weights = TRUE)
+    z <- .Call("C_np_sigtest_residual_block", level$kw, response, rows, PACKAGE = "npRmpi")
+    # Unidentified residuals need the ordinary owner's dependency certificates.
+    if (is.null(z)) return(NULL)
+    residual[rows, ] <- z
+  }
+  scale <- apply(abs(residual), 2L, max)
+  residual <- sweep(residual, 2L, ifelse(scale == 0, 1, scale), "/")
+  gradient <- stderr <- matrix(0, n, ncol(response))
+  for (start in starts) {
+    rows <- seq.int(start, min(n, start + width - 1L))
+    rows <- rows[!structural[rows, 1L]]
+    if (!length(rows)) next
+    # The permutation payload is the paired endpoint from the same kernel
+    # traversal as the level row. Two separately normalized hats lose digits.
+    level <- npksum(txdat = xdat, exdat = xdat[rows, , drop = FALSE],
+      bws = bw, compute.ocg = TRUE, return.kernel.weights = TRUE,
+      return.derivative.kernel.weights = TRUE)
+    alternate <- level$p.kw
+    if (length(categories) > 1L) {
+      alternate <- alternate[, , coordinate, drop = FALSE]
+      dim(alternate) <- c(n, length(rows))
+    }
+    pair <- .Call("C_np_sigtest_contrast_block", level$kw, alternate, response,
+                  residual, scale, PACKAGE = "npRmpi")
+    if (is.null(pair)) return(NULL)
+    gradient[rows, ] <- pair[[1L]]
+    stderr[rows, ] <- pair[[2L]]
+    structural[rows, 1L] <- pair[[3L]]
+  }
+  vapply(seq_len(ncol(response)), function(j) {
+    fit <- list(grad = gradient[, j, drop = FALSE], gerr = stderr[, j, drop = FALSE])
+    colnames(fit$grad) <- names(xdat)[index]
+    .np_npsig_statistic(fit, 1L, TRUE, structural = structural,
+      context = sprintf("%s (tile column %d)", context, j))
+  }, numeric(1L))
+}
+
 .np_npsig_streamed_iid_tile <- function(bws,
                                          xdat,
                                          tested.index,
@@ -681,9 +744,11 @@ npsigtest.npregression <-
   if (pivotal && !identical(mode, 1L)) {
     payload <- if (response.ready) response.matrix else donor.index
     n <- nrow(xdat)
+    use.batch <- is.null(.fit.cache) && .np_npsig_scalar_batch_eligible(bws, n)
     if (!is.matrix(payload) || !is.numeric(payload) || nrow(payload) != n ||
-        ncol(payload) < 1L || ncol(payload) > 8L || any(!is.finite(payload)))
-      stop("npsigtest response tile requires a finite n-by-at-most-8 payload", call. = FALSE)
+        ncol(payload) < 1L || ncol(payload) > (if (use.batch) 64L else 8L) || any(!is.finite(payload)))
+      stop(if (use.batch) "npsigtest response tile requires a finite n-by-at-most-64 payload"
+           else "npsigtest response tile requires a finite n-by-at-most-8 payload", call. = FALSE)
     if (!response.ready) {
       if (any(payload != floor(payload)) || any(payload < 1) || any(payload > n) ||
           length(null.mean) != n || length(residual.pool) != n ||
@@ -695,6 +760,11 @@ npsigtest.npregression <-
       structural <- .np_npsig_structure(bws, xdat, tested.index)
     if (all(structural))
       return(numeric(ncol(payload)))
+    if (use.batch) {
+      statistic <- .np_with_compiled_fit_progress("Computing bootstrap statistic", n,
+        expr = .npRmpi_with_local_regression(.np_npsig_scalar_batch(bws, xdat, tested.index, payload, structural, context)))
+      if (!is.null(statistic)) return(statistic)
+    }
     fit.total <- if (is.null(.fit.cache)) {
       reg.spec <- npValidatedConditionalRegSpec(bws,
         where = ".np_regression_direct", ncon.field = "ncon")
@@ -1590,7 +1660,8 @@ npsigtest.rbandwidth <- function(bws,
           .npRmpi_npsig_replay_check(task.idx, seed.plan)
           out <- numeric(length(task.idx))
           if (streamed.iid) {
-            tile.width <- 8L
+            tile.width <- if (pivot.use && is.factor(xdat[[i]]) &&
+              .np_npsig_scalar_batch_eligible(bws, num.obs)) .np_npsig_scalar_batch_width(num.obs) else 8L
             for (tile.start in seq.int(1L, length(task.idx), by = tile.width)) {
               tile.count <- min(tile.width, length(task.idx) - tile.start + 1L)
               tile.position <- tile.start:(tile.start + tile.count - 1L)
@@ -1734,6 +1805,8 @@ npsigtest.rbandwidth <- function(bws,
         if (boot.method != "pairwise")
           indiv.bindings <- c(indiv.bindings, list(mhat.xi = mhat.xi, ei = ei))
 
+        progress.context$tile.width <- if (streamed.iid && pivot.use &&
+          is.factor(xdat[[i]]) && .np_npsig_scalar_batch_eligible(bws, num.obs)) .np_npsig_scalar_batch_width(num.obs) else 8L
         progress.context$state <- progress
         progress.context$done <- progress$last_done
         progress.context$use.bootstrap.done <- TRUE

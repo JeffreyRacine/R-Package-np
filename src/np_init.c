@@ -5,6 +5,8 @@
 /* Routine registration for the npRmpi shared library. */
 
 /* .Call calls */
+extern SEXP C_np_sigtest_residual_block(SEXP, SEXP, SEXP);
+extern SEXP C_np_sigtest_contrast_block(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_pltest_angles(SEXP);
 extern SEXP C_np_pltest_prefix_scores(SEXP, SEXP, SEXP);
 extern SEXP C_np_pltest_angle_columns(SEXP, SEXP);
@@ -225,6 +227,8 @@ extern SEXP C_np_plot_udens_bb_draw(SEXP, SEXP);
 static const R_CallMethodDef CallEntries[] = {
   {"C_np_pltest_angle_columns", (DL_FUNC) &C_np_pltest_angle_columns, 2},
   {"C_np_pltest_prefix_scores", (DL_FUNC) &C_np_pltest_prefix_scores, 3},
+  {"C_np_sigtest_residual_block", (DL_FUNC) &C_np_sigtest_residual_block, 3},
+  {"C_np_sigtest_contrast_block", (DL_FUNC) &C_np_sigtest_contrast_block, 5},
   {"C_np_pltest_angles", (DL_FUNC) &C_np_pltest_angles, 1},
     {"C_np_indextest_score", (DL_FUNC) &C_np_indextest_score, 5},
     {"C_np_plot_udens_bb_draw", (DL_FUNC) &C_np_plot_udens_bb_draw, 2},

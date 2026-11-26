@@ -10510,10 +10510,10 @@ static int np_regression_scalar_ann_contrast_finish(
 /* Scalar fixed/GNN rows reproduce constants. Use the two resident endpoint
  * rows for both the centered categorical effect and its complete influence
  * covariance; never subtract their already rounded fitted responses. */
-static int np_regression_scalar_contrast_row(
+static inline int np_regression_scalar_contrast_row_impl(
   const NPRegressionScalarContrastContext *context, const int evaluation,
   const int num_weights, const double *left, const double *alternates,
-  const XL *support)
+  const XL *support, NPContrastNumber *prepared, int *prepared_anchor)
 {
   const int ranges=support == NULL ? 1 : support->n;
   NPContrastNumber left_sum=np_contrast_number(0.0);
@@ -10534,6 +10534,7 @@ static int np_regression_scalar_contrast_row(
   left_sum=np_contrast_two_sum(left_sum.hi,left_sum.lo);
   if(!np_contrast_finite(left_sum)) return 0;
   if(left_sum.hi == 0.0) {
+    if(prepared != NULL) return 0;
     for(int coordinate=context->categorical_range.begin;
         coordinate<context->categorical_range.end;++coordinate) {
       context->gradient[coordinate][evaluation]=NA_REAL;
@@ -10560,6 +10561,7 @@ static int np_regression_scalar_contrast_row(
     right_sum=np_contrast_two_sum(right_sum.hi,right_sum.lo);
     if(!np_contrast_finite(right_sum)) return 0;
     if(right_sum.hi == 0.0) {
+      if(prepared != NULL) return 0;
       context->gradient[coordinate][evaluation]=NA_REAL;
       if(context->want_variance) context->gradient_stderr[coordinate][evaluation]=0.0;
       continue;
@@ -10567,6 +10569,7 @@ static int np_regression_scalar_contrast_row(
     const int structural_zero=identical ||
       (left_count == 1 && right_count == 1 && left_donor == right_donor);
     if(structural_zero) {
+      if(prepared != NULL) { *prepared_anchor = -1; return 1; }
       context->gradient[coordinate][evaluation]=0.0;
       if(context->want_variance) {
         context->gradient_stderr[coordinate][evaluation]=0.0;
@@ -10594,7 +10597,7 @@ static int np_regression_scalar_contrast_row(
     if(anchor<0 || !R_FINITE(anchor_score)) return 0;
     const NPContrastRatio ratio=np_contrast_ratio_prepare(left_sum,right_sum);
     NPRegressionContrastAccumulator sum=np_regression_contrast_begin(
-      context->response[anchor],context->want_variance);
+      prepared == NULL ? context->response[anchor] : 0.0,context->want_variance);
     for(int range=0;range<ranges;++range) {
       const int start=support == NULL ? 0 : support->istart[range];
       const int end=support == NULL ? num_weights : start+support->nlev[range];
@@ -10608,6 +10611,10 @@ static int np_regression_scalar_contrast_row(
                                              right[donor],&left_exact));
         const NPContrastNumber coefficient=certified_zero ? np_contrast_number(0.0) :
           np_contrast_ratio_apply(&ratio,left[donor],right[donor]);
+        if(prepared != NULL) {
+          prepared[donor] = coefficient;
+          continue;
+        }
         np_regression_contrast_add(&sum,coefficient,context->response[donor],
           certified_zero,
           context->want_variance ?
@@ -10616,6 +10623,7 @@ static int np_regression_scalar_contrast_row(
           context->want_variance ? context->uncertainty->scaled_residual[donor] : 0.0);
       }
     }
+    if(prepared != NULL) { *prepared_anchor = anchor; return 1; }
     NPRegressionContrastResult result=np_regression_contrast_finish(&sum,
       context->want_variance ?
         (NPResidualInformation)context->uncertainty->residual_information[anchor] :
@@ -10640,6 +10648,26 @@ static int np_regression_scalar_contrast_row(
     }
   }
   return 1;
+}
+
+static int np_regression_scalar_contrast_row(
+  const NPRegressionScalarContrastContext *context, const int evaluation,
+  const int num_weights, const double *left, const double *alternates,
+  const XL *support)
+{
+  return np_regression_scalar_contrast_row_impl(context, evaluation, num_weights,
+    left, alternates, support, NULL, NULL);
+}
+
+/* The test consumer supplies a single dense pair of raw endpoint rows.
+ * The fitted estimator owns normalization, structural zeros and the anchor. */
+int np_sigtest_prepare_contrast(int n, const double *left, const double *right,
+                                NPContrastNumber *weights, int *anchor)
+{
+  NPRegressionScalarContrastContext geometry = {0};
+  geometry.categorical_range.end = 1;
+  return np_regression_scalar_contrast_row_impl(&geometry, 0, n, left, right,
+    NULL, weights, anchor);
 }
 
 /*

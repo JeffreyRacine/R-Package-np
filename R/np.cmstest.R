@@ -35,9 +35,25 @@
   model
 }
 
+# The retained design is the refit's input. Prepare it once even when the
+# caller omitted the fitted QR or subsequently replaced the retained matrix.
+.np_cms_bootstrap_qr <- function(model) {
+  x <- model[["x", exact = TRUE]]
+  if (!identical(class(model), "lm") || !is.null(model[["weights", exact = TRUE]]) ||
+      !is.null(model[["offset", exact = TRUE]]) || !is.matrix(x) ||
+      !is.numeric(x) || ncol(x) < 1L || nrow(x) <= ncol(x) ||
+      !identical(model[["rank", exact = TRUE]], ncol(x)))
+    return(NULL)
+  decomposition <- qr(x)
+  if (decomposition$rank != ncol(x) ||
+      rcond(qr.R(decomposition)) <= sqrt(.Machine$double.eps)) return(NULL)
+  decomposition
+}
+
 # One refit owner for serial and collective bootstrap callers. GLM working
 # weights are not observation weights; only its retained prior weights apply.
-.np_cms_refit_residuals <- function(model, y.star, tau = NULL) {
+.np_cms_refit_residuals <- function(model, y.star, tau = NULL, design.qr = NULL) {
+  if (!is.null(design.qr)) return(qr.resid(design.qr, y.star))
   if (!is.null(tau))
     return(residuals(rq(y.star ~ model$x - 1, tau = tau,
                         weights = model[["weights", exact = TRUE]]),
@@ -63,16 +79,50 @@
   as.integer(max(1, min(boot.num, progress.cap, by.memory)))
 }
 
+.np_cms_dense_eligible <- function(bw, n, pivot) {
+  isTRUE(pivot) && n >= 192L && inherits(bw, "kbandwidth") &&
+    identical(bw$type, "fixed") && identical(bw$ckertype, "gaussian") &&
+    identical(bw$ckerbound, "none") && bw$ncon > 0L &&
+    !npUseContinuousTree(bw$ncon, bw)
+}
+
+.np_cms_dense_statistics <- function(xdat, score, bw, fhat, prodh) {
+  n <- nrow(score)
+  rows.per.block <- max(1L, min(96L, floor(16 * 1024^2 / (32 * n))))
+  squared <- score^2
+  density <- rep_len(fhat, n)
+  first <- second <- numeric(ncol(score))
+  for (start in seq.int(1L, n, by = rows.per.block)) {
+    rows <- seq.int(start, min(n, start + rows.per.block - 1L))
+    kernel <- npksum(txdat = xdat, exdat = xdat[rows, , drop = FALSE],
+      bws = bw, bandwidth.divide = TRUE, return.kernel.weights = TRUE,
+      .np.internal.bandwidth.divide.weights = TRUE)[["kw", exact = TRUE]]
+    # Only an observation's own contribution is excluded. Ties remain.
+    kernel[cbind(rows, seq_along(rows))] <- 0
+    first <- first + colSums(score[rows, , drop = FALSE] *
+      crossprod(kernel, score) / density[rows])
+    second <- second + colSums(squared[rows, , drop = FALSE] *
+      crossprod(kernel * kernel, squared) / density[rows]^2)
+  }
+  In <- first / n^2
+  variance <- 2 * prodh * second / n^2
+  list(In = In, Omega.hat = variance, Jn = n * sqrt(prodh) * In / sqrt(variance))
+}
+
 .np_cms_statistics_batch <- function(xdat,
                                      score,
                                      bw,
                                      fhat,
                                      prodh,
                                      pivot,
-                                     kernel.args = list()) {
+                                     kernel.args = list(),
+                                     dense.batch = FALSE) {
   score <- as.matrix(score)
   n <- nrow(score)
   fhat <- as.numeric(fhat)
+  if (dense.batch && ncol(score) >= 8L && !length(kernel.args) &&
+      .np_cms_dense_eligible(bw, n, pivot))
+    return(.np_cms_dense_statistics(xdat, score, bw, fhat, prodh))
 
   ksum <- do.call(
     npksum,
@@ -172,7 +222,8 @@
                                                         statistic.batch,
                                                         method,
                                                         progress = NULL,
-                                                        comm = 1L) {
+                                                        comm = 1L, progress.cap = 16L) {
+  design.qr <- .np_cms_bootstrap_qr(model)
   boot.num <- nrow(plan)
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
@@ -189,7 +240,7 @@
   chunk.size <- .np_cms_bootstrap_chunk_size(
     n = length(model.resid),
     boot.num = max(1L, ceiling(boot.num / size)),
-    pivot = pivot
+    pivot = pivot, progress.cap = progress.cap
   )
 
   local.Sn <- as.numeric(unlist(.npRmpi_bootstrap_collective_apply(
@@ -201,7 +252,7 @@
         ii <- local.idx[[pos[[jj]]]]
         y.star <- yhat + model.resid * plan[ii, ]
         residuals.chunk[, jj] <-
-          .np_cms_refit_residuals(model, y.star)
+          .np_cms_refit_residuals(model, y.star, design.qr = design.qr)
       }
 
       statistic <- .npRmpi_with_local_regression(
@@ -256,7 +307,8 @@
                                                  pivot,
                                                  statistic.batch,
                                                  progress = NULL,
-                                                 comm = 1L) {
+                                                 comm = 1L, progress.cap = 16L) {
+  design.qr <- .np_cms_bootstrap_qr(model)
   boot.num <- nrow(plan)
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
@@ -273,7 +325,7 @@
   chunk.size <- .np_cms_bootstrap_chunk_size(
     n = length(model.resid),
     boot.num = max(1L, ceiling(boot.num / size)),
-    pivot = pivot
+    pivot = pivot, progress.cap = progress.cap
   )
 
   local.Sn <- as.numeric(unlist(.npRmpi_bootstrap_collective_apply(
@@ -285,7 +337,7 @@
         ii <- local.idx[[pos[[jj]]]]
         y.star <- yhat + model.resid[plan[ii, ]]
         residuals.chunk[, jj] <-
-          .np_cms_refit_residuals(model, y.star)
+          .np_cms_refit_residuals(model, y.star, design.qr = design.qr)
       }
 
       statistic <- .npRmpi_with_local_regression(
@@ -445,6 +497,7 @@ npcmstest <- function(formula,
   # Selection owns its dots. Every contraction uses its resolved kernel,
   # including manual bandwidths, scaling, nondefault kernels and bounds.
   kernel.bw <- kbandwidth(bw)
+  progress.cap <- if (.np_cms_dense_eligible(kernel.bw, n, pivot)) 64L else 16L
 
   ## Now define the Jn test statistic that takes arguments xdat, the
   ## residual vector, the bandwidth object, and the number of bootstrap
@@ -511,7 +564,7 @@ npcmstest <- function(formula,
       fhat = fhat,
       prodh = prodh,
       pivot = pivot,
-      kernel.args = list()
+      kernel.args = list(), dense.batch = TRUE
     )
   }
 
@@ -547,7 +600,7 @@ npcmstest <- function(formula,
 
     y.star <- yhat + model.resid * draw.wild.mult(length(model.resid), a, b, P.a)
     resid <-
-      .np_cms_refit_residuals(model, y.star)
+      .np_cms_refit_residuals(model, y.star, design.qr = design.qr)
     
     resid
   }
@@ -565,7 +618,7 @@ npcmstest <- function(formula,
 
     y.star <- yhat + model.resid * draw.wild.mult(length(model.resid), a, b, P.a)
     resid <-
-      .np_cms_refit_residuals(model, y.star)
+      .np_cms_refit_residuals(model, y.star, design.qr = design.qr)
     
     resid
   }
@@ -574,7 +627,7 @@ npcmstest <- function(formula,
 
     y.star <- yhat + model.resid[sample.int(length(model.resid), replace = TRUE)]
     resid <-
-      .np_cms_refit_residuals(model, y.star)
+      .np_cms_refit_residuals(model, y.star, design.qr = design.qr)
     
     resid
   }
@@ -592,6 +645,7 @@ npcmstest <- function(formula,
         model = model,
         pivot = pivot,
         statistic.batch = statistic.batch,
+        progress.cap = progress.cap,
         progress = progress
       )
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
@@ -611,6 +665,7 @@ npcmstest <- function(formula,
         model = model,
         pivot = pivot,
         statistic.batch = statistic.batch,
+        progress.cap = progress.cap,
         method = "wild",
         progress = progress
       )
@@ -631,16 +686,18 @@ npcmstest <- function(formula,
         model = model,
         pivot = pivot,
         statistic.batch = statistic.batch,
+        progress.cap = progress.cap,
         method = "wild-rademacher",
         progress = progress
       )
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
     } else {
+      design.qr <- .np_cms_bootstrap_qr(model)
       Sn.bootstrap <- numeric(B)
       chunk.size <- .np_cms_bootstrap_chunk_size(
         n = n,
         boot.num = B,
-        pivot = pivot
+        pivot = pivot, progress.cap = progress.cap
       )
       for (start in seq.int(1L, B, by = chunk.size)) {
         stopi <- min(B, start + chunk.size - 1L)
