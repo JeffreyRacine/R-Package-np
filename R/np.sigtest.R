@@ -642,14 +642,18 @@ npsigtest.npregression <-
   ))
 }
 
-.np_npsig_scalar_batch_eligible <- function(bws, n) {
-  n >= 96L && npIsCanonicalLp0Spec(bws, ncon = bws$ncon) &&
+.np_npsig_categorical_batch_eligible <- function(bws, n) {
+  n >= 96L &&
     identical(bws$type, "fixed") && identical(bws$ckertype, "gaussian") &&
     isTRUE(bws$ckerorder == 2L) && identical(bws$ckerbound, "none") &&
     bws$ncon > 0L && !npUseContinuousTree(bws$ncon, bws)
 }
 
-.np_npsig_scalar_batch_width <- function(n) {
+.np_npsig_scalar_batch_eligible <- function(bws, n) {
+  .np_npsig_categorical_batch_eligible(bws, n) && npIsCanonicalLp0Spec(bws, ncon = bws$ncon)
+}
+
+.np_npsig_categorical_batch_width <- function(n) {
   as.integer(max(1, min(64, floor(16 * 1024^2 / (8 * 8 * as.double(n))))))
 }
 
@@ -744,7 +748,7 @@ npsigtest.npregression <-
   if (pivotal && !identical(mode, 1L)) {
     payload <- if (response.ready) response.matrix else donor.index
     n <- nrow(xdat)
-    use.batch <- is.null(.fit.cache) && .np_npsig_scalar_batch_eligible(bws, n)
+    use.batch <- is.null(.fit.cache) && .np_npsig_categorical_batch_eligible(bws, n)
     if (!is.matrix(payload) || !is.numeric(payload) || nrow(payload) != n ||
         ncol(payload) < 1L || ncol(payload) > (if (use.batch) 64L else 8L) || any(!is.finite(payload)))
       stop(if (use.batch) "npsigtest response tile requires a finite n-by-at-most-64 payload"
@@ -760,11 +764,15 @@ npsigtest.npregression <-
       structural <- .np_npsig_structure(bws, xdat, tested.index)
     if (all(structural))
       return(numeric(ncol(payload)))
-    if (use.batch) {
+    if (use.batch && is.integer(payload)) storage.mode(payload) <- "double"
+    scalar <- use.batch && .np_npsig_scalar_batch_eligible(bws, n)
+    if (scalar) {
       statistic <- .np_with_compiled_fit_progress("Computing bootstrap statistic", n,
         expr = .npRmpi_with_local_regression(.np_npsig_scalar_batch(bws, xdat, tested.index, payload, structural, context)))
       if (!is.null(statistic)) return(statistic)
     }
+    replay <- use.batch && !scalar && ncol(payload) > 1L &&
+      max(abs(payload)) <= sqrt(.Machine$double.xmax / n)
     fit.total <- if (is.null(.fit.cache)) {
       reg.spec <- npValidatedConditionalRegSpec(bws,
         where = ".np_regression_direct", ncon.field = "ncon")
@@ -784,13 +792,25 @@ npsigtest.npregression <-
             label = "Fitting regression", total = fit.total,
             expr = .np_regression_direct(bws = bws, txdat = xdat,
               tydat = payload[, column], gradients = TRUE, se = TRUE,
-              gradient.coordinate = tested.index)))
+              gradient.coordinate = tested.index,
+              bootstrap.responses = if (replay && column == 1L)
+                payload else NULL)))
         } else {
           .npRmpi_npsig_npreg_local(bws = bws, txdat = xdat,
             tydat = payload[, column], gradients = TRUE, se = TRUE)
         }
         if (!is.null(.fit.cache))
           .fit.cache[["fits"]][[column]] <- fit
+      }
+      tile <- if (replay && column == 1L) fit[["bootstrap", exact = TRUE]]
+      if (!is.null(tile)) {
+        return(vapply(seq_len(ncol(payload)), function(j) {
+          component <- list(grad = tile[[1L]][, j, drop = FALSE],
+                            gerr = tile[[2L]][, j, drop = FALSE])
+          colnames(component$grad) <- names(xdat)[tested.index]
+          .np_npsig_statistic(component, 1L, TRUE, structural = structural,
+            context = sprintf("%s (tile column %d)", context, j))
+        }, numeric(1L)))
       }
       result[[column]] <- .np_npsig_statistic(fit, tested.index, TRUE,
         structural = structural,
@@ -1661,7 +1681,7 @@ npsigtest.rbandwidth <- function(bws,
           out <- numeric(length(task.idx))
           if (streamed.iid) {
             tile.width <- if (pivot.use && is.factor(xdat[[i]]) &&
-              .np_npsig_scalar_batch_eligible(bws, num.obs)) .np_npsig_scalar_batch_width(num.obs) else 8L
+              .np_npsig_categorical_batch_eligible(bws, num.obs)) .np_npsig_categorical_batch_width(num.obs) else 8L
             for (tile.start in seq.int(1L, length(task.idx), by = tile.width)) {
               tile.count <- min(tile.width, length(task.idx) - tile.start + 1L)
               tile.position <- tile.start:(tile.start + tile.count - 1L)
@@ -1806,7 +1826,7 @@ npsigtest.rbandwidth <- function(bws,
           indiv.bindings <- c(indiv.bindings, list(mhat.xi = mhat.xi, ei = ei))
 
         progress.context$tile.width <- if (streamed.iid && pivot.use &&
-          is.factor(xdat[[i]]) && .np_npsig_scalar_batch_eligible(bws, num.obs)) .np_npsig_scalar_batch_width(num.obs) else 8L
+          is.factor(xdat[[i]]) && .np_npsig_categorical_batch_eligible(bws, num.obs)) .np_npsig_categorical_batch_width(num.obs) else 8L
         progress.context$state <- progress
         progress.context$done <- progress$last_done
         progress.context$use.bootstrap.done <- TRUE

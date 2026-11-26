@@ -37,7 +37,7 @@ SEXP C_np_regression(SEXP tuno,
   int nc = asInteger(ncol);
   int request = asInteger(output_request);
   SEXP gradient_coordinate = PROTECT(getAttrib(output_request, install(".np.gradient.coordinate")));
-  NPRegressionGradientRequest gradient_request;
+  NPRegressionGradientRequest gradient_request = {0};
   const NPRegressionGradientRequest *gradient_request_ptr = NULL;
   int variance_unavailable = 0;
   int *gradient_zero_out = NULL;
@@ -130,6 +130,22 @@ SEXP C_np_regression(SEXP tuno,
   num_eval = (int)INTEGER(myopti_i)[REG_ENOBSI];
   train_is_eval = (int)INTEGER(myopti_i)[REG_TISEI];
   ey_is_ty = (int)INTEGER(myopti_i)[REG_EY];
+  if(gradient_request_ptr != NULL) {
+    SEXP responses = getAttrib(output_request, install(".np.sigtest.responses"));
+    if(responses != R_NilValue) {
+      if(!train_is_eval || num_train != num_eval || en != num_train ||
+         INTEGER(myopti_i)[REG_DOTREEI] != NP_TREE_FALSE ||
+         INTEGER(myopti_i)[REG_LL] != NP_LP_ENGINE_GENERAL ||
+         INTEGER(myopti_i)[REG_BWI] != BW_FIXED ||
+         descriptor.family != NP_CKERNEL_FAMILY_LEGACY)
+        error("polynomial significance batching requires a dense fixed training fit");
+#ifdef MPI2
+      if(!np_mpi_local_regression_active() && iNum_Processors > 1)
+        error("polynomial significance batching requires rank-local regression");
+#endif
+      gradient_request.bootstrap = np_sigtest_lp_begin(responses, num_train);
+    }
+  }
   if(XLENGTH(ty_r) < num_train)
     error("C_np_regression: training-response buffer is too short");
   /* An absent evaluation response aliases training y only at training
@@ -325,6 +341,8 @@ SEXP C_np_regression(SEXP tuno,
   SET_STRING_ELT(out_names, 4, mkChar("xtra"));
   setAttrib(out, R_NamesSymbol, out_names);
 
+  if(gradient_request.bootstrap != NULL)
+    np_sigtest_lp_attach(gradient_request.bootstrap, out);
   if(empty_rows.count > 0)
     setAttrib(out, install(".np.empty.rows"), empty_flags);
   if(variance_unavailable)

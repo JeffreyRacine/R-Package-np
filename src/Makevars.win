@@ -7,7 +7,7 @@ endif
 PKG_CPPFLAGS = -I"$(MPI_HOME)/Inc" -DMPI2 -DWin32
 
 all: $(SHLIB)
-sigtest_batch.o: regression_contrast.h regression_residual.h
+np.o jksum.o sigtest_batch.o: sigtest_lp_batch.h regression_contract.h regression_contrast.h regression_residual.h
 
 ifeq "$(WIN)" "64" 
 PKG_LIBS     = -L. -lmsmpi64 $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)

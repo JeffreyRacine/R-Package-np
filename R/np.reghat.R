@@ -1778,7 +1778,8 @@ npreghat <-
                                   gradient.order = 1L,
                                   local.mode = FALSE, allow.empty.rows = FALSE,
                                   gradient.coordinate = NULL,
-                                  fit.projection = FALSE, fit.inference = FALSE) {
+                                  fit.projection = FALSE, fit.inference = FALSE,
+                                  bootstrap.responses = NULL) {
   no.ex <- is.null(exdat)
   inference.identity <- if (isTRUE(fit.inference))
     list(bws=bws, xdat=toFrame(txdat),
@@ -2058,6 +2059,9 @@ npreghat <-
       gradient.coordinate, c(which(bws[["icon", exact = TRUE]]),
         which(bws[["iuno", exact = TRUE]]), which(bws[["iord", exact = TRUE]]))))
 
+  if (!is.null(bootstrap.responses))
+    attr(output.request, ".np.sigtest.responses") <- bootstrap.responses
+
   myout <- .np_with_nn_radius_context(.Call(
     "C_np_regression",
     asDouble(tuno), asDouble(tord), asDouble(tcon), as.double(tydat),
@@ -2091,6 +2095,8 @@ npreghat <-
 
   .npreg_report_variance_unavailable(myout)
   out <- list(mean = mean.out)
+  if (!is.null(bootstrap.responses))
+    out$bootstrap <- attr(myout, ".np.sigtest.batch", exact = TRUE)
   if (isTRUE(fit.projection) || isTRUE(fit.inference))
     out$fit.projection <- attr(myout, ".np.fit.projection", exact = TRUE)
   if (isTRUE(fit.inference)) {

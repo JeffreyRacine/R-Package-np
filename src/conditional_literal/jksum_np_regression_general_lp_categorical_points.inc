@@ -16,6 +16,8 @@ static NP_ALWAYS_INLINE int np_regression_general_lp_categorical_points(
   if(call == NULL || owner == NULL || owner->categorical_point == NULL)
     return 0;
   const int compute_pair = call->ordinary_response;
+  NPSigtestLPBatch *bootstrap = compute_hc0 && call->hc0_context->gradient_request != NULL ?
+    call->hc0_context->gradient_request->bootstrap : NULL;
 
   if(call->categorical_point_invariant) {
     for(coordinate = call->categorical_range.begin - call->num_reg_continuous;
@@ -41,6 +43,7 @@ static NP_ALWAYS_INLINE int np_regression_general_lp_categorical_points(
     double alternate_point;
 
     if(current == alternate) {
+      if(bootstrap != NULL) np_sigtest_lp_contrast(bootstrap, row, -1, 1.0);
       owner->categorical_point[coordinate] = 0.0;
       if(compute_hc0) {
         owner->categorical_stderr[coordinate] = 0.0;
@@ -83,7 +86,8 @@ static NP_ALWAYS_INLINE int np_regression_general_lp_categorical_points(
              call->num_reg_continuous + coordinate][row] : NULL,
          compute_hc0 && call->hc0_context->gradient_structural_zero != NULL ?
            &call->hc0_context->gradient_structural_zero[
-             call->num_reg_continuous + coordinate][row] : NULL))
+             call->num_reg_continuous + coordinate][row] : NULL,
+         bootstrap, row, 1.0))
       return 0;
   }
 
@@ -100,6 +104,7 @@ static NP_ALWAYS_INLINE int np_regression_general_lp_categorical_points(
     int index;
 
     if(count <= 1) {
+      if(bootstrap != NULL) np_sigtest_lp_contrast(bootstrap, row, -1, 1.0);
       owner->categorical_point[category] = 0.0;
       if(compute_hc0) {
         owner->categorical_stderr[category] = 0.0;
@@ -157,7 +162,8 @@ static NP_ALWAYS_INLINE int np_regression_general_lp_categorical_points(
              call->num_reg_continuous + category][row] : NULL,
          compute_hc0 && call->hc0_context->gradient_structural_zero != NULL ?
            &call->hc0_context->gradient_structural_zero[
-             call->num_reg_continuous + category][row] : NULL))
+             call->num_reg_continuous + category][row] : NULL,
+         bootstrap, row, sign))
       return 0;
     if(compute_pair) owner->categorical_point[category] *= sign;
   }
