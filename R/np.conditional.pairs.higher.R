@@ -66,18 +66,8 @@
     if (rms) {
       # Working around an observed donor avoids forming tiny deviations by
       # subtracting conditional probabilities which have rounded to one.
-      centered <- function(weights, response) {
-        anchor <- max.col(t(weights), ties.method = "first")
-        shift <- response[cbind(anchor[z$ix], iy)]
-        W <- weights[, z$ix, drop = FALSE]
-        deviation <- sweep(response[, iy, drop = FALSE], 2L, shift, "-")
-        total <- colSums(W)
-        mean <- colSums(W * deviation) / total
-        numerator <- W * sweep(deviation, 2L, mean, "-")
-        list(numerator = numerator, original = colSums(numerator) / total)
-      }
-      a <- centered(z$w, main.y)
-      b <- centered(z$jw, wide.y)
+      a <- .np_conditional_centered_donors(z$w, main.y, z$ix, iy)
+      b <- .np_conditional_centered_donors(z$jw, wide.y, z$ix, iy)
       plan$stable <- list(main = a$numerator, wide = b$numerator,
                           center = 2 * a$original - b$original)
     }

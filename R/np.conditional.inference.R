@@ -5,6 +5,13 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
   if (!is.null(pointwise) &&
       !(identical(construction, "pairs-score") && identical(pointwise, "local-wilson")))
     stop("pointwise = 'local-wilson' requires construction = 'pairs-score'", call. = FALSE)
+  if (identical(simultaneous, "design-envelope")) {
+    if (!identical(construction, "pairs-score") || !is.null(pointwise))
+      stop("design-envelope requires pairs-score with sharp-score pointwise protection", call. = FALSE)
+    return(structure(list(construction = construction, pointwise = NULL,
+                          simultaneous = simultaneous, version = 4L),
+                     class = "np_conditional_bias_control"))
+  }
   if (!is.null(simultaneous)) {
     if (!(identical(construction, "pairs-score") && identical(simultaneous, "rms-envelope")))
       stop("simultaneous = 'rms-envelope' requires construction = 'pairs-score'", call. = FALSE)
@@ -33,13 +40,26 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
         c("analytic", "jackknife", "jackknife-mp1", "pairs-score"), TRUE) ||
       (!is.null(pointwise) && !(identical(pointwise, "local-wilson") &&
         identical(control[["construction", exact = TRUE]], "pairs-score"))) ||
-      (!is.null(simultaneous) && !(identical(simultaneous, "rms-envelope") &&
+      (!is.null(simultaneous) && !((identical(simultaneous, "rms-envelope") || identical(simultaneous, "design-envelope")) &&
         identical(control[["construction", exact = TRUE]], "pairs-score"))) ||
       !identical(control, np_conditional_bias_control(control[["construction", exact = TRUE]], pointwise, simultaneous)))
     stop("invalid np_conditional_bias_control object", call. = FALSE)
   if (!identical(center, "bias-corrected") ||
       !method %in% c("bootstrap", "asymptotic"))
     stop('conditional bias.control requires center="bias-corrected" and errors="asymptotic" or "bootstrap"', call. = FALSE)
+  if (identical(simultaneous, "design-envelope")) {
+    spec <- npConditionalRegEngineSpec(bws, where = "conditional CDF design envelope")
+    local.constant <- identical(bws[["regtype"]], "lc") && identical(spec$reg.engine, "lc")
+    if (!cdf || method != "bootstrap" || !identical(law, "inid") ||
+        !identical(calibration, "default") || isTRUE(gradients) || isTRUE(quantreg) || isTRUE(proper) ||
+        !local.constant ||
+        bws$xndim != 1L || bws$xncon != 1L || bws$yndim != 1L || bws$yncon != 1L ||
+        !identical(bws$type, "fixed") || !identical(bws$cxkertype, "gaussian") ||
+        !identical(bws$cykertype, "gaussian") || bws$cxkerorder != 2L || bws$cykerorder != 2L ||
+        any(is.finite(c(bws$cxkerlb, bws$cxkerub, bws$cykerlb, bws$cykerub))))
+      stop("design-envelope requires conditional CDF levels, inid percentile pairs, one continuous X and Y, and fixed unbounded Gaussian2 local-constant fits", call. = FALSE)
+    return(TRUE)
+  }
   compact.response <- identical(control$construction, "pairs-score") && bws$cykertype %in% c("epanechnikov", "uniform")
   beta.response <- identical(control$construction, "pairs-score") && identical(bws$cykertype, "beta") &&
     identical(bws$cykerbound, "fixed") && length(bws$cykerlb) == 1L && length(bws$cykerub) == 1L &&
@@ -199,7 +219,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
 }
 
 .np_conditional_inference <- function(x, y, grid, h, cdf, method, calibration,
-                                      B=9999L, alpha=.05, cdf.centers=NULL, construction=NULL, response.kernel="gaussian", pointwise=NULL, response.bounds=NULL, response.order=2L, conditioning.bounds=NULL) {
+                                      B=9999L, alpha=.05, cdf.centers=NULL, construction=NULL, response.kernel="gaussian", pointwise=NULL, response.bounds=NULL, response.order=2L, conditioning.bounds=NULL, simultaneous=NULL) {
   allocation <- .np_conditional_workspace(x, y, grid, h, B, identical(construction, "pairs-score"))
   B <- allocation$B
   if (!is.numeric(alpha) || length(alpha)!=1L || !is.finite(alpha) || alpha<=0 || alpha>=.5)
@@ -211,7 +231,7 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
       stop("invalid conditional CDF pairs-score inputs", call. = FALSE)
     .np_conditional_runtime_admit(length(x), B)
     return(.np_conditional_pairs_score(x, y, grid, h, B, alpha, cdf.centers[, 1L],
-                                       allocation$estimated.bytes, allocation[["tile.size"]], response.kernel, pointwise, response.bounds, response.order, conditioning.bounds))
+                                       allocation$estimated.bytes, allocation[["tile.size"]], response.kernel, pointwise, response.bounds, response.order, conditioning.bounds, simultaneous=simultaneous))
   }
   if (!is.logical(cdf) || length(cdf)!=1L || is.na(cdf) ||
       !method %in% c("asymptotic", "bootstrap") ||
@@ -321,9 +341,20 @@ np_conditional_bias_control <- function(construction = c("analytic", "jackknife"
     cc <- if(cdf) .np_conditional_cdf_centers(bws,x,y,ex,ey) else NULL
     a <- .np_conditional_inference(x[[1L]],y[[1L]],grid,h,cdf,method,calibration,B,alpha,cc,construction,response.kernel=bws$cykertype,pointwise=pointwise,
                                    response.bounds=if (identical(bws$cykertype, "beta")) c(bws$cykerlb, bws$cykerub), response.order=bws$cykerorder,
-                                   conditioning.bounds=if (identical(bws$cxkertype, "beta")) c(bws$cxkerlb, bws$cxkerub))
+                                   conditioning.bounds=if (identical(bws$cxkertype, "beta")) c(bws$cxkerlb, bws$cxkerub),
+                                   simultaneous=simultaneous)
   }
-  if(isTRUE(a$resolution.limited)) .np_warning(paste(a$law, "Bonferroni tails have limited finite-draw resolution; increase B for better tail resolution"))
+  if (isTRUE(a$resolution.limited)) {
+    if (identical(simultaneous, "design-envelope")) {
+      if (band %in% c("all", "bonferroni"))
+        .np_warning(sprintf(paste("Bonferroni tails on %d targets use order statistics",
+          "%d and %d of %d. The empirical tails cannot resolve the requested probability;",
+          "the reported limits include the simultaneous band."),
+          a$resolution$family.size, a$resolution$lower.index, a$resolution$upper.index, B))
+    } else {
+      .np_warning(paste(a$law, "Bonferroni tails have limited finite-draw resolution; increase B for better tail resolution"))
+    }
+  }
   widths <- lapply(a$bands,function(v)cbind(lower=a$center-v[,1L],upper=v[,2L]-a$center,center=a$center))
   chosen <- if(band=="all") "simultaneous" else band
   list(err=widths[[chosen]], all.err=widths, inference=a)

@@ -5,7 +5,7 @@
 \strong{Bias-corrected bounds are experimental (pre-beta research), incomplete,
 and not recommended for general-purpose inference.} See the experimental-status
 section below.
-Selects explicitly the experimental local-constant conditional
+Selects explicitly experimental conditional
 inference constructions. Existing plots and methods are unchanged when this
 control is omitted.}
 \usage{
@@ -28,7 +28,24 @@ simultaneous family consists of the coordinates in each requested panel.
 All-zero bootstrap coordinates contribute zero to the scaled maximum.
 For Epanechnikov conditioning, every requested original and resampled denominator
 must be positive at both bandwidths. Sparse full-range plots can therefore
-refuse; a trimmed grid is a distinct user request. All received pairs draws are retained.}
+refuse; a trimmed grid is a distinct user request. All received pairs draws are retained.
+
+For a local-constant conditional CDF with one continuous X and Y and fixed
+unbounded second-order Gaussian kernels, \code{"design-envelope"} keeps the
+sharp-score pointwise interval and uses predictor-scaled and coordinate-RMS
+whole-grid maxima on the same independent pairs draws. Both pilot bandwidths
+use the multiplier \eqn{\sqrt{2}}. In 18 independent samples the 95\%
+simultaneous band covered all 18 untrimmed and trimmed grids. Full-grid
+widths were smaller on average and trimmed widths were slightly larger than
+with the common-radius comparison. Pointwise coverage was conservative.
+
+Selected bandwidths can leave residual smoothing bias. The sharp-score component
+concerns the smoothed functional. Coverage of the population CDF is empirical.
+The \code{resolution} field gives the two actual type-1 Bonferroni order
+statistics, expected draws per tail and their ranks using denominator
+\eqn{B+1}. A 50-by-50 grid at 9,999 draws uses the sample extremes; these
+marginal quantiles do not resolve the requested 95\% family calibration.
+Reported endpoints retain their original scale.}
 \item{pointwise}{For pairs-score intervals, the default uses sharp-score pointwise protection.
 With fixed Gaussian conditioning and an unbounded Gaussian or Epanechnikov response kernel
 of order 2, 4, 6 or 8, a uniform response kernel, or a beta2 response on known finite support, explicitly
@@ -42,9 +59,10 @@ requested grid. Known-support beta2 conditioning is also available with a Gaussi
 \value{A validated control object for the \code{bias.control} argument of
 \code{plot} applied to \code{npcdist} or \code{npcdens} fits or bandwidths.}
 \details{
-These are experimental opt-ins for local constant, one continuous explanatory
-variable and one continuous response, fixed unbounded second-order Gaussian
-kernels. The explicit pairs-score construction also admits an unbounded
+The analytic and jackknife constructions use local-constant fits, one
+continuous explanatory variable and one continuous response, with fixed
+unbounded second-order Gaussian kernels. The pairs constructions admit the
+additional configurations described here and under the simultaneous argument. The explicit pairs-score construction also admits an unbounded
 Gaussian or Epanechnikov response kernel of order 2, 4, 6 or 8,
 a uniform response kernel, and a beta2 response on known finite
 support with Gaussian explanatory smoothing. Fixed beta2 conditioning on known finite support admits unbounded Gaussian2 or known-support beta2 responses. Conditioning weights use the fitted beta density at both bandwidth scales. For beta responses the donor range is
@@ -132,8 +150,9 @@ change either existing analytic SD bootstrap construction.
 A nominal marginal sharp-score safeguard uses the certified range of each
 signed contribution and its heterogeneous variance bound. It augments the
 Gaussian or bootstrap intervals. The density asymptotic and jackknife-MP1 constructions use a
-marginal hull. The pairs-score construction uses one absolute radius across
-all targets. The analytic pilot bootstrap and analytic CDF asymptotic bands
+marginal hull. The original local-constant pairs-score construction uses one absolute radius
+across all targets. The design-scaled and RMS constructions use the
+whole-family maxima described above. The analytic pilot bootstrap and analytic CDF asymptotic bands
 propagate required widths within explanatory slices. Companion hulls protect interval nesting. These are
 approximate confidence constructions, not finite-sample honesty guarantees.
 No clipping, positivity projection or forced properness is applied to corrected

@@ -213,22 +213,39 @@
   }
 }
 
-.np_conditional_pairs_prepare <- function(x, y, grid, h, alpha, response.kernel = "gaussian") {
+.np_conditional_centered_donors <- function(weights, response, ix, iy) {
+  anchor <- max.col(t(weights), ties.method = "first")
+  shift <- response[cbind(anchor[ix], iy)]
+  W <- weights[, ix, drop = FALSE]
+  deviation <- sweep(response[, iy, drop = FALSE], 2L, shift, "-")
+  total <- colSums(W)
+  mean <- colSums(W * deviation) / total
+  numerator <- W * sweep(deviation, 2L, mean, "-")
+  list(numerator = numerator, original = colSums(numerator) / total)
+}
+
+.np_conditional_pairs_prepare <- function(x, y, grid, h, alpha, response.kernel = "gaussian", design = FALSE) {
   z <- .np_conditional_jack_context(.np_conditional_den_context(x, y, grid, h, pairs.score = TRUE))
   delta <- outer(y, z$gy, function(a, b) b - a)
   primitive <- switch(response.kernel, gaussian = pnorm, epanechnikov = .np_conditional_epan_cdf,
     uniform = function(u) stats::punif(u, -1, 1),
     stop("unsupported response kernel for conditional CDF pairs-score", call. = FALSE))
-  numerator <- function(weight, width) {
-    weight[, z$ix, drop = FALSE] * primitive(delta / width)[, z$iy, drop = FALSE]
-  }
-  main <- numerator(z$w, h[2L])
-  wide <- numerator(z$jw, z$H[2L])
+  main.y <- primitive(delta / h[2L])
+  wide.y <- primitive(delta / z$H[2L])
+  main <- z$w[, z$ix, drop = FALSE] * main.y[, z$iy, drop = FALSE]
+  wide <- z$jw[, z$ix, drop = FALSE] * wide.y[, z$iy, drop = FALSE]
   center <- 2 * colSums(main) - colSums(wide)
-  score <- .np_conditional_range_interval(center, .np_conditional_pairs_range(z, response.kernel),
-                                          "sharp-score", alpha)
+  bounds <- .np_conditional_pairs_range(z, response.kernel)
+  score <- .np_conditional_range_interval(center, bounds, "sharp-score", alpha)
   plan <- list(ix = z$ix, w = z$w, jw = z$jw, main = main, wide = wide, center = center)
-  list(plan = plan, score = score)
+  if (!design) return(list(plan = plan, score = score))
+  a <- .np_conditional_centered_donors(z$w, main.y, z$ix, z$iy)
+  b <- .np_conditional_centered_donors(z$jw, wide.y, z$ix, z$iy)
+  plan$stable <- list(main = a$numerator, wide = b$numerator, center = 2*a$original - b$original)
+  scale <- bounds$span * sqrt(colSums(bounds$q^2))
+  if (any(!is.finite(scale) | scale <= 0))
+    stop("undefined local-constant CDF design scale", call. = FALSE)
+  list(plan = plan, score = score, scale = scale)
 }
 
 .np_conditional_pairs_allocation <- function(n, m, B) {
@@ -292,7 +309,15 @@
 
   # The explicit standardized maximum needs a second numerical root per
   # target and draw. Both use the same counts, denominator and worker task.
-  if (identical(simultaneous, "rms-envelope") && !is.null(profile.weights)) {
+  design <- identical(simultaneous, "design-envelope")
+  rms.envelope <- identical(simultaneous, "rms-envelope")
+  if (design && (!identical(response.kernel, "gaussian") || response.order != 2L ||
+                 !is.null(pointwise) || !is.null(conditioning.bounds) || !is.null(profile.weights)))
+    stop("unsupported local-constant design-envelope calculation", call. = FALSE)
+  if (!is.null(simultaneous) && !design && !(rms.envelope && !is.null(profile.weights)))
+    stop("unsupported pairs-score simultaneous calculation", call. = FALSE)
+  scaled <- design || rms.envelope
+  if (scaled) {
     cap <- 256 * 1024^2
     nx <- length(unique(grid$x))
     ny <- length(unique(grid$y))
@@ -315,16 +340,14 @@
     if (bytes > 256 * 1024^2)
       stop("local Wilson numerical workspace exceeds the 256 MiB budget", call. = FALSE)
   }
-  rms.envelope <- identical(simultaneous, "rms-envelope")
-  if (!is.null(simultaneous) && (!rms.envelope || is.null(profile.weights)))
-    stop("unsupported pairs-score simultaneous calculation", call. = FALSE)
-  if (rms.envelope) {
+  if (scaled) {
     bytes <- bytes + 64 * as.double(B) + 32 * m
     if (bytes > 256 * 1024^2)
       stop("RMS envelope exceeds the 256 MiB numerical workspace", call. = FALSE)
     draw.rms.max <- numeric(B)
     root.rms <- numeric(m)
   }
+  if (design) design.scale <- numeric(m)
   conditioning <- NULL
   if (!is.null(conditioning.bounds) || !is.null(profile.weights)) {
     targets <- unique(grid$x)
@@ -360,7 +383,13 @@
   draw.max <- numeric(B)
   for (first in seq.int(1L, m, by = tile.size)) {
     idx <- seq.int(first, min(m, first + tile.size - 1L))
-    tile <- prepare(x, y, grid[idx, , drop = FALSE], h, alpha, response.kernel)
+    tile.grid <- grid[idx, , drop = FALSE]
+    if (design) {
+      tile <- .np_conditional_pairs_prepare(x, y, tile.grid, h, alpha, response.kernel, design = TRUE)
+      design.scale[idx] <- tile$scale
+    } else {
+      tile <- prepare(x, y, tile.grid, h, alpha, response.kernel)
+    }
     if (first == 1L) {
       # Every target sees exactly the same coordinator-generated pairs draws.
       prob <- rep(1 / n, n)
@@ -371,21 +400,21 @@
       attr(tasks, "rng_final_state") <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
     }
     if (first == 1L && (tiled || !is.null(conditioning)))
-      .np_conditional_pairs_support(x, targets, h[1L], tasks, conditioning)
+      .np_conditional_pairs_support(x, unique(grid$x), h[1L], tasks, conditioning)
     if (tiled) {
       tile$plan$tile.label <- sprintf("Conditional inference, target tile %d of %d",
                                      (first - 1L) %/% tile.size + 1L, ceiling(m / tile.size))
     }
     roots <- .np_conditional_dispatch(tasks, tile$plan, "pairs-score",
-                                      length(idx) * if (rms.envelope) 2L else 1L)
+                                      length(idx) * if (scaled) 2L else 1L)
     if (!is.null(profile.weights)) original[idx] <- colSums(tile$plan$main)
     center[idx] <- tile$plan$center
-    if (tiled || rms.envelope) {
+    if (tiled || scaled) {
       for (i in seq_along(idx)) {
         v <- roots[i, ]
         se[idx[i]] <- sd(v)
         cuts[, idx[i]] <- quantile(v, probs, type = 1L, names = FALSE)
-        draw.max <- pmax(draw.max, abs(v))
+        draw.max <- pmax(draw.max, if (design) abs(v) / tile$scale[i] else abs(v))
       }
     } else {
       se[idx] <- apply(roots, 1L, sd)
@@ -395,7 +424,7 @@
     }
     point[idx, 1L] <- pmin(center[idx] - cuts[3L, idx], tile$score[, 1L])
     point[idx, 2L] <- pmax(center[idx] - cuts[2L, idx], tile$score[, 2L])
-    if (rms.envelope) {
+    if (scaled) {
       for (i in seq_along(idx)) {
         absolute <- abs(roots[length(idx) + i, ])
         peak <- max(absolute)
@@ -410,6 +439,18 @@
       }
     }
     rm(roots, tile)
+  }
+  if (design) {
+    ans <- .np_conditional_design_intervals(center, point, design.scale, alpha, cuts,
+                                            root.rms, se, draw.max, draw.rms.max)
+    resolution <- .np_conditional_design_resolution(B, m, alpha)
+    return(c(ans, list(original = original, alpha = alpha, B = B, physical.bandwidth = h,
+      grid = grid, law = "inid", correction = "pairs-score", calibration = "percentile",
+      primary = "fixed-X sharp-score and basic pairs pointwise envelope",
+      conditioning = "selected bandwidths fixed; pairs resample X and Y jointly",
+      endpoint.construction = "predictor-scaled and coordinate-RMS whole-grid maxima with outward pointwise protection",
+      scope = "experimental local-constant conditional CDF, fixed unbounded Gaussian2 X and Y",
+      resolution = resolution, resolution.limited = resolution$limited, estimated.numerical.bytes = bytes)))
   }
   raw <- unname(quantile(draw.max, 1-alpha, type = 1L))
   radius <- max(raw, center - point[, 1L], point[, 2L] - center)
@@ -475,4 +516,31 @@
   if (!is.null(ans$range.construction))
     ans$endpoint.construction <- paste(ans$endpoint.construction, ans$range.construction, sep = ". ")
   ans
+}
+
+.np_conditional_design_intervals <- function(center, score, design, alpha, cuts, rms,
+                                          se, design.max, rms.max) {
+  dc <- unname(quantile(design.max, 1-alpha, type = 1L))
+  rc <- unname(quantile(rms.max, 1-alpha, type = 1L))
+  radius <- pmax(dc * design, rc * rms)
+  point <- cbind(lower = pmin(center - cuts[3L, ], score[, 1L]),
+                 upper = pmax(center - cuts[2L, ], score[, 2L]))
+  joint <- cbind(lower = pmin(center - radius, point[, 1L]),
+                 upper = pmax(center + radius, point[, 2L]))
+  bonf <- cbind(lower = pmin(center - cuts[4L, ], joint[, 1L]),
+                upper = pmax(center - cuts[1L, ], joint[, 2L]))
+  list(center = center, se = se, bands = list(pointwise = point, simultaneous = joint,
+       bonferroni = bonf), critical = radius, critical.units = "CDF",
+       settings = list(critical.components = list(design.scaled = dc, coordinate.rms = rc)))
+}
+
+# Type-1 order statistics and their ranks among B exchangeable draws plus
+# one reference value. Rank resolution alone does not assure coverage.
+.np_conditional_design_resolution <- function(B, m, alpha) {
+  tail <- alpha / (2 * m)
+  ranks <- as.integer(quantile(seq_len(B), c(tail, 1-tail), type=1L, names=FALSE))
+  list(B=B, family.size=m, nominal.tail=tail, expected.tail.draws=B*tail,
+       lower.index=ranks[1L], upper.index=ranks[2L],
+       lower.rank.tail=ranks[1L]/(B+1), upper.rank.tail=(B+1-ranks[2L])/(B+1),
+       limited=tail < 1/(B+1))
 }
