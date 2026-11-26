@@ -35,6 +35,36 @@ test_that("categorical bootstrap batching follows the fitted polynomial degree",
   expect_false(eligible(bw, 120L))
 })
 
+test_that("polynomial bootstrap columns use the signed contrasts of the supplied fit", {
+  old <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+  set.seed(8126)
+  n <- 120L
+  x <- data.frame(x = rnorm(n), u = factor(sample.int(3L, n, TRUE)),
+                  o = ordered(sample.int(4L, n, TRUE)))
+  y <- sin(x$x) + rnorm(n)
+  responses <- cbind(y, rev(y), y + 1e10, rep(5, n))
+  verify <- function() {
+    for (method in c("ll", "lp")) for (near in c(FALSE, TRUE)) {
+      args <- list(xdat = x, ydat = y, bandwidth.compute = FALSE,
+                   bws = c(.45, .18, if (near) 1 - 1e-12 else .24), regtype = method)
+      if (method == "lp") args <- c(args, list(degree = 2L, bernstein.basis = TRUE))
+      bw <- do.call(npregbw, args)
+      direct <- function(y, tile = NULL)
+        np:::.np_regression_direct(bw, x, y, se = TRUE, gradients = TRUE,
+                                     gradient.coordinate = 3L, bootstrap.responses = tile)
+      batch <- direct(y, responses)[["bootstrap", exact = TRUE]]
+      expect_length(batch, 2L)
+      for (b in seq_len(ncol(responses))) {
+        fit <- direct(responses[, b])
+        expect_equal(batch[[1L]][, b], fit$grad[, 3L], tolerance = 2e-12)
+        expect_equal(batch[[2L]][, b], fit$gerr[, 3L], tolerance = 2e-12)
+      }
+    }
+  }
+  verify()
+})
+
 test_that("OLS projections and shared kernel rows preserve individual CMS draws", {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)

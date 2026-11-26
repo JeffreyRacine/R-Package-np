@@ -364,6 +364,8 @@ static SEXP np_regression_fitted_execute(void *data)
       ordinary_hc0_residual[i] = 0.0;
       ordinary_hc0_information[i] = NP_RESIDUAL_INVALID;
     }
+    residual_preparation.bootstrap = call->gradient_request == NULL ? NULL :
+      call->gradient_request->bootstrap;
     residual_preparation.response = vector_Y_extern;
     residual_preparation.evaluation_to_donor = training_identity;
     residual_preparation.num_obs_train = num_obs_train_extern;
@@ -420,6 +422,8 @@ static SEXP np_regression_fitted_execute(void *data)
       &training_geometry_context,
       &residual_preparation_context, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
+    if(residual_preparation.bootstrap != NULL)
+      np_sigtest_lp_standardize(residual_preparation.bootstrap);
     if(temporary_training_tree) {
       kdt_extern_X = outer_evaluation_kdt;
       free_kdtree(&owner->training_tree);

@@ -25,6 +25,7 @@
 #include <R_ext/Utils.h>
 #include <Rmath.h>
 #include <Rinternals.h>
+#include "sigtest_lp_batch.h"
 
 #ifndef La_INT
 # define La_INT int
@@ -23276,6 +23277,8 @@ static int np_regression_hc0_lp_prepare_row(
          basis, nterms, projection, kernel_row[donor], donor, &influence))
 #endif
       return 0;
+    if(preparation->bootstrap != NULL)
+      preparation->bootstrap->weight[donor] = influence;
     np_residual_offdiag_add(&state, influence,
       (long double)preparation->response[self] -
         (long double)preparation->response[donor]);
@@ -23290,6 +23293,8 @@ static int np_regression_hc0_lp_prepare_row(
   if(information == NP_RESIDUAL_INVALID ||
      fabsl(normalized) > (long double)DBL_MAX)
     return 0;
+  if(preparation->bootstrap != NULL && information == NP_RESIDUAL_IDENTIFIED)
+    np_sigtest_lp_residual(preparation->bootstrap, self, &state);
   preparation->normalized_residual[self] = (double)normalized;
   preparation->information[self] = (int)information;
   return 1;
@@ -23560,7 +23565,8 @@ static int np_regression_lp_categorical_contrast(
   double *standard_error,
   const NPRegressionHC0Context *context,
   int *unavailable,
-  int *structural_zero)
+  int *structural_zero,
+  NPSigtestLPBatch *bootstrap, int evaluation, double sign)
 {
   const int want_variance = standard_error != NULL;
   int same_projection = 1, same_row = 1, anchor = 0;
@@ -23611,6 +23617,7 @@ static int np_regression_lp_categorical_contrast(
     *contrast = 0.0;
     if(want_variance) *standard_error = 0.0;
     if(structural_zero != NULL) *structural_zero = 1;
+    if(bootstrap != NULL) np_sigtest_lp_contrast(bootstrap, evaluation, -1, sign);
     return 1;
   }
 
@@ -23666,6 +23673,7 @@ static int np_regression_lp_categorical_contrast(
       }
     }
     if(certified_zero) coefficient = np_contrast_number(0.0);
+    if(bootstrap != NULL) bootstrap->coefficient[donor] = coefficient;
     np_regression_contrast_add(&sum, coefficient, response[donor], certified_zero,
       want_variance && context->residual_information != NULL ?
         (NPResidualInformation)context->residual_information[donor] :
@@ -23677,6 +23685,7 @@ static int np_regression_lp_categorical_contrast(
       (NPResidualInformation)context->residual_information[anchor] : NP_RESIDUAL_IDENTIFIED,
     want_variance ? context->scaled_residual[anchor] : 0.0, anchor_certified_zero);
   if(result.information == NP_RESIDUAL_INVALID) return 0;
+  if(bootstrap != NULL) np_sigtest_lp_contrast(bootstrap, evaluation, anchor, sign);
   *contrast = result.contrast;
   if(structural_zero != NULL) *structural_zero = result.structural_zero;
   if(want_variance) {

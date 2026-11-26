@@ -31,6 +31,7 @@ typedef enum {
  * NULL requests every column. Resolve ranges before entering donor loops. */
 typedef struct {
   int coordinate;
+  struct NPSigtestLPBatch *bootstrap;
 } NPRegressionGradientRequest;
 
 typedef struct {
@@ -49,6 +50,7 @@ typedef struct {
   int num_obs_eval;
   double *normalized_residual;
   int *information;
+  struct NPSigtestLPBatch *bootstrap;
 } NPRegressionResidualPreparation;
 
 static inline NPRegressionGradientRange np_regression_gradient_range(
