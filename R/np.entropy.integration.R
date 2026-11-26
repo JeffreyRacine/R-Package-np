@@ -547,6 +547,44 @@
   )
 }
 
+
+# A diagonal product kernel factors on the two quadrature axes. Keep observation
+# rows paired in the crossproduct, including repeated rows of a bootstrap draw.
+# The three block sizes bound temporary storage independently of sample/grid size.
+.np_entropy_gaussian_panels <- function(x, y, bw, axis.x, axis.y) {
+  n <- length(x)
+  gaussian <- function(distance, bandwidth)
+    stats::dnorm(distance, sd = bandwidth)
+  total <- compensation <- 0
+  for (ix in seq.int(1L, length(axis.x$grid), by = 64L)) {
+    i <- seq.int(ix, length.out = min(64L, length(axis.x$grid) - ix + 1L))
+    for (iy in seq.int(1L, length(axis.y$grid), by = 64L)) {
+      j <- seq.int(iy, length.out = min(64L, length(axis.y$grid) - iy + 1L))
+      mx <- numeric(length(i))
+      my <- numeric(length(j))
+      joint <- matrix(0, length(i), length(j))
+      for (start in seq.int(1L, n, by = 512L)) {
+        donors <- seq.int(start, length.out = min(512L, n - start + 1L))
+        dx <- outer(x[donors], axis.x$grid[i], "-")
+        dy <- outer(y[donors], axis.y$grid[j], "-")
+        kx <- gaussian(dx, bw[3L])
+        ky <- gaussian(dy, bw[4L])
+        mx <- mx + colSums(if (bw[1L] == bw[3L]) kx else gaussian(dx, bw[1L]))
+        my <- my + colSums(if (bw[2L] == bw[4L]) ky else gaussian(dy, bw[2L]))
+        joint <- joint + crossprod(kx, ky)
+        .np_fit_progress_step(done = start)
+      }
+      delta <- sqrt(joint / n) - tcrossprod(sqrt(mx / n), sqrt(my / n))
+      piece <- sum(tcrossprod(axis.x$weights[i], axis.y$weights[j]) * delta^2)
+      adjusted <- piece - compensation
+      next.total <- total + adjusted
+      compensation <- (next.total - total) - adjusted
+      total <- next.total
+    }
+  }
+  0.5 * total
+}
+
 .np_entropy_bivariate_integral <- function(x.dat,
                                            y.dat,
                                            bw.x,
@@ -573,6 +611,17 @@
     lower[2L], upper[2L], min(bandwidths[c(2L, 4L)]),
     points.per.bandwidth = 2L
   )
+  if (identical(getOption("np.macMseries.accelerate", "auto"), "auto") &&
+      length(x.dat) >= 50L && all(is.finite(x.dat)) && all(is.finite(y.dat)) &&
+      all(abs(log(bandwidths)) < log(.Machine$double.xmax) / 4) &&
+      !.npRmpi_entropy_collective_rows()) {
+    value <- .np_entropy_compute(length(x.dat),
+      .np_entropy_gaussian_panels(x.dat, y.dat, bandwidths, axis.x, axis.y))
+    # At numerical independence the sign of a bootstrap tie can depend on
+    # summation order. Use the original integrand in its roundoff envelope.
+    if (is.finite(value) && value > (length(x.dat) * .Machine$double.eps)^2)
+      return(value)
+  }
   max.points <- as.integer(max(
     1L, floor(.np_entropy_workspace_bytes / 64)
   ))
