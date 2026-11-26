@@ -1,5 +1,10 @@
 # np 0.80-4
 
+* Added `npscoeftest()` to test whether a smooth-coefficient regression is
+  affine in its slope regressors at each value of its continuous modifiers.
+  The default uses a wider, unstudentized kernel score. Set `method = "jlwy"`
+  for the studentized test of Jansen, Li, Wang and Yang (2008).
+
 * Added experimental Gaussian-process bands for the bias-corrected univariate Epanechnikov generalized nearest-neighbor CDF.
 * Added experimental asymptotic bias-corrected bands for a univariate fixed-bandwidth beta CDF on known continuous support.
 * Experimental fixed Gaussian conditional CDF bands support an explicit

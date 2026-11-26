@@ -53,7 +53,8 @@
   bw <- .npscoefbw_build_scbandwidth(x, y, z, a, FALSE,
              list(regtype = "lc", bwmethod = "manual", bandwidth = a))
   list(x = x, z = z, y = y, bw = bw, pooled = .npscoefbw_fast_eligible(bw, z),
-       w = w, a = a, h = h, student = student, trim = trim, input.a = input.a,
+       # Promote integer coordinates before pairwise differences can overflow.
+       w = lapply(w, as.double), a = a, h = h, student = student, trim = trim, input.a = input.a,
        input.fit = if (fit && !student) as.numeric(fitted(object)))
 }
 
