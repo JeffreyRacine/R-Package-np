@@ -39,3 +39,18 @@ test_that("pair scores accept the full integer range of a continuous modifier", 
   }
   expect_identical(score(z), score(as.double(z)))
 })
+
+test_that("the public smooth-coefficient test preserves its seeded upper tail", {
+  withr::local_seed(136)
+  n <- 64L
+  z <- as.integer(round(seq(-2e9, 2e9, length.out = n)))[sample.int(n)]
+  x <- runif(n, -1, 1)
+  y <- sin(x) + (z/2e9) * cos(x) + rnorm(n)
+  bw <- npscoefbw(xdat = data.frame(x), zdat = data.frame(z), ydat = y,
+                  bws = 1.6e9, bandwidth.compute = FALSE)
+  seed <- .Random.seed
+  result <- npscoeftest(bw, B = 19L)
+  expect_identical(result$exceedances, 2L)
+  expect_equal(result$P, 2/19)
+  expect_identical(.Random.seed, seed)
+})
