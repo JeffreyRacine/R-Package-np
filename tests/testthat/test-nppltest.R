@@ -108,3 +108,42 @@ test_that("Sobol prefix scores reproduce the column oracle at tied thresholds", 
                "row index")
   expect_error(.Call(C_np_pltest_prefix_scores, E, ord, 4L), "Incomplete")
 })
+
+test_that("Sobol prefix scores match a direct scan of tie groups", {
+  # Dyadic inputs keep this literal oracle exact across accumulator widths.
+  for (n in c(1L, 2L, 17L, 33L)) {
+    E <- matrix(((seq_len(17L * n) %% 23L) - 11L) / 8, nrow = n)
+    ord <- rev(seq_len(n))
+    for (ends in list(integer(), n, unique(c(seq.int(1L, n, by = 3L), n)))) {
+      groups <- if (length(ends)) ends else seq_len(n)
+      direct <- vapply(seq_len(ncol(E)), function(j) {
+        prefix <- total <- 0
+        first <- 1L
+        for (last in groups) {
+          for (i in seq.int(first, last)) prefix <- prefix + E[ord[i], j]
+          total <- total + (prefix * prefix) * (last - first + 1L)
+          first <- last + 1L
+        }
+        total
+      }, numeric(1))
+      expect_identical(.Call(C_np_pltest_prefix_scores, E, ord, ends), direct)
+    }
+  }
+})
+
+test_that("Sobol prefix scorer rejects incompatible orders and tie endpoints", {
+  E <- matrix(c(1, 2, 3))
+  score <- function(x = E, ord = 1:3, ends = integer())
+    .Call(C_np_pltest_prefix_scores, x, ord, ends)
+  expect_error(score(x = 1:3), "inputs")
+  expect_error(score(x = matrix(1:3)), "inputs")
+  expect_error(score(ord = c(1, 2, 3)), "inputs")
+  expect_error(score(ends = 3), "inputs")
+  expect_error(score(x = matrix(numeric(), 0L, 1L), ord = integer()), "dimensions")
+  expect_error(score(ord = 1:2), "dimensions")
+  expect_error(score(ends = 1:4), "dimensions")
+  expect_error(score(ord = c(1L, NA_integer_, 3L)), "row index")
+  expect_error(score(ends = c(0L, 3L)), "tie endpoints")
+  expect_error(score(ends = c(2L, 2L)), "tie endpoints")
+  expect_error(score(ends = 4L), "tie endpoints")
+})

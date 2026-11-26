@@ -105,8 +105,9 @@ SEXP C_np_pltest_angle_columns(SEXP coordinates, SEXP columns) {
 
 /* For one projected order, accumulate the squared prefix sums of every
    residual column. Tied observations all see the prefix at the group end.
-   Match matrixStats' extended accumulators and R's intervening double
-   roundings, including on hosts where a multiply-add could be contracted. */
+   Match the accumulator choice in matrixStats' 000.types.h. With the
+   standard installed R headers both use double. The volatile stores round
+   each product to double before summation and prevent FMA contraction. */
 SEXP C_np_pltest_prefix_scores(SEXP residuals, SEXP order, SEXP ends)
 {
     if (!isReal(residuals) || !isMatrix(residuals) ||

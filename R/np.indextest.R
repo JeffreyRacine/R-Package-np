@@ -250,6 +250,7 @@
     if (any(fraction > 0 & fraction < 64*.Machine$double.xmin)) return(direct())
     base <- as.integer(base) + 4L
     weights <- vapply(offsets, function(offset) fraction - offset, numeric(n))
+    dim(weights) <- c(n, length(offsets))
     nodal <- which(fraction == 0)
     weights[nodal, ] <- 1
     weights <- (1/weights) * rep(barycentric, each = n)
