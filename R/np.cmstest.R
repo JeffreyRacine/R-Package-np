@@ -53,7 +53,12 @@
 # One refit owner for serial and collective bootstrap callers. GLM working
 # weights are not observation weights; only its retained prior weights apply.
 .np_cms_refit_residuals <- function(model, y.star, tau = NULL, design.qr = NULL) {
-  if (!is.null(design.qr)) return(qr.resid(design.qr, y.star))
+  if (!is.null(design.qr)) {
+    # Match residuals.glm(type = "response"), including its final subtraction
+    # in the original units when y has a large common offset.
+    fitted <- drop(model[["x", exact = TRUE]] %*% qr.coef(design.qr, y.star))
+    return(y.star - fitted)
+  }
   if (!is.null(tau))
     return(residuals(rq(y.star ~ model$x - 1, tau = tau,
                         weights = model[["weights", exact = TRUE]]),
