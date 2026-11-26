@@ -422,3 +422,7 @@ export(np_conditional_bias_control)
 S3method(print,np_plot_data)
 S3method(as.data.frame,np_plot_data)
 S3method(plot,np_plot_data)
+
+export(npscoeftest)
+S3method(print, scoeftest)
+S3method(summary, scoeftest)
