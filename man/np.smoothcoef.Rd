@@ -486,7 +486,7 @@ bias-corrected inference. Method-specific assumptions, restrictions and known
 failures must be considered when experimenting with these bounds.
 }
 
-\seealso{\code{\link{npscoeftest}}, 
+\seealso{\code{\link{npscoeftest}},
   \code{\link{npRmpi.init}},
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}},
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}}, \code{\link{hist}},

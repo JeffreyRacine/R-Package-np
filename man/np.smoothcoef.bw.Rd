@@ -909,7 +909,7 @@ or standard-deviation factors.
 
 }
 
-\seealso{\code{\link{npscoeftest}}, 
+\seealso{\code{\link{npscoeftest}},
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}, \code{\link{plot.np}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
