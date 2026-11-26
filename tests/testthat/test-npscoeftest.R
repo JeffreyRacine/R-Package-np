@@ -20,3 +20,22 @@ test_that("smooth-coefficient pair panels omit self-pairs and preserve signed sc
     expect_equal(got,expected,tolerance=1e-12)
   }
 })
+
+test_that("pair scores accept the full integer range of a continuous modifier", {
+  z <- as.integer(c(-2e9, -1e9, 0, 1e9, 2e9))
+  x <- data.frame(x = c(0.2, 0.7, 0.1, 0.9, 0.3))
+  y <- c(0.4, -0.6, 1, 0.3, -0.9)
+  setup <- function(z) {
+    bw <- .npscoefbw_build_scbandwidth(x, y, data.frame(z), 1.6e9, FALSE,
+                                      list(regtype = "lc", bwmethod = "manual", bandwidth = 1.6e9))
+    bw[[".np.native.training"]] <- list(xdat = x, ydat = y, zdat = data.frame(z))
+    .sct_setup(bw, "wide", "application", NULL, NULL)
+  }
+  bank <- .sct_score_bank(matrix(y, ncol = 1L), length(y), FALSE)
+  score <- function(z) {
+    s <- setup(z)
+    s$width <- length(y)
+    .sct_panel_score(s, bank, 1L)
+  }
+  expect_identical(score(z), score(as.double(z)))
+})
