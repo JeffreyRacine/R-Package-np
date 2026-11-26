@@ -341,6 +341,14 @@ npsigtest.npregression <-
   as.integer(max(1, min(64, floor(16 * 1024^2 / (8 * 8 * as.double(n))))))
 }
 
+# Replay one geometry per factor over the same joint-null responses. With
+# more targets than responses per tile, retain the shared full-gradient fit.
+.np_npsig_joint_factor_batch <- function(bws, index, n) {
+  length(index) > 1L && all((bws$iuno | bws$iord)[index]) &&
+    .np_npsig_categorical_batch_eligible(bws, n) &&
+    length(index) < .np_npsig_categorical_batch_width(n)
+}
+
 .np_npsig_scalar_batch <- function(bws, xdat, index, response, structural, context) {
   n <- nrow(xdat)
   if (is.integer(response)) storage.mode(response) <- "double"
@@ -536,7 +544,8 @@ npsigtest.npregression <-
   placeholder <- response.matrix[, 1L]
   fit.cache <- NULL
   categorical <- which(bws[["iuno", exact = TRUE]] | bws[["iord", exact = TRUE]])
-  if (isTRUE(pivotal) && sum(index %in% categorical) > 1L) {
+  if (isTRUE(pivotal) && sum(index %in% categorical) > 1L &&
+      !.np_npsig_joint_factor_batch(bws, index, nrow(xdat))) {
     # Cache only within this identical-input tile. Fill lazily so component
     # order, response order and the first diagnostic remain unchanged.
     fit.cache <- new.env(parent = emptyenv())
@@ -877,7 +886,10 @@ npsigtest.rbandwidth <- function(bws,
 
     nn.stage <- "bootstrap"
     if (streamed.iid) {
-      tile.width <- 8L
+      tile.width <- if (pivot.use &&
+        .np_npsig_joint_factor_batch(bws, index, num.obs)) {
+        .np_npsig_categorical_batch_width(num.obs)
+      } else 8L
       for (tile.start in seq.int(1L, B, by = tile.width)) {
         tile.count <- min(tile.width, B - tile.start + 1L)
         if (identical(boot.method, "iid")) {

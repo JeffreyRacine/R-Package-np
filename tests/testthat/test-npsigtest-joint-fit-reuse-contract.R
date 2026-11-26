@@ -202,3 +202,25 @@ test_that("public joint reuse retains bootstrap arrays, metadata and RNG", {
     }
   }
 })
+
+test_that("joint factor panels replay the same responses in requested order", {
+  old <- options(np.tree = FALSE, np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  set.seed(152)
+  n <- 120L
+  x <- data.frame(x = rnorm(n), u = factor(rep(1:3, length.out = n)),
+                  o = ordered(rep(1:4, length.out = n)))
+  y <- sin(x$x) + rnorm(n)
+  bw <- npregbw(xdat = x, ydat = y, bws = c(.45, .18, .24),
+                bandwidth.compute = FALSE, regtype = "ll")
+  eligible <- getFromNamespace(".np_npsig_joint_factor_batch", "np")
+  score <- getFromNamespace(".np_npsig_streamed_response_statistic", "np")
+  expect_true(eligible(bw, 3:2, n))
+  expect_false(eligible(bw, 1:3, n))
+  responses <- matrix(rnorm(n * 11L), n)
+  expected <- c(j1_uncached(bw, x, 3:2, responses[, 1:8], TRUE),
+                j1_uncached(bw, x, 3:2, responses[, 9:11], TRUE))
+  expect_identical(score(bw, x, 3:2, responses, TRUE), expected)
+  options(np.tree = TRUE)
+  expect_false(eligible(bw, 3:2, n))
+})
