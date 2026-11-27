@@ -8,6 +8,9 @@
 #include "headers.h"
 #include "jksum_lp_row.h"
 
+/* The dense pair accumulator's caller allocates the input basis separately
+ * from both output buffers (moments and RHS). Fixed and moving rows also
+ * have distinct destinations, including when the donor order is permuted. */
 static inline void np_lp_dense_support_add(const int row,
                                             const int nterms,
                                             int *support_count)
