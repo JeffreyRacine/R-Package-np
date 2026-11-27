@@ -48,7 +48,8 @@ npdeptest <- function(data.x = NULL,
                          bw.x = NULL,
                          bw.y = NULL,
                          bw.joint = NULL,
-                         method=c("integration","summation")) {
+                         method=c("integration","summation"),
+                         reference = NULL, pointwise = FALSE) {
     
     if(is.null(bw.x)||is.null(bw.y)||is.null(bw.joint)) stop(" you must provide numeric bandwidths for f(x), f(y) and f(x,y)")
     
@@ -80,7 +81,8 @@ npdeptest <- function(data.x = NULL,
         bw.y = bw.y,
         bw.joint = bw.joint,
         lower = domain$lower,
-        upper = domain$upper
+        upper = domain$upper,
+        reference = reference, pointwise = pointwise
       ))
       
     }
@@ -95,7 +97,7 @@ npdeptest <- function(data.x = NULL,
 
   
   Srho.vec <- .np_progress_activity_run("Computing entropy statistic",
-    Srho.bivar(data.x,data.y,bw.data.x,bw.data.y,bw.joint,method=method))
+    Srho.bivar(data.x,data.y,bw.data.x,bw.data.y,bw.joint,method=method,pointwise=TRUE))
 
   ## Bootstrap if requested - null is independence so simple iid
   ## index resampling under replacement is sufficient
@@ -135,7 +137,8 @@ npdeptest <- function(data.x = NULL,
 
         data.x.boot <- data.x[sample.int(length(data.x), replace = TRUE)]
 
-        Srho.vec.boot[b] <- Srho.bivar(data.x.boot,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
+        Srho.vec.boot[b] <- Srho.bivar(data.x.boot,data.y,bw.data.x,bw.data.y,bw.joint,
+          method=method, reference=Srho.vec)
         .np_progress_activity_step(progress, done = b)
       }
     }

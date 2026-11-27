@@ -146,3 +146,27 @@ test_that("blocked product kernels preserve pairing across donor and grid bounda
   expect_lt(abs(panel(x, y, bw, a, b) - reference), 2e-13)
   expect_gt(abs(panel(x, rev(y), bw, a, b) - reference), 1e-3)
 })
+
+test_that("near-tail draws and cumulative-only ties use pointwise arithmetic", {
+  f <- getFromNamespace(".np_entropy_bivariate_integral", "np")
+  d <- getFromNamespace(".np_entropy_bivariate_domain", "np")
+  guard <- getFromNamespace(".np_entropy_guard_lag_draw", "np")
+  set.seed(428)
+  x <- sample(c(-1, .4, 1), 127L, replace = TRUE)
+  y <- round(.4 * x + rnorm(length(x)))
+  bw <- c(.44, .69, .32, .53)
+  dom <- d(x, y, bw[1], bw[2], bw[3:4])
+  score <- function(v, ...) f(v, y, bw[1], bw[2], bw[3:4], dom$lower, dom$upper, ...)
+  ref <- score(x, pointwise = TRUE)
+  for (i in 1:4) {
+    shifted <- x
+    for (group in split(seq_along(y), y))
+      shifted[group] <- x[group[sample.int(length(group))]]
+    expect_identical(score(shifted, reference = ref), score(shifted, pointwise = TRUE))
+  }
+  literal <- function(..., pointwise) { expect_true(pointwise); .25 }
+  expect_identical(guard(c(.1,.4), c(.2,.3), as.ts(y), bw, bw, bw, bw, literal),
+                   c(.25,.25))
+  expect_identical(guard(c(.1,.3), c(.2,.4), as.ts(y), bw, bw, bw, bw,
+                         function(...) stop("unexpected pointwise replay")), c(.1,.3))
+})
