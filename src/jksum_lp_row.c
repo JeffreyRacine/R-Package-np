@@ -8,27 +8,9 @@
 #include "headers.h"
 #include "jksum_lp_row.h"
 
-/* The generic dense row has identical per-entry arithmetic in both layouts.
- * Enable tiling on the Apple arm64 toolchain qualified by complete CV searches.
- * Other builds retain the original row loop. */
-#if defined(__APPLE__) && defined(__aarch64__) && defined(__clang__) && \
-    defined(__apple_build_version__) && __apple_build_version__ == 21000401
-# define NP_LP_TILE_WIDE_DONOR 1
-#else
-# define NP_LP_TILE_WIDE_DONOR 0
-#endif
-
 /* The dense pair accumulator's caller allocates the input basis separately
  * from both output buffers (moments and RHS). Fixed and moving rows also
  * have distinct destinations, including when the donor order is permuted. */
-static inline void np_lp_dense_support_add(const int row,
-                                            const int nterms,
-                                            int *support_count)
-{
-  const int count = support_count[row];
-  if(count < nterms)
-    support_count[row] = count + 1;
-}
 
 /*
   MPI transport assigns a complete evaluation row to one rank. For widths
@@ -555,90 +537,14 @@ np_lp_mirror_dense_moments_row3(double *moments, const int nrows)
   }
 }
 
-/* Inlining the tiled loop also changes code generation for the adjacent
- * fixed widths in the same dispatcher. Keep those rank-local searches
- * independent of the wide implementation on the qualified toolchain. */
-#if NP_LP_TILE_WIDE_DONOR
-__attribute__((noinline))
-#endif
-static void np_lp_accumulate_dense_row_generic(
-    const NPLPDenseRowContext *ctx)
-{
-  int i, a, b;
-  const int nterms = ctx->nterms;
-
-  for(i = 0; i < ctx->nsub; i++){
-    const int orig_ii = ctx->row_j + 1 + i;
-    const int ii = ctx->use_tree ? ctx->tree_lookup[orig_ii] : orig_ii;
-    const int widx = ctx->use_tree ? ii : i;
-    const double weight = ctx->weights[widx];
-    const double reverse_weight = np_lp_reverse_pair_weight(weight,
-      ctx->rly_log_normalizer,ii,ctx->eval_idx);
-
-    if(weight == 0.0)
-      continue;
-
-    if(ctx->track_lowsupport){
-      np_lp_dense_support_add(ctx->row_j, nterms, ctx->support_count);
-      np_lp_dense_support_add(orig_ii, nterms, ctx->support_count);
-    }
-
-    {
-      const double yi = ctx->response[ii];
-      double * const fixed_moments =
-        ctx->moments + (size_t)ctx->row_j*(size_t)nterms*(size_t)nterms;
-      double * const moving_moments =
-        ctx->moments + (size_t)orig_ii*(size_t)nterms*(size_t)nterms;
-      double * const fixed_rhs =
-        ctx->rhs + (size_t)ctx->row_j*(size_t)nterms;
-      double * const moving_rhs =
-        ctx->rhs + (size_t)orig_ii*(size_t)nterms;
+#define NP_LP_COMPILE_TILED_DONOR 0
+#include "jksum_lp_wide_donor.inc"
 
 #if NP_LP_TILE_WIDE_DONOR
-      /* The basis is stored by term. Gather contiguous donor tiles before
-         updating full rows. Each entry retains its original donor order. */
-      for(a = 0; a < nterms; ++a){
-        const double weighted_bia = weight*ctx->basis[a][ii];
-        fixed_rhs[a] += weighted_bia*yi;
-        moving_rhs[a] += reverse_weight*ctx->eval_ybasis[a];
-      }
-      for(int first = 0; first < nterms; ){
-        double donor[32];
-        const int count = nterms - first < 32 ? nterms - first : 32;
-        for(b = 0; b < count; ++b)
-          donor[b] = ctx->basis[first+b][ii];
-        for(a = 0; a < nterms; ++a){
-          const double weighted_bia = weight*ctx->basis[a][ii];
-          double * const row = fixed_moments + (size_t)a*nterms + first;
-          for(b = 0; b < count; ++b)
-            row[b] += weighted_bia*donor[b];
-        }
-        first += count;
-      }
-      for(a = 0; a < nterms; ++a){
-        const size_t offset = (size_t)a*nterms;
-        for(b = 0; b < nterms; ++b)
-          moving_moments[offset+b] += reverse_weight*ctx->eval_outer[offset+b];
-      }
+void np_lp_accumulate_standard_dense_row(const NPLPDenseRowContext *ctx)
 #else
-      for(a = 0; a < nterms; a++){
-        const double bia = ctx->basis[a][ii];
-        const double weighted_bia = weight*bia;
-        fixed_rhs[a] += weighted_bia*yi;
-        moving_rhs[a] += reverse_weight*ctx->eval_ybasis[a];
-        for(b = 0; b < nterms; b++){
-          fixed_moments[a*nterms+b] +=
-            weighted_bia*ctx->basis[b][ii];
-          moving_moments[a*nterms+b] +=
-            reverse_weight*ctx->eval_outer[a*nterms+b];
-        }
-      }
-#endif
-    }
-  }
-}
-
 void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx)
+#endif
 {
   switch(ctx->nterms){
   case 1: np_lp_accumulate_dense_row_1(ctx); return;

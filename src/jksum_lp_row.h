@@ -179,6 +179,29 @@ typedef struct {
   int *support_count;
 } NPLPOwnedRowContext;
 
+/* The generic dense row has identical per-entry arithmetic in both layouts.
+ * Enable tiling on the Apple arm64 toolchain qualified by complete CV searches.
+ * Other builds retain the original row loop. */
+#if defined(__APPLE__) && defined(__aarch64__) && defined(__clang__) && \
+    defined(__apple_build_version__) && __apple_build_version__ == 21000401
+# define NP_LP_TILE_WIDE_DONOR 1
+#else
+# define NP_LP_TILE_WIDE_DONOR 0
+#endif
+
+static inline void np_lp_dense_support_add(const int row,
+                                            const int nterms,
+                                            int *support_count)
+{
+  const int count = support_count[row];
+  if(count < nterms)
+    support_count[row] = count + 1;
+}
+
+
+#if NP_LP_TILE_WIDE_DONOR
+attribute_hidden void np_lp_accumulate_standard_dense_row(const NPLPDenseRowContext *ctx);
+#endif
 void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx);
 
 attribute_hidden int
