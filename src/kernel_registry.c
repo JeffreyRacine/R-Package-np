@@ -1,6 +1,8 @@
 #include <float.h>
 #include <math.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
 #include <R_ext/Arith.h>
 
@@ -17,9 +19,28 @@ typedef char np_ckernel_family_codes_must_differ[
 typedef char np_ckernel_coordinate_code_must_be_nonlegacy[
   (NP_CKERNEL_COORDINATE_CODE < NP_CKERNEL_LEGACY_CODE_MIN) ? 1 : -1];
 
+/* These ABIs store binary64 and uint64_t in the same byte order. Inspect
+ * the exponent as integer data so partial finite-math compiler options
+ * cannot discard the NaN or infinity check. memcpy avoids type aliasing. */
+static inline int np_legacy_kernel_isfinite(double value)
+{
+#if !defined(HAVE_WORKING_ISFINITE) && !defined(__FAST_MATH__) && \
+    (!defined(__FINITE_MATH_ONLY__) || __FINITE_MATH_ONLY__ == 0) && \
+    defined(UINT64_MAX) && (defined(__aarch64__) || defined(__x86_64__)) && \
+    FLT_RADIX == 2 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024
+  if(sizeof(double) == sizeof(uint64_t)){
+    uint64_t bits;
+    const uint64_t exponent = UINT64_C(0x7ff0000000000000);
+    memcpy(&bits, &value, sizeof(bits));
+    return (bits & exponent) != exponent;
+  }
+#endif
+  return R_FINITE(value);
+}
+
 static int np_continuous_kernel_finite_bound(double value)
 {
-  return R_FINITE(value) && fabs(value) < 0.5 * DBL_MAX;
+  return np_legacy_kernel_isfinite(value) && fabs(value) < 0.5 * DBL_MAX;
 }
 
 /* Callers validate centre and bandwidth before this pure mass arithmetic. */
@@ -44,7 +65,7 @@ double np_continuous_kernel_legacy_pdf_mass(int kernel_code,
                                            double centre, double bandwidth,
                                            double lower, double upper)
 {
-  if(!R_FINITE(centre) || !R_FINITE(bandwidth) || bandwidth <= 0.0)
+  if(!np_legacy_kernel_isfinite(centre) || !np_legacy_kernel_isfinite(bandwidth) || bandwidth <= 0.0)
     return NAN;
   return np_continuous_kernel_legacy_pdf_mass_unchecked(
     kernel_code, centre, bandwidth, lower, upper);
@@ -62,13 +83,13 @@ static inline double np_continuous_kernel_legacy_pdf(int kernel_code,
   const double base = kernel(kernel_code,
                              (evaluation - observation) / bandwidth);
   double denominator;
-  if(!R_FINITE(evaluation) || !R_FINITE(observation) ||
-     !R_FINITE(bandwidth) || bandwidth <= 0.0 || !R_FINITE(base))
+  if(!np_legacy_kernel_isfinite(evaluation) || !np_legacy_kernel_isfinite(observation) ||
+     !np_legacy_kernel_isfinite(bandwidth) || bandwidth <= 0.0 || !np_legacy_kernel_isfinite(base))
     return NAN;
   denominator = prepared_mass != NULL ? *prepared_mass :
     np_continuous_kernel_legacy_pdf_mass_unchecked(
       kernel_code, evaluation, bandwidth, lower, upper);
-  if(!R_FINITE(denominator) || denominator <= 0.0)
+  if(!np_legacy_kernel_isfinite(denominator) || denominator <= 0.0)
     return NAN;
   return base / (bandwidth * denominator);
 }
@@ -77,7 +98,7 @@ static NPContinuousKernelScalarStatus
 np_continuous_kernel_legacy_log_value(double value,
                                      double *log_absolute, int *sign)
 {
-  if(!R_FINITE(value))
+  if(!np_legacy_kernel_isfinite(value))
     return NP_CONTINUOUS_KERNEL_SCALAR_ERR_KERNEL;
   if(value != 0.0) {
     *log_absolute = log(fabs(value));

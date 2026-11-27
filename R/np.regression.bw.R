@@ -491,6 +491,8 @@ npregbw.rbandwidth <-
 
       cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
+      # The outer clock records elapsed time. Preserve native error timing
+      # without forcing a full collection on each participating rank.
       system.time(myout <-
         .Call("C_np_regression_bw",
               as.double(runo), as.double(rord), as.double(rcon), as.double(ydat),
@@ -506,7 +508,7 @@ npregbw.rbandwidth <-
               as.double(cker.bounds.c$lb),
               as.double(cker.bounds.c$ub),
               .np_native_categorical_support(bws),
-              PACKAGE = "npRmpi"))[1]
+              PACKAGE = "npRmpi"), gcFirst = FALSE)[1]
 
 
       rorder = numeric(ncol)

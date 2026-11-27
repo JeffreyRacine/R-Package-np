@@ -1189,6 +1189,38 @@ np_continuous_kernel_beta_segment_log_fill(
 
       if(prepare_status != NP_CONTINUOUS_ROW_OK)
         return prepare_status;
+      /* Order two in one coordinate is one positive unit-coefficient term.
+         Select it once per row, outside the general signed-product loop. */
+      if(prepared_component_count == 1 && segment->coordinate_count == 1) {
+        const int coordinate = segment->coordinate_offset;
+        const int slot = prepared->coordinate_slot[coordinate];
+        if(slot >= 0 && slot < prepared->num_beta_coordinates) {
+          const size_t offset = (size_t)slot * plan->num_train;
+          const np_beta_pdf_component *component = &prepared->pdf_row_component[
+            (size_t)slot * NP_BETA_PREPARED_MAX_COMPONENTS];
+          for(observation = 0; observation < plan->num_train; ++observation) {
+            if(observation == omitted_observation) {
+              log_absolute[observation] = -INFINITY;
+              sign[observation] = 0;
+              continue;
+            }
+            result->beta_status = prepared->pdf_observation_status[offset + observation];
+            if(result->beta_status == NP_BETA_OK)
+              log_absolute[observation] = np_beta_log_pdf_component_prepared(
+                component, &prepared->pdf_observation[offset + observation],
+                &result->beta_status) + 0.0;
+            if(result->beta_status != NP_BETA_OK) {
+              result->bad_coordinate = coordinate;
+              result->bad_observation = observation;
+              return NP_CONTINUOUS_ROW_ERR_KERNEL;
+            }
+            sign[observation] = log_absolute[observation] == -INFINITY ? 0 : 1;
+            if(log_absolute[observation] > *maximum)
+              *maximum = log_absolute[observation];
+          }
+          return NP_CONTINUOUS_ROW_OK;
+        }
+      }
       for(observation = 0; observation < plan->num_train; ++observation) {
         double log_product = 0.0;
         int product_sign = 1;

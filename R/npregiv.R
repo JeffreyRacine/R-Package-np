@@ -997,7 +997,7 @@ npregiv.default <- function(y,
         tyw <- matrix(tww[,1,,drop=FALSE], nrow=ncol(W), ncol=n)
         tww <- tww[,-1,,drop=FALSE]
 
-        ghat <- rep(maxPenalty, n)
+        ghat <- trH.comp <- rep(maxPenalty, n)
         ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
         ridge <- rep.int(ridge.grid[1L], n)
         ridge.idx <- rep.int(1L, n)
@@ -1014,33 +1014,34 @@ npregiv.default <- function(y,
           for(i in ii) {
             doridge[i] <- FALSE
             ridge.lc.mean[i] <- tyw[1,i][1]/NZD(tww[,,i][1,1])
-            ghat.i <- W[i,, drop = FALSE] %*% tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
-                                                       error = function(e){
-                                                         ridge.idx[i] <- ridge.idx[i] + 1L
-                                                         if (ridge.idx[i] <= length(ridge.grid)) {
-                                                           ridge[i] <- ridge.grid[ridge.idx[i]]
-                                                           doridge[i] <- TRUE
-                                                         }
-                                                         return(rep(maxPenalty,nc))
-                                                       })
+            # Use the same inverse for the fit and its diagonal leverage.
+            inverse <- NULL
+            ghat.i <- W[i,, drop = FALSE] %*% tryCatch({
+              inverse <- chol2inv(chol(tww[,,i] + diag(rep(ridge[i], nc))))
+              inverse %*% tyw[,i]
+            }, error = function(e) {
+              ridge.idx[i] <- ridge.idx[i] + 1L
+              if (ridge.idx[i] <= length(ridge.grid)) {
+                ridge[i] <- ridge.grid[ridge.idx[i]]
+                doridge[i] <- TRUE
+              }
+              rep(maxPenalty, nc)
+            })
             alpha.i <- min(1.0, ridge[i])
             ghat[i] <- (1 - alpha.i) * ghat.i + alpha.i * ridge.lc.mean[i]
+            if (!is.null(inverse)) {
+              trH.comp[i] <- tryCatch(
+                (1 - alpha.i) * W[i,, drop = FALSE] %*% inverse %*%
+                  t(W[i,, drop = FALSE]) + alpha.i / NZD(tww[,,i][1,1]),
+                error = function(e) maxPenalty
+              )
+            }
           }
         }
 
         if (any(ghat == maxPenalty))
           return(maxPenalty)
 
-        ridge.alpha <- pmin(1.0, ridge)
-        trH.comp <- sapply(seq_len(n), function(i) {
-          tryCatch(
-            (1 - ridge.alpha[i]) * W[i,, drop = FALSE] %*%
-              chol2inv(chol(tww[,,i] + diag(rep(ridge[i], nc)))) %*%
-              t(W[i,, drop = FALSE]) +
-              ridge.alpha[i] / NZD(tww[,,i][1,1]),
-            error = function(e) maxPenalty
-          )
-        })
         if (any(trH.comp == maxPenalty))
           return(maxPenalty)
         trH <- kernel.i.eq.j * sum(trH.comp)
