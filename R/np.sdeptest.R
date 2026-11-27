@@ -56,7 +56,7 @@
                                                Srho.bivar,
                                                method,
                                                progress = NULL,
-                                               comm = 1L) {
+                                               comm = 1L, observed = NULL) {
   boot.num <- nrow(plan)
   size <- mpi.comm.size(comm)
   rank <- mpi.comm.rank(comm)
@@ -80,6 +80,10 @@
           bw.y[k], bw.y.lag[k], c(bw.joint.y[k], bw.joint.y.lag[k]),
           method = method))
       }
+      if (method == "integration")
+        values <- .npRmpi_with_local_regression(.np_entropy_guard_lag_draw(
+          values, observed, resampled.ts, bw.y, bw.y.lag, bw.joint.y,
+          bw.joint.y.lag, Srho.bivar))
       c(values, vapply(seq_len(lag.num),
         function(k) sum(values[seq_len(k)]), numeric(1)))
     }, progress = progress, comm = comm)
@@ -190,7 +194,8 @@ npsdeptest <- function(data = NULL,
                          bw.x = NULL,
                          bw.y = NULL,
                          bw.joint = NULL,
-                         method=c("integration","summation")) {
+                         method=c("integration","summation"),
+                         pointwise = FALSE) {
     
     if(is.null(bw.x)||is.null(bw.y)||is.null(bw.joint)) stop(" you must provide numeric bandwidths for f(x), f(y) and f(x,y)")
     
@@ -223,7 +228,8 @@ npsdeptest <- function(data = NULL,
         bw.y = bw.y,
         bw.joint = bw.joint,
         lower = domain$lower,
-        upper = domain$upper
+        upper = domain$upper,
+        pointwise = pointwise
       ))
     }
 
@@ -232,7 +238,6 @@ npsdeptest <- function(data = NULL,
   ## Compute the metric entropy for lags 1 through lag.num
 
   Srho.vec <- numeric()
-  ## `Portmanteau' cumulant of all lags
   Srho.cumulant.vec <- numeric()
   
   bw.y <- numeric()
@@ -262,7 +267,7 @@ npsdeptest <- function(data = NULL,
     bw.joint.y[k] <- bw.joint[1]
     bw.joint.y.lag[k] <- bw.joint[2]
     
-    Srho.vec[k] <- Srho.bivar(y,y.lag,bw.y[k],bw.y.lag[k],bw.joint,method=method)
+    Srho.vec[k] <- Srho.bivar(y,y.lag,bw.y[k],bw.y.lag[k],bw.joint,method=method,pointwise=TRUE)
     .np_progress_activity_step(lag.progress, done = k)
 
   }
@@ -293,6 +298,7 @@ npsdeptest <- function(data = NULL,
         bw.joint.y = bw.joint.y,
         bw.joint.y.lag = bw.joint.y.lag,
         Srho.bivar = Srho.bivar,
+        observed = Srho.vec,
         method = method,
         progress = progress
       )
@@ -301,8 +307,6 @@ npsdeptest <- function(data = NULL,
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
     } else {
       Srho.vec.boot <- numeric()
-      ## `Portmanteau' cumulant of all lags
-      Srho.cumulant.vec.boot <- numeric()
 
       Srho.bootstrap.mat <- matrix(NA,B,(lag.num))
       Srho.cumulant.bootstrap.mat <- matrix(NA,B,(lag.num))
@@ -318,11 +322,14 @@ npsdeptest <- function(data = NULL,
           y <- as.numeric(tmp[,1])
           y.lag <- as.numeric(tmp[,2])
           Srho.vec.boot[k] <- Srho.bivar(y, y.lag, bw.y[k], bw.y.lag[k], c(bw.joint.y[k], bw.joint.y.lag[k]), method = method)
-          Srho.bootstrap.mat[b,k] <- Srho.vec.boot[k]
-          ## `Portmanteau' cumulant of all lags
-          Srho.cumulant.vec.boot[k] <- sum(Srho.vec.boot[seq_len(k)])
-          Srho.cumulant.bootstrap.mat[b,k] <- Srho.cumulant.vec.boot[k]
         }
+        if (method == "integration")
+          Srho.vec.boot <- .np_entropy_guard_lag_draw(
+            Srho.vec.boot, Srho.vec, resampled.ts, bw.y, bw.y.lag,
+            bw.joint.y, bw.joint.y.lag, Srho.bivar)
+        Srho.bootstrap.mat[b, ] <- Srho.vec.boot
+        for (k in seq_len(lag.num))
+          Srho.cumulant.bootstrap.mat[b, k] <- sum(Srho.vec.boot[seq_len(k)])
 
         .np_progress_activity_step(progress, done = b)
       }

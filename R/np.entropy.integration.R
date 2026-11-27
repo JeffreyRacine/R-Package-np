@@ -585,13 +585,40 @@
   0.5 * total
 }
 
+# This envelope selects arithmetic only. The public tail remains the literal
+# inclusive comparison of the returned draw to its pointwise observed score.
+.np_entropy_near_tail <- function(value, reference, n, terms = 1L) {
+  tolerance <- max(sqrt(.Machine$double.eps), 64 * n * .Machine$double.eps)
+  is.finite(value) & is.finite(reference) &
+    abs(value - reference) <= tolerance * pmax(terms, abs(value), abs(reference))
+}
+
+.np_entropy_guard_lag_draw <- function(values, observed, series, bw.y, bw.lag,
+                                       joint.y, joint.lag, statistic) {
+  k <- seq_along(values)
+  # A cumulative statistic can tie even if all its individual lags differ.
+  if (!any(.np_entropy_near_tail(values, observed, length(series))) &&
+      !any(.np_entropy_near_tail(cumsum(values), cumsum(observed),
+                                 length(series), k)))
+    return(values)
+  for (j in k) {
+    pair <- ts.intersect(series, lag(series, j))
+    values[j] <- statistic(as.numeric(pair[, 1L]), as.numeric(pair[, 2L]),
+      bw.y[j], bw.lag[j], c(joint.y[j], joint.lag[j]),
+      method = "integration", pointwise = TRUE)
+  }
+  values
+}
+
 .np_entropy_bivariate_integral <- function(x.dat,
                                            y.dat,
                                            bw.x,
                                            bw.y,
                                            bw.joint,
                                            lower,
-                                           upper) {
+                                           upper,
+                                           reference = NULL,
+                                           pointwise = FALSE) {
   x.dat <- as.double(x.dat)
   y.dat <- as.double(y.dat)
   bandwidths <- as.double(c(bw.x, bw.y, bw.joint))
@@ -611,7 +638,7 @@
     lower[2L], upper[2L], min(bandwidths[c(2L, 4L)]),
     points.per.bandwidth = 2L
   )
-  if (identical(getOption("np.macMseries.accelerate", "auto"), "auto") &&
+  if (!pointwise && identical(getOption("np.macMseries.accelerate", "auto"), "auto") &&
       length(x.dat) >= 50L && all(is.finite(x.dat)) && all(is.finite(y.dat)) &&
       all(abs(log(bandwidths)) < log(.Machine$double.xmax) / 4) &&
       !.npRmpi_entropy_collective_rows()) {
@@ -619,7 +646,8 @@
       .np_entropy_gaussian_panels(x.dat, y.dat, bandwidths, axis.x, axis.y))
     # At numerical independence the sign of a bootstrap tie can depend on
     # summation order. Use the original integrand in its roundoff envelope.
-    if (is.finite(value) && value > (length(x.dat) * .Machine$double.eps)^2)
+    if (is.finite(value) && value > (length(x.dat) * .Machine$double.eps)^2 &&
+        (is.null(reference) || !.np_entropy_near_tail(value, reference, length(x.dat))))
       return(value)
   }
   max.points <- as.integer(max(
