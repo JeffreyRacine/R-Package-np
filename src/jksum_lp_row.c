@@ -555,6 +555,12 @@ np_lp_mirror_dense_moments_row3(double *moments, const int nrows)
   }
 }
 
+/* Inlining the tiled loop also changes code generation for the adjacent
+ * fixed widths in the same dispatcher. Keep those rank-local searches
+ * independent of the wide implementation on the qualified toolchain. */
+#if NP_LP_TILE_WIDE_DONOR
+__attribute__((noinline))
+#endif
 static void np_lp_accumulate_dense_row_generic(
     const NPLPDenseRowContext *ctx)
 {
