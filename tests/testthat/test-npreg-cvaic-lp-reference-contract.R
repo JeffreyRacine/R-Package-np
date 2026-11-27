@@ -111,6 +111,11 @@ test_that("LP CVAIC agrees with the independent exact-hat definition", {
          basis = "glp", bernstein = TRUE),
     list(type = "fixed", bws = c(0.30, 0.34), degree = c(2L, 3L),
          basis = "tensor", bernstein = FALSE),
+    # Dense moment rows on either side of a 32-term tile boundary.
+    list(type = "fixed", bws = c(0.50, 0.54), degree = c(5L, 5L),
+         basis = "glp", bernstein = TRUE),
+    list(type = "fixed", bws = c(0.50, 0.54), degree = c(5L, 5L),
+         basis = "tensor", bernstein = TRUE),
     list(type = "generalized_nn", bws = c(65, 75), degree = c(1L, 1L),
          basis = "glp", bernstein = FALSE),
     list(type = "generalized_nn", bws = c(75, 85), degree = c(2L, 2L),

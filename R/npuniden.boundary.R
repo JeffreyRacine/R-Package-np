@@ -282,11 +282,43 @@ npuniden.boundary <- function(X=NULL,
             (sum(kv) - kv[i])/(n - 1L)
         })
     }
+    # Plain repeated observations have identical evaluation rows and diagonal
+    # entries. Keep distinct signed zeros and observation-specific classes on
+    # the ordinary path. Build the first-occurrence map once per search.
+    first <- NULL
+    if (is.null(h) && is.null(attributes(X)) && (is.double(X) || is.integer(X)) &&
+        anyDuplicated(X) && all(is.finite(X)) && !any(1 / X[X == 0] < 0)) {
+        index <- match(X, X)
+        if (sum(index == seq_along(index)) <= length(index) / 2)
+            first <- index
+    }
+    repeated.rows <- function(X, h, a, b, need.fitted) {
+        n <- length(X)
+        loo <- numeric(n)
+        fitted <- if (need.fitted) numeric(n)
+        warned <- FALSE
+        withCallingHandlers({
+            for (i in seq_along(X)) {
+                j <- first[i]
+                if (j < i && !warned) {
+                    loo[i] <- loo[j]
+                    if (need.fitted) fitted[i] <- fitted[j]
+                } else {
+                    row <- kernel(X[i], X, h, a, b)
+                    loo[i] <- (sum(row) - row[i]) / (n - 1L)
+                    if (need.fitted) fitted[i] <- mean(row)
+                }
+            }
+        }, warning = function(w) warned <<- TRUE)
+        if (warned && need.fitted) loo <- fhat.loo(X, h, a, b)
+        list(fitted = fitted, loo = loo)
+    }
     if(bwmethod=="cv.ml") {
         ## Likelihood cross-validation function (maximizing)
         fnscale <- list(fnscale = -1)
         cv.function <- function(h,X,a=0,b=1) {
-            f.loo <- fhat.loo(X,h,a,b)
+            f.loo <- if (is.null(first)) fhat.loo(X,h,a,b) else
+                repeated.rows(X, h, a, b, FALSE)$loo
             good <- (f.loo > 0) & is.finite(f.loo)
             f.safe <- f.loo
             f.safe[!good] <- .Machine$double.xmin
@@ -297,7 +329,25 @@ npuniden.boundary <- function(X=NULL,
         fnscale <- list(fnscale = 1) 
         cv.geometry <- if(is.null(h)) .np_quadrature_prepare(X) else NULL
         cv.function <- function(h,X,a=0,b=1) {
-            cv.ls <- .np_quadrature_total(X,fhat(X,X,h,a,b)**2,cv.geometry)-2*mean(fhat.loo(X,h,a,b))
+            if (!is.null(first)) {
+                rows <- repeated.rows(X, h, a, b, TRUE)
+                cv.ls <- .np_quadrature_total(X, rows$fitted**2, cv.geometry) - 2*mean(rows$loo)
+                return(if (is.finite(cv.ls)) cv.ls else sqrt(sqrt(.Machine$double.xmax)))
+            }
+            n <- length(X)
+            fitted <- loo <- numeric(n)
+            warned <- FALSE
+            withCallingHandlers({
+                for (i in seq_along(X)) {
+                    row <- kernel(X[i], X, h, a, b)
+                    fitted[i] <- mean(row)
+                    loo[i] <- if (n > 1L) (sum(row) - row[i])/(n - 1L) else NA_real_
+                }
+            }, warning = function(w) warned <<- TRUE)
+            # Preserve both passes' diagnostics at extreme trial bandwidths.
+            if (warned)
+                loo <- fhat.loo(X, h, a, b)
+            cv.ls <- .np_quadrature_total(X, fitted**2, cv.geometry) - 2*mean(loo)
             if (is.finite(cv.ls)) cv.ls else sqrt(sqrt(.Machine$double.xmax))
         }
     }

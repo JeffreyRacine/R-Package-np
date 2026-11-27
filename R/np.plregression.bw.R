@@ -142,7 +142,7 @@ npplregbw.plbandwidth =
           bws$bw[[i+1]] <- .npregbw_auxiliary(xdat=zdat, ydat=xdat[,i],
                   bws = bws$bw[[i+1]], nmulti = nmulti, ...)
         }
-      })[["elapsed"]]
+      }, gcFirst = FALSE)[["elapsed"]]
     num.feval <- sum(sapply(bws$bw, function(bwi) {
       if (is.null(bwi$num.feval) || identical(bwi$num.feval, NA)) 0 else bwi$num.feval
     }))

@@ -120,6 +120,24 @@ static void np_lp_accumulate_dense_row_##WIDTH(                             \
     moving_moments =                                                        \
       ctx->moments + (size_t)orig_ii*(size_t)(WIDTH)*(size_t)(WIDTH);        \
     moving_rhs = ctx->rhs + (size_t)orig_ii*(size_t)(WIDTH);                 \
+    if((WIDTH) >= 7){                                                         \
+      /* Gather this donor once. Keep both triangles and the original */      \
+      /* multiplication and addition order within every entry. */             \
+      double donor_basis[(WIDTH)];                                            \
+      for(b = 0; b < (WIDTH); ++b)                                            \
+        donor_basis[b] = ctx->basis[b][ii];                                   \
+      for(a = 0; a < (WIDTH); ++a){                                           \
+        const double weighted_bia = weight*donor_basis[a];                    \
+        fixed_rhs[a] += weighted_bia*yi;                                      \
+        for(b = 0; b < (WIDTH); ++b)                                          \
+          fixed_moments[a*(WIDTH)+b] += weighted_bia*donor_basis[b];          \
+      }                                                                       \
+      for(a = 0; a < (WIDTH); ++a)                                            \
+        moving_rhs[a] += reverse_weight*ctx->eval_ybasis[a];                  \
+      for(b = 0; b < (WIDTH)*(WIDTH); ++b)                                    \
+        moving_moments[b] += reverse_weight*ctx->eval_outer[b];               \
+      continue;                                                               \
+    }                                                                         \
     for(a = 0; a < (WIDTH); a++){                                            \
       const double bia = ctx->basis[a][ii];                                 \
       const double weighted_bia = weight*bia;                               \
@@ -426,17 +444,30 @@ static void np_lp_accumulate_dense_row_generic(
       double * const moving_rhs =
         ctx->rhs + (size_t)orig_ii*(size_t)nterms;
 
-      for(a = 0; a < nterms; a++){
-        const double bia = ctx->basis[a][ii];
-        const double weighted_bia = weight*bia;
+      /* The basis is stored by term. Gather contiguous donor tiles before
+         updating full rows. Each entry retains its original donor order. */
+      for(a = 0; a < nterms; ++a){
+        const double weighted_bia = weight*ctx->basis[a][ii];
         fixed_rhs[a] += weighted_bia*yi;
         moving_rhs[a] += reverse_weight*ctx->eval_ybasis[a];
-        for(b = 0; b < nterms; b++){
-          fixed_moments[a*nterms+b] +=
-            weighted_bia*ctx->basis[b][ii];
-          moving_moments[a*nterms+b] +=
-            reverse_weight*ctx->eval_outer[a*nterms+b];
+      }
+      for(int first = 0; first < nterms; ){
+        double donor[32];
+        const int count = nterms - first < 32 ? nterms - first : 32;
+        for(b = 0; b < count; ++b)
+          donor[b] = ctx->basis[first+b][ii];
+        for(a = 0; a < nterms; ++a){
+          const double weighted_bia = weight*ctx->basis[a][ii];
+          double * const row = fixed_moments + (size_t)a*nterms + first;
+          for(b = 0; b < count; ++b)
+            row[b] += weighted_bia*donor[b];
         }
+        first += count;
+      }
+      for(a = 0; a < nterms; ++a){
+        const size_t offset = (size_t)a*nterms;
+        for(b = 0; b < nterms; ++b)
+          moving_moments[offset+b] += reverse_weight*ctx->eval_outer[offset+b];
       }
     }
   }

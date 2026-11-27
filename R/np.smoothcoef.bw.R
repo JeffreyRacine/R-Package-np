@@ -1261,6 +1261,70 @@ npscoefbw.scbandwidth <-
             invisible(NULL)
           }
 
+          lc_loo_mean <- function(tww) {
+            nc <- ncol(W)
+            # Bound copied moments to about 1 MiB (or one full system).
+            # Match the incumbent row-wise matrix product after each solve.
+            block.size <- max(1, floor(131072 / (nc * (nc + 1.0))))
+            mean.loo <- rep(maxPenalty, n)
+            doridge <- rep.int(FALSE, n)
+            for (first in seq.int(1L, n, by = block.size)) {
+              rows <- seq.int(first, min(n, first + block.size - 1L))
+              coef <- .npscoef_batch_zero_solve(
+                tyw = matrix(tww[-1L, 1L, rows, drop = FALSE], nrow = nc),
+                tww = tww[-1L, -1L, rows, drop = FALSE]
+              )
+              if (is.null(coef)) {
+                # Repeated failed LAPACK batches can be expensive. Hand the
+                # remaining rows to the original scalar ridge loop.
+                doridge[seq.int(first, n)] <- TRUE
+                break
+              }
+              for (j in seq_along(rows)) {
+                i <- rows[j]
+                mean.loo[i] <- W[i, , drop = FALSE] %*% coef[, j]
+              }
+            }
+            if (!any(doridge))
+              return(mean.loo)
+
+            ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
+            ridge <- rep.int(ridge.grid[1L], n)
+            ridge.idx <- rep.int(1L, n)
+
+            while(any(doridge)){
+              iloo <- which(doridge)
+              for (ii in iloo) {
+                doridge[ii] <- FALSE
+                ridge.val <- npRidgeInterceptCorrection(
+                  ridge = ridge[ii], intercept = tww[-1, 1, ii][1L],
+                  pristine.anchor = tww[-1, -1, ii][1L, 1L]
+                )
+                if (!is.finite(ridge.val)) {
+                  mean.loo[ii] <- NA_real_
+                  next
+                }
+                beta.ii <- tryCatch(
+                  solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
+                        tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
+                  error = function(e) e
+                )
+                if (inherits(beta.ii, "error")) {
+                  ridge.idx[ii] <- ridge.idx[ii] + 1L
+                  if (ridge.idx[ii] <= length(ridge.grid)) {
+                    ridge[ii] <- ridge.grid[ridge.idx[ii]]
+                    doridge[ii] <- TRUE
+                    next
+                  }
+                  mean.loo[ii] <- NA_real_
+                  next
+                }
+                mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
+              }
+            }
+            mean.loo
+          }
+
           overall.cache <- NULL
           overall.cv.ls.raw <- function(param, account = TRUE) {
             if (account)
@@ -1298,44 +1362,7 @@ npscoefbw.scbandwidth <-
                   .np_estimator_loo_ksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
                               leave.one.out = TRUE))$ksum
 
-                mean.loo <- rep(maxPenalty,n)
-                ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
-                ridge <- rep.int(ridge.grid[1L], n)
-                ridge.idx <- rep.int(1L, n)
-                doridge <- rep.int(TRUE, n)
-
-                nc <- ncol(tww[-1,-1,1])
-
-                while(any(doridge)){
-                  iloo <- which(doridge)
-                  for (ii in iloo) {
-                    doridge[ii] <- FALSE
-                    ridge.val <- npRidgeInterceptCorrection(
-                      ridge = ridge[ii], intercept = tww[-1, 1, ii][1L],
-                      pristine.anchor = tww[-1, -1, ii][1L, 1L]
-                    )
-                    if (!is.finite(ridge.val)) {
-                      mean.loo[ii] <- NA_real_
-                      next
-                    }
-                    beta.ii <- tryCatch(
-                      solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
-                            tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
-                      error = function(e) e
-                    )
-                    if (inherits(beta.ii, "error")) {
-                      ridge.idx[ii] <- ridge.idx[ii] + 1L
-                      if (ridge.idx[ii] <= length(ridge.grid)) {
-                        ridge[ii] <- ridge.grid[ridge.idx[ii]]
-                        doridge[ii] <- TRUE
-                        next
-                      }
-                      mean.loo[ii] <- NA_real_
-                      next
-                    }
-                    mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
-                  }
-                }
+                mean.loo <- lc_loo_mean(tww)
               }
             } else {
               coef.loo <- lp_full_coef(sbw = sbw, leave.one.out.eval = TRUE)
@@ -1866,7 +1893,7 @@ npscoefbw.scbandwidth <-
           bws$numimp = numimp.overall
           bws$fval.vector = value.overall
         }
-      })[["elapsed"]]
+      }, gcFirst = FALSE)[["elapsed"]]
     
     bws$sfactor <- bws$bandwidth <- bws$bw
     nfactor <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))
