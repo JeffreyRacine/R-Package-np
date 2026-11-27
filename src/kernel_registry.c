@@ -19,9 +19,9 @@ typedef char np_ckernel_family_codes_must_differ[
 typedef char np_ckernel_coordinate_code_must_be_nonlegacy[
   (NP_CKERNEL_COORDINATE_CODE < NP_CKERNEL_LEGACY_CODE_MIN) ? 1 : -1];
 
-/* These ABIs store binary64 and uint64_t in the same byte order. Inspect
- * the exponent as integer data so partial finite-math compiler options
- * cannot discard the NaN or infinity check. memcpy avoids type aliasing. */
+/* On the selected binary64 ABIs, inspecting the exponent in place avoids
+ * an out-of-line R_finite call. The integer and double byte orders agree,
+ * and memcpy preserves aliasing rules. Other builds use R_FINITE. */
 static inline int np_legacy_kernel_isfinite(double value)
 {
 #if !defined(HAVE_WORKING_ISFINITE) && !defined(__FAST_MATH__) && \

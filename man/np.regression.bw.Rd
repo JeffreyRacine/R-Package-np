@@ -271,12 +271,14 @@ These arguments control regression type, local-polynomial specification, and opt
     \code{degree.select="coordinate"},
     \code{bernstein.basis=TRUE}, \code{degree.min=0L},
     \code{degree.max=10L}, \code{degree.verify=FALSE}, and
-    \code{bwtype="fixed"}. Explicit incompatible settings error
-    immediately; in particular, explicit \code{nomad=TRUE} currently requires
-    \code{regtype="lp"}, \code{bwtype="fixed"}, automatic degree
-    search, no explicit \code{degree},
-    at least one continuous predictor, and
-    \code{search.engine \%in\% c("nomad", "nomad+powell")}.
+    \code{bwtype="fixed"}. The shortcut also accepts an explicit
+    \code{bwtype="generalized_nn"} or \code{bwtype="adaptive_nn"}.
+    With \code{nomad=TRUE}, use \code{regtype="lp"}, automatic degree
+    selection, \code{degree.verify=FALSE}, at least one continuous
+    predictor, and \code{search.engine="nomad"} or
+    \code{search.engine="nomad+powell"}. Supplying a fixed \code{degree}
+    raises an error. Use \code{degree.min} and \code{degree.max} to
+    restrict the search.
     This shortcut does not change the meaning of \code{nmulti} or
     \code{nomad.nmulti}: \code{nmulti} remains the outer restart count,
     while \code{nomad.nmulti} controls inner
@@ -759,7 +761,7 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
   fixed-degree bandwidth optimizer. With
   \code{search.engine="nomad"} or \code{"nomad+powell"}, the package
   instead evaluates the cross-validation criterion directly over the
-  joint space of fixed bandwidths and polynomial degrees using
+  joint space of bandwidth parameters and polynomial degrees using
   the native \pkg{crs} NOMAD C API. \code{"nomad+powell"} then performs one Powell
   hot start from the NOMAD solution and retains the better of the
   direct NOMAD and polished solutions. This direct joint-search route
