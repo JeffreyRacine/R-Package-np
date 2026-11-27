@@ -39253,7 +39253,7 @@ typedef struct {
   double *p, *s, *c00, *c10, *c11, *product;
   double *linear, *quadratic, *y, *h0, *h1;
   int *active;
-  int active_count, equal_widths;
+  int active_count;
 } NPConditionalANNOverlapBlock;
 
 static void np_conditional_ann_overlap_clear(NPConditionalANNOverlapBlock *b)
@@ -39305,7 +39305,6 @@ static int np_conditional_ann_overlap_prepare(
      * the existing literal-radius contract; never fabricate a positive width. */
     if(!(b->h0[j] > 0.0) || !(b->h1[j] > 0.0))
       return 1;
-    b->equal_widths += b->h0[j] == b->h1[j];
   }
   return 0;
 }
@@ -39349,74 +39348,31 @@ static int np_conditional_ann_overlap_contract(NPConditionalANNOverlapBlock *b)
       b->p[(size_t)r*active_count+a] = b->p[(size_t)r*n+b->active[a]];
       b->s[(size_t)r*active_count+a] = b->s[(size_t)r*n+b->active[a]];
     }
-  /* Equal adjacent radii identify interchangeable overlap entries; the three
-     contractions still use their original weights and accumulation order. */
-  /* Only a proper subset of a mixed-width sample needs a new count. */
-  int equal_count = b->equal_widths;
-  if(active_count != n && equal_count != 0) {
-    if(equal_count == n) equal_count = active_count;
-    else {
-      equal_count = 0;
-      for(int a = 0; a < active_count; ++a) {
-        const int donor = b->active[a];
-        equal_count += b->h0[donor] == b->h1[donor];
-      }
-    }
-  }
-  const int same_widths = equal_count == active_count;
   for(int j0 = 0; j0 < active_count; j0 += b->capacity) {
     const int width = MIN(b->capacity, active_count-j0);
     np_progress_bandwidth_loop_step();
-    if(equal_count > active_count/2) {
-      for(int j = 0; j < width; ++j) {
-        const int jj = b->active[j0+j];
-        if(same_widths) {
-          for(int l = 0; l < active_count; ++l){
-            const int ll = b->active[l];
-            const size_t at = (size_t)j*active_count+l;
-            b->c00[at] = overlap[kernel](b->y[jj],b->y[ll],b->h0[jj],b->h0[ll])/
-              (b->h0[jj]*b->h0[ll]);
-          }
-        } else {
-          const int equal_j = b->h0[jj] == b->h1[jj];
-          for(int l = 0; l < active_count; ++l){
-            const int ll = b->active[l];
-            const size_t at = (size_t)j*active_count+l;
-            b->c00[at] = overlap[kernel](b->y[jj],b->y[ll],b->h0[jj],b->h0[ll])/
-              (b->h0[jj]*b->h0[ll]);
-            b->c10[at] = equal_j ? b->c00[at] :
-              overlap[kernel](b->y[jj],b->y[ll],b->h1[jj],b->h0[ll])/
-                (b->h1[jj]*b->h0[ll]);
-            b->c11[at] = b->h0[ll] == b->h1[ll] ? b->c10[at] :
-              overlap[kernel](b->y[jj],b->y[ll],b->h1[jj],b->h1[ll])/
-                (b->h1[jj]*b->h1[ll]);
-          }
-        }
-      }
-    } else {
-      for(int j = 0; j < width; ++j) {
-        const int jj = b->active[j0+j];
-        if(kernel == 0) for(int l = 0; l < active_count; ++l) {
-          const int ll = b->active[l];
-          const size_t at = (size_t)j*active_count+l;
-          /* Reuse the canonical overlap primitive, including its incumbent
-           * floating-point constants. No shared kernel arithmetic is changed. */
-          b->c00[at] = np_aconvol_gauss2(b->y[jj], b->y[ll], b->h0[jj], b->h0[ll])/
-            (b->h0[jj]*b->h0[ll]);
-          b->c10[at] = np_aconvol_gauss2(b->y[jj], b->y[ll], b->h1[jj], b->h0[ll])/
-            (b->h1[jj]*b->h0[ll]);
-          b->c11[at] = np_aconvol_gauss2(b->y[jj], b->y[ll], b->h1[jj], b->h1[ll])/
-            (b->h1[jj]*b->h1[ll]);
-        } else for(int l = 0; l < active_count; ++l) {
-          const int ll = b->active[l];
-          const size_t at = (size_t)j*active_count+l;
-          b->c00[at] = overlap[kernel](b->y[jj],b->y[ll],b->h0[jj],b->h0[ll])/
-            (b->h0[jj]*b->h0[ll]);
-          b->c10[at] = overlap[kernel](b->y[jj],b->y[ll],b->h1[jj],b->h0[ll])/
-            (b->h1[jj]*b->h0[ll]);
-          b->c11[at] = overlap[kernel](b->y[jj],b->y[ll],b->h1[jj],b->h1[ll])/
-            (b->h1[jj]*b->h1[ll]);
-        }
+    for(int j = 0; j < width; ++j) {
+      const int jj = b->active[j0+j];
+      if(kernel == 0) for(int l = 0; l < active_count; ++l) {
+        const int ll = b->active[l];
+        const size_t at = (size_t)j*active_count+l;
+        /* Reuse the canonical overlap primitive, including its incumbent
+         * floating-point constants. No shared kernel arithmetic is changed. */
+        b->c00[at] = np_aconvol_gauss2(b->y[jj], b->y[ll], b->h0[jj], b->h0[ll])/
+          (b->h0[jj]*b->h0[ll]);
+        b->c10[at] = np_aconvol_gauss2(b->y[jj], b->y[ll], b->h1[jj], b->h0[ll])/
+          (b->h1[jj]*b->h0[ll]);
+        b->c11[at] = np_aconvol_gauss2(b->y[jj], b->y[ll], b->h1[jj], b->h1[ll])/
+          (b->h1[jj]*b->h1[ll]);
+      } else for(int l = 0; l < active_count; ++l) {
+        const int ll = b->active[l];
+        const size_t at = (size_t)j*active_count+l;
+        b->c00[at] = overlap[kernel](b->y[jj],b->y[ll],b->h0[jj],b->h0[ll])/
+          (b->h0[jj]*b->h0[ll]);
+        b->c10[at] = overlap[kernel](b->y[jj],b->y[ll],b->h1[jj],b->h0[ll])/
+          (b->h1[jj]*b->h0[ll]);
+        b->c11[at] = overlap[kernel](b->y[jj],b->y[ll],b->h1[jj],b->h1[ll])/
+          (b->h1[jj]*b->h1[ll]);
       }
     }
     /* C01=C10^T: cross-state scalar contributions are equal even for signed
@@ -39424,7 +39380,7 @@ static int np_conditional_ann_overlap_contract(NPConditionalANNOverlapBlock *b)
     for(int state = 0; state < 3; ++state) {
       const double *left = state == 2 ? b->s : b->p;
       const double *right = state == 0 ? b->p : b->s;
-      const double *overlap = (same_widths || state == 0) ? b->c00 : state == 1 ? b->c10 : b->c11;
+      const double *overlap = state == 0 ? b->c00 : state == 1 ? b->c10 : b->c11;
       const double factor = state == 1 ? 2.0 : 1.0;
       np_blas_dgemm_tn_int(rows, width, active_count, left, overlap, b->product);
       for(int r = 0; r < rows; ++r)
