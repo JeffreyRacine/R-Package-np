@@ -8,6 +8,16 @@
 #include "headers.h"
 #include "jksum_lp_row.h"
 
+/* The generic dense row has identical per-entry arithmetic in both layouts.
+ * Enable tiling on the Apple arm64 toolchain qualified by complete CV searches.
+ * Other builds retain the original row loop. */
+#if defined(__APPLE__) && defined(__aarch64__) && defined(__clang__) && \
+    defined(__apple_build_version__) && __apple_build_version__ == 21000401
+# define NP_LP_TILE_WIDE_DONOR 1
+#else
+# define NP_LP_TILE_WIDE_DONOR 0
+#endif
+
 /* The dense pair accumulator's caller allocates the input basis separately
  * from both output buffers (moments and RHS). Fixed and moving rows also
  * have distinct destinations, including when the donor order is permuted. */
@@ -447,9 +457,7 @@ static void np_lp_accumulate_dense_row_generic(
       double * const moving_rhs =
         ctx->rhs + (size_t)orig_ii*(size_t)nterms;
 
-      /* Tiled donor reads accelerate this wide loop with Apple Clang on arm64.
-         Keep the original loop on other toolchains, including GCC. */
-#if defined(__APPLE__) && defined(__aarch64__) && defined(__clang__) && defined(__apple_build_version__)
+#if NP_LP_TILE_WIDE_DONOR
       /* The basis is stored by term. Gather contiguous donor tiles before
          updating full rows. Each entry retains its original donor order. */
       for(a = 0; a < nterms; ++a){
