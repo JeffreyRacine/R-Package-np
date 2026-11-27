@@ -568,7 +568,7 @@ void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx)
   case 13: np_lp_accumulate_dense_row_13(ctx); return;
   case 14: np_lp_accumulate_dense_row_14(ctx); return;
   case 15: np_lp_accumulate_dense_row_15(ctx); return;
-  case 16: np_lp_accumulate_dense_row_16(ctx); return;
+  case NP_LP_LAST_DENSE_WIDTH: np_lp_accumulate_dense_row_16(ctx); return;
   default: np_lp_accumulate_dense_row_generic(ctx); return;
   }
 }

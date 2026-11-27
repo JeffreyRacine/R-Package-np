@@ -179,6 +179,9 @@ typedef struct {
   int *support_count;
 } NPLPOwnedRowContext;
 
+/* Move the last switch case to its new helper when adding a specialization. */
+#define NP_LP_LAST_DENSE_WIDTH 16
+
 /* The generic dense row has identical per-entry arithmetic in both layouts.
  * Enable tiling on the Apple arm64 toolchain qualified by complete CV searches.
  * Other builds retain the original row loop. */

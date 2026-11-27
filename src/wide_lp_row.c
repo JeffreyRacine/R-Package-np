@@ -8,7 +8,7 @@
 
 void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx)
 {
-  if (ctx->nterms > 16)
+  if (ctx->nterms > NP_LP_LAST_DENSE_WIDTH)
     np_lp_accumulate_dense_row_generic(ctx);
   else
     np_lp_accumulate_standard_dense_row(ctx);
