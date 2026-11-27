@@ -578,6 +578,9 @@ static void np_lp_accumulate_dense_row_generic(
       double * const moving_rhs =
         ctx->rhs + (size_t)orig_ii*(size_t)nterms;
 
+      /* Tiled donor reads accelerate this wide loop with Apple Clang on arm64.
+         Keep the original loop on other toolchains, including GCC. */
+#if defined(__APPLE__) && defined(__aarch64__) && defined(__clang__) && defined(__apple_build_version__)
       /* The basis is stored by term. Gather contiguous donor tiles before
          updating full rows. Each entry retains its original donor order. */
       for(a = 0; a < nterms; ++a){
@@ -603,6 +606,20 @@ static void np_lp_accumulate_dense_row_generic(
         for(b = 0; b < nterms; ++b)
           moving_moments[offset+b] += reverse_weight*ctx->eval_outer[offset+b];
       }
+#else
+      for(a = 0; a < nterms; a++){
+        const double bia = ctx->basis[a][ii];
+        const double weighted_bia = weight*bia;
+        fixed_rhs[a] += weighted_bia*yi;
+        moving_rhs[a] += reverse_weight*ctx->eval_ybasis[a];
+        for(b = 0; b < nterms; b++){
+          fixed_moments[a*nterms+b] +=
+            weighted_bia*ctx->basis[b][ii];
+          moving_moments[a*nterms+b] +=
+            reverse_weight*ctx->eval_outer[a*nterms+b];
+        }
+      }
+#endif
     }
   }
 }
