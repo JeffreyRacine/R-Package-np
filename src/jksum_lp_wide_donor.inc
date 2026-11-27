@@ -1,5 +1,9 @@
 /* Shared donor traversal. The standard row object always instantiates the
  * original update. The qualified Apple wide-row object instantiates tiling. */
+/* The narrow-width jump must not set up the wide donor stack frame. */
+#if NP_LP_COMPILE_TILED_DONOR
+__attribute__((noinline))
+#endif
 static void np_lp_accumulate_dense_row_generic(
     const NPLPDenseRowContext *ctx)
 {
