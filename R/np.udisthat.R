@@ -92,28 +92,22 @@ npudisthat <- function(bws,
       return(if (k == 1L) as.vector(scaled) else scaled)
     }
 
-    rhs <- if (ncol(y) == 1L) {
-      y
-    } else {
-      lapply(seq_len(ncol(y)), function(j) y[, j, drop = FALSE])
-    }
-
-    fixed <- identical(bws$type, "fixed")
-    operator.apply <- if (fixed) .np_direct_operator_apply else .np_exact_operator_apply
-    label <- if (fixed) "npudisthat direct operator" else "npudisthat exact operator"
     apply.column <- function(column, operation) {
-      operator.apply(kbw = bws, txdat = tdat, exdat = if (no.e) tdat else edat,
-                     operator = "integral", rhs = column,
-                     where = paste(label, operation), train.is.eval = no.e) / n.train
+      .np_exact_operator_apply(
+        kbw = bws, txdat = tdat, exdat = if (no.e) tdat else edat,
+        operator = "integral", rhs = column,
+        where = paste("npudisthat exact operator", operation),
+        train.is.eval = no.e) / n.train
     }
 
-    # All response columns have the same kernel row normalization.
-    probe.sum <- apply.column(matrix(1.0, n.train, 1L), "probe")
-    apply.one <- function(column) {
-      out <- apply.column(column, "apply")
-      scale_rows(out, probe.sum)
+    # The probe is shared. Its promise is first forced after a response succeeds.
+    apply.columns <- function(probe.sum) {
+      do.call(cbind, lapply(seq_len(ncol(y)), function(j) {
+        out <- apply.column(y[, j, drop = FALSE], "apply")
+        scale_rows(out, probe.sum)
+      }))
     }
-    out <- if (is.list(rhs)) do.call(cbind, lapply(rhs, apply.one)) else apply.one(rhs)
+    out <- apply.columns(apply.column(matrix(1.0, n.train, 1L), "probe"))
 
     if (ncol(out) == 1L)
       return(as.vector(out))
