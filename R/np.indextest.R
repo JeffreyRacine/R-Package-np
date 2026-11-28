@@ -15,7 +15,7 @@
   args <- as.list(call)[-1L]
   stored <- c("formula","data","subset","na.action","xdat","ydat","method","regtype",
               "bwtype","ckertype","ckerorder","ckerbound","ckerlb","ckerub",
-              "nmulti","optim.method","scale.factor.search.lower","only.optimize.beta",
+              "nmulti","optim.method","optim.threshold","scale.factor.search.lower","only.optimize.beta",
               "bandwidth.compute")
   replay <- c("bws","optim.maxit","optim.maxattempts","optim.reltol","optim.abstol",
               "random.seed","scale.factor.init.lower","scale.factor.init.upper",

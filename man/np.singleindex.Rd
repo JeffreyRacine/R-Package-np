@@ -341,13 +341,11 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \subsection{Optimizer Choice When Bandwidths Are Computed}{
     When \code{npindex} computes its bandwidth object internally,
     optimizer controls in \code{\dots} are passed to \code{\link{npindexbw}}.
-    The default \code{optim.method="Nelder-Mead"} is a robust
-    derivative-free starting point for low-dimensional searches, such as
-    one bandwidth plus only a few index coefficients. For larger
-    \eqn{p}, \code{optim.method="BFGS"} can be useful as a performance
-    and sensitivity comparison, but users should compare objective
-    values, convergence behavior, and fitted objects because the
-    single-index criterion can be nonconvex and route-sensitive.
+    The default \code{optim.method="auto"} selects Nelder--Mead for
+    indices with fewer than \code{optim.threshold} predictors and BFGS at
+    or above that width. The default threshold is eight index columns,
+    including the normalized first coefficient. Both controls can be
+    supplied when \code{npindex} selects bandwidths.
   }
 
   For practitioners who want the recommended automatic local-polynomial degree-and-bandwidth NOMAD route
