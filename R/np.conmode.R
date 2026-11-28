@@ -204,16 +204,22 @@ npconmode.condbandwidth <-
   invalid.rows <- !finite.row
 
   if (isTRUE(proper)) {
-    for (i in which(finite.row)) {
-      x <- raw[i,]
-      if (any(x < -tol) || abs(sum(x) - 1) > tol) {
-        repaired[i,] <- .npConmodeProjectSimplexVector(x)
-      } else {
-        repaired[i,] <- pmax(x, 0)
-        repaired[i,] <- repaired[i,] / sum(repaired[i,])
-      }
-      projection.distance[i] <- max(abs(repaired[i,] - raw[i,]))
+    project <- finite.row & (raw.min < -tol | abs(raw.rowsum - 1) > tol)
+    regular <- which(finite.row & !project)
+    if (length(regular)) {
+      total <- raw.rowsum[regular]
+      clipped <- which(raw.min[regular] < 0)
+      if (length(clipped))
+        total[clipped] <- rowSums(pmax(raw[regular[clipped], , drop = FALSE], 0))
+      for (j in seq_len(ncol(raw)))
+        repaired[regular, j] <- pmax(raw[regular, j], 0) / total
     }
+    for (i in which(project))
+      repaired[i, ] <- .npConmodeProjectSimplexVector(raw[i, ])
+    distance <- numeric(sum(finite.row))
+    for (j in seq_len(ncol(raw)))
+      distance <- pmax(distance, abs(repaired[finite.row, j] - raw[finite.row, j]))
+    projection.distance[finite.row] <- distance
   } else {
     projection.distance[finite.row] <- 0
   }
