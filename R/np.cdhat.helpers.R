@@ -436,7 +436,8 @@
                                       operator,
                                       rhs,
                                       where,
-                                      train.is.eval = FALSE) {
+                                      train.is.eval = FALSE,
+                                      separate.columns = FALSE) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
   train.is.eval <- npValidateScalarLogical(train.is.eval, "train.is.eval")
@@ -467,6 +468,11 @@
   if (nrow(kw) != nrow(txdat) || ncol(kw) != nrow(exdat))
     stop(sprintf("%s returned unexpected operator shape", where))
 
+  if (separate.columns && ncol(rhs) > 1L) {
+    # Reuse the kernel weights while preserving the single-column BLAS reductions.
+    return(do.call(cbind, lapply(seq_len(ncol(rhs)), function(j)
+      crossprod(kw, rhs[, j, drop = FALSE]) / op.info$scale)))
+  }
   crossprod(kw, rhs) / op.info$scale
 }
 

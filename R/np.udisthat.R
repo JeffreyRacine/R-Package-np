@@ -24,61 +24,41 @@
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
 
+    if (identical(bws$type, "fixed") && ncol(y) > 0L) {
+      k <- ncol(y)
+      sums <- .np_direct_operator_apply(
+        kbw = bws, txdat = tdat, exdat = edat,
+        operator = "integral", rhs = cbind(y, 1.0),
+        where = "npudisthat direct operator apply", train.is.eval = train.is.eval,
+        separate.columns = TRUE) / n.train
+      values <- sums[, seq_len(k), drop = FALSE]
+      colnames(values) <- colnames(y)
+      scaled <- .np_udisthat_scale_rows(values, sums[, k + 1L], target.dist = target.dist)
+      return(if (k == 1L) as.vector(scaled) else scaled)
+    }
+
     rhs <- if (ncol(y) == 1L) {
       y
     } else {
       lapply(seq_len(ncol(y)), function(j) y[, j, drop = FALSE])
     }
 
-    apply_one <- function(rhs.col) {
-      if (identical(bws$type, "fixed")) {
-        out <- .np_direct_operator_apply(
-          kbw = bws,
-          txdat = tdat,
-          exdat = edat,
-          operator = "integral",
-          rhs = rhs.col,
-          where = "npudisthat direct operator apply",
-          train.is.eval = train.is.eval
-        ) / n.train
-        probe.sum <- .np_direct_operator_apply(
-          kbw = bws,
-          txdat = tdat,
-          exdat = edat,
-          operator = "integral",
-          rhs = matrix(1.0, nrow = n.train, ncol = 1L),
-          where = "npudisthat direct operator probe",
-          train.is.eval = train.is.eval
-        ) / n.train
-      } else {
-        out <- .np_exact_operator_apply(
-          kbw = bws,
-          txdat = tdat,
-          exdat = edat,
-          operator = "integral",
-          rhs = rhs.col,
-          where = "npudisthat exact operator apply",
-          train.is.eval = train.is.eval
-        ) / n.train
-        probe.sum <- .np_exact_operator_apply(
-          kbw = bws,
-          txdat = tdat,
-          exdat = edat,
-          operator = "integral",
-          rhs = matrix(1.0, nrow = n.train, ncol = 1L),
-          where = "npudisthat exact operator probe",
-          train.is.eval = train.is.eval
-        ) / n.train
-      }
+    fixed <- identical(bws$type, "fixed")
+    operator.apply <- if (fixed) .np_direct_operator_apply else .np_exact_operator_apply
+    label <- if (fixed) "npudisthat direct operator" else "npudisthat exact operator"
+    apply.column <- function(column, operation) {
+      operator.apply(kbw = bws, txdat = tdat, exdat = edat,
+                     operator = "integral", rhs = column,
+                     where = paste(label, operation), train.is.eval = train.is.eval) / n.train
+    }
 
+    # All response columns have the same kernel row normalization.
+    probe.sum <- apply.column(matrix(1.0, n.train, 1L), "probe")
+    apply.one <- function(column) {
+      out <- apply.column(column, "apply")
       .np_udisthat_scale_rows(out, probe.sum, target.dist = target.dist)
     }
-
-    out <- if (is.list(rhs)) {
-      do.call(cbind, lapply(rhs, apply_one))
-    } else {
-      apply_one(rhs)
-    }
+    out <- if (is.list(rhs)) do.call(cbind, lapply(rhs, apply.one)) else apply.one(rhs)
 
     if (ncol(out) == 1L)
       return(as.vector(out))

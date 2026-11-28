@@ -11,6 +11,13 @@
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
 
+    if (ncol(y) > 1L && identical(bws$type, "fixed")) {
+      return(.np_direct_operator_apply(
+        kbw = bws, txdat = tdat, exdat = edat,
+        operator = "normal", rhs = y, where = "npudenshat direct operator apply",
+        train.is.eval = train.is.eval, separate.columns = TRUE) / n.train)
+    }
+
     rhs <- if (ncol(y) == 1L) {
       y
     } else {
