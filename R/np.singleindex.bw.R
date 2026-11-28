@@ -1857,6 +1857,7 @@ npindexbw.default <-
            optim.maxit,
            optim.method = c("auto", "Nelder-Mead", "BFGS", "CG"),
            optim.reltol,
+           optim.threshold = 8L,
            random.seed,
            regtype = c("lc", "ll", "lp"),
            scale.factor.init.lower = 0.1,
@@ -1864,8 +1865,7 @@ npindexbw.default <-
            scale.factor.init = 0.5,
            scale.factor.search.lower = NULL,
            ...,
-           nomad.opts = list(),
-           optim.threshold = 8L){
+           nomad.opts = list()){
   .np_reject_native_data(substitute(list(...))[-1L])
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
@@ -2215,6 +2215,7 @@ npindexbw.sibandwidth <-
            optim.maxit = 500,
            optim.method = c("auto", "Nelder-Mead", "BFGS", "CG"),
            optim.reltol = sqrt(.Machine$double.eps),
+           optim.threshold = 8L,
            random.seed = 42,
            scale.factor.init.lower = 0.1,
            scale.factor.init.upper = 2.0,
@@ -2222,7 +2223,6 @@ npindexbw.sibandwidth <-
            scale.factor.search.lower = NULL,
            .restore.first.start = TRUE,
            ...,
-           optim.threshold = 8L,
            .indextest.leaf = NULL,
            .fixed.h.lower = NULL){
   .np_reject_native_data(substitute(list(...))[-1L])
