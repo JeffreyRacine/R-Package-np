@@ -53,7 +53,7 @@ npindexbw(\dots)
           optim.abstol,
           optim.maxattempts,
           optim.maxit,
-          optim.method,
+          optim.method = c("auto", "Nelder-Mead", "BFGS", "CG"),
           optim.reltol,
           random.seed,
           regtype = c("lc", "ll", "lp"),
@@ -62,7 +62,8 @@ npindexbw(\dots)
           scale.factor.init = 0.5,
           scale.factor.search.lower = NULL,
           \dots,
-          nomad.opts = list())
+          nomad.opts = list(),
+          optim.threshold = 8L)
 
 \method{npindexbw}{sibandwidth}(xdat = stop("training data xdat missing"),
           ydat = stop("training data ydat missing"),
@@ -74,7 +75,7 @@ npindexbw(\dots)
           optim.abstol = .Machine$double.eps,
           optim.maxattempts = 10,
           optim.maxit = 500,
-          optim.method = c("Nelder-Mead", "BFGS", "CG"),
+          optim.method = c("auto", "Nelder-Mead", "BFGS", "CG"),
           optim.reltol = sqrt(.Machine$double.eps),
           random.seed = 42,
           scale.factor.init.lower = 0.1,
@@ -83,6 +84,7 @@ npindexbw(\dots)
           scale.factor.search.lower = NULL,
           .restore.first.start = TRUE,
           \dots,
+          optim.threshold = 8L,
           .indextest.leaf = NULL,
           .fixed.h.lower = NULL,
           .rng.collective = .npRmpi_rng_scope_collective())
@@ -488,40 +490,27 @@ These arguments control outer optimization behavior for the semiparametric searc
 
   \item{optim.maxit}{
     maximum number of iterations used by \code{\link{optim}}. Defaults
-     to \code{500}.
+    to \code{500}. For a wider index, \code{optim.maxit=5000} can be
+    useful when comparing an explicit Nelder--Mead search that reaches
+    the default iteration limit.
    }
 
-  \item{optim.method}{ method used by \code{\link{optim}} for minimization of
-    the objective function. See \code{?optim} for references. Defaults
-    to \code{"Nelder-Mead"}.
+  \item{optim.method}{
+    Optimizer for fixed-degree index searches and for local refinement steps
+    that call \code{\link{optim}}. The default, \code{"auto"}, uses
+    \code{"Nelder-Mead"} below \code{optim.threshold} index predictors and
+    \code{"BFGS"} at or above the threshold. An explicit \code{"Nelder-Mead"},
+    \code{"BFGS"} or \code{"CG"} selects that optimizer at every width.
+    The fitted bandwidth object's \code{pomethod} records the resolved
+    method for an \code{optim} search.
+  }
 
-    the default method is an implementation of that of Nelder and Mead
-    (1965), that uses only function values and is robust but relatively
-    slow.  It will work reasonably well for non-differentiable
-    functions.
-
-    method \code{"BFGS"} is a quasi-Newton method (also known as a
-    variable metric algorithm), specifically that published
-    simultaneously in 1970 by Broyden, Fletcher, Goldfarb and Shanno.
-    This uses function values and gradients to build up a picture of the
-    surface to be optimized.
-
-    method \code{"CG"} is a conjugate gradients method based
-    on that by Fletcher and Reeves (1964) (but with the option of
-    Polak-Ribiere or Beale-Sorenson updates).  Conjugate gradient
-    methods will generally be more fragile than the BFGS method, but as
-    they do not store a matrix they may be successful in much larger
-    optimization problems.
-
-    The default \code{"Nelder-Mead"} method is a reasonable, robust
-    derivative-free default when the search dimension is small, such as
-    one scalar bandwidth plus only a few index coefficients. As the
-    number of predictors grows, the \eqn{\beta} search becomes higher
-    dimensional and \code{optim.method="BFGS"} can be a useful
-    performance and sensitivity comparison. Because the single-index
-    objective can be nonconvex and route-sensitive, compare the selected
-    objective value, convergence behavior, and resulting bandwidth
-    object against the default search before relying on the result.
+  \item{optim.threshold}{
+    Positive integer giving the first index width at which \code{"auto"}
+    uses BFGS. Defaults to \code{8L}. Width counts the columns entering
+    the index after any factor expansion, including the first column whose
+    coefficient is normalized to one. This rule also applies when the
+    bandwidth is held fixed and only the coefficients are optimized.
   }
 
   \item{optim.reltol}{
@@ -721,15 +710,16 @@ or standard-deviation factors.
   is substituted when restoration fails.
 
   \subsection{Choosing \code{optim.method}}{
-    The default \code{"Nelder-Mead"} search is often a good starting
-    point for low-dimensional single-index problems because it uses only
-    objective values and is comparatively tolerant of rough objective
-    surfaces. When \eqn{p} is larger, especially when many coefficients
-    enter \eqn{\beta}, \code{"BFGS"} may reduce runtime for some
-    problems, but it is more dependent on local smoothness and on the
-    quality of numerical gradient information. For important fits, try
-    both methods with adequate multistarts and compare the final
-    objective values, convergence messages, and fitted objects.
+    Nelder--Mead uses objective values and is useful for small, potentially
+    rough searches. In paired two-start comparisons with 1,000 and 10,000
+    observations, BFGS typically required substantially fewer objective
+    evaluations in wider indices, with similar or lower attained CV loss.
+    The comparisons included Ichimura and Klein--Spady models with
+    local-constant, local-linear and local-quadratic links. Most replications
+    used the second-order Epanechnikov kernel. The single-index objective
+    can be nonconvex, and different methods can return different fits.
+    To compare optimizers on a particular sample, select them explicitly
+    and compare the attained \code{fval} and \code{num.feval}.
   }
 
   \code{npindexbw} may be invoked \emph{either} with a formula-like
@@ -745,9 +735,7 @@ or standard-deviation factors.
   exploratory purposes, you may wish to override the default search
   tolerances, say, setting \code{optim.reltol=.1} and conduct
   multistarting (the default is to restart min(2, ncol(xdat)) times) as is done
-  for a number of examples. See the optimizer guidance above when
-  choosing between the default \code{"Nelder-Mead"} method and
-  \code{optim.method="BFGS"} for higher-dimensional index searches.
+  for a number of examples. The optimizer guidance above describes the automatic width rule.
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{dependent data

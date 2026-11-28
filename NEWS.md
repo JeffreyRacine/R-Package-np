@@ -1,5 +1,11 @@
 # npRmpi 0.80-4
 
+* `npindexbw()` now defaults to `optim.method = "auto"`. Searches that
+  use `optim()` select Nelder-Mead below eight index columns and BFGS from
+  eight columns onward. Set `optim.threshold` to change the cutoff or
+  name the optimizer explicitly. This applies to both Ichimura and
+  Klein-Spady estimation.
+
 * Added `npscoeftest()` to test whether a smooth-coefficient regression is
   affine in its slope regressors at each value of its continuous modifiers.
   The default uses a wider, unstudentized kernel score. Set `method = "jlwy"`

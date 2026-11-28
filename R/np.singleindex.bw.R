@@ -2769,6 +2769,13 @@ npindexbw.NULL <-
   bws
 }
 
+.npindex_validate_optim_threshold <- function(value) {
+  if (!is.null(dim(value)) || is.object(value) ||
+      (is.numeric(value) && any(value > .Machine$integer.max, na.rm = TRUE)))
+    stop("'optim.threshold' must be a positive integer", call. = FALSE)
+  npValidatePositiveInteger(value, "optim.threshold")
+}
+
 npindexbw.default <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
@@ -2794,7 +2801,7 @@ npindexbw.default <-
            optim.abstol,
            optim.maxattempts,
            optim.maxit,
-           optim.method,
+           optim.method = c("auto", "Nelder-Mead", "BFGS", "CG"),
            optim.reltol,
            random.seed,
            regtype = c("lc", "ll", "lp"),
@@ -2803,10 +2810,13 @@ npindexbw.default <-
            scale.factor.init = 0.5,
            scale.factor.search.lower = NULL,
            ...,
-           nomad.opts = list()){
+           nomad.opts = list(),
+           optim.threshold = 8L){
   .np_reject_native_data(substitute(list(...))[-1L])
   .np_reject_native_frame_args(substitute(list(...))[-1L])
 
+    if (!missing(optim.threshold))
+      optim.threshold <- .npindex_validate_optim_threshold(optim.threshold)
     only.beta <- !missing(only.optimize.beta) &&
       npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npindexbw")
@@ -3074,7 +3084,7 @@ npindexbw.default <-
                        bandwidth.compute = bandwidth.compute)
     tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
-    margs <- c("nmulti", "nomad.remin", "powell.remin", "random.seed", "optim.method", "optim.maxattempts",
+    margs <- c("nmulti", "nomad.remin", "powell.remin", "random.seed", "optim.method", "optim.threshold", "optim.maxattempts",
                "nomad.opts",
                "optim.reltol", "optim.abstol", "optim.maxit", "only.optimize.beta",
                "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
@@ -3203,7 +3213,7 @@ npindexbw.sibandwidth <-
            optim.abstol = .Machine$double.eps,
            optim.maxattempts = 10,
            optim.maxit = 500,
-           optim.method = c("Nelder-Mead", "BFGS", "CG"),
+           optim.method = c("auto", "Nelder-Mead", "BFGS", "CG"),
            optim.reltol = sqrt(.Machine$double.eps),
            random.seed = 42,
            scale.factor.init.lower = 0.1,
@@ -3212,6 +3222,7 @@ npindexbw.sibandwidth <-
            scale.factor.search.lower = NULL,
            .restore.first.start = TRUE,
            ...,
+           optim.threshold = 8L,
            .indextest.leaf = NULL,
            .fixed.h.lower = NULL,
            .rng.collective = .npRmpi_rng_scope_collective()){
@@ -3291,6 +3302,7 @@ npindexbw.sibandwidth <-
     }
 
     optim.method <- match.arg(optim.method)
+    optim.threshold <- .npindex_validate_optim_threshold(optim.threshold)
 
     ## catch and destroy NA's
     keep.rows <- rep_len(TRUE, nrow(xdat))
@@ -3316,6 +3328,8 @@ npindexbw.sibandwidth <-
       xdat <- .np_index_design_apply(index.design, xdat)
     xdat = toMatrix(xdat)
     p <- ncol(xdat)
+    if (optim.method == "auto")
+      optim.method <- if (p >= optim.threshold) "BFGS" else "Nelder-Mead"
     beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
     nobs <- nrow(xdat)
     spec <- .npindex_resolve_spec(bws, where = "npindexbw")

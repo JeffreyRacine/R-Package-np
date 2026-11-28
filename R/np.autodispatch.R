@@ -2395,7 +2395,7 @@
      "proper", "proper.method", "proper.control",
      "alpha", "alpha.iter", "alpha.max", "alpha.min", "alpha.tol",
      "constant", "iterate.diff.tol", "iterate.max", "iterate.Tikhonov", "iterate.Tikhonov.num",
-     "optim.abstol", "optim.maxattempts", "optim.maxit", "optim.method", "optim.reltol",
+     "optim.abstol", "optim.maxattempts", "optim.maxit", "optim.method", "optim.threshold", "optim.reltol",
      "p", "penalize.iteration", "return.weights.phi", "return.weights.phi.deriv.1",
      "return.weights.phi.deriv.2", "smooth.residuals", "start.from", "starting.values",
      "stop.on.increase", "iterate.break", "n.quasi.inv", "er.quasi.inv",
