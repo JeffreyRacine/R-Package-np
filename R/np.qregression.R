@@ -438,11 +438,24 @@ npqreg <-
   exdat <- as.data.frame(exdat)
   if (!nrow(exdat))
     return(character(0L))
+  if (!ncol(exdat))
+    return(rep.int("", nrow(exdat)))
+  # Format ordinary predictor columns once, using the same lossless atom encoding.
+  ordinary <- vapply(exdat, function(x) is.null(dim(x)) &&
+    ((!is.object(x) && typeof(x) %in% c("double", "integer", "logical", "character")) ||
+       identical(class(x), "factor") ||
+       identical(class(x), c("ordered", "factor")) || identical(class(x), "Date") ||
+       identical(class(x), c("POSIXct", "POSIXt"))), logical(1L))
+  if (all(ordinary)) {
+    parts <- unname(lapply(exdat, .npqreg_selected_cdf_cache_atom))
+    return(do.call(paste, c(parts, list(sep = "\r"))))
+  }
   vapply(seq_len(nrow(exdat)), function(i) .npqreg_selected_cdf_cache_row_key(exdat, i), character(1L))
 }
 
 .npqreg_selected_cdf_cache_key <- function(row.key, ycand) {
-  paste(c(row.key, paste0("y:", sprintf("%a", as.double(ycand)))), collapse = "\r")
+  if (!length(row.key)) return(character(0L))
+  paste0(row.key, "\ry:", sprintf("%a", as.double(ycand)))
 }
 
 .npqreg_selected_cdf_cache_new <- function(enabled) {
@@ -573,70 +586,48 @@ npqreg <-
   if (is.null(row.keys) || length(row.keys) != n.eval)
     row.keys <- .npqreg_selected_cdf_cache_row_keys(exdat)
 
-  out <- rep.int(NA_real_, n.eval)
-  keys <- character(n.eval)
-  miss.first <- integer(0L)
-  miss.keys <- character(0L)
-  miss.map <- new.env(parent = emptyenv(), hash = TRUE)
+  keys <- .npqreg_selected_cdf_cache_key(row.keys, ycand)
+  first <- which(!duplicated(keys))
+  unique.keys <- keys[first]
+  index <- match(keys, unique.keys)
+  cached <- mget(unique.keys, cdf.cache$store, ifnotfound = list(NULL), inherits = FALSE)
+  missing <- lengths(cached) == 0L
+  missed <- sum(missing[index])
+  cdf.cache$visits <- cdf.cache$visits + n.eval
+  cdf.cache$misses <- cdf.cache$misses + missed
+  cdf.cache$hits <- cdf.cache$hits + (n.eval - missed)
 
-  for (i in seq_len(n.eval)) {
-    key <- .npqreg_selected_cdf_cache_key(row.keys[[i]], ycand[[i]])
-    keys[[i]] <- key
-    cdf.cache$visits <- cdf.cache$visits + 1L
-    if (exists(key, envir = cdf.cache$store, inherits = FALSE)) {
-      cdf.cache$hits <- cdf.cache$hits + 1L
-      out[[i]] <- get(key, envir = cdf.cache$store, inherits = FALSE)
-    } else {
-      cdf.cache$misses <- cdf.cache$misses + 1L
-      if (!exists(key, envir = miss.map, inherits = FALSE)) {
-        assign(key, length(miss.first) + 1L, envir = miss.map)
-        miss.first <- c(miss.first, i)
-        miss.keys <- c(miss.keys, key)
-      }
-    }
-  }
-
-  if (length(miss.first)) {
-    values <- cdf.values(
-      bws = bws,
-      xdat = xdat,
-      ydat = ydat,
-      exdat = exdat[miss.first, , drop = FALSE],
-      ycand = ycand[miss.first]
-    )
-    for (j in seq_along(miss.first)) {
-      assign(miss.keys[[j]], values[[j]], envir = cdf.cache$store)
-      cdf.cache$unique <- cdf.cache$unique + 1L
-    }
-    flags <- .npqreg_empty_rows(values, length(miss.first))
-    base.flags <- .npqreg_empty_rows(values, length(miss.first), base = TRUE)
+  if (any(missing)) {
+    rows <- first[missing]
+    values <- cdf.values(bws = bws, xdat = xdat, ydat = ydat,
+                         exdat = exdat[rows, , drop = FALSE], ycand = ycand[rows])
+    added <- as.list(as.double(values))
+    names(added) <- unique.keys[missing]
+    list2env(added, cdf.cache$store)
+    cached[missing] <- added
+    cdf.cache$unique <- cdf.cache$unique + length(rows)
+    flags <- .npqreg_empty_rows(values, length(rows))
+    base.flags <- .npqreg_empty_rows(values, length(rows), base = TRUE)
     if (!is.null(flags) || !is.null(base.flags)) {
       if (!is.environment(cdf.cache$empty.store))
         cdf.cache$empty.store <- new.env(parent = emptyenv(), hash = TRUE)
-      for (j in seq_along(miss.first))
-        assign(miss.keys[[j]], c(
+      for (j in seq_along(rows))
+        assign(names(added)[j], c(
           if (is.null(flags)) 0L else flags[[j]],
           if (is.null(base.flags)) 0L else base.flags[[j]]
         ), envir = cdf.cache$empty.store)
     }
   }
-
-  missing.out <- which(!is.finite(out) & is.na(out))
-  if (length(missing.out)) {
-    for (i in missing.out)
-      out[[i]] <- get(keys[[i]], envir = cdf.cache$store, inherits = FALSE)
-  }
+  out <- as.double(unlist(cached, use.names = FALSE))[index]
   if (is.environment(cdf.cache$empty.store)) {
-    flags <- base.flags <- integer(n.eval)
-    for (i in seq_len(n.eval)) {
-      if (exists(keys[[i]], envir = cdf.cache$empty.store, inherits = FALSE)) {
-        row.flags <- get(keys[[i]], envir = cdf.cache$empty.store, inherits = FALSE)
-        flags[[i]] <- row.flags[[1L]]
-        base.flags[[i]] <- row.flags[[2L]]
-      }
+    masks <- mget(unique.keys, cdf.cache$empty.store, ifnotfound = list(NULL), inherits = FALSE)
+    flags <- base.flags <- integer(length(masks))
+    for (j in which(lengths(masks) > 0L)) {
+      flags[j] <- masks[[j]][[1L]]
+      base.flags[j] <- masks[[j]][[2L]]
     }
-    if (any(flags == 1L)) attr(out, ".np.empty.rows") <- flags
-    if (any(base.flags == 1L)) attr(out, ".np.empty.base.rows") <- base.flags
+    if (any(flags == 1L)) attr(out, ".np.empty.rows") <- flags[index]
+    if (any(base.flags == 1L)) attr(out, ".np.empty.base.rows") <- base.flags[index]
   }
   out
 }
