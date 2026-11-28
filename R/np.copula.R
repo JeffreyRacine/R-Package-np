@@ -1630,7 +1630,7 @@ npcopula.default <- function(bws,
         x.eval <- sort(c(seq(x.er[1],x.er[2],length=round(n.quasi.inv/2)),x.q))
       } else {
         x.u[,j] <- .np_factor_with_levels(x.u[,j],levels=levels(x.marginal),ordered=TRUE)
-        x.q <- sapply(seq_len(round(n.quasi.inv/2)), function(i) { uocquantile(x.marginal, quantile.seq[i]) })
+        x.q <- uocquantile(x.marginal, quantile.seq)
         x.eval <- sort(.np_factor_with_levels(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal),ordered=TRUE))
       }
       tdat <- .npcopula_marginal_data(bws, data, j)
