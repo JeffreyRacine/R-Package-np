@@ -136,3 +136,51 @@ test_that("npudisthat preserves bounded gaussian manual-bandwidth semantics", {
   expect_equal(as.vector(H %*% iota), as.vector(fit$dist), tolerance = 1e-7)
   expect_equal(as.vector(apply.out), as.vector(fit$dist), tolerance = 1e-7)
 })
+
+test_that("multi-response hats reuse kernel weights and the first normalization", {
+  x <- data.frame(x = seq(0, 1, length.out = 48L))
+  y <- cbind(score = x$x, score = cos(3 * x$x))
+  kernel.calls <- 0L
+  operations <- character()
+  kernel.weights <- .np_kernel_weights_direct
+  exact.apply <- .np_exact_operator_apply
+  testthat::local_mocked_bindings(
+    .np_kernel_weights_direct = function(...) {
+      kernel.calls <<- kernel.calls + 1L
+      kernel.weights(...)
+    },
+    .np_exact_operator_apply = function(..., where) {
+      operations <<- c(operations, where)
+      exact.apply(..., where = where)
+    }
+  )
+
+  for (type in c("fixed", "generalized_nn", "adaptive_nn")) {
+    bw <- npudistbw(dat = x, bwtype = type,
+                    bws = if (type == "fixed") 0.2 else 7,
+                    bandwidth.compute = FALSE)
+    apply.hat <- function(response)
+      npudisthat(bws = bw, tdat = x, y = response, output = "apply")
+    reference <- cbind(apply.hat(y[, 1L]), apply.hat(y[, 2L]))
+    kernel.calls <- 0L
+    operations <- character()
+    result <- apply.hat(y)
+    expect_identical(unname(result), unname(reference))
+    if (type == "fixed") {
+      expect_identical(colnames(result), colnames(y))
+      expect_identical(kernel.calls, 1L)
+    } else {
+      expect_identical(operations, paste("npudisthat exact operator",
+                                        c("apply", "probe", "apply")))
+    }
+  }
+  bw <- npudensbw(dat = x, bws = 0.2, bandwidth.compute = FALSE)
+  apply.density <- function(response)
+    npudenshat(bws = bw, tdat = x, y = response, output = "apply")
+  reference <- cbind(apply.density(y[, 1L]), apply.density(y[, 2L]))
+  kernel.calls <- 0L
+  result <- apply.density(y)
+  expect_identical(unname(result), unname(reference))
+  expect_identical(colnames(result), colnames(y))
+  expect_identical(kernel.calls, 1L)
+})

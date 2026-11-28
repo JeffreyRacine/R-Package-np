@@ -38,3 +38,34 @@ test_that("invalid index optimizer thresholds have an informative error", {
                            bandwidth.compute = FALSE, optim.threshold = value),
                  "optim.threshold.*positive integer")
 })
+
+test_that("optimizer controls occupy their documented positions", {
+  for (method in list(npindexbw.default, npindexbw.sibandwidth)) {
+    arguments <- names(formals(method))
+    start <- match("optim.abstol", arguments)
+    expect_identical(arguments[start + 0:6],
+                     c("optim.abstol", "optim.maxattempts", "optim.maxit",
+                       "optim.method", "optim.reltol", "optim.threshold", "random.seed"))
+    expect_identical(formals(method)$optim.threshold, 8L)
+  }
+})
+
+test_that("wide automatic index fits retain BFGS in bootstrap refits", {
+  set.seed(2104)
+  x <- as.data.frame(matrix(rnorm(165L * 8L), 165L))
+  y <- sin(x[[1L]]) + 0.3 * x[[2L]] + rnorm(nrow(x), sd = 0.5)
+  bw <- npindexbw(xdat = x, ydat = y, ckertype = "gaussian", nmulti = 1L)
+  data <- .indextest_setup(bw, "published")
+  expect_identical(data$recipe$optim.method, "BFGS")
+  expect_false(data$grid)
+  data$pilot <- .indextest_pilot(data, .indextest_index(data, data$beta, data$bw))
+  methods <- character()
+  optimizer <- optim
+  testthat::local_mocked_bindings(optim = function(par, fn, ..., method) {
+    methods <<- c(methods, method)
+    optimizer(par, fn, ..., method = method)
+  })
+  statistic <- .indextest_refit(.indextest_response(data), data, 1L)
+  expect_true(is.finite(statistic))
+  expect_identical(unique(methods), "BFGS")
+})
