@@ -61,6 +61,13 @@ npudenshat <- function(bws,
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
 
+    if (ncol(y) > 1L && identical(bws$type, "fixed")) {
+      return(.np_direct_operator_apply(
+        kbw = bws, txdat = tdat, exdat = if (no.e) tdat else edat,
+        operator = "normal", rhs = y, where = "npudenshat direct operator apply",
+        train.is.eval = no.e, separate.columns = TRUE) / n.train)
+    }
+
     rhs <- if (ncol(y) == 1L) {
       y
     } else {
