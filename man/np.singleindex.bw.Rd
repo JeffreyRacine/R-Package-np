@@ -55,6 +55,7 @@ npindexbw(\dots)
           optim.maxit,
           optim.method = c("auto", "Nelder-Mead", "BFGS", "CG"),
           optim.reltol,
+          optim.threshold = 8L,
           random.seed,
           regtype = c("lc", "ll", "lp"),
           scale.factor.init.lower = 0.1,
@@ -62,8 +63,7 @@ npindexbw(\dots)
           scale.factor.init = 0.5,
           scale.factor.search.lower = NULL,
           \dots,
-          nomad.opts = list(),
-          optim.threshold = 8L)
+          nomad.opts = list())
 
 \method{npindexbw}{sibandwidth}(xdat = stop("training data xdat missing"),
           ydat = stop("training data ydat missing"),
@@ -77,6 +77,7 @@ npindexbw(\dots)
           optim.maxit = 500,
           optim.method = c("auto", "Nelder-Mead", "BFGS", "CG"),
           optim.reltol = sqrt(.Machine$double.eps),
+          optim.threshold = 8L,
           random.seed = 42,
           scale.factor.init.lower = 0.1,
           scale.factor.init.upper = 2.0,
@@ -84,7 +85,6 @@ npindexbw(\dots)
           scale.factor.search.lower = NULL,
           .restore.first.start = TRUE,
           \dots,
-          optim.threshold = 8L,
           .indextest.leaf = NULL,
           .fixed.h.lower = NULL,
           .rng.collective = .npRmpi_rng_scope_collective())
@@ -505,19 +505,19 @@ These arguments control outer optimization behavior for the semiparametric searc
     method for an \code{optim} search.
   }
 
+  \item{optim.reltol}{
+    relative convergence tolerance used by \code{\link{optim}}.  The algorithm
+    stops if it is unable to reduce the value by a factor of 'reltol *
+    (abs(val) + reltol)' at a step.  Defaults to
+    \code{sqrt(.Machine$double.eps)}, typically about \code{1e-8}.
+  }
+
   \item{optim.threshold}{
     Positive integer giving the first index width at which \code{"auto"}
     uses BFGS. Defaults to \code{8L}. Width counts the columns entering
     the index after any factor expansion, including the first column whose
     coefficient is normalized to one. This rule also applies when the
     bandwidth is held fixed and only the coefficients are optimized.
-  }
-
-  \item{optim.reltol}{
-    relative convergence tolerance used by \code{\link{optim}}.  The algorithm
-    stops if it is unable to reduce the value by a factor of 'reltol *
-    (abs(val) + reltol)' at a step.  Defaults to
-    \code{sqrt(.Machine$double.eps)}, typically about \code{1e-8}.
   }
 
   \item{random.seed}{

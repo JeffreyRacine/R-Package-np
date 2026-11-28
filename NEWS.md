@@ -4,7 +4,9 @@
   use `optim()` select Nelder-Mead below eight index columns and BFGS from
   eight columns onward. Set `optim.threshold` to change the cutoff or
   name the optimizer explicitly. This applies to both Ichimura and
-  Klein-Spady estimation.
+  Klein-Spady estimation. In the default and bandwidth-object methods,
+  `optim.threshold` follows `optim.reltol`. Calls that previously supplied
+  `random.seed` or later arguments by position should name those arguments.
 
 * Added `npscoeftest()` to test whether a smooth-coefficient regression is
   affine in its slope regressors at each value of its continuous modifiers.
