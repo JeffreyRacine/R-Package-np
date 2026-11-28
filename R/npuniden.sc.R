@@ -263,8 +263,9 @@ npuniden.sc <- function(X=NULL,
         index <- seq_along(Y)
     }
 
-    se.f <- sqrt(abs(f*int.kernel.squared(X.grid,h,a,b)/(h*n.train)))[index]
-    se.f.sc <- sqrt(abs(f.sc*int.kernel.squared(X.grid,h,a,b)/(h*n.train)))[index]
+    kappa <- int.kernel.squared(X.grid,h,a,b)
+    se.f <- sqrt(abs(f*kappa/(h*n.train)))[index]
+    se.f.sc <- sqrt(abs(f.sc*kappa/(h*n.train)))[index]
 
     evaluation <- X.grid[index]
     log.shape <- constraint %in% c("log-concave","log-convex")
