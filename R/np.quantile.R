@@ -40,11 +40,18 @@ npquantile <- function(x=NULL,
   ## undefined).
 
   x.tau <- numeric(length(tau))
-  
-  for (i in seq_along(tau)) {
-    tau[tau<min(F)] <- min(F)
-    tau[tau>max(F)] <- max(F)        
-    x.tau[i] <-  min(x.eval[F>=tau[i]])
+  if (length(tau)) {
+    tau[tau < min(F)] <- min(F)
+    tau[tau > max(F)] <- max(F)
+    if (all(is.finite(F))) {
+      # x.eval is sorted; the running maximum gives the first crossing
+      # even when a higher-order CDF estimate decreases locally.
+      first <- 1L + findInterval(tau, cummax(F), left.open = TRUE)
+      x.tau[] <- x.eval[first]
+    } else {
+      for (i in seq_along(tau))
+        x.tau[i] <- min(x.eval[F >= tau[i]])
+    }
   }
 
   ## Asymptotic standard errors could be passed as an attribute
